@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestAddApproveTransferRemove::test_remove_liquidity
 
 Node is bootstrapped.
-Estimated gas: 8136.916 units (will add 100 for safety)
+Estimated gas: 8138.576 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.001176
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 8237
+    Gas limit: 8239
     Storage limit: 87 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.001176
@@ -33,7 +33,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
-      Consumed gas: 2311.491
+      Consumed gas: 2313.151
     Internal operations:
       Transaction:
         Amount: ꜩ0

@@ -5423,7 +5423,11 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
       | None -> fail (Invalid_contract (loc, contract))
       | Some code ->
           Lwt.return
-            ( Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
+            ( Script.force_decode_in_context
+                ~consume_deserialization_gas:When_needed
+                ctxt
+                code
+            >>? fun (code, ctxt) ->
               (* can only fail because of gas *)
               parse_toplevel ctxt ~legacy:true code
               >>? fun ({arg_type; root_name; _}, ctxt) ->
@@ -5615,7 +5619,11 @@ let parse_contract_for_script :
       | None -> return (ctxt, None)
       | Some code ->
           Lwt.return
-            ( Script.force_decode_in_context ctxt code >>? fun (code, ctxt) ->
+            ( Script.force_decode_in_context
+                ~consume_deserialization_gas:When_needed
+                ctxt
+                code
+            >>? fun (code, ctxt) ->
               (* can only fail because of gas *)
               match parse_toplevel ctxt ~legacy:true code with
               | Error _ -> error (Invalid_contract (loc, contract))
@@ -5651,7 +5659,11 @@ let parse_code :
     code:lazy_expr ->
     (ex_code * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~code ->
-  Script.force_decode_in_context ctxt code >>?= fun (code, ctxt) ->
+  Script.force_decode_in_context
+    ~consume_deserialization_gas:When_needed
+    ctxt
+    code
+  >>?= fun (code, ctxt) ->
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
   >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
@@ -5732,7 +5744,11 @@ let parse_storage :
     storage:lazy_expr ->
     ('storage * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged storage_type ~storage ->
-  Script.force_decode_in_context ctxt storage >>?= fun (storage, ctxt) ->
+  Script.force_decode_in_context
+    ~consume_deserialization_gas:When_needed
+    ctxt
+    storage
+  >>?= fun (storage, ctxt) ->
   trace_eval
     (fun () ->
       let storage_type = serialize_ty_for_error storage_type in

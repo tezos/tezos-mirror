@@ -79,10 +79,24 @@ val serialized_cost : bytes -> Gas_limit_repr.cost
 
 val bytes_node_cost : bytes -> Gas_limit_repr.cost
 
+(** Returns (a lower bound on) the cost to deserialize a
+    {!lazy_expr}. If the expression has already been deserialized
+    (i.e. the lazy expression contains the deserialized value or both
+    the bytes representation and the deserialized value) then the cost
+    is {b free}. *)
 val force_decode_cost : lazy_expr -> Gas_limit_repr.cost
+
+(** Like {!force_decode_cost}, excepted that the returned cost does
+    not depend on the internal state of the lazy_expr. This means that
+    the cost is never free (excepted for zero bytes expressions). *)
+val stable_force_decode_cost : lazy_expr -> Gas_limit_repr.cost
 
 val force_decode : lazy_expr -> expr tzresult
 
+(** Returns the cost to serialize a {!lazy_expr}. If the expression
+    has already been deserialized (i.e. le lazy expression contains the
+    bytes representation or both the bytes representation and the
+    deserialized value) then the cost is {b free}. *)
 val force_bytes_cost : lazy_expr -> Gas_limit_repr.cost
 
 val force_bytes : lazy_expr -> bytes tzresult

@@ -361,6 +361,14 @@ module Gas : sig
      [Unaccounted], an arbitrary value will be returned. *)
   val remaining_operation_gas : context -> Arith.fp
 
+  (** [reset_block_gas ctxt] returns a context where the remaining gas
+     in the block is reset to the constant [hard_gas_limit_per_block],
+     i.e., as if no operations have been included in the block.
+
+     /!\ Do not call this function unless you want to validate
+     operations on their own (like in the mempool). *)
+  val reset_block_gas : context -> context
+
   (** [level ctxt] is the current gas level in [ctxt] for the current
      operation. *)
   val level : context -> t
@@ -673,8 +681,21 @@ module Script : sig
 
   val bytes_node_cost : bytes -> Gas.cost
 
+  (** Mode of deserialization gas consumption in {!force_decode}:
+
+      - {!Always}: the gas is taken independently of the internal state of the
+        [lazy_expr]
+      - {!When_needed}: the gas is consumed only if the [lazy_expr] has never
+        been deserialized before. *)
+  type consume_deserialization_gas = Always | When_needed
+
+  (** Decode an expression in the context after consuming the deserialization
+      gas cost (see {!consume_deserialization_gas}). *)
   val force_decode_in_context :
-    context -> lazy_expr -> (expr * context) tzresult
+    consume_deserialization_gas:consume_deserialization_gas ->
+    context ->
+    lazy_expr ->
+    (expr * context) tzresult
 
   val force_bytes_in_context :
     context -> lazy_expr -> (bytes * context) tzresult

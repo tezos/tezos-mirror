@@ -105,9 +105,15 @@ module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 
-  let force_decode_in_context ctxt lexpr =
-    Raw_context.consume_gas ctxt (Script_repr.force_decode_cost lexpr)
-    >>? fun ctxt ->
+  type consume_deserialization_gas = Always | When_needed
+
+  let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
+    let gas_cost =
+      match consume_deserialization_gas with
+      | Always -> Script_repr.stable_force_decode_cost lexpr
+      | When_needed -> Script_repr.force_decode_cost lexpr
+    in
+    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
     Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
@@ -175,6 +181,10 @@ module Gas = struct
 
   let update_remaining_operation_gas =
     Raw_context.update_remaining_operation_gas
+
+  let reset_block_gas ctxt =
+    let gas = Constants.hard_gas_limit_per_block ctxt in
+    Raw_context.update_remaining_block_gas ctxt gas
 
   let level = Raw_context.gas_level
 

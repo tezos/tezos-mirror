@@ -214,7 +214,7 @@ val apply_manager_contents_list :
   Script_ir_translator.unparsing_mode ->
   payload_producer:public_key_hash ->
   Chain_id.t ->
-  ('a Kind.manager, Receipt.balance_updates) prechecked_contents_list ->
+  'a Kind.manager prechecked_contents_list ->
   (t * 'a Kind.manager contents_result_list) Lwt.t
 
 val apply_contents_list :
@@ -232,19 +232,16 @@ val apply_contents_list :
    containing balance updates for fees related to each manager
    operation in [contents_list]
 
-    If [check_limit_in_block], the function checks whether adding the
-   gas consumed by this operation into would reach the [gas_limit] of
-   a block. This check is necessary in [Application] and
-   [Full_construction] mode. It is optional in [Partial_construction]
-   mode and is currently deactivated for this mode. *)
+   If [mempool_mode], the function checks whether the total gas limit
+   of this batch of operation is below the [gas_limit] of a block and
+   fails with a permanent error when above. Otherwise, the gas limit
+   of the batch is removed from the one of the block (when possible)
+   before moving on. *)
 val precheck_manager_contents_list :
   t ->
   'kind Kind.manager contents_list ->
-  check_limit_in_block:bool ->
-  (context
-  * ('kind Kind.manager, Receipt.balance_updates) prechecked_contents_list)
-  tzresult
-  Lwt.t
+  mempool_mode:bool ->
+  (context * 'kind Kind.manager prechecked_contents_list) tzresult Lwt.t
 
 (** [value_of_key ctxt k] builds a value identified by key [k]
     so that it can be put into the cache. *)

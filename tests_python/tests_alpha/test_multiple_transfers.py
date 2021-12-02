@@ -119,8 +119,8 @@ class TestMultipleTransfers:
         new_balance_bootstrap3 = client.get_mutez_balance('bootstrap3')
 
         if payer == source:
-            fee_first_transfer = 403
-            fee_second_transfer = 307
+            fee_first_transfer = 404
+            fee_second_transfer = 308
             source_fee_mutez = fee_first_transfer + fee_second_transfer
         else:
             source_fee_mutez = 0

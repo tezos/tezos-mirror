@@ -1583,98 +1583,6 @@ module RPC = struct
     let run_operation_service ctxt ()
         ({shell; protocol_data = Operation_data protocol_data}, chain_id) =
       (* this code is a duplicate of Apply without signature check *)
-      let partial_precheck_manager_contents (type kind) ctxt
-          (op : kind Kind.manager contents) :
-          (context * Receipt.balance_updates) tzresult Lwt.t =
-        let (Manager_operation
-              {source; fee; counter; operation; gas_limit; storage_limit}) =
-          op
-        in
-        Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
-        let ctxt = Gas.set_limit ctxt gas_limit in
-        Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
-        Contract.must_be_allocated ctxt (Contract.implicit_contract source)
-        >>=? fun () ->
-        Contract.check_counter_increment ctxt source counter >>=? fun () ->
-        (match operation with
-        | Reveal pk -> Contract.reveal_manager_key ctxt source pk
-        | Transaction {parameters; _} ->
-            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-            let arg_bytes =
-              Data_encoding.Binary.to_bytes_exn
-                Script.lazy_expr_encoding
-                parameters
-            in
-            let arg =
-              match
-                Data_encoding.Binary.of_bytes_opt
-                  Script.lazy_expr_encoding
-                  arg_bytes
-              with
-              | Some arg -> arg
-              | None -> assert false
-            in
-            Lwt.return
-            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-            @@ (* Fail if not enough gas for complete deserialization cost *)
-            ( Script.force_decode_in_context ctxt arg >|? fun (_arg, ctxt) ->
-              ctxt )
-        | Origination {script; _} ->
-            (* Here the data comes already deserialized, so we need to fake the deserialization to mimic apply *)
-            let script_bytes =
-              Data_encoding.Binary.to_bytes_exn Script.encoding script
-            in
-            let script =
-              match
-                Data_encoding.Binary.of_bytes_opt Script.encoding script_bytes
-              with
-              | Some script -> script
-              | None -> assert false
-            in
-            Lwt.return
-            @@ record_trace Apply.Gas_quota_exceeded_init_deserialize
-            @@ (* Fail if not enough gas for complete deserialization cost *)
-            ( Script.force_decode_in_context ctxt script.code
-            >>? fun (_code, ctxt) ->
-              Script.force_decode_in_context ctxt script.storage
-              >|? fun (_storage, ctxt) -> ctxt )
-        | _ -> return ctxt)
-        >>=? fun ctxt ->
-        Contract.get_manager_key ctxt source >>=? fun _public_key ->
-        (* signature check unplugged from here *)
-        Contract.increment_counter ctxt source >>=? fun ctxt ->
-        let source_contract = Contract.implicit_contract source in
-        Token.transfer ctxt (`Contract source_contract) `Block_fees fee
-      in
-      let open Apply_results in
-      let rec partial_precheck_manager_contents_list :
-          type kind.
-          Alpha_context.t ->
-          kind Kind.manager contents_list ->
-          payload_producer:Signature.Public_key_hash.t ->
-          (context
-          * ( kind Kind.manager,
-              Receipt.balance_updates )
-            prechecked_contents_list)
-          tzresult
-          Lwt.t =
-       fun ctxt contents_list ~payload_producer ->
-        match contents_list with
-        | Single contents ->
-            partial_precheck_manager_contents ctxt contents
-            >>=? fun (ctxt, balance_updates) ->
-            return (ctxt, PrecheckedSingle {contents; result = balance_updates})
-        | Cons (contents, rest) ->
-            partial_precheck_manager_contents ctxt contents
-            >>=? fun (ctxt, balance_updates) ->
-            partial_precheck_manager_contents_list ctxt rest ~payload_producer
-            >>=? fun (ctxt, prechecked_contents_list) ->
-            return
-              ( ctxt,
-                PrecheckedCons
-                  ( {contents; result = balance_updates},
-                    prechecked_contents_list ) )
-      in
       let ret contents =
         ( Operation_data protocol_data,
           Apply_results.Operation_metadata {contents} )
@@ -1685,8 +1593,9 @@ module RPC = struct
       let payload_producer = Signature.Public_key_hash.zero in
       match protocol_data.contents with
       | Single (Manager_operation _) as op ->
-          partial_precheck_manager_contents_list ctxt op ~payload_producer
+          Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
           >>=? fun (ctxt, prechecked_contents_list) ->
+          (* removed signature check here *)
           Apply.apply_manager_contents_list
             ctxt
             Optimized
@@ -1695,8 +1604,9 @@ module RPC = struct
             prechecked_contents_list
           >|= fun (_ctxt, result) -> ok @@ ret result
       | Cons (Manager_operation _, _) as op ->
-          partial_precheck_manager_contents_list ctxt op ~payload_producer
+          Apply.precheck_manager_contents_list ctxt op ~mempool_mode:true
           >>=? fun (ctxt, prechecked_contents_list) ->
+          (* removed signature check here *)
           Apply.apply_manager_contents_list
             ctxt
             Optimized
@@ -2334,7 +2244,10 @@ module RPC = struct
               >>=? fun (Ex_script script, ctxt) ->
               unparse_script ctxt unparsing_mode script
               >>=? fun (script, ctxt) ->
-              Script.force_decode_in_context ctxt script.storage
+              Script.force_decode_in_context
+                ~consume_deserialization_gas:When_needed
+                ctxt
+                script.storage
               >>?= fun (storage, _ctxt) -> return_some storage) ;
       (* Patched RPC: get_script *)
       Registration.register1
