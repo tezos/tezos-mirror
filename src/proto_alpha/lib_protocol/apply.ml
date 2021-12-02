@@ -1560,7 +1560,7 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
       kind Kind.manager contents_list ->
       (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
    fun ctxt contents_list ->
-    match[@coq_match_with_default] contents_list with
+    match contents_list with
     | Single contents ->
         precheck_manager_contents ctxt contents ~only_batch:mempool_mode
         >>=? fun (ctxt, result) ->
