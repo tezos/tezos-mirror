@@ -115,6 +115,16 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
                let* () = Lwt_utils_unix.Json.write_file filename_tmp json in
                let*! () = Lwt_unix.rename filename_tmp filename in
                return_unit)
+
+    method last_modification_time : string -> float option tzresult Lwt.t =
+      let open Lwt_tzresult_syntax in
+      fun alias_name ->
+        let filename = self#filename alias_name in
+        let*! exists = Lwt_unix.file_exists filename in
+        if exists then
+          let* stat = Error_monad.catch_s (fun () -> Lwt_unix.stat filename) in
+          return_some stat.st_mtime
+        else return_none
   end
 
 class unix_prompter : Client_context.prompter =
