@@ -119,7 +119,7 @@ val of_option : error:'e -> 'a option -> ('a, 'e) result
 
 val to_list : ('a, 'e) result -> 'a list
 
-val to_seq : ('a, 'e) result -> 'a Stdlib.Seq.t
+val to_seq : ('a, 'e) result -> 'a Seq.t
 
 (** [catch f] is [try Ok (f ()) with e -> Error e]: it is [Ok x] if [f ()]
     evaluates to [x], and it is [Error e] if [f ()] raises [e].

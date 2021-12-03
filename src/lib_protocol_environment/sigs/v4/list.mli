@@ -83,7 +83,7 @@
 
 (** {3 Trivial values} *)
 
-type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
+type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
 (** in-monad, preallocated nil *)
 
@@ -867,7 +867,7 @@ val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 
 (** {3 conversion} *)
 
-val to_seq : 'a t -> 'a Seq.t
+val to_seq : 'a list -> 'a Seq.t
 
 val of_seq : 'a Seq.t -> 'a list
 
