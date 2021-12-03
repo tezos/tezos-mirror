@@ -206,6 +206,7 @@ end
 type back = {
   context : Context.t;
   constants : Constants_repr.parametric;
+  round_durations : Round_repr.Durations.t;
   cycle_eras : Level_repr.cycle_eras;
   level : Level_repr.t;
   predecessor_timestamp : Time.t;
@@ -254,6 +255,8 @@ let[@inline] current_level ctxt = ctxt.back.level
 let[@inline] predecessor_timestamp ctxt = ctxt.back.predecessor_timestamp
 
 let[@inline] current_timestamp ctxt = ctxt.back.timestamp
+
+let[@inline] round_durations ctxt = ctxt.back.round_durations
 
 let[@inline] cycle_eras ctxt = ctxt.back.cycle_eras
 
@@ -727,6 +730,10 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
   Raw_level_repr.of_int32 level >>?= fun level ->
   check_inited ctxt >>=? fun () ->
   get_constants ctxt >>=? fun constants ->
+  Round_repr.Durations.create
+    ~first_round_duration:constants.minimal_block_delay
+    ~delay_increment_per_round:constants.delay_increment_per_round
+  >>?= fun round_durations ->
   get_cycle_eras ctxt >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
   let level = Level_repr.from_raw ~cycle_eras level in
@@ -739,6 +746,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
         level;
         predecessor_timestamp;
         timestamp;
+        round_durations;
         cycle_eras;
         fees = Tez_repr.zero;
         origination_nonce = None;
@@ -822,22 +830,27 @@ let prepare_first_block ~level ~timestamp ctxt =
       add_constants ctxt param.constants >|= ok
   | Hangzhou_011 ->
       get_previous_protocol_constants ctxt >>= fun c ->
-      let block_time = c.minimal_block_delay in
-      (if Compare.Int64.(Period_repr.to_seconds block_time = 30L) then
+      let minimal_block_delay = c.minimal_block_delay in
+      let minimal_block_delay_s = Period_repr.to_seconds minimal_block_delay in
+      (if Compare.Int64.(minimal_block_delay_s = 30L) then
        (* that's the mainnet value of the constant; so we're
           probably on the mainnet: do no inherit this constant's
           value (as done in the else case below) *)
-       Period_repr.of_seconds 45L
+       Period_repr.of_seconds 15L
       else
         match c.time_between_blocks with
-        | first_time_between_blocks :: _ -> ok first_time_between_blocks
-        | [] -> Period_repr.mult 2l block_time)
-      >>?= fun second_round_duration ->
-      Round_repr.Durations.create
-        ~round0:block_time
-        ~round1:second_round_duration
-        ()
-      >>?= fun round_durations ->
+        | first_time_between_blocks :: _ ->
+            let delay_increment_per_round_s =
+              let m =
+                Int64.sub
+                  (Period_repr.to_seconds first_time_between_blocks)
+                  minimal_block_delay_s
+              in
+              if Compare.Int64.(m < 1L) then 1L else m
+            in
+            Period_repr.of_seconds delay_increment_per_round_s
+        | [] -> ok minimal_block_delay)
+      >>?= fun delay_increment_per_round ->
       let constants =
         let consensus_committee_size = 7000 in
         let Constants_repr.Generated.
@@ -850,10 +863,7 @@ let prepare_first_block ~level ~timestamp ctxt =
           Constants_repr.Generated.generate
             ~consensus_committee_size
             ~blocks_per_minute:
-              {
-                numerator = 60;
-                denominator = Int64.to_int (Period_repr.to_seconds block_time);
-              }
+              {numerator = 60; denominator = Int64.to_int minimal_block_delay_s}
         in
         Constants_repr.
           {
@@ -889,7 +899,8 @@ let prepare_first_block ~level ~timestamp ctxt =
               then 3_063_809l
               else c.liquidity_baking_sunset_level);
             liquidity_baking_escape_ema_threshold = 666_667l;
-            round_durations;
+            minimal_block_delay;
+            delay_increment_per_round;
             consensus_committee_size;
             consensus_threshold;
             minimal_participation_ratio = {numerator = 2; denominator = 3};

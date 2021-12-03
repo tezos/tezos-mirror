@@ -265,26 +265,15 @@ module Round : sig
 
   module Durations : sig
     val create :
-      ?other_rounds:Period.t list ->
-      round0:Period.t ->
-      round1:Period.t ->
-      unit ->
+      first_round_duration:Period.t ->
+      delay_increment_per_round:Period.t ->
       round_durations tzresult
 
     val create_opt :
-      ?other_rounds:Period.t list ->
-      round0:Period.t ->
-      round1:Period.t ->
-      unit ->
+      first_round_duration:Period.t ->
+      delay_increment_per_round:Period.t ->
       round_durations option
-
-    val first : round_durations -> Period.t
   end
-
-  type round_and_offset = {round : t; offset : Period.t}
-
-  val round_and_offset :
-    round_durations -> level_offset:Period.t -> round_and_offset tzresult
 
   val level_offset_of_round : round_durations -> round:t -> Period.t tzresult
 
@@ -762,7 +751,8 @@ module Constants : sig
     liquidity_baking_sunset_level : int32;
     liquidity_baking_escape_ema_threshold : int32;
     max_operations_time_to_live : int;
-    round_durations : Round.round_durations;
+    minimal_block_delay : Period.t;
+    delay_increment_per_round : Period.t;
     minimal_participation_ratio : ratio;
     consensus_committee_size : int;
     consensus_threshold : int;
@@ -833,6 +823,10 @@ module Constants : sig
   val liquidity_baking_sunset_level : context -> int32
 
   val liquidity_baking_escape_ema_threshold : context -> int32
+
+  val minimal_block_delay : context -> Period.t
+
+  val delay_increment_per_round : context -> Period.t
 
   val round_durations : context -> Round.round_durations
 

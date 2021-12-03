@@ -74,6 +74,7 @@ type global_state = {
   chain_id : Chain_id.t;
   config : Baking_configuration.t;
   constants : Constants.t;
+  round_durations : Round.round_durations;
   operation_worker : Operation_worker.t;
   validation_mode : validation_mode;
   delegates : delegate list;

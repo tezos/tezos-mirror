@@ -147,10 +147,9 @@ let round_durations (rpc_context : RPC_context.json)
   let open Protocol in
   let rpc_context = new Protocol_client_context.wrap_rpc_context rpc_context in
   Constants_services.all rpc_context (chain, block) >>=? fun constants ->
-  let times = constants.parametric.round_durations in
+  (* Return the duration of block 0 *)
   return_some
-  @@ Alpha_context.Period.to_seconds
-       Alpha_context.Round.(round_duration times zero)
+    (Alpha_context.Period.to_seconds constants.parametric.minimal_block_delay)
 
 let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
     (proxy_builder :

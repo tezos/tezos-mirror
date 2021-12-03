@@ -878,9 +878,9 @@ let make_genesis_context ~delegate_selection ~round0 ~round1
     let open Alpha_context in
     Stdlib.Option.get
       (Round.Durations.create_opt
-         ~round0:(Period.of_seconds_exn round0)
-         ~round1:(Period.of_seconds_exn round1)
-         ())
+         ~minimal_block_delay:(Period.of_seconds_exn round0)
+         ~delay_increment_per_round:
+           (Period.of_seconds_exn (Int64.sub round1 round0)))
   in
   let constants =
     {
@@ -888,7 +888,9 @@ let make_genesis_context ~delegate_selection ~round0 ~round1
       delegate_selection;
       consensus_committee_size;
       consensus_threshold;
-      round_durations;
+      minimal_block_delay = Alpha_context.Period.of_seconds_exn round0;
+      delay_increment_per_round =
+        Alpha_context.Period.of_seconds_exn (Int64.sub round1 round0);
     }
   in
   let common_parameters =
@@ -942,7 +944,7 @@ let make_genesis_context ~delegate_selection ~round0 ~round1
     in
     return (block_header, rpc_context)
   in
-  let round_durations = constants.round_durations in
+
   let level0_round0_duration =
     Protocol.Alpha_context.Round.round_duration
       round_durations

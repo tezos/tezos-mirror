@@ -554,7 +554,9 @@ module Mempool = struct
                    assert false
                | Some proposal_level -> proposal_level
              in
-             let round_durations = Constants.round_durations ctxt in
+             let round_durations =
+               Alpha_context.Constants.round_durations ctxt
+             in
              Lwt.return
              @@ acceptable_op
                   ~config
@@ -2762,7 +2764,7 @@ module RPC = struct
       Round.get ctxt >>=? fun current_round ->
       let current_level = Level.current ctxt in
       let current_timestamp = Timestamp.current ctxt in
-      let round_durations = Constants.round_durations ctxt in
+      let round_durations = Alpha_context.Constants.round_durations ctxt in
       let rec loop l acc round =
         if Compare.Int.(round > max_round) then return (List.rev acc)
         else
@@ -2926,7 +2928,7 @@ module RPC = struct
       Round.get ctxt >>=? fun current_round ->
       let current_level = Level.current ctxt in
       let current_timestamp = Timestamp.current ctxt in
-      let round_durations = Constants.round_durations ctxt in
+      let round_durations = Alpha_context.Constants.round_durations ctxt in
       estimated_time
         round_durations
         ~current_level

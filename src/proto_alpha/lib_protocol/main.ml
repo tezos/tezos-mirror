@@ -286,8 +286,9 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   | Some proto_header ->
       Alpha_context.Fitness.round_from_raw predecessor_fitness
       >>?= fun predecessor_round ->
+      let round_durations = Alpha_context.Constants.round_durations ctxt in
       Alpha_context.Round.round_of_timestamp
-        (Alpha_context.Constants.round_durations ctxt)
+        round_durations
         ~predecessor_timestamp
         ~predecessor_round
         ~timestamp

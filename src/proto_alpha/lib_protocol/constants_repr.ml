@@ -194,7 +194,8 @@ type parametric = {
   liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
   max_operations_time_to_live : int;
-  round_durations : Round_repr.Durations.t;
+  minimal_block_delay : Period_repr.t;
+  delay_increment_per_round : Period_repr.t;
   minimal_participation_ratio : ratio;
   consensus_committee_size : int;
   consensus_threshold : int;
@@ -234,7 +235,8 @@ let parametric_encoding =
               c.liquidity_baking_sunset_level,
               c.liquidity_baking_escape_ema_threshold,
               c.max_operations_time_to_live,
-              c.round_durations,
+              c.minimal_block_delay,
+              c.delay_increment_per_round,
               c.consensus_committee_size,
               c.consensus_threshold ),
             ( ( c.minimal_participation_ratio,
@@ -267,7 +269,8 @@ let parametric_encoding =
                  liquidity_baking_sunset_level,
                  liquidity_baking_escape_ema_threshold,
                  max_operations_time_to_live,
-                 round_durations,
+                 minimal_block_delay,
+                 delay_increment_per_round,
                  consensus_committee_size,
                  consensus_threshold ),
                ( ( minimal_participation_ratio,
@@ -301,7 +304,8 @@ let parametric_encoding =
         liquidity_baking_sunset_level;
         liquidity_baking_escape_ema_threshold;
         max_operations_time_to_live;
-        round_durations;
+        minimal_block_delay;
+        delay_increment_per_round;
         minimal_participation_ratio;
         max_slashing_period;
         consensus_committee_size;
@@ -339,14 +343,15 @@ let parametric_encoding =
              (req "hard_storage_limit_per_operation" z)
              (req "quorum_min" int32))
           (merge_objs
-             (obj9
+             (obj10
                 (req "quorum_max" int32)
                 (req "min_proposal_quorum" int32)
                 (req "liquidity_baking_subsidy" Tez_repr.encoding)
                 (req "liquidity_baking_sunset_level" int32)
                 (req "liquidity_baking_escape_ema_threshold" int32)
                 (req "max_operations_time_to_live" int16)
-                (req "round_durations" Round_repr.Durations.encoding)
+                (req "minimal_block_delay" Period_repr.encoding)
+                (req "delay_increment_per_round" Period_repr.encoding)
                 (req "consensus_committee_size" int31)
                 (req "consensus_threshold" int31))
              (merge_objs
@@ -389,6 +394,16 @@ let () =
     (fun reason -> Invalid_protocol_constants reason)
 
 let check_constants constants =
+  error_unless
+    Period_repr.(constants.minimal_block_delay > zero)
+    (Invalid_protocol_constants
+       "The minimal block delay must be greater than zero")
+  >>? fun () ->
+  error_unless
+    Period_repr.(constants.delay_increment_per_round > zero)
+    (Invalid_protocol_constants
+       "The delay increment per round must be greater than zero")
+  >>? fun () ->
   error_unless
     Compare.Int.(constants.consensus_committee_size > 3)
     (Invalid_protocol_constants
