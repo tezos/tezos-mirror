@@ -2228,6 +2228,8 @@ module Kind : sig
 
   type tx_rollup_submit_batch = Tx_rollup_submit_batch_kind
 
+  type tx_rollup_commit = Tx_rollup_commit_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -2241,6 +2243,7 @@ module Kind : sig
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
+    | Tx_rollup_commit_manager_kind : tx_rollup_commit manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
 end
@@ -2366,6 +2369,11 @@ and _ manager_operation =
       content : string;
     }
       -> Kind.tx_rollup_submit_batch manager_operation
+  | Tx_rollup_commit : {
+      tx_rollup : Tx_rollup.t;
+      commitment : Tx_rollup_commitments.Commitment.t;
+    }
+      -> Kind.tx_rollup_commit manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : Sc_rollup.PVM.boot_sector;
@@ -2519,6 +2527,8 @@ module Operation : sig
     val tx_rollup_submit_batch_case :
       Kind.tx_rollup_submit_batch Kind.manager case
 
+    val tx_rollup_commit_case : Kind.tx_rollup_commit Kind.manager case
+
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
 
@@ -2556,6 +2566,8 @@ module Operation : sig
       val tx_rollup_origination_case : Kind.tx_rollup_origination case
 
       val tx_rollup_submit_batch_case : Kind.tx_rollup_submit_batch case
+
+      val tx_rollup_commit_case : Kind.tx_rollup_commit case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 

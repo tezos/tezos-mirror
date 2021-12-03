@@ -248,6 +248,7 @@ let tickets_of_operation ctxt
   | Set_deposits_limit _ -> return (None, ctxt)
   | Tx_rollup_origination -> return (None, ctxt)
   | Tx_rollup_submit_batch _ -> return (None, ctxt)
+  | Tx_rollup_commit _ -> return (None, ctxt)
   | Sc_rollup_originate {kind = _; boot_sector = _} -> return (None, ctxt)
   | Sc_rollup_add_messages {rollup = _; messages = _} -> return (None, ctxt)
 
