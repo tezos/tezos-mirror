@@ -374,21 +374,7 @@ module Make
 
   type prevalidation_t = Prevalidation_t.t
 
-  module Filter = Filter
   module Proto = Filter.Proto
-
-  (* [Tezos_protocol_environment.PROTOCOL] is a subtype of
-     [Registered_protocol.T]. The [Prevalidation.Make] expects the
-     former. However if we give [Proto] directly we will have a type
-     checking error since [with type] constraints of OCaml does not
-     allow subtyping. *)
-
-  module Protocol :
-    Tezos_protocol_environment.PROTOCOL
-      with type operation_data = Proto.P.operation_data
-       and type validation_state = Proto.P.validation_state
-       and type operation_receipt = Proto.P.operation_receipt =
-    Proto
 
   let name = (Arg.chain_id, Proto.hash)
 
@@ -534,7 +520,7 @@ module Make
       shell.mempool
 
   let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
-      oph (op : Protocol.operation_data operation) =
+      oph (op : Proto.operation_data operation) =
     let validation_state = Prevalidation_t.validation_state validation_state in
     if disable_precheck then Lwt.return `Undecided
     else
