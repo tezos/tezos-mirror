@@ -1186,6 +1186,7 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [])
   | Tx_rollup_commit {tx_rollup; commitment} -> (
+      (* TODO: bonds https://gitlab.com/tezos/tezos/-/issues/2459 *)
       match Contract.is_implicit source with
       | None -> assert false (* This is only called with implicit contracts *)
       | Some key ->

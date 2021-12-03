@@ -640,6 +640,11 @@ module Tx_rollup = struct
   let spawn_get_inbox ?endpoint ?hooks ?chain ?block ~tx_rollup client =
     let path = sub_path ?chain ?block ~tx_rollup "inbox" in
     Client.spawn_rpc ?endpoint ?hooks GET path client
+
+  let get_commitments ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~tx_rollup client =
+    let path = sub_path ~chain ~block ~tx_rollup "commitments" in
+    Client.rpc ?endpoint ?hooks GET path client
 end
 
 module Sc_rollup = struct
