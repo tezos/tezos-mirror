@@ -68,6 +68,9 @@ type limits = {
           intended to be used for testing and debugging. *)
 }
 
+(** Sane default values for {!limits} *)
+val default_limits : limits
+
 (** Creates/tear-down a new prevalidator context. *)
 val create :
   limits ->

@@ -217,6 +217,14 @@ type limits = {
   disable_precheck : bool;
 }
 
+let default_limits =
+  {
+    operation_timeout = Time.System.Span.of_seconds_exn 10.;
+    max_refused_operations = 1000;
+    operations_batch_size = 50;
+    disable_precheck = false;
+  }
+
 (* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
 
