@@ -114,13 +114,13 @@ module type S = sig
 
   val of_list : elt list -> t
 
-  val to_seq_from : elt -> t -> elt Stdlib.Seq.t
+  val to_seq_from : elt -> t -> elt Seq.t
 
-  val to_seq : t -> elt Stdlib.Seq.t
+  val to_seq : t -> elt Seq.t
 
-  val add_seq : elt Stdlib.Seq.t -> t -> t
+  val add_seq : elt Seq.t -> t -> t
 
-  val of_seq : elt Stdlib.Seq.t -> t
+  val of_seq : elt Seq.t -> t
 
   val iter_ep :
     (elt -> (unit, 'error Error_monad.trace) result Lwt.t) ->
