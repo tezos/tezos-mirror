@@ -461,15 +461,6 @@ let () =
     (obj1 (req "item_level" int16))
     (function Bad_stack_item n -> Some n | _ -> None)
     (fun n -> Bad_stack_item n) ;
-  (* SELF in lambda *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.self_in_lambda"
-    ~title:"SELF instruction in lambda"
-    ~description:"A SELF instruction was encountered in a lambda expression."
-    (located empty)
-    (function Self_in_lambda loc -> Some (loc, ()) | _ -> None)
-    (fun (loc, ()) -> Self_in_lambda loc) ;
   (* Forbidden instruction in a context. *)
   register_error_kind
     `Permanent

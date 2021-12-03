@@ -105,8 +105,6 @@ type error +=
 
 type error += Duplicated_view_name of Script.location
 
-type error += Self_in_lambda of Script.location
-
 type context_desc = Lambda | View
 
 type error +=

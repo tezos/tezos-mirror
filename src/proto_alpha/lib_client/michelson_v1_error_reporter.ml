@@ -108,7 +108,6 @@ let collect_error_locations errs =
         | Bad_return (loc, _, _)
         | Bad_stack (loc, _, _, _)
         | Unmatched_branches (loc, _, _)
-        | Self_in_lambda loc
         | Forbidden_instr_in_context (loc, _, _)
         | Invalid_constant (loc, _, _)
         | Invalid_syntactic_constant (loc, _, _)
@@ -652,12 +651,6 @@ let report_errors ~details ~show_source ?parsed ppf errs =
             Format.fprintf
               ppf
               "%aDUP n expects an argument of at least 1 (passed 0)."
-              print_loc
-              loc
-        | Self_in_lambda loc ->
-            Format.fprintf
-              ppf
-              "%aThe SELF instruction cannot appear in a lambda."
               print_loc
               loc
         | Forbidden_instr_in_context (loc, ctxt, prim) ->
