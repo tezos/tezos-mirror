@@ -298,16 +298,15 @@ module Generators = struct
       let ops_list_gen =
         (* Having super long list of operations isn't necessary.
            In addition it slows everything down. *)
-        list_size (int_range 0 10) External_generators.operation_gen
+        list_size
+          (int_range 0 10)
+          (External_generators.operation_with_hash_gen ())
       in
       (* In production these lists are exactly of size 4, being more general *)
       ops_list_gen |> list_size (int_range 0 8)
     in
-    let ops_and_hashes : (Operation_hash.t * Operation.t) list list =
-      List.map (List.map (fun op -> (Operation.hash op, op))) ops
-    in
-    let hash = Block.hash_of_block ops_and_hashes in
-    return Block.{hash; operations = ops_and_hashes}
+    let hash = Block.hash_of_block ops in
+    return Block.{hash; operations = ops}
 
   (* A generator of lists of {!Block.t} where all elements are guaranteed
      to be different. *)

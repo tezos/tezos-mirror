@@ -31,12 +31,6 @@ let add_if_not_present classification oph op t =
 
 let string_gen = QCheck.Gen.string ?gen:None
 
-let operation_hash_gen : Operation_hash.t QCheck.Gen.t =
-  let open QCheck.Gen in
-  let+ key = opt (string_size (0 -- 64))
-  and+ path = list_size (0 -- 100) string_gen in
-  Operation_hash.hash_string ?key path
-
 let block_hash_gen : Block_hash.t QCheck.Gen.t =
   let open QCheck.Gen in
   let+ key = opt (string_size (0 -- 64))
@@ -49,13 +43,21 @@ let block_hash_gen : Block_hash.t QCheck.Gen.t =
       valid proto bytes doesn't matter (for example for {!Prevalidator_classification}).
     - [block_hash_t] is an optional generator for the branch.
       If omitted {!block_hash_gen} is used. *)
-let operation_gen ?(string_gen = string_gen) ?block_hash_t :
+let operation_gen ?(string_gen = string_gen) ?block_hash_t () :
     Operation.t QCheck.Gen.t =
   let open QCheck.Gen in
   let prod_block_hash_gen = Option.value ~default:block_hash_gen block_hash_t in
   let+ branch = prod_block_hash_gen
   and+ proto = string_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
+
+(** Like {operation_gen} with a hash. *)
+let operation_with_hash_gen ?string_gen ?block_hash_t () :
+    (Operation_hash.t * Operation.t) QCheck.Gen.t =
+  let open QCheck.Gen in
+  let+ op = operation_gen ?string_gen ?block_hash_t () in
+  let hash = Operation.hash op in
+  (hash, op)
 
 (** A generator of maps of operations and their hashes. Parameters are:
     - [string_gen] is an optional generator for the protocol bytes.
@@ -67,7 +69,7 @@ let operation_gen ?(string_gen = string_gen) ?block_hash_t :
 let op_map_gen ?string_gen ?block_hash_t () :
     Operation.t Operation_hash.Map.t QCheck.Gen.t =
   let open QCheck.Gen in
-  let+ ops = small_list (operation_gen ?string_gen ?block_hash_t) in
+  let+ ops = small_list (operation_gen ?string_gen ?block_hash_t ()) in
   (* Op_map.of_seq eliminates duplicate keys (if any) *)
   List.map (fun op -> (Operation.hash op, op)) ops
   |> List.to_seq |> Operation_hash.Map.of_seq
@@ -123,11 +125,11 @@ let t_gen ?(can_be_full = true) () : t QCheck.Gen.t =
     let limit = parameters.map_size_limit - if can_be_full then 0 else 1 in
     list_size
       (0 -- limit)
-      (triple classification_gen operation_hash_gen operation_gen)
+      (pair classification_gen (operation_with_hash_gen ()))
   in
   let t = Prevalidator_classification.create parameters in
   List.iter
-    (fun (classification, operation_hash, operation) ->
+    (fun (classification, (operation_hash, operation)) ->
       add_if_not_present classification operation_hash operation t)
     inputs ;
   t
@@ -168,7 +170,7 @@ let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t =
         freq_and_gen_of_map (Classification.map t.branch_delayed);
         freq_and_gen_of_map (Classification.map t.refused);
         freq_and_gen_of_map (Classification.map t.outdated);
-        (freq_fresh t, pair operation_hash_gen operation_gen);
+        (freq_fresh t, operation_with_hash_gen ());
       ]
 
 let t_with_operation_gen ?can_be_full () :
