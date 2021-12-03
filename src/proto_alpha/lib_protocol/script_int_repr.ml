@@ -29,86 +29,96 @@ type n = Natural_tag
 type z = Integer_tag
 
 (* We could define `num` as a GADT with constructors for `n` and `z`.
-  This would enable factorizing the code a bit in the Michelson interpreter and
-  also make formal the claim that `num` is only instantiated with `n` and `z`,
-  but it would result in space and time overheads when manipulating `num`s, by
-  having to deconstruct to and reconstruct from `Z.t`. *)
-type 't num = Z.t
+   This would enable factorizing the code a bit in the Michelson interpreter and
+   also make formal the claim that `num` is only instantiated with `n` and `z`,
+   but it would result in space and time overheads when manipulating `num`s, by
+   having to deconstruct to and reconstruct from `Z.t`. *)
+type 't repr = Z.t
 
-let compare x y = Z.compare x y
+type 't num = Num_tag of 't repr [@@ocaml.unboxed]
 
-let zero = Z.zero
+let compare (Num_tag x) (Num_tag y) = Z.compare x y
 
-let zero_n = Z.zero
+let zero = Num_tag Z.zero
 
-let one_n = Z.one
+let zero_n = Num_tag Z.zero
 
-let to_string x = Z.to_string x
+let one_n = Num_tag Z.one
 
-let of_string s = Option.catch (fun () -> Z.of_string s)
+let to_string (Num_tag x) = Z.to_string x
 
-let of_int32 n = Z.of_int64 @@ Int64.of_int32 n
+let of_string s = Option.catch (fun () -> Num_tag (Z.of_string s))
 
-let to_int64 x = Option.catch (fun () -> Z.to_int64 x)
+let of_int32 n = Num_tag (Z.of_int64 @@ Int64.of_int32 n)
 
-let of_int64 n = Z.of_int64 n
+let to_int64 (Num_tag x) = Option.catch (fun () -> Z.to_int64 x)
 
-let to_int x = Option.catch (fun () -> Z.to_int x)
+let of_int64 n = Num_tag (Z.of_int64 n)
 
-let of_int n = Z.of_int n
+let to_int (Num_tag x) = Option.catch (fun () -> Z.to_int x)
 
-let of_zint x = x
+let of_int n = Num_tag (Z.of_int n)
 
-let to_zint x = x
+let of_zint x = Num_tag x
 
-let add x y = Z.add x y
+let to_zint (Num_tag x) = x
 
-let sub x y = Z.sub x y
+let add (Num_tag x) (Num_tag y) = Num_tag (Z.add x y)
 
-let mul x y = Z.mul x y
+let sub (Num_tag x) (Num_tag y) = Num_tag (Z.sub x y)
 
-let ediv x y = Option.catch (fun () -> Z.ediv_rem x y)
+let mul (Num_tag x) (Num_tag y) = Num_tag (Z.mul x y)
+
+let ediv (Num_tag x) (Num_tag y) =
+  let ediv_tagged x y =
+    let (quo, rem) = Z.ediv_rem x y in
+    (Num_tag quo, Num_tag rem)
+  in
+  Option.catch (fun () -> ediv_tagged x y)
 
 let add_n = add
 
-let succ_n = Z.succ
+let succ_n (Num_tag x) = Num_tag (Z.succ x)
 
 let mul_n = mul
 
 let ediv_n = ediv
 
-let abs x = Z.abs x
+let abs (Num_tag x) = Num_tag (Z.abs x)
 
-let is_nat x = if Compare.Z.(x < Z.zero) then None else Some x
+let is_nat (Num_tag x) =
+  if Compare.Z.(x < Z.zero) then None else Some (Num_tag x)
 
-let neg x = Z.neg x
+let neg (Num_tag x) = Num_tag (Z.neg x)
 
-let int x = x
+let int (Num_tag x) = Num_tag x
 
-let shift_left x y =
+let shift_left (Num_tag x) (Num_tag y) =
   if Compare.Int.(Z.compare y (Z.of_int 256) > 0) then None
   else
     let y = Z.to_int y in
-    Some (Z.shift_left x y)
+    Some (Num_tag (Z.shift_left x y))
 
-let shift_right x y =
+let shift_right (Num_tag x) (Num_tag y) =
   if Compare.Int.(Z.compare y (Z.of_int 256) > 0) then None
   else
     let y = Z.to_int y in
-    Some (Z.shift_right x y)
+    Some (Num_tag (Z.shift_right x y))
 
 let shift_left_n = shift_left
 
 let shift_right_n = shift_right
 
-let logor x y = Z.logor x y
+let logor (Num_tag x) (Num_tag y) = Num_tag (Z.logor x y)
 
-let logxor x y = Z.logxor x y
+let logxor (Num_tag x) (Num_tag y) = Num_tag (Z.logxor x y)
 
-let logand x y = Z.logand x y
+let logand (Num_tag x) (Num_tag y) = Num_tag (Z.logand x y)
 
-let lognot x = Z.lognot x
+let lognot (Num_tag x) = Num_tag (Z.lognot x)
 
-let z_encoding : z num Data_encoding.encoding = Data_encoding.z
+let z_encoding : z num Data_encoding.encoding =
+  Data_encoding.(conv (fun (Num_tag z) -> z) (fun z -> Num_tag z) z)
 
-let n_encoding : n num Data_encoding.encoding = Data_encoding.n
+let n_encoding : n num Data_encoding.encoding =
+  Data_encoding.(conv (fun (Num_tag n) -> n) (fun n -> Num_tag n) n)
