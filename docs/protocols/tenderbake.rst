@@ -172,9 +172,40 @@ The following RPCs are new:
 
 - ``../helpers/validators``: is a variant of ``endorsing_rights`` RPC, used by the Octez baker daemon.
 
+- ``../context/delegates/<pkh>/current_frozen_deposits``: gives the
+  current amount of the delegate's frozen deposits, in contrast to
+  ``../<pkh>/frozen_deposits`` which returns the initial amount (that
+  is, at the beginning of a cycle) of the frozen deposits. The two
+  amounts are different only when the delegate has been punished.
+
 - ``../context/delegates/<pkh>/frozen_deposits_limit``: gives the frozen deposits limit of a registered delegate.
 
-- ``../context/delegates/<pkh>/participation``: gives information on the participation (in consensus) of a registered delegate.
+- ``../context/delegates/<pkh>/participation``: gives information on the participation (in consensus) of a registered delegate, as follows:
+
+  - ``expected_cycle_activity`` indicates the number of endorsing
+    slots the delegate is expected to have in the cycle based on its
+    active stake. This number does not necessary equal the number of
+    slots the delegate actually has, which are also dependent on the
+    cycle's seed.
+
+  - ``minimal_cycle_activity`` indicates the minimal endorsing slots
+    in the cycle required to get endorsing rewards. It is computed
+    based on the ``expected_cycle_activity``.
+
+  - ``missed_slots`` indicates the number of missed endorsing slots in the cycle so far.
+
+  - ``missed_levels`` indicates the number of missed levels for endorsing in the cycle so far.
+
+  - ``remaining_allowed_missed_slots`` indicates the remaining amount
+    of endorsing slots that can be missed in the cycle before
+    forfeiting the rewards.
+
+  - ``expected_endorsing_rewards`` indicates the endorsing rewards
+    that will be distributed at the end of the cycle if activity at
+    that point will be greater than the minimal required; if the
+    activity is already known to be below the required minimum, then
+    the rewards are zero.
+
 
 Signer
 ------
