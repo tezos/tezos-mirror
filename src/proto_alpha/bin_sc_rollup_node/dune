@@ -1,0 +1,28 @@
+; build static executable with --profile static
+(env
+ (static (flags (:standard
+                  -ccopt -static
+                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+
+(executable
+ (name main_sc_rollup_node_alpha)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-sc-rollup-node-alpha)
+ (libraries
+            tezos-base
+            tezos-client-base
+            tezos-client-base-unix
+            tezos-client-commands
+            tezos-client-alpha
+            tezos-protocol-alpha-parameters
+            tezos-protocol-plugin-alpha)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_client_commands
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base
+                   -open Tezos_client_base_unix
+                   -open Tezos_client_alpha
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
+                   -open Tezos_protocol_alpha_parameters
+                   )))

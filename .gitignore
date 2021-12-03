@@ -34,6 +34,7 @@ __pycache__
 /tezos-codec
 /tezos-snoop
 /tezos-tps-evaluation
+/tezos-sc-rollup-node-*
 
 /src/proto_*/parameters/*-parameters.json
 
