@@ -292,7 +292,11 @@ let fix_head chain_dir block_store genesis_block =
      block_store
      (Block_store.Block (Block_repr.hash floating_head, 0))
    >>=? function
-   | None -> fail (Corrupted_store "inferred head must have metadata")
+   | None ->
+       fail
+         (Corrupted_store
+            (Inferred_head
+               (Block_repr.hash inferred_head, Block_repr.level inferred_head)))
    | Some _ -> return_unit)
   >>=? fun () ->
   (* Try to load the current head *)
@@ -348,7 +352,12 @@ let fix_savepoint_and_caboose chain_dir block_store head =
          metadata file. However, the current metadata file is
          invalid/broken and it should be reported. *)
       trace (Exn _exn)
-      @@ fail (Corrupted_store "Failed to find a valid savepoint")
+      @@ fail
+           (Corrupted_store
+              (Cannot_find_cemented_savepoint
+                 (Option.value
+                    (Option.map Naming.file_path metadata_file)
+                    ~default:"unknown metadata file")))
   in
   (* Returns the lowest cemented metadata stored. *)
   let cemented_dir = Naming.cemented_blocks_dir chain_dir in
@@ -395,6 +404,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
   (* Returns both the lowest block and the lowest block with metadata
      from the floating block store.*)
   let lowest_floating_blocks floating_stores =
+    (* Ensure that the block is actually available by trying to read it?*)
     List.map_es
       (Floating_block_store.fold_left_s
          (fun (last_min, last_min_with_metadata) block ->
@@ -461,7 +471,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
       >>=? fun (_, lowest_floating_with_metadata) ->
       (match lowest_floating_with_metadata with
       | Some lvl -> return lvl
-      | None -> fail (Corrupted_store "Failed to find a valid savepoint"))
+      | None -> fail (Corrupted_store Cannot_find_savepoint_candidate))
       >>=? fun savepoint_level -> return (savepoint_level, caboose_level)
   | (None, None) ->
       (* No cycle found. Searching for savepoint and caboose in the
@@ -470,11 +480,11 @@ let fix_savepoint_and_caboose chain_dir block_store head =
       >>=? fun (lowest_floating, lowest_floating_with_metadata) ->
       (match lowest_floating_with_metadata with
       | Some lvl -> return lvl
-      | None -> fail (Corrupted_store "Failed to find a valid savepoint"))
+      | None -> fail (Corrupted_store Cannot_find_savepoint_candidate))
       >>=? fun savepoint_level ->
       (match lowest_floating with
       | Some lvl -> return lvl
-      | None -> fail (Corrupted_store "Failed to find a valid caboose"))
+      | None -> fail (Corrupted_store Cannot_find_caboose_candidate))
       >>=? fun caboose_level -> return (savepoint_level, caboose_level)
   | (Some _, None) ->
       (* Inconsistent as a cemented cycle with metadata implies that
@@ -528,7 +538,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
        >>= fun stored_caboose ->
        Store_events.(emit fix_caboose (stored_caboose, inferred_caboose))
        >>= fun () -> return inferred_caboose
-   | None -> fail (Corrupted_store "Failed to find a valid caboose"))
+   | None -> fail (Corrupted_store Cannot_find_caboose_candidate))
   >>=? fun caboose -> return (savepoint, caboose)
 
 (* [fix_checkpoint chain_dir block_store head] fixes the checkpoint
@@ -545,7 +555,9 @@ let fix_checkpoint chain_dir block_store head =
     | Some m -> return m.last_allowed_fork_level
     | None ->
         (*Assumption: head must have metadata *)
-        fail (Corrupted_store "Missing metadata for head: Broken invariant."))
+        fail
+          (Corrupted_store
+             (Inferred_head (Block_repr.hash head, Block_repr.level head))))
     >>=? fun head_lafl ->
     let head_hash = Block_repr.hash head in
     (* Returns the lowest block with metadata *)
@@ -570,10 +582,7 @@ let fix_checkpoint chain_dir block_store head =
           (* If the head was reached and it has no metadata, the store
              is broken *)
           if Compare.Int32.(block_level = Block_repr.level head) then
-            fail
-              (Corrupted_store
-                 "No block with metadata found. At least the head must have \
-                  metadata")
+            fail (Corrupted_store Cannot_find_block_with_metadata)
           else
             (* Freshly imported rolling nodes may have deleted blocks
                at a level higher that the lafl of the current
@@ -818,12 +827,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
     let corrupted_store head_proto_level head_hash =
       fail
         (Corrupted_store
-           (Format.asprintf
-              "Failed to find a valid activation block for protocol %d of the \
-               current head (%a)"
-              head_proto_level
-              Block_hash.pp
-              head_hash))
+           (Cannot_find_activation_block (head_hash, head_proto_level)))
     in
     (* Make sure that the protocol of the current head is registered. If
        not, set it to the savepoint. *)
@@ -1028,7 +1032,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
   Store_events.(emit fix_store ()) >>= fun () ->
   (* We suppose that the genesis block is accessible *)
   trace
-    (Corrupted_store "The genesis block is not available in the store.")
+    (Corrupted_store Missing_genesis)
     (Stored_data.load (Naming.genesis_block_file chain_dir))
   >>=? fun genesis_data ->
   Stored_data.get genesis_data >>= fun genesis_block ->
