@@ -425,17 +425,17 @@ module Make
         || Operation_hash.Set.mem oph shell.live_operations
         || Operation_hash.Set.mem oph shell.classification.in_mempool)
 
-  let advertise (w : worker) pv mempool =
-    match pv.advertisement with
+  let advertise (w : worker) (shell : types_state_shell) mempool =
+    match shell.advertisement with
     | `Pending {Mempool.known_valid; pending} ->
-        pv.advertisement <-
+        shell.advertisement <-
           `Pending
             {
               known_valid = known_valid @ mempool.Mempool.known_valid;
               pending = Operation_hash.Set.union pending mempool.pending;
             }
     | `None ->
-        pv.advertisement <- `Pending mempool ;
+        shell.advertisement <- `Pending mempool ;
         Lwt.dont_wait
           (fun () ->
             Lwt_unix.sleep advertisement_delay >>= fun () ->
@@ -1041,11 +1041,11 @@ module Make
     (* This function fetches one operation through the
        [distributed_db]. On errors, we emit an event and proceed as
        usual. *)
-    let fetch_operation w pv ?peer oph =
+    let fetch_operation w (shell : types_state_shell) ?peer oph =
       Event.(emit fetching_operation) oph >|= fun () ->
       Distributed_db.Operation.fetch
-        ~timeout:pv.parameters.limits.operation_timeout
-        pv.parameters.chain_db
+        ~timeout:shell.parameters.limits.operation_timeout
+        shell.parameters.chain_db
         ?peer
         oph
         ()
@@ -1070,26 +1070,26 @@ module Make
        promise [p] is terminated, we remove the operation from the
        fetching operations. This is to ensure that if an error
        happened, we can still fetch this operation in the future. *)
-    let may_fetch_operation w pv peer oph =
+    let may_fetch_operation w (shell : types_state_shell) peer oph =
       let origin =
         match peer with
         | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
         | None -> "leftover from previous run"
       in
-      already_handled ~origin pv oph >>= fun already_handled ->
+      already_handled ~origin shell oph >>= fun already_handled ->
       if not already_handled then
         ignore
           (Lwt.finalize
              (fun () ->
-               pv.fetching <- Operation_hash.Set.add oph pv.fetching ;
-               fetch_operation w pv ?peer oph)
+               shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
+               fetch_operation w shell ?peer oph)
              (fun () ->
-               pv.fetching <- Operation_hash.Set.remove oph pv.fetching ;
+               shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
                Lwt.return_unit)) ;
       Lwt.return_unit
 
-    let on_notify w pv peer mempool =
-      let may_fetch_operation = may_fetch_operation w pv (Some peer) in
+    let on_notify w (shell : types_state_shell) peer mempool =
+      let may_fetch_operation = may_fetch_operation w shell (Some peer) in
       List.iter_s may_fetch_operation mempool.Mempool.known_valid >>= fun () ->
       Seq.iter_s
         may_fetch_operation
@@ -1163,15 +1163,15 @@ module Make
       pv.shell.pending <- new_pending_operations ;
       set_mempool pv.shell Mempool.empty
 
-    let on_advertise pv =
-      match pv.advertisement with
+    let on_advertise (shell : types_state_shell) =
+      match shell.advertisement with
       | `None -> () (* should not happen *)
       | `Pending mempool ->
-          pv.advertisement <- `None ;
+          shell.advertisement <- `None ;
           Distributed_db.Advertise.current_head
-            pv.parameters.chain_db
+            shell.parameters.chain_db
             ~mempool
-            pv.predecessor
+            shell.predecessor
 
     let remove_from_advertisement oph = function
       | `Pending mempool -> `Pending (Mempool.remove oph mempool)
