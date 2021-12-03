@@ -971,21 +971,21 @@ let test_voting_power_updated_each_voting_period () =
   (* Retrieve balance of con1 *)
   let open Test_tez in
   Context.Contract.balance (B genesis) con1 >>=? fun balance1 ->
-  Context.Delegate.frozen_deposits (B genesis) baker1
+  Context.Delegate.current_frozen_deposits (B genesis) baker1
   >>=? fun frozen_deposits1 ->
   balance1 +? frozen_deposits1 >>?= fun full_balance1 ->
   Assert.equal_tez ~loc:__LOC__ full_balance1 (of_mutez_exn init_bal1)
   >>=? fun () ->
   (* Retrieve balance of con2 *)
   Context.Contract.balance (B genesis) con2 >>=? fun balance2 ->
-  Context.Delegate.frozen_deposits (B genesis) baker2
+  Context.Delegate.current_frozen_deposits (B genesis) baker2
   >>=? fun frozen_deposits2 ->
   balance2 +? frozen_deposits2 >>?= fun full_balance2 ->
   Assert.equal_tez ~loc:__LOC__ full_balance2 (of_mutez_exn init_bal2)
   >>=? fun () ->
   (* Retrieve balance of con3 *)
   Context.Contract.balance (B genesis) con3 >>=? fun balance3 ->
-  Context.Delegate.frozen_deposits (B genesis) baker3
+  Context.Delegate.current_frozen_deposits (B genesis) baker3
   >>=? fun frozen_deposits3 ->
   balance3 +? frozen_deposits3 >>?= fun full_balance3 ->
   Assert.equal_tez ~loc:__LOC__ full_balance3 (of_mutez_exn init_bal3)
@@ -1036,7 +1036,8 @@ let test_voting_power_updated_each_voting_period () =
   Context.Contract.balance (B block) con1 >>=? fun balance1 ->
   (* Assert balance has changed by deducing the amount *)
   of_mutez_exn init_bal1 -? amount >>?= fun balance1_after_deducing_amount ->
-  Context.Delegate.frozen_deposits (B block) baker1 >>=? fun frozen_deposit1 ->
+  Context.Delegate.current_frozen_deposits (B block) baker1
+  >>=? fun frozen_deposit1 ->
   balance1_after_deducing_amount -? frozen_deposit1
   >>?= Assert.equal_tez ~loc:__LOC__ balance1
   >>=? fun () ->
@@ -1044,7 +1045,8 @@ let test_voting_power_updated_each_voting_period () =
   Context.Contract.balance (B block) con2 >>=? fun balance2 ->
   (* Assert balance has changed by adding amount *)
   of_mutez_exn init_bal2 +? amount >>?= fun balance2_after_adding_amount ->
-  Context.Delegate.frozen_deposits (B block) baker2 >>=? fun frozen_deposit2 ->
+  Context.Delegate.current_frozen_deposits (B block) baker2
+  >>=? fun frozen_deposit2 ->
   balance2_after_adding_amount -? frozen_deposit2
   >>?= Assert.equal_tez ~loc:__LOC__ balance2
   >>=? fun () ->
