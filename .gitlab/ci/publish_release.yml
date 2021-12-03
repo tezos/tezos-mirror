@@ -1,39 +1,17 @@
-.release_static_binaries_template:
-  extends:
-    - .rules_template__release_tag
-  image: registry.gitlab.com/gitlab-org/release-cli
-  variables:
-    ARCH_PREFIX: ""
-    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
-  stage: publish_release
-  script:
-    - apk --no-cache --virtual add bash jq curl
-    - scripts/release/upload-static-binaries-to-package-registry.sh "$ARCH_PREFIX"
-
-release-static-x86_64-binaries:
-  extends: .release_static_binaries_template
-  variables:
-    ARCH_PREFIX: "x86_64-"
-  dependencies:
-    - build:static-x86_64-linux-binaries
-
-release-static-arm64-binaries:
-  extends: .release_static_binaries_template
-  variables:
-    ARCH_PREFIX: "arm64-"
-  dependencies:
-    - build:static-arm64-linux-binaries
 
 release-on-gitlab:
+  image: registry.gitlab.com/gitlab-org/release-cli
   extends:
     - .rules_template__release_tag
-  image: registry.gitlab.com/gitlab-org/release-cli
   variables:
-    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
+    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAMESPACE}/${CI_COMMIT_TAG}"
   stage: publish_release
   script:
-    - apk --no-cache --virtual add bash jq
-    - scripts/release/create-release-with-static-binaries.sh
+    - apk --no-cache --virtual add jq
+    - scripts/release/create-gitlab-release.sh
+  dependencies:
+    - build:static-arm64-linux-binaries
+    - build:static-x86_64-linux-binaries
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
