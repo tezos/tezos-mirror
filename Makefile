@@ -22,7 +22,6 @@ DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
-MERLIN_INSTALLED := $(shell opam list merlin --installed --silent 2> /dev/null; echo $$?)
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
@@ -68,9 +67,6 @@ endif
 		$(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) \
 		@copy-parameters
 	@cp -f $(foreach b, $(TEZOS_BIN), _build/install/default/bin/${b}) ./
-ifeq ($(MERLIN_INSTALLED),0) # only build tooling support if merlin is installed
-	@dune build --profile=$(PROFILE) @check
-endif
 
 # List protocols, i.e. directories proto_* in src with a TEZOS_PROTOCOL file.
 TEZOS_PROTOCOL_FILES=$(wildcard src/proto_*/lib_protocol/TEZOS_PROTOCOL)
