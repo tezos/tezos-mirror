@@ -84,7 +84,7 @@
 module type S = sig
   (** {3 Trivial values} *)
 
-  type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
+  type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
   (** in-monad, preallocated nil *)
 
