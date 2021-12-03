@@ -91,42 +91,36 @@ build_release:docker_arm64:
   tags:
     - arm64
 
-.release_static_binaries_template:
+upload-gitlab-packages:
   extends:
     - .rules_template__release_tag
+    - .rules_template__master_and_releases
   image: registry.gitlab.com/gitlab-org/release-cli
   variables:
-    ARCH_PREFIX: ""
     PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
   stage: publish_release
-  script:
-    - apk --no-cache --virtual add bash jq curl
-    - scripts/release/upload-static-binaries-to-package-registry.sh "$ARCH_PREFIX"
-
-release-static-x86_64-binaries:
-  extends: .release_static_binaries_template
-  variables:
-    ARCH_PREFIX: "x86_64-"
-  dependencies:
-    - build:static-x86_64-linux-binaries
-
-release-static-arm64-binaries:
-  extends: .release_static_binaries_template
-  variables:
-    ARCH_PREFIX: "arm64-"
-  dependencies:
+  needs:
     - build:static-arm64-linux-binaries
+    - build:static-x86_64-linux-binaries
+  script:
+    - apk --no-cache --virtual add jq curl git
+    - scripts/release/upload-static-binaries-to-package-registry.sh "x86_64-"
+    - scripts/release/upload-static-binaries-to-package-registry.sh "arm64-"
+    - scripts/release/upload-tarball-to-package-registry.sh
 
 release-on-gitlab:
+  image: registry.gitlab.com/gitlab-org/release-cli
   extends:
     - .rules_template__release_tag
-  image: registry.gitlab.com/gitlab-org/release-cli
   variables:
-    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/tezos/${CI_COMMIT_TAG}"
+    PACKAGE_REGISTRY_URL: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${CI_PROJECT_NAMESPACE}/${CI_COMMIT_TAG}"
   stage: publish_release
   script:
-    - apk --no-cache --virtual add bash jq
-    - scripts/release/create-release-with-static-binaries.sh
+    - apk --no-cache --virtual add jq
+    - scripts/release/create-gitlab-release.sh
+  dependencies:
+    - build:static-arm64-linux-binaries
+    - build:static-x86_64-linux-binaries
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $TAG_NAME would contain $IMAGE_ARCH_PREFIX too.
@@ -219,8 +213,8 @@ publish:documentation:
     - if [ -z "$(git status -s)" ] ; then
         echo "Nothing to commit!" ;
       else
-          git add public ;
-          git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
-          git push origin master ;
+        git add public ;
+        git commit -m "Import doc of ${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}:${CI_COMMIT_SHA}" ;
+        git push origin master ;
       fi
   interruptible: false

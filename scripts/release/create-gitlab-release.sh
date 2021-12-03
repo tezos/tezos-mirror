@@ -1,11 +1,20 @@
 #!/bin/sh
 
+# release the source tarball and static binaries on the gitlab registry
+
 set -eu
 
 binaries=
 . scripts/release/binaries.sh
 
 assets=
+
+source="tezos-source-$CI_COMMIT_SHORT_SHA.tgz"
+asset_json="$(jq -n --arg name "$source (source)" \
+                    --arg url "$PACKAGE_REGISTRY_URL/$source" \
+                    '{name: $name, url: $url}')"
+assets="$assets --assets-link=$asset_json"
+
 for binary in $binaries; do
     asset_json="$(jq -n --arg name "$binary (x86_64 Linux)" \
                         --arg url "$PACKAGE_REGISTRY_URL/x86_64-$binary" \
