@@ -70,6 +70,10 @@ val compare_update_origin : update_origin -> update_origin -> int
     for baker [b] and cycle [c]. *)
 type balance_updates = (balance * balance_update * update_origin) list
 
+(** The property [Json.destruct (Json.construct balance_updates) = balance_updates]
+    does not always hold for [balance_updates_encoding] when [balance_updates]
+    contains entries of the form [(_, _ Tez_repr.zero, _)]. This is because the
+    [balance_update] [(_ Tez_repr.zero)] always decodes into [(Credited Tez_repr.zero)]. *)
 val balance_updates_encoding : balance_updates Data_encoding.t
 
 (** Group updates by (balance x origin), and remove zero-valued balances. *)
