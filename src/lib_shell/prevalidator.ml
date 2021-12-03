@@ -294,27 +294,34 @@ let mk_chain_tools (chain_db : Distributed_db.chain_db) :
   }
 
 module type T = sig
-  module Proto : Registered_protocol.T
+  (** Type instantiated by {!Filter.Mempool.state}. *)
+  type filter_state
 
-  module Filter : Prevalidator_filters.FILTER with module Proto = Proto
+  (** Type instantiated by {!Filter.Mempool.config}. *)
+  type filter_config
+
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL} *)
+  type operation_data
+
+  (** Type instantiated by {!Prevalidation.t} *)
+  type prevalidation_t
 
   val name : Name.t
 
-  module Prevalidation : Prevalidation.T
-
   type types_state = {
     shell : types_state_shell;
-    mutable filter_state : Filter.Mempool.state;
+    mutable filter_state : filter_state;
         (** Internal state of the filter in the plugin *)
-    mutable validation_state : Prevalidation.t tzresult;
+    mutable validation_state : prevalidation_t tzresult;
     mutable operation_stream :
       (Classification.classification
       * Operation_hash.t
       * Operation.shell_header
-      * Proto.operation_data)
+      * operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
-    mutable filter_config : Filter.Mempool.config;
+    mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
 
@@ -344,7 +351,29 @@ end
 
 type t = (module T)
 
-module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
+module Make
+    (Filter : Prevalidator_filters.FILTER)
+    (Arg : ARG)
+    (Prevalidation_t : Prevalidation.T
+                         with type validation_state =
+                               Filter.Proto.validation_state
+                          and type operation_data = Filter.Proto.operation_data
+                          and type operation_receipt =
+                               Filter.Proto.operation_receipt
+                          and type chain_store = Store.chain_store) :
+  T
+    with type filter_state = Filter.Mempool.state
+     and type filter_config = Filter.Mempool.config
+     and type operation_data = Filter.Proto.operation_data
+     and type prevalidation_t = Prevalidation_t.t = struct
+  type filter_state = Filter.Mempool.state
+
+  type filter_config = Filter.Mempool.config
+
+  type operation_data = Filter.Proto.operation_data
+
+  type prevalidation_t = Prevalidation_t.t
+
   module Filter = Filter
   module Proto = Filter.Proto
 
@@ -365,12 +394,10 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   type 'operation_data operation = 'operation_data Prevalidation.operation
 
-  module Prevalidation = Prevalidation.Make (Protocol)
-
   type types_state = {
     shell : types_state_shell;
-    mutable filter_state : Filter.Mempool.state;
-    mutable validation_state : Prevalidation.t tzresult;
+    mutable filter_state : filter_state;
+    mutable validation_state : prevalidation_t tzresult;
     mutable operation_stream :
       (Classification.classification
       * Operation_hash.t
@@ -378,7 +405,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       * Proto.operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
-    mutable filter_config : Filter.Mempool.config;
+    mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
 
@@ -460,7 +487,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let pre_filter shell ~filter_config ~filter_state ~validation_state ~chain_db
       ~notifier oph raw : bool Lwt.t =
-    match Prevalidation.parse raw with
+    match Prevalidation_t.parse raw with
     | Error _ ->
         Event.(emit unparsable_operation) oph >|= fun () ->
         Distributed_db.Operation.clear_or_cancel chain_db oph ;
@@ -474,7 +501,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         in
         let validation_state_before =
           Option.map
-            Prevalidation.validation_state
+            Prevalidation_t.validation_state
             (Option.of_result validation_state)
         in
         Filter.Mempool.pre_filter
@@ -508,7 +535,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
       oph (op : Protocol.operation_data operation) =
-    let validation_state = Prevalidation.validation_state validation_state in
+    let validation_state = Prevalidation_t.validation_state validation_state in
     if disable_precheck then Lwt.return `Undecided
     else
       Filter.Mempool.precheck
@@ -535,7 +562,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
 
   let classify_operation ~notifier shell ~filter_config ~filter_state
       ~validation_state mempool op oph =
-    match Prevalidation.parse op with
+    match Prevalidation_t.parse op with
     | Error errors ->
         handle ~notifier shell (`Unparsed (oph, op)) (`Refused errors) ;
         Lwt.return (filter_state, validation_state, mempool)
@@ -556,15 +583,15 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Undecided -> (
-            Prevalidation.apply_operation validation_state op >>= function
+            Prevalidation_t.apply_operation validation_state op >>= function
             | Applied (new_validation_state, receipt) -> (
                 post_filter
                   ~filter_config
                   ~filter_state
                   ~validation_state_before:
-                    (Prevalidation.validation_state validation_state)
+                    (Prevalidation_t.validation_state validation_state)
                   ~validation_state_after:
-                    (Prevalidation.validation_state new_validation_state)
+                    (Prevalidation_t.validation_state new_validation_state)
                   op.protocol_data
                   receipt
                 >>= function
@@ -783,7 +810,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
            (Proto_services.S.Mempool.pending_operations RPC_path.open_root)
            (fun pv params () ->
              let map_op op =
-               match Prevalidation.parse_unsafe op.Operation.proto with
+               match Prevalidation_t.parse_unsafe op.Operation.proto with
                | Ok protocol_data ->
                    Some {Proto.shell = op.shell; protocol_data}
                | Error _ -> None
@@ -868,7 +895,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
              in
              (* Convert ops *)
              let map_op error (hash, op) =
-               match Prevalidation.parse_unsafe op.Operation.proto with
+               match Prevalidation_t.parse_unsafe op.Operation.proto with
                | Error _ -> None
                | Ok protocol_data ->
                    Some (hash, Proto.{shell = op.shell; protocol_data}, error)
@@ -1005,8 +1032,8 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
           op.Operation.shell.branch
       else
         pv.validation_state >>?= fun validation_state ->
-        Prevalidation.parse op >>?= fun parsed_op ->
-        Prevalidation.apply_operation validation_state parsed_op >>= function
+        Prevalidation_t.parse op >>?= fun parsed_op ->
+        Prevalidation_t.apply_operation validation_state parsed_op >>= function
         | Applied (_, _result) ->
             Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
             >>= fun (_ : bool) ->
@@ -1018,7 +1045,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
               "Error while applying operation %a:@ %a"
               Operation_hash.pp
               oph
-              Prevalidation.pp_result
+              Prevalidation_t.pp_result
               res
 
     (* This function fetches one operation through the
@@ -1092,7 +1119,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       let chain_store =
         Distributed_db.chain_store pv.shell.parameters.chain_db
       in
-      Prevalidation.create
+      Prevalidation_t.create
         chain_store
         ~predecessor:new_predecessor
         ~live_operations:new_live_operations
@@ -1105,7 +1132,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         pv.filter_state
         ?validation_state:
           (Option.map
-             Prevalidation.validation_state
+             Prevalidation_t.validation_state
              (Option.of_result validation_state))
         ~predecessor:(Store.Block.header new_predecessor)
         ()
@@ -1247,7 +1274,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
       >>= fun (live_blocks, live_operations) ->
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
-      Prevalidation.create
+      Prevalidation_t.create
         chain_store
         ~predecessor
         ~timestamp
@@ -1290,7 +1317,7 @@ module Make (Filter : Prevalidator_filters.FILTER) (Arg : ARG) : T = struct
         Filter.Mempool.default_config
         ?validation_state:
           (Option.map
-             Prevalidation.validation_state
+             Prevalidation_t.validation_state
              (Option.of_result validation_state))
         ~predecessor:predecessor_header
         ()
@@ -1371,6 +1398,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
     ChainProto_registry.find (chain_id, Filter.Proto.hash) !chain_proto_registry
   with
   | None ->
+      let module Prevalidation_t = Prevalidation.Make (Filter.Proto) in
       let module Prevalidator =
         Make
           (Filter)
@@ -1381,6 +1409,7 @@ let create limits (module Filter : Prevalidator_filters.FILTER) chain_db =
 
             let chain_id = chain_id
           end)
+          (Prevalidation_t)
       in
       (* Checking initialization errors before giving a reference to dangerous
        * `worker` value to caller. *)
