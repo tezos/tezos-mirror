@@ -1182,6 +1182,73 @@ module Revamped = struct
       ~title:"Max refused operations refused"
       ~tags:["mempool"; "refused"; "max"]
     @@ fun protocol -> max_refused_operations ~protocol `Refused
+
+  (** This test checks max_refused_operations for outdated classification. *)
+  let max_refused_operations_outdated =
+    let max_refused_operations = 1 in
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Max refused operations outdated"
+      ~tags:["mempool"; "refused"; "max"; "outdated"]
+    @@ fun protocol ->
+    log_step
+      1
+      "Initialize a node with 'max_refused_operations=%d'."
+      max_refused_operations ;
+    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
+    let* () = Node.config_init node [] in
+    Node.Config_file.(update node (set_prevalidator ~max_refused_operations)) ;
+    let* () = Node.run node [] in
+    let* () = Node.wait_for_ready node in
+    let* client = Client.init ~endpoint:(Node node) () in
+    let* () = Client.activate_protocol ~protocol client in
+    let* _ = Node.wait_for_level node 1 in
+
+    log_step 2 "Bake an empty block to be able to endorse it." ;
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+
+    log_step 3 "Endorse with bootstrap1." ;
+    let* _ =
+      Client.endorse_for
+        ~protocol
+        ~key:[Constant.bootstrap1.alias]
+        ~force:true
+        client
+    in
+
+    log_step 3 "Endorse with bootstrap2." ;
+    let* _ =
+      Client.endorse_for
+        ~protocol
+        ~key:[Constant.bootstrap2.alias]
+        ~force:true
+        client
+    in
+
+    log_step 4 "Check that both endorsements are in the applied mempool." ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (2 = List.length mempool.applied)
+        int
+        ~error_msg:
+          "number of mempool applied operations expected to be %L, got %R") ;
+
+    log_step 5 "Bake two empty block to force endorsements to be outdated." ;
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+
+    log_step 4 "Check that only one endorsement is in the outdated mempool." ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (max_refused_operations = List.length mempool.outdated)
+        int
+        ~error_msg:
+          "number of mempool outdated operations expected to be %L, got %R") ;
+    Check.(
+      (Mempool.empty = {mempool with outdated = []})
+        Mempool.classified_typ
+        ~error_msg:"the rest of the mempool should be empty got %R") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3808,6 +3875,7 @@ let register ~protocols =
   Revamped.max_refused_operations_branch_delayed ~protocols ;
   Revamped.max_refused_operations_branch_refused ~protocols ;
   Revamped.max_refused_operations_refused ~protocols ;
+  Revamped.max_refused_operations_outdated ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
