@@ -1,7 +1,7 @@
-#! /usr/bin/env bash
+#!/bin/sh
 
 # TODO tezos/tezos#2170: search shifted protocol name/number & adapt
-trap 'exit $?' ERR
+set -e
 set -x
 # [install prerequisites]
 apt-get update

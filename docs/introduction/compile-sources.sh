@@ -1,7 +1,10 @@
-#! /usr/bin/env bash
+#!/bin/sh
 # shellcheck source=/dev/null
+# for not checking the existence of sourced file $HOME/.cargo/env
 # shellcheck disable=SC2046
+# for omitting quotes in: eval $(opam env)
 # shellcheck disable=SC2086
+# for omitting quotes in: source $HOME/.cargo/env
 
 set -e
 set -x
@@ -18,7 +21,7 @@ wget https://sh.rustup.rs/rustup-init.sh
 chmod +x rustup-init.sh
 ./rustup-init.sh --profile minimal --default-toolchain 1.52.1 -y
 # [source cargo]
-source $HOME/.cargo/env
+. $HOME/.cargo/env
 # [get sources]
 git clone https://gitlab.com/tezos/tezos.git
 cd tezos
@@ -31,7 +34,7 @@ eval $(opam env)
 make
 # [optional setup]
 export PATH=~/tezos:$PATH
-source ./src/bin_client/bash-completion.sh
+. ./src/bin_client/bash-completion.sh
 export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 # [test executable]
 ./tezos-client

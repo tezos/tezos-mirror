@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/bin/sh
 
 # TODO tezos/tezos#2170: search shifted protocol name/no; rename script
 set -e
