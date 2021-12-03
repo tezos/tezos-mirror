@@ -374,9 +374,7 @@ module Make
 
   type prevalidation_t = Prevalidation_t.t
 
-  module Proto = Filter.Proto
-
-  let name = (Arg.chain_id, Proto.hash)
+  let name = (Arg.chain_id, Filter.Proto.hash)
 
   type 'operation_data operation = 'operation_data Prevalidation.operation
 
@@ -388,7 +386,7 @@ module Make
       (Classification.classification
       * Operation_hash.t
       * Operation.shell_header
-      * Proto.operation_data)
+      * Filter.Proto.operation_data)
       Lwt_watcher.input;
     mutable rpc_directory : types_state RPC_directory.t lazy_t;
     mutable filter_config : filter_config;
@@ -453,14 +451,15 @@ module Make
          Classification.classification ->
          Operation_hash.t ->
          Operation.shell_header ->
-         Proto.operation_data ->
+         Filter.Proto.operation_data ->
          unit) shell op kind =
     (match op with
-    | `Parsed ({hash; raw; _} : Proto.operation_data operation)
+    | `Parsed ({hash; raw; _} : Filter.Proto.operation_data operation)
     | `Unparsed (hash, raw) ->
         Classification.add kind hash raw shell.classification) ;
     match op with
-    | `Parsed ({raw; protocol_data; hash} : Proto.operation_data operation) ->
+    | `Parsed
+        ({raw; protocol_data; hash} : Filter.Proto.operation_data operation) ->
         notifier kind hash raw.shell protocol_data
     | _ -> ()
 
@@ -520,7 +519,7 @@ module Make
       shell.mempool
 
   let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
-      oph (op : Proto.operation_data operation) =
+      oph (op : Filter.Proto.operation_data operation) =
     let validation_state = Prevalidation_t.validation_state validation_state in
     if disable_precheck then Lwt.return `Undecided
     else
@@ -736,7 +735,9 @@ module Make
   let build_rpc_directory w =
     lazy
       (let dir : state RPC_directory.t ref = ref RPC_directory.empty in
-       let module Proto_services = Block_services.Make (Proto) (Proto) in
+       let module Proto_services =
+         Block_services.Make (Filter.Proto) (Filter.Proto)
+       in
        dir :=
          RPC_directory.register
            !dir
@@ -798,7 +799,7 @@ module Make
              let map_op op =
                match Prevalidation_t.parse_unsafe op.Operation.proto with
                | Ok protocol_data ->
-                   Some {Proto.shell = op.shell; protocol_data}
+                   Some {Filter.Proto.shell = op.shell; protocol_data}
                | Error _ -> None
              in
              let map_op_error oph (op, error) acc =
@@ -884,7 +885,10 @@ module Make
                match Prevalidation_t.parse_unsafe op.Operation.proto with
                | Error _ -> None
                | Ok protocol_data ->
-                   Some (hash, Proto.{shell = op.shell; protocol_data}, error)
+                   Some
+                     ( hash,
+                       Filter.Proto.{shell = op.shell; protocol_data},
+                       error )
              in
              let fold_op hash (op, error) acc =
                match map_op error (hash, op) with
@@ -952,7 +956,7 @@ module Make
                          | `Outdated errors -> errors
                        in
                        Lwt.return_some
-                         [((hash, {Proto.shell; protocol_data}), errors)]
+                         [((hash, {Filter.Proto.shell; protocol_data}), errors)]
                    | Some _ -> next ()
                    | None -> Lwt.return_none)
              in
