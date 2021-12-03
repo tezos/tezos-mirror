@@ -6,7 +6,7 @@ Support for load balanced batching of tests.
 import os
 import re
 import argparse
-from typing import Dict, List, Tuple, Any, Callable
+from typing import Dict, List, Tuple, Any, Callable, Sequence
 import xml.etree.ElementTree as ET
 from operator import itemgetter
 from datetime import timedelta
@@ -21,7 +21,9 @@ DEFAULT_TEST_TIME = 60.0
 
 # The solution of a knapsack is a list of Bag, where each Bag contains
 # the `total_weight` of the `items` in that bag.
-Bag = TypedDict('Bag', {'total_weight': float, 'items': List[Any]})
+Bag = TypedDict(
+    'Bag', {'total_weight': float, 'items': List[Tuple[Any, float]]}
+)
 
 
 # Get the nodeid mangler from the junitxml plugin
@@ -111,7 +113,7 @@ def knapsack(items: List[Tuple[Any, float]], bag_count: int) -> List[Bag]:
                 min_total_weight = bag['total_weight']
                 min_index = index + 1
         knapsack[min_index]['total_weight'] += weight
-        knapsack[min_index]['items'].append(item)
+        knapsack[min_index]['items'].append((item, weight))
 
     return knapsack
 
@@ -173,27 +175,49 @@ def tabulate(
         print()
 
 
+def pp_time(seconds: float) -> str:
+    """Pretty print a duration in seconds"""
+    return str(timedelta(seconds=int(seconds)))
+
+
 def job_selection_dry_run(
     jobs_total: int,
     job_current: int,
     jobs_bags: List[Bag],
-    timing_items: List[Tuple[str, float]],
+    timings_selected_items: List[Tuple[str, float]],
+    prev_timings: Dict[str, float],
 ) -> None:
     """
     Runs no tests but prints debugging information
     """
 
-    print("Jobs: weight and contents")
     items_collapsed = [
-        [job_idx + 1, bag['total_weight'], len(bag['items'])]
+        (job_idx + 1, bag['total_weight'], len(bag['items']))
         for job_idx, bag in enumerate(jobs_bags)
     ]
-    tabulate(["jobs", "weight", "#classes"], items_collapsed)
+
+    print("Jobs: weight and contents")
+    tabulate(
+        ["job", "weight", "#classes"],
+        [
+            [job_idx, pp_time(total_weight), length]
+            for (job_idx, total_weight, length) in items_collapsed
+        ],
+    )
+
+    print()
+    print("Jobs: weight and full contents")
+    items_full = [
+        [job_idx + 1, classname, pp_time(weight)]
+        for job_idx, bag in enumerate(jobs_bags)
+        for (classname, weight) in bag['items']
+    ]
+    tabulate(["job", "class", "weight"], items_full)
 
     print()
     print("Jobs: statistics")
 
-    def avg(vals: List[float]):
+    def avg(vals: Sequence[float]):
         return sum(vals) / len(vals)
 
     weights = [item[1] for item in items_collapsed]
@@ -209,9 +233,9 @@ def job_selection_dry_run(
     ]
     row = [
         f"jobs_total={jobs_total}",
-        str(timedelta(seconds=avg(weights))),
-        str(timedelta(seconds=min(weights))),
-        str(timedelta(seconds=max(weights))),
+        pp_time(avg(weights)),
+        pp_time(min(weights)),
+        pp_time(max(weights)),
         str(avg(lengths)),
         str(min(lengths)),
         str(max(lengths)),
@@ -229,48 +253,76 @@ def job_selection_dry_run(
     tabulate(
         ['weight', 'class'],
         [
-            [str(timedelta(seconds=item[1])), str(item[0])]
-            for item in timing_items[0:10]
+            [pp_time(item[1]), str(item[0])]
+            for item in timings_selected_items[0:10]
         ],
     )
 
     print()
-    print("Would run test classes:")
+    print(f"Would run test classes in job {job_current + 1}/{jobs_total}:")
+    current_job_classes = [
+        class_name for (class_name, weight) in jobs_bags[job_current]['items']
+    ]
     tabulate(
-        ['weight', 'class'],
+        ['class', 'weight'],
         [
-            [str(timedelta(seconds=item[1])), str(item[0])]
-            for item in timing_items
-            if item[0] in jobs_bags[job_current]['items']
+            [item[0], pp_time(item[1])]
+            for item in timings_selected_items
+            if item[0] in current_job_classes
         ],
     )
+
+    if prev_timings:
+        # all class names that have been selected (included by the
+        # user on the command line, but not necessarily in the current
+        # job)
+        selected_classes = [
+            class_name for (class_name, _) in timings_selected_items
+        ]
+
+        # all classes that have a timing from the junit files but
+        # which have not been selected
+        unselected_timings = [
+            class_name
+            for (class_name, _) in prev_timings.items()
+            if class_name not in selected_classes
+        ]
+        print()
+        print("Orphaned classes from previous timings file:")
+        for class_name in unselected_timings:
+            print(class_name)
 
 
 def job_selection(
     config: _pytest.config.Config,
     items: List[pytest.Item],
-    timings: Dict[str, float],
+    prev_timings: Dict[str, float],
     jobs_total: int,
     job_current: int,
     dry_run: bool,
 ) -> None:
-    # Give dummy values for tests lacking timings
+    # Only select timings for jobs that were previously collected,
+    # and give dummy values for collected tests lacking timings
+    timings_selected: Dict[str, float] = {}
     for item in items:
         junit_classname = classname_of_nodeid(config, item.nodeid)
-        if junit_classname not in timings:
-            timings[junit_classname] = DEFAULT_TEST_TIME
+        timings_selected[junit_classname] = prev_timings.get(
+            junit_classname, DEFAULT_TEST_TIME
+        )
 
     # Sort timings by descending time
-    timing_items = sorted(timings.items(), key=itemgetter(1), reverse=True)
+    timings_selected_items = sorted(
+        timings_selected.items(), key=itemgetter(1), reverse=True
+    )
 
     # Batch test classes
-    jobs_bags = knapsack(timing_items, jobs_total)
+    jobs_bags = knapsack(timings_selected_items, jobs_total)
 
     # Map classes to bags
     jobs_bags_rev = {
         class_name: index
         for (index, bag) in enumerate(jobs_bags)
-        for class_name in bag['items']
+        for (class_name, weight) in bag['items']
     }
 
     def select(item: pytest.Item) -> bool:
@@ -285,7 +337,13 @@ def job_selection(
     # Filter test items in place
     if dry_run:
         print("dry run")
-        job_selection_dry_run(jobs_total, job_current, jobs_bags, timing_items)
+        job_selection_dry_run(
+            jobs_total,
+            job_current,
+            jobs_bags,
+            timings_selected_items,
+            prev_timings,
+        )
         items[:] = []
     else:
         items[:] = [item for item in items if select(item)]
@@ -331,15 +389,15 @@ def pytest_collection_modifyitems(
                 + '--prev-junit-xml does not exist'
             )
         else:
-            timings = read_prev_timings(prev_junit_xml)
+            prev_timings = read_prev_timings(prev_junit_xml)
     else:
-        timings = {}
+        prev_timings = {}
 
     print(
-        f"(job selection: {job_current+1}/{jobs_total} with "
-        + f" {len(timings)} timings from {prev_junit_xml})"
+        f"(job selection: {job_current+1}/{jobs_total} with"
+        + f" {len(prev_timings)} timings from {prev_junit_xml})"
     )
 
-    job_selection(config, items, timings, jobs_total, job_current, dry_run)
+    job_selection(config, items, prev_timings, jobs_total, job_current, dry_run)
 
     return None
