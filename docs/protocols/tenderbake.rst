@@ -100,20 +100,21 @@ The balance updates have been updated as follows:
 - The following new balance types have been introduced:
 
   - deposits, with the kind ``freezer``, category ``deposits``, and 3rd field ``delegate``;
-  - nonce revelation rewards, with the kind ``minted`` and category ``rewards``;
-  - double signing evidence rewards, with the kind ``minted`` and category ``rewards``;
-  - endorsing rewards, with the kind ``minted`` and category ``rewards``;
-  - baking rewards, with the kind ``minted`` and category ``rewards``;
-  - baking bonuses, with the kind ``minted`` and category ``rewards``;
-  - block fees, with the kind ``accumulator`` and category ``fees``;
-  - storage fees, with the kind ``burned`` and category ``storage_fees``;
+  - nonce revelation rewards, with the kind ``minted`` and category ``nonce revelation rewards``;
+  - double signing evidence rewards, with the kind ``minted`` and category ``double signing evidence rewards``;
+  - endorsing rewards, with the kind ``minted`` and category ``endorsing rewards``;
+  - baking rewards, with the kind ``minted`` and category ``baking rewards``;
+  - baking bonuses, with the kind ``minted`` and category ``baking bonuses``;
+  - block fees, with the kind ``accumulator`` and category ``block fees``;
+  - storage fees, with the kind ``burned`` and category ``storage fees``;
   - double signing punishments, with the kind ``burned`` and category ``punishments``;
-  - lost endorsing rewards, with the kind ``burned``, category ``rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of unsufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
+  - lost endorsing rewards, with the kind ``burned``, category ``lost endorsing rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of unsufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
   - liquidity baking subsidies, with the kind ``minted`` and category ``subsidy``;
-  - commitments, with the kind ``commitments`` and category ``commitment``;
+  - commitments, with the kind ``commitment`` and category ``commitment``;
   - invoices, with the kind ``minted`` and category ``invoice``;
 
-- The following new balance types are for internal use, they will not appear in the metadata during normal operation on mainnet :
+- The following new balance types are for internal use, they will not appear in the metadata during normal operation on mainnet,
+  but may appear on test networks, or in sandboxed mode:
 
   - "bootstrap" with the kind ``minted`` and category ``bootstrap``;
   - "initial commitments", with the kind ``minted`` and category ``commitment``;

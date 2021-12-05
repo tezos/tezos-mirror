@@ -61,6 +61,8 @@ Tenderbake
 
 - Address comments on Tenderbake. (MR :gl:`!3906`)
 
+- Fix issues with receipts (MR :gl:`!3987`)
+
 Tickets Hardening
 -----------------
 
