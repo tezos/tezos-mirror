@@ -48,7 +48,7 @@ Injected block at minimal timestamp
 Injected block at minimal timestamp
 none
 Node is bootstrapped.
-Estimated gas: 3055.975 units (will add 100 for safety)
+Estimated gas: 3056.175 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -61,7 +61,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000612
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3156
+    Gas limit: 3157
     Storage limit: 0 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.000612
@@ -74,7 +74,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 51 bytes
-      Consumed gas: 2055.975
+      Consumed gas: 2056.175
     Internal operations:
       Delegation:
         Contract: [CONTRACT_HASH]

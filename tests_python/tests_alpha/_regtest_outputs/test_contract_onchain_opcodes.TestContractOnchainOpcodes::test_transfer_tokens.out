@@ -143,7 +143,7 @@ Injected block at minimal timestamp
 [CONTRACT_HASH]
 
 Node is bootstrapped.
-Estimated gas: 4581.026 units (will add 100 for safety)
+Estimated gas: 5177.026 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -154,13 +154,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000766
+    Fee to the baker: ꜩ0.000825
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 4682
+    Gas limit: 5278
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.000766
-      payload fees(the block proposer) ....... +ꜩ0.000766
+      [CONTRACT_HASH] ... -ꜩ0.000825
+      payload fees(the block proposer) ....... +ꜩ0.000825
     Transaction:
       Amount: ꜩ100
       From: [CONTRACT_HASH]
@@ -169,7 +169,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 66 bytes
-      Consumed gas: 2532.352
+      Consumed gas: 3128.352
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
@@ -191,7 +191,7 @@ Injected block at minimal timestamp
 [CONTRACT_HASH]
 
 Node is bootstrapped.
-Estimated gas: 3727.909 units (will add 100 for safety)
+Estimated gas: 4323.909 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -202,13 +202,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.00068
+    Fee to the baker: ꜩ0.00074
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3828
+    Gas limit: 4424
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.00068
-      payload fees(the block proposer) ....... +ꜩ0.00068
+      [CONTRACT_HASH] ... -ꜩ0.00074
+      payload fees(the block proposer) ....... +ꜩ0.00074
     Transaction:
       Amount: ꜩ100
       From: [CONTRACT_HASH]
@@ -217,7 +217,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: Unit
       Storage size: 66 bytes
-      Consumed gas: 1679.235
+      Consumed gas: 2275.235
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100
