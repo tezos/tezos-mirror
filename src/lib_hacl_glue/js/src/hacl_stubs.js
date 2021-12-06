@@ -8,13 +8,16 @@ function hacl_create_buffer(bytes) {
 }
 
 //Provides: hacl_blit_buf_to_bytes
-//Requires: caml_ml_bytes_length, caml_bytes_of_array, caml_blit_bytes
+//Requires: caml_ml_bytes_length, caml_bytes_of_array, caml_blit_bytes, caml_invalid_argument
 function hacl_blit_buf_to_bytes(buf, bytes) {
-    var len1 = caml_ml_bytes_length(bytes);
-    var buf = caml_bytes_of_array(buf);
-    var len2 = caml_ml_bytes_length(buf);
-    caml_blit_bytes(buf,0,bytes,0,Math.min(len1,len2));
-    return 0;
+  var len_bytes = caml_ml_bytes_length(bytes);
+  var buf = caml_bytes_of_array(buf);
+  var len_buf = caml_ml_bytes_length(buf);
+  if (len_bytes < len_buf) {
+    caml_invalid_argument("hacl_blit_buf_to_bytes: bytes too small, need " + len_buf +  ", got " + len_bytes);
+  }
+  caml_blit_bytes(buf,0,bytes,0,len_buf);
+  return 0;
 }
 
 //Provides: hacl_to_bool
@@ -28,25 +31,27 @@ function hacl_zero_is_true(x) {
 }
 
 //Provides: _1_Lib_RandomBuffer_System_randombytes
-//Requires: hacl_blit_buf_to_bytes
+//Requires: hacl_blit_buf_to_bytes, caml_ml_bytes_length
 function _1_Lib_RandomBuffer_System_randombytes(buf) {
-  return ((typeof self !== 'undefined' && (self.crypto || self.msCrypto))
-    ? function() { // Browsers
-      var crypto = (self.crypto || self.msCrypto), QUOTA = 65536;
-      return function(n) {
-        var result = new joo_global_object.Uint8Array(n);
-        for (var i = 0; i < n; i += QUOTA) {
-          crypto.getRandomValues(result.subarray(i, i + Math.min(n - i, QUOTA)));
-        }
-        hacl_blit_buf_to_bytes(result, buf);
-        return true;
-      };
+  function browser(buf) {
+    var n = caml_ml_bytes_length(buf);
+    var crypto = (self.crypto || self.msCrypto), QUOTA = 65536;
+    var result = new joo_global_object.Uint8Array(n);
+    for (var i = 0; i < n; i += QUOTA) {
+      crypto.getRandomValues(result.subarray(i, i + Math.min(n - i, QUOTA)));
     }
-    : function() { // Node
-      var result = require("crypto").randomBytes(60);
-      hacl_blit_buf_to_bytes(result, buf);
-      return true;
-    })(buf)
+    hacl_blit_buf_to_bytes(result, buf);
+    return true;
+  }
+  function node(buf) {
+    var n = caml_ml_bytes_length(buf);
+    var result = require("crypto").randomBytes(n);
+    hacl_blit_buf_to_bytes(result, buf);
+    return true;
+  }
+  return ((typeof self !== 'undefined' && (self.crypto || self.msCrypto))
+          ? browser
+          : node) (buf)
 }
 
 
