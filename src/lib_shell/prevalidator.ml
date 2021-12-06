@@ -247,6 +247,11 @@ type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
 
 module Classification = Prevalidator_classification
 
+(** This module encapsulates pending operations to maintain them in two
+    different data structure and avoid coslty repetitive convertions when
+    handling batches in [classify_pending_operations]. *)
+module Pending_ops = Prevalidator_pending_operations
+
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
 type types_state_shell = {
@@ -257,7 +262,7 @@ type types_state_shell = {
   mutable live_blocks : Block_hash.Set.t;
   mutable live_operations : Operation_hash.Set.t;
   mutable fetching : Operation_hash.Set.t;
-  mutable pending : Operation.t Operation_hash.Map.t;
+  mutable pending : Pending_ops.t;
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
   mutable banned_operations : Operation_hash.Set.t;
@@ -420,7 +425,7 @@ module Make
       Event.(emit ban_operation_encountered) (origin, oph) >|= fun () -> true
     else
       Lwt.return
-        (Operation_hash.Map.mem oph shell.pending
+        (Pending_ops.mem oph shell.pending
         || Operation_hash.Set.mem oph shell.fetching
         || Operation_hash.Set.mem oph shell.live_operations
         || Operation_hash.Set.mem oph shell.classification.in_mempool)
@@ -622,13 +627,13 @@ module Make
      all our pending operations. *)
   let classify_pending_operations ~notifier w shell filter_config filter_state
       state =
-    Operation_hash.Map.fold_es
+    Pending_ops.fold_es
       (fun oph op (acc_filter_state, acc_validation_state, acc_mempool, limit) ->
         if limit <= 0 then
           (* Using Error as an early-return mechanism *)
           Lwt.return_error (acc_filter_state, acc_validation_state, acc_mempool)
         else (
-          shell.pending <- Operation_hash.Map.remove oph shell.pending ;
+          shell.pending <- Pending_ops.remove oph shell.pending ;
           classify_operation
             ~notifier
             shell
@@ -659,7 +664,7 @@ module Make
     | Error err ->
         (* At the time this comment was written (26/05/21), this is dead
            code since [Proto.begin_construction] cannot fail. *)
-        Operation_hash.Map.iter
+        Pending_ops.iter
           (fun oph op ->
             handle
               ~notifier
@@ -667,49 +672,43 @@ module Make
               (`Unparsed (oph, op))
               (`Branch_delayed err))
           pv.shell.pending ;
-        pv.shell.pending <- Operation_hash.Map.empty ;
+        pv.shell.pending <- Pending_ops.empty ;
         Lwt.return_unit
-    | Ok state -> (
-        match Operation_hash.Map.cardinal pv.shell.pending with
-        | 0 -> Lwt.return_unit
-        | n ->
-            Event.(emit processing_n_operations) n >>= fun () ->
-            classify_pending_operations
-              ~notifier
-              w
-              pv.shell
-              pv.filter_config
-              pv.filter_state
-              state
-            >>= fun (filter_state, state, advertised_mempool) ->
-            let remaining_pendings =
-              Operation_hash.Map.fold
-                (fun k _ acc -> Operation_hash.Set.add k acc)
-                pv.shell.pending
-                Operation_hash.Set.empty
-            in
-            pv.filter_state <- filter_state ;
-            pv.validation_state <- Ok state ;
-            (* We advertise only newly classified operations. *)
-            let mempool_to_advertise =
-              {
-                advertised_mempool with
-                known_valid = List.rev advertised_mempool.known_valid;
-              }
-            in
-            advertise w pv.shell mempool_to_advertise ;
-            let our_mempool =
-              {
-                (* Using List.rev_map is ok since the size of pv.shell.classification.applied
-                   cannot be too big. *)
-                (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
-                   This field does not only contain valid operation *)
-                Mempool.known_valid =
-                  List.rev_map fst pv.shell.classification.applied_rev;
-                pending = remaining_pendings;
-              }
-            in
-            set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ())
+    | Ok state ->
+        if Pending_ops.is_empty pv.shell.pending then Lwt.return_unit
+        else
+          Event.(emit processing_operations) () >>= fun () ->
+          classify_pending_operations
+            ~notifier
+            w
+            pv.shell
+            pv.filter_config
+            pv.filter_state
+            state
+          >>= fun (filter_state, state, advertised_mempool) ->
+          let remaining_pendings = Pending_ops.hashes pv.shell.pending in
+          pv.filter_state <- filter_state ;
+          pv.validation_state <- Ok state ;
+          (* We advertise only newly classified operations. *)
+          let mempool_to_advertise =
+            {
+              advertised_mempool with
+              known_valid = List.rev advertised_mempool.known_valid;
+            }
+          in
+          advertise w pv.shell mempool_to_advertise ;
+          let our_mempool =
+            {
+              (* Using List.rev_map is ok since the size of pv.shell.classification.applied
+                 cannot be too big. *)
+              (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
+                 This field does not only contain valid operation *)
+              Mempool.known_valid =
+                List.rev_map fst pv.shell.classification.applied_rev;
+              pending = remaining_pendings;
+            }
+          in
+          set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ()
 
   (** Mimics [Data_encoding.Json.construct] but accepts argument
       [?include_default_fields] to pass on to [Json_encoding.construct]. *)
@@ -840,7 +839,7 @@ module Make
                  (Classification.map pv.shell.classification.branch_delayed)
              in
              let unprocessed =
-               Operation_hash.Map.fold
+               Pending_ops.fold
                  (fun oph op acc ->
                    match map_op op with
                    | Some op -> Operation_hash.Map.add oph op acc
@@ -995,7 +994,7 @@ module Make
             else (
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                  Should this have an influence on the peer's score ? *)
-              pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
+              pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
               return_unit)
         | false -> return_unit
 
@@ -1009,7 +1008,7 @@ module Make
       else if force then (
         Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
         >>= fun (_ : bool) ->
-        pv.shell.pending <- Operation_hash.Map.add oph op pv.shell.pending ;
+        pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
         return_unit)
       else if
         not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
@@ -1028,7 +1027,7 @@ module Make
             Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
             >>= fun (_ : bool) ->
             pv.shell.pending <-
-              Operation_hash.Map.add parsed_op.hash op pv.shell.pending ;
+              Pending_ops.add parsed_op.hash op pv.shell.pending ;
             return_unit
         | res ->
             failwith
@@ -1133,7 +1132,7 @@ module Make
         ~to_branch:new_predecessor
         ~live_blocks:new_live_blocks
         ~classification:pv.shell.classification
-        ~pending:pv.shell.pending
+        ~pending:(Pending_ops.operations pv.shell.pending)
         ~block_store:block_tools
         ~chain:(mk_chain_tools pv.shell.parameters.chain_db)
         ~handle_branch_refused
@@ -1141,7 +1140,7 @@ module Make
       (* Could be implemented as Operation_hash.Map.filter_s which
          does not exist for the moment. *)
       Operation_hash.Map.fold_s
-        (fun oph op pending ->
+        (fun oph op (pending, nb_pending) ->
           pre_filter
             pv.shell
             ~filter_config:pv.filter_config
@@ -1152,14 +1151,12 @@ module Make
             oph
             op
           >|= function
-          | true -> Operation_hash.Map.add oph op pending
-          | false -> pending)
+          | true -> (Pending_ops.add oph op pending, nb_pending + 1)
+          | false -> (pending, nb_pending))
         new_pending_operations
-        Operation_hash.Map.empty
-      >>= fun new_pending_operations ->
-      Event.(emit operations_to_reclassify)
-        (Operation_hash.Map.cardinal new_pending_operations)
-      >>= fun () ->
+        (Pending_ops.empty, 0)
+      >>= fun (new_pending_operations, nb_pending) ->
+      Event.(emit operations_to_reclassify) nb_pending >>= fun () ->
       pv.shell.pending <- new_pending_operations ;
       set_mempool pv.shell Mempool.empty
 
@@ -1202,9 +1199,9 @@ module Make
             pv.shell.live_blocks
             pv.shell.live_operations
           >|=? fun () ->
-          pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending
+          pv.shell.pending <- Pending_ops.remove oph pv.shell.pending
       else (
-        pv.shell.pending <- Operation_hash.Map.remove oph pv.shell.pending ;
+        pv.shell.pending <- Pending_ops.remove oph pv.shell.pending ;
         pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
         return_unit)
 
@@ -1297,7 +1294,7 @@ module Make
           live_operations;
           mempool = Mempool.empty;
           fetching;
-          pending = Operation_hash.Map.empty;
+          pending = Pending_ops.empty;
           advertisement = `None;
           banned_operations = Operation_hash.Set.empty;
         }

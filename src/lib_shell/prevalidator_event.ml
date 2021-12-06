@@ -64,13 +64,13 @@ let unparsable_operation =
     ~level:Debug
     ("oph", Operation_hash.encoding)
 
-let processing_n_operations =
-  declare_1
+let processing_operations =
+  declare_0
     ~section
-    ~name:"processing_n_operations"
-    ~msg:"processing {count} operations"
+    ~name:"processing_operations"
+    ~msg:"processing operations"
     ~level:Debug
-    ("count", Data_encoding.int31)
+    ()
 
 let fetching_operation =
   declare_1
