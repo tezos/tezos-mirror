@@ -54,7 +54,7 @@ type run_view_params = {
 type run_params = {
   shared_params : simulation_params;
   amount : Tez.t option;
-  balance : Tez.t;
+  balance : Tez.t option;
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
   entrypoint : Entrypoint.t option;

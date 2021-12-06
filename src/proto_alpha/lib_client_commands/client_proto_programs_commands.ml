@@ -103,10 +103,9 @@ let commands () =
       ()
   in
   let balance_arg =
-    Client_proto_args.tez_arg
+    Client_proto_args.tez_opt_arg
       ~parameter:"balance"
       ~doc:"balance of run contract in \xEA\x9C\xA9"
-      ~default:"4_000_000"
   in
   let now_arg = Client_proto_args.now_arg in
   let level_arg = Client_proto_args.level_arg in

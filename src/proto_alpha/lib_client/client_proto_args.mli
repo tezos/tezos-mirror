@@ -99,6 +99,9 @@ val no_confirmation : (bool, full) Clic.arg
 val tez_arg :
   default:string -> parameter:string -> doc:string -> (Tez.t, full) Clic.arg
 
+val tez_opt_arg :
+  parameter:string -> doc:string -> (Tez.t option, full) Clic.arg
+
 val tez_param :
   name:string ->
   desc:string ->
