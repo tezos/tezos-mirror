@@ -361,16 +361,18 @@ module HashStability = struct
       The resulting tree may or may not be shallowed (i.e. exactly the same as
       the input one). *)
   let rec make_partial_shallow_tree repo tree =
+    let open Lwt_syntax in
     if (Store.Tree.hash tree |> Context_hash.hash) mod 2 = 0 then
       (* Full shallow *)
       Lwt.return @@ make_tree_shallow repo tree
     else
       (* Maybe shallow some sub-trees *)
-      Store.Tree.list tree [] >>= fun dir ->
+      let* dir = Store.Tree.list tree [] in
       Lwt_list.fold_left_s
         (fun wip_tree (key, sub_tree) ->
-          make_partial_shallow_tree repo sub_tree
-          >>= fun partial_shallowed_sub_tree ->
+          let* partial_shallowed_sub_tree =
+            make_partial_shallow_tree repo sub_tree
+          in
           Store.Tree.add_tree wip_tree [key] partial_shallowed_sub_tree)
         tree
         dir
@@ -524,6 +526,7 @@ module Consensus = struct
       returns [consensus_expected]. [randoms] is used to inject randomness in the rogue behaviour. *)
   let test_consensus min_agreement nb_honest nb_rogue key mtree randoms
       consensus_expected =
+    let open Lwt_syntax in
     assert (nb_honest >= 0) ;
     assert (nb_rogue >= 0) ;
     (* Because the consensus algorithm expects the merkle tree not to contain
@@ -542,8 +545,9 @@ module Consensus = struct
     let module Consensus = Tezos_proxy.Light_consensus.Make (Light_proto) in
     let printer = mock_printer () in
     let repo = Lwt_main.run (Store.Tree.make_repo ()) in
-    Internal.Merkle.merkle_tree_to_irmin_tree repo mtree >|= get_ok
-    >>= fun tree ->
+    let* tree =
+      Internal.Merkle.merkle_tree_to_irmin_tree repo mtree >|= get_ok
+    in
     let input : Tezos_proxy.Light_consensus.input =
       {
         printer = (printer :> Tezos_client_base.Client_context.printer);
@@ -562,9 +566,8 @@ module Consensus = struct
           (uri, endpoint))
         endpoints_and_rogueness
     in
-    Consensus.consensus input validating_endpoints >>= fun consensus_reached ->
-    Lwt.return
-    @@ qcheck_eq ~pp:Format.pp_print_bool consensus_expected consensus_reached
+    let+ consensus_reached = Consensus.consensus input validating_endpoints in
+    qcheck_eq ~pp:Format.pp_print_bool consensus_expected consensus_reached
 end
 
 let add_test_consensus (min_agreement, honest, rogue, consensus_expected) =

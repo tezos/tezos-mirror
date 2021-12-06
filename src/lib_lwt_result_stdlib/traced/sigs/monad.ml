@@ -137,9 +137,9 @@ module type S = sig
       ('b, 'e trace) result Lwt.t ->
       ('a * 'b, 'e trace) result Lwt.t
 
-    val lwt_ok : 'a Lwt.t -> ('a, 'e) result Lwt.t
+    val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
-    val bind_from_result :
+    val ( let*? ) :
       ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
 
     val join :

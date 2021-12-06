@@ -97,9 +97,9 @@ module Lwt_result_syntax = struct
 
   let lwt_map_error = Lwt_result.map_err
 
-  let lwt_ok = Lwt_result.ok
+  let ( let*! ) = Lwt.bind
 
-  let bind_from_result r f =
+  let ( let*? ) r f =
     match r with Ok v -> f v | Error _ as err -> Lwt.return err
 
   let join ts =

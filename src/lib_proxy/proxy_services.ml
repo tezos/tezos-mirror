@@ -310,17 +310,16 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           block_key
       in
       fill_b2h @@ initial_context.block_hash ;
-      let* () =
-        lwt_ok
-        @@ schedule_clearing
-             printer
-             rpc_context
-             proxy_env
-             mode
-             envs_cache
-             key
-             chain
-             block
+      let*! () =
+        schedule_clearing
+          printer
+          rpc_context
+          proxy_env
+          mode
+          envs_cache
+          key
+          chain
+          block
       in
       return initial_context
     in

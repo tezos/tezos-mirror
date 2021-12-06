@@ -72,28 +72,28 @@
     Finally, the {!Lwt_result_syntax} module includes two facilities for lifting
     values from the more specilaised Lwt-only and Result-only monads.
 
-    {!Lwt_result_syntax.lwt_ok} lifts a plain Lwt promise into an Lwt-Result
-    promise. It is used in combination with [let*]:
+    [let*!] binds a plain Lwt promise into an Lwt-Result promise.
 
 {[
 let open Lwt_result_syntax in
-let* x = lwt_ok @@ f a b c in
+let*! x = f a b c in
 …
 ]}
 
-    {!Lwt_result_syntax.bind_from_result} binds a plain result value into an
-    Lwt-Result promise. It is used as a prefix-bind, with a contnuation:
+    [let*?] binds a plain result into an Lwt-Result promise.
 
 {[
 let open Lwt_result_syntax in
-bind_from_result (f u v w) @@ fun y ->
+let*? y = f u v w in
 …
 ]}
 
     In the cases where performance is not a grave concern, it is also possible to
-    use [Lwt.return] as a simple lifting function in the same style as [lwt_ok].
+    use [Lwt_result.ok] to lift Lwt-only expressions and [Lwt.return] to lift
+    result-only expressions.
     More details on the matter within the documentation of
-    {!Lwt_result_syntax.bind_from_result} itself. *)
+    {!Lwt_result_syntax.( let*! )} and {!Lwt_result_syntax.( let*? )}
+    themselves. *)
 
 module type S = sig
   (** {1 The tower of monads} *)
@@ -306,61 +306,46 @@ in
         out of the monad). In addition, the former is for aborting computations
         on failures whereas the latter is for waiting before continuing.
 
-        Consequently, the approaches for mixing in expressions from either of
-        these two monads are fundamentally different. *)
+        Still, from a syntax point-of-view, both are handled the same way: with
+        a specialised binding operator. *)
 
-    (** [lwt_ok] is for lifing an Lwt-only expression into the LwtResult monad.
-        [lwt_ok p] is equivalent to [Lwt.bind p (fun x -> Lwt.return (Ok x))].
+    (** [let*!] is for binding Lwt-only expressions into the LwtResult combined
+        monad.
 
 {[
 let open Lwt_result_syntax in
 let* x = … in
-let* y = lwt_ok @@ … in
+let*! y = … in
 return (x + y)
 ]}
 
         *)
-    val lwt_ok : 'a Lwt.t -> ('a, 'e) result Lwt.t
+    val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 
-    (** [bind_from_result] is for binding the value from a Result-only
-        expression into the LwtResult combined monad.
-
-        If you code doesn't make heavy use of Result-only expressions, you can
-        use the functions as is. You can also use it in a pseudo-infix manner
-        using [@@ fun _ ->], e.g.,
+    (** [let*?] is for binding the value from Result-only
+        expressions into the LwtResult combined monad.
 
 {[
 let open Lwt_result_syntax in
-let* x = … in
-let y_result = … in
-bind_from_result y_result @@ fun y ->
-…
-]}
-
-        If you are using code that mixes single and combined monad a lot, you
-        can also locally define a specialised binding operator as follows:
-
-{[
-let open Lwt_result_syntax in
-let ( let*? ) = bind_from_result in
 let* x = … in
 let*? y = … in
 …
-]}
-
-        Other uses are also acceptable. Simply make sure the code is readable.
-
-        Note that binding from Result-only into the LwtResult combined monad is
-        moderately more efficient than lifting. Indeed, if you are in a
-        situation where performance is unimportant, you can simply use {!let*}
-        and wrap the bound expression with [Lwt.return]. (E.g.,
-        [let* y = Lwt.return @@ … in …].)
-
-        However, if you are in performance-critical parts of the code, you
-        should avoid this lifting and use [bind_from_result] as demonstrated
-        above. *)
-    val bind_from_result :
+]} *)
+    val ( let*? ) :
       ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+
+    (** Note that you can mix [let*], [let*!], and [let*?] as needed, within a
+        single expression.
+
+{[
+let do_thing param =
+  let open Lwt_result_syntax in
+  let*? () = check_p param in (* Result-only for parameter checking *)
+  let*! () = log "starting doing the thing" in (* Lwt-only for infallible logging *)
+  let* r = thing param in
+  let*! () = log "done doing the thing" in (* Lwt-only for infallible logging *)
+  return r
+]} *)
 
     (** [join] is the joining of concurrent success/failure unit values. *)
     val join : (unit, 'e) result Lwt.t list -> (unit, 'e list) result Lwt.t

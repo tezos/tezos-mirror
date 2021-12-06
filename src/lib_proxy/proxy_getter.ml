@@ -205,9 +205,9 @@ module Core
    fun pgi key ->
     let open Lwt_tzresult_syntax in
     let* tree = X.do_rpc pgi key in
-    let* current_store = lwt_ok @@ lazy_load_store () in
+    let*! current_store = lazy_load_store () in
     (* Update cache with data obtained *)
-    let* updated = lwt_ok @@ T.set_leaf current_store key tree in
+    let*! updated = T.set_leaf current_store key tree in
     (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
     return_unit
 end
@@ -281,15 +281,15 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
            So data was obtained already. Note that this does not imply
            that this function will return [Some] (maybe the node doesn't
            map this key). *)
-        lwt_ok @@ Events.(emit cache_hit (kind, key))
+        Lwt_result.ok @@ Events.(emit cache_hit (kind, key))
       else
         (* This exact request was NOT done already (either a longer request
            was done or no related request was done at all).
            An RPC MUST be done. *)
-        let* () = lwt_ok @@ Events.(emit cache_miss (kind, key)) in
+        let*! () = Events.(emit cache_miss (kind, key)) in
         do_rpc pgi kind key
     in
-    lwt_ok @@ C.get key
+    Lwt_result.ok @@ C.get key
 
   let proxy_get pgi key = generic_call Get pgi key
 

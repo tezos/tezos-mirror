@@ -1419,9 +1419,7 @@ end) : Test = struct
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           let* () =
-             lwt_ok @@ M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright
-           in
+           let*! () = M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright in
            match leftovers with None -> return !acc | Some _ -> fail 101))
 
   let iter_es =
@@ -1752,7 +1750,8 @@ end) : Test = struct
                   (M.of_list left)
                   (M.of_list right)
            in
-           lwt_ok @@ M.fold_right_s (uncurry_r @@ Fold2SOf.fn fn) leftright init))
+           Lwt_result.ok
+           @@ M.fold_right_s (uncurry_r @@ Fold2SOf.fn fn) leftright init))
 
   let fold_right_es =
     Test.make

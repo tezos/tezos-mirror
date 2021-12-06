@@ -359,7 +359,7 @@ let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
   let* res = with_open_out ~overwrite temp_file f in
   Lwt.catch
     (fun () ->
-      let* () = Lwt_result.ok @@ Lwt_unix.rename temp_file filename in
+      let*! () = Lwt_unix.rename temp_file filename in
       return res)
     (function
       | Unix.Unix_error (unix_code, caller, arg) ->

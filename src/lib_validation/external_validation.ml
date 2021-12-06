@@ -417,11 +417,11 @@ let create_socket ~canceler =
 
 let create_socket_listen ~canceler ~max_requests ~socket_path =
   let open Lwt_tzresult_syntax in
-  let* socket = lwt_ok @@ create_socket ~canceler in
+  let*! socket = create_socket ~canceler in
   let* () =
     Lwt.catch
       (fun () ->
-        let* () = lwt_ok @@ Lwt_unix.bind socket (make_socket socket_path) in
+        let*! () = Lwt_unix.bind socket (make_socket socket_path) in
         return_unit)
       (function
         | Unix.Unix_error (ENAMETOOLONG, _, _) ->

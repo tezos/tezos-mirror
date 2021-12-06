@@ -203,10 +203,9 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
             | Error msg -> light_failwith pgi msg
             | Ok x -> f x)
       in
-      let* () = lwt_ok @@ Logger.(emit api_do_rpc @@ key_to_string key) in
-      let* mtree_and_i_opt =
-        lwt_ok
-        @@ get_first_merkle_tree chain block key Block_services.Raw_context
+      let*! () = Logger.(emit api_do_rpc @@ key_to_string key) in
+      let*! mtree_and_i_opt =
+        get_first_merkle_tree chain block key Block_services.Raw_context
       in
       let nb_endpoints = List.length endpoints in
       match mtree_and_i_opt with
@@ -219,17 +218,16 @@ let get_core (module Light_proto : Light_proto.PROTO_RPCS)
       | Some (mtree, validating_endpoints) -> (
           let* {root; repo} = get_irmin_and_update_root pgi mtree in
           let** root' = Merkle.union_irmin_tree_merkle_tree repo root mtree in
-          let* () =
-            lwt_ok
-            @@ Logger.(
-                 emit
-                   staged_data
-                   (key_to_string key, List.length validating_endpoints))
+          let*! () =
+            Logger.(
+              emit
+                staged_data
+                (key_to_string key, List.length validating_endpoints))
           in
           let input : Light_consensus.input =
             {printer; min_agreement; chain; block; key; mtree; tree = root'}
           in
-          let* r = lwt_ok @@ Consensus.consensus input validating_endpoints in
+          let*! r = Consensus.consensus input validating_endpoints in
           match r with
           | false ->
               light_failwith pgi ~warn_symbolic:true

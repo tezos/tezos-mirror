@@ -565,7 +565,7 @@ struct
       Lwt.bind
         Lwt_tzresult_syntax.(
           let* popped =
-            protect ~canceler:w.canceler (fun () -> lwt_ok @@ pop w)
+            protect ~canceler:w.canceler (fun () -> Lwt_result.ok @@ pop w)
           in
           match popped with
           | None -> Handlers.on_no_request w
@@ -581,38 +581,28 @@ struct
                   let completed = Ptime.diff completed_time treated_time in
                   w.current_request <- None ;
                   let status = Worker_types.{pushed; treated; completed} in
-                  let* () =
-                    lwt_ok @@ Handlers.on_completion w request res status
-                  in
-                  let* () =
-                    lwt_ok
-                    @@ lwt_emit w (Request (current_request, status, None))
+                  let*! () = Handlers.on_completion w request res status in
+                  let*! () =
+                    lwt_emit w (Request (current_request, status, None))
                   in
                   return_unit
               | Some u ->
-                  let* res =
-                    (* [res] is a promise of a result (i.e., it is within the
-                       LwtResult combined monad. But the side effect [wakeup]
-                       needs to happen regardless of success (Ok) or failure
-                       (Error). To that end, we treat it locally like a regular
-                       promise (which happens to carry a [result]) within the Lwt
-                       monad. *)
-                    let open Lwt_syntax in
-                    let* res = Handlers.on_request w request in
-                    Lwt.wakeup_later u res ;
-                    return res
-                  in
+                  (* [res] is a result. But the side effect [wakeup]
+                     needs to happen regardless of success (Ok) or failure
+                     (Error). To that end, we treat it locally like a regular
+                     promise (which happens to carry a [result]) within the Lwt
+                     monad. *)
+                  let*! res = Handlers.on_request w request in
+                  Lwt.wakeup_later u res ;
+                  let*? res = res in
                   let completed_time = Systime_os.now () in
                   let treated = Ptime.diff treated_time pushed in
                   let completed = Ptime.diff completed_time treated_time in
                   let status = Worker_types.{pushed; treated; completed} in
                   w.current_request <- None ;
-                  let* () =
-                    lwt_ok @@ Handlers.on_completion w request res status
-                  in
-                  let* () =
-                    lwt_ok
-                    @@ lwt_emit w (Request (current_request, status, None))
+                  let*! () = Handlers.on_completion w request res status in
+                  let*! () =
+                    lwt_emit w (Request (current_request, status, None))
                   in
                   return_unit))
         Lwt_syntax.(
@@ -706,7 +696,7 @@ struct
       Nametbl.add table.instances name w ;
       let open Lwt_tzresult_syntax in
       let started = if id_name = base_name then None else Some name_s in
-      let* () = lwt_ok @@ lwt_emit w (Started started) in
+      let*! () = lwt_emit w (Started started) in
       let* state = Handlers.on_launch w name parameters in
       w.status <- Running (Systime_os.now ()) ;
       w.state <- Some state ;
