@@ -488,6 +488,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
              ~timestamp
            >>=? fun value_of_key ->
            Tezos_protocol_environment.Context.load_cache
+             predecessor
              predecessor_context
              `Lazy
              value_of_key

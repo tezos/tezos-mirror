@@ -849,8 +849,11 @@ let initial_context chain_id (header : Block_header.shell_header)
       reason, the mockup mode loads the cache lazily.
       See {!Environment_context.source_of_cache}.
   *)
-  Tezos_protocol_environment.Context.load_cache context `Lazy (fun key ->
-      value_of_key key >|= Protocol.Environment.wrap_tzresult)
+  Tezos_protocol_environment.Context.load_cache
+    predecessor
+    context
+    `Lazy
+    (fun key -> value_of_key key >|= Protocol.Environment.wrap_tzresult)
   >>=? fun context -> return context
 
 let mem_init :
