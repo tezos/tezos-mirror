@@ -16,7 +16,7 @@
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - bash ./docs/introduction/install-bin-ubuntu.sh
+    - ./docs/introduction/install-bin-ubuntu.sh
 
 install_bin_bionic:
   image: public.ecr.aws/lts/ubuntu:18.04_stable
@@ -32,7 +32,7 @@ install_bin_focal:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - bash ./docs/introduction/install-bin-rc-ubuntu.sh
+    - ./docs/introduction/install-bin-rc-ubuntu.sh
 
 install_bin_rc_bionic:
   image: public.ecr.aws/lts/ubuntu:18.04_stable
@@ -48,7 +48,7 @@ install_bin_rc_focal:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - bash ./docs/introduction/install-bin-fedora.sh
+    - ./docs/introduction/install-bin-fedora.sh
 
 install_bin_fedora_33:
   image: fedora:33
@@ -64,7 +64,7 @@ install_bin_fedora_34:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - bash ./docs/introduction/install-bin-rc-fedora.sh
+    - ./docs/introduction/install-bin-rc-fedora.sh
 
 install_bin_rc_fedora_33:
   image: fedora:33
@@ -80,7 +80,7 @@ install_bin_rc_fedora_34:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - bash < ./docs/introduction/install-opam.sh
+    - ./docs/introduction/install-opam.sh
 
 install_opam_bionic:
   image: ocaml/opam:ubuntu-18.04
@@ -96,7 +96,7 @@ install_opam_focal:
     - .base-test-doc-scripts-template
     - .rules_template__development_documentation
   script:
-    - bash < ./docs/introduction/compile-sources.sh
+    - ./docs/introduction/compile-sources.sh
 
 compile_sources_buster:
   image: ocaml/opam:debian-10

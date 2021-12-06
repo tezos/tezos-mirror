@@ -34,7 +34,7 @@ eval $(opam env)
 make
 # [optional setup]
 export PATH=~/tezos:$PATH
-. ./src/bin_client/bash-completion.sh
+# if using bash: source ./src/bin_client/bash-completion.sh
 export TEZOS_CLIENT_UNSAFE_DISABLE_DISCLAIMER=Y
 # [test executable]
 ./tezos-client
