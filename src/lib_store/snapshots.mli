@@ -137,7 +137,7 @@ type error +=
       got : Distributed_db_version.Name.t;
     }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
-  | Inconsistent_snapshot_file of string
+  | Wrong_snapshot_file of {filename : string}
 
 (** Current version of snapshots *)
 val current_version : int
@@ -148,7 +148,7 @@ val pp_snapshot_format : Format.formatter -> snapshot_format -> unit
 
 val snapshot_format_encoding : snapshot_format Data_encoding.t
 
-type snapshot_kind = Current of snapshot_format | Invalid
+type snapshot_kind = Current of snapshot_format | Invalid of error trace
 
 type snapshot_header
 
