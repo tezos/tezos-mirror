@@ -1,3 +1,5 @@
+:orphan:
+
 Compiling (part of) the Octez codebase to JavaScript
 ====================================================
 
