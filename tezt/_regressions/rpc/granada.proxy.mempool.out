@@ -277,7 +277,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -361,7 +361,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -453,7 +453,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -1623,7 +1623,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "$ref": "#/definitions/unistring"
                       },
                       "error_opt": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "An optional error-trace (None indicates no error). The full list of errors is available with the global RPC `GET errors`"
                       },
                       "fitness": {
                         "title": "Block fitness",
@@ -3545,7 +3545,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5138,7 +5138,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "$ref": "#/definitions/unistring"
                       },
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       },
                       "fitness": {
                         "title": "Block fitness",
@@ -5331,7 +5331,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5439,7 +5439,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5533,7 +5533,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5658,7 +5658,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
