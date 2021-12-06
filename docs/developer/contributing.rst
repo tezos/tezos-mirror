@@ -499,14 +499,16 @@ Merge Request Approvals
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 Two approvals from different Octez :doc:`Octez merge team <merge_team>` members are required for merge
-requests to be merged. After their review, the second approver will also
-typically merge unless there is another merge in progress.
+requests to be merged. Both approvals must result from independent thorough
+reviews. After both reviews, the second approver will also typically merge.
 
-Both approvals must correspond to different thorough reviews
-but Octez merge team members may trust the reviews of other developers and
-approve without reviewing thoroughly, especially for less critical
-parts of the code. Good comments from reviewers help the Octez merge team to decide
-to approve a merge request without doing a full review.
+However, for less critical parts of the code, an Octez merge team member may
+choose to trust the review of a developer who is not a member of the Octez
+merge team. In that case, the Octez merge team member may choose to count that
+review as their own, effectively "converting" the other developer's passing
+review into an approval. This may be done even when the Octez merge team
+member is the author of the merge request. A second independent review from an
+Octez merge team member is still required, of course.
 
 For this reason, if you make a partial review, for instance if you only
 reviewed part of the code, or only the general design, it is good practice
