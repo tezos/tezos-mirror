@@ -485,6 +485,7 @@ let unparse_contract ~loc ctxt mode {arg_ty = _; address} =
   unparse_address ~loc ctxt mode address
 
 let unparse_signature ~loc ctxt mode s =
+  let s = Script_signature.get s in
   match mode with
   | Optimized | Optimized_legacy ->
       Gas.consume ctxt Unparse_costs.signature_optimized >|? fun ctxt ->
@@ -2207,7 +2208,9 @@ let parse_signature ctxt : Script.node -> (signature * context) tzresult =
   function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_optimized >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes_opt Signature.encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt Script_signature.encoding bytes
+      with
       | Some k -> ok (k, ctxt)
       | None ->
           error
@@ -2215,7 +2218,7 @@ let parse_signature ctxt : Script.node -> (signature * context) tzresult =
                (loc, strip_locations expr, "a valid signature"))
   | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_readable >>? fun ctxt ->
-      match Signature.of_b58check_opt s with
+      match Script_signature.of_b58check_opt s with
       | Some s -> ok (s, ctxt)
       | None ->
           error

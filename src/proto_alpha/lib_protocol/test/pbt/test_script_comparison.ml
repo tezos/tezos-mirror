@@ -52,7 +52,7 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   match (ty, x, y) with
   | (Unit_key _, (), ()) -> 0
   | (Never_key _, _, _) -> .
-  | (Signature_key _, x, y) -> normalize_compare @@ Signature.compare x y
+  | (Signature_key _, x, y) -> normalize_compare @@ Script_signature.compare x y
   | (String_key _, x, y) -> normalize_compare @@ Script_string.compare x y
   | (Bool_key _, x, y) -> normalize_compare @@ Compare.Bool.compare x y
   | (Mutez_key _, x, y) -> normalize_compare @@ Tez.compare x y

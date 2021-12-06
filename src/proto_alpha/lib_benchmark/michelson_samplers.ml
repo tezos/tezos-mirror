@@ -515,6 +515,9 @@ end)
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
       Data_encoding.Binary.of_string_exn Script_chain_id.encoding string
 
+    let signature rng_state =
+      Script_signature.make (Michelson_base.signature rng_state)
+
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
       fun typ ->
@@ -523,7 +526,7 @@ end)
         | Unit_t _ -> M.return ()
         | Int_t _ -> Michelson_base.int
         | Nat_t _ -> Michelson_base.nat
-        | Signature_t _ -> Michelson_base.signature
+        | Signature_t _ -> signature
         | String_t _ -> Michelson_base.string
         | Bytes_t _ -> Michelson_base.bytes
         | Mutez_t _ -> Michelson_base.tez

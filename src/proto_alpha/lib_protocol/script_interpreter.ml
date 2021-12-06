@@ -1171,7 +1171,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | INow (_, k) -> (step [@ocaml.tailcall]) g gas k ks sc.now (accu, stack)
       | ICheck_signature (_, k) ->
           let key = accu and (signature, (message, stack)) = stack in
-          let res = Signature.check key signature message in
+          let res = Script_signature.check key signature message in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IHash_key (_, k) ->
           let key = accu in

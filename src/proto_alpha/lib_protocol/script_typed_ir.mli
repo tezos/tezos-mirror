@@ -46,6 +46,33 @@ type never = |
 
 type address = {contract : Contract.t; entrypoint : Entrypoint.t}
 
+module Script_signature : sig
+  (** [t] is made algebraic in order to distinguish it from the other type
+      parameters of [Script_typed_ir.ty]. *)
+  type t = Signature_tag of signature [@@ocaml.unboxed]
+
+  val make : signature -> t
+
+  val get : t -> signature
+
+  val encoding : t Data_encoding.t
+
+  val of_b58check_opt : string -> t option
+
+  val check :
+    ?watermark:Signature.watermark ->
+    Signature.Public_key.t ->
+    t ->
+    Bytes.t ->
+    bool
+
+  val compare : t -> t -> int
+
+  val size : int
+end
+
+type signature = Script_signature.t
+
 type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b

@@ -65,6 +65,31 @@ type never = |
 
 type address = {contract : Contract.t; entrypoint : Entrypoint.t}
 
+module Script_signature = struct
+  type t = Signature_tag of signature [@@ocaml.unboxed]
+
+  let make s = Signature_tag s
+
+  let get (Signature_tag s) = s
+
+  let encoding =
+    Data_encoding.conv
+      (fun (Signature_tag x) -> x)
+      (fun x -> Signature_tag x)
+      Signature.encoding
+
+  let of_b58check_opt x = Option.map make (Signature.of_b58check_opt x)
+
+  let check ?watermark pub_key (Signature_tag s) bytes =
+    Signature.check ?watermark pub_key s bytes
+
+  let compare (Signature_tag x) (Signature_tag y) = Signature.compare x y
+
+  let size = Signature.size
+end
+
+type signature = Script_signature.t
+
 type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b

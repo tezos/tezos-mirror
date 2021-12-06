@@ -2285,6 +2285,7 @@ module Registration_section = struct
                   rng_state
             in
             let signed_message = Signature.sign sk unsigned_message in
+            let signed_message = Script_signature.make signed_message in
             (pk, (signed_message, (unsigned_message, eos))))
         ()
 

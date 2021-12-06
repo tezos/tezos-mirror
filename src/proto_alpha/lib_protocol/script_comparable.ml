@@ -47,7 +47,8 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     match (kind, x, y) with
     | (Unit_key _, (), ()) -> (apply [@tailcall]) 0 k
     | (Never_key _, _, _) -> .
-    | (Signature_key _, x, y) -> (apply [@tailcall]) (Signature.compare x y) k
+    | (Signature_key _, x, y) ->
+        (apply [@tailcall]) (Script_signature.compare x y) k
     | (String_key _, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
     | (Bool_key _, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
     | (Mutez_key _, x, y) -> (apply [@tailcall]) (Tez.compare x y) k

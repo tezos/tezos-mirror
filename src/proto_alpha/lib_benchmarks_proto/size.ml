@@ -128,7 +128,8 @@ let mutez (_tez : Alpha_context.Tez.tez) : t =
 
 let bool (_ : bool) : t = 1
 
-let signature (_signature : Signature.t) : t = Signature.size
+let signature (_signature : Script_typed_ir.Script_signature.t) : t =
+  Script_typed_ir.Script_signature.size
 
 let key_hash (_keyhash : Signature.public_key_hash) : t =
   Signature.Public_key_hash.size
