@@ -29,5 +29,5 @@ open Sc_rollup
 type origination_result = {address : Address.t; size : Z.t}
 
 let originate ctxt ~kind ~boot_sector =
-  originate ctxt ~kind ~boot_sector >>=? fun (ctxt, address, size) ->
-  return (ctxt, {address; size})
+  originate ctxt ~kind ~boot_sector >>=? fun (address, size, ctxt) ->
+  return ({address; size}, ctxt)

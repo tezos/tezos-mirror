@@ -40,6 +40,6 @@ let originate ctxt ~kind ~boot_sector =
     Z.of_int
       (origination_size + stored_kind_size + boot_sector_size + addresses_size)
   in
-  return (ctxt, address, size)
+  return (address, size, ctxt)
 
 let kind ctxt address = Storage.Sc_rollup.PVM_kind.find ctxt address

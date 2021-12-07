@@ -171,6 +171,10 @@ and _ successful_manager_operation_result =
       size : Z.t;
     }
       -> Kind.sc_rollup_originate successful_manager_operation_result
+  | Sc_rollup_add_messages_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.sc_rollup_add_messages successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :

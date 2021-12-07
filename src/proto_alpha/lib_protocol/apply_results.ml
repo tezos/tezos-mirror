@@ -99,6 +99,10 @@ type _ successful_manager_operation_result =
       size : Z.t;
     }
       -> Kind.sc_rollup_originate successful_manager_operation_result
+  | Sc_rollup_add_messages_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.sc_rollup_add_messages successful_manager_operation_result
 
 let migration_origination_result_to_successful_manager_operation_result
     ({
@@ -551,6 +555,30 @@ module Manager_result = struct
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Sc_rollup_originate_result
           {balance_updates; address; consumed_gas = consumed_milligas; size})
+
+  let sc_rollup_add_messages_case =
+    make
+      ~op_case:Operation.Encoding.Manager_operations.sc_rollup_add_messages_case
+      ~encoding:
+        (obj2
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero))
+      ~iselect:(function
+        | Internal_operation_result
+            (({operation = Sc_rollup_add_messages _; _} as op), res) ->
+            Some (op, res)
+        | _ -> None)
+      ~select:(function
+        | Successful_manager_result (Sc_rollup_add_messages_result _ as op) ->
+            Some op
+        | _ -> None)
+      ~proj:(function
+        | Sc_rollup_add_messages_result {consumed_gas} ->
+            (Gas.Arith.ceil consumed_gas, consumed_gas))
+      ~kind:Kind.Sc_rollup_add_messages_manager_kind
+      ~inj:(fun (consumed_gas, consumed_milligas) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+        Sc_rollup_add_messages_result {consumed_gas = consumed_milligas})
 end
 
 let internal_operation_result_encoding :
@@ -589,6 +617,7 @@ let internal_operation_result_encoding :
          make Manager_result.set_deposits_limit_case;
          make Manager_result.tx_rollup_origination_case;
          make Manager_result.sc_rollup_originate_case;
+         make Manager_result.sc_rollup_add_messages_case;
        ]
 
 let successful_manager_operation_result_encoding :
@@ -694,6 +723,10 @@ let equal_manager_kind :
       Kind.Sc_rollup_originate_manager_kind ) ->
       Some Eq
   | (Kind.Sc_rollup_originate_manager_kind, _) -> None
+  | ( Kind.Sc_rollup_add_messages_manager_kind,
+      Kind.Sc_rollup_add_messages_manager_kind ) ->
+      Some Eq
+  | (Kind.Sc_rollup_add_messages_manager_kind, _) -> None
 
 module Encoding = struct
   type 'kind case =
@@ -1066,6 +1099,17 @@ module Encoding = struct
               res ) ->
             Some (op, res)
         | _ -> None)
+
+  let[@coq_axiom_with_reason "gadt"] sc_rollup_add_messages_case =
+    make_manager_case
+      Operation.Encoding.sc_rollup_add_messages_case
+      Manager_result.sc_rollup_add_messages_case
+      (function
+        | Contents_and_result
+            ( (Manager_operation {operation = Sc_rollup_add_messages _; _} as op),
+              res ) ->
+            Some (op, res)
+        | _ -> None)
 end
 
 let contents_result_encoding =
@@ -1104,6 +1148,7 @@ let contents_result_encoding =
          make set_deposits_limit_case;
          make tx_rollup_origination_case;
          make sc_rollup_originate_case;
+         make sc_rollup_add_messages_case;
        ]
 
 let contents_and_result_encoding =
@@ -1147,6 +1192,7 @@ let contents_and_result_encoding =
          make set_deposits_limit_case;
          make tx_rollup_origination_case;
          make sc_rollup_originate_case;
+         make sc_rollup_add_messages_case;
        ]
 
 type 'kind contents_result_list =
@@ -1476,6 +1522,32 @@ let kind_equal :
         } ) ->
       Some Eq
   | (Manager_operation {operation = Sc_rollup_originate _; _}, _) -> None
+  | ( Manager_operation {operation = Sc_rollup_add_messages _; _},
+      Manager_operation_result
+        {operation_result = Applied (Sc_rollup_add_messages_result _); _} ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_add_messages _; _},
+      Manager_operation_result
+        {operation_result = Backtracked (Sc_rollup_add_messages_result _, _); _}
+    ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_add_messages _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Failed (Alpha_context.Kind.Sc_rollup_add_messages_manager_kind, _);
+          _;
+        } ) ->
+      Some Eq
+  | ( Manager_operation {operation = Sc_rollup_add_messages _; _},
+      Manager_operation_result
+        {
+          operation_result =
+            Skipped Alpha_context.Kind.Sc_rollup_add_messages_manager_kind;
+          _;
+        } ) ->
+      Some Eq
+  | (Manager_operation {operation = Sc_rollup_add_messages _; _}, _) -> None
 
 let rec kind_equal_list :
     type kind kind2.

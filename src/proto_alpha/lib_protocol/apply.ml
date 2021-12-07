@@ -1156,14 +1156,19 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector} ->
-      let open Sc_rollup_operations in
       assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
-      originate ctxt ~kind ~boot_sector >>=? fun (ctxt, {address; size}) ->
+      Sc_rollup_operations.originate ctxt ~kind ~boot_sector
+      >>=? fun ({address; size}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result =
         Sc_rollup_originate_result
           {address; consumed_gas; size; balance_updates = []}
       in
+      return (ctxt, result, [])
+  | Sc_rollup_add_messages {rollup = _; messages = _} ->
+      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
+      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let result = Sc_rollup_add_messages_result {consumed_gas} in
       return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
@@ -1384,6 +1389,7 @@ let burn_storage_fees :
       >>=? fun (ctxt, storage_limit, balance_updates) ->
       let result = Sc_rollup_originate_result {payload with balance_updates} in
       return (ctxt, storage_limit, result)
+  | Sc_rollup_add_messages_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
