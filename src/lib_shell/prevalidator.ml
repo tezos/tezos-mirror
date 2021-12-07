@@ -652,7 +652,7 @@ module Make
             handle ~notifier shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
         | `Passed_precheck filter_state ->
-            handle ~notifier shell (`Parsed op) `Applied ;
+            handle ~notifier shell (`Parsed op) `Prechecked ;
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Passed_precheck_with_replace (old_oph, filter_state) ->
