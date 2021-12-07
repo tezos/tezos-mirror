@@ -246,7 +246,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
           (match Cycle_repr.sub cycle preserved with
           | None -> cycle
           | Some cycle -> cycle)
-          ---> Cycle_repr.add cycle (preserved + 2))
+          ---> Cycle_repr.add cycle (preserved + 3))
       >>= fun ctxt ->
       Raw_context.remove_existing_tree ctxt ["rolls"] >>=? fun ctxt ->
       migrate_nonces ctxt cycle >>=? fun ctxt ->
