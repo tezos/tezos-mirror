@@ -160,7 +160,7 @@ let test_in_mempool_leak f (nb_ops : int) (_ : unit) =
     f [] oph op classes
   in
   List.iter handle (1 -- nb_ops) ;
-  let actual_in_mempool_size = Operation_hash.Set.cardinal classes.in_mempool in
+  let actual_in_mempool_size = Operation_hash.Map.cardinal classes.in_mempool in
   Alcotest.(
     check
       bool
