@@ -963,9 +963,10 @@ module Make
              RPC_answer.return_stream {next; shutdown}) ;
        !dir)
 
-  module Handlers = struct
-    type self = worker
-
+  (** Module containing functions that are the internal transitions
+      of the mempool. These functions are called by the {!Worker} when
+      an event arrives. *)
+  module Transitions = struct
     let on_arrived (pv : state) oph op =
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
@@ -1209,13 +1210,19 @@ module Make
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       remove pv oph_to_ban
+  end
+
+  (** Module implementing the events at the {!Worker} level. Contrary
+      to {!Transitions}, these functions depend on [Worker]. *)
+  module Handlers = struct
+    type self = worker
 
     let on_request : type r. worker -> r Request.t -> r tzresult Lwt.t =
      fun w request ->
       let pv = Worker.state w in
       (match request with
       | Request.Flush (hash, event, live_blocks, live_operations) ->
-          on_advertise pv.shell ;
+          Transitions.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
           let chain_store =
@@ -1230,18 +1237,24 @@ module Make
               | Branch_switch -> true)
           in
           Lwt_mutex.with_lock pv.lock @@ fun () ->
-          on_flush ~handle_branch_refused pv block live_blocks live_operations
+          Transitions.on_flush
+            ~handle_branch_refused
+            pv
+            block
+            live_blocks
+            live_operations
       | Request.Notify (peer, mempool) ->
-          on_notify w pv.shell peer mempool >>= fun () -> return_unit
+          Transitions.on_notify w pv.shell peer mempool >>= fun () ->
+          return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject {op; force} -> on_inject pv ~force op
-      | Request.Arrived (oph, op) -> on_arrived pv oph op
+      | Request.Inject {op; force} -> Transitions.on_inject pv ~force op
+      | Request.Arrived (oph, op) -> Transitions.on_arrived pv oph op
       | Request.Advertise ->
-          on_advertise pv.shell ;
+          Transitions.on_advertise pv.shell ;
           return_unit
-      | Request.Ban oph -> on_ban pv oph)
+      | Request.Ban oph -> Transitions.on_ban pv oph)
       >>=? fun r ->
       handle_unprocessed w pv >>= fun () -> return r
 
@@ -1324,7 +1337,7 @@ module Make
         }
       in
       Seq.iter_s
-        (may_fetch_operation w pv.shell None)
+        (Transitions.may_fetch_operation w pv.shell None)
         (Operation_hash.Set.to_seq fetching)
       >>= fun () -> return pv
 
