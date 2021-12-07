@@ -278,6 +278,12 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
     ~balance_updates
     ctxt
   >>=? fun (ctxt, balance_updates) ->
+  (match Level_storage.dawn_of_a_new_cycle ctxt with
+  | None -> return ctxt
+  | Some last_cycle ->
+      assert (Cycle_repr.(last_cycle = cycle)) ;
+      Stake_storage.clear_at_cycle_end ctxt ~new_cycle:(Cycle_repr.succ cycle))
+  >>=? fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   >>= fun ctxt -> return ctxt
