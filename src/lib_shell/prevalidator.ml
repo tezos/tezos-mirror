@@ -1164,7 +1164,6 @@ module Make
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
-
              let refused =
                filter
                  map_op_error
@@ -1194,9 +1193,23 @@ module Make
                  pv.shell.pending
                  Operation_hash.Map.empty
              in
+             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
+
+                We merge prechecked operation with applied operation
+                so that the encoding of the RPC does not need to be
+                changed. Once prechecking will be done by the protocol
+                and not the plugin, we will change the encoding to
+                reflect that. *)
+             let prechecked_with_applied =
+               (Operation_hash.Map.bindings pv.shell.classification.prechecked
+               |> List.rev_filter_map (fun (oph, op) ->
+                      Option.map (fun proto_op -> (oph, proto_op)) (map_op op))
+               )
+               @ applied
+             in
              let pending_operations =
                {
-                 Proto_services.Mempool.applied;
+                 Proto_services.Mempool.applied = prechecked_with_applied;
                  refused;
                  outdated;
                  branch_refused;
