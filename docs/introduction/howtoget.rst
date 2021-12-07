@@ -232,7 +232,8 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
 
 .. note::
 
-   The ``opam switch create`` command may fail if the switch already exists.
+   The ``opam switch create`` command may fail if the switch already exists;
+   you are probably re-installing or upgrading an existing installation.
    If the required compiler version has not changed since the last time, you
    may simply ignore this error. Otherwise, you are upgrading to a new compiler,
    so look at the :ref:`relevant section below <updating_with_opam>`.
