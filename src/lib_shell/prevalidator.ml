@@ -710,6 +710,255 @@ module Make
           in
           set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ()
 
+  (* This function fetches one operation through the
+     [distributed_db]. On errors, we emit an event and proceed as
+     usual. *)
+  let fetch_operation w (shell : types_state_shell) ?peer oph =
+    Event.(emit fetching_operation) oph >|= fun () ->
+    Distributed_db.Operation.fetch
+      ~timeout:shell.parameters.limits.operation_timeout
+      shell.parameters.chain_db
+      ?peer
+      oph
+      ()
+    >>= function
+    | Ok op ->
+        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+        Lwt.return_unit
+    | Error (Distributed_db.Operation.Canceled _ :: _) ->
+        Event.(emit operation_included) oph
+    | Error _ ->
+        (* This may happen if the peer timed out for example. *)
+        Event.(emit operation_not_fetched) oph
+
+  (* This function fetches an operation if it is not already handled
+     by the mempool. To ensure we fetch at most a given operation,
+     we record it in the [pv.fetching] field.
+
+     Invariant: This function should be the only one to modify this
+     field.
+
+     Invariant: To ensure, there is no leak, we ensure that when the
+     promise [p] is terminated, we remove the operation from the
+     fetching operations. This is to ensure that if an error
+     happened, we can still fetch this operation in the future. *)
+  let may_fetch_operation w (shell : types_state_shell) peer oph =
+    let origin =
+      match peer with
+      | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
+      | None -> "leftover from previous run"
+    in
+    already_handled ~origin shell oph >>= fun already_handled ->
+    if not already_handled then
+      ignore
+        (Lwt.finalize
+           (fun () ->
+             shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
+             fetch_operation w shell ?peer oph)
+           (fun () ->
+             shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
+             Lwt.return_unit)) ;
+    Lwt.return_unit
+
+  (** Module containing functions that are the internal transitions
+      of the mempool. These functions are called by the {!Worker} when
+      an event arrives. *)
+  module Transitions = struct
+    let on_arrived (pv : state) oph op =
+      already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
+      if already_handled then return_unit
+      else
+        pre_filter
+          pv.shell
+          ~filter_config:pv.filter_config
+          ~filter_state:pv.filter_state
+          ~validation_state:pv.validation_state
+          ~chain_db:pv.shell.parameters.chain_db
+          ~notifier:(mk_notifier pv.operation_stream)
+          oph
+          op
+        >>= function
+        | true ->
+            if
+              not
+                (Block_hash.Set.mem
+                   op.Operation.shell.branch
+                   pv.shell.live_blocks)
+            then (
+              Distributed_db.Operation.clear_or_cancel
+                pv.shell.parameters.chain_db
+                oph ;
+              return_unit)
+            else (
+              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
+                 Should this have an influence on the peer's score ? *)
+              pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
+              return_unit)
+        | false -> return_unit
+
+    let on_inject (pv : state) ~force op =
+      let oph = Operation.hash op in
+      already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
+      if already_handled then
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
+           Is this an error? *)
+        return_unit
+      else if force then (
+        Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
+        >>= fun (_ : bool) ->
+        pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
+        return_unit)
+      else if
+        not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
+      then
+        failwith
+          "Operation %a is branched on a block %a which is too old"
+          Operation_hash.pp
+          oph
+          Block_hash.pp
+          op.Operation.shell.branch
+      else
+        pv.validation_state >>?= fun validation_state ->
+        Prevalidation_t.parse op >>?= fun parsed_op ->
+        Prevalidation_t.apply_operation validation_state parsed_op >>= function
+        | Applied (_, _result) ->
+            Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
+            >>= fun (_ : bool) ->
+            pv.shell.pending <-
+              Pending_ops.add parsed_op.hash op pv.shell.pending ;
+            return_unit
+        | res ->
+            failwith
+              "Error while applying operation %a:@ %a"
+              Operation_hash.pp
+              oph
+              Prevalidation_t.pp_result
+              res
+
+    let on_notify w (shell : types_state_shell) peer mempool =
+      let may_fetch_operation = may_fetch_operation w shell (Some peer) in
+      List.iter_s may_fetch_operation mempool.Mempool.known_valid >>= fun () ->
+      Seq.iter_s
+        may_fetch_operation
+        (Operation_hash.Set.to_seq mempool.Mempool.pending)
+
+    let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
+        new_live_operations =
+      let old_predecessor = pv.shell.predecessor in
+      pv.shell.predecessor <- new_predecessor ;
+      pv.shell.live_blocks <- new_live_blocks ;
+      pv.shell.live_operations <- new_live_operations ;
+      Lwt_watcher.shutdown_input pv.operation_stream ;
+      pv.operation_stream <- Lwt_watcher.create_input () ;
+      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
+      pv.shell.timestamp <- timestamp_system ;
+      let timestamp = Time.System.to_protocol timestamp_system in
+      let chain_store =
+        Distributed_db.chain_store pv.shell.parameters.chain_db
+      in
+      Prevalidation_t.create
+        chain_store
+        ~predecessor:new_predecessor
+        ~live_operations:new_live_operations
+        ~timestamp
+        ()
+      >>= fun validation_state ->
+      pv.validation_state <- validation_state ;
+      Filter.Mempool.on_flush
+        pv.filter_config
+        pv.filter_state
+        ?validation_state:
+          (Option.map
+             Prevalidation_t.validation_state
+             (Option.of_result validation_state))
+        ~predecessor:(Store.Block.header new_predecessor)
+        ()
+      >>=? fun filter_state ->
+      pv.filter_state <- filter_state ;
+      Classification.recycle_operations
+        ~from_branch:old_predecessor
+        ~to_branch:new_predecessor
+        ~live_blocks:new_live_blocks
+        ~classification:pv.shell.classification
+        ~pending:(Pending_ops.operations pv.shell.pending)
+        ~block_store:block_tools
+        ~chain:(mk_chain_tools pv.shell.parameters.chain_db)
+        ~handle_branch_refused
+      >>= fun new_pending_operations ->
+      (* Could be implemented as Operation_hash.Map.filter_s which
+         does not exist for the moment. *)
+      Operation_hash.Map.fold_s
+        (fun oph op (pending, nb_pending) ->
+          pre_filter
+            pv.shell
+            ~filter_config:pv.filter_config
+            ~filter_state:pv.filter_state
+            ~validation_state:pv.validation_state
+            ~chain_db:pv.shell.parameters.chain_db
+            ~notifier:(mk_notifier pv.operation_stream)
+            oph
+            op
+          >|= function
+          | true -> (Pending_ops.add oph op pending, nb_pending + 1)
+          | false -> (pending, nb_pending))
+        new_pending_operations
+        (Pending_ops.empty, 0)
+      >>= fun (new_pending_operations, nb_pending) ->
+      Event.(emit operations_to_reclassify) nb_pending >>= fun () ->
+      pv.shell.pending <- new_pending_operations ;
+      set_mempool pv.shell Mempool.empty
+
+    let on_advertise (shell : types_state_shell) =
+      match shell.advertisement with
+      | `None -> () (* should not happen *)
+      | `Pending mempool ->
+          shell.advertisement <- `None ;
+          Distributed_db.Advertise.current_head
+            shell.parameters.chain_db
+            ~mempool
+            shell.predecessor
+
+    let remove_from_advertisement oph = function
+      | `Pending mempool -> `Pending (Mempool.remove oph mempool)
+      | `None -> `None
+
+    let remove pv oph =
+      Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+      pv.shell.advertisement <-
+        remove_from_advertisement oph pv.shell.advertisement ;
+      pv.shell.banned_operations <-
+        Operation_hash.Set.add oph pv.shell.banned_operations ;
+      if Classification.is_in_mempool oph pv.shell.classification then
+        if not (Classification.is_applied oph pv.shell.classification) then (
+          pv.filter_state <-
+            Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
+          return (Classification.remove oph pv.shell.classification))
+        else
+          (* Modifying the list of operations classified as [Applied]
+             might change the classification of all the operations in
+             the mempool. Hence if the removed operation has been
+             applied we flush the mempool to force the
+             reclassification of all the operations except the one
+             removed. *)
+          on_flush
+            ~handle_branch_refused:false
+            pv
+            pv.shell.predecessor
+            pv.shell.live_blocks
+            pv.shell.live_operations
+          >|=? fun () ->
+          pv.shell.pending <- Pending_ops.remove oph pv.shell.pending
+      else (
+        pv.shell.pending <- Pending_ops.remove oph pv.shell.pending ;
+        pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
+        return_unit)
+
+    let on_ban pv oph_to_ban =
+      pv.shell.banned_operations <-
+        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
+      remove pv oph_to_ban
+  end
+
   (** Mimics [Data_encoding.Json.construct] but accepts argument
       [?include_default_fields] to pass on to [Json_encoding.construct]. *)
   let data_encoding_json_construct ?include_default_fields e v =
@@ -962,255 +1211,6 @@ module Make
              let shutdown () = Lwt_watcher.shutdown stopper in
              RPC_answer.return_stream {next; shutdown}) ;
        !dir)
-
-  (* This function fetches one operation through the
-     [distributed_db]. On errors, we emit an event and proceed as
-     usual. *)
-  let fetch_operation w (shell : types_state_shell) ?peer oph =
-    Event.(emit fetching_operation) oph >|= fun () ->
-    Distributed_db.Operation.fetch
-      ~timeout:shell.parameters.limits.operation_timeout
-      shell.parameters.chain_db
-      ?peer
-      oph
-      ()
-    >>= function
-    | Ok op ->
-        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
-        Lwt.return_unit
-    | Error (Distributed_db.Operation.Canceled _ :: _) ->
-        Event.(emit operation_included) oph
-    | Error _ ->
-        (* This may happen if the peer timed out for example. *)
-        Event.(emit operation_not_fetched) oph
-
-  (* This function fetches an operation if it is not already handled
-     by the mempool. To ensure we fetch at most a given operation,
-     we record it in the [pv.fetching] field.
-
-     Invariant: This function should be the only one to modify this
-     field.
-
-     Invariant: To ensure, there is no leak, we ensure that when the
-     promise [p] is terminated, we remove the operation from the
-     fetching operations. This is to ensure that if an error
-     happened, we can still fetch this operation in the future. *)
-  let may_fetch_operation w (shell : types_state_shell) peer oph =
-    let origin =
-      match peer with
-      | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
-      | None -> "leftover from previous run"
-    in
-    already_handled ~origin shell oph >>= fun already_handled ->
-    if not already_handled then
-      ignore
-        (Lwt.finalize
-           (fun () ->
-             shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-             fetch_operation w shell ?peer oph)
-           (fun () ->
-             shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
-             Lwt.return_unit)) ;
-    Lwt.return_unit
-
-  (** Module containing functions that are the internal transitions
-      of the mempool. These functions are called by the {!Worker} when
-      an event arrives. *)
-  module Transitions = struct
-    let on_arrived (pv : state) oph op =
-      already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
-      if already_handled then return_unit
-      else
-        pre_filter
-          pv.shell
-          ~filter_config:pv.filter_config
-          ~filter_state:pv.filter_state
-          ~validation_state:pv.validation_state
-          ~chain_db:pv.shell.parameters.chain_db
-          ~notifier:(mk_notifier pv.operation_stream)
-          oph
-          op
-        >>= function
-        | true ->
-            if
-              not
-                (Block_hash.Set.mem
-                   op.Operation.shell.branch
-                   pv.shell.live_blocks)
-            then (
-              Distributed_db.Operation.clear_or_cancel
-                pv.shell.parameters.chain_db
-                oph ;
-              return_unit)
-            else (
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
-                 Should this have an influence on the peer's score ? *)
-              pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
-              return_unit)
-        | false -> return_unit
-
-    let on_inject (pv : state) ~force op =
-      let oph = Operation.hash op in
-      already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
-      if already_handled then
-        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
-           Is this an error? *)
-        return_unit
-      else if force then (
-        Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
-        >>= fun (_ : bool) ->
-        pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
-        return_unit)
-      else if
-        not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
-      then
-        failwith
-          "Operation %a is branched on a block %a which is too old"
-          Operation_hash.pp
-          oph
-          Block_hash.pp
-          op.Operation.shell.branch
-      else
-        pv.validation_state >>?= fun validation_state ->
-        Prevalidation_t.parse op >>?= fun parsed_op ->
-        Prevalidation_t.apply_operation validation_state parsed_op >>= function
-        | Applied (_, _result) ->
-            Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
-            >>= fun (_ : bool) ->
-            pv.shell.pending <-
-              Pending_ops.add parsed_op.hash op pv.shell.pending ;
-            return_unit
-        | res ->
-            failwith
-              "Error while applying operation %a:@ %a"
-              Operation_hash.pp
-              oph
-              Prevalidation_t.pp_result
-              res
-
-    let on_notify w (shell : types_state_shell) peer mempool =
-      let may_fetch_operation = may_fetch_operation w shell (Some peer) in
-      List.iter_s may_fetch_operation mempool.Mempool.known_valid >>= fun () ->
-      Seq.iter_s
-        may_fetch_operation
-        (Operation_hash.Set.to_seq mempool.Mempool.pending)
-
-    let on_flush ~handle_branch_refused pv new_predecessor new_live_blocks
-        new_live_operations =
-      let old_predecessor = pv.shell.predecessor in
-      pv.shell.predecessor <- new_predecessor ;
-      pv.shell.live_blocks <- new_live_blocks ;
-      pv.shell.live_operations <- new_live_operations ;
-      Lwt_watcher.shutdown_input pv.operation_stream ;
-      pv.operation_stream <- Lwt_watcher.create_input () ;
-      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
-      pv.shell.timestamp <- timestamp_system ;
-      let timestamp = Time.System.to_protocol timestamp_system in
-      let chain_store =
-        Distributed_db.chain_store pv.shell.parameters.chain_db
-      in
-      Prevalidation_t.create
-        chain_store
-        ~predecessor:new_predecessor
-        ~live_operations:new_live_operations
-        ~timestamp
-        ()
-      >>= fun validation_state ->
-      pv.validation_state <- validation_state ;
-      Filter.Mempool.on_flush
-        pv.filter_config
-        pv.filter_state
-        ?validation_state:
-          (Option.map
-             Prevalidation_t.validation_state
-             (Option.of_result validation_state))
-        ~predecessor:(Store.Block.header new_predecessor)
-        ()
-      >>=? fun filter_state ->
-      pv.filter_state <- filter_state ;
-      Classification.recycle_operations
-        ~from_branch:old_predecessor
-        ~to_branch:new_predecessor
-        ~live_blocks:new_live_blocks
-        ~classification:pv.shell.classification
-        ~pending:(Pending_ops.operations pv.shell.pending)
-        ~block_store:block_tools
-        ~chain:(mk_chain_tools pv.shell.parameters.chain_db)
-        ~handle_branch_refused
-      >>= fun new_pending_operations ->
-      (* Could be implemented as Operation_hash.Map.filter_s which
-         does not exist for the moment. *)
-      Operation_hash.Map.fold_s
-        (fun oph op (pending, nb_pending) ->
-          pre_filter
-            pv.shell
-            ~filter_config:pv.filter_config
-            ~filter_state:pv.filter_state
-            ~validation_state:pv.validation_state
-            ~chain_db:pv.shell.parameters.chain_db
-            ~notifier:(mk_notifier pv.operation_stream)
-            oph
-            op
-          >|= function
-          | true -> (Pending_ops.add oph op pending, nb_pending + 1)
-          | false -> (pending, nb_pending))
-        new_pending_operations
-        (Pending_ops.empty, 0)
-      >>= fun (new_pending_operations, nb_pending) ->
-      Event.(emit operations_to_reclassify) nb_pending >>= fun () ->
-      pv.shell.pending <- new_pending_operations ;
-      set_mempool pv.shell Mempool.empty
-
-    let on_advertise (shell : types_state_shell) =
-      match shell.advertisement with
-      | `None -> () (* should not happen *)
-      | `Pending mempool ->
-          shell.advertisement <- `None ;
-          Distributed_db.Advertise.current_head
-            shell.parameters.chain_db
-            ~mempool
-            shell.predecessor
-
-    let remove_from_advertisement oph = function
-      | `Pending mempool -> `Pending (Mempool.remove oph mempool)
-      | `None -> `None
-
-    let remove pv oph =
-      Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
-      pv.shell.advertisement <-
-        remove_from_advertisement oph pv.shell.advertisement ;
-      pv.shell.banned_operations <-
-        Operation_hash.Set.add oph pv.shell.banned_operations ;
-      if Classification.is_in_mempool oph pv.shell.classification then
-        if not (Classification.is_applied oph pv.shell.classification) then (
-          pv.filter_state <-
-            Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
-          return (Classification.remove oph pv.shell.classification))
-        else
-          (* Modifying the list of operations classified as [Applied]
-             might change the classification of all the operations in
-             the mempool. Hence if the removed operation has been
-             applied we flush the mempool to force the
-             reclassification of all the operations except the one
-             removed. *)
-          on_flush
-            ~handle_branch_refused:false
-            pv
-            pv.shell.predecessor
-            pv.shell.live_blocks
-            pv.shell.live_operations
-          >|=? fun () ->
-          pv.shell.pending <- Pending_ops.remove oph pv.shell.pending
-      else (
-        pv.shell.pending <- Pending_ops.remove oph pv.shell.pending ;
-        pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
-        return_unit)
-
-    let on_ban pv oph_to_ban =
-      pv.shell.banned_operations <-
-        Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      remove pv oph_to_ban
-  end
 
   (** Module implementing the events at the {!Worker} level. Contrary
       to {!Transitions}, these functions depend on [Worker]. *)
