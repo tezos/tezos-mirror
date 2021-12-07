@@ -74,10 +74,6 @@ val create : parameters -> t
     in field [in_mempool] of [classes]. *)
 val is_in_mempool : Operation_hash.t -> t -> bool
 
-(** [is_applied oph classes] indicates whether [oph] is present
-    in field [applied_rev] of [classes]. *)
-val is_applied : Operation_hash.t -> t -> bool
-
 (** [remove oph classes] removes operation of hash [oph] from all
     fields of [classes]. If the [oph] was classified as [Applied], the
     function is in [O(n)] with [n] being the length of

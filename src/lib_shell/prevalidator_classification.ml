@@ -127,9 +127,6 @@ let flush (classes : t) ~handle_branch_refused =
 
 let is_in_mempool oph classes = Operation_hash.Map.mem oph classes.in_mempool
 
-let is_applied oph classes =
-  List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied_rev
-
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
    node). However, removing an operation which is applied invalidates
@@ -142,27 +139,28 @@ let is_applied oph classes =
    set of pending operations instead. *)
 let remove oph classes =
   match Operation_hash.Map.find oph classes.in_mempool with
-  | None -> ()
-  | Some (_op, classification) -> (
-      classes.in_mempool <- Operation_hash.Map.remove oph classes.in_mempool ;
-      match classification with
-      | `Refused _ ->
-          classes.refused.map <-
-            Operation_hash.Map.remove oph classes.refused.map
-      | `Outdated _ ->
-          classes.outdated.map <-
-            Operation_hash.Map.remove oph classes.outdated.map
-      | `Branch_refused _ ->
-          classes.branch_refused.map <-
-            Operation_hash.Map.remove oph classes.branch_refused.map
-      | `Branch_delayed _ ->
-          classes.branch_delayed.map <-
-            Operation_hash.Map.remove oph classes.branch_delayed.map
-      | `Applied ->
-          classes.applied_rev <-
-            List.filter
-              (fun (op, _) -> Operation_hash.(op <> oph))
-              classes.applied_rev)
+  | None -> None
+  | Some (op, classification) ->
+      (classes.in_mempool <- Operation_hash.Map.remove oph classes.in_mempool ;
+       match classification with
+       | `Refused _ ->
+           classes.refused.map <-
+             Operation_hash.Map.remove oph classes.refused.map
+       | `Outdated _ ->
+           classes.outdated.map <-
+             Operation_hash.Map.remove oph classes.outdated.map
+       | `Branch_refused _ ->
+           classes.branch_refused.map <-
+             Operation_hash.Map.remove oph classes.branch_refused.map
+       | `Branch_delayed _ ->
+           classes.branch_delayed.map <-
+             Operation_hash.Map.remove oph classes.branch_delayed.map
+       | `Applied ->
+           classes.applied_rev <-
+             List.filter
+               (fun (op, _) -> Operation_hash.(op <> oph))
+               classes.applied_rev) ;
+      Some (op, classification)
 
 let handle_applied oph op classes =
   classes.applied_rev <- (oph, op) :: classes.applied_rev ;
