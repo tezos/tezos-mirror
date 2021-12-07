@@ -130,6 +130,7 @@ let export_import ~test_descr ~previously_baked_blocks ?exported_block_hash
       ~dst_store_dir
       ~dst_context_dir
       ~chain_name
+      ~configured_history_mode:None
       ~user_activated_upgrades:[]
       ~user_activated_protocol_overrides:[]
       genesis
@@ -510,6 +511,7 @@ let test_rolling () =
         ~dst_store_dir
         ~dst_context_dir
         ~chain_name
+        ~configured_history_mode:None
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
         genesis
@@ -634,6 +636,7 @@ let test_drag_after_import () =
         ~dst_store_dir
         ~dst_context_dir
         ~chain_name
+        ~configured_history_mode:None
         ~user_activated_upgrades:[]
         ~user_activated_protocol_overrides:[]
         ~block:export_block_hash

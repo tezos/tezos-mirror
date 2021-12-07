@@ -214,6 +214,7 @@ let test_from_snapshot ~descr:_ (store_dir, context_dir) store
             ~dst_store_dir
             ~dst_context_dir
             ~chain_name
+            ~configured_history_mode:None
             ~user_activated_upgrades:[]
             ~user_activated_protocol_overrides:[]
             genesis

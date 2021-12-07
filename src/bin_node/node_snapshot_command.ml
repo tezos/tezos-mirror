@@ -224,6 +224,7 @@ module Term = struct
                   | None -> return_none
                 in
                 let check_consistency = not disable_check in
+                let configured_history_mode = node_config.shell.history_mode in
                 Snapshots.import
                   ~snapshot_path
                   ~patch_context
@@ -232,6 +233,7 @@ module Term = struct
                   ~dst_store_dir:store_root
                   ~dst_context_dir:context_root
                   ~chain_name:node_config.blockchain_network.chain_name
+                  ~configured_history_mode
                   ~user_activated_upgrades:
                     node_config.blockchain_network.user_activated_upgrades
                   ~user_activated_protocol_overrides:

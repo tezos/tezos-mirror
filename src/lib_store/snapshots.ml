@@ -98,6 +98,10 @@ type error +=
       expected : Distributed_db_version.Name.t;
       got : Distributed_db_version.Name.t;
     }
+  | Inconsistent_history_mode_import of {
+      requested : History_mode.t;
+      stored : History_mode.t;
+    }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
   | Wrong_snapshot_file of {filename : string}
   | Invalid_chain_store_export of Chain_id.t * string
@@ -486,6 +490,32 @@ let () =
       | Inconsistent_chain_import {expected; got} -> Some (expected, got)
       | _ -> None)
     (fun (expected, got) -> Inconsistent_chain_import {expected; got}) ;
+  register_error_kind
+    `Permanent
+    ~id:"snapshots.inconsistent_history_mode_import"
+    ~title:"Inconsistent history_mode import"
+    ~description:
+      "The imported history mode is inconsistent with the target data \
+       directory."
+    ~pp:(fun ppf (requested, stored) ->
+      Format.fprintf
+        ppf
+        "The history mode contained in the snapshot file (%a) is not \
+         consistent with the one configured in the targeted data directory \
+         (%a). Please check your configuration file."
+        History_mode.pp
+        requested
+        History_mode.pp
+        stored)
+    (obj2
+       (req "requested" History_mode.encoding)
+       (req "stored" History_mode.encoding))
+    (function
+      | Inconsistent_history_mode_import {requested; stored} ->
+          Some (requested, stored)
+      | _ -> None)
+    (fun (requested, stored) ->
+      Inconsistent_history_mode_import {requested; stored}) ;
   register_error_kind
     `Permanent
     ~id:"context_dump.inconsistent_imported_block"
@@ -3211,6 +3241,7 @@ module type Snapshot_importer = sig
     dst_store_dir:[`Store_dir] Naming.directory ->
     dst_context_dir:string ->
     chain_name:Distributed_db_version.Name.t ->
+    configured_history_mode:History_mode.t option ->
     user_activated_upgrades:User_activated.upgrades ->
     user_activated_protocol_overrides:User_activated.protocol_overrides ->
     Genesis.t ->
@@ -3455,8 +3486,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   (* TODO? remove patch context *)
   let import ~snapshot_path ?patch_context ?block:user_expected_block
       ?(check_consistency = true) ~dst_store_dir ~dst_context_dir ~chain_name
-      ~user_activated_upgrades ~user_activated_protocol_overrides
-      (genesis : Genesis.t) =
+      ~configured_history_mode ~user_activated_upgrades
+      ~user_activated_protocol_overrides (genesis : Genesis.t) =
     let open Lwt_tzresult_syntax in
     let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
     let*! snapshot_importer = init ~snapshot_path ~dst_store_dir chain_id in
@@ -3496,6 +3527,15 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
            snapshot_metadata.chain_name)
         (Inconsistent_chain_import
            {expected = snapshot_metadata.chain_name; got = chain_name})
+    in
+    let* () =
+      match configured_history_mode with
+      | Some stored ->
+          let requested = snapshot_metadata.history_mode in
+          fail_unless
+            (History_mode.equal requested stored)
+            (Inconsistent_history_mode_import {requested; stored})
+      | None -> return_unit
     in
     let*! () =
       import_log_notice
@@ -3669,8 +3709,8 @@ let read_snapshot_header ~snapshot_path =
   return (Current_header (version, metadata))
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
-    ~dst_store_dir ~dst_context_dir ~chain_name ~user_activated_upgrades
-    ~user_activated_protocol_overrides genesis =
+    ~dst_store_dir ~dst_context_dir ~chain_name ~configured_history_mode
+    ~user_activated_upgrades ~user_activated_protocol_overrides genesis =
   let open Lwt_tzresult_syntax in
   let* kind = snapshot_file_kind ~snapshot_path in
   let (module Importer) =
@@ -3687,6 +3727,7 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir
     ~dst_context_dir
     ~chain_name
+    ~configured_history_mode
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
     genesis
