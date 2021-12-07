@@ -265,7 +265,7 @@ let rec value_size :
         let boxing_space = !!300 in
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
-        let module M = (val x) in
+        let module M = (val Script_map.get_module x) in
         let boxing_space = !!300 in
         ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->

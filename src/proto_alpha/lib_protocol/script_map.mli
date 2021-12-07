@@ -25,25 +25,27 @@
 (*****************************************************************************)
 
 open Alpha_context
+open Script_typed_ir
 
-val empty : 'a Script_typed_ir.comparable_ty -> ('a, 'b) Script_typed_ir.map
+val make :
+  (module Boxed_map with type key = 'key and type value = 'value) ->
+  ('key, 'value) map
+
+val get_module :
+  ('key, 'value) map ->
+  (module Boxed_map with type key = 'key and type value = 'value)
+
+val empty : 'a comparable_ty -> ('a, 'b) map
 
 val fold :
-  ('key -> 'value -> 'acc -> 'acc) ->
-  ('key, 'value) Script_typed_ir.map ->
-  'acc ->
-  'acc
+  ('key -> 'value -> 'acc -> 'acc) -> ('key, 'value) map -> 'acc -> 'acc
 
-val update :
-  'a ->
-  'b option ->
-  ('a, 'b) Script_typed_ir.map ->
-  ('a, 'b) Script_typed_ir.map
+val update : 'a -> 'b option -> ('a, 'b) map -> ('a, 'b) map
 
-val mem : 'key -> ('key, 'value) Script_typed_ir.map -> bool
+val mem : 'key -> ('key, 'value) map -> bool
 
-val get : 'key -> ('key, 'value) Script_typed_ir.map -> 'value option
+val get : 'key -> ('key, 'value) map -> 'value option
 
-val key_ty : ('a, 'b) Script_typed_ir.map -> 'a Script_typed_ir.comparable_ty
+val key_ty : ('a, 'b) map -> 'a comparable_ty
 
-val size : ('a, 'b) Script_typed_ir.map -> Script_int.n Script_int.num
+val size : ('a, 'b) map -> Script_int.n Script_int.num

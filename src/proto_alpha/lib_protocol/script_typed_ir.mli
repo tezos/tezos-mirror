@@ -343,8 +343,11 @@ module type Boxed_map = sig
   val size : int
 end
 
+(** [map] is made algebraic in order to distinguish it from the other type
+    parameters of [ty]. *)
 type ('key, 'value) map =
-  (module Boxed_map with type key = 'key and type value = 'value)
+  | Map_tag of (module Boxed_map with type key = 'key and type value = 'value)
+[@@ocaml.unboxed]
 
 module Big_map_overlay : Map.S with type key = Script_expr_hash.t
 

@@ -6339,7 +6339,8 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         >|=? fun (ctxt, l, ids_to_copy, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
         (ctxt, reversed, ids_to_copy, acc)
-    | (Map_f has_lazy_storage, Map_t (_, ty, _), (module M)) ->
+    | (Map_f has_lazy_storage, Map_t (_, ty, _), map) ->
+        let (module M) = Script_map.get_module map in
         let bindings m = M.OPS.fold (fun k v bs -> (k, v) :: bs) m [] in
         List.fold_left_es
           (fun (ctxt, m, ids_to_copy, acc) (k, x) ->
@@ -6363,7 +6364,10 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
           let size = M.size
         end in
         ( ctxt,
-          (module M : Boxed_map with type key = M.key and type value = M.value),
+          Script_map.make
+            (module M : Boxed_map
+              with type key = M.key
+               and type value = M.value),
           ids_to_copy,
           acc )
     | (_, Option_t (_, _), None) -> return (ctxt, None, ids_to_copy, acc)

@@ -447,7 +447,8 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ~include_lazy ctxt val_hty val_ty (module M) acc k ->
+   fun ~include_lazy ctxt val_hty val_ty map acc k ->
+    let (module M) = Script_map.get_module map in
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     (* Pay gas for folding over the values *)
     consume_gas_steps ctxt ~num_steps:M.size >>?= fun ctxt ->

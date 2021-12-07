@@ -490,7 +490,8 @@ module type Boxed_map = sig
 end
 
 type ('key, 'value) map =
-  (module Boxed_map with type key = 'key and type value = 'value)
+  | Map_tag of (module Boxed_map with type key = 'key and type value = 'value)
+[@@ocaml.unboxed]
 
 module Big_map_overlay = Map.Make (struct
   type t = Script_expr_hash.t
@@ -2302,7 +2303,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | Ticket_t (cty, _) -> (aux' [@ocaml.tailcall]) accu cty x.contents continue
     | List_t (ty', _) -> on_list ty' accu x.elements
     | Map_t (kty, ty', _) ->
-        let module M = (val x) in
+        let (Map_tag (module M)) = x in
         let bindings = M.OPS.fold (fun k v bs -> (k, v) :: bs) M.boxed [] in
         on_bindings accu kty ty' continue bindings
     | Set_t (ty', _) ->

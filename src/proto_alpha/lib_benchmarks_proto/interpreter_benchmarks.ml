@@ -1236,7 +1236,7 @@ module Registration_section = struct
           (Script_map.empty int_cmp)
           keys
       in
-      let (module M) = map in
+      let (module M) = Script_map.get_module map in
       let key =
         M.OPS.fold (fun k _ -> function None -> Some k | x -> x) M.boxed None
         |> WithExceptions.Option.get ~loc:__LOC__
@@ -1411,7 +1411,7 @@ module Registration_section = struct
           (Script_map.empty int_cmp)
           keys
       in
-      let (module M) = map in
+      let (module M) = Script_map.get_module map in
       let key =
         M.OPS.fold (fun k _ -> function None -> Some k | x -> x) M.boxed None
         |> WithExceptions.Option.get ~loc:__LOC__

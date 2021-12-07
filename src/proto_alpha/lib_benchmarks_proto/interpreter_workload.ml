@@ -1214,16 +1214,20 @@ let extract_ir_sized_step :
   | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
   | (IMap_map _, (map, _)) -> Instructions.map_map (Size.map map)
   | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
-  | (IMap_mem (_, _), (v, (((module Map) as map), _))) ->
+  | (IMap_mem (_, _), (v, (map, _))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_mem key_size (Size.map map)
-  | (IMap_get (_, _), (v, (((module Map) as map), _))) ->
+  | (IMap_get (_, _), (v, (map, _))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get key_size (Size.map map)
-  | (IMap_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
+  | (IMap_update (_, _), (v, (_elt_opt, (map, _)))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_update key_size (Size.map map)
-  | (IMap_get_and_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
+  | (IMap_get_and_update (_, _), (v, (_elt_opt, (map, _)))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get_and_update key_size (Size.map map)
   | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
@@ -1454,7 +1458,8 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KList_exit_body (_, _, _, _, _) -> Control.list_exit_body
   | KMap_enter_body (_, xs, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))
-  | KMap_exit_body (_, _, ((module Map) as map), k, _) ->
+  | KMap_exit_body (_, _, map, k, _) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty k in
       Control.map_exit_body key_size (Size.map map)
   | KView_exit _ -> Control.view_exit
