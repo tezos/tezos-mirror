@@ -1005,7 +1005,7 @@ module Cycle = struct
   module Roll_snapshot_legacy =
     Indexed_context.Make_map
       (struct
-        let name = ["stake_snapshot"]
+        let name = ["roll_snapshot"]
       end)
       (Encoding.UInt16)
 
