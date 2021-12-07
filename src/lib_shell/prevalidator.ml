@@ -963,6 +963,56 @@ module Make
              RPC_answer.return_stream {next; shutdown}) ;
        !dir)
 
+  (* This function fetches one operation through the
+     [distributed_db]. On errors, we emit an event and proceed as
+     usual. *)
+  let fetch_operation w (shell : types_state_shell) ?peer oph =
+    Event.(emit fetching_operation) oph >|= fun () ->
+    Distributed_db.Operation.fetch
+      ~timeout:shell.parameters.limits.operation_timeout
+      shell.parameters.chain_db
+      ?peer
+      oph
+      ()
+    >>= function
+    | Ok op ->
+        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+        Lwt.return_unit
+    | Error (Distributed_db.Operation.Canceled _ :: _) ->
+        Event.(emit operation_included) oph
+    | Error _ ->
+        (* This may happen if the peer timed out for example. *)
+        Event.(emit operation_not_fetched) oph
+
+  (* This function fetches an operation if it is not already handled
+     by the mempool. To ensure we fetch at most a given operation,
+     we record it in the [pv.fetching] field.
+
+     Invariant: This function should be the only one to modify this
+     field.
+
+     Invariant: To ensure, there is no leak, we ensure that when the
+     promise [p] is terminated, we remove the operation from the
+     fetching operations. This is to ensure that if an error
+     happened, we can still fetch this operation in the future. *)
+  let may_fetch_operation w (shell : types_state_shell) peer oph =
+    let origin =
+      match peer with
+      | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
+      | None -> "leftover from previous run"
+    in
+    already_handled ~origin shell oph >>= fun already_handled ->
+    if not already_handled then
+      ignore
+        (Lwt.finalize
+           (fun () ->
+             shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
+             fetch_operation w shell ?peer oph)
+           (fun () ->
+             shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
+             Lwt.return_unit)) ;
+    Lwt.return_unit
+
   (** Module containing functions that are the internal transitions
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
@@ -1037,56 +1087,6 @@ module Make
               oph
               Prevalidation_t.pp_result
               res
-
-    (* This function fetches one operation through the
-       [distributed_db]. On errors, we emit an event and proceed as
-       usual. *)
-    let fetch_operation w (shell : types_state_shell) ?peer oph =
-      Event.(emit fetching_operation) oph >|= fun () ->
-      Distributed_db.Operation.fetch
-        ~timeout:shell.parameters.limits.operation_timeout
-        shell.parameters.chain_db
-        ?peer
-        oph
-        ()
-      >>= function
-      | Ok op ->
-          Worker.Queue.push_request_now w (Arrived (oph, op)) ;
-          Lwt.return_unit
-      | Error (Distributed_db.Operation.Canceled _ :: _) ->
-          Event.(emit operation_included) oph
-      | Error _ ->
-          (* This may happen if the peer timed out for example. *)
-          Event.(emit operation_not_fetched) oph
-
-    (* This function fetches an operation if it is not already handled
-       by the mempool. To ensure we fetch at most a given operation,
-       we record it in the [pv.fetching] field.
-
-       Invariant: This function should be the only one to modify this
-       field.
-
-       Invariant: To ensure, there is no leak, we ensure that when the
-       promise [p] is terminated, we remove the operation from the
-       fetching operations. This is to ensure that if an error
-       happened, we can still fetch this operation in the future. *)
-    let may_fetch_operation w (shell : types_state_shell) peer oph =
-      let origin =
-        match peer with
-        | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
-        | None -> "leftover from previous run"
-      in
-      already_handled ~origin shell oph >>= fun already_handled ->
-      if not already_handled then
-        ignore
-          (Lwt.finalize
-             (fun () ->
-               shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-               fetch_operation w shell ?peer oph)
-             (fun () ->
-               shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
-               Lwt.return_unit)) ;
-      Lwt.return_unit
 
     let on_notify w (shell : types_state_shell) peer mempool =
       let may_fetch_operation = may_fetch_operation w shell (Some peer) in
@@ -1337,7 +1337,7 @@ module Make
         }
       in
       Seq.iter_s
-        (Transitions.may_fetch_operation w pv.shell None)
+        (may_fetch_operation w pv.shell None)
         (Operation_hash.Set.to_seq fetching)
       >>= fun () -> return pv
 
