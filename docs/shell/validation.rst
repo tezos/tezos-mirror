@@ -136,13 +136,8 @@ according to the protocol's decision.
 Prevalidator
 ------------
 
-<<<<<<< HEAD
-To each chain validator is associated a *prevalidator* that is
-responsible for the transmission of operations for this chain over the
-=======
 Each chain validator is associated to a *prevalidator* that is
 responsible for determining which operations to propagate for this chain over the
->>>>>>> 3fe52a95e8... fixup! Doc: Make prevalidator into its own section
 peer-to-peer network. The page :doc:`./prevalidation` gives a detailed
 description of the prevalidator component.
 
