@@ -320,7 +320,7 @@ type quorum_event_stream = {
 
 type t = {
   mutable operation_pool : Operation_pool.pool;
-  canceler : Lwt_canceler.t;
+  mutable canceler : Lwt_canceler.t;
   mutable proposal_watched : watch_kind option;
   qc_event_stream : quorum_event_stream;
   lock : Lwt_mutex.t;
@@ -614,6 +614,7 @@ let create ?initial_mempool ?(monitor_node_operations = true)
     | Error err -> Events.(emit loop_failed err)
     | Ok (head, operation_stream, op_stream_stopper) ->
         Events.(emit starting_new_monitoring ()) >>= fun () ->
+        state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
             op_stream_stopper () ;
             cancel_monitoring state ;
