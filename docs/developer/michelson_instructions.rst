@@ -416,5 +416,5 @@ After all, nobody will ever use it otherwise!
 
 Documenting the instruction may involve:
 
-- Editing the :doc:`Michelson language page <../alpha/michelson>` (only the page corresponding to the Alpha protocol needs be changed, because injected protocols cannot be extended with new instructions).
+- Editing the :doc:`Michelson language page <../alpha/michelson>` (only the page corresponding to the Alpha protocol needs be changed, because injected protocols cannot be extended with new instructions). The source for this page is :src:`docs/alpha/michelson.rst`.
 - Updating the `Michelson reference website <https://tezos.gitlab.io/michelson-reference/>`__, by modifying the associated `repository <https://gitlab.com/tezos/michelson-reference>`__.
