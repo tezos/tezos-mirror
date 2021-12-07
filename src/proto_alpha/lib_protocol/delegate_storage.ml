@@ -698,7 +698,11 @@ let punish_double_endorsing ctxt delegate (level : Level_repr.t) =
   let amount_to_burn =
     Tez_repr.(min frozen_deposits.current_amount punish_value)
   in
-  Token.transfer ctxt (`Frozen_deposits delegate) `Burned amount_to_burn
+  Token.transfer
+    ctxt
+    (`Frozen_deposits delegate)
+    `Double_signing_punishments
+    amount_to_burn
   >>=? fun (ctxt, balance_updates) ->
   Stake_storage.remove_stake ctxt delegate amount_to_burn >>=? fun ctxt ->
   Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)
@@ -725,7 +729,11 @@ let punish_double_baking ctxt delegate (level : Level_repr.t) =
   let amount_to_burn =
     Tez_repr.(min frozen_deposits.current_amount slashing_for_one_block)
   in
-  Token.transfer ctxt (`Frozen_deposits delegate) `Burned amount_to_burn
+  Token.transfer
+    ctxt
+    (`Frozen_deposits delegate)
+    `Double_signing_punishments
+    amount_to_burn
   >>=? fun (ctxt, balance_updates) ->
   Stake_storage.remove_stake ctxt delegate amount_to_burn >>=? fun ctxt ->
   Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)

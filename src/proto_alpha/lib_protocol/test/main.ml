@@ -77,5 +77,6 @@ let () =
       ("participation monitoring", Test_participation.tests);
       ("frozen deposits", Test_frozen_deposits.tests);
       ("token movements", Test_token.tests);
+      ("receipt encodings", Test_receipt.tests);
     ]
   |> Lwt_main.run

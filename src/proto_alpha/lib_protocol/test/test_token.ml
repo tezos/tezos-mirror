@@ -431,7 +431,7 @@ let test_transferring_from_source () =
       [(Initial_commitments, Debited am, Block_application)])
   >>=? fun _ ->
   test_transferring_from_unbounded_source ctxt `Revelation_rewards (fun am ->
-      [(NonceRevelation_rewards, Debited am, Block_application)])
+      [(Nonce_revelation_rewards, Debited am, Block_application)])
   >>=? fun _ ->
   test_transferring_from_unbounded_source
     ctxt

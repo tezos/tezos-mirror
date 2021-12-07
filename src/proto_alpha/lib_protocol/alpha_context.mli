@@ -1461,7 +1461,7 @@ module Receipt : sig
     | Block_fees
     | Legacy_deposits of Signature.Public_key_hash.t * Cycle.t
     | Deposits of public_key_hash
-    | NonceRevelation_rewards
+    | Nonce_revelation_rewards
     | Double_signing_evidence_rewards
     | Endorsing_rewards
     | Baking_rewards
