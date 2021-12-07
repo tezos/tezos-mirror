@@ -443,7 +443,7 @@ module Make
         (Pending_ops.mem oph shell.pending
         || Operation_hash.Set.mem oph shell.fetching
         || Operation_hash.Set.mem oph shell.live_operations
-        || Operation_hash.Set.mem oph shell.classification.in_mempool)
+        || Operation_hash.Map.mem oph shell.classification.in_mempool)
 
   let advertise (w : worker) (shell : types_state_shell) mempool =
     match shell.advertisement with

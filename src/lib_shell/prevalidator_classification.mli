@@ -58,7 +58,7 @@ type t = private {
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
   mutable applied_rev : (Operation_hash.t * Operation.t) list;
-  mutable in_mempool : Operation_hash.Set.t;
+  mutable in_mempool : (Operation.t * classification) Operation_hash.Map.t;
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold
