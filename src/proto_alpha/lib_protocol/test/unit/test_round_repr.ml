@@ -533,6 +533,91 @@ let test_level_offset_of_round () =
       (mk_round_durations 3 3, [(0, 0); (1, 3); (2, 9); (3, 18)]);
     ]
 
+(* This is the previous implementation, serving as an oracle *)
+let round_and_offset_oracle (round_durations : Round_repr.Durations.t)
+    ~level_offset =
+  let level_offset_in_seconds = Period_repr.to_seconds level_offset in
+  (* We have the invariant [round <= level_offset] so there is no need to search
+     beyond [level_offset]. We set [right_bound] to [level_offset + 1] to avoid
+     triggering the error level_offset too high when the round equals
+     [level_offset]. *)
+  let right_bound =
+    if Compare.Int64.(level_offset_in_seconds < Int64.of_int32 Int32.max_int)
+    then Int32.of_int (Int64.to_int level_offset_in_seconds + 1)
+    else Int32.max_int
+  in
+  let rec bin_search min_r max_r =
+    if Compare.Int32.(min_r >= right_bound) then invalid_arg "foo"
+    else
+      (Round_repr.of_int32 @@ Int32.(add min_r (div (sub max_r min_r) 2l)))
+      >>? fun round ->
+      let next_round = Round_repr.succ round in
+      Round_repr.level_offset_of_round round_durations ~round:next_round
+      >>? fun next_level_offset ->
+      if Period_repr.(level_offset >= next_level_offset) then
+        bin_search (Round_repr.to_int32 next_round) max_r
+      else
+        Round_repr.level_offset_of_round round_durations ~round
+        >>? fun current_level_offset ->
+        if Period_repr.(level_offset < current_level_offset) then
+          bin_search min_r (Round_repr.to_int32 round)
+        else
+          ok
+            Round_repr.Internals_for_test.
+              {
+                round;
+                offset =
+                  Period_repr.of_seconds_exn
+                    (Int64.sub
+                       (Period_repr.to_seconds level_offset)
+                       (Period_repr.to_seconds current_level_offset));
+              }
+  in
+  Environment.wrap_tzresult @@ bin_search 0l right_bound
+
+(* Test whether the new version is equivalent to the old one *)
+let test_round_and_offset_correction =
+  Tztest.tztest_qcheck
+    ~name:"round_and_offset is correct"
+    QCheck.(
+      pair
+        Lib_test.Qcheck_helpers.(pair uint16 uint16)
+        (Lib_test.Qcheck_helpers.int64_range 0L 100000L))
+    (fun ((first_round_duration, delay_increment_per_round), level_offset) ->
+      QCheck.assume (first_round_duration > 0) ;
+      QCheck.assume (delay_increment_per_round > 0) ;
+      let first_round_duration =
+        Period_repr.of_seconds_exn (Int64.of_int first_round_duration)
+      and delay_increment_per_round =
+        Period_repr.of_seconds_exn (Int64.of_int delay_increment_per_round)
+      and level_offset = Period_repr.of_seconds_exn level_offset in
+      let round_duration =
+        Stdlib.Option.get
+          (Round_repr.Durations.create_opt
+             ~first_round_duration
+             ~delay_increment_per_round)
+      in
+      let expected = round_and_offset_oracle round_duration ~level_offset in
+      let computed =
+        Round_repr.Internals_for_test.round_and_offset
+          round_duration
+          ~level_offset
+      in
+      match (computed, expected) with
+      | (Error _, Error _) -> return_unit
+      | (Ok {round; offset}, Ok {round = round'; offset = offset'}) ->
+          Assert.equal_int32
+            ~loc:__LOC__
+            (Round_repr.to_int32 round)
+            (Round_repr.to_int32 round')
+          >>=? fun () ->
+          Assert.equal_int64
+            ~loc:__LOC__
+            (Period_repr.to_seconds offset)
+            (Period_repr.to_seconds offset')
+      | (Ok _, Error _) -> failwith "expected error is ok"
+      | (Error _, Ok _) -> failwith "expected ok is error")
+
 let tests =
   Tztest.
     [
@@ -550,4 +635,5 @@ let tests =
         "ts_of_round (round_of_ts ts) <= ts"
         `Quick
         test_round_of_ts_inverse;
+      test_round_and_offset_correction;
     ]
