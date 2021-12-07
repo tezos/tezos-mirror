@@ -152,6 +152,18 @@ let protocol_parameters_json t : Ezjsonm.t =
   let extra_post_babylon_stuff subkind =
     let alpha_specific_parameters =
       match subkind with
+      | `Alpha ->
+          [ ("tx_rollup_enable", bool false)
+          ; (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
+            ("tx_rollup_origination_size", int 60_000)
+          ; ("sc_rollup_enable", bool false)
+          ; ("sc_rollup_origination_size", int 6_314)
+          ]
+      | `Granada | `Hangzhou | `Ithaca -> []
+      | _ -> failwith "unsupported protocol" in
+    let list_of_zs = list (fun i -> string (Int.to_string i)) in
+    let pre_alpha_specific_parameters =
+      match subkind with
       | `Ithaca | `Alpha ->
           [ ("max_operations_time_to_live", int 120)
           ; ("blocks_per_stake_snapshot", int t.blocks_per_roll_snapshot)
@@ -168,15 +180,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ( "ratio_of_frozen_deposits_slashed_per_double_endorsement"
             , dict [("numerator", int 1); ("denominator", int 2)] )
           ; ("double_baking_punishment", string "640000000")
-          ; ("tx_rollup_enable", bool false)
-          ; (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
-            ("tx_rollup_origination_size", int 60_000) ]
-      | `Granada | `Hangzhou -> []
-      | _ -> failwith "unsupported protocol" in
-    let list_of_zs = list (fun i -> string (Int.to_string i)) in
-    let pre_alpha_specific_parameters =
-      match subkind with
-      | `Ithaca | `Alpha -> []
+          ]
       | `Granada | `Hangzhou ->
           [ ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
           ; ("initial_endorsers", int 1)

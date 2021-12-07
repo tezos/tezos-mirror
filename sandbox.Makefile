@@ -102,7 +102,7 @@ user_activated_upgrade_next: tezos-sandbox tezos-client tezos-node \
 
 .PHONY: user_activated_upgrade_alpha
 user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
-	tezos-baker-${CURRENT_PROTO} tezos-endorser-${CURRENT_PROTO} tezos-accuser-${CURRENT_PROTO} \
+	tezos-baker-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \
 	tezos-baker-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
 	./tezos-sandbox mini-net \
 	  --root-path ${TMP}/flextesa-hard-fork-alpha/ \
@@ -111,13 +111,13 @@ user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
 	  --number-of-b 2 \
 	  --with-timestamp \
 	  --until 20 \
-	  --protocol-hash ${CURRENT_PROTO_HASH} \
-	  --protocol-kind ${CURRENT_PROTO_NAME} \
+	  --protocol-hash ${NEXT_PROTO_HASH} \
+	  --protocol-kind ${NEXT_PROTO_NAME} \
 	  --tezos-client ./tezos-client \
 	  --tezos-node ./tezos-node \
-	  --tezos-baker ./tezos-baker-${CURRENT_PROTO} \
-	  --tezos-endorser ./tezos-endorser-${CURRENT_PROTO} \
-	  --tezos-accuser ./tezos-accuser-${CURRENT_PROTO} \
+	  --tezos-baker ./tezos-baker-${NEXT_PROTO} \
+	  --tezos-endorser ./tezos-baker-${NEXT_PROTO} \
+	  --tezos-accuser ./tezos-accuser-${NEXT_PROTO} \
 	  --hard-fork 8:${ALPHA_PROTO_HASH} \
 	  --hard-fork-baker ./tezos-baker-${ALPHA_PROTO} \
 	  --hard-fork-endorser ./tezos-baker-${ALPHA_PROTO} \
@@ -153,7 +153,7 @@ daemons_upgrade_next: tezos-sandbox tezos-client tezos-admin-client tezos-node \
 
 .PHONY: daemons_upgrade_alpha
 daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node \
-	tezos-baker-${CURRENT_PROTO} tezos-endorser-${CURRENT_PROTO} tezos-accuser-${CURRENT_PROTO} \
+	tezos-baker-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \
 	tezos-baker-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
 	./tezos-sandbox daemons-upgrade \
 	  src/proto_${subst -,_,${ALPHA_PROTO}}/lib_protocol/TEZOS_PROTOCOL \
@@ -166,14 +166,14 @@ daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node 
 	  --time-betw 3 \
 	  --blocks-per-vot 14 \
 	  --with-timestamp \
-	  --protocol-hash ${CURRENT_PROTO_HASH} \
-	  --protocol-kind ${CURRENT_PROTO_NAME} \
+	  --protocol-hash ${NEXT_PROTO_HASH} \
+	  --protocol-kind ${NEXT_PROTO_NAME} \
 	  --tezos-client ./tezos-client \
 	  --tezos-admin ./tezos-admin-client \
 	  --tezos-node ./tezos-node \
-	  --first-baker ./tezos-baker-${CURRENT_PROTO} \
-	  --first-endorser ./tezos-endorser-${CURRENT_PROTO} \
-	  --first-accuser ./tezos-accuser-${CURRENT_PROTO} \
+	  --first-baker ./tezos-baker-${NEXT_PROTO} \
+	  --first-endorser ./tezos-baker-${NEXT_PROTO} \
+	  --first-accuser ./tezos-accuser-${NEXT_PROTO} \
 	  --second-baker ./tezos-baker-${ALPHA_PROTO} \
 	  --second-endorser ./tezos-baker-${ALPHA_PROTO} \
 	  --second-accuser ./tezos-accuser-${ALPHA_PROTO}
