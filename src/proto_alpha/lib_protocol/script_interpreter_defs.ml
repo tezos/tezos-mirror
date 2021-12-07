@@ -492,7 +492,6 @@ let apply ctxt gas capture_ty capture lam =
       let lam' = Lam (full_descr, full_expr) in
       let gas = update_local_gas_counter ctxt in
       return (lam', outdated ctxt, gas)
-  | _ -> assert false
 
 (* [transfer (ctxt, sc) gas tez tp p destination entrypoint]
    creates an operation that transfers an amount of [tez] to

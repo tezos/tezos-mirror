@@ -26,9 +26,6 @@
 
 open Alpha_context
 
-(* Impossible error *)
-type error += Unsupported_type_invariant_violated
-
 type error += Unsupported_non_empty_overlay | Unsupported_type_operation
 
 let () =
@@ -403,7 +400,6 @@ module Ticket_collection = struct
         else (k [@ocaml.tailcall]) ctxt acc
     | (True_ht, Ticket_t (comp_ty, _)) ->
         (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
-    | _ -> fail Unsupported_type_invariant_violated
 
   and tickets_of_list :
       type a ret.

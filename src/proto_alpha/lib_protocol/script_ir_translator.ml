@@ -4999,11 +4999,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             {apply = (fun kinfo k -> IJoin_tickets (kinfo, contents_ty, k))}
           in
           let stack = Item_t (res_ty, rest) in
-          typed ctxt loc instr stack
-      | _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
-             fix injectivity of types *)
-          assert false)
+          typed ctxt loc instr stack)
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t _, Item_t (Chest_t _, Item_t (Nat_t _, rest))) ) ->
