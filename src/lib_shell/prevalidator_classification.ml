@@ -141,15 +141,28 @@ let is_applied oph classes =
    Later on, it would be probably better if this function returns a
    set of pending operations instead. *)
 let remove oph classes =
-  classes.refused.map <- Operation_hash.Map.remove oph classes.refused.map ;
-  classes.outdated.map <- Operation_hash.Map.remove oph classes.outdated.map ;
-  classes.branch_refused.map <-
-    Operation_hash.Map.remove oph classes.branch_refused.map ;
-  classes.branch_delayed.map <-
-    Operation_hash.Map.remove oph classes.branch_delayed.map ;
-  classes.in_mempool <- Operation_hash.Map.remove oph classes.in_mempool ;
-  classes.applied_rev <-
-    List.filter (fun (op, _) -> Operation_hash.(op <> oph)) classes.applied_rev
+  match Operation_hash.Map.find oph classes.in_mempool with
+  | None -> ()
+  | Some (_op, classification) -> (
+      classes.in_mempool <- Operation_hash.Map.remove oph classes.in_mempool ;
+      match classification with
+      | `Refused _ ->
+          classes.refused.map <-
+            Operation_hash.Map.remove oph classes.refused.map
+      | `Outdated _ ->
+          classes.outdated.map <-
+            Operation_hash.Map.remove oph classes.outdated.map
+      | `Branch_refused _ ->
+          classes.branch_refused.map <-
+            Operation_hash.Map.remove oph classes.branch_refused.map
+      | `Branch_delayed _ ->
+          classes.branch_delayed.map <-
+            Operation_hash.Map.remove oph classes.branch_delayed.map
+      | `Applied ->
+          classes.applied_rev <-
+            List.filter
+              (fun (op, _) -> Operation_hash.(op <> oph))
+              classes.applied_rev)
 
 let handle_applied oph op classes =
   classes.applied_rev <- (oph, op) :: classes.applied_rev ;

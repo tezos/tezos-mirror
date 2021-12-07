@@ -79,13 +79,19 @@ val is_in_mempool : Operation_hash.t -> t -> bool
 val is_applied : Operation_hash.t -> t -> bool
 
 (** [remove oph classes] removes operation of hash [oph] from all
-    fields of [classes].
+    fields of [classes]. If the [oph] was classified as [Applied], the
+    function is in [O(n)] with [n] being the length of
+    [classes.applied]. Otherwise, the function is [O(log n)] with [n]
+    the number of operations in the corresponding class.
+
+    If [oph] was found, its classification as well as the operation it
+    was bound to are returned. If [oph] was not found, [None]
+    is returned.
 
     {b Warning:} If an operation is removed from the [applied] field,
-    this may invalidate the classification of all the other
-    operations. It is left to the caller to restore a consistent
-    state. *)
-val remove : Operation_hash.t -> t -> unit
+    this may invalidate the classification of all the other operations.
+    It is left to the caller to restore a consistent state. *)
+val remove : Operation_hash.t -> t -> (Operation.t * classification) option
 
 (** [add ~notify classification oph op classes] adds the operation [op] with
     hash [oph] classified as [classification] to the classifier [classes]. The
