@@ -6199,8 +6199,10 @@ let diff_of_sapling_state ctxt ~temporary ~ids_to_copy
 
     Please keep the usage of this GADT local.
 *)
+
 type 'ty has_lazy_storage =
-  | True_f : _ has_lazy_storage
+  | Big_map_f : ('a, 'b) big_map has_lazy_storage
+  | Sapling_state_f : Sapling.state has_lazy_storage
   | False_f : _ has_lazy_storage
   | Pair_f :
       'a has_lazy_storage * 'b has_lazy_storage
@@ -6229,8 +6231,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
     | (h1, h2) -> cons h1 h2
   in
   match ty with
-  | Big_map_t (_, _, _) -> True_f
-  | Sapling_state_t _ -> True_f
+  | Big_map_t (_, _, _) -> Big_map_f
+  | Sapling_state_t _ -> Sapling_state_f
   | Unit_t _ -> False_f
   | Int_t _ -> False_f
   | Nat_t _ -> False_f
@@ -6287,7 +6289,7 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
     Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
     match (has_lazy_storage, ty, x) with
     | (False_f, _, _) -> return (ctxt, x, ids_to_copy, acc)
-    | (_, Big_map_t (_, _, _), map) ->
+    | (Big_map_f, Big_map_t (_, _, _), map) ->
         diff_of_big_map ctxt mode ~temporary ~ids_to_copy map
         >|=? fun (diff, id, ctxt) ->
         let map =
@@ -6300,7 +6302,7 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         let diff = Lazy_storage.make Big_map id diff in
         let ids_to_copy = Lazy_storage.IdSet.add Big_map id ids_to_copy in
         (ctxt, map, ids_to_copy, diff :: acc)
-    | (_, Sapling_state_t _, sapling_state) ->
+    | (Sapling_state_f, Sapling_state_t _, sapling_state) ->
         diff_of_sapling_state ctxt ~temporary ~ids_to_copy sapling_state
         >|=? fun (diff, id, ctxt) ->
         let sapling_state =
@@ -6367,10 +6369,6 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
           ids_to_copy,
           acc )
     | (_, Option_t (_, _), None) -> return (ctxt, None, ids_to_copy, acc)
-    | _ ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
-           fix injectivity of types *)
-        assert false
   in
   let has_lazy_storage = has_lazy_storage ty in
   aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
@@ -6398,16 +6396,16 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
  fun ~f ~init ctxt ty x ~has_lazy_storage ->
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
-  | (_, Big_map_t (_, _, _), {id = Some id; _}) ->
+  | (Big_map_f, Big_map_t (_, _, _), {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Big_map id (Fold_lazy_storage.Ok init), ctxt)
-  | (_, Sapling_state_t _, {id = Some id; _}) ->
+  | (Sapling_state_f, Sapling_state_t _, {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Sapling_state id (Fold_lazy_storage.Ok init), ctxt)
   | (False_f, _, _) -> ok (Fold_lazy_storage.Ok init, ctxt)
-  | (_, Big_map_t (_, _, _), {id = None; _}) ->
+  | (Big_map_f, Big_map_t (_, _, _), {id = None; _}) ->
       ok (Fold_lazy_storage.Ok init, ctxt)
-  | (_, Sapling_state_t _, {id = None; _}) ->
+  | (Sapling_state_f, Sapling_state_t _, {id = None; _}) ->
       ok (Fold_lazy_storage.Ok init, ctxt)
   | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) -> (
       fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
@@ -6444,10 +6442,6 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
           | Fold_lazy_storage.Error -> ok (init, ctxt))
         m
         (ok (Fold_lazy_storage.Ok init, ctxt))
-  | _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
-         fix injectivity of types *)
-      assert false
 
 let[@coq_axiom_with_reason "gadt"] collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in
