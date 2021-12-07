@@ -222,6 +222,9 @@ let test_cannot_bake_with_zero_deposits () =
   (* by now, the active stake of account1 is 0 so it no longer has slots, thus it
      cannot be a proposer, thus it cannot bake. Precisely, bake fails because
      get_next_baker_by_account fails with "No slots found" *)
+  Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
+  Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
+  Block.bake ~policy:(By_account account1) b >>= fun b1 ->
   Assert.error ~loc:__LOC__ b1 (fun _ -> true)
 
 let test_deposits_after_stake_removal () =
