@@ -177,6 +177,15 @@ Building from sources via OPAM
 The easiest way to build the binaries from the source code is to use the OPAM
 source package manager for OCaml.
 
+This is easier than :ref:`setting up a complete development environment <build_from_sources>`, like developers do.
+However, this method is recommended for expert users as it requires basic
+knowledge of the OPAM package manager and the OCaml packages
+workflow. In particular, upgrading Tezos from release to
+release might require tinkering with different options of the OPAM
+package manager to adjust the local environment for the new
+dependencies.
+
+
 .. _build_environment:
 
 Environment
