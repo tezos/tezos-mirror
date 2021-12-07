@@ -2,8 +2,7 @@
 ; notice that the libraries are compiled with
 ; "\ -ccopt -static" is a temporary solution
 (env
- (static (flags (:standard -ccopt -static)) (ocamlopt_flags (:standard -O3)))
- (release (ocamlopt_flags (:standard -O3))))
+ (static (flags (:standard -ccopt -static))))
 
 (library
  (name tezos_protocol_registerer)
