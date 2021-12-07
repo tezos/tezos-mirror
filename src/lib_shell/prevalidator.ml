@@ -187,7 +187,22 @@
    service to get the classification of an operation (via the
    [monitor_operations] RPC). This also means an operation can be
    notified several times if it is classified again after a
-   [flush]. *)
+   [flush].
+
+   Internally, the prevalidator implementation is split between
+   the [Transitions] module and the [Handlers] module.
+
+   The [Transitions] module contains the top-level functions called to implement
+   the various requests defined in {!Prevalidator_worker_state}. These
+   transitions form the meat of the prevalidator implementation: that is where
+   the logic lies. This module is written in an imperative style: most
+   functions return [unit] instead of returning an updated value.
+   We aim to make this module functional in the near future.
+
+   The [Handlers] module implement the functions needed by the
+   {!Worker.T.HANDLERS} API. These functions concern the lifecycle
+   of a [Worker], such as what happens when it starts and when it is shutdown.
+   Except for initialization, the [Handlers] module is mostly boilerplate. *)
 
 (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1491
    This module should not use [Prevalidation.parse_unsafe] *)
