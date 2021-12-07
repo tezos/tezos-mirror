@@ -25,6 +25,7 @@
 
 type classification =
   [ `Applied
+  | `Prechecked
   | `Branch_delayed of tztrace
   | `Branch_refused of tztrace
   | `Refused of tztrace
@@ -41,16 +42,21 @@ type parameters = {
 }
 
 (** Invariants ensured by this module **provided that the caller does
-    not {!add} an operation which is already present in [t]**:
-    - The field [in_mempool] is the set of all operation hashes present
-      in fields: [refused; branch_refused; branch_delayed; applied].
-    - An operation cannot be at the same time in two of the following
-      fields: [refused; branch_refused; branch_delayed; applied].
+   not {!add} an operation which is already present in [t]**:
 
-    Note: We could always enforce these invariants by checking in {!add}
-    whether the operation is already present. However, this would make
-    the behavior of {!add} less predictable, so we do not think this to
-    be an improvement from the point of view of the caller. *)
+    - The field [in_mempool] is the set of all operation hashes
+   present in fields: [refused; branch_refused; branch_delayed;
+   prechecked; applied].
+
+    - An operation cannot be at the same time in two of the following
+   fields: [refused; branch_refused; branch_delayed; prechecked;
+   applied].
+
+    Note: We could always enforce these invariants by checking in
+   {!add} whether the operation is already present. However, this
+   would make the behavior of {!add} less predictable, so we do not
+   think this to be an improvement from the point of view of the
+   caller. *)
 type t = private {
   parameters : parameters;
   refused : bounded_map;
@@ -58,6 +64,7 @@ type t = private {
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
   mutable applied_rev : (Operation_hash.t * Operation.t) list;
+  mutable prechecked : Operation.t Operation_hash.Map.t;
   mutable in_mempool : (Operation.t * classification) Operation_hash.Map.t;
 }
 
@@ -89,21 +96,32 @@ val is_in_mempool : Operation_hash.t -> t -> bool
     It is left to the caller to restore a consistent state. *)
 val remove : Operation_hash.t -> t -> (Operation.t * classification) option
 
-(** [add ~notify classification oph op classes] adds the operation [op] with
-    hash [oph] classified as [classification] to the classifier [classes]. The
-    [classes.parameters.on_discarded_operation] callback is called for any operation discarded in this
-    process. Currently, an operation is discarded in the following cases:
+(** [add ~notify classification oph op classes] adds the operation
+   [op] with hash [oph] classified as [classification] to the
+   classifier [classes]. The
+   [classes.parameters.on_discarded_operation] callback is called for
+   any operation discarded in this process. Currently, an operation is
+   discarded in the following cases:
 
-    - the corresponding error class field is full. In that case, the new operation is added to the class, and the removed one is discarded.
+    - the corresponding error class field is full. In that case, the
+   new operation is added to the class, and the removed one is
+   discarded. 
+
     - an operation is classified as [Refused].
 
-    Note that a [Refused] operation may thus be passed twice to [on_discarded_operation]: as soon as it is added, and if it is removed because the [classes.refused] bounded map is full.
+    Note that a [Refused] operation may thus be passed twice to
+   [on_discarded_operation]: as soon as it is added, and if it is
+   removed because the [classes.refused] bounded map is full.
 
     As a summary:
 
-    - [Applied] is never discarded
-    - [Branch_refused] and [Branch_delayed] are discarded 0 or 1 time (if the corresponding bounded_map is full)
-    - [Refused] is discarded 1 or 2 times (if the corresponding bounded_map is full) *)
+    - [Applied] and [Prechecked] are never discarded
+
+    - [Branch_refused] and [Branch_delayed] are discarded 0 or 1 time
+   (if the corresponding bounded_map is full)
+
+    - [Refused] is discarded 1 or 2 times (if the corresponding
+   bounded_map is full) *)
 val add : classification -> Operation_hash.t -> Operation.t -> t -> unit
 
 (** Functions to query data on a polymorphic block-like type ['block]. *)
@@ -188,6 +206,7 @@ module Internal_for_tests : sig
     named argument. *)
   val to_map :
     applied:bool ->
+    prechecked:bool ->
     branch_delayed:bool ->
     branch_refused:bool ->
     refused:bool ->

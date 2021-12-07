@@ -39,6 +39,7 @@ end
 
 type classification =
   [ `Applied
+  | `Prechecked
   | `Branch_delayed of tztrace
   | `Branch_refused of tztrace
   | `Refused of tztrace
@@ -80,6 +81,7 @@ type t = {
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
   mutable applied_rev : (Operation_hash.t * Operation.t) list;
+  mutable prechecked : Operation.t Operation_hash.Map.t;
   mutable in_mempool : (Operation.t * classification) Operation_hash.Map.t;
 }
 
@@ -90,6 +92,7 @@ let create parameters =
     outdated = mk_empty_bounded_map parameters.map_size_limit;
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
+    prechecked = Operation_hash.Map.empty;
     in_mempool = Operation_hash.Map.empty;
     applied_rev = [];
   }
@@ -123,7 +126,9 @@ let flush (classes : t) ~handle_branch_refused =
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Operation_hash.Map.empty ;
   remove_list_from_in_mempool classes.applied_rev ;
-  classes.applied_rev <- []
+  classes.applied_rev <- [] ;
+  update_in_mempool_map classes.prechecked ;
+  classes.prechecked <- Operation_hash.Map.empty
 
 let is_in_mempool oph classes = Operation_hash.Map.mem oph classes.in_mempool
 
@@ -155,6 +160,9 @@ let remove oph classes =
        | `Branch_delayed _ ->
            classes.branch_delayed.map <-
              Operation_hash.Map.remove oph classes.branch_delayed.map
+       | `Prechecked ->
+           classes.prechecked <-
+             Operation_hash.Map.remove oph classes.prechecked
        | `Applied ->
            classes.applied_rev <-
              List.filter
@@ -166,6 +174,11 @@ let handle_applied oph op classes =
   classes.applied_rev <- (oph, op) :: classes.applied_rev ;
   classes.in_mempool <-
     Operation_hash.Map.add oph (op, `Applied) classes.in_mempool
+
+let handle_prechecked oph op classes =
+  classes.prechecked <- Operation_hash.Map.add oph op classes.prechecked ;
+  classes.in_mempool <-
+    Operation_hash.Map.add oph (op, `Prechecked) classes.in_mempool
 
 (* 1. Add the operation to the ring underlying the corresponding
    error map class.
@@ -206,11 +219,13 @@ let handle_error oph op classification classes =
 let add classification oph op classes =
   match classification with
   | `Applied -> handle_applied oph op classes
+  | `Prechecked -> handle_prechecked oph op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
     classification ->
       handle_error oph op classification classes
 
-let to_map ~applied ~branch_delayed ~branch_refused ~refused ~outdated classes =
+let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
+    ~outdated classes =
   let module Map = Operation_hash.Map in
   let ( +> ) accum to_add =
     let merge_fun _k accum_v_opt to_add_v_opt =
@@ -229,11 +244,15 @@ let to_map ~applied ~branch_delayed ~branch_refused ~refused ~outdated classes =
     in
     Map.merge merge_fun accum to_add
   in
-  (if applied then Map.of_seq @@ List.to_seq classes.applied_rev else Map.empty)
-  +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
-  +> (if branch_refused then classes.branch_refused.map else Map.empty)
-  +> (if refused then classes.refused.map else Map.empty)
-  +> if outdated then classes.outdated.map else Map.empty
+  Map.union
+    (fun _oph op _ -> Some op)
+    (if prechecked then classes.prechecked else Map.empty)
+  @@ (if applied then Map.of_seq @@ List.to_seq classes.applied_rev
+     else Map.empty)
+     +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
+     +> (if branch_refused then classes.branch_refused.map else Map.empty)
+     +> (if refused then classes.refused.map else Map.empty)
+     +> if outdated then classes.outdated.map else Map.empty
 
 type 'block block_tools = {
   hash : 'block -> Block_hash.t;
@@ -314,6 +333,7 @@ let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
        (fun _key v _ -> Some v)
        (to_map
           ~applied:true
+          ~prechecked:true
           ~branch_delayed:true
           ~branch_refused:handle_branch_refused
           ~refused:false
@@ -345,6 +365,7 @@ module Internal_for_tests = struct
       branch_refused = copy_bounded_map t.branch_refused;
       branch_delayed = copy_bounded_map t.branch_delayed;
       applied_rev = t.applied_rev;
+      prechecked = t.prechecked;
       in_mempool = t.in_mempool;
     }
 
@@ -361,6 +382,7 @@ module Internal_for_tests = struct
         branch_refused;
         branch_delayed;
         applied_rev;
+        prechecked;
         in_mempool;
       } =
     let applied_pp ppf applied =
@@ -372,11 +394,15 @@ module Internal_for_tests = struct
       in_mempool |> Operation_hash.Map.bindings |> List.map fst
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
+    let prechecked_pp ppf prechecked =
+      prechecked |> Operation_hash.Map.bindings |> List.map fst
+      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+    in
     Format.fprintf
       ppf
       "Map_size_limit:@.%i@.On discarded operation: \
        <function>@.Refused:%a@.Outdated:%a@.Branch refused:@.%a@.Branch \
-       delayed:@.%a@.Applied:@.%a@.In Mempool:@.%a"
+       delayed:@.%a@.Applied:@.%a@.Prechecked:@.%a@.In Mempool:@.%a"
       parameters.map_size_limit
       bounded_map_pp
       refused
@@ -388,6 +414,8 @@ module Internal_for_tests = struct
       branch_delayed
       applied_pp
       applied_rev
+      prechecked_pp
+      prechecked
       in_mempool_pp
       in_mempool
 
@@ -402,14 +430,18 @@ module Internal_for_tests = struct
         name
         (List.length (Ringo.Ring.elements bounded_map.ring))
     in
+    let show_map name map =
+      Format.sprintf "%s map: %d" name (Operation_hash.Map.cardinal map)
+    in
     Format.fprintf
       pp
-      "map_size_limit: %d\n%s\n%s\n%s\n%s\napplied_rev: %d\nin_mempool: %d"
+      "map_size_limit: %d\n%s\n%s\n%s\n%s\n%sapplied_rev: %d\nin_mempool: %d"
       t.parameters.map_size_limit
       (show_bounded_map "refused" t.refused)
       (show_bounded_map "outdated" t.outdated)
       (show_bounded_map "branch_refused" t.branch_refused)
       (show_bounded_map "branch_delayed" t.branch_delayed)
+      (show_map "prechecked" t.prechecked)
       (List.length t.applied_rev)
       (Operation_hash.Map.cardinal t.in_mempool)
 
