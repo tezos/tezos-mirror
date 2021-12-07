@@ -449,7 +449,8 @@ module type Boxed_set = sig
   val size : int
 end
 
-type 'elt set = (module Boxed_set with type elt = 'elt)
+type 'elt set = Set_tag of (module Boxed_set with type elt = 'elt)
+[@@ocaml.unboxed]
 
 (*
 
@@ -2305,7 +2306,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
         let bindings = M.OPS.fold (fun k v bs -> (k, v) :: bs) M.boxed [] in
         on_bindings accu kty ty' continue bindings
     | Set_t (ty', _) ->
-        let module M = (val x) in
+        let (Set_tag (module M)) = x in
         let elements = M.OPS.fold (fun x s -> x :: s) M.boxed [] in
         on_list' accu ty' elements continue
     | Big_map_t (_, _, _) ->

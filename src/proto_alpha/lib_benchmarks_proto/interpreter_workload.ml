@@ -1203,11 +1203,11 @@ let extract_ir_sized_step :
   | (IEmpty_set (_, _, _), _) -> Instructions.empty_set
   | (ISet_iter _, (set, _)) -> Instructions.set_iter (Size.set set)
   | (ISet_mem (_, _), (v, (set, _))) ->
-      let (module S) = set in
+      let (module S) = Script_set.get set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_mem sz (Size.set set)
   | (ISet_update (_, _), (v, (_flag, (set, _)))) ->
-      let (module S) = set in
+      let (module S) = Script_set.get set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_update sz (Size.set set)
   | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)

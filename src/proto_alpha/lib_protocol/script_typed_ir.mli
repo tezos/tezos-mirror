@@ -306,7 +306,10 @@ module type Boxed_set = sig
   val size : int
 end
 
-type 'elt set = (module Boxed_set with type elt = 'elt)
+(** [set] is made algebraic in order to distinguish it from the other type
+    parameters of [ty]. *)
+type 'elt set = Set_tag of (module Boxed_set with type elt = 'elt)
+[@@ocaml.unboxed]
 
 module type Boxed_map_OPS = sig
   type t

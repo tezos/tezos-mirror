@@ -1005,7 +1005,8 @@ module Cost_of = struct
 
     let empty_set = atomic_step_cost cost_N_IEmpty_set
 
-    let set_iter (type a) ((module Box) : a Script_typed_ir.set) =
+    let set_iter (type a) (set : a Script_typed_ir.set) =
+      let (module Box) = Script_set.get set in
       atomic_step_cost (cost_N_ISet_iter Box.size)
 
     let set_size = atomic_step_cost cost_N_ISet_size
@@ -1443,15 +1444,17 @@ module Cost_of = struct
       let intercept = atomic_step_cost (S.safe_int 80) in
       Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
 
-    let set_mem (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+    let set_mem (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
+      let (module Box) = Script_set.get set in
       let per_elt_cost = compare Box.elt_ty elt elt in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 115) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
 
-    let set_update (type a) (elt : a) ((module Box) : a Script_typed_ir.set) =
+    let set_update (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
+      let (module Box) = Script_set.get set in
       let per_elt_cost = compare Box.elt_ty elt elt in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 130) in

@@ -261,7 +261,7 @@ let rec value_size :
     | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
-        let module M = (val x) in
+        let module M = (val Script_set.get x) in
         let boxing_space = !!300 in
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
