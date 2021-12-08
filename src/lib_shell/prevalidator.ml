@@ -190,9 +190,9 @@
    [flush].
 
    Internally, the prevalidator implementation is split between
-   the [Transitions] module and the [Handlers] module.
+   the [Requests] module and the [Handlers] module.
 
-   The [Transitions] module contains the top-level functions called to implement
+   The [Requests] module contains the top-level functions called to implement
    the various requests defined in {!Prevalidator_worker_state}. These
    transitions form the meat of the prevalidator implementation: that is where
    the logic lies. This module is written in an imperative style: most
@@ -778,7 +778,7 @@ module Make
   (** Module containing functions that are the internal transitions
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
-  module Transitions = struct
+  module Requests = struct
     let on_arrived (pv : state) oph op =
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
@@ -1228,7 +1228,7 @@ module Make
        !dir)
 
   (** Module implementing the events at the {!Worker} level. Contrary
-      to {!Transitions}, these functions depend on [Worker]. *)
+      to {!Requests}, these functions depend on [Worker]. *)
   module Handlers = struct
     type self = worker
 
@@ -1237,7 +1237,7 @@ module Make
       let pv = Worker.state w in
       (match request with
       | Request.Flush (hash, event, live_blocks, live_operations) ->
-          Transitions.on_advertise pv.shell ;
+          Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
           let chain_store =
@@ -1252,24 +1252,23 @@ module Make
               | Branch_switch -> true)
           in
           Lwt_mutex.with_lock pv.lock @@ fun () ->
-          Transitions.on_flush
+          Requests.on_flush
             ~handle_branch_refused
             pv
             block
             live_blocks
             live_operations
       | Request.Notify (peer, mempool) ->
-          Transitions.on_notify w pv.shell peer mempool >>= fun () ->
-          return_unit
+          Requests.on_notify w pv.shell peer mempool >>= fun () -> return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject {op; force} -> Transitions.on_inject pv ~force op
-      | Request.Arrived (oph, op) -> Transitions.on_arrived pv oph op
+      | Request.Inject {op; force} -> Requests.on_inject pv ~force op
+      | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
       | Request.Advertise ->
-          Transitions.on_advertise pv.shell ;
+          Requests.on_advertise pv.shell ;
           return_unit
-      | Request.Ban oph -> Transitions.on_ban pv oph)
+      | Request.Ban oph -> Requests.on_ban pv oph)
       >>=? fun r ->
       handle_unprocessed w pv >>= fun () -> return r
 
