@@ -103,6 +103,7 @@ let classification_gen : classification QCheck.Gen.t =
   QCheck.Gen.oneofa
     [|
       `Applied;
+      `Prechecked;
       `Branch_delayed [];
       `Branch_refused [];
       `Refused [];
@@ -110,7 +111,8 @@ let classification_gen : classification QCheck.Gen.t =
     |]
 
 let unrefused_classification_gen : classification QCheck.Gen.t =
-  QCheck.Gen.oneofa [|`Applied; `Branch_delayed []; `Branch_refused []|]
+  QCheck.Gen.oneofa
+    [|`Applied; `Prechecked; `Branch_delayed []; `Branch_refused []|]
 
 let parameters_gen : parameters QCheck.Gen.t =
   let open QCheck.Gen in
@@ -157,7 +159,7 @@ let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t =
     let freq_fresh t =
       max
         1
-        (freq_of_list t.applied_rev
+        (freq_of_list t.applied_rev + freq_of_map t.prechecked
         + freq_of_map (Classification.map t.branch_refused)
         + freq_of_map (Classification.map t.branch_delayed)
         + freq_of_map (Classification.map t.refused)
@@ -166,6 +168,7 @@ let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t =
     frequency
       [
         freq_and_gen_of_list t.applied_rev;
+        freq_and_gen_of_list (Operation_hash.Map.bindings t.prechecked);
         freq_and_gen_of_map (Classification.map t.branch_refused);
         freq_and_gen_of_map (Classification.map t.branch_delayed);
         freq_and_gen_of_map (Classification.map t.refused);
