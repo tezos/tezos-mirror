@@ -11,7 +11,9 @@ depends: [
   "dune" { >= "2.9" }
   "conf-rust"
   "integers"
+  "integers_stubs_js"
   "ctypes" { >= "0.18.0" }
+  "ctypes_stubs_js"
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-stdlib"
   "tezos-crypto"
@@ -22,6 +24,7 @@ depends: [
   "tezos-stdlib-unix" {with-test}
   "tezos-base-test-helpers" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
+  "tezos-hacl" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
