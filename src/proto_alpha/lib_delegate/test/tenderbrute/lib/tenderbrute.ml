@@ -62,19 +62,15 @@ let init_context ?constants_overrides_json ?bootstrap_accounts_json parameters =
 (* Change the initial seed for the first preserved cycles. This suppose that the
    seeds for these cycles are already set, which is the case because this
    function is always called after {!init_context}. *)
-let change_seed ?initial_seed_nonce ctxt =
+let change_seed ?initial_seed ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
-  (match initial_seed_nonce with
-  | None -> Ok None
-  | Some n -> Seed_repr.make_nonce n |> Result.map Option.some)
-  >>?= fun initial_seed_nonce ->
   List.fold_left_es
     (fun (c, ctxt) seed ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       Storage.Seed.For_cycle.remove_existing ctxt cycle >>=? fun ctxt ->
       Storage.Seed.For_cycle.init ctxt cycle seed >|=? fun ctxt -> (c + 1, ctxt))
     (0, ctxt)
-    (Seed_repr.initial_seeds ?initial_seed_nonce (preserved + 2))
+    (Seed_repr.initial_seeds ?initial_seed (preserved + 2))
   >|=? snd
 
 let init ?constants_overrides_json ?bootstrap_accounts_json parameters =
@@ -175,24 +171,25 @@ let bruteforce ?(show_progress = false) ?(random_seed = 0) ?max
     match max with
     | Some max when n > max -> failwith "Did not find seed nonce"
     | _ -> (
-        let initial_seed_nonce =
-          if n = 0 then None else Some (rnd_bytes32 ())
+        let initial_seed =
+          if n = 0 then None
+          else Some (State_hash.of_bytes_exn (rnd_bytes32 ()))
         in
-        change_seed ?initial_seed_nonce ctxt >|= Environment.wrap_tzresult
+        change_seed ?initial_seed ctxt >|= Environment.wrap_tzresult
         >>=? fun ctxt ->
         check ctxt ~selection >>=? function
         | true ->
             Format.eprintf "%s%!" (String.make !last_nb_chars '\b') ;
-            return initial_seed_nonce
+            return initial_seed
         | false -> loop (n + 1))
   in
   loop 0
 
-(* Check that an initial seed nonce corresonds to the desired delegate selection *)
-let check_seed_nonce ?(parameters = Mockup.Protocol_parameters.default_value)
-    ?constants_overrides_json ?bootstrap_accounts_json ~seed_nonce selection =
+(* Check that an initial seed corresonds to the desired delegate selection *)
+let check_seed ?(parameters = Mockup.Protocol_parameters.default_value)
+    ?constants_overrides_json ?bootstrap_accounts_json ~seed selection =
   init ?constants_overrides_json ?bootstrap_accounts_json parameters
   >>=? fun (ctxt, cycle_eras) ->
   let selection = mk_selection_map cycle_eras selection in
-  change_seed ?initial_seed_nonce:seed_nonce ctxt >|= Environment.wrap_tzresult
+  change_seed ?initial_seed:seed ctxt >|= Environment.wrap_tzresult
   >>=? fun ctxt -> check ctxt ~selection

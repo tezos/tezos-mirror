@@ -95,9 +95,9 @@ val deterministic_seed : seed -> seed
 
 (** [initial_seeds n] generates the first [n] seeds for which there are no nonces.
     The first seed is a constant value. The kth seed is the hash of seed (k-1)
-    concatenated with a constant. If an [initial_seed_nonce] is provided, the
-    {i first} seed is created with added entropy (see {!nonce}). *)
-val initial_seeds : ?initial_seed_nonce:nonce -> int -> seed list
+    concatenated with a constant. If an [initial_seed] is provided, the
+    {i first} seed is created using it as the first one. *)
+val initial_seeds : ?initial_seed:State_hash.t -> int -> seed list
 
 (** {2 Predefined nonce} *)
 

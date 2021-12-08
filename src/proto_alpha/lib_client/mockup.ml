@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 
 (* ------------------------------------------------------------------------- *)
 (* Mockup protocol parameters *)
@@ -72,7 +73,7 @@ module Protocol_constants_overrides = struct
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
-    initial_seed_nonce : bytes option option;
+    initial_seed : State_hash.t option option;
   }
 
   (** Shamefully copied from [Constants_repr.parametric_encoding] and adapted ([opt] instead of [req]). *)
@@ -114,7 +115,7 @@ module Protocol_constants_overrides = struct
                   c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                   c.chain_id,
                   c.timestamp,
-                  c.initial_seed_nonce ),
+                  c.initial_seed ),
                 (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
@@ -150,7 +151,7 @@ module Protocol_constants_overrides = struct
                      ratio_of_frozen_deposits_slashed_per_double_endorsement,
                      chain_id,
                      timestamp,
-                     initial_seed_nonce ),
+                     initial_seed ),
                    (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
         {
           preserved_cycles;
@@ -187,7 +188,7 @@ module Protocol_constants_overrides = struct
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
           chain_id;
           timestamp;
-          initial_seed_nonce;
+          initial_seed;
           tx_rollup_enable;
           tx_rollup_origination_size;
         })
@@ -213,7 +214,7 @@ module Protocol_constants_overrides = struct
                (opt "hard_storage_limit_per_operation" z)
                (opt "quorum_min" int32))
             (merge_objs
-               (obj9
+               (obj10
                   (opt "quorum_max" int32)
                   (opt "min_proposal_quorum" int32)
                   (opt "liquidity_baking_subsidy" Tez.encoding)
@@ -237,7 +238,7 @@ module Protocol_constants_overrides = struct
                         Constants.ratio_encoding)
                      (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
-                     (opt "initial_seed_nonce" (option bytes)))
+                     (opt "initial_seed" (option State_hash.encoding)))
                   (obj2
                      (opt "tx_rollup_enable" Data_encoding.bool)
                      (opt "tx_rollup_origination_size" int31))))))
@@ -304,7 +305,7 @@ module Protocol_constants_overrides = struct
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
-        initial_seed_nonce = Some parametric.initial_seed_nonce;
+        initial_seed = Some parametric.initial_seed;
       }
 
   let no_overrides : t =
@@ -347,7 +348,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_origination_size = None;
       chain_id = None;
       timestamp = None;
-      initial_seed_nonce = None;
+      initial_seed = None;
     }
 
   (** Existential wrapper to support heterogeneous lists/maps. *)
@@ -605,8 +606,7 @@ module Protocol_constants_overrides = struct
              o.consensus_committee_size;
          consensus_threshold =
            Option.value ~default:c.consensus_threshold o.consensus_threshold;
-         initial_seed_nonce =
-           Option.value ~default:c.initial_seed_nonce o.initial_seed_nonce;
+         initial_seed = Option.value ~default:c.initial_seed o.initial_seed;
          preserved_cycles =
            Option.value ~default:c.preserved_cycles o.preserved_cycles;
          blocks_per_cycle =

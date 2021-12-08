@@ -756,7 +756,7 @@ module Constants : sig
     frozen_deposits_percentage : int;
     double_baking_punishment : Tez.t;
     ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
-    initial_seed_nonce : bytes option;
+    initial_seed : State_hash.t option;
     tx_rollup_enable : bool;
     tx_rollup_origination_size : int;
   }

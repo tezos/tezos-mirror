@@ -627,7 +627,7 @@ def _test_create_mockup_init_show_roundtrip(
                 # DO NOT EDIT the value consensus_threshold this is actually a
                 # constant, not a parameter
                 'consensus_threshold': 0,
-                'initial_seed_nonce': None,
+                'initial_seed': None,
                 'minimal_participation_ratio': {
                     'denominator': 5,
                     'numerator': 1,

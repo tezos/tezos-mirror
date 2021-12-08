@@ -135,11 +135,9 @@ let main () =
       selection
   in
   Lwt_main.run
-    ( thread >|= report_err >|= fun seed_nonce ->
+    ( thread >|= report_err >|= fun seed ->
       let seed_str =
-        match seed_nonce with
-        | None -> "None"
-        | Some s -> Hex.of_bytes s |> Hex.show
+        match seed with None -> "None" | Some s -> State_hash.to_b58check s
       in
       Format.printf "%s@." seed_str )
 

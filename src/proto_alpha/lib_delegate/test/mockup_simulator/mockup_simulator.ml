@@ -870,7 +870,7 @@ let deduce_baker_sk
   return secret_key
 
 (** Generate the two initial genesis blocks. *)
-let make_genesis_context ~delegate_selection ~initial_seed_nonce ~round0 ~round1
+let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
     ~consensus_committee_size ~consensus_threshold accounts_with_secrets
     (total_accounts : int) =
   let default_constants = Mockup.Protocol_parameters.default_value.constants in
@@ -885,7 +885,7 @@ let make_genesis_context ~delegate_selection ~initial_seed_nonce ~round0 ~round1
   let constants =
     {
       default_constants with
-      initial_seed_nonce;
+      initial_seed;
       consensus_committee_size;
       consensus_threshold;
       minimal_block_delay = Alpha_context.Period.of_seconds_exn (max 1L round0);
@@ -919,41 +919,40 @@ let make_genesis_context ~delegate_selection ~initial_seed_nonce ~round0 ~round1
     delegate_selection
   |> Environment.wrap_tzresult
   >>?= fun delegate_selection ->
-  (match (delegate_selection, constants.initial_seed_nonce) with
+  (match (delegate_selection, constants.initial_seed) with
   | ([], _) -> return_none
-  | (selection, (Some _ as seed_nonce)) -> (
-      Faked_client_context.logger#warning "Checking provided seed nonce."
+  | (selection, (Some _ as seed)) -> (
+      Faked_client_context.logger#warning "Checking provided seed."
       >>= fun () ->
-      Tenderbrute.check_seed_nonce
+      Tenderbrute.check_seed
         ~bootstrap_accounts_json:bootstrap_accounts
         ~parameters:Mockup.Protocol_parameters.{default_value with constants}
-        ~seed_nonce
+        ~seed
         selection
       >>=? function
-      | true -> return seed_nonce
+      | true -> return seed
       | false ->
-          failwith
-            "Provided initial seed nonce does not match delegate selection")
+          failwith "Provided initial seed does not match delegate selection")
   | (_, None) ->
       Faked_client_context.logger#warning
-        "No initial seed nonce provided, bruteforcing."
+        "No initial seed provided, bruteforcing."
       >>= fun () ->
       Tenderbrute.bruteforce
         ~max:100_000_000_000
         ~bootstrap_accounts_json:bootstrap_accounts
         ~parameters:Mockup.Protocol_parameters.{default_value with constants}
         delegate_selection)
-  >>=? fun initial_seed_nonce ->
-  (match initial_seed_nonce with
+  >>=? fun initial_seed ->
+  (match initial_seed with
   | None -> Lwt.return_unit
-  | _ when initial_seed_nonce = constants.initial_seed_nonce -> Lwt.return_unit
-  | Some n ->
+  | _ when initial_seed = constants.initial_seed -> Lwt.return_unit
+  | Some seed ->
       Faked_client_context.logger#warning
-        "Bruteforced seed nonce is %a, please save into your test."
-        Hex.pp
-        (Hex.of_bytes n))
+        "Bruteforced seed is %a, please save into your test."
+        State_hash.pp
+        seed)
   >>= fun () ->
-  let constants = {constants with initial_seed_nonce} in
+  let constants = {constants with initial_seed} in
   let common_parameters =
     Mockup.Protocol_parameters.{default_value with constants}
   in
@@ -1042,7 +1041,7 @@ type config = {
   round1 : int64;
   timeout : int;
   delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
-  initial_seed_nonce : bytes option;
+  initial_seed : State_hash.t option;
   consensus_committee_size : int;
   consensus_threshold : int;
 }
@@ -1056,7 +1055,7 @@ let default_config =
     round1 = 3L (* No real need to increase round durations. *);
     timeout = 10;
     delegate_selection = [];
-    initial_seed_nonce = None;
+    initial_seed = None;
     consensus_committee_size =
       Default_parameters.constants_mainnet.consensus_committee_size;
     consensus_threshold =
@@ -1110,7 +1109,7 @@ let run ?(config = default_config) bakers_spec =
     let all_delegates = List.map make_baking_delegate accounts_with_secrets in
     make_genesis_context
       ~delegate_selection:config.delegate_selection
-      ~initial_seed_nonce:config.initial_seed_nonce
+      ~initial_seed:config.initial_seed
       ~round0:config.round0
       ~round1:config.round1
       ~consensus_committee_size:config.consensus_committee_size

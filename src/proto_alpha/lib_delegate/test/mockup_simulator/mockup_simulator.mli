@@ -140,8 +140,8 @@ type config = {
                      error. *)
   delegate_selection : (int32 * (int32 * Signature.public_key_hash) list) list;
       (** Desired selection of delegates per level/round *)
-  initial_seed_nonce : bytes option;
-      (** Optional initial seed nonce for protocol (used to control delegate selection) *)
+  initial_seed : State_hash.t option;
+      (** Optional initial seed for protocol (used to control delegate selection) *)
   consensus_committee_size : int;
       (** Size of the committee for tenderbake in number of slots *)
   consensus_threshold : int;

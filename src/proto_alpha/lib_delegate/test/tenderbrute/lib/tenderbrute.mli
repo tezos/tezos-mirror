@@ -70,14 +70,14 @@ val bruteforce :
   ?constants_overrides_json:json ->
   ?bootstrap_accounts_json:json ->
   delegate_selection ->
-  bytes option tzresult Lwt.t
+  State_hash.t option tzresult Lwt.t
 
 (** Check that an initial seed nonce yields to the desired delegate selection.
     See {!bruteforce} for the arguments. *)
-val check_seed_nonce :
+val check_seed :
   ?parameters:Mockup.Protocol_parameters.t ->
   ?constants_overrides_json:json ->
   ?bootstrap_accounts_json:json ->
-  seed_nonce:bytes option ->
+  seed:State_hash.t option ->
   delegate_selection ->
   bool tzresult Lwt.t

@@ -87,7 +87,7 @@ let constants_mainnet =
     double_baking_punishment = Tez.(mul_exn one 640);
     ratio_of_frozen_deposits_slashed_per_double_endorsement =
       {numerator = 1; denominator = 2};
-    initial_seed_nonce = None;
+    initial_seed = None;
     tx_rollup_enable = false;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
     tx_rollup_origination_size = 60_000;

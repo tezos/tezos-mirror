@@ -10,7 +10,7 @@ let bootstrap4 = Signature.Public_key.hash bootstrap4
 
 let bootstrap5 = Signature.Public_key.hash bootstrap5
 
-let some_nonce hex = Some (Hex.to_bytes (`Hex hex))
+let some_seed s = Some (Protocol.State_hash.of_b58check_exn s)
 
 (*
 
@@ -141,7 +141,7 @@ let test_scenario_t1 () =
   let config =
     {
       default_config with
-      initial_seed_nonce = None;
+      initial_seed = None;
       delegate_selection = [(1l, [(0l, bootstrap1); (1l, bootstrap2)])];
     }
   in
@@ -188,7 +188,7 @@ let test_scenario_t2 () =
   let config =
     {
       default_config with
-      initial_seed_nonce = None;
+      initial_seed = None;
       delegate_selection = [(1l, [(0l, bootstrap1); (1l, bootstrap2)])];
     }
   in
@@ -343,9 +343,8 @@ let test_scenario_t3 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "5d16cfb7cbd466a710341bfc8c8f85077b19a53311dd21d65bc4aa36671bf7f6";
+      initial_seed =
+        some_seed "rngFtAUcm1EneHCCrxxSWAaxSukwEhSPvpTnFjVdKLEjgkapUy1pP";
       delegate_selection =
         [
           ( 1l,
@@ -502,9 +501,8 @@ let test_scenario_f1 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "0e4d551c8e71e5d7594a3e307138a7eb62626ef1621ac77c61bff22bb244ac8f";
+      initial_seed =
+        some_seed "rngGohKUZjXzv69sxvDqAYRd4XPDQSxDoEpP72znu2jduBuhcYiSE";
       delegate_selection =
         [
           ( 1l,
@@ -569,9 +567,8 @@ let test_scenario_f2 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "6efa0f1fadafdf466c0c235fafb6ec4d1f7f24a59b9925f71086fc6a254624ee";
+      initial_seed =
+        some_seed "rngGPSm87ZqWxJmZu7rewiLiyKY72ffCQQvxDuWmFBw59dWAL5VTB";
       delegate_selection =
         [
           (1l, [(0l, bootstrap1)]);
@@ -685,9 +682,8 @@ let test_scenario_m2 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "59193d3896f1e3cf32d8d4a98e33bedf0b6cfb59e43344e15803ed5e365e42a0";
+      initial_seed =
+        some_seed "rngGo77zNC59bYiQMk2M14aDZZu4KXG8BV1C8pi7afjJ7cXyqB3M1";
       delegate_selection =
         [
           ( 1l,
@@ -764,9 +760,8 @@ let test_scenario_m3 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "695d017def5a08da4d1e008cfe1a30043b9d7a46180a28c712490f8a5361ba14";
+      initial_seed =
+        some_seed "rngGaxNJcwEVJLgQXmnN8KN5skn6fhU4Awtu8zVDKViTd5gsfT51M";
       delegate_selection =
         [
           ( 1l,
@@ -874,9 +869,8 @@ let test_scenario_m4 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "485306b3480315b96f0184227436f9e368c6eafe2dffc081773f3c1e2afcc3da";
+      initial_seed =
+        some_seed "rngGJmwLi7kPvGwV2LR3kjNQ6xamGPCZ9ooep9QcafbqRXZhYEciT";
       delegate_selection =
         [
           ( 1l,
@@ -957,9 +951,8 @@ let test_scenario_m5 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "0046499d6ab598f20cb9ad9aaa34ce6907727f2ae7f7cc641c0d42e3f23c2c6f";
+      initial_seed =
+        some_seed "rngGJmwLi7kPvGwV2LR3kjNQ6xamGPCZ9ooep9QcafbqRXZhYEciT";
       round0 = 3L;
       round1 = 4L;
     }
@@ -1074,9 +1067,8 @@ let test_scenario_m6 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "7b133f8f17a7688a485670d746582b2f0467dbed2c6ceb977009d74cf04e96b4";
+      initial_seed =
+        some_seed "rngGnwG2gApiRzo1kdbCgQheqtZroUsAjsJzyw2RBbtg3gtTeMQ9F";
       delegate_selection =
         [
           ( 1l,
@@ -1282,9 +1274,8 @@ let test_scenario_m7 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "10402a2f3fb2e6e37f6672b0d7fc089c25975da50d9fb57b671c071e49a33ca2";
+      initial_seed =
+        some_seed "rngGJ7ReXwsjWuzpeqCgHAjudFwJtxdYz44Genz1FnyJ8R226hoKh";
       delegate_selection =
         [
           ( 1l,
@@ -1428,9 +1419,8 @@ let test_scenario_m8 () =
   let config =
     {
       default_config with
-      initial_seed_nonce =
-        some_nonce
-          "508f362a9d6d68d81e2eebe4ba2f3c8e61f6862090c4435b29ccae38588bd94a";
+      initial_seed =
+        some_seed "rngFy2zFmgg25SXrE6aawqQVhD1kdw9eCCRxc843RLQjz5MZ6MGER";
       delegate_selection =
         [
           ( 1l,
