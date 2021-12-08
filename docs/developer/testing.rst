@@ -326,14 +326,14 @@ is done by prepending
 
 ::
 
-   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/
+   ./scripts/with_coverage.sh
 
 to build and test commands run from the root of the project directory. For example,
 
 ::
 
-   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/ make
-   COVERAGE_OPTIONS="--instrument-with bisect_ppx" BISECT_FILE=$(pwd)/_coverage_output/ make test-coverage
+   ./scripts/with_coverage.sh make
+   ./scripts/with_coverage.sh make test-coverage
 
 Generate the HTML report from the coverage files using
 
@@ -352,34 +352,15 @@ Clean up coverage data (output and report) with:
     make coverage-clean
 
 
-If calling ``dune`` directly, instrumentation is achieved by setting
-``BISECT_FILE`` environment variable to an existing directory and
-appending the flag ``--instrument-with``. Let's consider
-``lib_mockup`` as an example:
+The helper ``./scripts/with_coverage.sh`` can also be used outside make commands (e.g. with ``dune``, ``poetry``). For example,
 
 ::
 
-   cd src/lib_mockup
-   mkdir -p _coverage_output/
-   BISECT_FILE=$(pwd)/_coverage_output/ dune build --instrument-with bisect_ppx
+   ./scripts/with_coverage.sh dune runtest src/lib_shell/
+   ./scripts/with_coverage.sh poetry run pytest -s tests_python/tests_alpha/test_voting_full.py
 
-Now, still in the ``src/lib_mockup`` directory, run test commands:
-
-::
-
-   BISECT_FILE=$(pwd)/_coverage_output/ dune test -f --instrument-with bisect_ppx
-
-In this folder, we do not have the ``make coverage-report``. However,
-this target is simply a shortcut to the ``bisect-ppx-report`` binary. This
-command must be run from the root of the project:
-
-::
-
-   cd ../../
-   bisect-ppx-report html -o _coverage_report_mockup --coverage-path src/lib_mockup/_coverage_output/
-
-The report will now be found in ``_coverage_report_mockup``.
-
+However you launch the tests, the same commands are used to get the report
+(e.g. ``make coverage-report``).
 
 Enabling instrumentation for new libraries and executables
 """"""""""""""""""""""""""""""""""""""""""""""""""""""""""
@@ -396,7 +377,7 @@ and ``executable(s)`` stanzas in all ``dune`` files, e.g.:
      (backend bisect_ppx)))
 
 This enables the conditional instrumentation of the compilation unit
-through the ``--instrument-with bisect_ppx`` flag as described above.
+through the ``./scripts/with_coverage.sh`` helper as described above.
 
 Exempted from this rule are the ``dune`` files that belong to tests,
 developer utilities and old protocols. In particular:
