@@ -57,32 +57,66 @@ struct
   let tests = [test_prop_sign_check]
 end
 
-module Ed25519_Props =
-  Signature_Properties
-    (struct
-      let name = "Ed25519"
-    end)
-    (Ed25519)
+module Aggregate_Signature_Properties (Desc : sig
+  val name : string
+end)
+(X : S.AGGREGATE_SIGNATURE) =
+struct
+  (** Tests that signatures of [s] obtained using [X.sign] are accepted by
+      [X.check] when using the corresponding key. It then tests that the
+      aggregation of all these signatures obtained using
+      [X.aggregate_signature_opt] is accepted by [X.aggregate_check]. *)
+  let test_prop_sign_check ((seed1, msg1), (seed2, msg2), (seed3, msg3)) =
+    let (_, pk1, sk1) = X.generate_key ~seed:seed1 () in
+    let (_, pk2, sk2) = X.generate_key ~seed:seed2 () in
+    let (_, pk3, sk3) = X.generate_key ~seed:seed3 () in
+    let signed1 = X.sign sk1 msg1 in
+    let signed2 = X.sign sk2 msg2 in
+    let signed3 = X.sign sk3 msg3 in
+    let is_valid_aggregated_sign =
+      X.aggregate_signature_opt [signed1; signed2; signed3] |> function
+      | None -> false
+      | Some s -> X.aggregate_check [(pk1, msg1); (pk2, msg2); (pk3, msg3)] s
+    in
+    X.check pk1 signed1 msg1 && X.check pk2 signed2 msg2
+    && X.check pk3 signed3 msg3 && is_valid_aggregated_sign
 
-module P256_Props =
-  Signature_Properties
-    (struct
-      let name = "P256"
-    end)
-    (P256)
+  let test_prop_sign_check =
+    let gen =
+      let open Gen in
+      let+ seed1 = string_size (pure 32) >|= Bytes.of_string
+      and+ seed2 = string_size (pure 32) >|= Bytes.of_string
+      and+ seed3 = string_size (pure 32) >|= Bytes.of_string
+      and+ msg1 = string >|= Bytes.of_string
+      and+ msg2 = string >|= Bytes.of_string
+      and+ msg3 = string >|= Bytes.of_string in
+      ((seed1, msg1), (seed2, msg2), (seed3, msg3))
+    in
+    Test.make
+      ~name:("Aggregate_signature_" ^ Desc.name ^ "_sign_check")
+      ~print:
+        Print.(
+          triple
+            (pair Bytes.unsafe_to_string Bytes.unsafe_to_string)
+            (pair Bytes.unsafe_to_string Bytes.unsafe_to_string)
+            (pair Bytes.unsafe_to_string Bytes.unsafe_to_string))
+      gen
+      test_prop_sign_check
 
-module Secp256k1_Props =
-  Signature_Properties
-    (struct
-      let name = "Secp256k1"
-    end)
-    (Secp256k1)
+  let tests = [test_prop_sign_check]
+end
 
 (** Test: instantiate Signature_Properties over Signature
     with algo in generate key respectively set to
     Ed25519, Secp256k1, P256. *)
 let () =
-  let open Signature in
+  let module Bls_Props =
+    Aggregate_Signature_Properties
+      (struct
+        let name = "Bls12_381"
+      end)
+      (Bls)
+  in
   let f (algo, name) =
     let module X = struct
       include Signature
@@ -98,5 +132,7 @@ let () =
     in
     (name, qcheck_wrap XProps.tests)
   in
-  List.map f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1"); (P256, "P256")]
+
+  [("bls12_381", qcheck_wrap Bls_Props.tests)]
+  @ List.map f [(Ed25519, "Ed25519"); (Secp256k1, "Secp256k1"); (P256, "P256")]
   |> Alcotest.run "tezos-crypto-prop-signature"
