@@ -60,16 +60,16 @@ and 'a subdirs =
 
 and 'a suffix = {name : string; tree : 'a tree}
 
-let opt_mandatory name = function
-  | None -> failwith ("missing mandatory value: " ^ name)
+let opt_mandatory name json = function
+  | None -> Json.error json "missing mandatory value: %s" name
   | Some x -> x
 
 let parse_arg (json : Json.t) : arg =
   Json.as_record json @@ fun get ->
   {
     json;
-    id = get "id" |> opt_mandatory "id" |> Json.as_string;
-    name = get "name" |> opt_mandatory "name" |> Json.as_string;
+    id = get "id" |> opt_mandatory "id" json |> Json.as_string;
+    name = get "name" |> opt_mandatory "name" json |> Json.as_string;
     descr = get "descr" |> Option.map Json.as_string;
   }
 
@@ -97,17 +97,22 @@ and parse_subdirs (json : Json.t) : Json.t subdirs =
       Json.as_record dynamic_dispatch @@ fun get ->
       Dynamic_dispatch
         {
-          arg = get "arg" |> opt_mandatory "dynamic_dispatch.arg" |> parse_arg;
+          arg =
+            get "arg"
+            |> opt_mandatory "dynamic_dispatch.arg" dynamic_dispatch
+            |> parse_arg;
           tree =
-            get "tree" |> opt_mandatory "dynamic_dispatch.tree" |> parse_tree;
+            get "tree"
+            |> opt_mandatory "dynamic_dispatch.tree" dynamic_dispatch
+            |> parse_tree;
         }
   | (name, _) -> failwith ("parse_subdir: don't know what to do with: " ^ name)
 
 and parse_suffix (json : Json.t) : Json.t suffix =
   Json.as_record json @@ fun get ->
   {
-    name = get "name" |> opt_mandatory "suffixes.name" |> Json.as_string;
-    tree = get "tree" |> opt_mandatory "suffixes.tree" |> parse_tree;
+    name = get "name" |> opt_mandatory "suffixes.name" json |> Json.as_string;
+    tree = get "tree" |> opt_mandatory "suffixes.tree" json |> parse_tree;
   }
 
 (* We also have to manipulate flattened versions of the tree. *)
@@ -225,12 +230,14 @@ let parse_meth = function
 let parse_schemas (json : Json.t) : schemas =
   Json.as_record json @@ fun get ->
   {
-    json_schema = get "json_schema" |> opt_mandatory "json_schema";
-    binary_schema = get "binary_schema" |> opt_mandatory "binary_schema";
+    json_schema = get "json_schema" |> opt_mandatory "json_schema" json;
+    binary_schema = get "binary_schema" |> opt_mandatory "binary_schema" json;
   }
 
 let parse_path_item (json : Json.t) : path_item =
-  match json with `String s -> PI_static s | _ -> PI_dynamic (parse_arg json)
+  match Json.as_string_opt json with
+  | Some s -> PI_static s
+  | None -> PI_dynamic (parse_arg json)
 
 let parse_path (json : Json.t) : path =
   json |> Json.as_list |> List.map parse_path_item
@@ -238,15 +245,17 @@ let parse_path (json : Json.t) : path =
 let parse_query_parameter (json : Json.t) : query_parameter =
   Json.as_record json @@ fun get ->
   (* First, fetch information which is at the top level of the record. *)
-  let name = get "name" |> opt_mandatory "name" |> Json.as_string in
+  let name = get "name" |> opt_mandatory "name" json |> Json.as_string in
   let description = get "description" |> Option.map Json.as_string in
   (* Then, fetch information which is in the "kind" field. *)
   let (kind, id, descr) =
-    (get "kind" |> opt_mandatory "kind" |> Json.as_record) @@ fun get ->
+    (get "kind" |> opt_mandatory "kind" json |> Json.as_record) @@ fun get ->
     (* Function used for everything but kind "flag". *)
     let parse_kind_with_name make record =
       Json.as_record record @@ fun get ->
-      let name = get "name" |> opt_mandatory "kind.name" |> Json.as_string in
+      let name =
+        get "name" |> opt_mandatory "kind.name" json |> Json.as_string
+      in
       ( make name,
         get "id" |> Option.map Json.as_string,
         get "descr" |> Option.map Json.as_string )
@@ -281,14 +290,14 @@ let parse_query_parameter (json : Json.t) : query_parameter =
 let parse_service (json : Json.t) : service =
   Json.as_record json @@ fun get ->
   {
-    meth = get "meth" |> opt_mandatory "meth" |> Json.as_string |> parse_meth;
-    path = get "path" |> opt_mandatory "path" |> parse_path;
+    meth =
+      get "meth" |> opt_mandatory "meth" json |> Json.as_string |> parse_meth;
+    path = get "path" |> opt_mandatory "path" json |> parse_path;
     description =
-      get "description"
-      |> Option.value ~default:(`String "(no description)")
-      |> Json.as_string;
+      get "description" |> Option.map Json.as_string
+      |> Option.value ~default:"(no description)";
     query =
-      get "query" |> opt_mandatory "query" |> Json.as_list
+      get "query" |> opt_mandatory "query" json |> Json.as_list
       |> List.map parse_query_parameter;
     input = get "input" |> Option.map parse_schemas;
     output = get "output" |> Option.map parse_schemas;
