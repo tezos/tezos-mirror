@@ -1,0 +1,21 @@
+(executable
+ (name
+  bench_signature_perf
+  )
+ (libraries
+  tezos-crypto
+  zarith
+  zarith_stubs_js
+  data-encoding
+  alcotest
+  alcotest-lwt
+  lwt.unix
+  qcheck-alcotest
+  tezos-test-helpers
+  ptime
+  )
+ (flags
+  (:standard
+   -open Tezos_crypto
+   -open Tezos_error_monad.TzLwtreslib
+   -open Data_encoding)))
