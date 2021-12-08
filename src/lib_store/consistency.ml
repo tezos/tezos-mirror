@@ -233,9 +233,9 @@ let fix_floating_stores chain_dir =
   >>=? fun () ->
   Store_events.(emit fix_floating_stores ()) >>= fun () -> return_unit
 
-(* [fix_head ~chain_dir block_store genesis_block] iter through the
+(* [fix_head chain_dir block_store genesis_block] iter through the
    floating blocks and set, as head, the fittest block found. *)
-let fix_head block_store genesis_block =
+let fix_head chain_dir block_store genesis_block =
   let floating_stores = Block_store.floating_block_stores block_store in
   List.map_es
     (Floating_block_store.fold_left_s
@@ -286,19 +286,26 @@ let fix_head block_store genesis_block =
            blocks were truncated. The head is then chosen as the highest
            cemented block known. *)
       else return floating_head)
-  >>=? fun head ->
-  (* Make sure that the infered head have metadata *)
+  >>=? fun inferred_head ->
+  (* Make sure that the inferred head have metadata *)
   (Block_store.read_block_metadata
      block_store
      (Block_store.Block (Block_repr.hash floating_head, 0))
    >>=? function
-   | None -> fail (Corrupted_store "infered head must have metadata")
+   | None -> fail (Corrupted_store "inferred head must have metadata")
    | Some _ -> return_unit)
   >>=? fun () ->
-  Store_events.(emit fix_head (Block_repr.descriptor head)) >>= fun () ->
-  return head
+  (* Try to load the current head *)
+  (Stored_data.load (Naming.current_head_file chain_dir) >>= function
+   | Ok current_head_data ->
+       Stored_data.get current_head_data >>= Lwt.return_some
+   | Error _ -> Lwt.return_none)
+  >>= fun stored_head ->
+  Store_events.(
+    emit fix_head (stored_head, Block_repr.descriptor inferred_head))
+  >>= fun () -> return inferred_head
 
-(* [fix_savepoint_and_caboose ~chain_dir block_store head]
+(* [fix_savepoint_and_caboose chain_dir block_store head]
    Fix the savepoint by setting it to the lowest block with metadata.
    Assumption:
    - block store is valid and available.
@@ -486,11 +493,19 @@ let fix_savepoint_and_caboose chain_dir block_store head =
           Int32.(to_int (sub (Block_repr.level head) savepoint_level)) ))
    >>=? function
    | Some b ->
-       let savepoint = (Block_repr.hash b, Block_repr.level b) in
-       Stored_data.write_file (Naming.savepoint_file chain_dir) savepoint
+       let inferred_savepoint = (Block_repr.hash b, Block_repr.level b) in
+       Stored_data.write_file
+         (Naming.savepoint_file chain_dir)
+         inferred_savepoint
        >>=? fun () ->
-       Store_events.(emit fix_savepoint savepoint) >>= fun () ->
-       return savepoint
+       (* Try to load the current savepoint *)
+       (Stored_data.load (Naming.savepoint_file chain_dir) >>= function
+        | Ok savepoint_data ->
+            Stored_data.get savepoint_data >>= Lwt.return_some
+        | Error _ -> Lwt.return_none)
+       >>= fun stored_savepoint ->
+       Store_events.(emit fix_savepoint (stored_savepoint, inferred_savepoint))
+       >>= fun () -> return inferred_savepoint
    | None ->
        (* Assumption: the head is valid. Thus, at least the head
           (with metadata) must be a valid candidate for the
@@ -506,14 +521,20 @@ let fix_savepoint_and_caboose chain_dir block_store head =
           Int32.(to_int (sub (Block_repr.level head) caboose_level)) ))
    >>=? function
    | Some b ->
-       let caboose = (Block_repr.hash b, Block_repr.level b) in
-       Stored_data.write_file (Naming.caboose_file chain_dir) caboose
+       let inferred_caboose = (Block_repr.hash b, Block_repr.level b) in
+       Stored_data.write_file (Naming.caboose_file chain_dir) inferred_caboose
        >>=? fun () ->
-       Store_events.(emit fix_caboose caboose) >>= fun () -> return caboose
+       (* Try to load the current caboose *)
+       (Stored_data.load (Naming.caboose_file chain_dir) >>= function
+        | Ok caboose_data -> Stored_data.get caboose_data >>= Lwt.return_some
+        | Error _ -> Lwt.return_none)
+       >>= fun stored_caboose ->
+       Store_events.(emit fix_caboose (stored_caboose, inferred_caboose))
+       >>= fun () -> return inferred_caboose
    | None -> fail (Corrupted_store "Failed to find a valid caboose"))
   >>=? fun caboose -> return (savepoint, caboose)
 
-(* [fix_checkpoint ~chain_dir block_store head] fixes the checkpoint
+(* [fix_checkpoint chain_dir block_store head] fixes the checkpoint
    by setting it to the lowest block with metadata which is higher
    that the last allowed fork level of the current head (and <=
    head_level).
@@ -567,10 +588,17 @@ let fix_checkpoint chain_dir block_store head =
     Stored_data.write_file (Naming.checkpoint_file chain_dir) checkpoint
     >>=? fun () -> return checkpoint
   in
-  set_checkpoint head >>=? fun checkpoint ->
-  Store_events.(emit fix_checkpoint checkpoint) >>= fun () -> return checkpoint
+  set_checkpoint head >>=? fun inferred_checkpoint ->
+  (* Try to load the current checkpoint *)
+  (Stored_data.load (Naming.checkpoint_file chain_dir) >>= function
+   | Ok checkpoint_data -> Stored_data.get checkpoint_data >>= Lwt.return_some
+   | Error _ -> Lwt.return_none)
+  >>= fun stored_checkpoint ->
+  Store_events.(emit fix_checkpoint (stored_checkpoint, inferred_checkpoint))
+  >>= fun () -> return inferred_checkpoint
 
-(* [fix_protocol_levels context_index block_store genesis_header ~head]
+(* [fix_protocol_levels context_index block_store genesis_header ~head
+    ~savepoint]
    fixes protocol levels table by searching for all the protocol
    levels in the block store (cemented and floating). Fixing this
    table is possible in archive mode only.
@@ -846,7 +874,7 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
     cemented_protocol_levels
     floating_protocol_levels
 
-(* [fix_chain_state ~chain_dir ~head ~cementing_highwatermark
+(* [fix_chain_state chain_dir ~head ~cementing_highwatermark
    ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
    ~protocol_levels ~chain_config ~genesis ~genesis_context] writes, as
    [Stored_data.t], the given arguments. *)
@@ -915,7 +943,7 @@ let infer_history_mode chain_dir block_store genesis caboose savepoint =
   else Lwt.return 0)
   >>= fun nb_cycles_metadata ->
   let nb_cycles = List.length cemented_blocks_files in
-  (* If the infered offset equals the default offset value then we
+  (* If the inferred offset equals the default offset value then we
      assume that "default" was the previous value. *)
   let offset =
     if
@@ -944,10 +972,10 @@ let infer_history_mode chain_dir block_store genesis caboose savepoint =
          full or rolling. We choose full as the less destructive. *)
       Full offset
   in
-  Store_events.(emit restore_infered_history_mode history_mode) >>= fun () ->
+  Store_events.(emit restore_inferred_history_mode history_mode) >>= fun () ->
   return {history_mode; genesis; expiration = None}
 
-(* [fix_chain_config ?history_mode ~chain_dir block_store genesis
+(* [fix_chain_config ?history_mode chain_dir block_store genesis
    caboose savepoint] infers the history mode. *)
 let fix_chain_config ?history_mode chain_dir block_store genesis caboose
     savepoint =
@@ -967,13 +995,22 @@ let fix_chain_config ?history_mode chain_dir block_store genesis caboose
              line, we try to infer the history mode. *)
           infer_history_mode chain_dir block_store genesis caboose savepoint)
 
-let fix_cementing_highwatermark block_store =
+let fix_cementing_highwatermark chain_dir block_store =
   let cemented_block_store = Block_store.cemented_block_store block_store in
-  let cementing_highwatermark =
+  let inferred_cementing_highwatermark =
     Cemented_block_store.get_highest_cemented_level cemented_block_store
   in
-  Store_events.(emit fix_cementing_highwatermark cementing_highwatermark)
-  >>= fun () -> Lwt.return cementing_highwatermark
+  (* Try to load the current cementing highwatermark *)
+  (Stored_data.load (Naming.cementing_highwatermark_file chain_dir) >>= function
+   | Ok cementing_highwatermark_data ->
+       Stored_data.get cementing_highwatermark_data >>= Lwt.return
+   | Error _ -> Lwt.return_none)
+  >>= fun stored_cementing_highwatermark ->
+  Store_events.(
+    emit
+      fix_cementing_highwatermark
+      (stored_cementing_highwatermark, inferred_cementing_highwatermark))
+  >>= fun () -> Lwt.return inferred_cementing_highwatermark
 
 (* [fix_consistency ?history_mode store_dir context_index]
    aims to fix a store in an inconsistent state. The fixing steps are:
@@ -1000,11 +1037,12 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
   Stored_data.get genesis_data >>= fun genesis_block ->
   (* Start fixing things *)
   fix_floating_stores chain_dir >>=? fun () ->
-  (* May fix an interrupted merging *)
+  (* May fix an interrupted store merge *)
   Block_store.load chain_dir ~genesis_block ~readonly:false
   >>=? fun block_store ->
-  fix_head block_store genesis_block >>=? fun head ->
-  fix_cementing_highwatermark block_store >>= fun cementing_highwatermark ->
+  fix_head chain_dir block_store genesis_block >>=? fun head ->
+  fix_cementing_highwatermark chain_dir block_store
+  >>= fun cementing_highwatermark ->
   fix_savepoint_and_caboose chain_dir block_store head
   >>=? fun (savepoint, caboose) ->
   fix_checkpoint chain_dir block_store head >>=? fun checkpoint ->
