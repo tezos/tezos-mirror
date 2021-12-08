@@ -23,38 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module contains constants and utility functions for gas metering
-    functions used for extracting and handling tickets for the global ticket
-    balance table. *)
-
-module Constants : sig
-  val cost_contains_tickets_step : Alpha_context.Gas.cost
-
-  val cost_collect_tickets_step : Alpha_context.Gas.cost
-
-  val cost_token_and_amount_of_ticket : Alpha_context.Gas.cost
-
-  val cost_compare_key_script_expr_hash : Alpha_context.Gas.cost
-end
-
-(** [consume_gas_steps ctxt ~num_steps] consumes gas corresponding to
-    a given [num_steps] and [step_cost]. It's useful for paying for gas
-    upfront where the number of steps can be determined.
-
-    This function is generic and should probably be moved. See issue
-    https://gitlab.com/tezos/tezos/-/issues/1950.
-
-  *)
-val consume_gas_steps :
-  Alpha_context.t ->
-  step_cost:Alpha_context.Gas.cost ->
-  num_steps:int ->
-  Alpha_context.t tzresult
-
-(** [has_tickets_of_ty_cost ty] returns the cost of producing a [has_tickets],
-    used internally in the [Ticket_scanner] module. *)
-val has_tickets_of_ty_cost :
-  'a Script_typed_ir.ty -> Saturation_repr.may_saturate Saturation_repr.t
-
-(** [negate_cost z] returns the cost of negating the given value [z]. *)
-val negate_cost : Z.t -> Alpha_context.Gas.cost
+(** [ticket_diffs_of_lazy_storage_diff ctxt diffs] returns a list of ticket-token
+    balance differences, given a list, [diffs], of lazy storage diff items.
+ *)
+val ticket_diffs_of_lazy_storage_diff :
+  Alpha_context.context ->
+  Alpha_context.Lazy_storage.diffs_item list ->
+  ((Ticket_token.ex_token * Z.t) list * Alpha_context.context) tzresult Lwt.t

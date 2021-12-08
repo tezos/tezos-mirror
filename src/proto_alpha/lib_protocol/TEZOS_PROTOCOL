@@ -118,6 +118,7 @@
         "Ticket_scanner",
         "Ticket_token",
         "Ticket_balance_key",
+        "Ticket_lazy_storage_diff",
 
         "Script_interpreter_defs",
         "Script_interpreter",

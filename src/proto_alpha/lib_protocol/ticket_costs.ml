@@ -24,22 +24,42 @@
 (*****************************************************************************)
 
 open Alpha_context
+module S = Saturation_repr
 
 module Constants = struct
-  module S = Saturation_repr
-
-  (* TODO: Fill in real benchmarked values *)
+  (* TODO: #2315
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
   let cost_contains_tickets_step = S.safe_int 28
 
-  (* TODO: Fill in real benchmarked values *)
+  (* TODO: #2315
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
   let cost_collect_tickets_step = S.safe_int 360
 
-  (* TODO: Fill in real benchmarked values *)
+  (* TODO: #2315
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
   let cost_has_tickets_of_ty type_size = S.mul (S.safe_int 20) type_size
+
+  (* TODO: #2315
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
+  let cost_token_and_amount_of_ticket = S.safe_int 30
+
+  (* TODO: #2315
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
+  let cost_compare_key_script_expr_hash = S.safe_int 100
 end
 
 let consume_gas_steps ctxt ~step_cost ~num_steps =
-  let ( * ) = Saturation_repr.mul in
+  let ( * ) = S.mul in
   if Compare.Int.(num_steps <= 0) then Ok ctxt
   else
     let gas =
@@ -50,3 +70,9 @@ let consume_gas_steps ctxt ~step_cost ~num_steps =
 let has_tickets_of_ty_cost ty =
   Constants.cost_has_tickets_of_ty
     Script_typed_ir.(ty_size ty |> Type_size.to_int)
+
+(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg]
+    Approximating 0.066076 x term *)
+let negate_cost z =
+  let size = (7 + Z.numbits z) / 8 in
+  Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
