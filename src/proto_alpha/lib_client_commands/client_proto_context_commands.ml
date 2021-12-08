@@ -98,6 +98,32 @@ let boot_sector_param =
   in
   file_or_text_parameter ~from_text ()
 
+let messages_param =
+  let from_path path =
+    Lwt_utils_unix.Json.read_file path >>=? fun json -> return (`Json json)
+  in
+  let from_text text =
+    try return (`Json (Ezjsonm.from_string text))
+    with Ezjsonm.Parse_error _ ->
+      failwith "Given text is not valid JSON: '%s'" text
+  in
+  Clic.parameter @@ fun _ p ->
+  match String.split ~limit:1 ':' p with
+  | ["bin"; path] ->
+      Lwt_utils_unix.read_file path >>= fun bin -> return (`Bin bin)
+  | ["text"; text] -> from_text text
+  | ["file"; path] -> from_path path
+  | _ -> if Sys.file_exists p then from_path p else from_text p
+
+let rollup_address_param =
+  Clic.parameter (fun _ name ->
+      match Sc_rollup.Address.of_b58check_opt name with
+      | None ->
+          failwith
+            "Parameter '%s' is not a valid B58-encoded rollup address"
+            name
+      | Some addr -> return addr)
+
 let group =
   {
     Clic.name = "context";
@@ -2145,6 +2171,99 @@ let commands_rw () =
               ~boot_sector
               ()
             >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Send one or more messages to a smart-contract rollup."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["send"; "sc"; "rollup"; "message"]
+      @@ param
+           ~name:"messages"
+           ~desc:
+             "the message(s) to be sent to the rollup (syntax: \
+              bin:<path_to_binary_file>|text:<json list of hex \
+              messages>|file:<json_file>)"
+           messages_param
+      @@ prefixes ["from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the source contract"
+      @@ prefixes ["to"]
+      @@ param
+           ~name:"dst"
+           ~desc:"address of the destination rollup"
+           rollup_address_param
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           messages
+           (_, source)
+           rollup
+           cctxt ->
+        (match Contract.is_implicit source with
+        | None -> failwith "Only implicit accounts can send messages to rollups"
+        | Some source -> return source)
+        >>=? fun source ->
+        (match messages with
+        | `Bin message -> return [message]
+        | `Json messages -> (
+            match Data_encoding.(Json.destruct (list bytes) messages) with
+            | exception _ ->
+                failwith
+                  "Could not read list of messages (expected list of bytes)"
+            | messages -> return (List.map Bytes.to_string messages)))
+        >>=? fun messages ->
+        Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        sc_rollup_add_messages
+          cctxt
+          ~chain:cctxt#chain
+          ~block:cctxt#block
+          ?dry_run:(Some dry_run)
+          ?verbose_signing:(Some verbose_signing)
+          ?fee
+          ?storage_limit
+          ?counter
+          ?confirmations:cctxt#confirmations
+          ~simulation
+          ~source
+          ~rollup
+          ~messages
+          ~src_pk
+          ~src_sk
+          ~fee_parameter
+          ()
+        >>=? fun _res -> return_unit);
   ]
 
 let commands network () =
