@@ -23,6 +23,8 @@ be documented here either.
 Node
 ----
 
+- UNIX errors are now displayed using human-friendly English instead of error codes.
+
 - Manager operations do no longer need to be executed before being
   propagated over the network. This feature will be available from
   protocol `I`, provided the latter is activated. The aim is to

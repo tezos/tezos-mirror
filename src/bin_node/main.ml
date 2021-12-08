@@ -25,6 +25,20 @@
 (*****************************************************************************)
 
 let () =
+  Printexc.register_printer @@ function
+  | Unix.Unix_error (code, "", _) -> Some (Unix.error_message code)
+  | Unix.Unix_error (code, function_name, "") ->
+      Some (Printf.sprintf "in %s: %s" function_name (Unix.error_message code))
+  | Unix.Unix_error (code, function_name, arguments) ->
+      Some
+        (Printf.sprintf
+           "in %s %S: %s"
+           function_name
+           arguments
+           (Unix.error_message code))
+  | _ -> None
+
+let () =
   (* The default allocation policy of Octez is "best-fit" which gives
      the best compromise in terms of performances and memory
      consumption. This default policy can be changed if the user set
