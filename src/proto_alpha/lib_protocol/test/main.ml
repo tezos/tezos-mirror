@@ -72,6 +72,7 @@ let () =
       ("ticket storage", Test_ticket_storage.tests);
       ("ticket scanner", Test_ticket_scanner.tests);
       ("ticket balance key", Test_ticket_balance_key.tests);
+      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
       ("fitness", Test_fitness.tests);
       ("round", Test_round_repr.tests);
       ("participation monitoring", Test_participation.tests);
