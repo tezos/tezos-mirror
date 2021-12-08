@@ -59,8 +59,8 @@ end = struct
   let union tbl ~new_canonical ~existing =
     add tbl new_canonical ;
     let root = find tbl existing in
-    if root.title = new_canonical.title then ()
-    else Hashtbl.replace tbl root.title (Ref new_canonical.title)
+    if root.title <> new_canonical.title then
+      Hashtbl.replace tbl root.title (Ref new_canonical.title)
 
   let empty () = Hashtbl.create 128
 end
@@ -147,7 +147,7 @@ let dedup_canonicalize uf =
             (fun (desc, layout) -> (desc, fixup_references uf layout))
             acc
         in
-        if List.length fixedup = prev_len then
+        if List.compare_length_with fixedup prev_len = 0 then
           List.map (fun (name, layout) -> (UF.find uf name, layout)) fixedup
         else (
           Hashtbl.clear tbl ;

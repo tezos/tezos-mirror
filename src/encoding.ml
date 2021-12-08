@@ -356,7 +356,6 @@ module Variable = struct
         invalid_arg
         "Cannot insert potentially zero-sized element in %s."
         name
-    else ()
 
   let array ?max_length e =
     check_not_variable "an array" e ;

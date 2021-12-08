@@ -42,8 +42,7 @@ let find_test () =
       match Data_encoding.Registration.description r with
       | None -> Alcotest.failf "Expected description"
       | Some rd ->
-          if rd = description then ()
-          else
+          if rd <> description then
             Alcotest.failf
               "Descriptions do not match (expected %s) (got %s)"
               description
