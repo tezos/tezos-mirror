@@ -131,7 +131,7 @@ could log the point at which migration takes place by editing the file
 the match expression of the function ``prepare_first_block`` in the said file to
 include the following lines::
 
-  | Granada_010 ->
+  | Hangzhou_011 ->
       Logging.(log Notice "STITCHING!") ;
 
 After making sure that our ``master`` branch contains all the migration
@@ -390,7 +390,7 @@ The ``./tezos-node snapshot import`` command accepts an option
 the last block in the imported chain is ``<block_hash>``. This mechanism helps
 the developer to check that the imported chain contains blocks that are part of
 the current main chain of the Tezos network. The
-`Giganode <https://snapshots-tezos.giganode.io/>`_ provides 
+`Giganode <https://snapshots-tezos.giganode.io/>`_ provides
 the hash of the last block in a given snapshot file. Although we will not be
 using the ``--block`` option in this tutorial, the developer is encouraged to
 check that this prefix corresponds to the hash of a real block in Mainnet.
@@ -711,7 +711,7 @@ invoking the following eight commands)::
 
   $ ./scripts/snapshot_alpha.sh d_012
   $ ./scripts/link_protocol.sh src/proto_012_*
-  $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344 
+  $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344
   $ patch -p1 < scripts/yes-node.patch
   $ dune exec scripts/yes-wallet/yes_wallet.exe -- create minimal in /tmp/yes-wallet
   $ make

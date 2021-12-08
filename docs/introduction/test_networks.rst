@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Granada for granadanet), the protocol
+network is activated (such as Hangzhou for hangzhounet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -31,11 +31,6 @@ can obtain the key to these accounts from a faucet to claim the funds.
 Faucets can be accessed from https://teztnets.xyz/. Each of the test
 network listed there, including the active test networks described
 below, have independent faucets.
-
-**Caveat Emptor!**
-Testnets up to `granadanet` used to share the same faucet (formerly hosted at https://faucet.tzalpha.net/).
-The keys obtained from this faucet were shared between all test networks.
-This is no longer the case!
 
 Hangzhounet
 ===========
@@ -53,22 +48,6 @@ On Hangzhounet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
-Granadanet
-==========
-
-- Built-in network alias: ``granadanet`` (see :ref:`builtin_networks`)
-
-  * Available in version 9.2
-
-- Run Docker image: ``wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
-
-Granadanet is a test network running the ``PtGRANAD`` protocol.
-Granadanet will run until Granada is rejected or replaced by another protocol on Mainnet.
-
-On Granadanet, some constants differ from Mainnet.
-This results in a faster chain than Mainnet.
-See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
-
 Future Networks
 ===============
 
@@ -82,20 +61,29 @@ P is activated, the previous test network will end and P-net will continue on it
 Old Networks
 ============
 
+Granadanet
+==========
+
+Granadanet was a test network running the Granada protocol.
+Following the activation of the Hangzhou protocol replacing Granada on Mainnet,
+Granadanet stopped being maintained on December 4, 2021 (the bootstrap baker
+is no longer producing blocks).
+
 Florencenet
 -----------
 
 Florencenet was a test network running the Florence protocol.
 Following the activation of the Granada protocol replacing Florence on Mainnet,
-Florencenet stopped being maintained on August 6, 2021.
+Florencenet stopped being maintained on August 6, 2021 (the bootstrap baker
+is no longer producing blocks).
 
 Edo2net
 -------
 
 Edo2net was a test network running the Edo protocol.
 Following the activation of the Florence protocol replacing Edo on Mainnet,
-Edo2net stopped being maintained on May 11th, 2021 (the bootstrap baker will
-no longer be producing blocks).
+Edo2net stopped being maintained on May 11th, 2021 (the bootstrap baker is
+no longer producing blocks).
 
 Delphinet
 ---------
@@ -103,7 +91,7 @@ Delphinet
 Delphinet was a test network running the Delphi protocol.
 Following the activation of the Edo protocol replacing Delphi on Mainnet,
 Delphinet stopped being maintained on February 28th, 2021 (the bootstrap baker
-will no longer be producing blocks).
+is no longer producing blocks).
 
 Dalphanet
 ---------
@@ -118,8 +106,7 @@ Carthagenet
 
 Carthagenet was a test network running the Carthage protocol.
 Following the activation of the Delphi protocol replacing Carthage on Mainnet,
-Carthagenet stopped being maintained on December 12th, 2020 (the bootstrap
-baker will no longer be producing blocks).
+Carthagenet stopped being maintained on December 12th, 2020.
 
 Babylonnet
 ----------

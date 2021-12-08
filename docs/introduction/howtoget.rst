@@ -121,27 +121,27 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 Windows, OS X, and Linux.
 
-The same script can be used to run Tezos on Mainnet, on Granadanet, or on other network: it
+The same script can be used to run Tezos on Mainnet, on Hangzhounet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Granadanet test network with the latest release:
+For example, to run Tezos on the Hangzhounet test network with the latest release:
 
-.. literalinclude:: use-docker-granadanet.sh
+.. literalinclude:: use-docker-hangzhounet.sh
    :language: shell
-   :start-after: [get granadanet]
-   :end-before: [start granadanet]
+   :start-after: [get testnet]
+   :end-before: [start testnet]
 
 Alternatively, to run on Mainnet::
 
    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
    chmod +x mainnet.sh
 
-In the following we assume you are running on the Granadanet test network.
+In the following we assume you are running on the Hangzhounet test network.
 You are now one step away from a working node:
 
-.. literalinclude:: use-docker-granadanet.sh
+.. literalinclude:: use-docker-hangzhounet.sh
    :language: shell
-   :start-after: [start granadanet]
+   :start-after: [start testnet]
 
 This will download the right Docker image for your chosen network, launch 3
 Docker containers running the node, the baker and the endorser. Keep in mind
@@ -150,23 +150,23 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering that the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``granadanet.sh`` will check for updates of the node and
+Every call to ``hangzhounet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./granadanet.sh restart
+    ./hangzhounet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
    export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./granadanet.sh --help`` for more information about the
-script. In particular see ``./granadanet.sh client --help`` or the
+See ``./hangzhounet.sh --help`` for more information about the
+script. In particular see ``./hangzhounet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./granadanet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./granadanet.sh admin-client``.
+executed by using ``./hangzhounet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
+can be executed using ``./hangzhounet.sh admin-client``.
 
 
 .. _building_with_opam:
@@ -275,7 +275,7 @@ Now, install all the binaries by:
   :start-after: [install tezos]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
-install tezos-endorser-010-PtGRANAD``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
+install tezos-endorser-alpha``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 

@@ -6,8 +6,8 @@ cd
 apt-get update
 apt-get install -y docker.io docker-compose kmod wget
 dockerd &
-# [get granadanet]
-wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
-chmod +x granadanet.sh
-# [start granadanet]
-./granadanet.sh start
+# [get testnet]
+wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
+chmod +x hangzhounet.sh
+# [start testnet]
+./hangzhounet.sh start

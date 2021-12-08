@@ -27,19 +27,6 @@ Their OpenAPI specification can be found at:
 
 .. TODO tezos/tezos#2170: add/remove section(s)
 
-Granada RPCs
--------------
-
-The OpenAPI specification for RPCs which are specific to the Granada
-protocol can be found at:
-
-- `granada-openapi.json (version 11.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/granada-openapi.json>`_
-
-The OpenAPI specification for RPCs which are related to the mempool
-and specific to the Granada protocol can be found at:
-
-- `granada-mempool-openapi.json (version 11.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/granada-mempool-openapi.json>`_
-
 Hangzhou RPCs
 -------------
 
