@@ -239,12 +239,10 @@ let check_consumed_gas consumed expected =
           Alpha_context.Gas.Arith.pp
           expected))
 
-let lazy_unit =
-  Alpha_context.Script.lazy_expr
-    (Sapling_helpers.Interpreter_helpers.expression_from_string "Unit")
+let lazy_unit = Alpha_context.Script.lazy_expr (Expr.from_string "Unit")
 
 let prepare_origination block source script =
-  let code = Sapling_helpers.Interpreter_helpers.toplevel_from_string script in
+  let code = Expr.toplevel_from_string script in
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_unit}
   in

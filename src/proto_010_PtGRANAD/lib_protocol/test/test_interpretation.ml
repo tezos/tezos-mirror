@@ -10,47 +10,12 @@ open Protocol
 open Alpha_context
 open Script_interpreter
 
-let ( >>=?? ) x y =
-  x >>= function
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
-
 let test_context () =
   Context.init 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   return (Incremental.alpha_ctxt v)
 
 let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
-
-let default_step_constants =
-  {
-    source = default_source;
-    payer = default_source;
-    self = default_source;
-    amount = Tez.zero;
-    chain_id = Chain_id.zero;
-  }
-
-(** Helper function that parses and types a script, its initial storage and
-   parameters from strings. It then executes the typed script with the storage
-   and parameter and returns the result. *)
-let run_script ctx ?(step_constants = default_step_constants) contract
-    ?(entrypoint = "default") ~storage ~parameter () =
-  let contract_expr = Expr.from_string contract in
-  let storage_expr = Expr.from_string storage in
-  let parameter_expr = Expr.from_string parameter in
-  let script =
-    Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
-  in
-  Script_interpreter.execute
-    ctx
-    Readable
-    step_constants
-    ~script
-    ~entrypoint
-    ~parameter:parameter_expr
-    ~internal:false
-  >>=?? fun res -> return res
 
 let logger =
   Script_typed_ir.
@@ -64,6 +29,7 @@ let logger =
 
 let run_step ctxt code accu stack =
   let open Script_interpreter in
+  let open Contract_helpers in
   step None ctxt default_step_constants code accu stack
   >>=? fun ((_, _, ctxt') as r) ->
   step (Some logger) ctxt default_step_constants code accu stack
@@ -77,7 +43,7 @@ let run_step ctxt code accu stack =
 let test_bad_contract_parameter () =
   test_context () >>=? fun ctx ->
   (* Run script with a parameter of wrong type *)
-  run_script
+  Contract_helpers.run_script
     ctx
     "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
     ~storage:"Unit"
@@ -88,7 +54,7 @@ let test_bad_contract_parameter () =
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
       Alcotest.(check Testable.contract)
         "incorrect field in Bad_contract_parameter"
-        default_source
+        Contract_helpers.default_source
         source' ;
       return_unit
   | Error errs ->
@@ -98,7 +64,7 @@ let test_multiplication_close_to_overflow_passes () =
   test_context () >>=? fun ctx ->
   (* Get sure that multiplication deals with numbers between 2^62 and
      2^63 without overflowing *)
-  run_script
+  Contract_helpers.run_script
     ctx
     "{parameter unit;storage unit;code {DROP; PUSH mutez 2944023901536524477; \
      PUSH nat 2; MUL; DROP; UNIT; NIL operation; PAIR}}"

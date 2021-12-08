@@ -52,10 +52,7 @@ let call_the_contract b ~baker ~src contract param_left param_right =
   let fee = Alpha_context.Tez.one in
   let amount = Alpha_context.Tez.zero in
   let param = Printf.sprintf "Pair (%s) %s" param_left param_right in
-  let parameters =
-    Alpha_context.Script.lazy_expr
-      (Contract_helpers.expression_from_string param)
-  in
+  let parameters = Alpha_context.Script.lazy_expr (Expr.from_string param) in
   Op.transaction ~fee (B b) src contract amount ~parameters
   >>=? fun operation ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
