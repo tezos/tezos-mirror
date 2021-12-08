@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Stdlib
-    Invocation:   dune build @src/lib_stdlib/test/runtest_lwt_pipe
+    Invocation:   dune exec src/lib_stdlib/test-unix/test_lwt_pipe.exe
     Subject:      Lwt_pipe
 *)
 

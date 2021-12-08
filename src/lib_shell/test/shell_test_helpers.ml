@@ -26,7 +26,6 @@
 (** Testing
     -------
     Component:    Shell
-    Invocation:   dune build @src/lib_shell/runtest
     Subject:      Setup mocks for testing shell, notably state and protocol
                   validation.
 *)

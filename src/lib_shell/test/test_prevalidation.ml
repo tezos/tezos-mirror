@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Prevalidation
-    Invocation:   dune build @src/lib_shell/test/runtest
+    Invocation:   dune exec src/lib_shell/test/test_prevalidation.exe
     Subject:      Unit tests for [Prevalidation]
 *)
 
