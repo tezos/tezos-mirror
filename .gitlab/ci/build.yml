@@ -46,7 +46,7 @@
     paths:
       - tezos-*
       - src/proto_*/parameters/*.json
-      - _build/default/src/lib_protocol_compiler/main_native.exe
+      - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     expire_in: 1 day
     when: on_success
 

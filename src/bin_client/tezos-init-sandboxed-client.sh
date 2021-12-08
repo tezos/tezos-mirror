@@ -127,7 +127,7 @@ main () {
         local_client="${local_client:-$bin_dir/../../_build/default/src/bin_client/main_client.exe}"
         local_admin_client="${local_admin_client:-$bin_dir/../../_build/default/src/bin_client/main_admin.exe}"
         local_signer="${local_signer:-$bin_dir/../../_build/default/src/bin_signer/main_signer.exe}"
-        local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/main_native.exe}"
+        local_compiler="${local_compiler:-$bin_dir/../../_build/default/src/lib_protocol_compiler/bin/main_native.exe}"
 
         parameters_file="$bin_dir/../proto_alpha/parameters/sandbox-parameters.json"
 
