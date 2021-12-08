@@ -193,7 +193,7 @@ module Asynchronous_result = struct
 
   let yield () =
     (* https://github.com/ocsigen/lwt/issues/631 *)
-    if false then Lwt_unix.auto_yield 0.005 () else Lwt_main.yield ()
+    if false then Lwt_unix.auto_yield 0.005 () else Lwt.pause ()
 
   let fail ?attach error_value : (_, _) t =
     Lwt.return (error ?attachments:attach error_value)
@@ -339,7 +339,7 @@ module Asynchronous_result = struct
     match
       Lwt_main.run
         Lwt.(
-          Lwt_unix.yield ()
+          Lwt.pause ()
           >>= fun () ->
           Dbg.e EF.(wf "Lwt_main.run") ;
           r ())

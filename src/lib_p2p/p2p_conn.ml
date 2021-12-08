@@ -47,7 +47,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   let request_info =
     P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
   in
-  Lwt_unix.yield () >>= fun () ->
+  Lwt.pause () >>= fun () ->
   protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) >>= function
   | Ok (_, Bootstrap) -> (
       callback.bootstrap request_info >>= function

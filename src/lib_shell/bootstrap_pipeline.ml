@@ -197,7 +197,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
     4. It loops on the predecessor of the current block. *)
 let fetch_step pipeline (step : Block_locator.step) =
   let rec fetch_loop acc hash cpt =
-    Lwt_unix.yield () >>= fun () ->
+    Lwt.pause () >>= fun () ->
     (if
      step.step > big_step_size && 0 <> cpt && cpt mod big_step_size_announce = 0
     then
@@ -362,7 +362,7 @@ let headers_fetch_worker_loop pipeline =
    successfuly in the queue. It is canceled if one operation could not
    be fetched. *)
 let rec operations_fetch_worker_loop pipeline =
-  ( Lwt_unix.yield () >>= fun () ->
+  ( Lwt.pause () >>= fun () ->
     protect ~canceler:pipeline.canceler (fun () ->
         Lwt_pipe.Bounded.pop pipeline.fetched_headers >>= return)
     >>=? fun batch ->
@@ -422,7 +422,7 @@ let rec operations_fetch_worker_loop pipeline =
    fulfilled if every block from the locator was validated. It is
    canceled if the validation of one block fails. *)
 let rec validation_worker_loop pipeline =
-  ( Lwt_unix.yield () >>= fun () ->
+  ( Lwt.pause () >>= fun () ->
     protect ~canceler:pipeline.canceler (fun () ->
         Lwt_pipe.Bounded.pop pipeline.fetched_blocks >>= return)
     >>=? fun (hash, header, operations) ->

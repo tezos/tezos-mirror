@@ -78,7 +78,7 @@ let display_progress ?(every = 1) ?(out = Lwt_unix.stdout) ~pp_print_step f =
     let (stream, notifier) = Lwt_stream.create () in
     let wrapped_notifier () =
       notifier (Some ()) ;
-      Lwt_unix.yield ()
+      Lwt.pause ()
     in
     let main_promise =
       Lwt.finalize

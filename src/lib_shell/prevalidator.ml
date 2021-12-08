@@ -723,7 +723,7 @@ module Make
               pending = remaining_pendings;
             }
           in
-          set_mempool pv.shell our_mempool >>= fun _res -> Lwt_main.yield ()
+          set_mempool pv.shell our_mempool >>= fun _res -> Lwt.pause ()
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as

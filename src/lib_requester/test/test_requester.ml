@@ -466,7 +466,7 @@ let test_full_requester_test_notify_valid _ () =
   Test_Requester.notify req P2p_peer.Id.zero "foo" 1 >>= fun () ->
   Test_Requester.known req "foo"
   >>= lwt_assert_true "fetched value is now known"
-  >>= Lwt_unix.yield
+  >>= Lwt.pause
   (* Ensure that [f1] is scheduled *)
   >>= fun () -> lwt_assert_true "promise is resolved" (is_resolved f1)
 
@@ -520,7 +520,7 @@ let test_full_requester_test_pending_requests _ () =
       [
         Test_Requester.fetch req key precheck_pass >|= ignore;
         (* Ensure that the request is registered before [k] is scheduled. *)
-        Lwt_main.yield () >>= k;
+        Lwt.pause () >>= k;
       ]
   in
   (* Variant of [with_request] for requests that are never satisfied. When [k]
@@ -530,7 +530,7 @@ let test_full_requester_test_pending_requests _ () =
       [
         ( Test_Requester.fetch req key precheck_pass >|= fun _ ->
           Alcotest.fail "Request should not have been satisfied" );
-        Lwt_main.yield () >>= k;
+        Lwt.pause () >>= k;
       ]
   in
   (* Fetch value  *)

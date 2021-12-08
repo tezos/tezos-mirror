@@ -157,7 +157,7 @@ module Scheduler (IO : IO) = struct
     if st.max_speed <> None && st.quota < 0 then
       Events.(emit wait_quota) IO.name >>= fun () ->
       Lwt_condition.wait st.quota_updated
-    else Lwt_unix.yield ()
+    else Lwt.pause ()
 
   (* Main worker loop:
 
