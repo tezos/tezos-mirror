@@ -1744,6 +1744,8 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IEdiv_teznat
+        ~intercept_stack:
+          (Alpha_context.Tez.zero, (Alpha_context.Script_int.zero_n, eos))
         ~kinstr:
           (IEdiv_teznat
              ( kinfo (mutez @$ nat @$ bot),
@@ -1758,6 +1760,7 @@ module Registration_section = struct
     let () =
       simple_benchmark
         ~name:Interpreter_workload.N_IEdiv_tez
+        ~intercept_stack:(Alpha_context.Tez.zero, (Alpha_context.Tez.zero, eos))
         ~kinstr:
           (IEdiv_tez
              ( kinfo (mutez @$ mutez @$ bot),
