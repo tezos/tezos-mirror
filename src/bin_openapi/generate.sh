@@ -85,7 +85,7 @@ clean_private_rpc () {
 # Convert the RPC descriptions.
 dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $api_json | clean_private_rpc "$@" > $openapi_json
 echo "Generated OpenAPI specification: $openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $proto_api_json | clean_private_rpc "$@" > $proto_openapi_json,,
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $proto_api_json | clean_private_rpc "$@" > $proto_openapi_json
 echo "Generated OpenAPI specification: $proto_openapi_json"
 dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $mempool_api_json | clean_private_rpc "$@" > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
