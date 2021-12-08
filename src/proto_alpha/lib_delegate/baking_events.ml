@@ -249,15 +249,6 @@ module State_transitions = struct
       ~pp2:Block_hash.pp
       ("expected_hash", Block_hash.encoding)
 
-  let prequorum_reached =
-    declare_1
-      ~section
-      ~name:"prequorum_reached"
-      ~level:Info
-      ~msg:"prequorum reached for {block_hash}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
-
   let unexpected_quorum_received =
     declare_2
       ~section
@@ -270,15 +261,6 @@ module State_transitions = struct
       ("received_hash", Block_hash.encoding)
       ~pp2:Block_hash.pp
       ("expected_hash", Block_hash.encoding)
-
-  let quorum_reached =
-    declare_1
-      ~section
-      ~name:"quorum_reached"
-      ~level:Info
-      ~msg:"quorum reached for {block_hash}"
-      ~pp1:Block_hash.pp
-      ("block_hash", Block_hash.encoding)
 
   let step_current_phase =
     declare_2

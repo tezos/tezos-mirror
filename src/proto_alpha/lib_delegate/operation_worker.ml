@@ -39,6 +39,8 @@ module Events = struct
 
   let section = [Protocol.name; "baker"; "operation_worker"]
 
+  let pp_int = Format.pp_print_int
+
   let loop_failed =
     declare_1
       ~section
@@ -57,20 +59,64 @@ module Events = struct
       ("stacktrace", Data_encoding.string)
 
   let pqc_reached =
-    declare_0
+    declare_2
       ~section
       ~name:"pqc_reached"
       ~level:Debug
-      ~msg:"pre-quorum consensus reached"
-      ()
+      ~msg:
+        "pre-quorum reached (voting power: {voting_power}, {preendorsements} \
+         preendorsements)"
+      ~pp1:pp_int
+      ("voting_power", Data_encoding.int31)
+      ~pp2:pp_int
+      ("preendorsements", Data_encoding.int31)
+
+  let preendorsements_received =
+    declare_4
+      ~section
+      ~name:"preendorsements_received"
+      ~level:Debug
+      ~msg:
+        "received {count} preendorsements (power: {delta_power}) (total voting \
+         power: {voting_power}, {preendorsements} preendorsements)"
+      ~pp1:pp_int
+      ("count", Data_encoding.int31)
+      ~pp2:pp_int
+      ("delta_power", Data_encoding.int31)
+      ~pp3:pp_int
+      ("voting_power", Data_encoding.int31)
+      ~pp4:pp_int
+      ("preendorsements", Data_encoding.int31)
 
   let qc_reached =
-    declare_0
+    declare_2
       ~section
       ~name:"qc_reached"
       ~level:Debug
-      ~msg:"quorum consensus reached"
-      ()
+      ~msg:
+        "quorum reached (voting power: {voting_power}, {endorsements} \
+         endorsements)"
+      ~pp1:pp_int
+      ("voting_power", Data_encoding.int31)
+      ~pp2:pp_int
+      ("endorsements", Data_encoding.int31)
+
+  let endorsements_received =
+    declare_4
+      ~section
+      ~name:"endorsements_received"
+      ~level:Debug
+      ~msg:
+        "received {count} endorsements (power: {delta_power}) (total voting \
+         power: {voting_power}, {endorsements} endorsements)"
+      ~pp1:pp_int
+      ("count", Data_encoding.int31)
+      ~pp2:pp_int
+      ("delta_power", Data_encoding.int31)
+      ~pp3:pp_int
+      ("voting_power", Data_encoding.int31)
+      ~pp4:pp_int
+      ("endorsements", Data_encoding.int31)
 
   let starting_new_monitoring =
     declare_0
@@ -240,9 +286,12 @@ let candidate_encoding =
        (req "round_watched" Round.encoding)
        (req "payload_hash_watched" Block_payload_hash.encoding))
 
+type voting_power = int
+
 type event =
-  | Prequorum_reached of candidate * Kind.preendorsement operation list
-  | Quorum_reached of candidate * Kind.endorsement operation list
+  | Prequorum_reached of
+      candidate * voting_power * Kind.preendorsement operation list
+  | Quorum_reached of candidate * voting_power * Kind.endorsement operation list
 
 type pqc_watched = {
   candidate_watched : candidate;
@@ -250,6 +299,7 @@ type pqc_watched = {
   consensus_threshold : int;
   mutable current_voting_power : int;
   mutable preendorsements_received : Kind.preendorsement operation list;
+  mutable preendorsements_count : int;
 }
 
 type qc_watched = {
@@ -258,6 +308,7 @@ type qc_watched = {
   consensus_threshold : int;
   mutable current_voting_power : int;
   mutable endorsements_received : Kind.endorsement operation list;
+  mutable endorsements_count : int;
 }
 
 type watch_kind = Pqc_watch of pqc_watched | Qc_watch of qc_watched
@@ -339,34 +390,57 @@ let update_monitoring ?(should_lock = true) state ops =
            _;
          } as proposal_watched)) ->
       let preendorsements = Operation_pool.filter_preendorsements ops in
-      List.iter
-        (fun (op : Kind.preendorsement Operation.t) ->
-          let {
-            shell = _;
-            protocol_data =
-              {contents = Single (Preendorsement consensus_content); _};
-            _;
-          } =
-            op
-          in
-          if is_valid_consensus_content candidate_watched consensus_content then (
-            proposal_watched.current_voting_power <-
-              proposal_watched.current_voting_power
-              + get_preendorsement_voting_power ~slot:consensus_content.slot ;
-            proposal_watched.preendorsements_received <-
-              op :: proposal_watched.preendorsements_received))
-        preendorsements ;
+      let (preendorsements_count, voting_power) =
+        List.fold_left
+          (fun (count, power) (op : Kind.preendorsement Operation.t) ->
+            let {
+              shell = _;
+              protocol_data =
+                {contents = Single (Preendorsement consensus_content); _};
+              _;
+            } =
+              op
+            in
+            if is_valid_consensus_content candidate_watched consensus_content
+            then (
+              let op_power =
+                get_preendorsement_voting_power ~slot:consensus_content.slot
+              in
+              proposal_watched.current_voting_power <-
+                proposal_watched.current_voting_power + op_power ;
+              proposal_watched.preendorsements_received <-
+                op :: proposal_watched.preendorsements_received ;
+              proposal_watched.preendorsements_count <-
+                proposal_watched.preendorsements_count + 1 ;
+              (count + 1, power + op_power))
+            else (count, power))
+          (0, 0)
+          preendorsements
+      in
       if proposal_watched.current_voting_power >= consensus_threshold then (
-        Events.(emit pqc_reached ()) >>= fun () ->
+        Events.(
+          emit
+            pqc_reached
+            ( proposal_watched.current_voting_power,
+              proposal_watched.preendorsements_count ))
+        >>= fun () ->
         state.qc_event_stream.push
           (Some
              (Prequorum_reached
                 ( candidate_watched,
+                  proposal_watched.current_voting_power,
                   List.rev proposal_watched.preendorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
         Lwt.return_unit)
-      else Lwt.return_unit
+      else
+        Events.(
+          emit
+            preendorsements_received
+            ( preendorsements_count,
+              voting_power,
+              proposal_watched.current_voting_power,
+              proposal_watched.preendorsements_count ))
   | Some
       (Qc_watch
         ({
@@ -376,34 +450,57 @@ let update_monitoring ?(should_lock = true) state ops =
            _;
          } as proposal_watched)) ->
       let endorsements = Operation_pool.filter_endorsements ops in
-      List.iter
-        (fun (op : Kind.endorsement Operation.t) ->
-          let {
-            shell = _;
-            protocol_data =
-              {contents = Single (Endorsement consensus_content); _};
-            _;
-          } =
-            op
-          in
-          if is_valid_consensus_content candidate_watched consensus_content then (
-            proposal_watched.current_voting_power <-
-              proposal_watched.current_voting_power
-              + get_endorsement_voting_power ~slot:consensus_content.slot ;
-            proposal_watched.endorsements_received <-
-              op :: proposal_watched.endorsements_received))
-        endorsements ;
+      let (endorsements_count, voting_power) =
+        List.fold_left
+          (fun (count, power) (op : Kind.endorsement Operation.t) ->
+            let {
+              shell = _;
+              protocol_data =
+                {contents = Single (Endorsement consensus_content); _};
+              _;
+            } =
+              op
+            in
+            if is_valid_consensus_content candidate_watched consensus_content
+            then (
+              let op_power =
+                get_endorsement_voting_power ~slot:consensus_content.slot
+              in
+              proposal_watched.current_voting_power <-
+                proposal_watched.current_voting_power + op_power ;
+              proposal_watched.endorsements_received <-
+                op :: proposal_watched.endorsements_received ;
+              proposal_watched.endorsements_count <-
+                proposal_watched.endorsements_count + 1 ;
+              (count + 1, power + op_power))
+            else (count, power))
+          (0, 0)
+          endorsements
+      in
       if proposal_watched.current_voting_power >= consensus_threshold then (
-        Events.(emit qc_reached ()) >>= fun () ->
+        Events.(
+          emit
+            qc_reached
+            ( proposal_watched.current_voting_power,
+              proposal_watched.endorsements_count ))
+        >>= fun () ->
         state.qc_event_stream.push
           (Some
              (Quorum_reached
                 ( candidate_watched,
+                  proposal_watched.current_voting_power,
                   List.rev proposal_watched.endorsements_received ))) ;
         (* Once the event has been emitted, we cancel the monitoring *)
         cancel_monitoring state ;
         Lwt.return_unit)
-      else Lwt.return_unit
+      else
+        Events.(
+          emit
+            endorsements_received
+            ( endorsements_count,
+              voting_power,
+              proposal_watched.current_voting_power,
+              proposal_watched.endorsements_count ))
 
 let monitor_quorum state new_proposal_watched =
   Lwt_mutex.with_lock state.lock @@ fun () ->
@@ -427,6 +524,7 @@ let monitor_preendorsement_quorum state ~consensus_threshold
            consensus_threshold;
            current_voting_power = 0;
            preendorsements_received = [];
+           preendorsements_count = 0;
          })
   in
   monitor_quorum state new_proposal
@@ -442,6 +540,7 @@ let monitor_endorsement_quorum state ~consensus_threshold
            consensus_threshold;
            current_voting_power = 0;
            endorsements_received = [];
+           endorsements_count = 0;
          })
   in
   monitor_quorum state new_proposal

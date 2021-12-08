@@ -146,12 +146,18 @@ type timeout_kind =
 
 val timeout_kind_encoding : timeout_kind Data_encoding.t
 
+type voting_power = int
+
 type event =
   | New_proposal of proposal
   | Prequorum_reached of
-      Operation_worker.candidate * Kind.preendorsement operation list
+      Operation_worker.candidate
+      * voting_power
+      * Kind.preendorsement operation list
   | Quorum_reached of
-      Operation_worker.candidate * Kind.endorsement operation list
+      Operation_worker.candidate
+      * voting_power
+      * Kind.endorsement operation list
   | Timeout of timeout_kind
 
 val event_encoding : event Data_encoding.t
