@@ -158,8 +158,8 @@ let test_inner_error () =
     ~errors:["Oh no"]
     ~remaining_gas:5
 
-(* Test that no gas-exhaustion error is produced when run with unlimited gas
-   mode. Only gas that does not exceed the limit is consumed.
+(* Test that no gas-exhaustion error is produced and that no gas is consumed
+   when run in unlimited mode.
  *)
 let test_unlimited () =
   let* ctxt = new_context ~limit:10 in
@@ -168,10 +168,7 @@ let test_unlimited () =
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* y = GM.return 2 in
-    (* With an initial limit 10, this results in a gas-exhaustion error which is
-       why no gas is consumed. *)
     let* () = GM.consume_gas (Saturation_repr.safe_int 100) in
-    (* This gas is actually consumed as there is still a budget of 5 remaining. *)
     let* () = GM.consume_gas (Saturation_repr.safe_int 3) in
     GM.return (x + y)
   in
@@ -180,7 +177,7 @@ let test_unlimited () =
     (Gas.set_unlimited ctxt)
     gas_monad
     ~result:3
-    ~remaining_gas:2
+    ~remaining_gas:10
 
 let tests =
   [
