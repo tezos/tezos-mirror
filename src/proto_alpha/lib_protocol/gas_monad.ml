@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,29 +26,54 @@
 
 open Alpha_context
 
-(* The outer [tzresult] is for gas exhaustion only. The inner [result] is for all
-   other (non-gas) errors. *)
-type ('a, 'trace) t = context -> (('a, 'trace) result * context) tzresult
+(* The outer option is for gas exhaustion. The inner [result] is for all other
+   errors. *)
+type ('a, 'trace) t =
+  Local_gas_counter.local_gas_counter ->
+  (('a, 'trace) result * Local_gas_counter.local_gas_counter) option
 
 type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-let of_result x ctxt = ok (x, ctxt)
+let of_result x gas = Some (x, gas)
 
 let return x = of_result (ok x)
 
-let ( >>$ ) m f ctxt =
-  m ctxt >>? fun (x, ctxt) ->
-  match x with Ok y -> f y ctxt | Error _ as err -> of_result err ctxt
+(* Inlined [Option.bind] for performance. *)
+let ( >>?? ) m f =
+  match m with None -> None | Some x -> f x
+  [@@ocaml.inline always]
 
-let ( >|$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> of_result (x >|? f) ctxt
+let ( >>$ ) m f gas =
+  m gas >>?? fun (res, gas) ->
+  match res with Ok y -> f y gas | Error _ as err -> of_result err gas
+
+let ( >|$ ) m f gas = m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
 
 let ( >?$ ) m f = m >>$ fun x -> of_result (f x)
 
-let ( >??$ ) m f ctxt = m ctxt >>? fun (x, ctxt) -> f x ctxt
+let ( >??$ ) m f gas = m gas >>?? fun (x, gas) -> f x gas
 
-let consume_gas cost ctxt = Gas.consume ctxt cost >>? return ()
+let consume_gas cost gas =
+  match Local_gas_counter.update_and_check gas cost with
+  | None -> None
+  | Some gas -> Some (ok (), gas)
 
-let run ctxt x = x ctxt
+let run ctxt m =
+  match Gas.level ctxt with
+  | Gas.Unaccounted -> (
+      match m (Saturation_repr.saturated :> int) with
+      | Some (res, _new_gas_counter) -> ok (res, ctxt)
+      | None -> error Gas.Operation_quota_exceeded)
+  | Limited {remaining} -> (
+      match m (remaining :> int) with
+      | Some (res, new_gas_counter) ->
+          let ctxt =
+            Local_gas_counter.update_context
+              new_gas_counter
+              (Local_gas_counter.outdated ctxt)
+          in
+          ok (res, ctxt)
+      | None -> error Gas.Operation_quota_exceeded)
 
-let record_trace_eval f m ctxt =
-  m ctxt >>? fun (x, ctxt) -> of_result (record_trace_eval f x) ctxt
+let record_trace_eval f m gas =
+  m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
