@@ -8,7 +8,7 @@ license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
   "tezos-alpha-test-helpers" { with-test }
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-base"
   "tezos-version"
   "tezos-protocol-environment"
