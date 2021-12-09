@@ -80,7 +80,7 @@ type t = {
   branch_refused : bounded_map;
   branch_delayed : bounded_map;
   mutable applied_rev : (Operation_hash.t * Operation.t) list;
-  mutable in_mempool : Operation_hash.Set.t;
+  mutable in_mempool : (Operation.t * classification) Operation_hash.Map.t;
 }
 
 let create parameters =
@@ -90,7 +90,7 @@ let create parameters =
     outdated = mk_empty_bounded_map parameters.map_size_limit;
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
-    in_mempool = Operation_hash.Set.empty;
+    in_mempool = Operation_hash.Map.empty;
     applied_rev = [];
   }
 
@@ -101,23 +101,31 @@ let set_of_bounded_map bounded_map =
     Operation_hash.Set.empty
 
 let flush (classes : t) ~handle_branch_refused =
+  let update_in_mempool_map map =
+    classes.in_mempool <-
+      Operation_hash.Map.fold
+        (fun oph _ mempool -> Operation_hash.Map.remove oph mempool)
+        map
+        classes.in_mempool
+  in
+  let remove_list_from_in_mempool list =
+    classes.in_mempool <-
+      List.fold_left
+        (fun mempool (oph, _) -> Operation_hash.Map.remove oph mempool)
+        classes.in_mempool
+        list
+  in
   if handle_branch_refused then (
+    update_in_mempool_map classes.branch_refused.map ;
     Ringo.Ring.clear classes.branch_refused.ring ;
     classes.branch_refused.map <- Operation_hash.Map.empty) ;
+  update_in_mempool_map classes.branch_delayed.map ;
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Operation_hash.Map.empty ;
-  classes.applied_rev <- [] ;
-  classes.in_mempool <-
-    Operation_hash.Set.union
-      (Operation_hash.Set.union
-         (set_of_bounded_map classes.refused)
-         (set_of_bounded_map classes.branch_refused))
-      (set_of_bounded_map classes.outdated)
+  remove_list_from_in_mempool classes.applied_rev ;
+  classes.applied_rev <- []
 
-let is_in_mempool oph classes = Operation_hash.Set.mem oph classes.in_mempool
-
-let is_applied oph classes =
-  List.exists (fun (h, _) -> Operation_hash.equal h oph) classes.applied_rev
+let is_in_mempool oph classes = Operation_hash.Map.mem oph classes.in_mempool
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
@@ -130,19 +138,34 @@ let is_applied oph classes =
    Later on, it would be probably better if this function returns a
    set of pending operations instead. *)
 let remove oph classes =
-  classes.refused.map <- Operation_hash.Map.remove oph classes.refused.map ;
-  classes.outdated.map <- Operation_hash.Map.remove oph classes.outdated.map ;
-  classes.branch_refused.map <-
-    Operation_hash.Map.remove oph classes.branch_refused.map ;
-  classes.branch_delayed.map <-
-    Operation_hash.Map.remove oph classes.branch_delayed.map ;
-  classes.in_mempool <- Operation_hash.Set.remove oph classes.in_mempool ;
-  classes.applied_rev <-
-    List.filter (fun (op, _) -> Operation_hash.(op <> oph)) classes.applied_rev
+  match Operation_hash.Map.find oph classes.in_mempool with
+  | None -> None
+  | Some (op, classification) ->
+      (classes.in_mempool <- Operation_hash.Map.remove oph classes.in_mempool ;
+       match classification with
+       | `Refused _ ->
+           classes.refused.map <-
+             Operation_hash.Map.remove oph classes.refused.map
+       | `Outdated _ ->
+           classes.outdated.map <-
+             Operation_hash.Map.remove oph classes.outdated.map
+       | `Branch_refused _ ->
+           classes.branch_refused.map <-
+             Operation_hash.Map.remove oph classes.branch_refused.map
+       | `Branch_delayed _ ->
+           classes.branch_delayed.map <-
+             Operation_hash.Map.remove oph classes.branch_delayed.map
+       | `Applied ->
+           classes.applied_rev <-
+             List.filter
+               (fun (op, _) -> Operation_hash.(op <> oph))
+               classes.applied_rev) ;
+      Some (op, classification)
 
 let handle_applied oph op classes =
   classes.applied_rev <- (oph, op) :: classes.applied_rev ;
-  classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
+  classes.in_mempool <-
+    Operation_hash.Map.add oph (op, `Applied) classes.in_mempool
 
 (* 1. Add the operation to the ring underlying the corresponding
    error map class.
@@ -171,12 +194,14 @@ let handle_error oph op classification classes =
   |> Option.iter (fun e ->
          bounded_map.map <- Operation_hash.Map.remove e bounded_map.map ;
          classes.parameters.on_discarded_operation e ;
-         classes.in_mempool <- Operation_hash.Set.remove e classes.in_mempool) ;
+         classes.in_mempool <- Operation_hash.Map.remove e classes.in_mempool) ;
   (match classification with
   | `Refused _ | `Outdated _ -> classes.parameters.on_discarded_operation oph
-  | _ -> ()) ;
+  | `Branch_delayed _ | `Branch_refused _ -> ()) ;
   bounded_map.map <- Operation_hash.Map.add oph (op, tztrace) bounded_map.map ;
-  classes.in_mempool <- Operation_hash.Set.add oph classes.in_mempool
+  let classification : classification = (classification :> classification) in
+  classes.in_mempool <-
+    Operation_hash.Map.add oph (op, classification) classes.in_mempool
 
 let add classification oph op classes =
   match classification with
@@ -344,7 +369,7 @@ module Internal_for_tests = struct
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
     let in_mempool_pp ppf in_mempool =
-      in_mempool |> Operation_hash.Set.elements
+      in_mempool |> Operation_hash.Map.bindings |> List.map fst
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
     Format.fprintf
@@ -386,7 +411,7 @@ module Internal_for_tests = struct
       (show_bounded_map "branch_refused" t.branch_refused)
       (show_bounded_map "branch_delayed" t.branch_delayed)
       (List.length t.applied_rev)
-      (Operation_hash.Set.cardinal t.in_mempool)
+      (Operation_hash.Map.cardinal t.in_mempool)
 
   let to_map = to_map
 
