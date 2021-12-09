@@ -417,7 +417,8 @@ let mk_chain_tools (chain_db : Distributed_db.chain_db) :
     read_predecessor_opt;
   }
 
-module type T = sig
+(** Module type used both in production and in tests. *)
+module type S = sig
   (** Type instantiated by {!Filter.Mempool.state}. *)
   type filter_state
 
@@ -430,8 +431,6 @@ module type T = sig
 
   (** Type instantiated by {!Prevalidation.t} *)
   type prevalidation_t
-
-  val name : Name.t
 
   type types_state = {
     shell : (protocol_operation, prevalidation_t) types_state_shell;
@@ -446,6 +445,61 @@ module type T = sig
     mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
+
+  (** This function fetches an operation if it is not already handled
+      as defined by [already_handled] below. The implementation makes
+      sure to fetch an operation at most once, modulo operations
+      lost because of bounded buffers becoming full.
+
+      This function is an intruder to this module type. It just happens
+      that it is needed both by internals of the implementation of {!S}
+      and by the internals of the implementation of {!T}; so it needs
+      to be exposed here. *)
+  val may_fetch_operation :
+    (protocol_operation, prevalidation_t) types_state_shell ->
+    P2p_peer_id.t option ->
+    Operation_hash.t ->
+    unit Lwt.t
+
+  (** The function called after every call to a function of {!API}. *)
+  val handle_unprocessed : types_state -> unit Lwt.t
+
+  (** The inner API of the mempool i.e. functions called by the worker
+      when an individual request arrives. These functions are the
+      most high-level ones that we test. All these [on_*] functions
+      correspond to a single event. Possible
+      sequences of calls to this API are always of the form:
+
+      on_*; handle_unprocessed; on_*; handle_unprocessed; ... *)
+  module Requests : sig
+    val on_advertise : _ types_state_shell -> unit
+
+    val on_arrived :
+      types_state -> Operation_hash.t -> Operation.t -> unit tzresult Lwt.t
+
+    val on_ban : types_state -> Operation_hash.t -> unit tzresult Lwt.t
+
+    val on_flush :
+      handle_branch_refused:bool ->
+      types_state ->
+      Store.Block.t ->
+      Block_hash.Set.t ->
+      Operation_hash.Set.t ->
+      unit tzresult Lwt.t
+
+    val on_inject :
+      types_state -> force:bool -> Operation.t -> unit tzresult Lwt.t
+
+    val on_notify :
+      _ types_state_shell -> P2p_peer_id.t -> Mempool.t -> unit Lwt.t
+  end
+end
+
+(** Module type used exclusively in production. *)
+module type T = sig
+  include S
+
+  val name : Name.t
 
   module Types : Worker_intf.TYPES with type state = types_state
 
@@ -463,27 +517,22 @@ module type T = sig
   val worker : worker Lazy.t
 end
 
-module type ARG = sig
-  val limits : limits
-
-  val chain_db : Distributed_db.chain_db
-
-  val chain_id : Chain_id.t
-end
-
 type t = (module T)
 
-module Make
+(** A functor for obtaining the testable part of this file (see
+    the instantiation of this functor in {!Internal_for_tests} at the
+    end of this file). Contrary to the production-only functor {!Make} below,
+    this functor doesn't assume a specific chain store implementation,
+    which is the crux for having it easily unit-testable. *)
+module Make_s
     (Filter : Prevalidator_filters.FILTER)
-    (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                                Filter.Proto.validation_state
                           and type protocol_operation = Filter.Proto.operation
                           and type operation_receipt =
-                               Filter.Proto.operation_receipt
-                          and type chain_store = Store.chain_store) :
-  T
+                               Filter.Proto.operation_receipt) :
+  S
     with type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
      and type protocol_operation = Filter.Proto.operation
@@ -495,8 +544,6 @@ module Make
   type protocol_operation = Filter.Proto.operation
 
   type prevalidation_t = Prevalidation_t.t
-
-  let name = (Arg.chain_id, Filter.Proto.hash)
 
   type 'operation_data operation = 'operation_data Prevalidation.operation
 
@@ -512,27 +559,6 @@ module Make
     mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
-
-  module Types = struct
-    type state = types_state
-
-    type parameters = limits * Distributed_db.chain_db
-  end
-
-  module Worker :
-    Worker.T
-      with type Name.t = Name.t
-       and type Event.t = Dummy_event.t
-       and type 'a Request.t = 'a Request.t
-       and type Request.view = Request.view
-       and type Types.state = Types.state
-       and type Types.parameters = Types.parameters =
-    Worker.Make (Name) (Dummy_event) (Prevalidator_worker_state.Request) (Types)
-      (Logger)
-
-  open Types
-
-  type worker = Worker.infinite Worker.queue Worker.t
 
   (* This function is in [Lwt] only for logging. *)
   let already_handled ~origin shell oph =
@@ -911,7 +937,7 @@ module Make
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
   module Requests = struct
-    let on_arrived (pv : state) oph op =
+    let on_arrived (pv : types_state) oph op =
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
       else
@@ -948,7 +974,7 @@ module Make
                     Pending_ops.add parsed_op prio pv.shell.pending ;
                   return_unit))
 
-    let on_inject (pv : state) ~force op =
+    let on_inject (pv : types_state) ~force op =
       let oph = Operation.hash op in
       (* Currently, an injection is always done with priority = `High, because:
          - We want to process and propagate the injected operations fast,
@@ -1182,6 +1208,60 @@ module Make
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       remove ~flush_if_prechecked:true pv oph_to_ban
   end
+end
+
+module type ARG = sig
+  val limits : limits
+
+  val chain_db : Distributed_db.chain_db
+
+  val chain_id : Chain_id.t
+end
+
+(** The functor that is not tested, in other words used only in production.
+    This functor's code is not tested (contrary to functor {!Make_s} above),
+    because it hardcodes a dependency to [Store.chain_store] in its instantiation
+    of type [chain_store]. This is what makes the code of this functor
+    not testable for the moment, because [Store.chain_store] has poor
+    testing capabilities.
+
+    Note that, because this functor [include]s {!Make_s}, it is a
+    strict extension of [Make_s]. *)
+module Make
+    (Filter : Prevalidator_filters.FILTER)
+    (Arg : ARG)
+    (Prevalidation_t : Prevalidation.T
+                         with type validation_state =
+                               Filter.Proto.validation_state
+                          and type protocol_operation = Filter.Proto.operation
+                          and type operation_receipt =
+                               Filter.Proto.operation_receipt
+                          and type chain_store = Store.chain_store) :
+  T with type prevalidation_t = Prevalidation_t.t = struct
+  include Make_s (Filter) (Prevalidation_t)
+
+  let name = (Arg.chain_id, Filter.Proto.hash)
+
+  module Types = struct
+    type state = types_state
+
+    type parameters = limits * Distributed_db.chain_db
+  end
+
+  module Worker :
+    Worker.T
+      with type Name.t = Name.t
+       and type Event.t = Dummy_event.t
+       and type 'a Request.t = 'a Request.t
+       and type Request.view = Request.view
+       and type Types.state = Types.state
+       and type Types.parameters = Types.parameters =
+    Worker.Make (Name) (Dummy_event) (Prevalidator_worker_state.Request) (Types)
+      (Logger)
+
+  open Types
+
+  type worker = Worker.infinite Worker.queue Worker.t
 
   (** Mimics [Data_encoding.Json.construct] but accepts argument
       [?include_default_fields] to pass on to [Json_encoding.construct]. *)
