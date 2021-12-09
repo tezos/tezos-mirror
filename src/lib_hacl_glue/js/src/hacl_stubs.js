@@ -328,9 +328,15 @@ function Hacl_Ed25519_verify(pk, msg, signature) { // eslint-disable-line no-unu
 }
 
 //Provides: Hacl_P256_ecdsa_sign_p256_without_hash
-//Requires: caml_failwith
-function Hacl_P256_ecdsa_sign_p256_without_hash () { // eslint-disable-line no-unused-vars
-    caml_failwith(' not implemented Hacl_P256_ecdsa_sign_p256_without_hash');
+//Requires: MlBytes2buf, blit_buf_onto_MlBytes
+function Hacl_P256_ecdsa_sign_p256_without_hash (privkey, m, k, result) { // eslint-disable-line no-unused-vars
+  var _HACL = joo_global_object._HACL;
+  var bm = MlBytes2buf(m);
+  var bprivkey = MlBytes2buf(privkey);
+  var bk = MlBytes2buf(k);
+  var bret = _HACL.P256.ecdsa_sign_without_hash(bm, bprivkey, bk);
+  blit_buf_onto_MlBytes(bret[1], result);
+  return (bret[0] ? 1 : 0);
 }
 
 //Provides: Hacl_P256_ecdsa_verif_without_hash
