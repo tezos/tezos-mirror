@@ -359,14 +359,7 @@ let pp_manager_operation_contents_and_result ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
-    match balance_updates with
-    | [] -> ()
-    | balance_updates ->
-        Format.fprintf
-          ppf
-          "@,Balance updates:@,  %a"
-          pp_balance_updates
-          balance_updates
+    pp_balance_updates_opt ppf balance_updates
   in
   let pp_origination_result
       (Origination_result
@@ -395,14 +388,7 @@ let pp_manager_operation_contents_and_result ppf
         "@,Paid storage size diff: %s bytes"
         (Z.to_string paid_storage_size_diff) ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
-    match balance_updates with
-    | [] -> ()
-    | balance_updates ->
-        Format.fprintf
-          ppf
-          "@,Balance updates:@,  %a"
-          pp_balance_updates
-          balance_updates
+    pp_balance_updates_opt ppf balance_updates
   in
   let pp_register_global_constant_result
       (Register_global_constant_result
@@ -412,12 +398,7 @@ let pp_manager_operation_contents_and_result ppf
         (* Not possible - register global constant operation always returns
            balance updates. *)
         assert false
-    | balance_updates ->
-        Format.fprintf
-          ppf
-          "@,Balance updates:@,  %a"
-          pp_balance_updates
-          balance_updates) ;
+    | balance_updates -> pp_balance_updates_opt ppf balance_updates) ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size_of_constant) ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
@@ -544,14 +525,7 @@ let pp_manager_operation_contents_and_result ppf
     Gas.Arith.pp_integral
     gas_limit
     (Z.to_string storage_limit) ;
-  (match balance_updates with
-  | [] -> ()
-  | balance_updates ->
-      Format.fprintf
-        ppf
-        "@,Balance updates:@,  %a"
-        pp_balance_updates
-        balance_updates) ;
+  pp_balance_updates_opt ppf balance_updates ;
   Format.fprintf
     ppf
     "@,%a"

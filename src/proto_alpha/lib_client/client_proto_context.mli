@@ -408,3 +408,29 @@ val originate_tx_rollup :
   * Kind.tx_rollup_origination Kind.manager Apply_results.contents_result)
   tzresult
   Lwt.t
+
+val sc_rollup_originate :
+  #Protocol_client_context.full ->
+  chain:Chain_services.chain ->
+  block:Block_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  ?counter:counter ->
+  source:public_key_hash ->
+  kind:Sc_rollup.Kind.t ->
+  boot_sector:Sc_rollup.PVM.boot_sector ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  fee_parameter:Injection.fee_parameter ->
+  unit ->
+  ( Operation_hash.t
+    * Kind.sc_rollup_originate Kind.manager contents
+    * Kind.sc_rollup_originate Kind.manager Apply_results.contents_result,
+    tztrace )
+  result
+  Lwt.t
