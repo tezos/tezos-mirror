@@ -320,7 +320,7 @@ type quorum_event_stream = {
 
 type t = {
   mutable operation_pool : Operation_pool.pool;
-  canceler : Lwt_canceler.t;
+  mutable canceler : Lwt_canceler.t;
   mutable proposal_watched : watch_kind option;
   qc_event_stream : quorum_event_stream;
   lock : Lwt_mutex.t;
@@ -342,7 +342,18 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
       (fun ops -> List.map (fun ((_, op), _) -> op) ops)
       operation_stream
   in
-  return (operation_stream, stream_stopper)
+  Shell_services.Blocks.Header.shell_header
+    cctxt
+    ~chain:cctxt#chain
+    ~block:(`Head 0)
+    ()
+  >>=? fun shell_header ->
+  let round =
+    match Fitness.(round_from_raw shell_header.fitness) with
+    | Ok r -> r
+    | Error _ -> Round.zero
+  in
+  return ((shell_header.level, round), operation_stream, stream_stopper)
 
 let make_initial_state ?initial_mempool ?(monitor_node_operations = true) () =
   let qc_event_stream =
@@ -549,6 +560,50 @@ let shutdown_worker state =
   Events.(emit shutting_down ()) >>= fun () ->
   Lwt_canceler.cancel state.canceler
 
+(* Each time a new head is received, the operation_pool field of the state is
+   cleaned/reset by this function. Instead of emptying it completely, we keep
+   the endorsements of at most 5 rounds and 1 level in the past, to be able to
+   include as much endorsements as possible in the next block if this baker is
+   the proposer. This allows to handle the following situations:
+
+   - The baker observes an EQC for (L, R), but a proposal arrived for (L, R+1).
+   After the flush, extra endorsements on top of (L, R) are 'Branch_refused',
+   and are not re-sent by the node. If the baker proposes at (L+1, 1), he should
+   be able to include these extra endorsements. Hence the cache for old rounds.
+
+   - The baker receives a head at (L+1, 0) on top of (L, 0), but this head
+   didn't reach consensus. If the baker who proposes at (L+1, 1) observed some
+   extra endorsements for (L, 0) that are not included in (L+1, 0), he may want
+   to add them. But these endorsements become 'Outdated' in the mempool once
+   (L+1, 0) is received. Hence the cache for previous level.
+*)
+let may_update_operations_pool state (head_level, head_round) =
+  let endorsements =
+    let head_round_i32 = Round.to_int32 head_round in
+    let head_level_i32 = head_level in
+    Operation_pool.OpSet.filter
+      (function
+        | {
+            protocol_data =
+              Operation_data
+                {contents = Single (Endorsement {round; level; _}); _};
+            _;
+          } ->
+            let round_i32 = Round.to_int32 round in
+            let level_i32 = Raw_level.to_int32 level in
+            let delta_round = Int32.sub head_round_i32 round_i32 in
+            let delta_level = Int32.sub head_level_i32 level_i32 in
+            (* Only retain endorsements that are maximum 5 rounds old and
+               1 level in the last *)
+            Compare.Int32.(delta_round <= 5l && delta_level <= 1l)
+        | _ -> false)
+      state.operation_pool.consensus
+  in
+  let operation_pool =
+    {Operation_pool.empty with Operation_pool.consensus = endorsements}
+  in
+  state.operation_pool <- operation_pool
+
 let create ?initial_mempool ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
   Mempool.retrieve initial_mempool >>= fun initial_mempool ->
@@ -557,12 +612,14 @@ let create ?initial_mempool ?(monitor_node_operations = true)
   let rec worker_loop () =
     monitor_operations cctxt >>= function
     | Error err -> Events.(emit loop_failed err)
-    | Ok (operation_stream, op_stream_stopper) ->
+    | Ok (head, operation_stream, op_stream_stopper) ->
         Events.(emit starting_new_monitoring ()) >>= fun () ->
+        state.canceler <- Lwt_canceler.create () ;
         Lwt_canceler.on_cancel state.canceler (fun () ->
             op_stream_stopper () ;
             cancel_monitoring state ;
             Lwt.return_unit) ;
+        may_update_operations_pool state head ;
         let rec loop () =
           Lwt_stream.get operation_stream >>= function
           | None ->
@@ -570,7 +627,6 @@ let create ?initial_mempool ?(monitor_node_operations = true)
                  we cancel the monitoring and flush current operations *)
               Events.(emit end_of_stream ()) >>= fun () ->
               op_stream_stopper () ;
-              state.operation_pool <- Operation_pool.empty ;
               cancel_monitoring state ;
               worker_loop ()
           | Some ops ->
