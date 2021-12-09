@@ -263,12 +263,17 @@ build-deps:
 build-dev-deps:
 	@./scripts/install_build_deps.sh --dev
 
+.PHONY: lift-protocol-limits-patch
+lift-protocol-limits-patch:
+	@git apply -R ./src/bin_tps_evaluation/lift_limits.patch || true
+	@git apply ./src/bin_tps_evaluation/lift_limits.patch
+
 .PHONY: build-tps-deps
 build-tps-deps:
 	@./scripts/install_build_deps.sh --tps
 
 .PHONY: build-tps
-build-tps:
+build-tps: lift-protocol-limits-patch all
 	@dune build ./src/bin_tps_evaluation
 	@cp -f ./_build/install/default/bin/tezos-tps-evaluation .
 
