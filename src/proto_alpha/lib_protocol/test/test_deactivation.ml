@@ -89,7 +89,8 @@ let test_simple_staking_rights () =
   let (a1, _a2) = account_pair accounts in
   Context.Contract.balance (B b) a1 >>=? fun balance ->
   Context.Contract.pkh a1 >>=? fun delegate1 ->
-  Context.Delegate.frozen_deposits (B b) delegate1 >>=? fun frozen_deposits ->
+  Context.Delegate.current_frozen_deposits (B b) delegate1
+  >>=? fun frozen_deposits ->
   let expected_initial_balance =
     Account.default_initial_balance -! frozen_deposits
   in
@@ -114,7 +115,8 @@ let test_simple_staking_rights_after_baking () =
   Block.bake_n ~policy:(By_account m2.pkh) 5 b >>=? fun b ->
   Context.Contract.balance (B b) a1 >>=? fun balance ->
   Context.Contract.pkh a1 >>=? fun delegate1 ->
-  Context.Delegate.frozen_deposits (B b) delegate1 >>=? fun frozen_deposits ->
+  Context.Delegate.current_frozen_deposits (B b) delegate1
+  >>=? fun frozen_deposits ->
   balance +? frozen_deposits >>?= fun full_balance ->
   Context.Delegate.info (B b) m1.pkh >>=? fun info ->
   Assert.equal_tez ~loc:__LOC__ full_balance info.staking_balance >>=? fun () ->

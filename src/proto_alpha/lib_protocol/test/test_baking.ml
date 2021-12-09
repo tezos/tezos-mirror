@@ -145,7 +145,8 @@ let test_basic_baking_reward () =
   let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Context.Contract.pkh baker >>=? fun baker_pkh ->
   Context.Contract.balance (B b) baker >>=? fun bal ->
-  Context.Delegate.frozen_deposits (B b) baker_pkh >>=? fun frozen_deposit ->
+  Context.Delegate.current_frozen_deposits (B b) baker_pkh
+  >>=? fun frozen_deposit ->
   Context.get_baking_reward_fixed_portion (B b) >>=? fun br ->
   let open Test_tez in
   let expected_initial_balance = bal +! frozen_deposit -! br in
@@ -217,7 +218,8 @@ let test_rewards_block_and_payload_producer () =
   Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
   get_contract_for_pkh contracts baker_b2 >>=? fun baker_b2_contract ->
   Context.Contract.balance (B b2) baker_b2_contract >>=? fun bal ->
-  Context.Delegate.frozen_deposits (B b2) baker_b2 >>=? fun frozen_deposit ->
+  Context.Delegate.current_frozen_deposits (B b2) baker_b2
+  >>=? fun frozen_deposit ->
   Context.get_baking_reward_fixed_portion (B b2) >>=? fun baking_reward ->
   Context.get_bonus_reward (B b2) ~endorsing_power >>=? fun bonus_reward ->
   (if Signature.Public_key_hash.equal baker_b2 baker_b1 then
@@ -260,7 +262,8 @@ let test_rewards_block_and_payload_producer () =
   >>=? fun b2' ->
   (* [baker_b2], as payload producer, gets the block reward and the fees *)
   Context.Contract.balance (B b2') baker_b2_contract >>=? fun bal ->
-  Context.Delegate.frozen_deposits (B b2') baker_b2 >>=? fun frozen_deposit ->
+  Context.Delegate.current_frozen_deposits (B b2') baker_b2
+  >>=? fun frozen_deposit ->
   let reward_for_b1 =
     if Signature.Public_key_hash.equal baker_b2 baker_b1 then baking_reward
     else Tez.zero
@@ -275,7 +278,7 @@ let test_rewards_block_and_payload_producer () =
      endorsements *)
   get_contract_for_pkh contracts baker_b2' >>=? fun baker_b2'_contract ->
   Context.Contract.balance (B b2') baker_b2'_contract >>=? fun bal' ->
-  Context.Delegate.frozen_deposits (B b2') baker_b2'
+  Context.Delegate.current_frozen_deposits (B b2') baker_b2'
   >>=? fun frozen_deposits' ->
   Context.get_baker (B genesis) ~round:0 >>=? fun baker_b1 ->
   let reward_for_b1' =
@@ -315,7 +318,8 @@ let test_enough_active_stake_to_bake ~has_active_stake () =
   if has_active_stake then
     b1 >>?= fun b1 ->
     Context.Contract.balance (B b1) account1 >>=? fun bal ->
-    Context.Delegate.frozen_deposits (B b1) pkh1 >>=? fun frozen_deposit ->
+    Context.Delegate.current_frozen_deposits (B b1) pkh1
+    >>=? fun frozen_deposit ->
     let expected_bal =
       Test_tez.(
         Tez.of_mutez_exn initial_bal1

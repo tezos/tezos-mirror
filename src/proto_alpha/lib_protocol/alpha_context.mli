@@ -1529,10 +1529,10 @@ module Delegate : sig
   type participation_info = {
     expected_cycle_activity : int;
     minimal_cycle_activity : int;
-    missed_slots : bool;
+    missed_slots : int;
+    missed_levels : int;
     remaining_allowed_missed_slots : int;
     expected_endorsing_rewards : Tez.t;
-    current_pending_rewards : Tez.t;
   }
 
   val delegate_participation_info :
@@ -1583,7 +1583,9 @@ module Delegate : sig
     endorsing_power:int ->
     context tzresult Lwt.t
 
-  val frozen_deposits : context -> public_key_hash -> Tez.t tzresult Lwt.t
+  type deposits = {initial_amount : Tez.t; current_amount : Tez.t}
+
+  val frozen_deposits : context -> public_key_hash -> deposits tzresult Lwt.t
 
   val staking_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t

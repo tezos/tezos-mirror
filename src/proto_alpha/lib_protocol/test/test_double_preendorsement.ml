@@ -116,7 +116,8 @@ end = struct
     (* let's bake the block on top of pred without denunciating d1 *)
     bake ~policy:(By_account baker) pred >>=? fun bgood ->
     (* Checking what the endorser lost *)
-    Context.Delegate.frozen_deposits (B pred) d1 >>=? fun frozen_deposit ->
+    Context.Delegate.current_frozen_deposits (B pred) d1
+    >>=? fun frozen_deposit ->
     Context.Delegate.full_balance (B bgood) d1 >>=? fun bal_good ->
     Context.Delegate.full_balance (B bbad) d1 >>=? fun bal_bad ->
     (* the diff of the two balances in normal and in denunciation cases *)

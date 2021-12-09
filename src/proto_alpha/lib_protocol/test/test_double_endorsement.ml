@@ -122,9 +122,9 @@ let test_valid_double_endorsement_evidence () =
   Context.Delegate.full_balance (B blk_a) baker >>=? fun full_balance ->
   Block.bake ~policy:(By_account baker) ~operation blk_a >>=? fun blk_final ->
   (* Check that parts of the frozen deposits are slashed *)
-  Context.Delegate.frozen_deposits (B blk_a) delegate
+  Context.Delegate.current_frozen_deposits (B blk_a) delegate
   >>=? fun frozen_deposits_before ->
-  Context.Delegate.frozen_deposits (B blk_final) delegate
+  Context.Delegate.current_frozen_deposits (B blk_final) delegate
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
   let r =
@@ -140,6 +140,11 @@ let test_valid_double_endorsement_evidence () =
     ~loc:__LOC__
     expected_frozen_deposits_after
     frozen_deposits_after
+  >>=? fun () ->
+  (* Check that the initial frozen deposits has not changed *)
+  Context.Delegate.initial_frozen_deposits (B blk_final) delegate
+  >>=? fun initial_frozen_deposits ->
+  Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
   >>=? fun () ->
   (* Check that [baker] is rewarded with:
      - baking_reward_fixed_portion for baking and,
@@ -179,7 +184,7 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
   Block.bake ~policy:(By_account baker) ~operation blk_3
   >>=? fun blk_with_evidence2 ->
   (* Check that all the frozen deposits are slashed *)
-  Context.Delegate.frozen_deposits (B blk_with_evidence2) delegate
+  Context.Delegate.current_frozen_deposits (B blk_with_evidence2) delegate
   >>=? fun frozen_deposits_after ->
   Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after >>=? fun () ->
   Block.bake ~policy:(By_account delegate) blk_with_evidence2 >>= fun b ->
@@ -415,7 +420,10 @@ let test_freeze_more_with_low_balance =
     (* Denunciation has happened: we check that the full balance of [account1]
        is (still) equal to its deposit. *)
     Context.Delegate.info (B b3) account1 >>=? fun info3 ->
-    Assert.equal_tez ~loc:__LOC__ info3.full_balance info3.frozen_deposits
+    Assert.equal_tez
+      ~loc:__LOC__
+      info3.full_balance
+      info3.current_frozen_deposits
     >>=? fun () ->
     (* We also check that compared to deposits at block [b2], [account1] lost
        50% of its deposits. *)
@@ -431,7 +439,7 @@ let test_freeze_more_with_low_balance =
     Assert.equal_tez
       ~loc:__LOC__
       expected_frozen_deposits_after
-      info3.frozen_deposits
+      info3.current_frozen_deposits
     >>=? fun () ->
     (* We now bake until end of cycle only with [account2]:
        block of the new cycle are called cX below. *)
@@ -442,7 +450,8 @@ let test_freeze_more_with_low_balance =
        current deposits are thus 0tz. *)
     Context.Delegate.info (B c2) account1 >>=? fun info4 ->
     Assert.equal_tez ~loc:__LOC__ info4.full_balance Tez.zero >>=? fun () ->
-    Assert.equal_tez ~loc:__LOC__ info4.frozen_deposits Tez.zero >>=? fun () ->
+    Assert.equal_tez ~loc:__LOC__ info4.current_frozen_deposits Tez.zero
+    >>=? fun () ->
     Block.bake c2 ~policy:(By_account account1) >>= fun c3 ->
     (* Once the deposits dropped to 0, the baker cannot bake anymore *)
     Assert.proto_error_with_info ~loc:__LOC__ c3 "Zero frozen deposits"

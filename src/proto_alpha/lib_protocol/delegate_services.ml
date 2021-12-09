@@ -51,6 +51,7 @@ let () =
 
 type info = {
   full_balance : Tez.t;
+  current_frozen_deposits : Tez.t;
   frozen_deposits : Tez.t;
   staking_balance : Tez.t;
   frozen_deposits_limit : Tez.t option;
@@ -66,6 +67,7 @@ let info_encoding =
   conv
     (fun {
            full_balance;
+           current_frozen_deposits;
            frozen_deposits;
            staking_balance;
            frozen_deposits_limit;
@@ -76,6 +78,7 @@ let info_encoding =
            voting_power;
          } ->
       ( full_balance,
+        current_frozen_deposits,
         frozen_deposits,
         staking_balance,
         frozen_deposits_limit,
@@ -85,6 +88,7 @@ let info_encoding =
         grace_period,
         voting_power ))
     (fun ( full_balance,
+           current_frozen_deposits,
            frozen_deposits,
            staking_balance,
            frozen_deposits_limit,
@@ -95,6 +99,7 @@ let info_encoding =
            voting_power ) ->
       {
         full_balance;
+        current_frozen_deposits;
         frozen_deposits;
         staking_balance;
         frozen_deposits_limit;
@@ -104,8 +109,9 @@ let info_encoding =
         grace_period;
         voting_power;
       })
-    (obj9
+    (obj10
        (req "full_balance" Tez.encoding)
+       (req "current_frozen_deposits" Tez.encoding)
        (req "frozen_deposits" Tez.encoding)
        (req "staking_balance" Tez.encoding)
        (opt "frozen_deposits_limit" Tez.encoding)
@@ -122,37 +128,37 @@ let participation_info_encoding =
            Delegate.expected_cycle_activity;
            minimal_cycle_activity;
            missed_slots;
+           missed_levels;
            remaining_allowed_missed_slots;
            expected_endorsing_rewards;
-           current_pending_rewards;
          } ->
       ( expected_cycle_activity,
         minimal_cycle_activity,
         missed_slots,
+        missed_levels,
         remaining_allowed_missed_slots,
-        expected_endorsing_rewards,
-        current_pending_rewards ))
+        expected_endorsing_rewards ))
     (fun ( expected_cycle_activity,
            minimal_cycle_activity,
            missed_slots,
+           missed_levels,
            remaining_allowed_missed_slots,
-           expected_endorsing_rewards,
-           current_pending_rewards ) ->
+           expected_endorsing_rewards ) ->
       {
         expected_cycle_activity;
         minimal_cycle_activity;
         missed_slots;
+        missed_levels;
         remaining_allowed_missed_slots;
         expected_endorsing_rewards;
-        current_pending_rewards;
       })
     (obj6
        (req "expected_cycle_activity" int31)
        (req "minimal_cycle_activity" int31)
-       (req "missed_slots" bool)
+       (req "missed_slots" int31)
+       (req "missed_levels" int31)
        (req "remaining_allowed_missed_slots" int31)
-       (req "expected_endorsing_rewards" Tez.encoding)
-       (req "current_pending_rewards" Tez.encoding))
+       (req "expected_endorsing_rewards" Tez.encoding))
 
 module S = struct
   let raw_path = RPC_path.(open_root / "context" / "delegates")
@@ -188,16 +194,26 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the full balance (in mutez) of a given delegate, including \
-         the frozen balances."
+         the frozen deposits. It does not include its delegated balance."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "full_balance")
 
+  let current_frozen_deposits =
+    RPC_service.get_service
+      ~description:
+        "Returns the current amount of the frozen deposits (in mutez)."
+      ~query:RPC_query.empty
+      ~output:Tez.encoding
+      RPC_path.(path / "current_frozen_deposits")
+
   let frozen_deposits =
     RPC_service.get_service
       ~description:
-        "Returns the amount of frozen deposits (in mutez) for a specific level \
-         or the total sum when no specific level is provided."
+        "Returns the initial amount (that is, at the beginning of a cycle) of \
+         the frozen deposits (in mutez). This amount is the same as the \
+         current amount of the frozen deposits, unless the delegate has been \
+         punished."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "frozen_deposits")
@@ -208,8 +224,7 @@ module S = struct
         "Returns the total amount of tokens (in mutez) delegated to a given \
          delegate. This includes the balances of all the contracts that \
          delegate to it, but also the balance of the delegate itself and its \
-         frozen fees and deposits. The rewards do not count in the delegated \
-         balance until they are unfrozen."
+         frozen deposits."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "staking_balance")
@@ -218,7 +233,7 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns the frozen deposits limit for the given delegate or none if \
-         unbounded."
+         no limit is set."
       ~query:RPC_query.empty
       ~output:(Data_encoding.option Tez.encoding)
       RPC_path.(path / "frozen_deposits_limit")
@@ -234,9 +249,9 @@ module S = struct
   let delegated_balance =
     RPC_service.get_service
       ~description:
-        "Returns the balances (in mutez) of all the contracts that delegate to \
-         a given delegate. This excludes the delegate's own balance and its \
-         frozen balances."
+        "Returns the sum (in mutez) of all balances of all the contracts that \
+         delegate to a given delegate. This excludes the delegate's own \
+         balance and its frozen deposits."
       ~query:RPC_query.empty
       ~output:Tez.encoding
       RPC_path.(path / "delegated_balance")
@@ -254,9 +269,9 @@ module S = struct
       ~description:
         "Returns the cycle by the end of which the delegate might be \
          deactivated if she fails to execute any delegate action. A \
-         deactivated delegate might be reactivated (without loosing any rolls) \
+         deactivated delegate might be reactivated (without loosing any stake) \
          by simply re-registering as a delegate. For deactivated delegates, \
-         this value contains the cycle by which they were deactivated."
+         this value contains the cycle at which they were deactivated."
       ~query:RPC_query.empty
       ~output:Cycle.encoding
       RPC_path.(path / "grace_period")
@@ -273,9 +288,21 @@ module S = struct
     RPC_service.get_service
       ~description:
         "Returns cycle and level participation information. In particular this \
-         indicates the total number of slots that are required for a delegate \
-         to endorse in the current cycle in order to be awarded its endorsing \
-         rewards."
+         indicates, in the field 'expected_cycle_activity', the number of \
+         slots the delegate is expected to have in the cycle based on its \
+         active stake. The field 'minimal_cycle_activity' indicates the \
+         minimal endorsing slots in the cycle required to get endorsing \
+         rewards. It is computed based on 'expected_cycle_activity. The fields \
+         'missed_slots' and 'missed_levels' indicate the number of missed \
+         endorsing slots and missed levels (for endorsing) in the cycle so \
+         far. 'missed_slots' indicates the number of missed endorsing slots in \
+         the cycle so far. The field 'remaining_allowed_missed_slots' \
+         indicates the remaining amount of endorsing slots that can be missed \
+         in the cycle before forfeiting the rewards. Finally, \
+         'expected_endorsing_rewards' indicates the endorsing rewards that \
+         will be distributed at the end of the cycle if activity at that point \
+         will be greater than the minimal required; if the activity is already \
+         known to be below the required minimum, then the rewards are zero."
       ~query:RPC_query.empty
       ~output:participation_info_encoding
       RPC_path.(path / "participation")
@@ -306,7 +333,8 @@ let register () =
       Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
       {
         full_balance;
-        frozen_deposits;
+        current_frozen_deposits = frozen_deposits.current_amount;
+        frozen_deposits = frozen_deposits.initial_amount;
         staking_balance;
         frozen_deposits_limit;
         delegated_contracts;
@@ -318,9 +346,14 @@ let register () =
   register1 ~chunked:false S.full_balance (fun ctxt pkh () () ->
       trace (Balance_rpc_non_delegate pkh) (Delegate.check_delegate ctxt pkh)
       >>=? fun () -> Delegate.full_balance ctxt pkh) ;
+  register1 ~chunked:false S.current_frozen_deposits (fun ctxt pkh () () ->
+      Delegate.check_delegate ctxt pkh >>=? fun () ->
+      Delegate.frozen_deposits ctxt pkh >>=? fun deposits ->
+      return deposits.current_amount) ;
   register1 ~chunked:false S.frozen_deposits (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.frozen_deposits ctxt pkh) ;
+      Delegate.frozen_deposits ctxt pkh >>=? fun deposits ->
+      return deposits.initial_amount) ;
   register1 ~chunked:false S.staking_balance (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.staking_balance ctxt pkh) ;
@@ -353,6 +386,9 @@ let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
 
 let full_balance ctxt block pkh =
   RPC_context.make_call1 S.full_balance ctxt block pkh () ()
+
+let current_frozen_deposits ctxt block pkh =
+  RPC_context.make_call1 S.current_frozen_deposits ctxt block pkh () ()
 
 let frozen_deposits ctxt block pkh =
   RPC_context.make_call1 S.frozen_deposits ctxt block pkh () ()

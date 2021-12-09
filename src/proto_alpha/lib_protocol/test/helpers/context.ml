@@ -288,6 +288,7 @@ end
 module Delegate = struct
   type info = Delegate_services.info = {
     full_balance : Tez.t;
+    current_frozen_deposits : Tez.t;
     frozen_deposits : Tez.t;
     staking_balance : Tez.t;
     frozen_deposits_limit : Tez.t option;
@@ -302,7 +303,10 @@ module Delegate = struct
 
   let full_balance ctxt pkh = Delegate_services.full_balance rpc_ctxt ctxt pkh
 
-  let frozen_deposits ctxt pkh =
+  let current_frozen_deposits ctxt pkh =
+    Delegate_services.current_frozen_deposits rpc_ctxt ctxt pkh
+
+  let initial_frozen_deposits ctxt pkh =
     Delegate_services.frozen_deposits rpc_ctxt ctxt pkh
 
   let staking_balance ctxt pkh =
@@ -312,6 +316,8 @@ module Delegate = struct
     Delegate_services.frozen_deposits_limit rpc_ctxt ctxt pkh
 
   let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
+
+  let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end
 
 let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold

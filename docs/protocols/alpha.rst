@@ -49,17 +49,21 @@ Tenderbake
 
 - Tenderbake is a new consensus algorithm replacing Emmy* in order to provide deterministic finality. (MR :gl:`!3738`)
 
-- The list of breaking changes related to Tenderbake are described in a separate :doc:`change log<tenderbake>`
+- The list of breaking changes related to Tenderbake are described in a separate :doc:`change log<tenderbake>`.
 
-- Export participation RPC. (MR :gl:`!3822`)
+- Further, related changes after the main MR has been merged:
+  
+  - Export participation RPC. (MR :gl:`!3822`)
 
-- Rename Bonds to Deposits. (MR :gl:`!3832`)
+  - Rename Bonds to Deposits. (MR :gl:`!3832`)
 
-- Fix issues related to token management in Tenderbake. (MR :gl:`!3811`)
+  - Fix issues related to token management in Tenderbake. (MR :gl:`!3811`)
 
-- Inherit block times. (MR :gl:`!3850`)
+  - Inherit block times. (MR :gl:`!3850`)
 
-- Address comments on Tenderbake. (MR :gl:`!3906`)
+  - Address comments on Tenderbake. (MR :gl:`!3906`)
+
+  - Small updates to the ``../delegates/<pkh>/..`` RPCs. (MR :gl:`!3977`)
 
 - Fix issues with receipts (MR :gl:`!3987`)
 

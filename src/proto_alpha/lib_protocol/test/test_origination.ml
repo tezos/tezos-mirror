@@ -76,7 +76,8 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Block.bake ~operation ~policy:(By_account pkh_for_bake) b >>=? fun b ->
   (* check that after the block has been baked the contract for originating
      was debited all the fees *)
-  Context.Delegate.frozen_deposits (B b) pkh_for_orig >>=? fun deposits ->
+  Context.Delegate.current_frozen_deposits (B b) pkh_for_orig
+  >>=? fun deposits ->
   total_fee +? deposits >>?= fun total_fee_plus_deposits ->
   Assert.balance_was_debited
     ~loc:__LOC__
@@ -107,7 +108,7 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Block.bake ~operation ~policy:(By_account pkh_for_bake) b >>=? fun b ->
   (* fee + credit were debited from source *)
   total_fees_for_origination ~fee ~credit b >>=? fun total_fee ->
-  Context.Delegate.frozen_deposits (B b) source_pkh >>=? fun deposits ->
+  Context.Delegate.current_frozen_deposits (B b) source_pkh >>=? fun deposits ->
   total_fee +? deposits >>?= fun total_fee_plus_deposits ->
   Assert.balance_was_debited
     ~loc:__LOC__

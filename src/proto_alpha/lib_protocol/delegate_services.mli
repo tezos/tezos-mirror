@@ -37,6 +37,7 @@ val list :
 
 type info = {
   full_balance : Tez.t;  (** Balance + Frozen balance *)
+  current_frozen_deposits : Tez.t;
   frozen_deposits : Tez.t;
   staking_balance : Tez.t;
   frozen_deposits_limit : Tez.t option;
@@ -56,6 +57,12 @@ val info :
   info shell_tzresult Lwt.t
 
 val full_balance :
+  'a #RPC_context.simple ->
+  'a ->
+  Signature.Public_key_hash.t ->
+  Tez.t shell_tzresult Lwt.t
+
+val current_frozen_deposits :
   'a #RPC_context.simple ->
   'a ->
   Signature.Public_key_hash.t ->

@@ -307,6 +307,11 @@ module Receipt = Receipt_repr
 module Delegate = struct
   include Delegate_storage
 
+  type deposits = Storage.deposits = {
+    initial_amount : Tez.t;
+    current_amount : Tez.t;
+  }
+
   let grace_period = Delegate_activation_storage.grace_period
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution

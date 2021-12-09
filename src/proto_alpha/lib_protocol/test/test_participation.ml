@@ -58,11 +58,9 @@ let bake_and_endorse_once (b_pred, b_cur) baker endorser =
   - a delegate that does not participating enough during a cycle, doesn't get rewarded.
 
   The case distinction is made by the boolean argument [sufficient_participation].
-  To perform these checks we let
-    [sufficient_endorsed_levels = minimal_participation_ratio * blocks_per_cycle].
   If [sufficient_participation] is true,
-  then a validator endorses for [sufficient_endorsed_levels] levels,
-  otherwise it endorses for [sufficient_endorsed_level - 1] levels.
+  then a validator endorses for as long as the minimal required activity is not reached,
+  otherwise it does not endorse.
   Finally, we check the validator's balance at the end of the cycle.
 *)
 let test_participation ~sufficient_participation () =
@@ -84,9 +82,10 @@ let test_participation ~sufficient_participation () =
   Context.Contract.pkh account1 >>=? fun del1 ->
   Context.Contract.pkh account2 >>=? fun del2 ->
   Block.bake ~policy:(By_account del1) b0 >>=? fun b1 ->
-  (* To separate concerns, only del1 bakes: this way, we don't need to consider
-     baking rewards for del2. Delegate del2 endorses for [target_endorsements]
-     times; for the rest, it is del1 that endorses. *)
+  (* To separate concerns, only [del1] bakes: this way, we don't need to
+     consider baking rewards for [del2]. Delegate [del2] endorses only
+     if the target [minimal_nb_active_slots] is not reached; for the
+     rest, it is [del1] that endorses. *)
   List.fold_left_es
     (fun (b_pred, b_crt, endorsing_power) level ->
       let int_level = Int32.of_int level in
@@ -119,6 +118,82 @@ let test_participation ~sufficient_participation () =
   let expected_bal2_at_b = Int64.add bal2_at_pred_b endorsing_rewards in
   Assert.equal_int64 ~loc:__LOC__ bal2_at_b expected_bal2_at_b
 
+(* We bake and endorse with 1 out of 2 accounts; we monitor the result
+   returned by the '../delegates/<pkh>/participation' RPC for the
+   non-participating account. *)
+let test_participation_rpc () =
+  let n_accounts = 2 in
+  Context.init ~consensus_threshold:1 n_accounts >>=? fun (b0, accounts) ->
+  let (account1, account2) =
+    match accounts with a1 :: a2 :: _ -> (a1, a2) | _ -> assert false
+  in
+  Context.Contract.pkh account1 >>=? fun del1 ->
+  Context.Contract.pkh account2 >>=? fun del2 ->
+  Context.get_constants (B b0) >>=? fun csts ->
+  let blocks_per_cycle = Int32.to_int csts.parametric.blocks_per_cycle in
+  let Constants.{numerator; denominator} =
+    csts.parametric.minimal_participation_ratio
+  in
+  let expected_cycle_activity =
+    blocks_per_cycle * csts.parametric.consensus_committee_size / n_accounts
+  in
+  let minimal_cycle_activity =
+    expected_cycle_activity * numerator / denominator
+  in
+  let allowed_missed_slots = expected_cycle_activity - minimal_cycle_activity in
+  let expected_endorsing_rewards =
+    Tez.mul_exn
+      csts.parametric.endorsing_reward_per_slot
+      expected_cycle_activity
+  in
+  Block.bake ~policy:(By_account del1) b0 >>=? fun b1 ->
+  List.fold_left_es
+    (fun (b_pred, b_crt, total_endorsing_power) level_int ->
+      Context.Delegate.participation (B b_crt) del2 >>=? fun info ->
+      Assert.equal_int
+        ~loc:__LOC__
+        info.expected_cycle_activity
+        expected_cycle_activity
+      >>=? fun () ->
+      Assert.equal_int
+        ~loc:__LOC__
+        info.minimal_cycle_activity
+        minimal_cycle_activity
+      >>=? fun () ->
+      Assert.equal_int ~loc:__LOC__ info.missed_levels (level_int - 1)
+      >>=? fun () ->
+      let missed_slots = total_endorsing_power in
+      Assert.equal_int ~loc:__LOC__ info.missed_slots missed_slots
+      >>=? fun () ->
+      let remaining_allowed_missed_slots =
+        allowed_missed_slots - missed_slots
+      in
+      Assert.equal_int
+        ~loc:__LOC__
+        info.remaining_allowed_missed_slots
+        (max 0 remaining_allowed_missed_slots)
+      >>=? fun () ->
+      let endorsing_rewards =
+        if remaining_allowed_missed_slots >= 0 then expected_endorsing_rewards
+        else Tez.zero
+      in
+      Assert.equal_tez
+        ~loc:__LOC__
+        info.expected_endorsing_rewards
+        endorsing_rewards
+      >>=? fun () ->
+      bake_and_endorse_once (b_pred, b_crt) del1 del1 >>=? fun b ->
+      (* [level_int] is the level of [b_crt] *)
+      level_int |> Int32.of_int |> Raw_level.of_int32
+      |> Environment.wrap_tzresult
+      >>?= fun level ->
+      Context.get_endorsing_power_for_delegate (B b_crt) ~levels:[level] del2
+      >>=? fun endorsing_power ->
+      return (b_crt, b, total_endorsing_power + endorsing_power))
+    (b0, b1, 0)
+    (1 -- (blocks_per_cycle - 2))
+  >>=? fun (_, _, _) -> return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -129,4 +204,5 @@ let tests =
       "test minimal participation"
       `Quick
       (test_participation ~sufficient_participation:true);
+    Tztest.tztest "test participation RPC" `Quick test_participation_rpc;
   ]

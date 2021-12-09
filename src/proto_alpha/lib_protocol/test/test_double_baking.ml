@@ -100,15 +100,19 @@ let test_valid_double_baking_evidence () =
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~policy:(By_account baker2) ~operation blk_a >>=? fun blk_final ->
   (* Check that the frozen deposits are slashed *)
-  Context.Delegate.frozen_deposits (B blk_a) baker1
+  Context.Delegate.current_frozen_deposits (B blk_a) baker1
   >>=? fun frozen_deposits_before ->
-  Context.Delegate.frozen_deposits (B blk_final) baker1
+  Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
   let slashed_amount =
     Test_tez.(frozen_deposits_before -! frozen_deposits_after)
   in
   Assert.equal_tez ~loc:__LOC__ slashed_amount double_baking_punishment
-  >>=? fun () -> return_unit
+  >>=? fun () ->
+  (* Check that the initial frozen deposits has not changed *)
+  Context.Delegate.initial_frozen_deposits (B blk_final) baker1
+  >>=? fun initial_frozen_deposits ->
+  Assert.equal_tez ~loc:__LOC__ initial_frozen_deposits frozen_deposits_before
 
 (** Test that the payload producer of the block containing a double
    baking evidence (and not the block producer, if different) receives
@@ -151,9 +155,9 @@ let test_payload_producer_gets_evidence_rewards () =
     b1
   >>=? fun b' ->
   (* the frozen deposits of the double-signer [baker1] are slashed *)
-  Context.Delegate.frozen_deposits (B b1) baker1
+  Context.Delegate.current_frozen_deposits (B b1) baker1
   >>=? fun frozen_deposits_before ->
-  Context.Delegate.frozen_deposits (B b') baker1
+  Context.Delegate.current_frozen_deposits (B b') baker1
   >>=? fun frozen_deposits_after ->
   let slashed_amount =
     Test_tez.(frozen_deposits_before -! frozen_deposits_after)

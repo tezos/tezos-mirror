@@ -1833,7 +1833,7 @@ let validate_consensus_contents (type kind) ctxt chain_id
   | Some (delegate_pk, delegate_pkh, voting_power) ->
       Delegate.frozen_deposits ctxt delegate_pkh >>=? fun frozen_deposits ->
       fail_unless
-        Tez.(frozen_deposits > zero)
+        Tez.(frozen_deposits.current_amount > zero)
         (Zero_frozen_deposits delegate_pkh)
       >>=? fun () ->
       Operation.check_signature delegate_pk chain_id operation >>?= fun () ->
@@ -2381,7 +2381,9 @@ let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
   Stake_distribution.baking_rights_owner ctxt current_level ~round
   >>=? fun (ctxt, _slot, (_block_producer_pk, block_producer)) ->
   Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
-  fail_unless Tez.(frozen_deposits > zero) (Zero_frozen_deposits block_producer)
+  fail_unless
+    Tez.(frozen_deposits.current_amount > zero)
+    (Zero_frozen_deposits block_producer)
   >>=? fun () ->
   Stake_distribution.baking_rights_owner
     ctxt
@@ -2439,7 +2441,9 @@ let begin_application ctxt chain_id (block_header : Block_header.t) fitness
     ~expected_commitment:current_level.expected_commitment
   >>?= fun () ->
   Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
-  fail_unless Tez.(frozen_deposits > zero) (Zero_frozen_deposits block_producer)
+  fail_unless
+    Tez.(frozen_deposits.current_amount > zero)
+    (Zero_frozen_deposits block_producer)
   >>=? fun () ->
   Stake_distribution.baking_rights_owner
     ctxt
@@ -2603,13 +2607,13 @@ let finalize_application ctxt (mode : finalize_application_mode) protocol_data
   | Some nonce_hash ->
       Nonce.record_hash ctxt {nonce_hash; delegate = block_producer})
   >>=? fun ctxt ->
-  record_endorsing_participation ctxt >>=? fun ctxt ->
-  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
   (if required_endorsements then
+   record_endorsing_participation ctxt >>=? fun ctxt ->
    Baking.bonus_baking_reward ctxt ~endorsing_power:block_endorsing_power
-   >>? Result.return_some
-  else Result.return_none)
-  >>?= fun reward_bonus ->
+   >>?= fun rewards_bonus -> return (ctxt, Some rewards_bonus)
+  else return (ctxt, None))
+  >>=? fun (ctxt, reward_bonus) ->
+  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
   Delegate.record_baking_activity_and_pay_rewards_and_fees
     ctxt
     ~payload_producer

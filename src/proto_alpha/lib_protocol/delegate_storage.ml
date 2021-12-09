@@ -304,11 +304,10 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake ~active_stake
           (Z.of_int64 (Tez_repr.to_mutez total_active_stake))))
 
 let delegate_participated_enough ctxt delegate =
-  Storage.Contract.Remaining_allowed_missed_slots.find ctxt delegate
-  >>=? function
+  Storage.Contract.Missed_endorsements.find ctxt delegate >>=? function
   | None -> return_true
-  | Some remaining_allowed_missed_levels ->
-      return Compare.Int.(remaining_allowed_missed_levels > 0)
+  | Some missed_endorsements ->
+      return Compare.Int.(missed_endorsements.remaining_slots >= 0)
 
 let delegate_has_revealed_nonces delegate unrevelead_nonces_set =
   not (Signature.Public_key_hash.Set.mem delegate unrevelead_nonces_set)
@@ -361,9 +360,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
         >|=? fun (ctxt, payed_rewards_receipts) ->
         (ctxt, payed_rewards_receipts @ balance_updates))
       >>=? fun (ctxt, balance_updates) ->
-      Storage.Contract.Remaining_allowed_missed_slots.remove
-        ctxt
-        delegate_contract
+      Storage.Contract.Missed_endorsements.remove ctxt delegate_contract
       >>= fun ctxt -> return (ctxt, balance_updates))
     (ctxt, [])
     delegates
@@ -535,12 +532,11 @@ let balance ctxt delegate =
 
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.implicit_contract delegate)
-  >>=? fun deposits -> return deposits.current_amount
 
 let full_balance ctxt delegate =
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
   balance ctxt delegate >>=? fun balance ->
-  Lwt.return Tez_repr.(frozen_deposits +? balance)
+  Lwt.return Tez_repr.(frozen_deposits.current_amount +? balance)
 
 let deactivated = Delegate_activation_storage.is_inactive
 
@@ -548,7 +544,8 @@ let delegated_balance ctxt delegate =
   staking_balance ctxt delegate >>=? fun staking_balance ->
   balance ctxt delegate >>=? fun balance ->
   frozen_deposits ctxt delegate >>=? fun frozen_deposits ->
-  Tez_repr.(balance +? frozen_deposits) >>?= fun self_staking_balance ->
+  Tez_repr.(balance +? frozen_deposits.current_amount)
+  >>?= fun self_staking_balance ->
   Lwt.return Tez_repr.(staking_balance -? self_staking_balance)
 
 let fold = Storage.Delegates.fold
@@ -761,15 +758,13 @@ let record_endorsing_participation ctxt ~delegate ~participation
   | Participated -> set_active ctxt delegate
   | Didn't_participate -> (
       let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Remaining_allowed_missed_slots.find ctxt contract
-      >>=? function
-      | Some 0 -> return ctxt
-      | Some n ->
-          let remaining = Compare.Int.max 0 (n - endorsing_power) in
-          Storage.Contract.Remaining_allowed_missed_slots.update
+      Storage.Contract.Missed_endorsements.find ctxt contract >>=? function
+      | Some {remaining_slots; missed_levels} ->
+          let remaining_slots = remaining_slots - endorsing_power in
+          Storage.Contract.Missed_endorsements.update
             ctxt
             contract
-            remaining
+            {remaining_slots; missed_levels = missed_levels + 1}
       | None -> (
           let level = Level_storage.current ctxt in
           Raw_context.stake_distribution_for_current_cycle ctxt
@@ -798,13 +793,11 @@ let record_endorsing_participation ctxt ~delegate ~participation
               in
               let minimal_activity = expected_slots * numerator / denominator in
               let maximal_inactivity = expected_slots - minimal_activity in
-              let remaining =
-                Compare.Int.max 0 (maximal_inactivity - endorsing_power)
-              in
-              Storage.Contract.Remaining_allowed_missed_slots.init
+              let remaining_slots = maximal_inactivity - endorsing_power in
+              Storage.Contract.Missed_endorsements.init
                 ctxt
                 contract
-                remaining))
+                {remaining_slots; missed_levels = 1}))
 
 let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
     ~block_producer ~baking_reward ~reward_bonus =
@@ -837,30 +830,11 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
 type participation_info = {
   expected_cycle_activity : int;
   minimal_cycle_activity : int;
-  missed_slots : bool;
+  missed_slots : int;
+  missed_levels : int;
   remaining_allowed_missed_slots : int;
   expected_endorsing_rewards : Tez_repr.t;
-  current_pending_rewards : Tez_repr.t;
 }
-
-let estimated_activity_for_given_active_stake ctxt ~level ~total_active_stake
-    ~active_stake =
-  let consensus_committee_size =
-    Constants_storage.consensus_committee_size ctxt
-  in
-  let blocks_per_cycle =
-    Int32.to_int (Constants_storage.blocks_per_cycle ctxt)
-  in
-  let estimated_number_of_endorsements =
-    (Int32.to_int level.Level_repr.cycle_position + 1)
-    mod blocks_per_cycle * consensus_committee_size
-  in
-  Z.to_int
-    (Z.div
-       (Z.mul
-          (Z.of_int64 (Tez_repr.to_mutez active_stake))
-          (Z.of_int estimated_number_of_endorsements))
-       (Z.of_int64 (Tez_repr.to_mutez total_active_stake)))
 
 (* Inefficient, only for RPC *)
 let delegate_participation_info ctxt delegate =
@@ -879,10 +853,10 @@ let delegate_participation_info ctxt delegate =
         {
           expected_cycle_activity = 0;
           minimal_cycle_activity = 0;
-          missed_slots = false;
+          missed_slots = 0;
+          missed_levels = 0;
           remaining_allowed_missed_slots = 0;
           expected_endorsing_rewards = Tez_repr.zero;
-          current_pending_rewards = Tez_repr.zero;
         }
   | Some active_stake ->
       Stake_storage.get_total_active_stake ctxt level.cycle
@@ -908,33 +882,27 @@ let delegate_participation_info ctxt delegate =
         Tez_repr.mul_exn endorsing_reward_per_slot expected_cycle_activity
       in
       let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Remaining_allowed_missed_slots.find ctxt contract
-      >>=? fun remaining ->
-      let (missed_slots, remaining_allowed_missed_slots) =
-        match remaining with
-        | None -> (false, maximal_cycle_inactivity)
-        | Some remaining -> (true, remaining)
+      Storage.Contract.Missed_endorsements.find ctxt contract
+      >>=? fun missed_endorsements ->
+      let (missed_slots, missed_levels, remaining_allowed_missed_slots) =
+        match missed_endorsements with
+        | None -> (0, 0, maximal_cycle_inactivity)
+        | Some {remaining_slots; missed_levels} ->
+            ( maximal_cycle_inactivity - remaining_slots,
+              missed_levels,
+              Compare.Int.max 0 remaining_slots )
       in
-      let optimal_cycle_activity =
-        estimated_activity_for_given_active_stake
-          ctxt
-          ~total_active_stake
-          ~active_stake
-          ~level
-      in
-      let (current_pending_rewards, expected_endorsing_rewards) =
-        match remaining with
-        | Some r when Compare.Int.(r <= 0) -> (Tez_repr.zero, Tez_repr.zero)
-        | _ ->
-            ( Tez_repr.mul_exn endorsing_reward_per_slot optimal_cycle_activity,
-              expected_endorsing_rewards )
+      let expected_endorsing_rewards =
+        match missed_endorsements with
+        | Some r when Compare.Int.(r.remaining_slots < 0) -> Tez_repr.zero
+        | _ -> expected_endorsing_rewards
       in
       return
         {
           expected_cycle_activity;
           minimal_cycle_activity;
           missed_slots;
+          missed_levels;
           remaining_allowed_missed_slots;
           expected_endorsing_rewards;
-          current_pending_rewards;
         }
