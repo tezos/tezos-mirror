@@ -377,25 +377,41 @@ let fill_in ?(show_optionals = true) schema =
   | Any | Object {properties = []; _} -> Lwt.return_ok (`O [])
   | _ -> editor_fill_in ~show_optionals schema
 
-let display_answer (cctxt : #Client_context.full) = function
-  | `Ok json -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
-  | `Not_found _ -> cctxt#error "No service found at this URL\n%!"
-  | `Gone _ ->
-      cctxt#error
-        "Requested data concerns a pruned block and target resource is no \
-         longer available\n\
-         %!"
-  | `Unauthorized None ->
-      cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
-  | `Error (Some json) ->
+let display_answer (cctxt : #Client_context.full) :
+    RPC_context.generic_call_result -> unit Lwt.t = function
+  | `Json (`Ok json) -> cctxt#answer "%a" Json_repr.(pp (module Ezjsonm)) json
+  | `Binary (`Ok binary) -> cctxt#answer "%a" Hex.pp (Hex.of_string binary)
+  | `Json (`Error (Some error)) ->
       cctxt#error
         "@[<v 2>Command failed: @[%a@]@]@."
         (Format.pp_print_list Error_monad.pp)
         (Data_encoding.Json.destruct
            (Data_encoding.list Error_monad.error_encoding)
-           json)
-  | `Error None | `Unauthorized _ | `Forbidden _ | `Conflict _ ->
-      cctxt#error "Unexpected server answer\n%!"
+           error)
+  | `Binary (`Error (Some error)) -> (
+      match Data_encoding.Binary.of_string Error_monad.trace_encoding error with
+      | Ok trace ->
+          cctxt#error
+            "@[<v 2>Command failed: @[%a@]@]@."
+            Error_monad.pp_print_trace
+            trace
+      | Error msg ->
+          cctxt#error
+            "@[<v 2>Error whilst decoding the server response: @[%a@]@]@."
+            Data_encoding.Binary.pp_read_error
+            msg)
+  | `Json (`Not_found _) | `Binary (`Not_found _) | `Other (_, `Not_found _) ->
+      cctxt#error "No service found at this URL\n%!"
+  | `Json (`Gone _) | `Binary (`Gone _) | `Other (_, `Gone _) ->
+      cctxt#error
+        "Requested data concerns a pruned block and target resource is no \
+         longer available\n\
+         %!"
+  | `Json (`Unauthorized _)
+  | `Binary (`Unauthorized _)
+  | `Other (_, `Unauthorized _) ->
+      cctxt#error "@[<v 2>[HTTP 403] Access denied to: %a@]@." Uri.pp cctxt#base
+  | _ -> cctxt#error "Unexpected server answer\n%!"
 
 let call ?body meth raw_url (cctxt : #Client_context.full) =
   let uri = Uri.of_string raw_url in
@@ -411,7 +427,7 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
               cctxt#warning
                 "This URL did not expect a JSON input but one was provided\n%!")
           >>= fun () ->
-          cctxt#generic_json_call meth ?body uri >>=? fun answer ->
+          cctxt#generic_media_type_call meth ?body uri >>=? fun answer ->
           display_answer cctxt answer >|= ok
       | Some {input = Some input; _} -> (
           (match body with
@@ -420,7 +436,7 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
           >>= function
           | Error msg -> cctxt#error "%s" msg
           | Ok body ->
-              cctxt#generic_json_call meth ~body uri >>=? fun answer ->
+              cctxt#generic_media_type_call meth ~body uri >>=? fun answer ->
               display_answer cctxt answer >|= ok))
   | _ -> cctxt#error "No service found at this URL\n%!"
 
