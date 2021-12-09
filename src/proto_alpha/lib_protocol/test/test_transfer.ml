@@ -634,7 +634,7 @@ let test_bad_entrypoint () =
   let parameter = "Unit" in
   let entrypoint = "bad entrypoint" in
   (* bad entrypoint *)
-  Test_typechecking.run_script
+  Contract_helpers.run_script
     ctxt
     "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
     ~entrypoint
@@ -660,7 +660,7 @@ let test_bad_parameter () =
   let storage = "Unit" in
   let parameter = "1" in
   (* bad parameter *)
-  Test_typechecking.run_script
+  Contract_helpers.run_script
     ctxt
     "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
     ~storage
