@@ -1,0 +1,62 @@
+(env (static (flags (:standard -ccopt -static))))
+
+(executable
+ (name main_native)
+ (public_name tezos-protocol-compiler)
+ (package tezos-protocol-compiler)
+ (instrumentation (backend bisect_ppx))
+ (modes native)
+ (libraries
+  tezos-protocol-compiler.native)
+ (flags (:standard -linkall))
+ (modules Main_native))
+
+(executable
+ (name main_packer)
+ (public_name tezos-protocol-compiler.tezos-protocol-packer)
+ (package tezos-protocol-compiler)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-compiler
+  tezos-stdlib-unix)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_protocol_compiler))
+ (modules Main_packer))
+
+(executable
+ (name main_embedded_packer)
+ (public_name tezos-embedded-protocol-packer)
+ (package tezos-protocol-compiler)
+ (instrumentation (backend bisect_ppx))
+ (modes native)
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_base_unix
+   -open Tezos_stdlib_unix))
+ (modules Main_embedded_packer))
+
+(executable
+ (name replace)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  re.str)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix))
+ (modules Replace))
+
+(install
+ (section libexec)
+ (files (replace.exe as replace)
+))

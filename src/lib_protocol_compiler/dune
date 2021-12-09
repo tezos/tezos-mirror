@@ -1,8 +1,3 @@
-; build static executable with --profile static
-; notice that the libraries are compiled with
-; "\ -ccopt -static" is a temporary solution
-(env
- (static (flags (:standard -ccopt -static))))
 
 (library
  (name tezos_protocol_registerer)
@@ -11,7 +6,7 @@
  (libraries
   tezos-base
   tezos-protocol-environment-sigs)
- (flags (:standard -opaque -open Tezos_base__TzPervasives  \ -ccopt -static ))
+ (flags (:standard -opaque -open Tezos_base__TzPervasives ))
  (modules Registerer))
 
 (rule
@@ -46,8 +41,7 @@
   (:standard
    -open Tezos_base__TzPervasives
    -open Tezos_base_unix
-   -open Tezos_stdlib_unix
-    \ -ccopt -static ))
+   -open Tezos_stdlib_unix))
  (modules Embedded_cmis Packer Compiler))
 
 (library
@@ -61,70 +55,12 @@
  (flags
   (:standard
    -open Tezos_base__TzPervasives
-   -open Tezos_protocol_compiler
-   \ -ccopt -static ))
- (modules Native))
-
-(executable
- (name main_native)
- (public_name tezos-protocol-compiler)
- (package tezos-protocol-compiler)
- (instrumentation (backend bisect_ppx))
- (modes native)
- (libraries
-  tezos-protocol-compiler.native)
- (flags (:standard -linkall))
- (modules Main_native))
-
-(executable
- (name main_packer)
- (public_name tezos-protocol-compiler.tezos-protocol-packer)
- (package tezos-protocol-compiler)
- (instrumentation (backend bisect_ppx))
- (libraries
-  tezos-base
-  tezos-protocol-compiler
-  tezos-stdlib-unix)
- (flags
-  (:standard
-   -open Tezos_base__TzPervasives
-   -open Tezos_stdlib_unix
    -open Tezos_protocol_compiler))
- (modules Main_packer))
-
-(executable
- (name main_embedded_packer)
- (public_name tezos-embedded-protocol-packer)
- (package tezos-protocol-compiler)
- (instrumentation (backend bisect_ppx))
- (modes native)
- (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix)
- (flags
-  (:standard
-   -linkall
-   -open Tezos_base__TzPervasives
-   -open Tezos_base_unix
-   -open Tezos_stdlib_unix))
- (modules Main_embedded_packer))
-
-(executable
- (name replace)
- (instrumentation (backend bisect_ppx))
- (libraries
-  tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
-  re.str)
- (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix))
- (modules Replace))
+ (modules Native))
 
 (install
  (section libexec)
  (files
-  (replace.exe as replace)
   dune_protocol.v0
   dune_protocol.v1
   dune_protocol.template.v0

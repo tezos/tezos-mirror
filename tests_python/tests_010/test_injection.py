@@ -18,7 +18,7 @@ def clients(sandbox):
 
 PROTO = f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
 COMPILER = (
-    f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
+    f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/bin/'
     'main_native.exe'
 )
 PARAMS = ['-p', PROTO_GENESIS]
