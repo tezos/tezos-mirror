@@ -174,7 +174,19 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         Contract.pp
         source
         pp_result
+        result
+  | Sc_rollup_originate {kind; boot_sector} ->
+      let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
+      Format.fprintf
+        ppf
+        "@[<v 2>Originate smart contract rollup of kind %s with boot sector \
+         '%a'%a@]"
+        R.name
+        R.pp_boot_sector
+        boot_sector
+        pp_result
         result) ;
+
   Format.fprintf ppf "@]"
 
 let pp_balance_updates ppf = function
@@ -277,6 +289,16 @@ let pp_balance_updates ppf = function
         ppf
         "@[<v 0>%a@]"
         (Format.pp_print_list pp_one)
+        balance_updates
+
+let pp_balance_updates_opt ppf balance_updates =
+  match balance_updates with
+  | [] -> ()
+  | balance_updates ->
+      Format.fprintf
+        ppf
+        "@,Balance updates:@,  %a"
+        pp_balance_updates
         balance_updates
 
 let pp_manager_operation_contents_and_result ppf
@@ -415,6 +437,14 @@ let pp_manager_operation_contents_and_result ppf
       Tx_rollup.pp
       originated_tx_rollup
   in
+  let pp_sc_rollup_originate_result
+      (Sc_rollup_originate_result
+        {address; consumed_gas; size; balance_updates}) =
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size) ;
+    Format.fprintf ppf "@,Address: %a" Sc_rollup.Address.pp address ;
+    pp_balance_updates_opt ppf balance_updates
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -484,6 +514,17 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This rollup operation was BACKTRACKED, its expected effects \
            (as follow) were NOT applied.@]" ;
         pp_tx_rollup_result op
+    | Applied (Sc_rollup_originate_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This smart contract rollup origination was successfully applied" ;
+        pp_sc_rollup_originate_result op
+    | Backtracked ((Sc_rollup_originate_result _ as op), _errs) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This rollup origination was BACKTRACKED, its expected \
+           effects (as follow) were NOT applied.@]" ;
+        pp_sc_rollup_originate_result op
   in
 
   Format.fprintf

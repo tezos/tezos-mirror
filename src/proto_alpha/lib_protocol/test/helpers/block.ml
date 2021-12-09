@@ -683,20 +683,16 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
         List.fold_left
           (fun balance_updates_rev ->
             let open Apply_results in
-            function
-            | Successful_manager_result (Reveal_result _)
-            | Successful_manager_result (Delegation_result _)
-            | Successful_manager_result (Tx_rollup_origination_result _) ->
-                balance_updates_rev
-            | Successful_manager_result (Set_deposits_limit_result _) ->
-                balance_updates_rev
-            | Successful_manager_result
-                (Transaction_result {balance_updates; _})
-            | Successful_manager_result
-                (Origination_result {balance_updates; _})
-            | Successful_manager_result
-                (Register_global_constant_result {balance_updates; _}) ->
-                List.rev_append balance_updates balance_updates_rev)
+            fun (Successful_manager_result r) ->
+              match r with
+              | Reveal_result _ | Delegation_result _
+              | Set_deposits_limit_result _ | Sc_rollup_originate_result _
+              | Tx_rollup_origination_result _ ->
+                  balance_updates_rev
+              | Transaction_result {balance_updates; _}
+              | Origination_result {balance_updates; _}
+              | Register_global_constant_result {balance_updates; _} ->
+                  List.rev_append balance_updates balance_updates_rev)
           balance_updates_rev
           metadata.implicit_operations_results
       in
@@ -719,7 +715,8 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Transaction_result _)
             | Successful_manager_result (Register_global_constant_result _)
             | Successful_manager_result (Set_deposits_limit_result _)
-            | Successful_manager_result (Tx_rollup_origination_result _) ->
+            | Successful_manager_result (Tx_rollup_origination_result _)
+            | Successful_manager_result (Sc_rollup_originate_result _) ->
                 origination_results_rev
             | Successful_manager_result (Origination_result x) ->
                 Origination_result x :: origination_results_rev)

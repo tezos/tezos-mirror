@@ -1961,6 +1961,8 @@ module Kind : sig
 
   type tx_rollup_origination = Tx_rollup_origination_kind
 
+  type sc_rollup_originate = Sc_rollup_originate_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -1969,6 +1971,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
+    | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
 end
 
 type 'a consensus_operation_type =
@@ -2087,6 +2090,11 @@ and _ manager_operation =
       Tez.t option
       -> Kind.set_deposits_limit manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
+  | Sc_rollup_originate : {
+      kind : Sc_rollup.Kind.t;
+      boot_sector : Sc_rollup.PVM.boot_sector;
+    }
+      -> Kind.sc_rollup_originate manager_operation
 
 and counter = Z.t
 
@@ -2232,6 +2240,8 @@ module Operation : sig
 
     val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
+    val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -2257,6 +2267,8 @@ module Operation : sig
       val set_deposits_limit_case : Kind.set_deposits_limit case
 
       val tx_rollup_origination_case : Kind.tx_rollup_origination case
+
+      val sc_rollup_originate_case : Kind.sc_rollup_originate case
     end
   end
 
@@ -2510,6 +2522,14 @@ module Fees : sig
     context ->
     storage_limit:Z.t ->
     payer:Token.source ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_sc_rollup_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    Z.t ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   type error += Cannot_pay_storage_fee (* `Temporary *)
