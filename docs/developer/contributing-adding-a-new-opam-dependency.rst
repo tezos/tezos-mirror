@@ -98,14 +98,14 @@ into the following places:
    ``.gitlab/ci/build.yml``,
 -  the ``script`` section of the ``documentation:build`` rule of
    ``.gitlab/ci/doc.yml``,
--  the ``before_script`` section of the ``integration_template`` rule of
-   ``.gitlab/ci/integration.yml``,
+-  the ``before_script`` section of the ``.integration_template`` rule of
+   ``.gitlab/ci/test/integration.yml``,
 -  the ``before_script`` section of the ``tezt:main`` rule of
    ``.gitlab/ci/tezt.yml``,
 -  the ``before_script`` section of the ``tezt:manual:migration`` rule
    of ``.gitlab/ci/tezt.yml``, and
--  the ``before_script`` section of the ``test-script-gen-genesis`` rule
-   of ``.gitlab/ci/test.yml``.
+-  the ``before_script`` section of the ``script:test-gen-genesis`` rule
+   of :src:`.gitlab/ci/test/integration.yml`.
 
 With this ``opam pin`` hack, it can be tested but it cannot be merged
 onto master. You can push you branch to Gitlab and open an MR.

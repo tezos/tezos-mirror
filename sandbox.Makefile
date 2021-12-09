@@ -16,7 +16,7 @@ all: accusations_simple_double_endorsing \
 	daemons_upgrade_next \
 	daemons_upgrade_alpha
 
-# These are the targets that are actually run in ./.gitlab/ci/integration.yml
+# These are the targets that are actually run in ./.gitlab/ci/test/integration.yml
 ci: all
 
 

@@ -515,7 +515,7 @@ pipeline. The grain used varies slightly for different types of
 tests:
 
 Python integration and regression tests
-   Python tests are grouped in a number of batch jobs (chosen in ``.gitlab/ci/integration.yml``). This number is
+   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/test/integration.yml`). This number is
    chosen to keep the duration of job each lower under 10 minutes on
    average, and to accommodate the addition of new protocol test
    suites.

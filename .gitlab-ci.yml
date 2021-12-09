@@ -49,7 +49,7 @@ include:
   - .gitlab/ci/unittest.yml
   - .gitlab/ci/test/lints.yml
   - .gitlab/ci/test/unit.yml
-  - .gitlab/ci/integration.yml
+  - .gitlab/ci/test/integration.yml
   - .gitlab/ci/liquidity-baking-scripts-integrity.yml
   - .gitlab/ci/coq.yml
   - .gitlab/ci/tezt.yml
