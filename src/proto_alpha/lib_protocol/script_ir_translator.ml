@@ -4852,7 +4852,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
-           (Tc_context.toplevel storage_type arg_type root_name)
+           (Tc_context.toplevel ~storage_type ~param_type:arg_type root_name)
            ctxt
            ~legacy
            ?type_logger
@@ -5692,7 +5692,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
-       Tc_context.(toplevel storage_type arg_type root_name)
+       Tc_context.(toplevel ~storage_type ~param_type:arg_type root_name)
        ctxt
        ~legacy
        ~stack_depth:0
@@ -5822,7 +5822,7 @@ let typecheck_code :
   let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
-      (Tc_context.toplevel storage_type arg_type root_name)
+      (Tc_context.toplevel ~storage_type ~param_type:arg_type root_name)
       ctxt
       ~legacy
       ~stack_depth:0

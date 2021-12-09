@@ -41,7 +41,7 @@ type t = {callsite : callsite; in_lambda : in_lambda}
 
 let init callsite = {callsite; in_lambda = false}
 
-let toplevel storage_type param_type root_name =
+let toplevel ~storage_type ~param_type root_name =
   init (Toplevel {storage_type; param_type; root_name})
 
 let view = init View
