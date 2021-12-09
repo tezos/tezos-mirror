@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
+open Configuration
+open Protocol.Alpha_context
+open Plugin
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+let check_sc_rollup_address_exists sc_rollup_address
+    (cctxt : Protocol_client_context.full) =
+  RPC.Sc_rollup.kind cctxt (cctxt#chain, cctxt#block) sc_rollup_address ()
+  >>=? fun kind_opt ->
+  (match kind_opt with
+  | None ->
+      cctxt#error "%a does not exist" Sc_rollup.Address.pp sc_rollup_address
+  | Some kind -> Event.rollup_exists ~addr:sc_rollup_address ~kind)
+  >>= fun () -> return ()
 
-  module type S = sig
-    val name : string
-
-    val parse_boot_sector : string -> boot_sector option
-
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
-
-  type t = (module S)
-end
-
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
-
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
-
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
-
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
-
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
-
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+let start configuration (cctxt : Protocol_client_context.full) =
+  check_sc_rollup_address_exists configuration.sc_rollup_address cctxt

@@ -62,3 +62,9 @@ let all_names =
       let (module M : PVM.S) = of_kind k in
       M.name)
     all
+
+let string_of_kind k =
+  let (module M) = of_kind k in
+  M.name
+
+let pp fmt k = Format.fprintf fmt "%s" (string_of_kind k)

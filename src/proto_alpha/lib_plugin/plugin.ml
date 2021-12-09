@@ -3237,6 +3237,30 @@ module RPC = struct
         RPC_path.(path / "round")
   end
 
+  module Sc_rollup = struct
+    open Data_encoding
+
+    module S = struct
+      let path = RPC_path.(open_root / "context" / "sc_rollup")
+
+      let kind =
+        RPC_service.get_service
+          ~description:"Kind of smart contract rollup"
+          ~query:RPC_query.empty
+          ~output:(obj1 (opt "kind" Sc_rollup.Kind.encoding))
+          RPC_path.(path /: Sc_rollup.Address.rpc_arg / "kind")
+    end
+
+    let kind ctxt block sc_rollup_address =
+      RPC_context.make_call1 S.kind ctxt block sc_rollup_address ()
+
+    let register_kind () =
+      Registration.register1 ~chunked:true S.kind @@ fun ctxt address () () ->
+      Sc_rollup.kind ctxt address
+
+    let register () = register_kind ()
+  end
+
   type Environment.Error_monad.error += Negative_level_offset
 
   let () =
@@ -3260,6 +3284,7 @@ module RPC = struct
     Baking_rights.register () ;
     Endorsing_rights.register () ;
     Validators.register () ;
+    Sc_rollup.register () ;
     Registration.register0 ~chunked:false S.current_level (fun ctxt q () ->
         if q.offset < 0l then fail Negative_level_offset
         else

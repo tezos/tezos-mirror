@@ -71,34 +71,43 @@ let data_dir_arg =
     ~default
     Client_proto_args.string_parameter
 
-let sc_rollup_commands () =
+let group =
+  {
+    Clic.name = "sc_rollup.node";
+    title = "Commands related to the smart-contract rollup node.";
+  }
+
+let config_init_command =
   let open Clic in
-  let group =
-    {
-      Clic.name = "sc_rollup.node";
-      title = "Commands related to the smart-contract rollup node.";
-    }
-  in
-  [
-    command
-      ~group
-      ~desc:"Configure the smart-contract rollup node."
-      (args3 data_dir_arg rpc_addr_arg rpc_port_arg)
-      (prefixes ["config"; "init"; "on"] @@ sc_rollup_address_param @@ stop)
-      (fun (data_dir, rpc_addr, rpc_port) sc_rollup_address cctxt ->
-        let open Configuration in
-        let config = {data_dir; sc_rollup_address; rpc_addr; rpc_port} in
-        save config >>=? fun () ->
-        cctxt#message
-          "Smart-contract rollup node configuration written in %s"
-          (filename config)
-        >>= fun _ -> return ());
-  ]
+  command
+    ~group
+    ~desc:"Configure the smart-contract rollup node."
+    (args3 data_dir_arg rpc_addr_arg rpc_port_arg)
+    (prefixes ["config"; "init"; "on"] @@ sc_rollup_address_param @@ stop)
+    (fun (data_dir, rpc_addr, rpc_port) sc_rollup_address cctxt ->
+      let open Configuration in
+      let config = {data_dir; sc_rollup_address; rpc_addr; rpc_port} in
+      save config >>=? fun () ->
+      cctxt#message
+        "Smart-contract rollup node configuration written in %s"
+        (filename config)
+      >>= fun _ -> return ())
+
+let run_command =
+  let open Clic in
+  command
+    ~group
+    ~desc:"Run the rollup daemon."
+    (args1 data_dir_arg)
+    (prefixes ["run"] @@ stop)
+    (fun data_dir cctxt -> Daemon.run ~data_dir cctxt >>=? fun () -> return ())
+
+let sc_rollup_commands () =
+  List.map
+    (Clic.map_command (new Protocol_client_context.wrap_full))
+    [config_init_command; run_command]
 
 let select_commands _ _ =
-  return
-    (List.map
-       (Clic.map_command (new Protocol_client_context.wrap_full))
-       (sc_rollup_commands ()))
+  return (sc_rollup_commands () @ Client_helpers_commands.commands ())
 
 let () = Client_main_run.run (module Client_config) ~select_commands

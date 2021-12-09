@@ -15,7 +15,10 @@
             tezos-client-commands
             tezos-client-alpha
             tezos-protocol-alpha-parameters
-            tezos-protocol-plugin-alpha)
+            tezos-protocol-plugin-alpha
+            tezos-rpc
+            tezos-rpc-http
+            tezos-rpc-http-server)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_client_commands
                    -open Tezos_stdlib_unix
@@ -25,4 +28,5 @@
                    -open Tezos_protocol_alpha
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_alpha_parameters
+                   -open Tezos_rpc
                    )))
