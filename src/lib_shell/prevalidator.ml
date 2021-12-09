@@ -308,7 +308,14 @@ module Pending_ops = Prevalidator_pending_operations
     The purpose of the {!Tools.tools} record is to abstract away from {!Store.chain_store}.
     Under the hood [Store.chain_store] requires an Irmin store on disk,
     which makes it impractical for fast testing: every test would need
-    to create a temporary folder on disk which doesn't scale well. *)
+    to create a temporary folder on disk which doesn't scale well.
+
+    The purpose of the {!Tools.worker_tools} record is to abstract away
+    from the {!Worker} implementation. This implementation is overkill
+    for testing: we don't need asynchronicity and concurrency in our
+    pretty basic existing tests. Having this abstraction allows to get
+    away with a much simpler state machine model of execution and
+    to have simpler test setup. *)
 module Tools = struct
   (** Functions provided by {!Distributed_db} and {!Store.chain_store}
       that are used in various places of the mempool. Gathered here so that we can test
@@ -349,6 +356,17 @@ module Tools = struct
             from current_head which might happen when a new head concurrently arrives just
             before this operation is being called. *)
   }
+
+  (** Abstraction over services implemented in production by {!Worker}
+      but implemented differently in tests.
+
+      Also see the enclosing module documentation as to why we have this record. *)
+  type worker_tools = {
+    push_request : unit Prevalidator_worker_state.Request.t -> unit Lwt.t;
+        (** Adds a message to the queue. *)
+    push_request_now : unit Prevalidator_worker_state.Request.t -> unit;
+        (** Adds a message to the queue immediately. *)
+  }
 end
 
 type 'a parameters = {limits : limits; tools : 'a Tools.tools}
@@ -367,6 +385,7 @@ type ('protocol_data, 'a) types_state_shell = {
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
   mutable banned_operations : Operation_hash.Set.t;
+  worker : Tools.worker_tools;
 }
 
 (** The concrete production instance of {!block_tools} *)
@@ -527,8 +546,7 @@ module Make
         || Classification.is_in_mempool oph shell.classification <> None
         || Classification.is_known_unparsable oph shell.classification)
 
-  let advertise (w : worker) (shell : ('operation_data, _) types_state_shell)
-      mempool =
+  let advertise (shell : ('operation_data, _) types_state_shell) mempool =
     match shell.advertisement with
     | `Pending {Mempool.known_valid; pending} ->
         shell.advertisement <-
@@ -542,7 +560,7 @@ module Make
         Lwt.dont_wait
           (fun () ->
             Lwt_unix.sleep advertisement_delay >>= fun () ->
-            Worker.Queue.push_request_now w Advertise ;
+            shell.worker.push_request_now Advertise ;
             Lwt.return_unit)
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
@@ -748,7 +766,7 @@ module Make
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier w shell filter_config filter_state
+  let classify_pending_operations ~notifier shell filter_config filter_state
       state =
     Pending_ops.fold_es
       (fun _prio
@@ -781,12 +799,12 @@ module Make
     >>= function
     | Error (filter_state, state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
-        Worker.Queue.push_request w Request.Leftover >>= fun () ->
+        shell.worker.push_request Request.Leftover >>= fun () ->
         Lwt.return (filter_state, state, advertised_mempool)
     | Ok (filter_state, state, advertised_mempool, _) ->
         Lwt.return (filter_state, state, advertised_mempool)
 
-  let update_advertised_mempool_fields w pv_shell delta_mempool =
+  let update_advertised_mempool_fields pv_shell delta_mempool =
     if Mempool.is_empty delta_mempool then Lwt.return_unit
     else
       (* We only advertise newly classified operations. *)
@@ -794,7 +812,7 @@ module Make
         Mempool.
           {delta_mempool with known_valid = List.rev delta_mempool.known_valid}
       in
-      advertise w pv_shell mempool_to_advertise ;
+      advertise pv_shell mempool_to_advertise ;
       let our_mempool =
         {
           (* Using List.rev_map is ok since the size of pv.shell.classification.applied
@@ -812,7 +830,7 @@ module Make
       in
       set_mempool pv_shell our_mempool >>= fun _res -> Lwt.pause ()
 
-  let handle_unprocessed w pv =
+  let handle_unprocessed pv =
     let notifier = mk_notifier pv.operation_stream in
     match pv.validation_state with
     | Error err ->
@@ -830,7 +848,6 @@ module Make
           Event.(emit processing_operations) () >>= fun () ->
           classify_pending_operations
             ~notifier
-            w
             pv.shell
             pv.filter_config
             pv.filter_state
@@ -838,13 +855,13 @@ module Make
           >>= fun (filter_state, validation_state, delta_mempool) ->
           pv.filter_state <- filter_state ;
           pv.validation_state <- Ok validation_state ;
-          update_advertised_mempool_fields w pv.shell delta_mempool
+          update_advertised_mempool_fields pv.shell delta_mempool
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
      usual. *)
-  let fetch_operation w (shell : ('operation_data, _) types_state_shell) ?peer
-      oph =
+  let fetch_operation (shell : ('operation_data, _) types_state_shell) ?peer oph
+      =
     Event.(emit fetching_operation) oph >|= fun () ->
     shell.parameters.tools.fetch
       ~timeout:shell.parameters.limits.operation_timeout
@@ -852,7 +869,7 @@ module Make
       oph
     >>= function
     | Ok op ->
-        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+        shell.worker.push_request_now (Arrived (oph, op)) ;
         Lwt.return_unit
     | Error (Distributed_db.Operation.Canceled _ :: _) ->
         Event.(emit operation_included) oph
@@ -871,8 +888,8 @@ module Make
      promise [p] is terminated, we remove the operation from the
      fetching operations. This is to ensure that if an error
      happened, we can still fetch this operation in the future. *)
-  let may_fetch_operation w (shell : ('operation_data, _) types_state_shell)
-      peer oph =
+  let may_fetch_operation (shell : ('operation_data, _) types_state_shell) peer
+      oph =
     let origin =
       match peer with
       | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
@@ -884,7 +901,7 @@ module Make
         (Lwt.finalize
            (fun () ->
              shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-             fetch_operation w shell ?peer oph)
+             fetch_operation shell ?peer oph)
            (fun () ->
              shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
              Lwt.return_unit)) ;
@@ -931,7 +948,7 @@ module Make
                     Pending_ops.add parsed_op prio pv.shell.pending ;
                   return_unit))
 
-    let on_inject w (pv : state) ~force op =
+    let on_inject (pv : state) ~force op =
       let oph = Operation.hash op in
       (* Currently, an injection is always done with priority = `High, because:
          - We want to process and propagate the injected operations fast,
@@ -1009,7 +1026,7 @@ module Make
                   pv.validation_state <- Ok validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
-                  update_advertised_mempool_fields w pv.shell delta_mempool
+                  update_advertised_mempool_fields pv.shell delta_mempool
                   >>= return
               | Some
                   ( _h,
@@ -1032,9 +1049,9 @@ module Make
                     Operation_hash.pp
                     oph)
 
-    let on_notify w (shell : ('operation_data, _) types_state_shell) peer
-        mempool =
-      let may_fetch_operation = may_fetch_operation w shell (Some peer) in
+    let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
+        =
+      let may_fetch_operation = may_fetch_operation shell (Some peer) in
       List.iter_s may_fetch_operation mempool.Mempool.known_valid >>= fun () ->
       Seq.iter_s
         may_fetch_operation
@@ -1451,18 +1468,18 @@ module Make
             live_blocks
             live_operations
       | Request.Notify (peer, mempool) ->
-          Requests.on_notify w pv.shell peer mempool >>= fun () -> return_unit
+          Requests.on_notify pv.shell peer mempool >>= fun () -> return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject {op; force} -> Requests.on_inject w pv ~force op
+      | Request.Inject {op; force} -> Requests.on_inject pv ~force op
       | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
       | Request.Advertise ->
           Requests.on_advertise pv.shell ;
           return_unit
       | Request.Ban oph -> Requests.on_ban pv oph)
       >>=? fun r ->
-      handle_unprocessed w pv >>= fun () -> return r
+      handle_unprocessed pv >>= fun () -> return r
 
     let on_close w =
       let pv = Worker.state w in
@@ -1510,6 +1527,11 @@ module Make
         set_mempool;
       }
 
+    let mk_worker_tools w : Tools.worker_tools =
+      let push_request r = Worker.Queue.push_request w r in
+      let push_request_now r = Worker.Queue.push_request_now w r in
+      {push_request; push_request_now}
+
     let on_launch w _ (limits, chain_db) =
       let chain_store = Distributed_db.chain_store chain_db in
       Store.Chain.current_head chain_store >>= fun predecessor ->
@@ -1555,6 +1577,7 @@ module Make
           pending = Pending_ops.empty;
           advertisement = `None;
           banned_operations = Operation_hash.Set.empty;
+          worker = mk_worker_tools w;
         }
       in
 
@@ -1582,7 +1605,7 @@ module Make
         }
       in
       Seq.iter_s
-        (may_fetch_operation w pv.shell None)
+        (may_fetch_operation pv.shell None)
         (Operation_hash.Set.to_seq fetching)
       >>= fun () -> return pv
 
