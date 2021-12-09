@@ -93,7 +93,6 @@ build_release:docker_arm64:
 
 upload-gitlab-packages:
   extends:
-    - .rules_template__release_tag
     - .rules_template__master_and_releases
   image: registry.gitlab.com/gitlab-org/release-cli
   variables:
