@@ -97,40 +97,53 @@ let randmsg_len = Bytes.length randmsg
 (** Checks that the SHA256-digest from [msg] corresponds to [expected_value],
     whether using [digest] or with [init]/[update]. Same for [randmsg].
 *)
+
+let sha256_expected_value =
+  of_hex "d8d219deae87c5e5fffbc0a0a38986de266427b2e08be9f9d22a07b91099dbfe"
+
+and sha256_rand_expected_value =
+  of_hex "9f043732d7117fa402d24e7343108976524b097390b0b160df42b0fa5bc6425c"
+
 let test_sha256 () =
   let open Hash.SHA256 in
-  let expected_value =
-    of_hex "d8d219deae87c5e5fffbc0a0a38986de266427b2e08be9f9d22a07b91099dbfe"
-  and rand_expected_value =
-    of_hex "9f043732d7117fa402d24e7343108976524b097390b0b160df42b0fa5bc6425c"
-  in
-  let init_finish_digest (value, msg) =
-    let st = init () in
-    update st msg ;
-    let d = finish st in
-    Alcotest.(check bytes "sha256" value d) ;
+  let run (value, msg) =
     let d = digest msg in
     Alcotest.(check bytes "sha256" value d)
   in
   List.iter
-    init_finish_digest
-    [(expected_value, msg); (rand_expected_value, randmsg)]
+    run
+    [(sha256_expected_value, msg); (sha256_rand_expected_value, randmsg)]
 
-(** Checks SHA256 incremental hashing with 2 updates. *)
+(** Checks SHA256 incremental hashing. *)
 let test_sha256_seq () =
   let open Hash.SHA256 in
-  let bothresp =
-    of_hex "ddabe6c4552e944d927bd0b03dd5ab95ecdfa5a135b6c3b60416dbde57b38416"
+  let one_update () =
+    let run (value, msg) =
+      let st = init () in
+      update st msg ;
+      let d = finish st in
+      Alcotest.(check bytes "sha256" value d)
+    in
+    List.iter
+      run
+      [(sha256_expected_value, msg); (sha256_rand_expected_value, randmsg)]
   in
-  let st = init () in
-  Printf.printf "Init done\n" ;
-  update st msg ;
-  update st randmsg ;
-  print_endline "Update done." ;
-  let d = finish st in
-  Printf.printf "Digest size %d\n" (Bytes.length d) ;
-  print_endline "Finish done." ;
-  Alcotest.(check bytes "sha256_seq" bothresp d)
+  let two_updates () =
+    let bothresp =
+      of_hex "ddabe6c4552e944d927bd0b03dd5ab95ecdfa5a135b6c3b60416dbde57b38416"
+    in
+    let st = init () in
+    Printf.printf "Init done\n" ;
+    update st msg ;
+    update st randmsg ;
+    print_endline "Update done." ;
+    let d = finish st in
+    Printf.printf "Digest size %d\n" (Bytes.length d) ;
+    print_endline "Finish done." ;
+    Alcotest.(check bytes "sha256_seq" bothresp d)
+  in
+  one_update () ;
+  two_updates ()
 
 (** Checks SHA512 hash function. *)
 let test_sha512 () =
@@ -198,17 +211,25 @@ let test_keccak_256 () =
   let digest = Hash.Keccak_256.digest msg in
   Alcotest.(check bytes "keccak_256" resp digest)
 
+let is_js_of_ocaml_backend =
+  match Sys.backend_type with
+  | Other "js_of_ocaml" -> true
+  | Native | Bytecode | Other _ -> false
+
 let hash =
   [
     ("hmac_sha256", `Quick, test_hmac_sha256);
     ("hmac_sha512", `Quick, test_hmac_sha512);
     ("sha256", `Quick, test_sha256);
-    ("sha256_seq", `Quick, test_sha256_seq);
     ("sha512", `Quick, test_sha512);
     ("sha3_256", `Quick, test_sha3_256);
     ("sha3_512", `Quick, test_sha3_512);
     ("keccak_256", `Quick, test_keccak_256);
   ]
+  @
+  (* Hacl wasm does not support incremental hashing yet *)
+  if is_js_of_ocaml_backend then []
+  else [("sha256_seq", `Quick, test_sha256_seq)]
 
 (** Compares a Blake2b hash from [data_in] with [key] to the expected
    output [data_out].
