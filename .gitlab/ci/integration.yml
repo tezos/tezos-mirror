@@ -52,6 +52,18 @@ script:snapshot_alpha_and_link:
     - make
     - dune build src/proto_"$new_proto_version"_*/
 
+script:test-gen-genesis:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
+  stage: test
+  needs: []
+  before_script:
+    - cd scripts/gen-genesis
+  script:
+    - dune build gen_genesis.exe
+
 ############################################################
 ## Stage: run OCaml integration tests                     ##
 ############################################################

@@ -1,15 +1,3 @@
-test-script-gen-genesis:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
-  stage: test
-  needs: []
-  before_script:
-    - cd scripts/gen-genesis
-  script:
-    - dune build gen_genesis.exe
-
 .test_template:
   extends:
     - .default_settings_template
