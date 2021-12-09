@@ -29,29 +29,29 @@ trace
       3  	
       4  	
       5  	 ]
-  - location: 20 (remaining gas: 1039987.839 units remaining)
+  - location: 20 (remaining gas: 1039987.799 units remaining)
     [ 2  	
       3  	
       4  	
       5  	
       1  	 ]
-  - location: 22 (remaining gas: 1039987.829 units remaining)
+  - location: 22 (remaining gas: 1039987.789 units remaining)
     [ 3  	
       4  	
       5  	
       1  	 ]
-  - location: 23 (remaining gas: 1039987.819 units remaining)
+  - location: 23 (remaining gas: 1039987.779 units remaining)
     [ 4  	
       5  	
       1  	 ]
-  - location: 24 (remaining gas: 1039987.809 units remaining)
+  - location: 24 (remaining gas: 1039987.769 units remaining)
     [ 5  	
       1  	 ]
-  - location: 25 (remaining gas: 1039987.799 units remaining)
+  - location: 25 (remaining gas: 1039987.759 units remaining)
     [ 1  	 ]
-  - location: 26 (remaining gas: 1039987.784 units remaining)
+  - location: 26 (remaining gas: 1039987.744 units remaining)
     [ {}  	
       1  	 ]
-  - location: 28 (remaining gas: 1039987.769 units remaining)
+  - location: 28 (remaining gas: 1039987.729 units remaining)
     [ (Pair {} 1)  	 ]
 

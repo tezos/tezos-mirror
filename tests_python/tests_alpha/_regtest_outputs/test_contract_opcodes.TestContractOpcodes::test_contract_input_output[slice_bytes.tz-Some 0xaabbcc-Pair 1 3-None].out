@@ -25,13 +25,13 @@ trace
     [ 1  	
       3  	
       0xaabbcc  	@storage.some ]
-  - location: 21 (remaining gas: 1039988.862 units remaining)
+  - location: 21 (remaining gas: 1039988.852 units remaining)
     [ None  	 ]
-  - location: 13 (remaining gas: 1039988.847 units remaining)
+  - location: 13 (remaining gas: 1039988.837 units remaining)
     [ None  	 ]
-  - location: 22 (remaining gas: 1039988.832 units remaining)
+  - location: 22 (remaining gas: 1039988.822 units remaining)
     [ {}  	
       None  	 ]
-  - location: 24 (remaining gas: 1039988.817 units remaining)
+  - location: 24 (remaining gas: 1039988.807 units remaining)
     [ (Pair {} None)  	 ]
 
