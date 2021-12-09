@@ -23,4 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let register ~protocols:(_ : Protocol.t list) = ()
+(*
+
+   Helpers
+   =======
+
+*)
+let test ~__FILE__ ~output_file title =
+  Protocol.register_regression_test
+    ~output_file
+    ~__FILE__
+    ~title
+    ~tags:["sc_rollup"]
+
+let setup f ~protocol =
+  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
+  let bootstrap1_key = Constant.bootstrap1.public_key_hash in
+  f node client bootstrap1_key
+
+(*
+
+   Tests
+   =====
+
+*)
+
+(* Originate a new SCORU of the arithmetic kind
+   --------------------------------------------
+
+   - Rollup addresses are fully determined by operation hashes and origination nonce.
+
+*)
+let test_origination =
+  let output_file = "sc_rollup_origination" in
+  test
+    ~__FILE__
+    ~output_file
+    "origination of a SCORU executes without error"
+    (fun protocol ->
+      setup ~protocol @@ fun _node client bootstrap1_key ->
+      let* rollup_address =
+        Client.originate_sc_rollup
+          ~burn_cap:Tez.(of_int 9999999)
+          ~src:bootstrap1_key
+          ~kind:"arith"
+          ~boot_sector:""
+          client
+      in
+      let* () = Client.bake_for client in
+      Regression.capture rollup_address ;
+      return ())
+
+let register ~protocols = test_origination ~protocols
