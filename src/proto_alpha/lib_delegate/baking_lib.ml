@@ -117,7 +117,8 @@ let endorse (cctxt : Protocol_client_context.full) ?(force = false) delegates =
 
 let bake_at_next_level state =
   let cctxt = state.global_state.cctxt in
-  Baking_scheduling.compute_next_potential_baking_time state >>= function
+  Baking_scheduling.compute_next_potential_baking_time_at_next_level state
+  >>= function
   | None -> cctxt#error "No baking slot found for the delegates"
   | Some (timestamp, round) ->
       cctxt#message

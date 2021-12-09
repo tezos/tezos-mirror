@@ -46,7 +46,7 @@ val compute_next_round_time : state -> (Time.Protocol.t * Round.t) option
 val first_potential_round_at_next_level :
   state -> earliest_round:Round.t -> (Round.t * delegate) option
 
-val compute_next_potential_baking_time :
+val compute_next_potential_baking_time_at_next_level :
   state -> (Time.Protocol.t * Round.t) option Lwt.t
 
 val compute_next_timeout : state -> timeout_kind Lwt.t tzresult Lwt.t

@@ -267,7 +267,7 @@ let first_potential_round_at_next_level state ~earliest_round =
 (** From the current [state], the function returns an optional
     association pair, which consists of the next baking timestamp and
     its baking round. In that case, an elected block must exist. *)
-let compute_next_potential_baking_time state =
+let compute_next_potential_baking_time_at_next_level state =
   let open Protocol.Alpha_context in
   let open Baking_state in
   match state.level_state.elected_block with
@@ -285,50 +285,49 @@ let compute_next_potential_baking_time state =
         elected_block.proposal.block.shell.timestamp
       in
       let predecessor_round = elected_block.proposal.block.round in
-      let round_durations =
-        state.global_state.constants.parametric.round_durations
-      in
-      (* Compute the timestamp at which the new level will start at
-         round 0.*)
-      Round.timestamp_of_round
-        round_durations
-        ~predecessor_timestamp
-        ~predecessor_round
-        ~round:Round.zero
-      |> function
-      | Error _ -> Lwt.return_none
-      | Ok min_possible_time -> (
-          let now = Systime_os.now () |> Time.System.to_protocol in
-          (* Lookup the next slot information if already stored in the
-             memoization table [Round_timestamp_interval_tbl]. *)
-          match
-            find_in_known_round_intervals
-              state.global_state.cache.round_timestamps
-              ~predecessor_timestamp
-              ~predecessor_round
-              ~now
-          with
-          | Some (first_potential_baking_time, first_potential_round, delegate)
-            -> (
-              (* Check if we already have proposed something at next
-                 level *)
-              match state.level_state.next_level_proposed_round with
-              | Some proposed_round
-                when Round.(proposed_round >= first_potential_round) ->
-                  Events.(emit proposal_already_injected ()) >>= fun () ->
-                  Lwt.return_none
-              | None | Some _ ->
-                  Events.(
-                    emit
-                      next_potential_slot
-                      ( Int32.succ state.level_state.current_level,
-                        first_potential_round,
-                        first_potential_baking_time,
-                        delegate ))
-                  >>= fun () ->
-                  Lwt.return_some
-                    (first_potential_baking_time, first_potential_round))
-          | None -> (
+      let now = Systime_os.now () |> Time.System.to_protocol in
+      (* Lookup the next slot information if already stored in the
+         memoization table [Round_timestamp_interval_tbl]. *)
+      match
+        find_in_known_round_intervals
+          state.global_state.cache.round_timestamps
+          ~predecessor_timestamp
+          ~predecessor_round
+          ~now
+      with
+      | Some (first_potential_baking_time, first_potential_round, delegate) -> (
+          (* Check if we already have proposed something at next
+             level *)
+          match state.level_state.next_level_proposed_round with
+          | Some proposed_round
+            when Round.(proposed_round >= first_potential_round) ->
+              Events.(emit proposal_already_injected ()) >>= fun () ->
+              Lwt.return_none
+          | None | Some _ ->
+              Events.(
+                emit
+                  next_potential_slot
+                  ( Int32.succ state.level_state.current_level,
+                    first_potential_round,
+                    first_potential_baking_time,
+                    delegate ))
+              >>= fun () ->
+              Lwt.return_some
+                (first_potential_baking_time, first_potential_round))
+      | None -> (
+          let round_durations =
+            state.global_state.constants.parametric.round_durations
+          in
+          (* Compute the timestamp at which the new level will start at
+             round 0.*)
+          Round.timestamp_of_round
+            round_durations
+            ~predecessor_timestamp
+            ~predecessor_round
+            ~round:Round.zero
+          |> function
+          | Error _ -> Lwt.return_none
+          | Ok min_possible_time -> (
               (* If this timestamp exists and is not yet outdated, the
                  earliest round to bake is thereby 0. Otherwise, we
                  compute the round from the current timestamp. This
@@ -344,7 +343,7 @@ let compute_next_potential_baking_time state =
               |> function
               | Error _ -> Lwt.return_none
               | Ok earliest_round -> (
-                  (* There does not necesserily exists a slot that is
+                  (* There does not necessarily exists a slot that is
                      equal to [earliest_round]. We must find the earliest
                      slot after this value for which a validator is
                      designated to propose. *)
@@ -429,27 +428,28 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     =
   (* FIXME: this function (may) try to instantly repropose a block *)
   let open Baking_state in
-  (* TODO: re-use what has been done in round_synchronizer.ml *)
-  (* Compute the timestamp of the next possible round. *)
-  let next_round = compute_next_round_time state in
-  compute_next_potential_baking_time state >>= fun next_baking ->
-  let wait_end_of_round (next_round_time, next_round) =
+  let wait_end_of_round ?(delta = 0L) (next_round_time, next_round) =
+    let next_time = Time.Protocol.add next_round_time delta in
     let now = Systime_os.now () in
-    let delay = Ptime.diff (Time.System.of_protocol_exn next_round_time) now in
-    Events.(
-      emit
-        waiting_end_of_round
-        (delay, Int32.pred @@ Round.to_int32 next_round, next_round_time))
+    let delay = Ptime.diff (Time.System.of_protocol_exn next_time) now in
+    let current_round = Int32.pred @@ Round.to_int32 next_round in
+    (if delta = 0L then
+     Events.(emit waiting_end_of_round (delay, current_round, next_time))
+    else
+      Events.(
+        emit
+          waiting_delayed_end_of_round
+          (delay, current_round, next_time, delta)))
     >>= fun () ->
     let end_of_round =
       Lwt.return
       @@ End_of_round {ending_round = state.round_state.current_round}
     in
-    match sleep_until next_round_time with
+    match sleep_until next_time with
     | None -> return end_of_round
     | Some t -> return (t >>= fun () -> end_of_round)
   in
-  let wait_baking_time (next_baking_time, next_baking_round) =
+  let wait_baking_time_next_level (next_baking_time, next_baking_round) =
     let now = Systime_os.now () in
     let delay = Ptime.diff (Time.System.of_protocol_exn next_baking_time) now in
     Events.(emit waiting_time_to_bake (delay, next_baking_time)) >>= fun () ->
@@ -464,27 +464,70 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
             Lwt.return (Time_to_bake_next_level {at_round = next_baking_round})
           )
   in
+  let delay_next_round_timeout next_round =
+    (* we only delay if it's our turn to bake *)
+    match
+      State_transitions.round_proposer
+        state
+        state.level_state.delegate_slots.own_delegate_slots
+        (snd next_round)
+    with
+    | Some _ ->
+        let delta =
+          Round.Durations.first
+            state.global_state.constants.parametric.round_durations
+          |> Period.to_seconds
+          |> fun d -> Int64.div d 5L
+        in
+        (* NB: this means 6 seconds delay, if the first round duration is
+           30. *)
+        wait_end_of_round ~delta next_round
+    | None -> wait_end_of_round next_round
+  in
+  (* TODO: re-use what has been done in round_synchronizer.ml *)
+  (* Compute the timestamp of the next possible round. *)
+  let next_round = compute_next_round_time state in
+  compute_next_potential_baking_time_at_next_level state >>= fun next_baking ->
   match (next_round, next_baking) with
   | (None, None) ->
       Events.(emit waiting_for_new_head ()) >>= fun () ->
       return (Lwt_utils.never_ending () >>= fun () -> assert false)
-  (* We have no slot in the near future, we will patiently wait for
-     the next round. *)
-  | (Some next_round, None) -> wait_end_of_round next_round
+  (* We have no slot at the next level in the near future, we will
+     patiently wait for the next round. *)
+  | (Some next_round, None) -> (
+      (* If there is an elected block, then we make the assumption
+         that the bakers at the next level have also received an
+         endorsement quorum, and we delay a bit injecting at the next
+         round, so that there are not two blocks injected at the same
+         time. *)
+      match state.level_state.elected_block with
+      | None -> wait_end_of_round next_round
+      | Some _elected_block -> delay_next_round_timeout next_round)
   (* There is no timestamp for a successor round but there is for a
      future baking slot, we will wait to bake. *)
-  | (None, Some next_baking) -> wait_baking_time next_baking
+  | (None, Some next_baking) -> wait_baking_time_next_level next_baking
   (* We choose the earliest timestamp between waiting to bake and
      waiting for the next round. *)
-  | ( Some ((next_round_time, _) as next_round),
+  | ( Some ((next_round_time, next_round) as next_round_info),
       Some ((next_baking_time, _) as next_baking) ) ->
-      (* If we can bake before (or at most 2s after) the next round
-         starts then bake. In other words if both timestamps are close
-         enough, waiting to bake supersedes waiting for the next
-         round. *)
-      if Time.Protocol.(next_baking_time <= add next_round_time 2L) then
-        wait_baking_time next_baking
-      else wait_end_of_round next_round
+      (* If we can bake at the next level before the end of the next
+         round, then do so. This is because the proposed block will have
+         a smaller timestamp than the earliest block at next level built
+         on top of the proposal made at the next round (at the current
+         level). *)
+      let next_round_duration =
+        Round.round_duration
+          state.global_state.constants.parametric.round_durations
+          next_round
+        |> Period.to_seconds
+      in
+      if
+        Time.Protocol.(
+          next_baking_time < add next_round_time next_round_duration)
+      then wait_baking_time_next_level next_baking
+      else
+        (* same observation is in the [(Some next_round, None)] case *)
+        delay_next_round_timeout next_round_info
 
 (* initialises endorsable_payload with the PQC included in the latest block
    if there is one and if it's more recent than the one loaded from disk

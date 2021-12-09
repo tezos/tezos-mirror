@@ -539,9 +539,9 @@ let end_of_round state current_round =
 
 let time_to_bake state at_round =
   (* It is now time to update the state level *)
-  (* We need to keep track which block we have 2f+1 *endorsements*
+  (* We need to keep track for which block we have 2f+1 *endorsements*, that is,
      which will become the new predecessor_block *)
-  (* Invariant: endorsable_round >= elected block >= locked_round *)
+  (* Invariant: endorsable_round >= round(elected block) >= locked_round *)
   let round_proposer_opt =
     round_proposer
       state
