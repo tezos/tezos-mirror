@@ -177,6 +177,15 @@ Building from sources via OPAM
 The easiest way to build the binaries from the source code is to use the OPAM
 source package manager for OCaml.
 
+This is easier than :ref:`setting up a complete development environment <build_from_sources>`, like developers do.
+However, this method is recommended for expert users as it requires basic
+knowledge of the OPAM package manager and the OCaml packages
+workflow. In particular, upgrading Tezos from release to
+release might require tinkering with different options of the OPAM
+package manager to adjust the local environment for the new
+dependencies.
+
+
 .. _build_environment:
 
 Environment
@@ -205,6 +214,8 @@ After the first install of OPAM, use ``opam init --bare`` to set it up
 while avoiding to compile an OCaml compiler now, as this will be done in
 the next step.
 
+.. _install_opam_packages:
+
 Install Tezos OPAM packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -229,6 +240,12 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
   :end-before: [get system dependencies]
 
 .. note::
+
+   The ``opam switch create`` command may fail if the switch already exists;
+   you are probably re-installing or upgrading an existing installation.
+   If the required compiler version has not changed since the last time, you
+   may simply ignore this error. Otherwise, you are upgrading to a new compiler,
+   so look at the :ref:`relevant section below <updating_with_opam>`.
 
    The command ``eval $(opam env)`` sets up required environment
    variables. OPAM will suggest to add it in your rc file. If, at any
@@ -268,6 +285,8 @@ install tezos-endorser-010-PtGRANAD``, ... In that case, it is enough to install
    ledgerwallet-tezos`` in addition to installing the binaries. (The
    macro meta-package ``tezos`` installs ``ledgerwallet-tezos``.)
 
+.. _updating_with_opam:
+
 Updating via OPAM
 ~~~~~~~~~~~~~~~~~
 
@@ -288,8 +307,18 @@ anymore. Beware not uninstall too much though.
 Identified situations where it will be more tricky are:
 
 * When the OCaml compiler version requirement changes. In this case,
-  be explicit about the "upgrade" and do ``opam upgrade --unlock-base
-  ocaml.$new_version tezos``.
+  you have several possibilities:
+
+  - Be explicit about the "upgrade" and do ``opam upgrade --unlock-base
+    ocaml.$new_version tezos``. Note that starting from OPAM version 2.1,
+    this option is replaced by ``--update-invariant`` (see the `opam-switch
+    manual <https://opam.ocaml.org/doc/man/opam-switch.html>`_).
+  - Remove the existing switch (e.g., ``opam switch remove for_tezos``, but
+    be aware that this will delete the previous installation), and replay
+    :ref:`the installation instructions <install_opam_packages>`.
+  - Replay :ref:`the installation instructions <install_opam_packages>` while
+    creating a different switch (e.g. ``ocaml_${ocaml_version}_for_tezos``), but
+    be aware that each switch consumes a significant amount of disk space.
 
 * When there are Rust dependencies involved. The way to go is still
   unclear.
