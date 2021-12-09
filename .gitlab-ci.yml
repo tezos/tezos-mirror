@@ -46,7 +46,7 @@ include:
   - .gitlab/ci/packaging.yml
   - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
-  - .gitlab/ci/unittest.yml
+  - .gitlab/ci/test/templates.yml
   - .gitlab/ci/test/lints.yml
   - .gitlab/ci/test/unit.yml
   - .gitlab/ci/test/integration.yml
