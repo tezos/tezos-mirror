@@ -26,8 +26,9 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe \
-      -- test "^ticket lazy storage diff"
+    Invocation: dune exec \
+                src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                -- test "^ticket lazy storage diff"
     Subject:    Ticket scanner tests
 *)
 
