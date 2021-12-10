@@ -258,7 +258,8 @@ let select_distribution_for_cycle_do_not_call_except_for_migration =
 let clear_cycle ctxt cycle =
   Storage.Total_active_stake.remove_existing ctxt cycle >>=? fun ctxt ->
   Selected_distribution_for_cycle.remove_existing ctxt cycle >>=? fun ctxt ->
-  Delegate_sampler_state.remove_existing ctxt cycle
+  Delegate_sampler_state.remove_existing ctxt cycle >>=? fun ctxt ->
+  Storage.Seed.For_cycle.remove_existing ctxt cycle
 
 let init_first_cycles ctxt pubkey =
   let preserved = Constants_storage.preserved_cycles ctxt in

@@ -106,8 +106,6 @@ let for_cycle ctxt cycle =
     (Unknown {oldest; cycle; latest})
   >>?= fun () -> Storage.Seed.For_cycle.get ctxt cycle
 
-let clear_cycle c cycle = Storage.Seed.For_cycle.remove_existing c cycle
-
 let init ctxt =
   let preserved = Constants_storage.preserved_cycles ctxt in
   List.fold_left_es
@@ -119,15 +117,8 @@ let init ctxt =
   >|=? snd
 
 let cycle_end ctxt last_cycle =
+  (* NB: the clearing of past seeds is done elsewhere by the caller *)
   let preserved = Constants_storage.preserved_cycles ctxt in
-  (match Cycle_repr.sub last_cycle preserved with
-  | None -> return ctxt
-  | Some cleared_cycle ->
-      (* LEGACY: we only need to keep at most [max_slashing_period] seed
-         but we need to preserve [preserved_cycles] seed to be able to
-         slash in Emmy after the migration *)
-      clear_cycle ctxt cleared_cycle)
-  >>=? fun ctxt ->
   match Cycle_repr.pred last_cycle with
   | None -> return (ctxt, [])
   | Some revealed ->
