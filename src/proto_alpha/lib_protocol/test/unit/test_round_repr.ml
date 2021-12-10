@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    protocol
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^round$"
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                  -- test "^\[Unit\] round$"
     Subject:      test the Round_repr module
 *)
 

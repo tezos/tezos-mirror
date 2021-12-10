@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:  Protocol (token)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^receipt"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                -- test "^\[Unit\] receipt"
     Subject:    Test receipt endocings.
 *)
 
