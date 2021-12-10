@@ -446,7 +446,8 @@ let dump_received cctxt path ?unaccurate level items =
       let unaccurate = Option.value ~default:infos.unaccurate unaccurate in
       let out_infos = {blocks = infos.blocks; endorsements; unaccurate} in
       write filename encoding out_infos >>=? fun () ->
-      extract_anomalies path level out_infos)
+      if infos.unaccurate then return_unit
+      else extract_anomalies path level out_infos)
   >>= fun out ->
   let () = drop_file_mutex filename in
   match out with
