@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Script_comparison
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/test_script_comparison.exe
+    Invocation:   dune exec \
+                  src/proto_alpha/lib_protocol/test/pbt/test_script_comparison.exe
     Subject:      PBT of the Script_comparable.compare_comparable function.
 *)
 

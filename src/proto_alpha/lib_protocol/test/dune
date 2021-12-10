@@ -1,12 +1,5 @@
 (tests
- (names main
-        saturation_fuzzing
-        test_gas_properties
-        test_tez_repr
-        liquidity_baking_pbt
-        test_script_comparison
-        test_sampler
-        test_carbonated_map)
+ (names main)
  (package tezos-protocol-alpha-tests)
  (deps (glob_files contracts/*))
  (libraries tezos-base
@@ -54,34 +47,3 @@
  (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:main.exe} -q)))
-
-(rule
- (alias runtest_saturation_fuzzing)
- (package tezos-protocol-alpha-tests)
- (action (run %{exe:saturation_fuzzing.exe})))
-
-(rule
- (alias runtest_sampler)
- (package tezos-protocol-alpha-tests)
- (action (run %{exe:test_sampler.exe})))
-
-(rule
- (alias runtest_test_script_comparison)
- (package tezos-protocol-alpha-tests)
- (action (run %{exe:test_script_comparison.exe})))
-
-(rule
- (alias runtest_test_tez_repr)
- (package tezos-protocol-alpha-tests)
- (action (run %{exe:test_tez_repr.exe})))
-
-(rule
- (alias runtest_liquidity_baking_pbt)
- (package tezos-protocol-alpha-tests)
- (action (run %{exe:liquidity_baking_pbt.exe})))
-
-(rule
- (alias runtest_carbonated_map)
- (package tezos-protocol-alpha-tests)
- (action
-  (run %{exe:test_carbonated_map.exe})))

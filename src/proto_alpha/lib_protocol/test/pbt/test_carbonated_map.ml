@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest_carbonated_map
+    Invocation:   dune exec \
+                  src/proto_alpha/lib_protocol/test/pbt/test_carbonated_map.exe
     Subject:      Operations in Carbonated_map
 *)
 

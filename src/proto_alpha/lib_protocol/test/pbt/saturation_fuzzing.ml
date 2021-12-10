@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/saturation_fuzzing.exe
+    Invocation:   dune exec \
+                  src/proto_alpha/lib_protocol/test/pbt/saturation_fuzzing.exe
     Subject:      Operations in Saturation_repr
 *)
 
