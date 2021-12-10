@@ -85,13 +85,13 @@ end
 
 (* int *)
 let equal_int ~loc (a : int) (b : int) =
-  equal ~loc ( = ) "Integers aren't equal" Format.pp_print_int a b
+  equal ~loc Int.equal "Integers aren't equal" Format.pp_print_int a b
 
 let not_equal_int ~loc (a : int) (b : int) =
-  not_equal ~loc ( = ) "Integers are equal" Format.pp_print_int a b
+  not_equal ~loc Int.equal "Integers are equal" Format.pp_print_int a b
 
 let leq_int ~loc (a : int) (b : int) =
-  leq ~loc compare "Integer comparison" Format.pp_print_int a b
+  leq ~loc Compare.Int.compare "Integer comparison" Format.pp_print_int a b
 
 (* int32 *)
 let equal_int32 ~loc (a : int32) (b : int32) =
@@ -99,38 +99,20 @@ let equal_int32 ~loc (a : int32) (b : int32) =
 
 (* int64 *)
 let equal_int64 ~loc (a : int64) (b : int64) =
-  equal
-    ~loc
-    ( = )
-    "Int64 aren't equal"
-    Format.pp_print_string
-    (Int64.to_string a)
-    (Int64.to_string b)
+  equal ~loc Compare.Int64.( = ) "Int64 aren't equal" Int64.pp a b
 
 let not_equal_int64 ~loc (a : int64) (b : int64) =
-  not_equal
-    ~loc
-    ( = )
-    "Int64 are equal"
-    Format.pp_print_string
-    (Int64.to_string a)
-    (Int64.to_string b)
+  not_equal ~loc Int64.equal "Int64 are equal" Int64.pp a b
 
 let leq_int64 ~loc (a : int64) (b : int64) =
-  leq
-    ~loc
-    compare
-    "Int64 comparison"
-    Format.pp_print_string
-    (Int64.to_string a)
-    (Int64.to_string b)
+  leq ~loc Compare.Int64.compare "Int64 comparison" Int64.pp a b
 
 (* bool *)
 let equal_bool ~loc (a : bool) (b : bool) =
-  equal ~loc ( = ) "Booleans aren't equal" Format.pp_print_bool a b
+  equal ~loc Bool.equal "Booleans aren't equal" Format.pp_print_bool a b
 
 let not_equal_bool ~loc (a : bool) (b : bool) =
-  not_equal ~loc ( = ) "Booleans are equal" Format.pp_print_bool a b
+  not_equal ~loc Bool.equal "Booleans are equal" Format.pp_print_bool a b
 
 (* tez *)
 let equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =

@@ -167,7 +167,7 @@ let assert_no_error d = match d with Error _ -> assert false | Ok d -> d
 let round_durations : Round.round_durations =
   assert_no_error
   @@ Round.Durations.create
-       ~minimal_block_delay:Period.(of_seconds_exn 4L)
+       ~first_round_duration:Period.(of_seconds_exn 4L)
        ~delay_increment_per_round:Period.(of_seconds_exn 10L)
 
 let round_zero_duration = Round.round_duration round_durations Round.zero

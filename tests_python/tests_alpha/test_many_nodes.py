@@ -24,7 +24,8 @@ class TestManyNodesBootstrap:
         # smaller threshold to make (almost sure) that 3/5 of the delegates
         # have enough endorsing power
         parameters['consensus_threshold'] = 5
-        parameters['round_durations'] = {"round0": '3', "round1": '3'}
+        parameters['minimal_block_delay'] = '3'
+        parameters['delay_increment_per_round'] = '1'
         protocol.activate(sandbox.client(0), parameters)
         for i in range(1, NEW_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)

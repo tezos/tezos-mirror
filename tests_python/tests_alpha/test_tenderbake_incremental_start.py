@@ -7,9 +7,9 @@ from . import protocol
 
 NUM_NODES = 5  # because we assume 5 (bootstrap) accounts
 NUM_EARLY_START_NODES = 2
-ROUND_DURATION = 4
-ROUND_DURATIONS = {'round0': str(ROUND_DURATION), 'round1': str(ROUND_DURATION)}
-TEST_DURATION = 5 * ROUND_DURATION
+MINIMAL_BLOCK_DELAY = 4
+DELAY_INCREMENT_PER_ROUND = 1
+TEST_DURATION = 5 * MINIMAL_BLOCK_DELAY
 
 
 @pytest.mark.baker
@@ -43,12 +43,13 @@ class TestProtoTenderbakeIncrementalStart:
     def test_activate(self, sandbox):
         proto_params = dict(protocol.TENDERBAKE_PARAMETERS)
         parameters = copy.deepcopy(proto_params)
-        parameters['round_durations'] = ROUND_DURATIONS
+        parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+        parameters['delay_increment_per_round'] = str(DELAY_INCREMENT_PER_ROUND)
         parameters['consensus_threshold'] = (
             2 * (parameters['consensus_threshold'] // 3) + 1
         )
 
-        time.sleep(2 * ROUND_DURATION)
+        time.sleep(2 * MINIMAL_BLOCK_DELAY)
         protocol.activate(
             sandbox.client(0),
             parameters=parameters,
@@ -63,7 +64,7 @@ class TestProtoTenderbakeIncrementalStart:
                 proto=protocol.DAEMON,
                 log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
             )
-            time.sleep(ROUND_DURATION)
+            time.sleep(MINIMAL_BLOCK_DELAY)
 
     def test_wait(self):
         time.sleep(TEST_DURATION)
@@ -71,7 +72,7 @@ class TestProtoTenderbakeIncrementalStart:
     def test_level(self, sandbox):
         # a decision should be taken in the first round, so we can deduce at
         # which minimal level the nodes should be at
-        expected_min_level = 1 + TEST_DURATION // ROUND_DURATION
+        expected_min_level = 1 + TEST_DURATION // MINIMAL_BLOCK_DELAY
         for client in sandbox.all_clients():
             level = client.get_level()
             assert level >= expected_min_level

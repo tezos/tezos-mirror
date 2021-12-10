@@ -7,9 +7,11 @@ from . import protocol
 
 NUM_NODES = 5  # because we assume 5 (bootstrap) accounts
 NUM_TEST_CYCLES = 4
-CYCLE_DUR = 10  # should be correlated with 'round_durations' below
-ROUND_DURATION = 4
-ROUND_DURATIONS = {"round0": str(ROUND_DURATION), "round1": str(ROUND_DURATION)}
+# CYCLE_DUR should be correlated with MINIMAL_BLOCK_DELAY and
+# DELAY_INCREMENT_PER_ROUND below
+CYCLE_DUR = 10
+MINIMAL_BLOCK_DELAY = 4
+DELAY_INCREMENT_PER_ROUND = 1
 
 
 @pytest.mark.baker
@@ -32,7 +34,8 @@ class TestProtoTenderbake:
 
         proto_params = dict(protocol.TENDERBAKE_PARAMETERS)
         parameters = copy.deepcopy(proto_params)
-        parameters['round_durations'] = ROUND_DURATIONS
+        parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+        parameters['delay_increment_per_round'] = str(DELAY_INCREMENT_PER_ROUND)
         parameters['consensus_threshold'] = (
             2 * (parameters['consensus_threshold'] // 3) + 1
         )
@@ -57,7 +60,7 @@ class TestProtoTenderbake:
                 sandbox.rm_baker(dead_baker, proto=protocol.DAEMON)
                 # we let some time pass
                 # (there will be no progress during this time)
-                time.sleep(ROUND_DURATION)
+                time.sleep(MINIMAL_BLOCK_DELAY)
             else:
                 if cycle > 1:
                     sandbox.add_baker(

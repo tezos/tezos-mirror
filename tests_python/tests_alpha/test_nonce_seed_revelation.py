@@ -10,9 +10,11 @@ BLOCKS_PER_CYCLE = protocol.PARAMETERS['blocks_per_cycle']
 FIRST_PROTOCOL_BLOCK = 1
 TIMEOUT = 60
 
-ROUND_DURATION = 1
-ROUND_DURATIONS = {"round0": str(ROUND_DURATION), "round1": str(ROUND_DURATION)}
-TEST_DURATION = (FIRST_PROTOCOL_BLOCK + 2 * BLOCKS_PER_CYCLE) * ROUND_DURATION
+MINIMAL_BLOCK_DELAY = 1
+DELAY_INCREMENT_PER_ROUND = 1
+TEST_DURATION = (
+    FIRST_PROTOCOL_BLOCK + 2 * BLOCKS_PER_CYCLE
+) * MINIMAL_BLOCK_DELAY
 NUM_NODES = 5
 
 
@@ -41,7 +43,8 @@ class TestNonceSeedRevelation:
 
         # client setup
         parameters = protocol.get_parameters()
-        parameters['round_durations'] = ROUND_DURATIONS
+        parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+        parameters['delay_increment_per_round'] = str(DELAY_INCREMENT_PER_ROUND)
         protocol.activate(sandbox.client(0), parameters=parameters)
 
         # baker setup
@@ -61,7 +64,7 @@ class TestNonceSeedRevelation:
         level = target - 1
         while level < target:
             time.sleep(
-                4 * ROUND_DURATION
+                4 * MINIMAL_BLOCK_DELAY
             )  # sleep first to avoid useless first query
             if sandbox.client(0).get_level() >= target:
                 break

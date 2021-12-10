@@ -6,7 +6,7 @@ from . import protocol
 
 # TODO parameterize test
 
-ROUND_DURATION = 15
+MINIMAL_BLOCK_DELAY = 15
 
 
 @pytest.mark.baker
@@ -25,7 +25,7 @@ class TestManyBakers:
 
     def test_wait(self):
         # expects two level to be added to level start
-        time.sleep(2 * ROUND_DURATION)
+        time.sleep(2 * MINIMAL_BLOCK_DELAY)
 
     def test_progress(self, sandbox: Sandbox):
         min_level = min(
