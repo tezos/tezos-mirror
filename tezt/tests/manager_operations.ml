@@ -588,7 +588,7 @@ module Memchecks = struct
       return oph)
     else return oph
 
-  let with_checks ~__LOC__ ~classification
+  let with_checks ~__LOC__ ?(bake = true) ~classification
       ?(classification_after_flush = classification) ~should_propagate
       ?(should_include = should_propagate) nodes inject =
     Log.subsection
@@ -612,35 +612,37 @@ module Memchecks = struct
       "- Baking (should%s include operation %s)."
       (if should_include then "" else " not")
       oph ;
-    let* () = Helpers.bake_and_wait_block nodes.main in
-    Log.info "- Waiting for observer to see operation or block." ;
-    let* observer_result = wait_observer in
-    Log.info "- Checking mempool of main node." ;
-    let* mempool_after_baking = RPC.get_mempool client in
-    check_operation_classification
-      classification_after_flush
-      ~__LOC__
-      mempool_after_baking
-      oph
-      ~explain:"after baking" ;
-    Log.info "- Checking that observer did not observe operation." ;
-    let* () =
-      check_op_in_block
+    if not bake then return oph
+    else
+      let* () = Helpers.bake_and_wait_block nodes.main in
+      Log.info "- Waiting for observer to see operation or block." ;
+      let* observer_result = wait_observer in
+      Log.info "- Checking mempool of main node." ;
+      let* mempool_after_baking = RPC.get_mempool client in
+      check_operation_classification
+        classification_after_flush
         ~__LOC__
-        client
+        mempool_after_baking
         oph
-        ~should_include
-        ~explain:"newly baked"
-    and* () =
-      check_op_not_propagated
-        ~__LOC__
-        nodes.observer
-        oph
-        observer_result
-        ~should_include
-        ~explain:(string_of_ext_classification classification)
-    in
-    return oph
+        ~explain:"after baking" ;
+      Log.info "- Checking that observer did not observe operation." ;
+      let* () =
+        check_op_in_block
+          ~__LOC__
+          client
+          oph
+          ~should_include
+          ~explain:"newly baked"
+      and* () =
+        check_op_not_propagated
+          ~__LOC__
+          nodes.observer
+          oph
+          observer_result
+          ~should_include
+          ~explain:(string_of_ext_classification classification)
+      in
+      return oph
 
   let with_refused_checks =
     with_checks ~classification:`Refused ~should_propagate:false
