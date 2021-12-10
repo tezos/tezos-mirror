@@ -270,6 +270,25 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
           | None -> cycle
           | Some cycle -> cycle)
           ---> Cycle_repr.add cycle (preserved + 1))
+      >>=? fun ctxt ->
+      (* Remove seeds that will not be useful any longer: those from
+         [cycle - preserved_cycles - 1] to [cycle -  max_slashable_period].
+         NB: The seed at [cycle - preserved] is already removed by
+         H.cycle_end.  The seed at [cycle - max_slashable_period + 1]
+         is removed a bit later below by [Stake_storage.clear_at_cycle_end]. *)
+      (match
+         ( Cycle_repr.sub cycle (preserved - 1),
+           Cycle_repr.sub cycle max_slashing_period )
+       with
+      | (Some from_cycle, Some to_cycle) ->
+          List.fold_left_es
+            (fun ctxt cycle ->
+              Storage.Seed.For_cycle.mem ctxt cycle >>= function
+              | false -> return ctxt
+              | true -> Storage.Seed.For_cycle.remove_existing ctxt cycle)
+            ctxt
+            Cycle_repr.(from_cycle ---> to_cycle)
+      | _ -> return ctxt)
       >>=? fun ctxt -> return (ctxt, balance_updates))
   >>=? fun (ctxt, balance_updates) ->
   Stake_storage.snapshot ctxt >>=? fun ctxt ->
