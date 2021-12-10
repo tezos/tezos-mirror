@@ -9,8 +9,8 @@ variables:
   # Sets the number of tries before failing opam downloads.
   OPAMRETRIES: "5"
 
-  TEZOS_DEFAULT_BRANCH: "master"
-  TEZOS_DEFAULT_NAMESPACE: "tezos"
+  TEZOS_DEFAULT_BRANCH: "abate@tarballs-release"
+  TEZOS_DEFAULT_NAMESPACE: "nomadic-labs"
 
 # Basic, specialised, minimal, orthogonal templates
 
