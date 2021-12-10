@@ -121,6 +121,11 @@ Node
   `multiple transfers` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
 
+-  Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
+   It is no longer possible to run ``tezos-node upgrade storage`` to upgrade
+   from those older versions. It is also no longer possible to import
+   snapshots that were exported using this version.
+
 Client
 ------
 
