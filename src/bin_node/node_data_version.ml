@@ -58,18 +58,7 @@ let data_version = "0.0.6"
    much, an idea would be to have triples (version, version,
    converter), and to sequence them dynamically instead of
    statically. *)
-let upgradable_data_version =
-  [
-    ( "0.0.4",
-      fun ~data_dir genesis ~chain_name ~sandbox_parameters ->
-        let patch_context =
-          Patch_context.patch_context genesis sandbox_parameters
-        in
-        Legacy.upgrade_0_0_4 ~data_dir ~patch_context ~chain_name genesis );
-    ( "0.0.5",
-      fun ~data_dir genesis ~chain_name:_ ~sandbox_parameters:_ ->
-        Legacy.upgrade_0_0_5 ~data_dir genesis );
-  ]
+let upgradable_data_version = []
 
 let version_encoding = Data_encoding.(obj1 (req "version" string))
 
@@ -221,17 +210,6 @@ module Events = struct
       ~pp2:Format.pp_print_string
       ("available_version", Data_encoding.string)
 
-  let legacy_store_is_present =
-    declare_1
-      ~section
-      ~level:Notice
-      ~name:"legacy_store_is_present"
-      ~msg:
-        "the former store is present at '{legacy_store_path}' and may be \
-         removed to save disk space if the upgrade process went well"
-      ~pp1:Format.pp_print_string
-      ("legacy_store_path", Data_encoding.string)
-
   let emit = Internal_event.Simple.emit
 end
 
@@ -314,17 +292,9 @@ let ensure_data_dir bare data_dir =
       | Unix.Unix_error _ -> fail (Invalid_data_dir {data_dir; msg = None})
       | exc -> raise exc)
 
-let check_data_dir_legacy_artifact data_dir =
-  let lmdb_store_artifact_path = Legacy.temporary_former_store_path ~data_dir in
-  Lwt_unix.file_exists lmdb_store_artifact_path >>= function
-  | true -> Events.(emit legacy_store_is_present) lmdb_store_artifact_path
-  | false -> Lwt.return_unit
-
 let upgrade_data_dir ~data_dir genesis ~chain_name ~sandbox_parameters =
   ensure_data_dir false data_dir >>=? function
-  | None ->
-      Events.(emit dir_is_up_to_date ()) >>= fun () ->
-      check_data_dir_legacy_artifact data_dir >>= fun () -> return_unit
+  | None -> Events.(emit dir_is_up_to_date ()) >>= return
   | Some (version, upgrade) -> (
       Events.(emit upgrading_node (version, data_version)) >>= fun () ->
       upgrade ~data_dir genesis ~chain_name ~sandbox_parameters >>= function
