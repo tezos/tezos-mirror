@@ -107,6 +107,9 @@ val options : options
 
     If you do not call [init], [options] will contain only default values.
 
+    [init] exits the program on failure to parse the arguments (with code 2) or
+    when either [-help] or [--help] is present (with code 0).
+
     Warning: if [--log-file] is specified, the file is truncated.
     So if you call [init] several times with the same [--log-file] argument,
     all logs between the calls to [init] are lost in this file. *)

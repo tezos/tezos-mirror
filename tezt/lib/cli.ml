@@ -367,4 +367,10 @@ let init ?args () =
     | None -> Sys.argv
     | Some x -> Array.of_list (executable_name :: x)
   in
-  Arg.parse_argv argv spec add_tag usage
+  try Arg.parse_argv argv spec add_tag usage with
+  | Arg.Bad msg ->
+      Printf.eprintf "%s" msg ;
+      exit 2
+  | Arg.Help msg ->
+      Printf.printf "%s" msg ;
+      exit 0
