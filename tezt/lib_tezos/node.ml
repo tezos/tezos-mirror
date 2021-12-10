@@ -387,13 +387,14 @@ let wait_for_request ~request node =
   let event_name =
     match request with
     | `Flush | `Inject -> "request_completed_notice.v0"
-    | `Notify -> "request_completed_debug.v0"
+    | `Notify | `Arrived -> "request_completed_debug.v0"
   in
   let request_str =
     match request with
     | `Flush -> "flush"
     | `Inject -> "inject"
     | `Notify -> "notify"
+    | `Arrived -> "arrived"
   in
   let filter json =
     match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
