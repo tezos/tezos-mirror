@@ -138,6 +138,17 @@ let init ?args () =
           raise (Arg.Bad "--job index cannot be greater than job count")
         else options.job <- Some (index, count)
   in
+  let add_from_record path =
+    if not (Sys.is_directory path) then
+      options.from_records <- path :: options.from_records
+    else
+      let records =
+        Sys.readdir path |> Array.to_list
+        |> List.filter (fun name -> Filename.extension name = ".json")
+        |> List.map (fun name -> path // name)
+      in
+      options.from_records <- records @ options.from_records
+  in
   let spec =
     Arg.align
       [
@@ -277,13 +288,14 @@ let init ?args () =
            --from-record. If you use --loop or --loop-count, times are \
            averaged for each test." );
         ( "--from-record",
-          Arg.String
-            (fun file -> options.from_records <- file :: options.from_records),
+          Arg.String add_from_record,
           "<FILE> Start from a file recorded with --record. Can be specified \
-           multiple times. When using --time, test durations include tests \
-           found in record files. When using --record, the new record which is \
-           output does NOT include the input records. When using --junit, \
-           reports do NOT include input records." );
+           multiple times. If <FILE> is a directory, this is equivalent to \
+           specifying --from-record for all files in this directory that have \
+           the .json extension. When using --time, test durations include \
+           tests found in record files. When using --record, the new record \
+           which is output does NOT include the input records. When using \
+           --junit, reports do NOT include input records." );
         ( "--job",
           Arg.String set_job,
           "<INDEX>/<COUNT> COUNT must be at least 1 and INDEX must be between \
