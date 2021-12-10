@@ -276,10 +276,13 @@ val empty_mempool_file : ?filename:string -> unit -> string Lwt.t
 val bake_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
-  ?key:string ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
-  ?monitor_node_mempool:bool ->
+  ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
   t ->
@@ -289,29 +292,17 @@ val bake_for :
 val spawn_bake_for :
   ?endpoint:endpoint ->
   ?protocol:Protocol.t ->
-  ?key:string ->
+  ?keys:string list ->
+  ?minimal_fees:int ->
+  ?minimal_nanotez_per_gas_unit:int ->
+  ?minimal_nanotez_per_byte:int ->
   ?minimal_timestamp:bool ->
   ?mempool:string ->
-  ?monitor_node_mempool:bool ->
+  ?ignore_node_mempool:bool ->
   ?force:bool ->
   ?context_path:string ->
   t ->
   Process.t
-
-(** Run [tezos-client bake for].
-
-    Default [key] is {!Constant.bootstrap1.alias}. *)
-val tenderbake_for :
-  ?endpoint:endpoint ->
-  ?protocol:Protocol.t ->
-  ?keys:string list ->
-  ?minimal_timestamp:bool ->
-  ?mempool:string ->
-  ?monitor_node_mempool:bool ->
-  ?force:bool ->
-  ?context_path:string ->
-  t ->
-  unit Lwt.t
 
 (** Run [tezos-client endorse for].
 
@@ -395,16 +386,14 @@ val show_address : alias:string -> t -> Account.key Lwt.t
     (which also implies that there is no output key to parse). *)
 val spawn_show_address : alias:string -> t -> Process.t
 
-(** Run [tezos-client gen keys]. *)
-val gen_keys : alias:string -> t -> unit Lwt.t
+(** Run [tezos-client gen keys] and return the key alias.
+
+    The default value for [alias] is a fresh alias of the form [tezt_<n>]. *)
+val gen_keys : ?alias:string -> t -> string Lwt.t
 
 (** A helper to run [tezos-client gen keys] followed by
     [tezos-client show address] to get the generated key. *)
-val gen_and_show_keys : alias:string -> t -> Account.key Lwt.t
-
-(** Same as [gen_and_show_keys] but returns a [Constant.key] instead of an
-    [Account.key]. *)
-val gen_and_show_secret_keys : alias:string -> t -> Account.key Lwt.t
+val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :

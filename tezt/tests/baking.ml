@@ -538,12 +538,12 @@ let wrong_branch_operation_dismissal =
     return (JSON.as_string json)
   in
   Log.info "Injecting a transfer branched on the current head." ;
-  let* oph =
+  let* (`OpHash oph) =
     Operation.inject_transfer
       ~branch:head_hash
       ~amount:1
       ~source:Constant.bootstrap1
-      ~destination:Constant.bootstrap2
+      ~dest:Constant.bootstrap2
       client
   in
   let* current_mempool = RPC.get_mempool client in

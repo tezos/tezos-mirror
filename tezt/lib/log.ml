@@ -122,6 +122,8 @@ module Color = struct
     let cyan = "\027[36m"
 
     let gray = "\027[37m"
+
+    let bright_white = "\027[97m"
   end
 
   module BG = struct
@@ -140,6 +142,8 @@ module Color = struct
     let cyan = "\027[46m"
 
     let gray = "\027[47m"
+
+    let bright_white = "\027[107m"
   end
 end
 
@@ -245,8 +249,8 @@ let log_string ~(level : Cli.log_level) ?color ?prefix ?prefix_color
       in
       List.iter log_line lines
 
-let log ~level ?color ?prefix =
-  Printf.ksprintf (log_string ~level ?color ?prefix)
+let log ~level ?color ?prefix fmt =
+  Format.kasprintf (log_string ~level ?color ?prefix) fmt
 
 let debug ?color = log ~level:Debug ?color
 

@@ -102,7 +102,7 @@ let test_bake_two =
       in
       Log.info "Phase %d" i ;
       let* () = Client.transfer ~amount ~giver ~receiver client in
-      let* () = Client.tenderbake_for ~endpoint ~protocol ~keys:baker client in
+      let* () = Client.bake_for ~endpoint ~protocol ~keys:baker client in
       loop (i + 1)
   in
   loop 0

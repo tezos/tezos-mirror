@@ -66,6 +66,8 @@ module Color : sig
     val cyan : t
 
     val gray : t
+
+    val bright_white : t
   end
 
   (** Background colors. *)
@@ -85,6 +87,8 @@ module Color : sig
     val cyan : t
 
     val gray : t
+
+    val bright_white : t
   end
 end
 
@@ -100,26 +104,35 @@ val log :
   level:Cli.log_level ->
   ?color:Color.t ->
   ?prefix:string ->
-  ('a, unit, string, unit) format4 ->
+  ('a, Format.formatter, unit, unit) format4 ->
   'a
 
 (** Same as [log ~level:Debug]. *)
 val debug :
-  ?color:Color.t -> ?prefix:string -> ('a, unit, string, unit) format4 -> 'a
+  ?color:Color.t ->
+  ?prefix:string ->
+  ('a, Format.formatter, unit, unit) format4 ->
+  'a
 
 (** Same as [log ~level:Info]. *)
 val info :
-  ?color:Color.t -> ?prefix:string -> ('a, unit, string, unit) format4 -> 'a
+  ?color:Color.t ->
+  ?prefix:string ->
+  ('a, Format.formatter, unit, unit) format4 ->
+  'a
 
 (** Same as [log ~level:Report]. *)
 val report :
-  ?color:Color.t -> ?prefix:string -> ('a, unit, string, unit) format4 -> 'a
+  ?color:Color.t ->
+  ?prefix:string ->
+  ('a, Format.formatter, unit, unit) format4 ->
+  'a
 
 (** Same as [log ~level:Warn ~color:red ~prefix:"warn"]. *)
-val warn : ('a, unit, string, unit) format4 -> 'a
+val warn : ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (** Same as [log ~level:Error ~color:red ~prefix:"error"]. *)
-val error : ('a, unit, string, unit) format4 -> 'a
+val error : ('a, Format.formatter, unit, unit) format4 -> 'a
 
 (** Whether a test succeeded, failed or was aborted by the user.
 

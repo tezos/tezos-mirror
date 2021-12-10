@@ -359,8 +359,9 @@ let empty_mempool_file ?(filename = "mempool.json") () =
   in
   Lwt.return mempool
 
-let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
-    ?(minimal_timestamp = true) ?mempool ?monitor_node_mempool ?force
+let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
+    ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
+    ?(minimal_timestamp = true) ?mempool ?(ignore_node_mempool = false) ?force
     ?context_path client =
   spawn_command
     ?endpoint
@@ -369,69 +370,47 @@ let spawn_bake_for ?endpoint ?protocol ?(key = Constant.bootstrap1.alias)
        ~none:[]
        ~some:(fun p -> ["--protocol"; Protocol.hash p])
        protocol
-    @ ["bake"; "for"; key]
+    @ ["bake"; "for"] @ keys
+    @ Option.fold
+        ~none:[]
+        ~some:(fun mutez -> ["--minimal-fees"; string_of_int mutez])
+        minimal_fees
+    @ Option.fold
+        ~none:[]
+        ~some:(fun nanotez ->
+          ["--minimal-nanotez-per-gas-unit"; string_of_int nanotez])
+        minimal_nanotez_per_gas_unit
+    @ Option.fold
+        ~none:[]
+        ~some:(fun nanotez ->
+          ["--minimal-nanotez-per-byte"; string_of_int nanotez])
+        minimal_nanotez_per_byte
     @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ Option.fold
         ~none:[]
         ~some:(fun mempool_json -> ["--mempool"; mempool_json])
         mempool
-    @ (match monitor_node_mempool with
-      | None | Some true -> []
-      | Some false -> (
-          match protocol with
+    @ (match protocol with
+      | Some Alpha ->
           (* Only Alpha/Tenderbake supports this switch *)
-          | Some Alpha -> ["--ignore-node-mempool"]
-          | None | Some _ -> []))
+          if ignore_node_mempool then ["--ignore-node-mempool"] else []
+      | None | Some (Granada | Hangzhou) -> [])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
     )
 
-let bake_for ?endpoint ?protocol ?key ?minimal_timestamp ?mempool
-    ?monitor_node_mempool ?force ?context_path client =
+let bake_for ?endpoint ?protocol ?keys ?minimal_fees
+    ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?minimal_timestamp
+    ?mempool ?ignore_node_mempool ?force ?context_path client =
   spawn_bake_for
     ?endpoint
-    ?key
-    ?minimal_timestamp
-    ?mempool
-    ?monitor_node_mempool
-    ?force
-    ?context_path
-    ?protocol
-    client
-  |> Process.check
-
-let spawn_tenderbake_for ?endpoint ?protocol
-    ?(keys = [Constant.bootstrap1.alias]) ?(minimal_timestamp = true) ?mempool
-    ?monitor_node_mempool ?force ?context_path client =
-  spawn_command
-    ?endpoint
-    client
-    (Option.fold
-       ~none:[]
-       ~some:(fun p -> ["--protocol"; Protocol.hash p])
-       protocol
-    @ ["bake"; "for"] @ keys
-    @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
-    @ Option.fold
-        ~none:[]
-        ~some:(fun mempool_json -> ["--mempool"; mempool_json])
-        mempool
-    @ (match monitor_node_mempool with
-      | None | Some true -> []
-      (* default behavior *)
-      | Some false -> ["--ignore-node-mempool"])
-    @ (match force with None | Some false -> [] | Some true -> ["--force"])
-    @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
-    )
-
-let tenderbake_for ?endpoint ?protocol ?keys ?minimal_timestamp ?mempool
-    ?monitor_node_mempool ?force ?context_path client =
-  spawn_tenderbake_for
-    ?endpoint
     ?keys
+    ?minimal_fees
+    ?minimal_nanotez_per_gas_unit
+    ?minimal_nanotez_per_byte
     ?minimal_timestamp
     ?mempool
-    ?monitor_node_mempool
+    ?ignore_node_mempool
     ?force
     ?context_path
     ?protocol
@@ -510,9 +489,22 @@ let propose_for ?endpoint ?(minimal_timestamp = true) ?protocol ?key ?force
   spawn_propose_for ?endpoint ?protocol ?key ?force ~minimal_timestamp client
   |> Process.check
 
-let spawn_gen_keys ~alias client = spawn_command client ["gen"; "keys"; alias]
+let spawn_gen_keys =
+  let id = ref 0 in
+  fun ?alias client ->
+    let alias =
+      match alias with
+      | None ->
+          incr id ;
+          sf "tezt_%d" !id
+      | Some alias -> alias
+    in
+    (spawn_command client ["gen"; "keys"; alias], alias)
 
-let gen_keys ~alias client = spawn_gen_keys ~alias client |> Process.check
+let gen_keys ?alias client =
+  let (p, alias) = spawn_gen_keys ?alias client in
+  let* () = Process.check p in
+  return alias
 
 let spawn_show_address ~alias client =
   spawn_command client ["show"; "address"; alias; "--show-secret"]
@@ -545,12 +537,8 @@ let show_address ~alias client =
   in
   return @@ extract_key output
 
-let gen_and_show_keys ~alias client =
-  let* () = gen_keys ~alias client in
-  show_address ~alias client
-
-let gen_and_show_secret_keys ~alias client =
-  let* () = gen_keys ~alias client in
+let gen_and_show_keys ?alias client =
+  let* alias = gen_keys ?alias client in
   show_address ~alias client
 
 let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
@@ -1129,7 +1117,7 @@ let get_parameter_file ?additional_bootstrap_account_count
         Lwt_list.map_s
           (fun i ->
             let alias = sf "bootstrap%d" i in
-            let* key = gen_and_show_secret_keys ~alias client in
+            let* key = gen_and_show_keys ~alias client in
             return (key, default_accounts_balance))
           (range 6 (5 + n))
       in
