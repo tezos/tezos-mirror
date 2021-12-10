@@ -26,7 +26,9 @@
 (** Testing
     -------
     Component:  Protocol (voting)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^voting$"
+    Invocation: dune exec \
+                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                -- test "^voting$"
     Subject:    On the voting process.
 
 *)

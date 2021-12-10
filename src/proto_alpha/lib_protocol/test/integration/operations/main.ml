@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,44 +26,22 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
+    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/operations
     Subject:      Entrypoint
 *)
 
 let () =
   Alcotest_lwt.run
-    "protocol_alpha"
+    "protocol_alpha > integration > operations"
     [
-      ("endorsement", Test_endorsement.tests);
-      ("preendorsement", Test_preendorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double preendorsement", Test_double_preendorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("deactivation", Test_deactivation.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("gas levels", Test_gas_levels.tests);
-      ("gas cost functions", Test_gas_costs.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("sapling", Test_sapling.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("storage description", Test_storage.tests);
-      ("constants", Test_constants.tests);
-      ("liquidity baking", Test_liquidity_baking.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("timelock", Test_timelock.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("participation monitoring", Test_participation.tests);
-      ("frozen deposits", Test_frozen_deposits.tests);
-      ("token movements", Test_token.tests);
-      ("script cache", Test_script_cache.tests);
+      ("voting", Test_voting.tests);
+      ("origination", Test_origination.tests);
+      ("revelation", Test_reveal.tests);
+      ("transfer", Test_transfer.tests);
+      ("activation", Test_activation.tests);
+      ("combined", Test_combined_operations.tests);
+      ("failing_noop operation", Test_failing_noop.tests);
+      ("tx rollup", Test_tx_rollup.tests);
+      ("sc rollup", Test_sc_rollup.tests);
     ]
   |> Lwt_main.run

@@ -26,7 +26,9 @@
 (** Testing
     -------
     Component:  Protocol (combined operations)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^combined$"
+    Invocation: dune exec \
+                src/proto_alpha/lib_protocol/test/integration/operations/main.exe \
+                -- test "^combined$"
     Subject:    Multiple operations can be grouped in one ensuring their
                 deterministic application.
 
