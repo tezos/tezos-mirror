@@ -26,7 +26,6 @@
 (** Testing
     -------
     Component:  Protocol (preendorsement) in Full_construction & Application modes
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^preendorsement$"
     Subject:    preendorsement inclusion in a block
 *)
 

@@ -34,21 +34,9 @@ let () =
   Alcotest_lwt.run
     "protocol_alpha"
     [
-      ("endorsement", Test_endorsement.tests);
-      ("preendorsement", Test_preendorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double preendorsement", Test_double_preendorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("deactivation", Test_deactivation.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
       ("storage description", Test_storage.tests);
       ("constants", Test_constants.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
-      ("participation monitoring", Test_participation.tests);
-      ("frozen deposits", Test_frozen_deposits.tests);
       ("token movements", Test_token.tests);
     ]
   |> Lwt_main.run
