@@ -342,8 +342,6 @@ type error +=
   | Cannot_load_testchain of string
   | Missing_activation_block of Block_hash.t * Protocol_hash.t * History_mode.t
   | Inconsistent_protocol_commit_info of Block_hash.t * Protocol_hash.t
-  | Missing_activation_block_legacy of
-      Int32.t * Protocol_hash.t * History_mode.t
   | Missing_stored_data of string
   | Failed_to_get_live_blocks of Block_hash.t
   | Target_mismatch
@@ -909,30 +907,6 @@ let () =
     (function
       | Inconsistent_protocol_commit_info (bh, ph) -> Some (bh, ph) | _ -> None)
     (fun (bh, ph) -> Inconsistent_protocol_commit_info (bh, ph)) ;
-  Error_monad.register_error_kind
-    `Temporary
-    ~id:"store.missing_activation_block_legacy"
-    ~title:"Missing activation block legacy"
-    ~description:"Missing activation block while restoring a legacy snapshot"
-    ~pp:(fun ppf (bl, ph, hm) ->
-      Format.fprintf
-        ppf
-        "Failed to restore legacy snapshot: the expected activation block \
-         (level %ld) originating the protocol %a was not found for %a."
-        bl
-        Protocol_hash.pp
-        ph
-        History_mode.pp
-        hm)
-    Data_encoding.(
-      obj3
-        (req "block_hash" int32)
-        (req "protocol_hash" Protocol_hash.encoding)
-        (req "history_mode" History_mode.encoding))
-    (function
-      | Missing_activation_block_legacy (bl, ph, hm) -> Some (bl, ph, hm)
-      | _ -> None)
-    (fun (bl, ph, hm) -> Missing_activation_block_legacy (bl, ph, hm)) ;
   Error_monad.register_error_kind
     `Temporary
     ~id:"store.missing_stored_data"

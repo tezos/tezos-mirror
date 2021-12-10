@@ -27,5 +27,3 @@
 
 (** @inline *)
 include Context_dump_intf.Context_dump
-
-include Context_dump_intf.Context_dump_legacy
