@@ -193,7 +193,7 @@ let test_transfer_to_originate_with_fee () =
   Incremental.begin_construction b >>=? fun b ->
   two_over_n_of_balance b contract 10L >>=? fun fee ->
   (* originated contract, paying a fee to originated this contract *)
-  Op.origination (I b) ~fee:ten_tez contract ~script:Op.dummy_script
+  Op.contract_origination (I b) ~fee:ten_tez contract ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_over_n_of_balance b contract 3L >>=? fun amount ->
@@ -272,7 +272,7 @@ let test_transfer_zero_to_originated_with_bal_src_as_fee () =
   let src = Contract.implicit_contract account.Account.pkh in
   Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
   Incremental.add_operation i op >>=? fun i ->
-  Op.origination (I i) dest ~script:Op.dummy_script
+  Op.contract_origination (I i) dest ~script:Op.dummy_script
   >>=? fun (op, new_contract) ->
   Incremental.add_operation i op >>=? fun i ->
   Context.Contract.balance (I i) src >>=? fun bal_src ->
@@ -367,7 +367,7 @@ let test_transfer_from_implicit_to_originated_contract () =
     amount1
   >>=? fun (b, _) ->
   (* originated contract *)
-  Op.origination (I b) contract ~script:Op.dummy_script
+  Op.contract_origination (I b) contract ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_over_n_of_balance b bootstrap_contract 4L >>=? fun amount2 ->

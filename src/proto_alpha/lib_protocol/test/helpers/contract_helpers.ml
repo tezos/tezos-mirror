@@ -57,7 +57,7 @@ let originate_contract file storage src b baker =
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
-  Op.origination (B b) src ~fee:(Test_tez.of_int 10) ~script
+  Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
   >>=? fun (operation, dst) ->
   Incremental.begin_construction ~policy:Block.(By_account baker) b
   >>=? fun incr ->

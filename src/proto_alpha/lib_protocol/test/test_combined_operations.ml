@@ -93,7 +93,7 @@ let test_multiple_origination_and_delegation () =
   (* Deploy n smart contracts with dummy scripts from c1 *)
   List.map_es
     (fun i ->
-      Op.origination
+      Op.contract_origination
         ~gas_limit
         ~delegate:delegate_pkh
         ~counter:(Z.of_int i)

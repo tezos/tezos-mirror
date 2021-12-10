@@ -58,21 +58,16 @@ val is_implicit : contract -> Signature.Public_key_hash.t option
 
 (** {2 Originated contracts} *)
 
-(** Originated contracts handles are crafted from the hash of the
-    operation that triggered their origination (and nothing else).
-    As a single operation can trigger several originations, the
-    corresponding handles are forged from a deterministic sequence of
-    nonces, initialized with the hash of the operation. *)
-type origination_nonce
+(** [originated_contract nonce] is the contract address originated from [nonce].
+*)
+val originated_contract : Origination_nonce.t -> contract
 
-val originated_contract : origination_nonce -> contract
-
+(** [originated_contracts ~since ~until] is the contract addresses originated
+    from [since] until [until]. The operation hash of nonce [since] and [until]
+    must be the same or it will fail with an [assert]. [since] < [until] or the
+    returned list is empty *)
 val originated_contracts :
-  since:origination_nonce -> until:origination_nonce -> contract list
-
-val initial_origination_nonce : Operation_hash.t -> origination_nonce
-
-val incr_origination_nonce : origination_nonce -> origination_nonce
+  since:Origination_nonce.t -> until:Origination_nonce.t -> contract list
 
 val is_originated : contract -> Contract_hash.t option
 
@@ -91,8 +86,6 @@ val pp_short : Format.formatter -> contract -> unit
 (** {2 Serializers} *)
 
 val encoding : contract Data_encoding.t
-
-val origination_nonce_encoding : origination_nonce Data_encoding.t
 
 val rpc_arg : contract RPC_arg.arg
 

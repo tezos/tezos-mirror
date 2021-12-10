@@ -59,9 +59,9 @@ let total_fees_for_origination ?(fee = Tez.zero) ?(credit = Tez.zero) b =
    operation valid.
    - the source contract has payed all the fees
    - the originated has been credited correctly.
-   Note that we need 2 contracts because in Tenderbake the baker receives the
-   fees instantaneously. So to see that the fees are subtracted, we need that
-   the bake is done by another delegated. *)
+     Note that we need 2 contracts because in Tenderbake the baker receives the
+     fees instantaneously. So to see that the fees are subtracted, we need that
+     the bake is done by another delegated. *)
 let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   Context.init 2 >>=? fun (b, contracts) ->
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
@@ -70,7 +70,7 @@ let test_origination_balances ~loc:_ ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   in
   Context.Contract.pkh source >>=? fun pkh_for_orig ->
   Context.Contract.pkh contract_for_bake >>=? fun pkh_for_bake ->
-  Op.origination (B b) source ~fee ~credit ~script:Op.dummy_script
+  Op.contract_origination (B b) source ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   total_fees_for_origination ~fee ~credit b >>=? fun total_fee ->
   Block.bake ~operation ~policy:(By_account pkh_for_bake) b >>=? fun b ->
@@ -103,7 +103,7 @@ let register_origination ?(fee = Tez.zero) ?(credit = Tez.zero) () =
   in
   Context.Contract.pkh source >>=? fun source_pkh ->
   Context.Contract.pkh contract_for_bake >>=? fun pkh_for_bake ->
-  Op.origination (B b) source ~fee ~credit ~script:Op.dummy_script
+  Op.contract_origination (B b) source ~fee ~credit ~script:Op.dummy_script
   >>=? fun (operation, originated) ->
   Block.bake ~operation ~policy:(By_account pkh_for_bake) b >>=? fun b ->
   (* fee + credit were debited from source *)
@@ -173,7 +173,7 @@ let test_not_tez_in_contract_to_pay_fee () =
   >>=? fun _ ->
   (* use this source contract to create an originate contract where it requires
      to pay a fee and add an amount of credit into this new contract *)
-  Op.origination
+  Op.contract_origination
     (I inc)
     ~fee:ten_tez
     ~credit:Tez.one
@@ -213,9 +213,17 @@ let test_counter () =
   Context.init 1 >>=? fun (b, contracts) ->
   let contract = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   Incremental.begin_construction b >>=? fun inc ->
-  Op.origination (I inc) ~credit:Tez.one contract ~script:Op.dummy_script
+  Op.contract_origination
+    (I inc)
+    ~credit:Tez.one
+    contract
+    ~script:Op.dummy_script
   >>=? fun (op1, _) ->
-  Op.origination (I inc) ~credit:Tez.one contract ~script:Op.dummy_script
+  Op.contract_origination
+    (I inc)
+    ~credit:Tez.one
+    contract
+    ~script:Op.dummy_script
   >>=? fun (op2, _) ->
   Incremental.add_operation inc op1 >>=? fun inc ->
   Incremental.add_operation inc op2 >>= fun res ->

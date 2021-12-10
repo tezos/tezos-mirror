@@ -163,7 +163,7 @@ let tickets_from_big_map_ref ~pre_populated value_exp =
   let* (block, contracts) = Context.init 1 in
   let source = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd contracts in
   let* (operation, originated) =
-    Op.origination (B block) source ~script:Op.dummy_script
+    Op.contract_origination (B block) source ~script:Op.dummy_script
   in
   let* block = Block.bake ~operation block in
   let* inc = Incremental.begin_construction block in

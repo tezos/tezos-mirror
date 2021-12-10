@@ -46,11 +46,11 @@ module Storage = struct
       xtzPool = Tez.zero;
       lqtTotal = Z.zero;
       tokenAddress =
-        Contract.originated_contract
-          (Contract.initial_origination_nonce Operation_hash.zero);
+        Contract.Internal_for_tests.originated_contract
+          (Origination_nonce.Internal_for_tests.initial Operation_hash.zero);
       lqtAddress =
-        Contract.originated_contract
-          (Contract.initial_origination_nonce Operation_hash.zero);
+        Contract.Internal_for_tests.originated_contract
+          (Origination_nonce.Internal_for_tests.initial Operation_hash.zero);
     }
 
   let to_string {tokenPool; xtzPool; lqtTotal; tokenAddress; lqtAddress} =

@@ -246,7 +246,7 @@ let prepare_origination block source script =
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_unit}
   in
-  Op.origination (B block) source ~script
+  Op.contract_origination (B block) source ~script
 
 let originate_contract block source script =
   prepare_origination block source script >>=? fun (operation, dst) ->

@@ -1339,6 +1339,24 @@ module Lazy_storage : sig
   val apply : t -> diffs -> (t * Z.t) tzresult Lwt.t
 end
 
+module Origination_nonce : sig
+  (** see [Raw_context.init_origination_nonce] *)
+  val init : context -> Operation_hash.t -> context
+
+  (** see [Raw_context.unset_origination_nonce] *)
+  val unset : context -> context
+
+  (** This module disclose a type and a function that are only useful for
+      tests. See [Origination_nonce] for documentation. *)
+  module Internal_for_tests : sig
+    type t
+
+    val initial : Operation_hash.t -> t
+
+    val incr : t -> t
+  end
+end
+
 module Contract : sig
   include BASIC_DATA
 
@@ -1391,10 +1409,6 @@ module Contract : sig
   val get_balance_carbonated :
     context -> contract -> (context * Tez.t) tzresult Lwt.t
 
-  val init_origination_nonce : context -> Operation_hash.t -> context
-
-  val unset_origination_nonce : context -> context
-
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult
 
   val originated_from_current_nonce :
@@ -1437,21 +1451,17 @@ module Contract : sig
   val check_counter_increment :
     context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
 
-  (**/**)
-
-  (* Only for testing *)
-  type origination_nonce
-
-  val initial_origination_nonce : Operation_hash.t -> origination_nonce
-
-  val originated_contract : origination_nonce -> contract
-
   val raw_originate :
     context ->
     prepaid_bootstrap_storage:bool ->
     t ->
     script:Script.t * Lazy_storage.diffs option ->
     context tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    (** see [Contract_repr.originated_contract] for documentation *)
+    val originated_contract : Origination_nonce.Internal_for_tests.t -> contract
+  end
 end
 
 module Receipt : sig

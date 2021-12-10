@@ -31,7 +31,7 @@
                 cannot delete/change their delegate (as opposed to contracts
                 not-being-delegate which can do these), bootstrap manager
                 as delegate during origination).
-                - Properties on delegation depending on whether delegate
+    - Properties on delegation depending on whether delegate
                 keys registration, through origination and delegation.
 *)
 
@@ -257,7 +257,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
   Context.Contract.manager (I i) bootstrap >>=? fun manager ->
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
   (* originate a contract with bootstrap's manager as delegate *)
-  Op.origination
+  Op.contract_origination
     ~fee
     ~credit:Tez.zero
     ~delegate:manager.pkh
@@ -431,18 +431,18 @@ let tests_bootstrap_contracts =
 
    Two main series of tests: without self-delegation and with a failed attempt at self-delegation:
 
-  1/ no self-delegation
+   1/ no self-delegation
      a/ no credit
-     - no token transfer
-     - credit of 1μꜩ and then debit of 1μꜩ
+   - no token transfer
+   - credit of 1μꜩ and then debit of 1μꜩ
      b/ with credit of 1μꜩ.
        For every scenario, we try three different ways of delegating:
-     - through origination (init origination)
-     - through delegation when no delegate was assigned (init delegation)
-     - through delegation when a delegate was assigned (switch delegation).
+   - through origination (init origination)
+   - through delegation when no delegate was assigned (init delegation)
+   - through delegation when a delegate was assigned (switch delegation).
 
-  2/ Self-delegation fails if the contract has no credit. We try the
-  two possibilities of 1a for non-credited contracts. *)
+   2/ Self-delegation fails if the contract has no credit. We try the
+   two possibilities of 1a for non-credited contracts. *)
 
 let expect_unregistered_key pkh = function
   | Environment.Ecoproto_error (Delegate_storage.Unregistered_delegate pkh0)
@@ -468,7 +468,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
   let unregistered_account = Account.new_account () in
   let unregistered_pkh = Account.(unregistered_account.pkh) in
   (* origination with delegate argument *)
-  Op.origination
+  Op.contract_origination
     ~fee
     ~delegate:unregistered_pkh
     (I i)
@@ -614,7 +614,7 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract amount >>=? fun _ ->
   (* origination with delegate argument *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
-  Op.origination
+  Op.contract_origination
     ~fee
     ~delegate:unregistered_pkh
     (I i)
@@ -765,7 +765,7 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
   (* origination with delegate argument *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
-  Op.origination
+  Op.contract_origination
     ~fee
     ~delegate:unregistered_pkh
     (I i)
