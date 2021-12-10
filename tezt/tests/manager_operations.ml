@@ -1421,8 +1421,6 @@ module Simple_transfers = struct
     in
     unit
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2244
-     Should be refused because this batch is never applicable. *)
   let test_batch_simple_transfers_wrong_counters =
     Protocol.register_test
       ~__FILE__
@@ -1451,11 +1449,11 @@ module Simple_transfers = struct
       Operation.mk_transfer
         ~source:Constant.bootstrap2
         ~dest:Constant.bootstrap3
-        ~counter:(counter + 2) (* Reuse counter: wrong *)
+        ~counter:(counter + 2)
         nodes.main.client
     in
     let* _ =
-      Memchecks.with_branch_refused_checks ~__LOC__ nodes @@ fun () ->
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
         ~batch:[op1; op2; op3]
@@ -1464,8 +1462,6 @@ module Simple_transfers = struct
     in
     unit
 
-  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2244
-     Should be refused because this batch is never applicable. *)
   let test_batch_simple_transfers_wrong_counters_2 =
     Protocol.register_test
       ~__FILE__
@@ -1498,7 +1494,7 @@ module Simple_transfers = struct
         nodes.main.client
     in
     let* _ =
-      Memchecks.with_branch_delayed_checks ~__LOC__ nodes @@ fun () ->
+      Memchecks.with_refused_checks ~__LOC__ nodes @@ fun () ->
       Operation.forge_and_inject_operation
         ~protocol
         ~batch:[op1; op2; op3]
@@ -1519,10 +1515,10 @@ module Simple_transfers = struct
     test_simple_transfer_low_balance_to_pay_allocation_1 ~protocols ;
     test_simple_transfer_low_balance_to_pay_allocation_2 ~protocols ;
     test_simple_transfer_of_the_whole_balance ~protocols ;
-    test_simple_transfers_successive_wrong_counters ~protocols:[Alpha] ;
+    test_simple_transfers_successive_wrong_counters ~protocols:[Ithaca; Alpha] ;
     test_simple_transfers_successive_wrong_counters_no_op_pre ~protocols ;
-    test_batch_simple_transfers_wrong_counters ~protocols ;
-    test_batch_simple_transfers_wrong_counters_2 ~protocols
+    test_batch_simple_transfers_wrong_counters ~protocols:[Alpha] ;
+    test_batch_simple_transfers_wrong_counters_2 ~protocols:[Alpha]
 end
 
 module Simple_contract_calls = struct
