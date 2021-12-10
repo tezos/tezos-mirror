@@ -393,7 +393,7 @@ developer utilities and old protocols. In particular:
    - ``src/lib_client_base/gen/dune`` (executable name ``bip39_generator``)
    - ``src/lib_protocol_compiler/dune`` (executable name ``replace``)
    - ``src/proto_alpha/lib_parameters/dune`` (executable name ``gen``)
-   - ``src/proto_010_PtGRANAD/lib_parameters/dune`` (executable name ``gen``)
+   - ``src/proto_011_PtHangz2/lib_parameters/dune`` (executable name ``gen``)
    - ``src/lib_protocol_environment/s_packer/dune`` (executable name ``s_packer``)
    - ``src/lib_store/legacy_store/dune`` (executable name ``legacy_store_builder``)
 
@@ -476,7 +476,7 @@ Tezt integration and regression tests
   ``make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json``
 
 The OCaml package tests (Alcotest & QCheck)
-  
+
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 

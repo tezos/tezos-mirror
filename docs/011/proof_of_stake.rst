@@ -50,6 +50,7 @@ from the delegates' own balance. Therefore delegates may be subject to
 Active and passive delegates
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+.. _active_delegate:
 .. _active_delegate_011:
 
 A delegate can be marked as either active or passive. A passive
@@ -71,6 +72,7 @@ track the specific tokens assigned to specific delegates. However, it would be
 too demanding of nodes to track assignments at such a granular level. Instead,
 Tezos works with *sets of tokens* which are called *rolls*.
 
+.. _roll_pos:
 .. _roll_pos_011:
 
 Rolls
@@ -100,6 +102,7 @@ The advantage of tracking tokens in this way is that a delegate creating a
 malicious fork cannot easily change the specific rolls assigned to them, even if
 they control the underlying tokens and shuffle them around.
 
+.. _random_seed:
 .. _random_seed_011:
 
 Random seed
@@ -125,6 +128,7 @@ wallet activations and denunciations can be contained in any given block.
 The seed for cycle ``n`` is obtained as follows: the seed of cycle ``n-1`` is
 hashed with a constant and then with each nonce revealed in cycle ``n-1``.
 
+.. _rights:
 .. _rights_011:
 
 Slot selection
@@ -150,6 +154,7 @@ The seed of the PRNG is the :ref:`random seed <random_seed_011>` associated with
 The PRNG first selects a snapshot from cycle ``n-PRESERVED_CYCLES-2`` and then it selects a roll in the selected snapshot.
 The slot owner is then the roll owner.
 
+.. _protocol_constants:
 .. _protocol_constants_011:
 
 Protocol constants
@@ -164,6 +169,7 @@ The values of protocol constants can be found using a :ref:`specific RPC call <G
 
 In particular, the protocol constants related to the proof-of-stake mechanism are detailed below.
 
+.. _ps_constants:
 .. _ps_constants_011:
 
 Proof-of-stake parameters

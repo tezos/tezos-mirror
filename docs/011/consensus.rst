@@ -36,6 +36,7 @@ Emmy* improves Emmy+ in that it brings smaller block times and faster times to
 finality.
 
 
+.. _terminology:
 .. _terminology_011:
 
 Terminology
@@ -74,6 +75,7 @@ serves to compute the minimal time between blocks depending on the current
 block's priority `p`, and its endorsing power `e`. Namely, Emmy* defines the
 minimal block delay function as follows:
 
+.. _delaystar:
 .. _delaystar_011:
 
 .. math::
@@ -146,6 +148,7 @@ attributes).  A delegate plays two roles:
   a block by **endorsing** that block.
 
 
+.. _emmyp_slot_selection:
 .. _emmyp_slot_selection_011:
 
 To these roles correspond the two types of actions mentioned above, baking and
@@ -155,6 +158,7 @@ given by its baking, respectively endorsing slots, whose selection is described
 if the delegate whose turn is to bake is for some reason unable to bake, the
 next delegate in the list can step up and bake the block.
 
+.. _emmyp_fitness_and_header:
 .. _emmyp_fitness_and_header_011:
 
 There are two more notions which are defined abstractly at the level of the
@@ -268,6 +272,7 @@ incident. Pragmatically, any baker who either double bakes or endorses in a
 given cycle should immediately stop both baking and endorsing for the rest of
 that cycle.
 
+.. _cs_constants:
 .. _cs_constants_011:
 
 Consensus protocol parameters

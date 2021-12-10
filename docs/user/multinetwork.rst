@@ -34,11 +34,11 @@ Built-In Networks
 -----------------
 
 The simplest way to select the network to connect to is to use the ``--network``
-option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Granadanet::
+option when you initialize your :doc:`node configuration <./node-configuration>`. For instance, to run on Hangzhounet::
 
-  tezos-node config init --data-dir ~/tezos-granadanet --network granadanet
-  tezos-node identity generate --data-dir ~/tezos-granadanet
-  tezos-node run --data-dir ~/tezos-granadanet
+  tezos-node config init --data-dir ~/tezos-hangzhounet --network hangzhounet
+  tezos-node identity generate --data-dir ~/tezos-hangzhounet
+  tezos-node run --data-dir ~/tezos-hangzhounet
 
 .. note::
    Once initialized, the node remembers its network settings on subsequent runs
@@ -56,17 +56,17 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``granadanet`` (available from version 9.2)
+- ``hangzhounet`` (available from version 11.0)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
 You can use the ``--network`` option with ``tezos-node run`` to make sure
 your node runs on the expected network. For instance, to make sure that
-it runs on Granadanet::
+it runs on Hangzhounet::
 
-  tezos-node run --data-dir ~/tezos-granadanet --network granadanet
+  tezos-node run --data-dir ~/tezos-hangzhounet --network hangzhounet
 
-This command will fail with an error if the configured network is not Granadanet.
+This command will fail with an error if the configured network is not Hangzhounet.
 The node also displays the chain name (such as ``TEZOS_MAINNET``) when it starts.
 Also mind opening the :doc:`RPC interface <../developer/rpc>` as appropriate.
 
@@ -199,11 +199,11 @@ Alias Versus Explicit Configuration
 
 If you use one of the `Built-In Networks`_, the configuration file stores
 the name of the network to connect to. For instance, if you configured it
-to connect to Granadanet, it will contain something like::
+to connect to Hangzhounet, it will contain something like::
 
   {
     "p2p": {},
-    "network": "granadanet"
+    "network": "hangzhounet"
   }
 
 For Mainnet, it would contain ``mainnet``, or nothing as this is actually the default.
@@ -215,7 +215,7 @@ overrides may be added. Because the configuration file only contains the name
 of the network and not its parameters, it will automatically use the updated values.
 
 However, if you configure `Custom Networks`_, the configuration file will
-no longer contain an alias such as ``mainnet`` or ``granadanet``. Instead,
+no longer contain an alias such as ``mainnet`` or ``hangzhounet``. Instead,
 it will explicitly contain the list of bootstrap peers, user-activated upgrades
 and user-activated protocol overrides that you specify. This means that when
 you update your node, updates to built-in network parameters will have no effect.

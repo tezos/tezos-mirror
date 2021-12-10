@@ -146,7 +146,7 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 010 Granada Protocol doc:
+   :caption: 011 Hangzhou Protocol doc:
 
    active/michelson
    active/proof_of_stake
@@ -154,26 +154,11 @@ in the :ref:`introduction <howtoget>`.
    active/sapling
    active/voting
    active/liquidity_baking
+   active/timelock
    active/plugins
    active/glossary
    active/cli-commands
    active/rpc
-
-.. toctree::
-   :maxdepth: 2
-   :caption: 011 Hangzhou Protocol doc:
-
-   011/michelson
-   011/proof_of_stake
-   011/consensus
-   011/sapling
-   011/voting
-   011/liquidity_baking
-   011/timelock
-   011/plugins
-   011/glossary
-   011/cli-commands
-   011/rpc
 
 .. toctree::
    :maxdepth: 2

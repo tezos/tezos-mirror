@@ -244,7 +244,7 @@ If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
 To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
-Alternatively, you may use the :ref:`baking rights RPC <GET_..--block_id--helpers--baking_rights>`) and the :ref:`endorsing rights RPC <GET_..--block_id--helpers--endorsing_rights>`, able to return a list of baking/endorsing slots for a given delegate (see :ref:`example <DelegateRegistration>`).
+Alternatively, you may use the baking rights RPC and the endorsing rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/endorsing slots for a given delegate (see :ref:`example <DelegateRegistration>`).
 
 .. _baker_run:
 
@@ -291,12 +291,12 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-Assuming you run on Granadanet, to know if you baked, just run::
+Assuming you run on Hangzhounet, to know if you baked, just run::
 
-    ./granadanet.sh baker log
-    ./granadanet.sh endorser log
+    ./hangzhounet.sh baker log
+    ./hangzhounet.sh endorser log
 
-(replace ``granadanet.sh`` with ``mainnet.sh`` for Mainnet).
+(replace ``hangzhounet.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)
