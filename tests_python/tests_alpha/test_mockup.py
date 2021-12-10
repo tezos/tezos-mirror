@@ -649,6 +649,9 @@ def _test_create_mockup_init_show_roundtrip(
                     'denominator': 2,
                 },
                 "double_baking_punishment": "640000001",
+                "tx_rollup_enable": False,
+                # TODO: https://gitlab.com/tezos/tezos/-/issues/2152
+                "tx_rollup_origination_size": 60_000,
             }
         ),
     ],

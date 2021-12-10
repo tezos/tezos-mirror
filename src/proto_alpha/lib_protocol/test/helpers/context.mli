@@ -162,6 +162,10 @@ module Delegate : sig
     t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
 end
 
+module Tx_rollup : sig
+  val state : t -> Tx_rollup.t -> Tx_rollup.state option tzresult Lwt.t
+end
+
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init :
@@ -179,6 +183,7 @@ val init :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?tx_rollup_enable:bool ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
 

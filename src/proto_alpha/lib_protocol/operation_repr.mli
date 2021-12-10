@@ -42,6 +42,7 @@
       - origination
       - delegation
       - set deposits limitation
+    - tx rollup origination
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -94,6 +95,8 @@ module Kind : sig
 
   type register_global_constant = Register_global_constant_kind
 
+  type tx_rollup_origination = Tx_rollup_origination_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -101,6 +104,7 @@ module Kind : sig
     | Delegation_manager_kind : delegation manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
 end
 
 type 'a consensus_operation_type =
@@ -231,6 +235,7 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
+  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -350,6 +355,8 @@ module Encoding : sig
 
   val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
+  val tx_rollup_origination_case : Kind.tx_rollup_origination Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -373,5 +380,7 @@ module Encoding : sig
     val register_global_constant_case : Kind.register_global_constant case
 
     val set_deposits_limit_case : Kind.set_deposits_limit case
+
+    val tx_rollup_origination_case : Kind.tx_rollup_origination case
   end
 end

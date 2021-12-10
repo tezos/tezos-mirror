@@ -771,6 +771,8 @@ module Constants : sig
     double_baking_punishment : Tez.t;
     ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
     delegate_selection : delegate_selection;
+    tx_rollup_enable : bool;
+    tx_rollup_origination_size : int;
   }
 
   module Generated : sig
@@ -847,6 +849,10 @@ module Constants : sig
   val double_baking_punishment : context -> Tez.t
 
   val ratio_of_frozen_deposits_slashed_per_double_endorsement : context -> ratio
+
+  val tx_rollup_enable : context -> bool
+
+  val tx_rollup_origination_size : context -> int
 
   val delegate_selection_encoding : delegate_selection Data_encoding.t
 
@@ -1507,6 +1513,41 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
+(** This simply re-exports [Tx_rollup_repr] and [tx_rollup_storage]. See
+    [tx_rollup_repr] and [tx_rollup_storage] for additional documentation of this
+    module *)
+module Tx_rollup : sig
+  include BASIC_DATA
+
+  type tx_rollup = t
+
+  val rpc_arg : tx_rollup RPC_arg.arg
+
+  val to_b58check : tx_rollup -> string
+
+  val of_b58check : string -> tx_rollup tzresult
+
+  val pp : Format.formatter -> tx_rollup -> unit
+
+  val encoding : tx_rollup Data_encoding.t
+
+  val originate : context -> (context * tx_rollup) tzresult Lwt.t
+
+  type state
+
+  val state : context -> tx_rollup -> state option tzresult Lwt.t
+
+  val state_encoding : state Data_encoding.t
+
+  val pp_state : Format.formatter -> state -> unit
+
+  module Internal_for_tests : sig
+    (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
+    val originated_tx_rollup :
+      Origination_nonce.Internal_for_tests.t -> tx_rollup
+  end
+end
+
 module Delegate : sig
   val init :
     context ->
@@ -1905,6 +1946,8 @@ module Kind : sig
 
   type register_global_constant = Register_global_constant_kind
 
+  type tx_rollup_origination = Tx_rollup_origination_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -1912,6 +1955,7 @@ module Kind : sig
     | Delegation_manager_kind : delegation manager
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
 end
 
 type 'a consensus_operation_type =
@@ -2029,6 +2073,7 @@ and _ manager_operation =
   | Set_deposits_limit :
       Tez.t option
       -> Kind.set_deposits_limit manager_operation
+  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -2166,6 +2211,9 @@ module Operation : sig
 
     val delegation_case : Kind.delegation Kind.manager case
 
+    val tx_rollup_origination_case :
+      Kind.tx_rollup_origination Kind.manager case
+
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
 
@@ -2194,6 +2242,8 @@ module Operation : sig
       val register_global_constant_case : Kind.register_global_constant case
 
       val set_deposits_limit_case : Kind.set_deposits_limit case
+
+      val tx_rollup_origination_case : Kind.tx_rollup_origination case
     end
   end
 
@@ -2436,6 +2486,13 @@ module Fees : sig
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   val burn_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_tx_rollup_origination_fees :
     ?origin:Receipt.update_origin ->
     context ->
     storage_limit:Z.t ->

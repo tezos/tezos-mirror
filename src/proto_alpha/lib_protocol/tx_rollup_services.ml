@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
@@ -25,15 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Originated contracts and tx rollups handles are crafted from the hash of the
-    operation that triggered their origination (and nothing else). As a single
-    operation can trigger several originations, the corresponding handles are
-    forged from a deterministic sequence of nonces, initialized with the hash of
-    the operation. *)
-type t = {operation_hash : Operation_hash.t; origination_index : int32}
+open Alpha_context
 
-val encoding : t Data_encoding.t
+let custom_root =
+  (RPC_path.(open_root / "context" / "tx_rollup")
+    : RPC_context.t RPC_path.context)
 
-val initial : Operation_hash.t -> t
+module S = struct
+  let state =
+    RPC_service.get_service
+      ~description:"Access the state of a rollup."
+      ~query:RPC_query.empty
+      ~output:(Data_encoding.option Tx_rollup.state_encoding)
+      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "state")
+end
 
-val incr : t -> t
+let register () =
+  let open Services_registration in
+  register1 ~chunked:false S.state (fun ctxt tx_rollup () () ->
+      Tx_rollup.state ctxt tx_rollup)
+
+let state ctxt block tx_rollup =
+  RPC_context.make_call1 S.state ctxt block tx_rollup () ()

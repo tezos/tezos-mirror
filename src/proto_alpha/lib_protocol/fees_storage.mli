@@ -75,3 +75,12 @@ val burn_origination_fees :
   storage_limit:Z.t ->
   payer:Token.source ->
   (Raw_context.t * Z.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+(** Calls [burn_storage_fees] with the parameter [consumed] mapped to the
+    constant [tx_rollup_origination_size]. *)
+val burn_tx_rollup_origination_fees :
+  ?origin:Receipt_repr.update_origin ->
+  Raw_context.t ->
+  storage_limit:Z.t ->
+  payer:Token.source ->
+  (Raw_context.t * Z.t * Receipt_repr.balance_updates) tzresult Lwt.t

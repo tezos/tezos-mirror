@@ -320,11 +320,15 @@ module Delegate = struct
   let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end
 
+module Tx_rollup = struct
+  let state ctxt tx_rollup = Tx_rollup_services.state rpc_ctxt ctxt tx_rollup
+end
+
 let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
     ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle n =
+    ?blocks_per_cycle ?tx_rollup_enable n =
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -344,6 +348,7 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?baking_reward_fixed_portion
     ?origination_size
     ?blocks_per_cycle
+    ?tx_rollup_enable
     accounts
   >|=? fun blk -> (blk, contracts)
 

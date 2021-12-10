@@ -1,7 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
@@ -25,15 +24,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Originated contracts and tx rollups handles are crafted from the hash of the
-    operation that triggered their origination (and nothing else). As a single
-    operation can trigger several originations, the corresponding handles are
-    forged from a deterministic sequence of nonces, initialized with the hash of
-    the operation. *)
-type t = {operation_hash : Operation_hash.t; origination_index : int32}
+let fresh_tx_rollup_from_current_nonce ctxt =
+  Raw_context.increment_origination_nonce ctxt >|? fun (ctxt, nonce) ->
+  (ctxt, Tx_rollup_repr.originated_tx_rollup nonce)
 
-val encoding : t Data_encoding.t
+let originate ctxt =
+  fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
+  Storage.Tx_rollup.State.add ctxt tx_rollup Tx_rollup_repr.empty_state
+  >|= fun ctxt -> ok (ctxt, tx_rollup)
 
-val initial : Operation_hash.t -> t
-
-val incr : t -> t
+let state c tx_rollup = Storage.Tx_rollup.State.find c tx_rollup

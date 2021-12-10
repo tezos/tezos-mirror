@@ -691,3 +691,14 @@ module Tenderbake : sig
       with type value = Block_hash.t * Block_payload_hash.t
        and type t := Raw_context.t
 end
+
+module Tx_rollup : sig
+  (** Storage from this submodule must only be accessed through the
+      module `Tx_rollup_storage`. *)
+
+  module State :
+    Indexed_data_storage
+      with type key = Tx_rollup_repr.t
+       and type value = Tx_rollup_repr.state
+       and type t := Raw_context.t
+end

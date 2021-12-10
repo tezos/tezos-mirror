@@ -38,6 +38,7 @@
         "Script_repr",
         "Cache_memory_helpers",
         "Contract_repr",
+        "Tx_rollup_repr",
         "Roll_repr_legacy",
         "Vote_repr",
         "Block_header_repr",
@@ -88,6 +89,7 @@
 
         "Global_constants_costs",
         "Global_constants_storage",
+        "Tx_rollup_storage",
 
         "Alpha_context",
 
@@ -123,6 +125,7 @@
         "Contract_services",
         "Delegate_services",
         "Voting_services",
+        "Tx_rollup_services",
         "Alpha_services",
 
         "Main"

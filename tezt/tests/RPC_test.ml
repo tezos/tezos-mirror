@@ -611,6 +611,19 @@ let test_votes ?endpoint client =
   let* _ = RPC.Votes.get_total_voting_power ?endpoint ~hooks client in
   unit
 
+let test_tx_rollup ?endpoint client =
+  let client_bake_for = make_client_bake_for () in
+  let* tx_rollup_hash =
+    Client.originate_tx_rollup
+      ~burn_cap:Tez.(of_int 9999999)
+      ~storage_limit:60_000
+      ~src:Constant.bootstrap1.public_key_hash
+      client
+  in
+  let* () = client_bake_for client in
+  let* _ = RPC.Tx_rollup.get_state ?endpoint ~tx_rollup_hash client in
+  unit
+
 (* Test the various other RPCs. *)
 let test_others ?endpoint client =
   let* _ = RPC.get_constants ?endpoint ~hooks client in
@@ -957,6 +970,11 @@ let register () =
                   (["blocks_per_voting_period"], Some "4");
                 ]
                @ alpha_consensus_threshold),
+             None );
+           ( "tx_rollup",
+             test_tx_rollup,
+             Some
+               ((["tx_rollup_enable"], Some "true") :: alpha_consensus_threshold),
              None );
            ("others", test_others, alpha_overrides, None);
          ]

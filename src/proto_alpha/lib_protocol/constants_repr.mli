@@ -132,6 +132,8 @@ type parametric = {
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
   delegate_selection : delegate_selection;
+  tx_rollup_enable : bool;
+  tx_rollup_origination_size : int;
 }
 
 val parametric_encoding : parametric Data_encoding.encoding

@@ -78,5 +78,6 @@ let () =
       ("frozen deposits", Test_frozen_deposits.tests);
       ("token movements", Test_token.tests);
       ("receipt encodings", Test_receipt.tests);
+      ("tx rollup", Test_tx_rollup.tests);
     ]
   |> Lwt_main.run

@@ -63,6 +63,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   tx_rollup_repr.mli tx_rollup_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -110,6 +111,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_storage.mli tx_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    gas_monad.mli gas_monad.ml
@@ -141,6 +143,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    voting_services.mli voting_services.ml
+   tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
    main.mli main.ml
    (:src_dir TEZOS_PROTOCOL))
@@ -186,6 +189,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   tx_rollup_repr.mli tx_rollup_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -233,6 +237,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_storage.mli tx_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    gas_monad.mli gas_monad.ml
@@ -264,6 +269,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    voting_services.mli voting_services.ml
+   tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
    main.mli main.ml
    (:src_dir TEZOS_PROTOCOL))
@@ -309,6 +315,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   tx_rollup_repr.mli tx_rollup_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -356,6 +363,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_storage.mli tx_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    gas_monad.mli gas_monad.ml
@@ -387,6 +395,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    voting_services.mli voting_services.ml
+   tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
    main.mli main.ml)
  (action
@@ -454,6 +463,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_repr
    Cache_memory_helpers
    Contract_repr
+   Tx_rollup_repr
    Roll_repr_legacy
    Vote_repr
    Block_header_repr
@@ -501,6 +511,7 @@ include Tezos_raw_protocol_alpha.Main
    Sapling_validator
    Global_constants_costs
    Global_constants_storage
+   Tx_rollup_storage
    Alpha_context
    Local_gas_counter
    Gas_monad
@@ -532,6 +543,7 @@ include Tezos_raw_protocol_alpha.Main
    Contract_services
    Delegate_services
    Voting_services
+   Tx_rollup_services
    Alpha_services
    Main))
 
@@ -618,6 +630,7 @@ include Tezos_raw_protocol_alpha.Main
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   tx_rollup_repr.mli tx_rollup_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -665,6 +678,7 @@ include Tezos_raw_protocol_alpha.Main
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_storage.mli tx_rollup_storage.ml
    alpha_context.mli alpha_context.ml
    local_gas_counter.ml
    gas_monad.mli gas_monad.ml
@@ -696,6 +710,7 @@ include Tezos_raw_protocol_alpha.Main
    contract_services.mli contract_services.ml
    delegate_services.mli delegate_services.ml
    voting_services.mli voting_services.ml
+   tx_rollup_services.mli tx_rollup_services.ml
    alpha_services.mli alpha_services.ml
    main.mli main.ml
   (:src_dir TEZOS_PROTOCOL))
