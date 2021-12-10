@@ -281,7 +281,9 @@ let expect_wrong_signature list =
   else
     failwith
       "Packed operation has invalid source in the middle : operation expected \
-       to fail."
+       to fail but got errors: %a."
+      Error_monad.pp_print_trace
+      list
 
 let test_wrong_signature_in_the_middle () =
   Context.init 2 >>=? function
@@ -295,6 +297,16 @@ let test_wrong_signature_in_the_middle () =
       (* Make legit transfers, performing reveals *)
       Incremental.add_operation inc op1 >>=? fun inc ->
       Incremental.add_operation inc op2 >>=? fun inc ->
+      (* Make c2 reach counter 5 *)
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+      >>=? fun op ->
+      Incremental.add_operation inc op >>=? fun inc ->
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+      >>=? fun op ->
+      Incremental.add_operation inc op >>=? fun inc ->
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+      >>=? fun op ->
+      Incremental.add_operation inc op >>=? fun inc ->
       (* Cook transactions for actual test *)
       Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
       >>=? fun op1 ->
