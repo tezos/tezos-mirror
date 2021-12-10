@@ -50,7 +50,6 @@ Parameters
 The following protocol parameters have been removed:
 
 * ``time_between_blocks``
-* ``minimal_block_delay``
 * ``endorsers_per_block``
 * ``blocks_per_roll_snapshot`` (it is replaced by ``blocks_per_stake_snapshot``)
 * ``block_security_deposit``
@@ -63,7 +62,7 @@ The following protocol parameters have been introduced:
 * ``baking_reward_fixed_portion`` = 10 tez
 * ``baking_reward_bonus_per_slot`` = 0.004285 tez
 * ``endorsing_reward_per_slot`` = 0.002857 tez
-* ``round_durations`` = [30, 45]
+* ``delay_increment_per_round`` = 15
 * ``minimal_participation_ratio`` = 2/3
 * ``consensus_committee_size`` = 7000
 * ``consensus_threshold`` = 4667
@@ -71,6 +70,8 @@ The following protocol parameters have been introduced:
 * ``frozen_deposits_percentage`` = 10
 * ``double_baking_punishment`` = 640 tez
 * ``ratio_of_frozen_deposits_slashed_per_double_endorsement`` = 1/2
+
+The parameter ``minimal_block_delay`` is reused to specify the duration of round 0.
 
 The values of the following protocol parameters has changed:
 

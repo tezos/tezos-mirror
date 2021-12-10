@@ -64,15 +64,16 @@ We call this sequence the block's *payload*.
 Each round has an associated duration. Round durations are set to increase so
 that for any possible message delay, there is a round that is sufficiently long
 for all required messages to be exchanged.
-Round durations are represented symbolically by an array
-``ROUND_DURATIONS`` of ``k`` elements denoting the durations of each of the
-first ``k`` rounds (from ``0`` to ``k-1``).
-The durations of rounds beyond ``k`` increase linearly.
-More precisely, call ``diff`` the difference between the last
-two round durations, that is, ``diff = ROUND_DURATIONS[k-1] -
-ROUND_DURATIONS[k-2]``. For any ``n`` greater than or equal to ``k``, the value of ``ROUND_DURATIONS[n]`` is given by the sum
-of the duration of the precedent round and ``diff``, that is,
-``ROUND_DURATIONS[n] = ROUND_DURATIONS[n-1] + diff``.
+Round durations depend on protocol parameters ``MINIMAL_BLOCK_DELAY`` and ``DELAY_INCREMENT_PER_ROUND``.
+These parameters specify round durations as follows:
+
+.. math::
+
+     round\_duration(0) &= minimal\_block\_delay \\
+     round\_duration(r+1) &= round\_duration(r) + delay\_increment\_per\_round \\
+     & = minimal\_block\_delay + (r + 1) * delay\_increment\_per\_round
+
+Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 
 Schematically, a round consists in the following steps:
 
@@ -84,9 +85,7 @@ Unlike Emmy*, Tenderbake has `two types of
 votes <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
 before endorsing a block ``b``, a validator preendorses ``b``. Furthermore,
 to be able to endorse, a validator must have observed a preendorsement *quorum*, that is a
-set of preendorsements from validators having at least ``ceil(2 *
-CONSENSUS_COMMITTEE_SIZE / 3)`` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least ``ceil(2 *
-CONSENSUS_COMMITTEE_SIZE / 3)`` validator slots. The
+set of preendorsements from validators having at least :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE \times \frac{2}{3} \rceil` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE \times \frac{2}{3} \rceil` validator slots. The
 endorsement quorum for a block ``b`` is included in a block ``b'`` on top of ``b``,
 serving as a certification that ``b`` has been agreed upon.
 We also say that block ``b'`` confirms block ``b``.
@@ -117,21 +116,20 @@ Consequently, to agree on a block, that is, on both the payload and the header, 
 confirmation, and thus guarantees
 **block finality after 2 confirmations**.
 
-The time between blocks
+Time between blocks
 ~~~~~~~~~~~~~~~~~~~~~~~
 
 The time between blocks represents the difference between the timestamps of the blocks. The timestamp of a block is given by the beginning of the round at which the block has been agreed upon. Thus, the time between blocks depends on the round at which decisions are taken. For
 example, if the decision at the previous level was taken at round 4 and at the current level at round 2, then the current block's delay relative to
-its predecessor, is ``ROUND_DURATIONS[4] + ROUND_DURATIONS[0] + ROUND_DURATIONS[1]``.
+its predecessor, is :math:`round\_duration(4) + round\_duration(0) + round\_duration(1)`.
 The general case is as follows, say that the decision at the previous
 level is taken at round ``m`` and the decision at the current level is
 taken at round ``n``, then the current block's delay relative to its
-predecessor is ``ROUND_DURATIONS[m] +
-sum_{i=0}^{n-1}ROUND_DURATIONS[i]``.
+predecessor is :math:`round\_duration(m) + \sum_{i=0}^{n-1} round\_duration(i)`.
 We note that, under
 normal network conditions, and with active and compliant validators, decisions
 should be taken at round 0, meaning that the time between blocks would be
-``ROUND_DURATIONS[0]`` seconds.
+:math:`round\_duration(0)` seconds i.e., parameter ``MINIMAL_BLOCK_DELAY``.
 
 
 Validator selection: staking balance, active stake, and frozen deposits
@@ -292,7 +290,7 @@ producer and are distributed immediately.
 To encourage fairness and participation, the *block* proposer receives
 a bonus for the extra endorsements it includes in the block.
 The bonus is proportional to the number of
-validator slots above the threshold of ``ceil(2*CONSENSUS_COMMITTEE_SIZE/3)`` that
+validator slots above the threshold of :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE \times \frac{2}{3} \rceil` that
 the included endorsements represent. The bonus is also distributed
 immediately.
 
@@ -320,8 +318,8 @@ Assuming ``blocks_per_minute = 2``, ``total_rewards`` is 40 tez.
 We define:
 
 - ``BAKING_REWARD_FIXED_PORTION := baking_reward_ratio * total_rewards``
-- ``bonus := (1-baking_reward_ratio) * bonus_ratio * total_rewards`` is the max bonus
-- ``endorsing_reward := (1-baking_reward_ratio) * (1-bonus_ratio) * total_rewards``
+- ``bonus := (1 - baking_reward_ratio) * bonus_ratio * total_rewards`` is the max bonus
+- ``endorsing_reward := (1 - baking_reward_ratio) * (1 - bonus_ratio) * total_rewards``
 
 where:
 
@@ -397,8 +395,10 @@ Consensus related protocol parameters
      - 7000
    * - ``CONSENSUS_THRESHOLD``
      - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)``
-   * - ``ROUND_DURATIONS``
-     - [30s, 45s]
+   * - ``MINIMAL_BLOCK_DELAY``
+     - 30s
+   * - ``DELAY_INCREMENT_PER_ROUND``
+     - 15s
    * - ``MINIMAL_PARTICIPATION_RATIO``
      - 2/3
    * - ``FROZEN_DEPOSITS_PERCENTAGE``
