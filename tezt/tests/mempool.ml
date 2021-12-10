@@ -1014,6 +1014,241 @@ module Revamped = struct
         ~error_msg:
           "branch_delayed mempool should contain only one operation, got %L") ;
     unit
+
+  let max_refused_operations ~protocol classification =
+    let max_refused_operations = 1 in
+    let source1 = Constant.bootstrap1 in
+    let source2 = Constant.bootstrap2 in
+    let dest = Constant.bootstrap3 in
+    let string_of_classification =
+      match classification with
+      | `Branch_delayed -> "branch_delayed"
+      | `Branch_refused -> "branch_refused"
+      | `Refused -> "refused"
+    in
+    let operation_fees_from_classification = function
+      | `Branch_delayed | `Branch_refused -> None
+      | `Refused -> Some 0
+      (* fees_too_low *)
+    in
+    let counter_shift_from_classification counter = function
+      | `Branch_delayed -> Some (counter + 2)
+      (* counter in the future *)
+      | `Branch_refused -> Some counter
+      (* counter in the past *)
+      | `Refused -> None
+    in
+    log_step
+      1
+      "Initialize a node with 'max_refused_operations=%d'."
+      max_refused_operations ;
+    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
+    let* () = Node.config_init node [] in
+    Node.Config_file.(update node (set_prevalidator ~max_refused_operations)) ;
+    let* () = Node.run node [] in
+    let* () = Node.wait_for_ready node in
+    let* client = Client.init ~endpoint:(Node node) () in
+    let* () = Client.activate_protocol ~protocol client in
+    let* _ = Node.wait_for_level node 1 in
+
+    log_step
+      2
+      "Forge and inject operations. Then, bake to increment the counter of \
+       boostrap1 and bootstrap2 in the context" ;
+    let* _ =
+      Operation.inject_transfer
+        ~wait_for_injection:node
+        ~source:source1
+        ~dest
+        ~amount:1
+        client
+    in
+    let* _ =
+      Operation.inject_transfer
+        ~wait_for_injection:node
+        ~source:source2
+        ~dest
+        ~amount:1
+        client
+    in
+    let* _ = bake_for ~wait_for_flush:true ~empty:false ~protocol node client in
+
+    log_step 3 "Forge and force inject an operation." ;
+    let* counter =
+      RPC.Contracts.get_counter ~contract_id:source1.public_key_hash client
+    in
+    let counter =
+      counter_shift_from_classification (JSON.as_int counter) classification
+    in
+    let fee = operation_fees_from_classification classification in
+
+    let* (`OpHash oph1) =
+      Operation.inject_transfer
+        ~wait_for_injection:node
+        ~force:true
+        ~source:source1
+        ~dest
+        ?counter
+        ?fee
+        client
+    in
+
+    log_step
+      3
+      "Flush the mempool and check that %s is classified as %s."
+      oph1
+      string_of_classification ;
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      match classification with
+      | `Branch_delayed -> {Mempool.empty with branch_delayed = [oph1]}
+      | `Branch_refused -> {Mempool.empty with branch_refused = [oph1]}
+      | `Refused -> {Mempool.empty with refused = [oph1]}
+    in
+    Check.(
+      (mempool = expected_mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 4 "Forge and force inject an operation." ;
+    let* counter =
+      RPC.Contracts.get_counter ~contract_id:source2.public_key_hash client
+    in
+    let counter =
+      counter_shift_from_classification (JSON.as_int counter) classification
+    in
+    let fee = operation_fees_from_classification classification in
+    let* (`OpHash oph2) =
+      Operation.inject_transfer
+        ~wait_for_injection:node
+        ~force:true
+        ~source:source2
+        ~dest
+        ?counter
+        ?fee
+        client
+    in
+
+    log_step
+      5
+      "Flush the mempool to classify %s as %s and check that the mempool \
+       contains only one operation %s."
+      oph2
+      string_of_classification
+      string_of_classification ;
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+    let* mempool = RPC.get_mempool client in
+    let (mempool_classification, mempool_without_classification) =
+      match classification with
+      | `Branch_delayed ->
+          (mempool.branch_delayed, {Mempool.empty with branch_delayed = []})
+      | `Branch_refused ->
+          (mempool.branch_refused, {Mempool.empty with branch_refused = []})
+      | `Refused -> (mempool.refused, {Mempool.empty with refused = []})
+    in
+    Check.(
+      (max_refused_operations = List.length mempool_classification)
+        int
+        ~error_msg:"number of operation in mempool expected to be %L, got %R") ;
+    Check.(
+      (Mempool.empty = mempool_without_classification)
+        Mempool.classified_typ
+        ~error_msg:"the rest of the mempool should be empty got %R") ;
+    unit
+
+  (** This test checks max_refused_operations for branch_delayed
+     classification. *)
+  let max_refused_operations_branch_delayed =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Max refused operations branch_delayed"
+      ~tags:["mempool"; "refused"; "max"; "branch_delayed"]
+    @@ fun protocol -> max_refused_operations ~protocol `Branch_delayed
+
+  (** This test checks max_refused_operations for branch_refused
+     classification. *)
+  let max_refused_operations_branch_refused =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Max refused operations branch_refused"
+      ~tags:["mempool"; "refused"; "max"; "branch_refused"]
+    @@ fun protocol -> max_refused_operations ~protocol `Branch_refused
+
+  (** This test checks max_refused_operations for refused classification. *)
+  let max_refused_operations_refused =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Max refused operations refused"
+      ~tags:["mempool"; "refused"; "max"]
+    @@ fun protocol -> max_refused_operations ~protocol `Refused
+
+  (** This test checks max_refused_operations for outdated classification. *)
+  let max_refused_operations_outdated =
+    let max_refused_operations = 1 in
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Max refused operations outdated"
+      ~tags:["mempool"; "refused"; "max"; "outdated"]
+    @@ fun protocol ->
+    log_step
+      1
+      "Initialize a node with 'max_refused_operations=%d'."
+      max_refused_operations ;
+    let node = Node.create [Connections 0; Synchronisation_threshold 0] in
+    let* () = Node.config_init node [] in
+    Node.Config_file.(update node (set_prevalidator ~max_refused_operations)) ;
+    let* () = Node.run node [] in
+    let* () = Node.wait_for_ready node in
+    let* client = Client.init ~endpoint:(Node node) () in
+    let* () = Client.activate_protocol ~protocol client in
+    let* _ = Node.wait_for_level node 1 in
+
+    log_step 2 "Bake an empty block to be able to endorse it." ;
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+
+    log_step 3 "Endorse with bootstrap1." ;
+    let* _ =
+      Client.endorse_for
+        ~protocol
+        ~key:[Constant.bootstrap1.alias]
+        ~force:true
+        client
+    in
+
+    log_step 3 "Endorse with bootstrap2." ;
+    let* _ =
+      Client.endorse_for
+        ~protocol
+        ~key:[Constant.bootstrap2.alias]
+        ~force:true
+        client
+    in
+
+    log_step 4 "Check that both endorsements are in the applied mempool." ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (2 = List.length mempool.applied)
+        int
+        ~error_msg:
+          "number of mempool applied operations expected to be %L, got %R") ;
+
+    log_step 5 "Bake two empty block to force endorsements to be outdated." ;
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+    let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
+
+    log_step 4 "Check that only one endorsement is in the outdated mempool." ;
+    let* mempool = RPC.get_mempool client in
+    Check.(
+      (max_refused_operations = List.length mempool.outdated)
+        int
+        ~error_msg:
+          "number of mempool outdated operations expected to be %L, got %R") ;
+    Check.(
+      (Mempool.empty = {mempool with outdated = []})
+        Mempool.classified_typ
+        ~error_msg:"the rest of the mempool should be empty got %R") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -3637,6 +3872,10 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_flush ~protocols ;
   Revamped.one_operation_per_manager_per_block_ban ~protocols ;
   Revamped.one_operation_per_manager_per_block_flush_on_ban ~protocols ;
+  Revamped.max_refused_operations_branch_delayed ~protocols ;
+  Revamped.max_refused_operations_branch_refused ~protocols ;
+  Revamped.max_refused_operations_refused ~protocols ;
+  Revamped.max_refused_operations_outdated ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
