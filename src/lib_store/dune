@@ -9,7 +9,6 @@
   irmin-pack
   tezos-stdlib-unix
   tezos-context
-  tezos-legacy-store
   tezos-validation
   tezos-protocol-updater
   lwt-watcher
@@ -23,7 +22,6 @@
    -open Tezos_base
    -open Tezos_base__TzPervasives
    -open Tezos_context
-   -open Tezos_legacy_store
    -open Tezos_validation
    -open Tezos_protocol_updater
    -open Tezos_stdlib_unix
