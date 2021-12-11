@@ -529,12 +529,12 @@ module Make
       (classification, hash, shell_header, op_data)
 
   let pre_filter shell ~filter_config ~filter_state ~validation_state ~chain_db
-      ~notifier oph raw : bool Lwt.t =
+      ~notifier oph raw : ([`High | `Low], unit) result Lwt.t =
     match Prevalidation_t.parse raw with
     | Error _ ->
         Event.(emit unparsable_operation) oph >|= fun () ->
         Distributed_db.Operation.clear_or_cancel chain_db oph ;
-        false
+        Error ()
     | Ok parsed_op -> (
         let op =
           {
@@ -556,8 +556,8 @@ module Make
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
           errs ->
             handle ~notifier shell (`Parsed parsed_op) errs ;
-            false
-        | `Passed_prefilter -> true)
+            Error ()
+        | `Passed_prefilter priority -> Ok priority)
 
   let post_filter ~filter_config ~filter_state ~validation_state_before
       ~validation_state_after op receipt =
@@ -724,7 +724,10 @@ module Make
   let classify_pending_operations ~notifier w shell filter_config filter_state
       state =
     Pending_ops.fold_es
-      (fun oph op (acc_filter_state, acc_validation_state, acc_mempool, limit) ->
+      (fun _prio
+           oph
+           op
+           (acc_filter_state, acc_validation_state, acc_mempool, limit) ->
         if limit <= 0 then
           (* Using Error as an early-return mechanism *)
           Lwt.return_error (acc_filter_state, acc_validation_state, acc_mempool)
@@ -761,7 +764,7 @@ module Make
         (* At the time this comment was written (26/05/21), this is dead
            code since [Proto.begin_construction] cannot fail. *)
         Pending_ops.iter
-          (fun oph op ->
+          (fun _prio oph op ->
             handle
               ~notifier
               pv.shell
@@ -876,7 +879,7 @@ module Make
           oph
           op
         >>= function
-        | true ->
+        | Ok prio ->
             if
               not
                 (Block_hash.Set.mem
@@ -890,12 +893,18 @@ module Make
             else (
               (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
                  Should this have an influence on the peer's score ? *)
-              pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
+              pv.shell.pending <- Pending_ops.add oph op prio pv.shell.pending ;
               return_unit)
-        | false -> return_unit
+        | Error () -> return_unit
 
     let on_inject (pv : state) ~force op =
       let oph = Operation.hash op in
+      (* Currently, an injection is always done with priority = `High, because:
+         - We want to process and propagate the injected operations fast,
+         - We don't want to call prefilter to get the priority.
+         But, this may change in the future
+      *)
+      let prio = `High in
       already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
       if already_handled then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
@@ -904,7 +913,7 @@ module Make
       else if force then (
         Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
         >>= fun (_ : bool) ->
-        pv.shell.pending <- Pending_ops.add oph op pv.shell.pending ;
+        pv.shell.pending <- Pending_ops.add oph op prio pv.shell.pending ;
         return_unit)
       else if
         not (Block_hash.Set.mem op.Operation.shell.branch pv.shell.live_blocks)
@@ -922,8 +931,7 @@ module Make
         | Applied (_, _result) ->
             Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
             >>= fun (_ : bool) ->
-            pv.shell.pending <-
-              Pending_ops.add parsed_op.hash op pv.shell.pending ;
+            pv.shell.pending <- Pending_ops.add oph op prio pv.shell.pending ;
             return_unit
         | res ->
             failwith
@@ -997,8 +1005,11 @@ module Make
             oph
             op
           >|= function
-          | true -> (Pending_ops.add oph op pending, nb_pending + 1)
-          | false -> (pending, nb_pending))
+          | Ok prio ->
+              (* Here, an operation injected in this node with `High priority will
+                 now get its approriate priority. *)
+              (Pending_ops.add oph op prio pending, nb_pending + 1)
+          | Error () -> (pending, nb_pending))
         new_pending_operations
         (Pending_ops.empty, 0)
       >>= fun (new_pending_operations, nb_pending) ->
@@ -1194,7 +1205,7 @@ module Make
              in
              let unprocessed =
                Pending_ops.fold
-                 (fun oph op acc ->
+                 (fun _prio oph op acc ->
                    match map_op op with
                    | Some op -> Operation_hash.Map.add oph op acc
                    | None -> acc)

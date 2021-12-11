@@ -71,7 +71,7 @@ module type FILTER = sig
         prechecked. In case the operation is successfully prechecked
         but replaces an already prechecked operation [old_oph], the
         result [`Passed_precheck_with_replace old_oph] is returned.
-        If the function returns [`Undecided] it means that 
+        If the function returns [`Undecided] it means that
         [apply_operation] should be called.
 
         This function takes a [state] as parameter and returns it updated if the
@@ -95,8 +95,9 @@ module type FILTER = sig
     (** [pre_filter config ~filter_state ?validation_state_before operation_data]
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
-        plugin and returns [`Passed_prefilter] if no error occurs during
-        checking of the [operation_data]. More tests are done using the
+        plugin and returns [`Passed_prefilter priority] if no error occurs during
+        checking of the [operation_data], where priority is either `High or `Low
+        depending on the operation. More tests are done using the
         [filter_state]. We classify an operation that passes the prefilter as
         [`Passed_prefilter] since we do not know yet if the operation is
         applicable or not. If an error occurs during the checks, this function
@@ -107,7 +108,7 @@ module type FILTER = sig
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      [ `Passed_prefilter
+      [ `Passed_prefilter of [`High | `Low]
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
