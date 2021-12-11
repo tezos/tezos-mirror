@@ -24,46 +24,95 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Ordering is important, as it is used below in map keys comparison *)
+type priority = [`High | `Low]
+
+module Priority_map : Map.S with type key = priority = Map.Make (struct
+  type t = priority
+
+  let compare p1 p2 =
+    (* - Explicit comparison, `High is smaller,
+       - Avoid fragile patterns in case the type is extended in the future *)
+    match (p1, p2) with
+    | (`High, `High) -> 0
+    | (`High, `Low) -> -1
+    | (`Low, `High) -> 1
+    | (`Low, `Low) -> 0
+end)
+
 module Set = Operation_hash.Set
 module Map = Operation_hash.Map
 
 (*
-   This type is used for data representing pending operations of the
-   prevalidator. The operations of this module (should) maintain the invariant:
-   keys (pending) = elements(hashes)
+   The type below is used for representing pending operations data of the
+   prevalidator. The functions of this module (should) maintain the
+   following invariants:
+   1 - Union (preimage(pending(prio))) = hashes, for each prio in dom(pending)
+   2 - preimage (priority_of) = hashes
+   3 - image(priority_of) = preimage (pending)
+   4 - map in pending(priority) => map <> empty
 *)
-
 type t = {
-  pending : Operation.t Operation_hash.Map.t;
+  (* The main map *)
+  pending : Operation.t Operation_hash.Map.t Priority_map.t;
+  (* Used for advertising *)
   hashes : Operation_hash.Set.t;
+  (* We need to remember the priority of each hash, to be used when removing
+     without providing the priority *)
+  priority_of : priority Operation_hash.Map.t;
 }
 
-let empty = {pending = Map.empty; hashes = Set.empty}
+let empty =
+  {pending = Priority_map.empty; hashes = Set.empty; priority_of = Map.empty}
 
-let from_operations pending =
+let is_empty {pending = _; priority_of = _; hashes} = Set.is_empty hashes
+
+let hashes {pending = _; priority_of = _; hashes} = hashes
+
+let operations {pending; priority_of = _; hashes = _} =
+  (* Build a flag map [oph -> op] from pending. Needed when re-cycling
+     operations *)
+  Priority_map.fold
+    (fun _prio -> Map.union (fun _ _ b -> Some b))
+    pending
+    Map.empty
+
+let mem oph {hashes; priority_of = _; pending = _} = Set.mem oph hashes
+
+let get_priority_map prio pending =
+  match Priority_map.find prio pending with None -> Map.empty | Some mp -> mp
+
+let add oph op prio {pending; hashes; priority_of} =
+  let mp = get_priority_map prio pending |> Map.add oph op in
   {
-    pending;
-    hashes = Map.fold (fun oph _op set -> Set.add oph set) pending Set.empty;
+    pending = Priority_map.add prio mp pending;
+    hashes = Set.add oph hashes;
+    priority_of = Map.add oph prio priority_of;
   }
 
-let is_empty {pending = _; hashes} = Set.is_empty hashes
+let remove oph ({pending; hashes; priority_of} as t) =
+  match Map.find oph priority_of with
+  | None -> t
+  | Some prio ->
+      let mp = get_priority_map prio pending |> Map.remove oph in
+      {
+        pending =
+          (if Map.is_empty mp then Priority_map.remove prio pending
+          else Priority_map.add prio mp pending);
+        hashes = Set.remove oph hashes;
+        priority_of = Map.remove oph priority_of;
+      }
 
-let hashes {pending = _; hashes} = hashes
+let cardinal {pending = _; hashes; priority_of = _} = Set.cardinal hashes
 
-let operations {pending; hashes = _} = pending
+let fold_es f {pending; hashes = _; priority_of = _} acc =
+  Priority_map.fold_es
+    (fun prio mp acc -> Map.fold_es (f prio) mp acc)
+    pending
+    acc
 
-let mem oph {hashes; pending = _} = Set.mem oph hashes
+let fold f {pending; hashes = _; priority_of = _} acc =
+  Priority_map.fold (fun prio mp acc -> Map.fold (f prio) mp acc) pending acc
 
-let add oph op {pending; hashes} =
-  {pending = Map.add oph op pending; hashes = Set.add oph hashes}
-
-let remove oph {pending; hashes} =
-  {pending = Map.remove oph pending; hashes = Set.remove oph hashes}
-
-let cardinal {pending = _; hashes} = Set.cardinal hashes
-
-let fold_es f {pending; hashes = _} = Map.fold_es f pending
-
-let fold f {pending; hashes = _} = Map.fold f pending
-
-let iter f {pending; hashes = _} = Map.iter f pending
+let iter f {pending; hashes = _; priority_of = _} =
+  Priority_map.iter (fun prio mp -> Map.iter (f prio) mp) pending
