@@ -2,8 +2,7 @@
  (names
   test_run
   test_prop_signature_pk
-  test_prop_signature
-  test_prop_hacl_hash)
+  test_prop_signature)
  (package tezos-crypto)
  (libraries
   tezos-crypto
