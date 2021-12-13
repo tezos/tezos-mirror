@@ -57,7 +57,8 @@ module Protocol_constants_overrides = struct
     liquidity_baking_sunset_level : int32 option;
     liquidity_baking_escape_ema_threshold : int32 option;
     max_operations_time_to_live : int option;
-    round_durations : Round.round_durations option;
+    minimal_block_delay : Period.t option;
+    delay_increment_per_round : Period.t option;
     minimal_participation_ratio : Constants.ratio option;
     consensus_committee_size : int option;
     consensus_threshold : int option;
@@ -102,11 +103,12 @@ module Protocol_constants_overrides = struct
                 c.liquidity_baking_sunset_level,
                 c.liquidity_baking_escape_ema_threshold,
                 c.max_operations_time_to_live,
-                c.round_durations,
+                c.minimal_block_delay,
+                c.delay_increment_per_round,
                 c.consensus_committee_size,
-                c.consensus_threshold,
-                c.delegate_selection ),
-              ( ( c.minimal_participation_ratio,
+                c.consensus_threshold ),
+              ( ( c.delegate_selection,
+                  c.minimal_participation_ratio,
                   c.max_slashing_period,
                   c.frozen_deposits_percentage,
                   c.double_baking_punishment,
@@ -137,11 +139,12 @@ module Protocol_constants_overrides = struct
                    liquidity_baking_sunset_level,
                    liquidity_baking_escape_ema_threshold,
                    max_operations_time_to_live,
-                   round_durations,
+                   minimal_block_delay,
+                   delay_increment_per_round,
                    consensus_committee_size,
-                   consensus_threshold,
-                   delegate_selection ),
-                 ( ( minimal_participation_ratio,
+                   consensus_threshold ),
+                 ( ( delegate_selection,
+                     minimal_participation_ratio,
                      max_slashing_period,
                      frozen_deposits_percentage,
                      double_baking_punishment,
@@ -173,7 +176,8 @@ module Protocol_constants_overrides = struct
           liquidity_baking_sunset_level;
           liquidity_baking_escape_ema_threshold;
           max_operations_time_to_live;
-          round_durations;
+          minimal_block_delay;
+          delay_increment_per_round;
           minimal_participation_ratio;
           max_slashing_period;
           frozen_deposits_percentage;
@@ -216,14 +220,15 @@ module Protocol_constants_overrides = struct
                   (opt "liquidity_baking_sunset_level" int32)
                   (opt "liquidity_baking_escape_ema_threshold" int32)
                   (opt "max_operations_time_to_live" int16)
-                  (opt "round_durations" Round.round_durations_encoding)
+                  (opt "minimal_block_delay" Period.encoding)
+                  (opt "delay_increment_per_round" Period.encoding)
                   (opt "consensus_committee_size" int31)
-                  (opt "consensus_threshold" int31)
-                  (opt
-                     "delegate_selection"
-                     Constants.delegate_selection_encoding))
+                  (opt "consensus_threshold" int31))
                (merge_objs
-                  (obj7
+                  (obj8
+                     (opt
+                        "delegate_selection"
+                        Constants.delegate_selection_encoding)
                      (opt
                         "minimal_participation_ratio"
                         Constants.ratio_encoding)
@@ -283,7 +288,8 @@ module Protocol_constants_overrides = struct
           Some parametric.liquidity_baking_escape_ema_threshold;
         max_operations_time_to_live =
           Some parametric.max_operations_time_to_live;
-        round_durations = Some parametric.round_durations;
+        minimal_block_delay = Some parametric.minimal_block_delay;
+        delay_increment_per_round = Some parametric.delay_increment_per_round;
         minimal_participation_ratio =
           Some parametric.minimal_participation_ratio;
         consensus_committee_size = Some parametric.consensus_committee_size;
@@ -328,7 +334,8 @@ module Protocol_constants_overrides = struct
       liquidity_baking_sunset_level = None;
       liquidity_baking_escape_ema_threshold = None;
       max_operations_time_to_live = None;
-      round_durations = None;
+      minimal_block_delay = None;
+      delay_increment_per_round = None;
       minimal_participation_ratio = None;
       consensus_committee_size = None;
       (* Let consensus threshold be overridable for Tenderbake mockup
@@ -500,9 +507,15 @@ module Protocol_constants_overrides = struct
           };
         O
           {
-            name = "round_durations";
-            override_value = o.round_durations;
-            pp = Round.pp_round_durations;
+            name = "minimal_block_delay";
+            override_value = o.minimal_block_delay;
+            pp = Period.pp;
+          };
+        O
+          {
+            name = "delay_increment_per_round";
+            override_value = o.delay_increment_per_round;
+            pp = Period.pp;
           };
         O
           {
@@ -582,8 +595,12 @@ module Protocol_constants_overrides = struct
     >>= fun () ->
     return
       ({
-         round_durations =
-           Option.value ~default:c.round_durations o.round_durations;
+         minimal_block_delay =
+           Option.value ~default:c.minimal_block_delay o.minimal_block_delay;
+         delay_increment_per_round =
+           Option.value
+             ~default:c.delay_increment_per_round
+             o.delay_increment_per_round;
          consensus_committee_size =
            Option.value
              ~default:c.consensus_committee_size

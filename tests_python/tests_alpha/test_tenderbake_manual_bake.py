@@ -6,7 +6,7 @@ from launchers.sandbox import Sandbox
 from . import protocol
 
 
-ROUND_DURATION = 1
+MINIMAL_BLOCK_DELAY = 1
 TRANSFER_AMOUNT = 500
 INITIAL_BALANCE = 4000000.0
 FEE = 0.1
@@ -51,8 +51,8 @@ class TestManualBake:
 
         proto_params = dict(protocol.TENDERBAKE_PARAMETERS)
         parameters = copy.deepcopy(proto_params)
-        duration = str(ROUND_DURATION)
-        parameters['round_durations'] = {"round0": duration, "round1": duration}
+        parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+        parameters['delay_increment_per_round'] = '1'
         protocol.activate(
             sandbox.client(0),
             parameters=proto_params,
@@ -132,7 +132,7 @@ class TestManualBake:
 
     def test_bake_again(self, sandbox: Sandbox, session: dict):
         print("Sleeping")
-        time.sleep(2 * ROUND_DURATION)
+        time.sleep(2 * MINIMAL_BLOCK_DELAY)
         client = sandbox.client(0)
         client.propose([session['level3_baker']], ['--minimal-timestamp'])
         client.get_head()

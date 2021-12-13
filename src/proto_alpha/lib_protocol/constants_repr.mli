@@ -119,7 +119,8 @@ type parametric = {
   liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
   max_operations_time_to_live : int;
-  round_durations : Round_repr.Durations.t;
+  minimal_block_delay : Period_repr.t;
+  delay_increment_per_round : Period_repr.t;
   minimal_participation_ratio : ratio;
   consensus_committee_size : int;
   (* in slots *)

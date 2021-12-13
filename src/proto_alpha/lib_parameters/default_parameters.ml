@@ -76,12 +76,8 @@ let constants_mainnet =
        The unit for this value is a block.
     *)
     max_operations_time_to_live = 120;
-    round_durations =
-      Stdlib.Option.get
-      @@ Round.Durations.create_opt
-           ~round0:(Period.of_seconds_exn (Int64.of_int block_time))
-           ~round1:(Period.of_seconds_exn 45L)
-           ();
+    minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
+    delay_increment_per_round = Period.of_seconds_exn 15L;
     consensus_committee_size;
     consensus_threshold;
     (* 4667 slots *)
@@ -120,12 +116,8 @@ let constants_sandbox =
     blocks_per_voting_period = 64l;
     proof_of_work_threshold = Int64.of_int (-1);
     liquidity_baking_sunset_level = 128l;
-    round_durations =
-      Stdlib.Option.get
-      @@ Round.Durations.create_opt
-           ~round0:(Period.of_seconds_exn (Int64.of_int block_time))
-           ~round1:(Period.of_seconds_exn 2L)
-           ();
+    minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
+    delay_increment_per_round = Period.one_second;
     consensus_committee_size = 256;
     consensus_threshold = 0;
     baking_reward_fixed_portion (* 333_333 mutez *);

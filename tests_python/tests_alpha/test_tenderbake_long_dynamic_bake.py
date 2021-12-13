@@ -33,11 +33,8 @@ KILL_BAKER = 4
 TIMEOUT = 6
 MAX_RETRY = 6
 TEST_DURATION = 300  # duration of the main loop
-FIRST_ROUND_DURATION = 1
-ROUND_DURATIONS = {
-    "round0": str(FIRST_ROUND_DURATION),
-    "round1": str(1 + FIRST_ROUND_DURATION),
-}
+MINIMAL_BLOCK_DELAY = 1
+DELAY_INCREMENT_PER_ROUND = 1
 MAX_LEVEL_DURATION = 6  # that is, decision expected in at most 3 rounds
 EXPECTED_LEVEL = TEST_DURATION // MAX_LEVEL_DURATION
 
@@ -52,7 +49,8 @@ def random_op(client: Client) -> None:
 def setup_parameters() -> Dict[str, Any]:
     proto_params = dict(protocol.TENDERBAKE_PARAMETERS)
     parameters = copy.deepcopy(proto_params)
-    parameters['round_durations'] = ROUND_DURATIONS
+    parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+    parameters['delay_increment_per_round'] = str(DELAY_INCREMENT_PER_ROUND)
     parameters['consensus_threshold'] = (
         2 * (parameters['consensus_threshold'] // 3) + 1
     )

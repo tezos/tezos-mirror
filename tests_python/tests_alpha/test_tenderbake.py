@@ -6,9 +6,9 @@ from launchers.sandbox import Sandbox
 from . import protocol
 
 
-ROUND_DURATION = 4
-ROUND_DURATIONS = {"round0": str(ROUND_DURATION), "round1": str(ROUND_DURATION)}
-TEST_DURATION = 5 * ROUND_DURATION
+MINIMAL_BLOCK_DELAY = 4
+DELAY_INCREMENT_PER_ROUND = 1
+TEST_DURATION = 5 * MINIMAL_BLOCK_DELAY
 NUM_NODES = 5
 
 
@@ -28,10 +28,11 @@ class TestProtoTenderbake:
 
         proto_params = dict(protocol.TENDERBAKE_PARAMETERS)
         parameters = copy.deepcopy(proto_params)
-        parameters['round_durations'] = ROUND_DURATIONS
         parameters['consensus_threshold'] = (
             2 * (parameters['consensus_threshold'] // 3) + 1
         )
+        parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+        parameters['delay_increment_per_round'] = str(DELAY_INCREMENT_PER_ROUND)
         protocol.activate(sandbox.client(0), parameters=parameters)
 
         for i in range(NUM_NODES):
@@ -48,7 +49,7 @@ class TestProtoTenderbake:
     def test_level(self, sandbox: Sandbox):
         # a decision should be taken in the first round, so we can deduce at
         # which minimal level the nodes should be at
-        expected_min_level = 1 + TEST_DURATION // ROUND_DURATION
+        expected_min_level = 1 + TEST_DURATION // MINIMAL_BLOCK_DELAY
         for client in sandbox.all_clients():
             level = client.get_level()
             assert level >= expected_min_level

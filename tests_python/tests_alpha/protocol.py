@@ -61,9 +61,7 @@ def get_now(client) -> str:
 
     constants = client.rpc('get', '/chains/main/blocks/head/context/constants')
 
-    delta = datetime.timedelta(
-        seconds=int(constants['round_durations']["round0"])
-    )
+    delta = datetime.timedelta(seconds=int(constants['minimal_block_delay']))
 
     now_date = timestamp_date + delta
 

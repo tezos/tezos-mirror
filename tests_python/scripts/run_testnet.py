@@ -438,8 +438,8 @@ def scenario(round_duration, num_nodes, log_dir):
 
         proto_testnet_params = dict(protocol.TENDERBAKE_PARAMETERS)
         parameters = dict(proto_testnet_params)
-        round_durations = [str(round_duration), str(2 * round_duration)]
-        parameters['round_durations'] = round_durations
+        parameters['minimal_block_delay'] = str(round_duration)
+        parameters['delay_increment_per_round'] = str(round_duration)
         protocol.activate(sandbox.client(0), parameters=parameters)
 
         for i in range(num_nodes):

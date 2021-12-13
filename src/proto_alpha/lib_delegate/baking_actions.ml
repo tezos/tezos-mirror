@@ -141,9 +141,10 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
   let cctxt = state.global_state.cctxt in
   let chain_id = state.global_state.chain_id in
   let simulation_mode = state.global_state.validation_mode in
+  let round_durations = state.global_state.round_durations in
   Environment.wrap_tzresult
     (Round.timestamp_of_round
-       state.global_state.constants.parametric.round_durations
+       round_durations
        ~predecessor_timestamp:predecessor.shell.timestamp
        ~predecessor_round:predecessor.round
        ~round)
@@ -443,15 +444,15 @@ let start_waiting_for_endorsement_quorum state =
     candidate
 
 let compute_round proposal round_durations =
-  let open Baking_state in
   let open Protocol in
-  let timestamp = Systime_os.now () |> Time.System.to_protocol in
-  let predecessor_block = proposal.predecessor in
+  let open Baking_state in
   (* If our current proposal is the transition block, we suppose a
      never ending round 0 *)
   if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
   then ok Round.zero
   else
+    let timestamp = Systime_os.now () |> Time.System.to_protocol in
+    let predecessor_block = proposal.predecessor in
     Environment.wrap_tzresult
     @@ Alpha_context.Round.round_of_timestamp
          round_durations
@@ -476,20 +477,16 @@ let update_to_level state level_update =
     ~level:(Int32.succ new_level)
     ~chain
   >>=? fun next_level_delegate_slots ->
-  compute_round
-    new_level_proposal
-    state.global_state.constants.parametric.round_durations
-  >>?= fun current_round ->
+  let round_durations = state.global_state.round_durations in
+  compute_round new_level_proposal round_durations >>?= fun current_round ->
   compute_new_state ~current_round ~delegate_slots ~next_level_delegate_slots
   >>= return
 
 let synchronize_round state {new_round_proposal; handle_proposal} =
   Events.(emit synchronizing_round new_round_proposal.predecessor.hash)
   >>= fun () ->
-  compute_round
-    new_round_proposal
-    state.global_state.constants.parametric.round_durations
-  >>?= fun current_round ->
+  let round_durations = state.global_state.round_durations in
+  compute_round new_round_proposal round_durations >>?= fun current_round ->
   if Round.(current_round < new_round_proposal.block.round) then
     (* impossible *)
     failwith

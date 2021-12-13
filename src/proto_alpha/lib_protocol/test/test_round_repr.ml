@@ -33,50 +33,6 @@
 open Protocol
 open Alpha_context
 
-let round_duration round_durations ~round =
-  match List.nth_opt round_durations (Int32.to_int round) with
-  | Some duration -> duration
-  | None -> (
-      let len = List.length round_durations in
-      match List.rev round_durations with
-      | last :: last_but_one :: _ ->
-          let last = Period_repr.to_seconds last in
-          let last_but_one = Period_repr.to_seconds last_but_one in
-          let diff = Int64.sub last last_but_one in
-          assert (Compare.Int64.(diff >= 0L)) ;
-          let offset =
-            Int64.sub (Int64.of_int32 round) (Int64.of_int (len - 1))
-          in
-          let duration = Int64.add last (Int64.mul diff offset) in
-          Period_repr.of_seconds_exn duration
-      | _ -> assert false)
-
-let test_round_repr () =
-  let round0 = Period_repr.one_second in
-  let round1 = Period_repr.of_seconds_exn 4L in
-  let round_durations =
-    Stdlib.Option.get @@ Round_repr.Durations.create_opt ~round0 ~round1 ()
-  in
-  let rec check_rounds = function
-    | [] -> return_unit
-    | round :: rounds -> (
-        let duration = round_duration ~round [round0; round1] in
-        match Round_repr.of_int32 round with
-        | Error _ -> failwith "Incorrect round value %ld" round
-        | Ok round ->
-            if
-              Period_repr.equal
-                (Round_repr.Durations.round_duration round_durations round)
-                duration
-            then check_rounds rounds
-            else
-              failwith
-                "Incorrect computed duration for round %a@."
-                Round_repr.pp
-                round)
-  in
-  check_rounds [0l; 1l; 2l; 3l; 4l; 5l]
-
 let ( >>>=? ) v f = v >|= Environment.wrap_tzresult >>=? f
 
 let ( >>>?= ) v f = v |> Environment.wrap_tzresult >>?= f
@@ -95,9 +51,9 @@ type round_test = {
 }
 
 (* an association list of the input, output values *)
-let case_3_3 =
+let case_3_4 =
   {
-    round_duration = [(0, 3); (1, 3); (2, 3); (3, 3)];
+    round_duration = [(0, 3); (1, 4); (2, 5); (3, 6)];
     round_and_offset =
       [
         (0, (0, 0));
@@ -106,25 +62,25 @@ let case_3_3 =
         (3, (1, 0));
         (4, (1, 1));
         (5, (1, 2));
-        (6, (2, 0));
-        (7, (2, 1));
-        (8, (2, 2));
+        (6, (1, 3));
+        (7, (2, 0));
+        (8, (2, 1));
       ];
-    timestamp_of_round = [((100, 0, 6), 121); ((100, 1, 6), 121)];
+    timestamp_of_round = [((100, 0, 6), 136); ((100, 1, 6), 137)];
     round_of_timestamp =
       [
-        ((100, 0, 121), 6);
-        ((100, 0, 122), 6);
-        ((100, 0, 123), 6);
-        ((100, 0, 124), 7);
-        ((100, 0, 125), 7);
-        ((100, 0, 126), 7);
-        ((100, 1, 121), 6);
-        ((100, 1, 122), 6);
-        ((100, 1, 123), 6);
-        ((100, 1, 124), 7);
-        ((100, 1, 125), 7);
-        ((100, 1, 126), 7);
+        ((100, 0, 121), 4);
+        ((100, 0, 122), 4);
+        ((100, 0, 123), 4);
+        ((100, 0, 124), 4);
+        ((100, 0, 125), 4);
+        ((100, 0, 126), 4);
+        ((100, 1, 121), 3);
+        ((100, 1, 122), 4);
+        ((100, 1, 123), 4);
+        ((100, 1, 124), 4);
+        ((100, 1, 125), 4);
+        ((100, 1, 126), 4);
       ];
   }
 
@@ -188,27 +144,29 @@ let case_3_6 =
 
 let test_cases =
   [
-    ([3; 3], case_3_3);
-    ([3; 3; 3], case_3_3);
-    ([3; 6], case_3_6);
-    ([3; 6; 9], case_3_6);
+    (* (first_round_duration, delay_increment_per_round), test_case_expectations *)
+    ((3, 1), case_3_4, "case_3_4");
+    ((3, 3), case_3_6, "case_3_6");
   ]
 
 let round_of_int i = Round_repr.of_int i |> Environment.wrap_tzresult
 
-let process_test_case (round_durations, ios) =
+let mk_round_durations first_round_duration delay_increment_per_round =
+  let first_round_duration =
+    Period_repr.of_seconds_exn @@ Int64.of_int first_round_duration
+  in
+  let delay_increment_per_round =
+    Period_repr.of_seconds_exn @@ Int64.of_int delay_increment_per_round
+  in
+  (* We assume test specifications do respect round_durations
+     invariants and cannot fail *)
+  Stdlib.Option.get
+  @@ Round_repr.Durations.create_opt
+       ~first_round_duration
+       ~delay_increment_per_round
+
+let process_test_case (round_durations, ios, _) =
   let open Round_repr in
-  (match
-     List.map
-       (fun x -> Period_repr.of_seconds_exn (Int64.of_int x))
-       round_durations
-   with
-  | round0 :: round1 :: other_rounds ->
-      Durations.create ~round0 ~round1 ~other_rounds ()
-      |> Environment.wrap_tzresult
-  | _ -> assert false)
-  >>?= fun round_durations ->
-  (* test [round_duration] *)
   List.iter_es
     (fun (i, o) ->
       round_of_int i >>?= fun round ->
@@ -219,15 +177,18 @@ let process_test_case (round_durations, ios) =
         (Period_repr.to_seconds dur))
     ios.round_duration
   >>=? fun () ->
+  let open Internals_for_test in
   (* test [round_and_offset] *)
   List.iter_es
-    (fun (i, (r, ro)) ->
-      let level_offset = Period_repr.of_seconds_exn (Int64.of_int i) in
+    (fun (level_offset, (round, ro)) ->
+      let level_offset =
+        Period_repr.of_seconds_exn (Int64.of_int level_offset)
+      in
       Environment.wrap_tzresult (round_and_offset round_durations ~level_offset)
       >>?= fun round_and_offset ->
       Assert.equal_int32
         ~loc:__LOC__
-        (Int32.of_int r)
+        (Int32.of_int round)
         (Round_repr.to_int32 round_and_offset.round)
       >>=? fun () ->
       Assert.equal_int64
@@ -271,8 +232,16 @@ let process_test_case (round_durations, ios) =
     ios.round_of_timestamp
 
 let test_round () =
+  let final_test_cases =
+    List.map
+      (fun ((first_round_duration, delay_increment_per_round), ios, name) ->
+        ( mk_round_durations first_round_duration delay_increment_per_round,
+          ios,
+          name ))
+      test_cases
+  in
   (* TODO this could be run in the error monad instead of lwt *)
-  List.iter_es process_test_case test_cases
+  List.iter_es process_test_case final_test_cases
 
 let ts_add ts period =
   match Timestamp.(ts +? period) with
@@ -281,40 +250,47 @@ let ts_add ts period =
 
 let test_round_of_timestamp () =
   let duration0 = Period.of_seconds_exn 1L in
-  let round_durations =
-    Stdlib.Option.get
-    @@ Round.Durations.create_opt ~round0:duration0 ~round1:duration0 ()
-  in
+  Environment.wrap_tzresult
+  @@ Round.Durations.create
+       ~first_round_duration:duration0
+       ~delay_increment_per_round:Period.one_second
+  >>?= fun round_durations ->
   let predecessor_timestamp = Time.Protocol.epoch in
-  let diff = ref 0 in
   let level_start = ts_add predecessor_timestamp duration0 in
-  while !diff < 1000 do
-    let timestamp =
-      ts_add level_start (Period.of_seconds_exn (Int64.of_int !diff))
-    in
-    match
-      Round.round_of_timestamp
-        round_durations
-        ~predecessor_timestamp
-        ~timestamp
-        ~predecessor_round:Round.zero
-    with
-    | Ok round ->
-        assert (Round.to_int32 round = Int32.of_int !diff) ;
-        diff := !diff + 1
-    | _ -> assert false
-  done ;
-  return_unit
+  let rec loop ~expected_round ~elapsed_time =
+    if elapsed_time < 1000 then
+      let timestamp =
+        ts_add level_start (Period.of_seconds_exn (Int64.of_int elapsed_time))
+      in
+      match
+        Round.round_of_timestamp
+          round_durations
+          ~predecessor_timestamp
+          ~timestamp
+          ~predecessor_round:Round.zero
+      with
+      | Ok round ->
+          Assert.equal_int32
+            ~loc:__LOC__
+            (Round.to_int32 round)
+            (Int32.of_int expected_round)
+          >>=? fun () ->
+          let elapsed_time = elapsed_time + (expected_round + 1)
+          and expected_round = 1 + expected_round in
+          loop ~expected_round ~elapsed_time
+      | Error _ -> failwith "error "
+    else return_unit
+  in
+  loop ~elapsed_time:0 ~expected_round:0
 
-let round_of_timestamp_perf durations =
-  let duration0_int64 = Stdlib.List.hd durations in
+let round_of_timestamp_perf (duration0_int64, dipr) =
   let duration0 = Period.of_seconds_exn duration0_int64 in
+  let delay_increment_per_round = Period.of_seconds_exn dipr in
   let round_durations =
     Stdlib.Option.get
     @@ Round.Durations.create_opt
-         ~round0:duration0
-         ~round1:(Period.of_seconds_exn (Stdlib.List.nth durations 1))
-         ()
+         ~first_round_duration:duration0
+         ~delay_increment_per_round
   in
   let predecessor_timestamp = Time.Protocol.epoch in
   let level_start = ts_add predecessor_timestamp duration0 in
@@ -340,19 +316,19 @@ let round_of_timestamp_perf durations =
   Environment.wrap_tzresult (loop 1000L) >>?= fun () -> return_unit
 
 let default_round_durations_list =
-  [[1L; 1L]; [1L; 2L]; [1L; 3L]; [2L; 3L]; [2L; 4L]]
+  [(1L, 1L); (1L, 2L); (1L, 3L); (2L, 3L); (2L, 4L)]
 
 let test_round_of_timestamp_perf () =
   List.iter_es round_of_timestamp_perf default_round_durations_list
 
-let timestamp_of_round_perf durations =
-  let duration0 = Period.of_seconds_exn (Stdlib.List.hd durations) in
+let timestamp_of_round_perf (duration0_int64, dipr) =
+  let duration0 = Period.of_seconds_exn duration0_int64 in
+  let delay_increment_per_round = Period.of_seconds_exn dipr in
   let round_durations =
     Stdlib.Option.get
     @@ Round.Durations.create_opt
-         ~round0:duration0
-         ~round1:(Period.of_seconds_exn (Stdlib.List.nth durations 1))
-         ()
+         ~first_round_duration:duration0
+         ~delay_increment_per_round
   in
   let predecessor_timestamp = Time.Protocol.epoch in
   let rec loop i =
@@ -380,10 +356,10 @@ let test_error_is_triggered_for_too_high_timestamp () =
   let round_durations =
     Stdlib.Option.get
     @@ Round.Durations.create_opt
-         ~round0:(Period.of_seconds_exn 1L)
-         ~round1:(Period.of_seconds_exn 1L)
-         ()
+         ~first_round_duration:Period.one_second
+         ~delay_increment_per_round:Period.one_second
   in
+
   let predecessor_timestamp = Time.Protocol.epoch in
   let res =
     Round.round_of_timestamp
@@ -406,13 +382,14 @@ let rec ( --> ) i j =
   (* [i; i+1; ...; j] *)
   if Compare.Int.(i > j) then [] else i :: (succ i --> j)
 
-let ts_of_round_inverse durations round_int =
+let ts_of_round_inverse (duration0_int64, dipr) round_int =
+  let first_round_duration = Period.of_seconds_exn duration0_int64 in
+  let delay_increment_per_round = Period.of_seconds_exn dipr in
   let round_durations =
     Stdlib.Option.get
     @@ Round.Durations.create_opt
-         ~round0:(Period.of_seconds_exn (Stdlib.List.nth durations 0))
-         ~round1:(Period.of_seconds_exn (Stdlib.List.nth durations 1))
-         ()
+         ~first_round_duration
+         ~delay_increment_per_round
   in
   let predecessor_timestamp = Time.Protocol.epoch in
   let predecessor_round = Round.zero in
@@ -441,19 +418,21 @@ let test_ts_of_round_inverse () =
     default_round_durations_list
   >>=? fun () ->
   List.iter_es
-    (ts_of_round_inverse [1L; 1L])
+    (ts_of_round_inverse (1L, 1L))
     (List.map (fun i -> Int32.to_int Int32.max_int - i) (1 --> 20))
 
-let round_of_ts_inverse durations ts =
-  let round_durations =
-    Stdlib.Option.get
-    @@ Round.Durations.create_opt
-         ~round0:(Period.of_seconds_exn (Stdlib.List.nth durations 0))
-         ~round1:(Period.of_seconds_exn (Stdlib.List.nth durations 1))
-         ()
+let round_of_ts_inverse ~first_round_duration ~delay_increment_per_round ts =
+  Format.printf "ts = %Ld@." ts ;
+  let first_round_duration = Period.of_seconds_exn first_round_duration in
+  let delay_increment_per_round =
+    Period.of_seconds_exn delay_increment_per_round
   in
+  Round.Durations.create ~first_round_duration ~delay_increment_per_round
+  >>>?= fun round_durations ->
   let predecessor_timestamp = Time.Protocol.epoch in
   let predecessor_round = Round.zero in
+  Timestamp.( +? ) predecessor_timestamp first_round_duration
+  >>>?= fun level_start ->
   let start_of_round timestamp =
     Round.round_of_timestamp
       round_durations
@@ -466,45 +445,86 @@ let round_of_ts_inverse durations ts =
       ~predecessor_timestamp
       ~predecessor_round
       ~round
-    >>>? fun t -> ok t
+    >>>? fun t -> ok (round, t)
   in
-  Period.of_seconds_exn ts |> Timestamp.( +? ) predecessor_timestamp
+  Period.of_seconds_exn ts |> Timestamp.( +? ) level_start
   >>>?= fun timestamp ->
-  start_of_round timestamp >>?= fun ts_start_of_round ->
-  Assert.leq_int64 ~loc:__LOC__ (Timestamp.to_seconds ts_start_of_round) ts
+  start_of_round timestamp >>?= fun (round, ts_start_of_round) ->
+  Assert.leq_int64
+    ~loc:__LOC__
+    (Timestamp.to_seconds ts_start_of_round)
+    (Timestamp.to_seconds timestamp)
   >>=? fun () ->
-  let pred ts = Period.of_seconds_exn 1L |> Timestamp.( - ) ts in
+  let pred ts = Period.one_second |> Timestamp.( - ) ts in
   let rec iter ts =
-    start_of_round ts >>?= fun ts_start_of_round' ->
+    start_of_round ts >>?= fun (round', ts_start_of_round') ->
     Assert.equal_int64
       ~loc:__LOC__
       (Timestamp.to_seconds ts_start_of_round)
       (Timestamp.to_seconds ts_start_of_round')
     >>=? fun () ->
-    if Timestamp.(timestamp > ts_start_of_round) then iter (pred ts)
-    else return_unit
+    Assert.equal_int32
+      ~loc:__LOC__
+      (Round.to_int32 round)
+      (Round.to_int32 round')
+    >>=? fun () ->
+    if Timestamp.(ts > ts_start_of_round') then iter (pred ts) else return_unit
   in
   if Timestamp.(timestamp > ts_start_of_round) then iter (pred timestamp)
   else return_unit
 
 let test_round_of_ts_inverse () =
   List.iter_es
-    (fun durations ->
+    (fun (first_round_duration, delay_increment_per_round) ->
       List.iter_es
-        (ts_of_round_inverse durations)
+        (fun ts ->
+          round_of_ts_inverse
+            ~first_round_duration
+            ~delay_increment_per_round
+            (Int64.of_int ts))
         ((0 --> 20) @ (60000 --> 60010)))
     default_round_durations_list
   >>=? fun () ->
   List.iter_es
-    (round_of_ts_inverse [1L; 1L])
+    (fun ts ->
+      Format.printf "%Ld@." ts ;
+      round_of_ts_inverse
+        ~first_round_duration:1L
+        ~delay_increment_per_round:2L
+        ts)
     (List.map
        (fun i -> Int64.of_int (Int32.to_int Int32.max_int - i))
        (0 --> 20))
 
+let test_level_offset_of_round () =
+  let rd1 =
+    let first_round_duration = 3 in
+    let delay_increment_per_round = 1 in
+    mk_round_durations first_round_duration delay_increment_per_round
+  in
+  List.iter_es
+    (fun (round_durations, tests) ->
+      List.iter_es
+        (fun (round, expected_offset) ->
+          Lwt.return @@ Environment.wrap_tzresult @@ Round_repr.of_int round
+          >>=? fun round ->
+          Lwt.return @@ Environment.wrap_tzresult
+          @@ Round_repr.level_offset_of_round round_durations ~round
+          >>=? fun computed_offset ->
+          Assert.equal_int64
+            ~loc:__LOC__
+            (Period_repr.to_seconds computed_offset)
+            (Int64.of_int expected_offset))
+        tests)
+    [
+      (rd1, [(0, 0); (1, 3); (2, 7)]);
+      (mk_round_durations 3 3, [(0, 0); (1, 3); (2, 9); (3, 18)]);
+    ]
+
 let tests =
   Tztest.
     [
-      tztest "round_duration [0..5]" `Quick test_round_repr;
+      tztest "test_level_offset_of_round" `Quick test_level_offset_of_round;
       tztest "test Round_duration" `Quick test_round;
       tztest "round_of_timestamp" `Quick test_round_of_timestamp;
       tztest "round_of_timestamp_perf" `Quick test_round_of_timestamp_perf;

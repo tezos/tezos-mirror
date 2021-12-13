@@ -47,7 +47,7 @@ let test_max_operations_ttl () =
   Environment.wrap_tzresult
     (Alpha_context.Period.mult
        (Int32.of_int constants.max_operations_time_to_live)
-       (Alpha_context.Round.Durations.first constants.round_durations))
+       constants.minimal_block_delay)
   >>?= fun result ->
   Assert.equal
     ~loc:__LOC__

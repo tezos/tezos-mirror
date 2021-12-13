@@ -88,6 +88,8 @@ val constants : t -> Constants_repr.parametric
 val patch_constants :
   t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
 
+val round_durations : t -> Round_repr.Durations.t
+
 (** Retrieve the cycle eras. *)
 val cycle_eras : t -> Level_repr.cycle_eras
 

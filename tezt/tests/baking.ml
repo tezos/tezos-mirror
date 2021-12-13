@@ -509,17 +509,15 @@ let wrong_branch_operation_dismissal =
   @@ fun protocol ->
   let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* client = Client.init ~endpoint:(Node node) () in
-  let first_round_duration = 1 in
+  let minimal_block_delay = 1 in
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Either.Right protocol)
       [
         (["consensus_threshold"], Some "1");
-        ( ["round_durations"],
-          Some
-            (Format.sprintf
-               "{ \"round0\": \"%d\", \"round1\": \"2\"}"
-               first_round_duration) );
+        ( ["minimal_block_delay"],
+          Some (Printf.sprintf "\"%d\"" minimal_block_delay) );
+        (["delay_increment_per_round"], Some "\"1\"");
       ]
   in
   let* () =
@@ -552,7 +550,7 @@ let wrong_branch_operation_dismissal =
       Tezt_tezos.Mempool.typ
       ~error_msg:"unexpected empty mempool") ;
   Log.info "Wait a bit in order to propose on a different round." ;
-  let* () = Lwt_unix.sleep (float first_round_duration) in
+  let* () = Lwt_unix.sleep (float minimal_block_delay) in
   Log.info "Bake a second proposal at a different round." ;
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   Log.info "Checking that the transfer is dismissed from the current mempool." ;

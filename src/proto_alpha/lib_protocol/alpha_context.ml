@@ -94,11 +94,10 @@ module Script_timestamp = struct
   include Script_timestamp_repr
 
   let now ctxt =
-    let {Constants_repr.round_durations; _} = Raw_context.constants ctxt in
-    let first_delay = Round_repr.Durations.first round_durations in
+    let {Constants_repr.minimal_block_delay; _} = Raw_context.constants ctxt in
+    let first_delay = Period_repr.to_seconds minimal_block_delay in
     let current_timestamp = Raw_context.predecessor_timestamp ctxt in
-    Time.add current_timestamp (Period_repr.to_seconds first_delay)
-    |> Timestamp.to_seconds |> of_int64
+    Time.add current_timestamp first_delay |> Timestamp.to_seconds |> of_int64
 end
 
 module Script = struct
@@ -134,6 +133,8 @@ module Constants = struct
   include Constants_repr
   include Constants_storage
 
+  let round_durations ctxt = Raw_context.round_durations ctxt
+
   let all ctxt = all (parametric ctxt)
 end
 
@@ -144,6 +145,7 @@ end
 
 module Round = struct
   include Round_repr
+  module Durations = Durations
 
   type round_durations = Durations.t
 

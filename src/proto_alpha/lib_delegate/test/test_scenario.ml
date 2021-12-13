@@ -37,7 +37,7 @@ let test_level_5 () =
       default_config with
       timeout = Int32.to_int level_to_reach * 3;
       round0 = 2L;
-      round1 = 2L;
+      round1 = 3L;
     }
   in
   run ~config [(3, (module Hooks)); (2, (module Hooks))]
@@ -511,7 +511,7 @@ let test_scenario_f2 () =
           ];
       timeout = 25;
       round0 = 2L;
-      round1 = 2L;
+      round1 = 3L;
     }
   in
   run
@@ -617,7 +617,7 @@ let test_scenario_m2 () =
             [bootstrap5; bootstrap1; bootstrap2; bootstrap3; bootstrap4];
           ];
       round0 = 2L;
-      round1 = 2L;
+      round1 = 3L;
       timeout = 20;
     }
   in
@@ -676,8 +676,8 @@ let test_scenario_m3 () =
       default_config with
       delegate_selection = Round_robin_over [[bootstrap1; bootstrap2]];
       round0 = 2L;
-      round1 = 2L;
-      timeout = 15;
+      round1 = 3L;
+      timeout = 30;
     }
   in
   run
@@ -838,6 +838,8 @@ let test_scenario_m5 () =
       delegate_selection =
         Round_robin_over
           [[bootstrap1; bootstrap2; bootstrap3; bootstrap4]; [bootstrap4]];
+      round0 = 3L;
+      round1 = 4L;
     }
   in
   run

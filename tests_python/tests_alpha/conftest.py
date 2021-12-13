@@ -85,7 +85,8 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
         sandbox.add_node(i, params=constants.NODE_PARAMS)
     parameters = protocol.get_parameters()
     parameters['consensus_threshold'] = 0
-    parameters['round_durations'] = {"round0": '1', "round1": '1'}
+    parameters['minimal_block_delay'] = '1'
+    parameters['delay_increment_per_round'] = '1'
     protocol.activate(
         sandbox.client(0), parameters=parameters, activate_in_the_past=True
     )

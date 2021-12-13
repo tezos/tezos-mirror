@@ -93,13 +93,13 @@ user_activated_upgrade_next: tezos-sandbox tezos-client tezos-node \
 	  --hard-fork-endorser ./tezos-endorser-${NEXT_PROTO} \
 	  --hard-fork-accuser ./tezos-accuser-${NEXT_PROTO}
 
-# The use --second-endorser ./tezos-baker-${ALPHA_PROTO} is a hack since there
-# is no endorser binary when Alpha is based on Tenderbake Since
-# user_activated_upgrade_* tests do not really use the endorsers but nonetheless
-# check the presence of the file, we can substitute it by another file that we
-# know to exist
-# The same hack is applied for the daemons_upgrade_alpha target
-# below
+# The use of --second-endorser ./tezos-baker-${ALPHA_PROTO} is a hack since
+# there is no endorser binary when Alpha is based on Tenderbake.
+#
+# Since user_activated_upgrade_* tests do not really use the endorsers but
+# nonetheless check the presence of the file, we can substitute it by another
+# file that we know to exist The same hack is applied for the
+# daemons_upgrade_alpha target below
 .PHONY: user_activated_upgrade_alpha
 user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
 	tezos-baker-${NEXT_PROTO} tezos-endorser-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \

@@ -205,22 +205,32 @@ let compute_next_round_time state =
            repropose a block at next level. *)
         None
     | None -> (
-        let round_durations =
-          state.global_state.constants.parametric.round_durations
+        let first_round_duration =
+          state.global_state.constants.parametric.minimal_block_delay
         in
-        let predecessor_timestamp = proposal.predecessor.shell.timestamp in
-        let predecessor_round = proposal.predecessor.round in
-        let next_round = Round.succ state.round_state.current_round in
+        let delay_increment_per_round =
+          state.global_state.constants.parametric.delay_increment_per_round
+        in
         match
-          timestamp_of_round
-            state.global_state.cache.known_timestamps
-            round_durations
-            ~predecessor_timestamp
-            ~predecessor_round
-            ~round:next_round
+          Round.Durations.create_opt
+            ~first_round_duration
+            ~delay_increment_per_round
         with
-        | Ok timestamp -> Some (timestamp, next_round)
-        | _ -> assert false)
+        | Some round_durations -> (
+            let predecessor_timestamp = proposal.predecessor.shell.timestamp in
+            let predecessor_round = proposal.predecessor.round in
+            let next_round = Round.succ state.round_state.current_round in
+            match
+              timestamp_of_round
+                state.global_state.cache.known_timestamps
+                round_durations
+                ~predecessor_timestamp
+                ~predecessor_round
+                ~round:next_round
+            with
+            | Ok timestamp -> Some (timestamp, next_round)
+            | _ -> assert false)
+        | None -> assert false)
 
 (** [first_potential_round_at_next_level state ~earliest_round] yields
     an optional pair of the earliest possible round (at or after
@@ -315,9 +325,7 @@ let compute_next_potential_baking_time_at_next_level state =
               Lwt.return_some
                 (first_potential_baking_time, first_potential_round))
       | None -> (
-          let round_durations =
-            state.global_state.constants.parametric.round_durations
-          in
+          let round_durations = state.global_state.round_durations in
           (* Compute the timestamp at which the new level will start at
              round 0.*)
           Round.timestamp_of_round
@@ -474,8 +482,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     with
     | Some _ ->
         let delta =
-          Round.Durations.first
-            state.global_state.constants.parametric.round_durations
+          state.global_state.constants.parametric.minimal_block_delay
           |> Period.to_seconds
           |> fun d -> Int64.div d 5L
         in
@@ -515,11 +522,9 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
          a smaller timestamp than the earliest block at next level built
          on top of the proposal made at the next round (at the current
          level). *)
+      let round_durations = state.global_state.round_durations in
       let next_round_duration =
-        Round.round_duration
-          state.global_state.constants.parametric.round_durations
-          next_round
-        |> Period.to_seconds
+        Round.round_duration round_durations next_round |> Period.to_seconds
       in
       if
         Time.Protocol.(
@@ -553,6 +558,16 @@ let may_initialise_with_latest_proposal_pqc state =
                 };
             })
 
+let create_round_durations constants =
+  let first_round_duration =
+    constants.Constants.parametric.minimal_block_delay
+  in
+  let delay_increment_per_round =
+    constants.parametric.delay_increment_per_round
+  in
+  Protocol.Environment.wrap_tzresult
+    (Round.Durations.create ~first_round_duration ~delay_increment_per_round)
+
 let create_initial_state cctxt ?(synchronize = true) ~chain config
     operation_worker ~(current_proposal : Baking_state.proposal) delegates =
   (* FIXME? consider saved endorsable value *)
@@ -561,12 +576,14 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
   Shell_services.Chain.chain_id cctxt ~chain () >>=? fun chain_id ->
   Alpha_services.Constants.all cctxt (`Hash chain_id, `Head 0)
   >>=? fun constants ->
-  (match config.Baking_configuration.validation with
-  | Node -> return Node
-  | Local {context_path} ->
-      Baking_simulator.load_context ~context_path >>=? fun index ->
-      return (Local index)
-  | ContextIndex index -> return (Local index))
+  create_round_durations constants >>?= fun round_durations ->
+  Baking_state.(
+    match config.Baking_configuration.validation with
+    | Node -> return Node
+    | Local {context_path} ->
+        Baking_simulator.load_context ~context_path >>=? fun index ->
+        return (Local index)
+    | ContextIndex index -> return (Local index))
   >>=? fun validation_mode ->
   let cache = Baking_state.create_cache () in
   let global_state =
@@ -575,6 +592,7 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
       chain_id;
       config;
       constants;
+      round_durations;
       operation_worker;
       validation_mode;
       delegates;
@@ -619,9 +637,14 @@ let create_initial_state cctxt ?(synchronize = true) ~chain config
     }
   in
   (if synchronize then
-   Baking_actions.compute_round
-     current_proposal
-     constants.parametric.round_durations
+   let round_durations =
+     Stdlib.Option.get
+     @@ Round.Durations.create_opt
+          ~first_round_duration:constants.parametric.minimal_block_delay
+          ~delay_increment_per_round:
+            constants.parametric.delay_increment_per_round
+   in
+   Baking_actions.compute_round current_proposal round_durations
    >>? fun current_round -> ok {current_round; current_phase = Idle}
   else ok {Baking_state.current_round = Round.zero; current_phase = Idle})
   >>?= fun round_state ->

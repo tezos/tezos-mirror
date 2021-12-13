@@ -9,8 +9,8 @@ from tools import utils, constants, paths
 
 from . import protocol
 
-ROUND_DURATION = 2
-SLEEP = 2 * ROUND_DURATION
+MINIMAL_BLOCK_DELAY = 2
+SLEEP = 2 * MINIMAL_BLOCK_DELAY
 
 
 def run_vote_file(sandbox: Sandbox, filename: str) -> None:
@@ -95,10 +95,8 @@ class TestAllPerBlockVotes:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         parameters = protocol.get_parameters()
-        parameters['round_durations'] = {
-            "round0": str(ROUND_DURATION),
-            "round1": str(ROUND_DURATION),
-        }
+        parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
+        parameters['delay_increment_per_round'] = "1"
         protocol.activate(sandbox.client(0), parameters=parameters)
         sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
 

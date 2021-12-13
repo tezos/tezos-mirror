@@ -109,6 +109,8 @@ type global_state = {
   config : Baking_configuration.t;
   (* protocol constants *)
   constants : Constants.t;
+  (* round durations *)
+  round_durations : Round.round_durations;
   (* worker that monitor and aggregates new operations *)
   operation_worker : Operation_worker.t;
   (* the validation mode used by the baker*)
