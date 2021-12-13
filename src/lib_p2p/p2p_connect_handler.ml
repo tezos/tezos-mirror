@@ -369,12 +369,12 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         info.announced_version
     in
     (* we have a common version, checking if there is an available slot *)
-    let* version =
+    let* () =
       if
         (* randomly allow one additional incoming connection *)
         t.config.max_connections + Random.int 2
         > P2p_pool.active_connections t.pool
-      then return version
+      then return_unit
       else P2p_rejection.(rejecting Too_many_connections)
     in
     (* we have a slot, checking if point and peer are acceptable *)

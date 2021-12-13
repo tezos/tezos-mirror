@@ -99,7 +99,7 @@ let test_mk_buffer_safe =
 let cancel_and_assert_success canceler =
   let open Lwt_syntax in
   let* r = Lwt_canceler.cancel canceler in
-  match r with Ok _ -> Lwt.return_unit | Error _ -> assert false
+  match r with Ok _ -> return_unit | Error _ -> assert false
 
 let easy_mk_readable ?maxlength ?fresh_buf_size ?size () =
   let read_buffer = Circular_buffer.create ?maxlength ?fresh_buf_size () in
@@ -116,7 +116,7 @@ let test_read_waits_for_data =
   let canceler = Lwt_canceler.create () in
   Lwt_canceler.on_cancel canceler (fun () ->
       cancelled := true ;
-      Lwt.return_unit) ;
+      return_unit) ;
   let schedule () : _ Lwt.t =
     let* () = Lwt_unix.sleep 0.3 in
     cancel_and_assert_success canceler
@@ -126,7 +126,7 @@ let test_read_waits_for_data =
          Alcotest.failf "Schedule execution failed: %s" (Printexc.to_string exn)) ;
      let* res = P2p_buffer_reader.read ~canceler readable buffer in
      assert (Result.is_error res) ;
-     Lwt.return_unit) ;
+     return_unit) ;
   assert (!cancelled = true)
 
 let test_read_less_than_length : QCheck.Test.t =

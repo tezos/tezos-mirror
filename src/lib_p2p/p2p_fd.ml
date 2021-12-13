@@ -50,7 +50,7 @@ let create =
     incr counter ;
     let t = {fd; id = !counter; nread = 0; nwrit = 0} in
     let* () = Events.(emit create_fd) t.id in
-    Lwt.return t
+    return t
 
 let string_of_sockaddr addr =
   match addr with

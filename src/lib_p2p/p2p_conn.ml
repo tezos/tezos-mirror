@@ -142,15 +142,15 @@ let pipe_exn_handler = function
 (* see [Lwt_pipe.Maybe_bounded.pop] *)
 
 let read t =
-  let open Lwt_tzresult_syntax in
+  let open Lwt_syntax in
   Lwt.catch
     (fun () ->
-      let*! (s, msg) = Lwt_pipe.Maybe_bounded.pop t.messages in
-      let*! () =
+      let* (s, msg) = Lwt_pipe.Maybe_bounded.pop t.messages in
+      let* () =
         Events.(emit bytes_popped_from_queue)
           (s, (P2p_socket.info t.conn).peer_id)
       in
-      return msg)
+      return_ok msg)
     pipe_exn_handler
 
 let is_readable t =

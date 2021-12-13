@@ -332,7 +332,7 @@ let testcase (module T : TEST) =
       Tztest.with_empty_mock_sink (fun () ->
           let* r = T.run () in
           match r with
-          | Ok () -> Lwt.return_unit
+          | Ok () -> return_unit
           | Error error ->
               Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
 

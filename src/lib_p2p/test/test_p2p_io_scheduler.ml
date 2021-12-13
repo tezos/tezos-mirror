@@ -50,7 +50,7 @@ let rec listen ?port addr =
     (fun () ->
       let* () = Lwt_unix.bind main_socket (ADDR_INET (uaddr, tentative_port)) in
       Lwt_unix.listen main_socket 50 ;
-      Lwt.return (main_socket, tentative_port))
+      return (main_socket, tentative_port))
     (function
       | Unix.Unix_error ((Unix.EADDRINUSE | Unix.EADDRNOTAVAIL), _, _)
         when port = None ->
@@ -103,7 +103,7 @@ let receive conn =
     match r with
     | Ok _ -> loop ()
     | Error (Tezos_p2p_services.P2p_errors.Connection_closed :: _) ->
-        Lwt.return_unit
+        return_unit
     | Error err -> Lwt.fail (Error err)
   in
   loop ()
@@ -206,11 +206,10 @@ let run ?display_client_stat ?max_download_speed ?max_upload_speed
     Process.detach ~prefix (fun _ ->
         let*! () =
           let*! r = Lwt_utils_unix.safe_close main_socket in
-          match r with
-          | Error trace ->
-              Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-              Lwt.return_unit
-          | Ok () -> Lwt.return_unit
+          Result.iter_error
+            (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
+            r ;
+          Lwt.return_unit
         in
         client ?max_upload_speed ?write_queue_size addr port time n)
   in
@@ -285,7 +284,7 @@ let wrap n f =
         let* () = Lazy.force init_logs in
         let* r = f () in
         match r with
-        | Ok () -> Lwt.return_unit
+        | Ok () -> return_unit
         | Error error ->
             Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
 

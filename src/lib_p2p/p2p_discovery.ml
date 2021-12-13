@@ -60,16 +60,15 @@ module Answer = struct
         Lwt_unix.set_close_on_exec socket ;
         Lwt_canceler.on_cancel st.canceler (fun () ->
             let* r = Lwt_utils_unix.safe_close socket in
-            match r with
-            | Error trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-                Lwt.return_unit
-            | Ok () -> Lwt.return_unit) ;
+            Result.iter_error
+              (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
+              r ;
+            return_unit) ;
         Lwt_unix.setsockopt socket SO_BROADCAST true ;
         Lwt_unix.setsockopt socket SO_REUSEADDR true ;
         let addr = Lwt_unix.ADDR_INET (Unix.inet_addr_any, st.discovery_port) in
         let* () = Lwt_unix.bind socket addr in
-        Lwt.return socket)
+        return socket)
       (fun exn ->
         let* () = Events.(emit create_socket_error) () in
         Lwt.fail exn)
@@ -119,7 +118,7 @@ module Answer = struct
     let open Lwt_syntax in
     let* r = loop st in
     match r with
-    | Error (Canceled :: _) -> Lwt.return_unit
+    | Error (Canceled :: _) -> return_unit
     | Error err ->
         let* () = Events.(emit unexpected_error) ("answer", err) in
         Error_monad.cancel_with_exceptions st.canceler
@@ -179,11 +178,10 @@ module Sender = struct
         let socket = Lwt_unix.(socket PF_INET SOCK_DGRAM 0) in
         Lwt_canceler.on_cancel st.canceler (fun () ->
             let* r = Lwt_utils_unix.safe_close socket in
-            match r with
-            | Error trace ->
-                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-                Lwt.return_unit
-            | Ok () -> Lwt.return_unit) ;
+            Result.iter_error
+              (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
+              r ;
+            return_unit) ;
         Lwt_unix.setsockopt socket Lwt_unix.SO_BROADCAST true ;
         let broadcast_ipv4 = Ipaddr_unix.V4.to_inet_addr st.discovery_addr in
         let addr = Lwt_unix.ADDR_INET (broadcast_ipv4, st.discovery_port) in
@@ -195,7 +193,7 @@ module Sender = struct
           (fun trace ->
             Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
           r ;
-        Lwt.return_unit)
+        return_unit)
       (fun _exn -> Events.(emit broadcast_error) ())
 
   let rec worker_loop sender_config st =
@@ -210,9 +208,9 @@ module Sender = struct
           @@ Lwt.pick
                [
                  (let* () = Lwt_condition.wait st.restart_discovery in
-                  Lwt.return Config.initial);
+                  return Config.initial);
                  (let* () = Lwt_unix.sleep sender_config.Config.delay in
-                  Lwt.return
+                  return
                     {sender_config with Config.loop = succ sender_config.loop});
                ])
     in
@@ -223,7 +221,7 @@ module Sender = struct
     | Ok config ->
         let new_sender_config = Config.increase_delay config in
         worker_loop new_sender_config st
-    | Error (Canceled :: _) -> Lwt.return_unit
+    | Error (Canceled :: _) -> return_unit
     | Error err ->
         let* () = Events.(emit unexpected_error) ("sender", err) in
         Error_monad.cancel_with_exceptions st.canceler

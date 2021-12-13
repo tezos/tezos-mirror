@@ -587,11 +587,10 @@ let register st fd =
         Lwt_pipe.Maybe_bounded.close write_queue ;
         Lwt_pipe.Maybe_bounded.close read_queue ;
         let* r = P2p_fd.close fd in
-        match r with
-        | Error trace ->
-            Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-            Lwt.return_unit
-        | Ok () -> Lwt.return_unit) ;
+        Result.iter_error
+          (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
+          r ;
+        return_unit) ;
     let readable = P2p_buffer_reader.mk_readable ~read_buffer ~read_queue in
     let conn =
       {

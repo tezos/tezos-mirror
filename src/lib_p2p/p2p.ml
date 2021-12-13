@@ -349,16 +349,14 @@ module Real = struct
   let send _net conn m =
     let open Lwt_result_syntax in
     let*! r = P2p_conn.write conn m in
-    match r with
-    | Ok () ->
-        let*! () = Events.(emit message_sent) (P2p_conn.info conn).peer_id in
-        return_unit
-    | Error trace as error ->
-        let*! () =
+    let*! () =
+      match r with
+      | Ok () -> Events.(emit message_sent) (P2p_conn.info conn).peer_id
+      | Error trace ->
           Events.(emit sending_message_error)
             ((P2p_conn.info conn).peer_id, trace)
-        in
-        Lwt.return error
+    in
+    Lwt.return r
 
   let try_send _net conn v =
     match P2p_conn.write_now conn v with

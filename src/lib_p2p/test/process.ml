@@ -163,18 +163,14 @@ module Channel = struct
     {inch; outch; input_encoding; output_encoding; flags}
 
   let push {outch; output_encoding; flags; _} v =
-    Lwt.catch
-      (fun () ->
+    Error_monad.catch_es (fun () ->
         let value_encoding = output_encoding in
         write ~value_encoding ~flags outch v)
-      (fun exn -> fail_with_exn exn)
 
   let pop {inch; input_encoding; flags; _} =
-    Lwt.catch
-      (fun () ->
+    Error_monad.catch_es (fun () ->
         let value_encoding = input_encoding in
         read ~value_encoding ~flags inch)
-      (fun exn -> fail_with_exn exn)
 end
 
 let terminate pid =
@@ -189,9 +185,9 @@ let wait ~value_encoding ~flags pid result_ch =
       match s with
       | (_, Lwt_unix.WEXITED 0) ->
           received_result ~value_encoding ~flags result_ch
-      | (_, Lwt_unix.WEXITED n) -> Lwt.return (error (Exn (Exited n)))
-      | (_, Lwt_unix.WSIGNALED n) -> Lwt.return (error (Exn (Signaled n)))
-      | (_, Lwt_unix.WSTOPPED n) -> Lwt.return (error (Exn (Stopped n))))
+      | (_, Lwt_unix.WEXITED n) -> fail_with_exn (Exited n)
+      | (_, Lwt_unix.WSIGNALED n) -> fail_with_exn (Signaled n)
+      | (_, Lwt_unix.WSTOPPED n) -> fail_with_exn (Stopped n))
     (function
       | Lwt.Canceled ->
           let* () = terminate pid in
@@ -281,8 +277,8 @@ let detach ?(prefix = "") ?canceler ?input_encoding ?output_encoding
               value_encoding;
             })
     ~on_error:(fun err ->
-      let* _ = Lwt_canceler.cancel canceler in
-      Lwt.return (Error err))
+      let* (_ : (unit, exn list) result) = Lwt_canceler.cancel canceler in
+      return_error err)
 
 let signal_names =
   [
@@ -437,7 +433,7 @@ let join_process (plist : ('a, 'b, 'c) t list) =
   List.map_p
     (fun {termination; prefix; _} ->
       let* t = termination in
-      Lwt.return (prefix, t))
+      return (prefix, t))
     plist
 
 (** Wait for all processes to terminate.
@@ -448,14 +444,14 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
   let rec loop processes =
     let open Lwt_syntax in
     match processes with
-    | [] -> Lwt.return_none
+    | [] -> return_none
     | processes ->
         let* (finished, remaining) = Lwt.nchoose_split processes in
         let rec handle = function
           | [] -> loop remaining
           | Ok _ :: finished -> handle finished
           | Error err :: _ ->
-              Lwt.return_some
+              return_some
                 ( err,
                   List.map
                     (fun remain ->
@@ -465,19 +461,19 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
         in
         handle finished
   in
-  let open Lwt_result_syntax in
+  let open Lwt_syntax in
   let terminations = List.map (fun p -> p.termination) processes in
-  let*! o = loop terminations in
+  let* o = loop terminations in
   match o with
   | None ->
-      let*! () = lwt_log_info "All done!" in
-      let*! terminated = Error_monad.Lwt_syntax.all terminations in
-      return
+      let* () = lwt_log_info "All done!" in
+      let* terminated = Error_monad.Lwt_syntax.all terminations in
+      return_ok
       @@ List.map (function Ok a -> a | Error _ -> assert false) terminated
   | Some (_err, remaining) ->
-      let*! () = lwt_log_error "Early error! Canceling remaining process." in
+      let* () = lwt_log_error "Early error! Canceling remaining process." in
       List.iter Lwt.cancel remaining ;
-      let*! terminated = join_process processes in
+      let* terminated = join_process processes in
       let terminated =
         List.mapi (fun i (prefix, a) -> (i, prefix, a)) terminated
       in
@@ -495,8 +491,8 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
                   ))
           terminated
       in
-      let*! _ = print_results terminated in
-      Lwt.return @@ error (Par errors)
+      let* _ = print_results terminated in
+      Error_monad.fail (Par errors)
 
 let wait_all pl =
   let open Lwt_result_syntax in
