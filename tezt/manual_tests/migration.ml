@@ -70,7 +70,7 @@ let rec bake_with_foundation ?(foundation_index = [1; 2; 3; 4; 5; 6; 7; 8])
     let foundation = List.nth foundation_index index in
     let proc =
       Client.spawn_bake_for
-        ~key:("foundation" ^ string_of_int foundation)
+        ~keys:["foundation" ^ string_of_int foundation]
         client
     in
     let* res = Process.wait proc in
