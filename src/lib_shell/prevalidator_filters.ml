@@ -60,6 +60,7 @@ module type FILTER = sig
       Operation_hash.t ->
       Proto.operation_data ->
       [ `Passed_precheck of state
+      | `Passed_precheck_with_replace of Operation_hash.t * state
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace

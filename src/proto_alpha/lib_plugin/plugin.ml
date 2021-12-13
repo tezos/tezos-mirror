@@ -81,6 +81,18 @@ module Mempool = struct
          (fun (num, den) -> {Q.num; den})
          (tup2 z z))
 
+  let manager_op_replacement_factor_enc : Q.t Data_encoding.t =
+    let open Data_encoding in
+    def
+      "manager operation replacement factor"
+      ~title:"A manager operation's replacement factor"
+      ~description:
+        "The fee and fee/gas ratio of an operation to replace another"
+      (conv
+         (fun q -> (q.Q.num, q.Q.den))
+         (fun (num, den) -> {Q.num; den})
+         (tup2 z z))
+
   type config = {
     minimal_fees : Tez.t;
     minimal_nanotez_per_gas_unit : nanotez;
@@ -90,6 +102,13 @@ module Mempool = struct
             [`Passed_postfilter filter_state], no matter the operation's
             success. *)
     clock_drift : Period.t option;
+    replace_by_fee_factor : Q.t;
+        (** This field determines the amount of additional fees (given as a
+            factor of the declared fees) a manager should add to an operation
+            in order to (eventually) replace an existing (prechecked) one
+            in the mempool. Note that other criteria, such as the gas ratio,
+            are also taken into account to decide whether to accept the
+            replacement or not. *)
   }
 
   let default_minimal_fees =
@@ -108,6 +127,9 @@ module Mempool = struct
 
   let config_encoding : config Data_encoding.t =
     let open Data_encoding in
+    (* 105/100 = 1.05%: This is the minumum fee increase ratio required between
+       an operation and another one it'd replace in the prevalidator. *)
+    let replace_factor = Q.make (Z.of_int 105) (Z.of_int 100) in
     conv
       (fun {
              minimal_fees;
@@ -115,25 +137,29 @@ module Mempool = struct
              minimal_nanotez_per_byte;
              allow_script_failure;
              clock_drift;
+             replace_by_fee_factor;
            } ->
         ( minimal_fees,
           minimal_nanotez_per_gas_unit,
           minimal_nanotez_per_byte,
           allow_script_failure,
-          clock_drift ))
+          clock_drift,
+          replace_by_fee_factor ))
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              allow_script_failure,
-             clock_drift ) ->
+             clock_drift,
+             replace_by_fee_factor ) ->
         {
           minimal_fees;
           minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte;
           allow_script_failure;
           clock_drift;
+          replace_by_fee_factor;
         })
-      (obj5
+      (obj6
          (dft "minimal_fees" Tez.encoding default_minimal_fees)
          (dft
             "minimal_nanotez_per_gas_unit"
@@ -144,7 +170,11 @@ module Mempool = struct
             nanotez_enc
             default_minimal_nanotez_per_byte)
          (dft "allow_script_failure" bool true)
-         (opt "clock_drift" Period.encoding))
+         (opt "clock_drift" Period.encoding)
+         (dft
+            "replace_by_fee_factor"
+            manager_op_replacement_factor_enc
+            replace_factor))
 
   let default_config =
     {
@@ -153,14 +183,35 @@ module Mempool = struct
       minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
       allow_script_failure = true;
       clock_drift = None;
+      replace_by_fee_factor =
+        Q.make (Z.of_int 105) (Z.of_int 100)
+        (* Default value of [replace_by_fee_factor] is set to 5% *);
     }
+
+  type manager_gas_witness
+
+  (* For each Prechecked manager operation (batched or not), we associate the
+     following information to its source:
+     - the operation's hash, needed in case the operation is replaced
+       afterwards,
+     - the total fee and gas_limit, needed to compare operations of the same
+       manager to decide which one has more fees w.r.t. announced gas limit
+       (modulo replace_by_fee_factor)
+  *)
+  type manager_op_info = {
+    operation_hash : Operation_hash.t;
+    gas_limit : manager_gas_witness Gas.Arith.t;
+    fee : Tez.t;
+  }
 
   type state = {
     grandparent_level_start : Alpha_context.Timestamp.t option;
     round_zero_duration : Period.t option;
-    op_prechecked_managers : Signature.Public_key_hash.Set.t;
-        (** Set of all managers that are the source of manager operations
-            applied in the mempool. Each manager in the set should be accessible
+    op_prechecked_managers : manager_op_info Signature.Public_key_hash.Map.t;
+        (** All managers that are the source of manager operations
+            prechecked in the mempool. Each manager in the map is associated to
+            a record of type [manager_op_info] (See for record details above).
+            Each manager in the map should be accessible
             with an operation hash in [operation_hash_to_manager]. *)
     operation_hash_to_manager : Signature.Public_key_hash.t Operation_hash.Map.t;
         (** Map of operation hash to manager used to remove a manager from
@@ -172,7 +223,7 @@ module Mempool = struct
     {
       grandparent_level_start = None;
       round_zero_duration = None;
-      op_prechecked_managers = Signature.Public_key_hash.Set.empty;
+      op_prechecked_managers = Signature.Public_key_hash.Map.empty;
       operation_hash_to_manager = Operation_hash.Map.empty;
     }
 
@@ -229,7 +280,7 @@ module Mempool = struct
         {
           filter_state with
           op_prechecked_managers =
-            Signature.Public_key_hash.Set.remove
+            Signature.Public_key_hash.Map.remove
               source
               filter_state.op_prechecked_managers;
           operation_hash_to_manager =
@@ -282,66 +333,89 @@ module Mempool = struct
       (function Manager_restriction -> Some () | _ -> None)
       (fun () -> Manager_restriction)
 
-  let check_manager_restriction filter_state source =
-    if
-      Signature.Public_key_hash.Set.mem
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2238
+     Write unit tests for the feature 'replace-by-fee' and for other changes
+     introduced by other MRs in the plugin. *)
+  (* In order to decide if the new operation can replace an old one from the
+     same manager, we check if its fees (resp. fees/gas ratio) are greater than
+     (or equal to) the old operations's fees (resp. fees/gas ratio), bumped by
+     the factor [config.replace_by_fee_factor].
+  *)
+  let better_fees_and_ratio =
+    let bump config q = Q.mul q config.replace_by_fee_factor in
+    fun config old_gas old_fee new_gas new_fee ->
+      let old_fee = Tez.to_mutez old_fee |> Z.of_int64 |> Q.of_bigint in
+      let old_gas = Gas.Arith.integral_to_z old_gas |> Q.of_bigint in
+      let new_fee = Tez.to_mutez new_fee |> Z.of_int64 |> Q.of_bigint in
+      let new_gas = Gas.Arith.integral_to_z new_gas |> Q.of_bigint in
+      let old_ratio = Q.div old_fee old_gas in
+      let new_ratio = Q.div new_fee new_gas in
+      Q.compare new_ratio (bump config old_ratio) >= 0
+      && Q.compare new_fee (bump config old_fee) >= 0
+
+  let check_manager_restriction config filter_state source ~fee ~gas_limit =
+    match
+      Signature.Public_key_hash.Map.find
         source
         filter_state.op_prechecked_managers
-    then
-      (* Manager already seen: one manager per block limitation triggered. *)
-      Error (`Branch_delayed [Environment.wrap_tzerror Manager_restriction])
-    else Ok ()
+    with
+    | None -> `Fresh
+    | Some {operation_hash = old_hash; gas_limit = old_gas; fee = old_fee} ->
+        (* Manager already seen: one manager per block limitation triggered.
+           Can replace old operation if new operation's fees are better *)
+        if better_fees_and_ratio config old_gas old_fee gas_limit fee then
+          `Replace old_hash
+        else
+          `Fail (`Branch_delayed [Environment.wrap_tzerror Manager_restriction])
 
   let pre_filter_manager :
       type t.
       config ->
       state ->
-      t Kind.manager contents_list ->
       public_key_hash ->
       int ->
+      t Kind.manager contents_list ->
       [ `Passed_prefilter
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ] =
-   fun config filter_state op source size ->
-    let check_gas_and_fee () =
-      match get_manager_operation_gas_and_fee op with
-      | Error err ->
-          let err = Environment.wrap_tztrace err in
-          `Refused err
-      | Ok (fee, gas) ->
-          let fees_in_nanotez =
-            Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
-          in
-          let minimal_fees_in_nanotez =
-            Q.mul
-              (Q.of_int64 (Tez.to_mutez config.minimal_fees))
-              (Q.of_int 1000)
-          in
-          let minimal_fees_for_gas_in_nanotez =
-            Q.mul
-              config.minimal_nanotez_per_gas_unit
-              (Q.of_bigint @@ Gas.Arith.integral_to_z gas)
-          in
-          let minimal_fees_for_size_in_nanotez =
-            Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
-          in
-          if
-            Q.compare
-              fees_in_nanotez
-              (Q.add
-                 minimal_fees_in_nanotez
-                 (Q.add
-                    minimal_fees_for_gas_in_nanotez
-                    minimal_fees_for_size_in_nanotez))
-            >= 0
-          then `Passed_prefilter
-          else `Refused [Environment.wrap_tzerror Fees_too_low]
+   fun config filter_state source size op ->
+    let check_gas_and_fee fee gas_limit =
+      let fees_in_nanotez =
+        Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
+      in
+      let minimal_fees_in_nanotez =
+        Q.mul (Q.of_int64 (Tez.to_mutez config.minimal_fees)) (Q.of_int 1000)
+      in
+      let minimal_fees_for_gas_in_nanotez =
+        Q.mul
+          config.minimal_nanotez_per_gas_unit
+          (Q.of_bigint @@ Gas.Arith.integral_to_z gas_limit)
+      in
+      let minimal_fees_for_size_in_nanotez =
+        Q.mul config.minimal_nanotez_per_byte (Q.of_int size)
+      in
+      if
+        Q.compare
+          fees_in_nanotez
+          (Q.add
+             minimal_fees_in_nanotez
+             (Q.add
+                minimal_fees_for_gas_in_nanotez
+                minimal_fees_for_size_in_nanotez))
+        >= 0
+      then `Passed_prefilter
+      else `Refused [Environment.wrap_tzerror Fees_too_low]
     in
-    match check_manager_restriction filter_state source with
-    | Error errs -> errs
-    | Ok () -> check_gas_and_fee ()
+    match get_manager_operation_gas_and_fee op with
+    | Error err -> `Refused (Environment.wrap_tztrace err)
+    | Ok (fee, gas_limit) -> (
+        match
+          check_manager_restriction config filter_state source ~fee ~gas_limit
+        with
+        | `Fail errs -> errs
+        | `Fresh | `Replace _ -> check_gas_and_fee fee gas_limit)
 
   type Environment.Error_monad.error += Outdated_endorsement
 
@@ -615,36 +689,43 @@ module Mempool = struct
     | Single (Ballot _) ->
         Lwt.return @@ `Passed_prefilter
     | Single (Manager_operation {source; _}) as op ->
-        Lwt.return (pre_filter_manager config filter_state op source bytes)
+        Lwt.return @@ pre_filter_manager config filter_state source bytes op
     | Cons (Manager_operation {source; _}, _) as op ->
-        Lwt.return (pre_filter_manager config filter_state op source bytes)
+        Lwt.return @@ pre_filter_manager config filter_state source bytes op
 
   let precheck_manager :
       type t.
+      config ->
       state ->
       validation_state ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
+      fee:Tez.t ->
+      gas_limit:manager_gas_witness Gas.Arith.t ->
       public_key_hash ->
       [> `Prechecked_manager
+      | `Prechecked_manager_with_replace of Operation_hash.t
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ]
       Lwt.t =
-   fun filter_state
+   fun config
+       filter_state
        validation_state
        shell
        ({contents; _} as protocol_data : t Kind.manager protocol_data)
+       ~fee
+       ~gas_limit
        source ->
-    let precheck_manager_and_check_signature () =
+    let precheck_manager_and_check_signature ~on_success =
       ( Main.precheck_manager validation_state contents >>=? fun () ->
         let (raw_operation : t Kind.manager operation) =
           Alpha_context.{shell; protocol_data}
         in
         Main.check_manager_signature validation_state contents raw_operation )
       >|= function
-      | Ok () -> `Prechecked_manager
+      | Ok () -> on_success
       | Error err -> (
           let err = Environment.wrap_tztrace err in
           match classify_trace err with
@@ -653,17 +734,24 @@ module Mempool = struct
           | Temporary -> `Branch_delayed err
           | Outdated -> `Outdated err)
     in
-    match check_manager_restriction filter_state source with
-    | Error err -> Lwt.return err
-    | Ok () -> precheck_manager_and_check_signature ()
+    match
+      check_manager_restriction config filter_state source ~fee ~gas_limit
+    with
+    | `Fail err -> Lwt.return err
+    | `Fresh ->
+        precheck_manager_and_check_signature ~on_success:`Prechecked_manager
+    | `Replace old_oph ->
+        precheck_manager_and_check_signature
+          ~on_success:(`Prechecked_manager_with_replace old_oph)
 
-  let add_manager_restriction filter_state oph source =
+  let add_manager_restriction filter_state oph info source =
     {
       filter_state with
       op_prechecked_managers =
         (* Manager not seen yet, record it for next ops *)
-        Signature.Public_key_hash.Set.add
+        Signature.Public_key_hash.Map.add
           source
+          info
           filter_state.op_prechecked_managers;
       operation_hash_to_manager =
         Operation_hash.Map.add oph source filter_state.operation_hash_to_manager
@@ -678,37 +766,49 @@ module Mempool = struct
       Operation_hash.t ->
       Main.operation_data ->
       [ `Passed_precheck of state
+      | `Passed_precheck_with_replace of Operation_hash.t * state
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace
       | `Undecided ]
       Lwt.t =
-   fun _
+   fun config
        ~filter_state
        ~validation_state
        shell_header
        oph
        (Operation_data protocol_data) ->
-    let precheck_manager protocol_data source =
-      precheck_manager
-        filter_state
-        validation_state
-        shell_header
-        protocol_data
-        source
-      >|= function
-      | `Prechecked_manager ->
-          `Passed_precheck (add_manager_restriction filter_state oph source)
-      | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _) as
-        errs ->
-          errs
+    let precheck_manager protocol_data source op =
+      match get_manager_operation_gas_and_fee op with
+      | Error err -> Lwt.return (`Refused (Environment.wrap_tztrace err))
+      | Ok (fee, gas_limit) -> (
+          let info = {operation_hash = oph; gas_limit; fee} in
+          precheck_manager
+            config
+            filter_state
+            validation_state
+            shell_header
+            protocol_data
+            source
+            ~fee
+            ~gas_limit
+          >|= function
+          | `Prechecked_manager ->
+              `Passed_precheck
+                (add_manager_restriction filter_state oph info source)
+          | `Prechecked_manager_with_replace old_oph ->
+              `Passed_precheck_with_replace
+                (old_oph, add_manager_restriction filter_state oph info source)
+          | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _)
+            as errs ->
+              errs)
     in
     match protocol_data.contents with
-    | Single (Manager_operation {source; _}) ->
-        precheck_manager protocol_data source
-    | Cons (Manager_operation {source; _}, _) ->
-        precheck_manager protocol_data source
+    | Single (Manager_operation {source; _}) as op ->
+        precheck_manager protocol_data source op
+    | Cons (Manager_operation {source; _}, _) as op ->
+        precheck_manager protocol_data source op
     | Single _ -> Lwt.return `Undecided
 
   open Apply_results
