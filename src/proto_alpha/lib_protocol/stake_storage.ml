@@ -57,10 +57,11 @@ module Selected_distribution_for_cycle = struct
 
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
-    Cache.find ctxt id >>=? function
-    | None ->
-        Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
-    | Some _ -> Cache.update ctxt id None >>?= fun ctxt -> return ctxt
+    (Cache.find ctxt id >>=? function
+     | None -> return ctxt
+     | Some _ -> Cache.update ctxt id None |> Lwt.return)
+    >>=? fun ctxt ->
+    Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
 module Delegate_sampler_state = struct
@@ -97,9 +98,10 @@ module Delegate_sampler_state = struct
 
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
-    Cache.find ctxt id >>=? function
-    | None -> Storage.Delegate_sampler_state.remove_existing ctxt cycle
-    | Some _ -> Cache.update ctxt id None >>?= fun ctxt -> return ctxt
+    (Cache.find ctxt id >>=? function
+     | None -> return ctxt
+     | Some _ -> Cache.update ctxt id None |> Lwt.return)
+    >>=? fun ctxt -> Storage.Delegate_sampler_state.remove_existing ctxt cycle
 end
 
 let get_staking_balance = Storage.Stake.Staking_balance.get
@@ -240,7 +242,7 @@ let select_distribution_for_cycle ctxt cycle pubkey =
          stakes
        >>=? fun stakes_pk ->
        let state = Sampler.create stakes_pk in
-       Storage.Delegate_sampler_state.init ctxt cycle state
+       Delegate_sampler_state.init ctxt cycle state
       else return ctxt)
       >>=? fun ctxt ->
       Storage.Stake.Staking_balance.delete_snapshot ctxt index >>= fun ctxt ->
@@ -256,7 +258,8 @@ let select_distribution_for_cycle_do_not_call_except_for_migration =
 let clear_cycle ctxt cycle =
   Storage.Total_active_stake.remove_existing ctxt cycle >>=? fun ctxt ->
   Selected_distribution_for_cycle.remove_existing ctxt cycle >>=? fun ctxt ->
-  Storage.Delegate_sampler_state.remove_existing ctxt cycle
+  Delegate_sampler_state.remove_existing ctxt cycle >>=? fun ctxt ->
+  Storage.Seed.For_cycle.remove_existing ctxt cycle
 
 let init_first_cycles ctxt pubkey =
   let preserved = Constants_storage.preserved_cycles ctxt in

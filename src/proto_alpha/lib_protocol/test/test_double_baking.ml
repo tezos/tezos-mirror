@@ -251,6 +251,21 @@ let test_too_late_double_baking_evidence () =
       | Apply.Outdated_denunciation {kind = Block; _} -> true
       | _ -> false)
 
+(** Check that before [max_slashing_period * blocks_per_cycle] blocks
+   -- corresponding to 2 cycles --, it is still possible to create a
+   double baking operation. *)
+let test_just_in_time_double_baking_evidence () =
+  Context.init ~consensus_threshold:0 2 >>=? fun (b, contracts) ->
+  Context.get_constants (B b)
+  >>=? fun Constants.{parametric = {blocks_per_cycle; _}; _} ->
+  block_fork ~policy:(By_round 0) contracts b >>=? fun (blk_a, blk_b) ->
+  Block.bake_until_cycle_end blk_a >>=? fun blk ->
+  Block.bake_n Int32.(sub blocks_per_cycle 2l |> to_int) blk >>=? fun blk ->
+  let operation = double_baking (B blk) blk_a.header blk_b.header in
+  (* We include the denuncation in the previous to last block of the
+     cycle. *)
+  Block.bake ~operation blk >>=? fun _ -> return_unit
+
 (** Check that an invalid double baking evidence that exposes two
     block baking with same level made by different bakers fails. *)
 let test_different_delegates () =
@@ -337,6 +352,10 @@ let tests =
       "too late double baking evidence"
       `Quick
       test_too_late_double_baking_evidence;
+    Tztest.tztest
+      "just in time double baking evidence"
+      `Quick
+      test_just_in_time_double_baking_evidence;
     Tztest.tztest "different delegates" `Quick test_different_delegates;
     Tztest.tztest "wrong delegate" `Quick test_wrong_signer;
     Tztest.tztest
