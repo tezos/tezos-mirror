@@ -288,32 +288,43 @@ module Path = struct
 end
 
 module Endpoint = struct
-  type t = {
-    path : Path.t;
-    get : Service.t option;
-    post : Service.t option;
-    put : Service.t option;
-    delete : Service.t option;
-    patch : Service.t option;
-  }
+  type methods = (Method.t * Service.t) list
+
+  type t = {path : Path.t; methods : methods}
 
   let make ?get ?post ?put ?delete ?patch path =
-    {path; get; post; put; delete; patch}
+    {
+      path;
+      methods =
+        List.filter_map
+          (function
+            | ((_ : Method.t), None) -> None | (m, Some s) -> Some (m, s))
+          [
+            (GET, get);
+            (POST, post);
+            (PUT, put);
+            (DELETE, delete);
+            (PATCH, patch);
+          ];
+    }
+
+  let get_method endpoint meth = List.assq_opt meth endpoint.methods
 
   let to_json endpoint =
     (* Note: we force path parameters to be the same for all methods. *)
+    let encode_parameters methods parameters =
+      let method_ m =
+        field_opt
+          (Method.to_openapi_string m)
+          (List.assoc_opt m methods)
+          (Service.to_json parameters)
+      in
+      obj (List.map method_ Method.list)
+    in
     let parameters =
       Path.get_dynamics endpoint.path |> List.map (Parameter.to_json "path")
     in
-    ( Path.to_string endpoint.path,
-      obj
-        [
-          field_opt "get" endpoint.get (Service.to_json parameters);
-          field_opt "post" endpoint.post (Service.to_json parameters);
-          field_opt "put" endpoint.put (Service.to_json parameters);
-          field_opt "delete" endpoint.delete (Service.to_json parameters);
-          field_opt "patch" endpoint.patch (Service.to_json parameters);
-        ] )
+    (Path.to_string endpoint.path, encode_parameters endpoint.methods parameters)
 end
 
 module Server = struct

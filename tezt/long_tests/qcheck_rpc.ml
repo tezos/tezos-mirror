@@ -240,11 +240,11 @@ module RPC_Index = struct
     let services =
       Client.
         [
-          (GET, endpoint.get);
-          (POST, endpoint.post);
-          (PUT, endpoint.put);
-          (DELETE, endpoint.delete);
-          (PATCH, endpoint.patch);
+          (GET, Openapi.(Endpoint.get_method endpoint GET));
+          (POST, Openapi.(Endpoint.get_method endpoint POST));
+          (PUT, Openapi.(Endpoint.get_method endpoint PUT));
+          (DELETE, Openapi.(Endpoint.get_method endpoint DELETE));
+          (PATCH, Openapi.(Endpoint.get_method endpoint PATCH));
         ]
     in
     let opt_convert (meth, opt_service) =
