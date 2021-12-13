@@ -20,7 +20,7 @@
   variables:
     TEZT_JOBS_TOTAL: 3
   script:
-    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/test-results.json --job $TEZT_JOB/$TEZT_JOBS_TOTAL --record tezt-results-$TEZT_JOB.json
+    - dune exec tezt/tests/main.exe -- --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/records --job $TEZT_JOB/$TEZT_JOBS_TOTAL --record tezt-results-$TEZT_JOB.json
 
 tezt:1:
   extends: .tezt_template
