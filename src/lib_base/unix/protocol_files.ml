@@ -28,9 +28,9 @@ let find_component dirname module_name =
   | (true, false) ->
       let+ implementation = Lwt_utils_unix.read_file implementation in
       {name = module_name; interface = None; implementation}
-  | _ ->
-      let* interface = Lwt_utils_unix.read_file interface in
-      let+ implementation = Lwt_utils_unix.read_file implementation in
+  | (true, true) ->
+      let+ interface = Lwt_utils_unix.read_file interface
+      and+ implementation = Lwt_utils_unix.read_file implementation in
       {name = module_name; interface = Some interface; implementation}
 
 let read_dir dir =
@@ -52,12 +52,11 @@ let create_files dir units =
         let name = String.lowercase_ascii name in
         let ml = dir // (name ^ ".ml") in
         let mli = dir // (name ^ ".mli") in
-        let* () = Lwt_utils_unix.create_file ml implementation in
-        match interface with
-        | None -> Lwt.return [ml]
-        | Some content ->
-            let* () = Lwt_utils_unix.create_file mli content in
-            Lwt.return [mli; ml])
+        let+ () = Lwt_utils_unix.create_file ml implementation
+        and+ () =
+          TzLwtreslib.Option.iter_s (Lwt_utils_unix.create_file mli) interface
+        in
+        match interface with None -> [ml] | Some _ -> [mli; ml])
       units
   in
   let files = List.concat files in
