@@ -97,7 +97,7 @@ include Compare.Make (struct
   type nonrec t = t
 
   let compare b1 b2 =
-    let ( >> ) x y = if x = 0 then y () else x in
+    let ( >> ) = Compare.or_else in
     let rec list compare xs ys =
       match (xs, ys) with
       | ([], []) -> 0
