@@ -107,7 +107,7 @@ let begin_construction ~timestamp ?protocol_data
         ~predecessor:pred_hash
         ?protocol_data
         ~timestamp
-        ~cache:`Load
+        ~cache:`Lazy
         ()
       >>=? fun state ->
       return {predecessor; context; state; rev_operations = []; header}
