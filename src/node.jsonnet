@@ -134,13 +134,13 @@ local prometheus = grafana.prometheus;
     local transaction = 'Transaction';
     local endorsement = 'Endorsement';
     local double_baking_evidence = 'Double baking evidence';
-    local delegation = 'delegation';
-    local ballot = 'ballot';
-    local double_endorsement_evidence = 'double endorsement evidence';
-    local origination = 'origination';
-    local proposals = 'proposals';
-    local seed_nonce_revelation = 'seed nonce revelation';
-    local reveal = 'reveal';
+    local delegation = 'Delegation';
+    local ballot = 'Ballot';
+    local double_endorsement_evidence = 'Double endorsement evidence';
+    local origination = 'Origination';
+    local proposals = 'Proposals';
+    local seed_nonce_revelation = 'Seed nonce revelation';
+    local reveal = 'Reveal';
     graphPanel.new(
       title='Head operations',
       datasource='Prometheus',
@@ -165,8 +165,8 @@ local prometheus = grafana.prometheus;
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_double_baking_evidence',
-        legendFormat=double_baking_evidence,
+        'tezos_metrics_chain_head_endorsement_with_slot',
+        legendFormat=endorsement,
       )
     ).addTarget(
       prometheus.target(
@@ -177,11 +177,6 @@ local prometheus = grafana.prometheus;
       prometheus.target(
         'tezos_metrics_chain_head_ballot',
         legendFormat=ballot,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_chain_head_double_endorsement_evidence',
-        legendFormat=double_endorsement_evidence,
       )
     ).addTarget(
       prometheus.target(
@@ -202,6 +197,16 @@ local prometheus = grafana.prometheus;
       prometheus.target(
         'tezos_metrics_chain_head_reveal',
         legendFormat=reveal,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_double_baking_evidence',
+        legendFormat=double_baking_evidence,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_double_endorsement_evidence',
+        legendFormat=double_endorsement_evidence,
       )
     ),
 
