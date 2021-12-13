@@ -116,8 +116,9 @@ local prometheus = grafana.prometheus;
   mempoolPending:
     local applied = 'Applied';
     local refused = 'Refused';
+    local outdated = 'Outdated';
     local branch_refused = 'Branch refused';
-    local branch_delayed = 'Branch applied';
+    local branch_delayed = 'Branch delayed';
     local unprocessed = 'Unprocessed';
     graphPanel.new(
       title='Mempool status',
@@ -137,9 +138,10 @@ local prometheus = grafana.prometheus;
       aliasColors={
         [applied]: 'light-green',
         [refused]: 'light-yellow',
-        [branch_refused]: 'light-blue',
-        [branch_delayed]: 'light-orange',
-        [unprocessed]: 'light-red',
+        [outdated]: 'light-blue',
+        [branch_refused]: 'light-orange',
+        [branch_delayed]: 'light-red',
+        [unprocessed]: 'blue',
       },
     ).addTarget(
       prometheus.target(
@@ -150,6 +152,11 @@ local prometheus = grafana.prometheus;
       prometheus.target(
         'tezos_metrics_mempool_pending_refused',
         legendFormat=refused,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_mempool_pending_outdated',
+        legendFormat=outdated,
       )
     ).addTarget(
       prometheus.target(
