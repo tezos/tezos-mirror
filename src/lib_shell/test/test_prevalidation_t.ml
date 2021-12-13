@@ -157,7 +157,7 @@ let mk_ops (module P : Prevalidation.T with type operation_data = unit) :
     QCheck.Gen.generate ~n:1 (prevalidation_operations_gen (module P) ~n:nb_ops)
     |> List.concat
   in
-  assert (List.length ops = nb_ops) ;
+  assert (Compare.List_length_with.(ops = nb_ops)) ;
   ops
 
 (** Test that [Prevalidation.apply_operations] only returns [Branch_delayed _]
