@@ -22,6 +22,7 @@
   tezos-event-logging-test-helpers
   alcotest-lwt
   astring)
+ (preprocess (pps bisect_ppx --bisect-sigterm))
  (flags
   (:standard
    -linkall

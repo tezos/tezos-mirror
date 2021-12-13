@@ -17,6 +17,7 @@ depends: [
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-event-logging-test-helpers" {with-test}
+  "tezos-tooling" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "astring" {with-test}
 ]
