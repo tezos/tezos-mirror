@@ -185,6 +185,8 @@ class proxy_context (obj : full) =
 
     method generic_json_call = obj#generic_json_call
 
+    method generic_media_type_call = obj#generic_media_type_call
+
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t = obj#with_lock
 
     method load : type a.

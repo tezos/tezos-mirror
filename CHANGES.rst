@@ -135,6 +135,7 @@ Client
   code. These options can be used to override the values normally
   returned by the ``NOW`` and ``LEVEL`` instructions.
 
+- The output of ``tezos-client``'s RPC commands now uses the format specified by the ``--media-type``.
 
 Baker / Endorser / Accuser
 --------------------------

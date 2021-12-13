@@ -53,6 +53,8 @@ class wrap_rpc_context (t : RPC_context.json) : rpc_context =
 
     method generic_json_call = t#generic_json_call
 
+    method generic_media_type_call = t#generic_media_type_call
+
     method call_service
         : 'm 'p 'q 'i 'o.
           (([< Resto.meth] as 'm), unit, 'p, 'q, 'i, 'o) RPC_service.t ->

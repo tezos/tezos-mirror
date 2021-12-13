@@ -170,3 +170,21 @@ let encoding : t RPC_encoding.t =
       ("application/bson", bson);
       ("application/octet-stream", octet_stream);
     ]
+
+module Content_type = struct
+  type t = string * string
+
+  let json = ("application", "json")
+
+  let bson = ("application", "bson")
+
+  let octet_stream = ("application", "octet-stream")
+
+  let pp fmt (l, r) = Format.fprintf fmt "%s/%s" l r
+end
+
+let of_content_type c =
+  if c = Content_type.json then Some json
+  else if c = Content_type.bson then Some bson
+  else if c = Content_type.octet_stream then Some octet_stream
+  else None
