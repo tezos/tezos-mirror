@@ -357,6 +357,26 @@ let rev_filter_error rxs =
 
 let filter_error rxs = rev_filter_error rxs |> rev
 
+let rev_filter_left exs =
+  let rec aux xs = function
+    | [] -> xs
+    | Either.Left x :: exs -> (aux [@ocaml.tailcall]) (x :: xs) exs
+    | Either.Right _ :: exs -> (aux [@ocaml.tailcall]) xs exs
+  in
+  aux [] exs
+
+let filter_left exs = rev_filter_left exs |> rev
+
+let rev_filter_right exs =
+  let rec aux xs = function
+    | [] -> xs
+    | Either.Right x :: exs -> (aux [@ocaml.tailcall]) (x :: xs) exs
+    | Either.Left _ :: exs -> (aux [@ocaml.tailcall]) xs exs
+  in
+  aux [] exs
+
+let filter_right exs = rev_filter_right exs |> rev
+
 let filter_e f xs = rev_filter_e f xs |> Result.map rev
 
 let rev_filter_s f xs =
@@ -1191,6 +1211,20 @@ let partition_result xs =
   let (rev_oks, rev_errors) = rev_partition_result xs in
   (rev rev_oks, rev rev_errors)
 
+let rev_partition_either xs =
+  let rec aux lefts rights = function
+    | [] -> (lefts, rights)
+    | Either.Left left :: xs ->
+        (aux [@ocaml.tailcall]) (left :: lefts) rights xs
+    | Either.Right right :: xs ->
+        (aux [@ocaml.tailcall]) lefts (right :: rights) xs
+  in
+  aux [] [] xs
+
+let partition_either xs =
+  let (rev_lefts, rev_rights) = rev_partition_either xs in
+  (rev rev_lefts, rev rev_rights)
+
 let rev_partition_e f l =
   let open Result_syntax in
   let rec aux trues falses = function
@@ -1286,14 +1320,12 @@ let combine ~when_different_lengths xs ys =
 let rev_combine ~when_different_lengths xs ys =
   rev_map2 ~when_different_lengths (fun x y -> (x, y)) xs ys
 
-type ('a, 'b) left_or_right_list = [`Left of 'a list | `Right of 'b list]
-
 let combine_with_leftovers xs ys =
   let rec aux rev_combined xs ys =
     match (xs, ys) with
     | ([], []) -> (rev rev_combined, None)
-    | ((_ :: _ as left), []) -> (rev rev_combined, Some (`Left left))
-    | ([], (_ :: _ as right)) -> (rev rev_combined, Some (`Right right))
+    | ((_ :: _ as left), []) -> (rev rev_combined, Some (Either.Left left))
+    | ([], (_ :: _ as right)) -> (rev rev_combined, Some (Either.Right right))
     | (x :: xs, y :: ys) ->
         (aux [@ocaml.tailcall]) ((x, y) :: rev_combined) xs ys
   in

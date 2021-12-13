@@ -1850,7 +1850,14 @@ let tezos_protocol_environment_structs =
     ~path:"src/lib_protocol_environment/structs"
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment-structs"
     ~synopsis:"Tezos: restricted typing environment for the economic protocols"
-    ~deps:[tezos_stdlib; tezos_crypto; data_encoding; bls12_381_legacy]
+    ~deps:
+      [
+        tezos_stdlib;
+        tezos_crypto;
+        tezos_lwt_result_stdlib;
+        data_encoding;
+        bls12_381_legacy;
+      ]
     ~opam_only_deps:
       [
         (* Build dependency but not for the (library) itself,

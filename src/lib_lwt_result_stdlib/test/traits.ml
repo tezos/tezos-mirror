@@ -450,7 +450,7 @@ module type COMBINE_VANILLA = sig
     (('a * 'b) t, 'trace) result
 
   val combine_with_leftovers :
-    'a t -> 'b t -> ('a * 'b) t * [`Left of 'a t | `Right of 'b t] option
+    'a t -> 'b t -> ('a * 'b) t * ('a list, 'b list) Either.t option
 end
 
 module type ALLDOUBLE_VANILLA = sig

@@ -181,6 +181,14 @@ let filter_error = function
   | Some (Error x) -> Some x
   | Some (Ok _) | None -> None
 
+let filter_left = function
+  | Some (Either.Left x) -> Some x
+  | Some (Either.Right _) | None -> None
+
+let filter_right = function
+  | Some (Either.Right x) -> Some x
+  | Some (Either.Left _) | None -> None
+
 let iter_s f = function None -> Lwt.return_unit | Some v -> f v
 
 let iter_e f = function None -> Ok () | Some v -> f v
