@@ -1421,7 +1421,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         }
                                       },
                                       {
-                                        "title": "Generic prim (any number of args with or without annot)",
+                                        "title": "Prim__generic",
+                                        "description": "Generic primitive (any number of args with or without annotations)",
                                         "type": "object",
                                         "properties": {
                                           "prim": {
@@ -1687,7 +1688,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     }
                                   },
                                   {
-                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
                                     "type": "object",
                                     "properties": {
                                       "prim": {
@@ -1818,7 +1820,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -1894,7 +1897,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -2002,7 +2006,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             }
                           },
                           {
-                            "title": "Generic prim (any number of args with or without annot)",
+                            "title": "Prim__generic",
+                            "description": "Generic primitive (any number of args with or without annotations)",
                             "type": "object",
                             "properties": {
                               "prim": {
@@ -5772,7 +5777,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         }
                                       },
                                       {
-                                        "title": "Generic prim (any number of args with or without annot)",
+                                        "title": "Prim__generic",
+                                        "description": "Generic primitive (any number of args with or without annotations)",
                                         "type": "object",
                                         "properties": {
                                           "prim": {
@@ -6038,7 +6044,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     }
                                   },
                                   {
-                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
                                     "type": "object",
                                     "properties": {
                                       "prim": {
@@ -6169,7 +6176,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -6245,7 +6253,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -6353,7 +6362,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             }
                           },
                           {
-                            "title": "Generic prim (any number of args with or without annot)",
+                            "title": "Prim__generic",
+                            "description": "Generic primitive (any number of args with or without annotations)",
                             "type": "object",
                             "properties": {
                               "prim": {
