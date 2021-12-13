@@ -131,7 +131,7 @@ test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_compile_protocol
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
-PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d -exec test -f \{\}/dune \; -print 2>/dev/null | LC_COLLATE=C sort)
+PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d 2>/dev/null | LC_COLLATE=C sort)
 PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
 PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
 
