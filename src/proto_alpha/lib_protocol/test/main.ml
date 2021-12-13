@@ -79,5 +79,6 @@ let () =
       ("token movements", Test_token.tests);
       ("receipt encodings", Test_receipt.tests);
       ("tx rollup", Test_tx_rollup.tests);
+      ("gas monad", Test_gas_monad.tests);
     ]
   |> Lwt_main.run
