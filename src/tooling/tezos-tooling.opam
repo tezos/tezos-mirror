@@ -11,7 +11,7 @@ depends: [
   "base-unix" {with-test}
   "coq-of-ocaml" { = "2.5.0" }
   "ocamlformat" { = "0.18.0" }
-  "bisect_ppx" { >= "2.3" }
+  "bisect_ppx" { >= "2.7.0" }
   "tezos-protocol-compiler"
   "tezos-base"
 ]
