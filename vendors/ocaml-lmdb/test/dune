@@ -1,8 +1,0 @@
-(executable
- (name test)
- (libraries cstruct rresult tezos-lmdb alcotest))
-
-(rule
- (targets    runtest)
- (package tezos-lmdb)
- (action  (run %{exe:test.exe})))

@@ -25,7 +25,6 @@
 
 open Snapshots_events
 open Store_types
-open Store_errors
 
 (* This module handles snapshot's versioning system. *)
 module Version = struct
@@ -35,11 +34,10 @@ module Version = struct
     let open Data_encoding in
     obj1 (req "version" int31)
 
-  (* Current version of the snapshots *)
+  (* Current version of the snapshots, since 0.0.5.
+   * Previous versions are:
+   * - 1: snapshot exported with storage 0.0.1 to 0.0.4 *)
   let current_version = 2
-
-  (* Legacy snapshots are fixed to a single version *)
-  let legacy_version = 1
 end
 
 let current_version = Version.current_version
@@ -95,7 +93,6 @@ type error +=
   | Target_block_validation_failed of Block_hash.t * string
   | Directory_already_exists of string
   | Empty_floating_store
-  | Inconsistent_predecessors
   | Cannot_create_tmp_export_directory of string
   | Inconsistent_chain_import of {
       expected : Distributed_db_version.Name.t;
@@ -454,18 +451,6 @@ let () =
     (fun () -> Empty_floating_store) ;
   register_error_kind
     `Permanent
-    ~id:"snapshot.inconsistent_predecessors"
-    ~title:"Inconsistent predecessors"
-    ~description:"Inconsistent predecessors while validating a legacy snapshot."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "Failed to validate the predecessors: inconsistent hash.")
-    unit
-    (function Inconsistent_predecessors -> Some () | _ -> None)
-    (fun () -> Inconsistent_predecessors) ;
-  register_error_kind
-    `Permanent
     ~id:"snapshots.cannot_create_tmp_export_directory"
     ~title:"Cannot create temporary export directory"
     ~description:"Cannot create temporary directory for exporting snapshot."
@@ -528,7 +513,8 @@ let () =
     ~pp:(fun ppf filename ->
       Format.fprintf
         ppf
-        "Failed to read snapshot file %s. The provided file is inconsistent."
+        "Failed to read snapshot file %s. The provided file is inconsistent or \
+         is from Octez 9.7 (or before) and it cannot be imported anymore."
         filename)
     Data_encoding.(obj1 (req "filename" string))
     (function Inconsistent_snapshot_file s -> Some s | _ -> None)
@@ -597,12 +583,7 @@ let metadata_encoding =
    versions. *)
 type header = Version.t * metadata
 
-type snapshot_header =
-  | Current_header of header
-  | Legacy_metadata of {
-      version : string;
-      legacy_history_mode : History_mode.Legacy.t;
-    }
+type snapshot_header = Current_header of header
 
 let pp_snapshot_header ppf = function
   | Current_header
@@ -621,17 +602,8 @@ let pp_snapshot_header ppf = function
         History_mode.pp_short
         history_mode
         version
-  | Legacy_metadata {version; legacy_history_mode} ->
-      Format.fprintf
-        ppf
-        "version %s in %a"
-        version
-        History_mode.Legacy.pp
-        legacy_history_mode
 
-let version = function
-  | Current_header (version, _) -> version
-  | Legacy_metadata _ -> Version.legacy_version
+let version = function Current_header (version, _) -> version
 
 type snapshot_format = Tar | Raw
 
@@ -642,7 +614,7 @@ let pp_snapshot_format ppf = function
   | Tar -> Format.fprintf ppf "tar (single file)"
   | Raw -> Format.fprintf ppf "directory"
 
-type snapshot_kind = Current of snapshot_format | Legacy | Invalid
+type snapshot_kind = Current of snapshot_format | Invalid
 
 (* To speed up the import of the cemented blocks we increase,
    temporarily the index cache size. *)
@@ -3386,14 +3358,6 @@ let snapshot_file_kind ~snapshot_path =
         >>= fun _ -> Lwt.return_true)
       (fun _ -> Lwt.return_false)
   in
-  let is_valid_legacy_snapshot snapshot_file =
-    protect
-      ~on_error:(fun _ -> return_false)
-      (fun () ->
-        Context.legacy_read_metadata ~snapshot_file >>= function
-        | Ok _metadata -> return_true
-        | Error _ -> return_false)
-  in
   if Sys.is_directory snapshot_path then
     let snapshot_dir = Naming.snapshot_dir ~snapshot_path () in
     is_valid_raw_snapshot snapshot_dir >>= fun is_raw_snasphot ->
@@ -3406,11 +3370,7 @@ let snapshot_file_kind ~snapshot_path =
     in
     is_valid_uncompressed_snapshot snapshot_file
     >>= fun is_uncompressed_snapshot ->
-    if is_uncompressed_snapshot then return (Current Tar)
-    else
-      is_valid_legacy_snapshot snapshot_path
-      >>=? fun is_valid_legacy_snapshot ->
-      if is_valid_legacy_snapshot then return Legacy else return Invalid
+    if is_uncompressed_snapshot then return (Current Tar) else return Invalid
 
 let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
     ~chain_name genesis =
@@ -3439,386 +3399,7 @@ let read_snapshot_header ~snapshot_path =
       in
       Loader.load_snapshot_header ~snapshot_path >>=? fun (version, metadata) ->
       return (Current_header (version, metadata))
-  | Legacy ->
-      Context.legacy_read_metadata ~snapshot_file:snapshot_path
-      >>=? fun (version, legacy_history_mode) ->
-      return (Legacy_metadata {version; legacy_history_mode})
-  | _ -> fail (Inconsistent_snapshot_file snapshot_path)
-
-(* Legacy import *)
-
-let legacy_verify_predecessors header_opt pred_hash =
-  match header_opt with
-  | None -> return_unit
-  | Some header ->
-      fail_unless
-        (header.Block_header.shell.level >= 2l
-        && Block_hash.equal header.shell.predecessor pred_hash)
-        Inconsistent_predecessors
-
-let legacy_check_operations_consistency block_header operations operation_hashes
-    =
-  (* Compute operations hashes and compare *)
-  (List.iter2_e
-     ~when_different_lengths:
-       Legacy_snapshots.Inconsistent_operation_hashes_lengths
-     (fun (_, op) (_, oph) ->
-       let expected_op_hash = List.map Operation.hash op in
-       List.iter2
-         ~when_different_lengths:
-           Legacy_snapshots.Inconsistent_operation_hashes_lengths
-         (fun expected found -> assert (Operation_hash.equal expected found))
-         expected_op_hash
-         oph)
-     operations
-     operation_hashes
-   |> function
-   | Ok _ as ok -> ok
-   | Error err -> error err)
-  (* To make a trace *)
-  >>? fun () ->
-  (* Check header hashes based on Merkle tree *)
-  let hashes =
-    List.rev_map (fun (_, opl) -> List.map Operation.hash opl) operations
-  in
-  let computed_hash =
-    Operation_list_list_hash.compute
-      (List.map Operation_list_hash.compute hashes)
-  in
-  let are_oph_equal =
-    Operation_list_list_hash.equal
-      computed_hash
-      block_header.Block_header.shell.operations_hash
-  in
-  error_unless
-    are_oph_equal
-    (Legacy_snapshots.Inconsistent_operation_hashes
-       (computed_hash, block_header.Block_header.shell.operations_hash))
-
-let legacy_block_validation succ_header_opt header_hash
-    {Context.Pruned_block_legacy.block_header; operations; operation_hashes} =
-  legacy_verify_predecessors succ_header_opt header_hash >>=? fun () ->
-  Lwt.return
-    (legacy_check_operations_consistency
-       block_header
-       operations
-       operation_hashes)
-
-let import_log_notice_legacy ?snapshot_header filename block =
-  let header =
-    Option.map
-      (fun header -> Format.asprintf "%a" pp_snapshot_header header)
-      snapshot_header
-  in
-  Event.(emit import_info (filename, header)) >>= fun () ->
-  (match block with
-  | None -> Event.(emit import_unspecified_hash ())
-  | Some _ -> Lwt.return_unit)
-  >>= fun () -> Event.(emit import_loading ())
-
-let check_context_hash_consistency_legacy validation_store block_header =
-  fail_unless
-    (Context_hash.equal
-       validation_store.Tezos_validation.Block_validation.context_hash
-       block_header.Block_header.shell.context)
-    (Inconsistent_context_hash
-       {
-         expected = block_header.Block_header.shell.context;
-         got = validation_store.Tezos_validation.Block_validation.context_hash;
-       })
-
-let import_legacy ?patch_context ?block:expected_block ~snapshot_file
-    ~dst_store_dir ~dst_context_dir ~chain_name ~user_activated_upgrades
-    ~user_activated_protocol_overrides genesis =
-  (* First: check that the imported snapshot is compatible with the
-     hardcoded networks *)
-  Legacy.Hardcoded.check_network ~chain_name >>=? fun () ->
-  import_log_notice_legacy snapshot_file expected_block >>= fun () ->
-  let chain_id = Chain_id.of_block_hash genesis.Genesis.block in
-  let dst_store_dir = Naming.store_dir ~dir_path:dst_store_dir in
-  let dst_protocol_dir = Naming.protocol_store_dir dst_store_dir in
-  let dst_chain_store_dir = Naming.chain_dir dst_store_dir chain_id in
-  let dst_cemented_dir = Naming.cemented_blocks_dir dst_chain_store_dir in
-  Lwt_list.iter_s
-    (Lwt_utils_unix.create_dir ~perm:0o755)
-    [
-      Naming.dir_path dst_store_dir;
-      Naming.dir_path dst_protocol_dir;
-      Naming.dir_path dst_chain_store_dir;
-      Naming.dir_path dst_cemented_dir;
-    ]
-  >>= fun () ->
-  Context.init ~readonly:false ?patch_context dst_context_dir
-  >>= fun context_index ->
-  Lwt.finalize
-    (fun () ->
-      (* Start by commiting genesis in the context *)
-      Context.commit_genesis
-        context_index
-        ~chain_id
-        ~time:genesis.Genesis.time
-        ~protocol:genesis.protocol
-      >>=? fun genesis_context_hash ->
-      let cycle_length = Legacy.Hardcoded.cycle_length ~chain_name in
-      let floating_blocks = ref [] in
-      let current_blocks = ref [] in
-      let has_reached_cemented = ref false in
-      let partial_protocol_levels = ref [] in
-      let genesis_block =
-        Block_repr.create_genesis_block ~genesis genesis_context_hash
-      in
-      Cemented_block_store.init
-        ~log_size:cemented_import_log_size
-        ~readonly:false
-        dst_chain_store_dir
-      >>=? fun cemented_store ->
-      Lwt.finalize
-        (fun () ->
-          let handle_block snapshot_history_mode =
-            let is_rolling =
-              snapshot_history_mode = History_mode.Legacy.Rolling
-            in
-            fun ((hash : Block_hash.t), (block : Context.Pruned_block_legacy.t)) ->
-              (let proj (hash, (block : Context.Pruned_block_legacy.t)) =
-                 let contents =
-                   {
-                     Block_repr.header = block.block_header;
-                     operations =
-                       List.rev_map (fun (_, l) -> l) block.operations;
-                     (* TODO: incorporate the metadata hashes in a new format *)
-                     block_metadata_hash = None;
-                     operations_metadata_hashes = None;
-                   }
-                 in
-                 {Block_repr.hash; contents; metadata = None}
-               in
-               let block = proj (hash, block) in
-               (* Blocks are stored in reverse order in legacy snapshots so
-                  consing them puts them back in correct order. *)
-               if is_rolling then (
-                 current_blocks := block :: !current_blocks ;
-                 return_unit)
-               else
-                 (* Full snapshot *)
-                 match Block_repr.level block with
-                 (* Hardcoded special treatment for the first two blocks. *)
-                 | 0l -> (* No genesis in previous format *) assert false
-                 | 1l ->
-                     (* Cement from genesis to this block *)
-                     if !current_blocks <> [] then (
-                       assert (!floating_blocks = []) ;
-                       current_blocks := !floating_blocks) ;
-                     Cemented_block_store.cement_blocks
-                       ~check_consistency:false
-                       cemented_store
-                       ~write_metadata:false
-                       [genesis_block; block]
-                 | level ->
-                     (* 4 cases :
-                        - in future floating blocks => after the cementing part
-                        - at the end of a cycle
-                        - in the middle of a cycle
-                        - at the dawn of a cycle
-                     *)
-                     let is_end_of_a_cycle =
-                       (* We are shifted by one in every cycles. *)
-                       Compare.Int32.equal
-                         1l
-                         Int32.(rem level (of_int cycle_length))
-                     in
-                     if is_end_of_a_cycle then (
-                       if not !has_reached_cemented then (
-                         has_reached_cemented := true ;
-                         (* All current blocks should be written in floating *)
-                         (* We will write them later on *)
-                         floating_blocks := !current_blocks) ;
-                       (* Start building up the cycle to cement *)
-                       current_blocks := [block] ;
-                       return_unit)
-                     else
-                       let is_dawn_of_a_cycle =
-                         Compare.Int32.equal
-                           2l
-                           Int32.(rem level (of_int cycle_length))
-                       in
-                       if is_dawn_of_a_cycle && !has_reached_cemented then (
-                         (* Cycle is complete, cement it *)
-                         Cemented_block_store.cement_blocks
-                           ~check_consistency:false
-                           cemented_store
-                           ~write_metadata:false
-                           (block :: !current_blocks)
-                         >>=? fun () ->
-                         current_blocks := [] ;
-                         return_unit)
-                       else (
-                         current_blocks := block :: !current_blocks ;
-                         return_unit))
-              >>=? fun () -> return_unit
-          in
-          let handle_protocol_data (transition_level, protocol) =
-            let open Context.Protocol_data_legacy in
-            let open Protocol_levels in
-            let {
-              info = {author; message; _};
-              protocol_hash;
-              test_chain_status;
-              predecessor_block_metadata_hash;
-              predecessor_ops_metadata_hash;
-              data_key;
-              parents;
-            } =
-              protocol
-            in
-            let commit_info =
-              {
-                author;
-                message;
-                test_chain_status;
-                predecessor_block_metadata_hash;
-                predecessor_ops_metadata_hash;
-                data_merkle_root = data_key;
-                parents_contexts = parents;
-              }
-            in
-            partial_protocol_levels :=
-              (transition_level, protocol_hash, Some commit_info)
-              :: !partial_protocol_levels ;
-            return_unit
-          in
-          (* Restore context and fetch data *)
-          Context.legacy_restore_context
-            ?expected_block:
-              (Option.map (fun b -> Block_hash.to_b58check b) expected_block)
-            context_index
-            ~snapshot_file
-            ~handle_block
-            ~handle_protocol_data
-            ~block_validation:legacy_block_validation)
-        (fun () ->
-          Cemented_block_store.close cemented_store ;
-          Lwt.return_unit)
-      >>=? fun ( predecessor_block_header,
-                 block_data,
-                 predecessor_block_metadata_hash,
-                 predecessor_ops_metadata_hashes,
-                 _oldest_header_opt,
-                 legacy_history_mode ) ->
-      let history_mode = History_mode.convert legacy_history_mode in
-      (* Floating blocks should be initialized now *)
-      let floating_blocks =
-        if not !has_reached_cemented then !current_blocks else !floating_blocks
-      in
-      (* Apply pred block *)
-      let pred_context_hash = predecessor_block_header.shell.context in
-      (Context.checkout context_index pred_context_hash >>= function
-       | Some ctxt -> return ctxt
-       | None ->
-           fail
-             (Cannot_checkout_context
-                (Block_header.hash predecessor_block_header, pred_context_hash)))
-      >>=? fun predecessor_context ->
-      let {Context.Block_data_legacy.block_header; operations} = block_data in
-      let predecessor_ops_metadata_hash =
-        Option.map
-          (fun ll ->
-            Operation_metadata_list_list_hash.compute
-              (List.map Operation_metadata_list_hash.compute ll))
-          predecessor_ops_metadata_hashes
-      in
-      let apply_environment =
-        {
-          Block_validation.max_operations_ttl =
-            Int32.to_int predecessor_block_header.shell.level;
-          chain_id;
-          predecessor_block_header;
-          predecessor_context;
-          predecessor_block_metadata_hash;
-          predecessor_ops_metadata_hash;
-          user_activated_upgrades;
-          user_activated_protocol_overrides;
-        }
-      in
-      (Block_validation.apply
-         apply_environment
-         block_header
-         operations
-         ~cache:`Lazy
-       >>= function
-       | Ok block_validation_result -> return block_validation_result
-       | Error errs ->
-           Format.kasprintf
-             (fun errs ->
-               fail
-                 (Target_block_validation_failed
-                    (Block_header.hash block_header, errs)))
-             "%a"
-             pp_print_trace
-             errs)
-      >>=? fun {result = block_validation_result; _} ->
-      check_context_hash_consistency_legacy
-        block_validation_result.validation_store
-        block_header
-      >>=? fun () ->
-      let {
-        Block_validation.validation_store;
-        block_metadata;
-        ops_metadata;
-        block_metadata_hash;
-        ops_metadata_hashes = operations_metadata_hashes;
-      } =
-        block_validation_result
-      in
-      let contents =
-        {
-          Block_repr.header = block_header;
-          operations;
-          block_metadata_hash;
-          operations_metadata_hashes;
-        }
-      in
-      let {
-        Block_validation.message;
-        max_operations_ttl;
-        last_allowed_fork_level;
-        _;
-      } =
-        validation_store
-      in
-      let metadata =
-        Some
-          {
-            Block_repr.message;
-            max_operations_ttl;
-            last_allowed_fork_level;
-            block_metadata;
-            operations_metadata = ops_metadata;
-          }
-      in
-      let new_head_with_metadata =
-        ({hash = Block_header.hash block_header; contents; metadata}
-          : Block_repr.block)
-      in
-      (* Append the new head with the floating blocks *)
-      Animation.display_progress
-        ~every:100
-        ~pp_print_step:(fun fmt i ->
-          Format.fprintf fmt "Storing floating blocks: %d blocks wrote" i)
-        (fun notify ->
-          Store.Unsafe.restore_from_legacy_snapshot
-            ~notify
-            dst_store_dir
-            ~context_index
-            ~genesis
-            ~genesis_context_hash
-            ~floating_blocks_stream:(Lwt_stream.of_list floating_blocks)
-            ~new_head_with_metadata
-            ~partial_protocol_levels:!partial_protocol_levels
-            ~history_mode))
-    (fun () -> Context.close context_index)
-  >>=? fun () ->
-  (* Protocol will be stored next time the store is loaded *)
-  Event.(emit import_success snapshot_file) >>= fun () -> return_unit
+  | Invalid -> fail (Inconsistent_snapshot_file snapshot_path)
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~user_activated_upgrades
@@ -3845,15 +3426,4 @@ let import ~snapshot_path ?patch_context ?block ?check_consistency
         ~user_activated_upgrades
         ~user_activated_protocol_overrides
         genesis
-  | Legacy ->
-      import_legacy
-        ?patch_context
-        ?block
-        ~snapshot_file:snapshot_path
-        ~dst_store_dir
-        ~dst_context_dir
-        ~chain_name
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        genesis
-  | _ -> fail (Inconsistent_snapshot_file snapshot_path)
+  | Invalid -> fail (Inconsistent_snapshot_file snapshot_path)

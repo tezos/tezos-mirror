@@ -80,15 +80,6 @@ as merge-requests.
 #### Differences with the initial library
 Unknown
 
-### ocaml-lmdb
-
-- ocaml-lmdb are simple OCaml bindings to Lightning Memory-Mapped Database from
-  Symas.
-- Cloned from: [ocaml-lmdb](https://github.com/vbmithr/ocaml-lmdb) but evolved
-  since.
-  + The original C code is from [lmdb](https://github.com/LMDB/lmdb)
-- It was vendored for fast development.
-
 #### Differences with the initial library
 
 The ocaml bindings are slowly evolving to serve Tezos.

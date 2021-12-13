@@ -13,7 +13,6 @@ depends: [
   "irmin-pack" { >= "2.8.0" }
   "tezos-stdlib-unix"
   "tezos-context"
-  "tezos-legacy-store"
   "tezos-validation"
   "tezos-protocol-updater"
   "lwt-watcher" { = "0.1" }
