@@ -93,12 +93,6 @@ class type json =
   object
     inherit t
 
-    method generic_json_call :
-      RPC_service.meth ->
-      ?body:Data_encoding.json ->
-      Uri.t ->
-      (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
-
     method generic_media_type_call :
       RPC_service.meth ->
       ?body:Data_encoding.json ->

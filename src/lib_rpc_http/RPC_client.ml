@@ -92,14 +92,6 @@ module type S = sig
     'i ->
     (unit -> unit) tzresult Lwt.t
 
-  val generic_json_call :
-    ?headers:(string * string) list ->
-    ?body:Data_encoding.json ->
-    [< RPC_service.meth] ->
-    Uri.t ->
-    (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
-    Lwt.t
-
   type content_type = Media_type.Content_type.t
 
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
@@ -233,7 +225,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Forbidden body -> handle_error body (fun v -> `Forbidden v)
     | `Not_found body ->
         (* The client's proxy mode matches on the `Not_found returned here,
-           to detect that a local RPC is unavailable at generic_json_call,
+           to detect that a local RPC is unavailable at generic_media_type_call,
            and hence that delegation to the endpoint must be done. *)
         handle_error body (fun v -> `Not_found v)
     | `Gone body -> handle_error body (fun v -> `Gone v)
@@ -286,29 +278,6 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
              (module Json_repr_bson.Repr)
              (module Json_repr.Ezjsonm)
              bson)
-
-  let generic_json_call ?headers ?body meth uri =
-    let body =
-      Option.map
-        (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
-        body
-    in
-    let media = Media_type.json in
-    generic_call ?headers ?body meth ~accept:Media_type.[json; bson] ~media uri
-    >>=? fun response ->
-    match response with
-    | `Ok (body, Some ("application", "json"), _) ->
-        Cohttp_lwt.Body.to_string body >>= fun body ->
-        post_process_json_response ~body meth uri >>=? fun body ->
-        return (`Ok body)
-    | `Ok (body, Some ("application", "bson"), _) ->
-        Cohttp_lwt.Body.to_string body >>= fun body ->
-        post_process_bson_response ~body meth uri >>=? fun body ->
-        return (`Ok body)
-    | _ ->
-        post_process_error_responses response meth uri Media_type.[json; bson]
-        >>=? fun (content_type, other) ->
-        jsonify_other meth uri content_type other
 
   (* This function checks that the content type of the answer belongs to accepted ones in [accept]. If not, it is processed as an error. If the answer lacks content-type, the response is decoded as JSON if possible. *)
   let generic_media_type_call ?headers ~accept ?body meth uri :
@@ -461,20 +430,14 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   class http_ctxt config media_types : RPC_context.json =
     let base = config.endpoint in
     let logger = config.logger in
-    let call meth uri f =
-      let path = Uri.path uri and query = Uri.query uri in
-      let prefix = Uri.path base in
-      let prefixed_path = if prefix = "" then path else prefix ^ "/" ^ path in
-      let uri = Uri.with_path base prefixed_path in
-      let uri = Uri.with_query uri query in
-      f meth uri
-    in
     object
-      method generic_json_call meth ?body uri =
-        call meth uri (generic_json_call ?body)
-
       method generic_media_type_call meth ?body uri =
-        call meth uri (generic_media_type_call ?body ~accept:config.media_type)
+        let path = Uri.path uri and query = Uri.query uri in
+        let prefix = Uri.path base in
+        let prefixed_path = if prefix = "" then path else prefix ^ "/" ^ path in
+        let uri = Uri.with_path base prefixed_path in
+        let uri = Uri.with_query uri query in
+        generic_media_type_call ?body ~accept:config.media_type meth uri
 
       method call_service
           : 'm 'p 'q 'i 'o.

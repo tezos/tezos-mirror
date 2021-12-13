@@ -51,8 +51,6 @@ class wrap_rpc_context (t : RPC_context.json) : rpc_context =
   object
     method base : Uri.t = t#base
 
-    method generic_json_call = t#generic_json_call
-
     method generic_media_type_call = t#generic_media_type_call
 
     method call_service

@@ -40,9 +40,6 @@ class mockup_ctxt (base_dir : string) (mem_only : bool)
   object
     method base = local_ctxt#base
 
-    method generic_json_call meth ?body uri =
-      local_ctxt#generic_json_call meth ?body uri
-
     method generic_media_type_call meth ?body uri =
       local_ctxt#generic_media_type_call meth ?body uri
 

@@ -92,14 +92,6 @@ module type S = sig
     'i ->
     (unit -> unit) tzresult Lwt.t
 
-  val generic_json_call :
-    ?headers:(string * string) list ->
-    ?body:Data_encoding.json ->
-    [< RPC_service.meth] ->
-    Uri.t ->
-    (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
-    Lwt.t
-
   val generic_media_type_call :
     ?headers:(string * string) list ->
     accept:Media_type.t list ->

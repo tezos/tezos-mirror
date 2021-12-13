@@ -24,24 +24,6 @@ let done_locally =
     ("name", Data_encoding.string)
     ("path", Data_encoding.string)
 
-let delegate_json_call_to_http =
-  declare_2
-    ~section
-    ~level
-    ~name:"delegate_json_call_to_http"
-    ~msg:"delegating to http generic json call: {method} {uri}"
-    ("method", Data_encoding.string)
-    ("uri", Data_encoding.string)
-
-let done_json_call_locally =
-  declare_2
-    ~section
-    ~level
-    ~name:"done_json_call_locally"
-    ~msg:"locally done generic json call: {method} {uri}"
-    ("method", Data_encoding.string)
-    ("uri", Data_encoding.string)
-
 let delegate_media_type_call_to_http =
   declare_2
     ~section

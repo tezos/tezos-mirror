@@ -248,18 +248,21 @@ module Mempool = struct
             ( (with_timeout
                  (Systime_os.sleep (Time.System.Span.of_seconds_exn 5.))
                  (fun _ ->
-                   Tezos_rpc_http_client_unix.RPC_client_unix.generic_json_call
+                   Tezos_rpc_http_client_unix.RPC_client_unix
+                   .generic_media_type_call
                      ?headers:http_headers
+                     ~accept:[Media_type.json]
                      `GET
                      uri)
                >>=? function
-               | `Ok json -> return json
-               | `Unauthorized json -> fail "unauthorized request" json
-               | `Gone json -> fail "gone" json
-               | `Error json -> fail "error" json
-               | `Not_found json -> fail "not found" json
-               | `Forbidden json -> fail "forbidden" json
-               | `Conflict json -> fail "conflict" json)
+               | `Json (`Ok json) -> return json
+               | `Json (`Unauthorized json) -> fail "unauthorized request" json
+               | `Json (`Gone json) -> fail "gone" json
+               | `Json (`Error json) -> fail "error" json
+               | `Json (`Not_found json) -> fail "not found" json
+               | `Json (`Forbidden json) -> fail "forbidden" json
+               | `Json (`Conflict json) -> fail "conflict" json
+               | _ -> fail "unexpected media type" None)
             >>=? fun json -> decode_mempool json )
             >>= function
             | Ok mempool -> Lwt.return_some mempool

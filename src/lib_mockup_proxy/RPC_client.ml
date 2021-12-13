@@ -66,8 +66,6 @@ let local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
   object
     method base = base
 
-    method generic_json_call meth ?body uri = C.generic_json_call meth ?body uri
-
     method generic_media_type_call meth ?body uri =
       C.generic_media_type_call ~accept:media_types meth ?body uri
 
