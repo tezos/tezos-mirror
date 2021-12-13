@@ -11,7 +11,6 @@ ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 .PHONY: all
 all: accusations_simple_double_endorsing \
-	voting_demo_noops \
 	user_activated_upgrade_next \
 	user_activated_upgrade_alpha \
 	daemons_upgrade_next \
@@ -70,22 +69,6 @@ accusations_simple_double_endorsing: tezos-sandbox tezos-client tezos-node
 	  --tezos-node-binary ./tezos-node \
 	  --protocol-hash ${CURRENT_PROTO_HASH} \
 	  --protocol-kind ${CURRENT_PROTO_NAME}
-
-.PHONY: voting_demo_noops
-voting_demo_noops: tezos-sandbox tezos-client tezos-admin-client tezos-node
-	./tezos-sandbox voting \
-	  src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL \
-	  src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL \
-	  --root-path ${TMP}/flextesa-voting-demo-noops/ \
-	  --base-port 12_000 \
-	  --size 3 \
-	  --with-timestamp \
-	  --winning-client-is-clueless \
-	  --winner-client-binary ./tezos-client \
-	  --current-client-binary ./tezos-client \
-	  --current-admin-client-binary ./tezos-admin-client \
-	  --current-node-binary ./tezos-node \
-	  --timestamp-delay=-600
 
 .PHONY: user_activated_upgrade_next
 user_activated_upgrade_next: tezos-sandbox tezos-client tezos-node \

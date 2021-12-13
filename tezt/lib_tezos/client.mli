@@ -218,6 +218,22 @@ module Admin : sig
 
   (** Same as [kick_peer], but do not wait for the process to exit. *)
   val spawn_kick_peer : ?endpoint:endpoint -> peer:string -> t -> Process.t
+
+  (** Run [tezos-admin-client inject protocol <protocol_path>].
+
+      Returns the hash of the injected protocol. *)
+  val inject_protocol :
+    ?endpoint:endpoint -> protocol_path:string -> t -> string Lwt.t
+
+  (** Same as [inject_protocol], but do not wait for the process to exit. *)
+  val spawn_inject_protocol :
+    ?endpoint:endpoint -> protocol_path:string -> t -> Process.t
+
+  (** Run [tezos-admin-client list protocols] and return the list of protocol hashes. *)
+  val list_protocols : ?endpoint:endpoint -> t -> string list Lwt.t
+
+  (** Same as [list_protocols], but do not wait for the process to exit. *)
+  val spawn_list_protocols : ?endpoint:endpoint -> t -> Process.t
 end
 
 (** {2 Regular Client Commands} *)
@@ -508,13 +524,26 @@ val spawn_create_mockup :
 
 (** Run [tezos-client submit proposals for].
 
+    If both [proto_hash] and [proto_hashes] are specified,
+    the list of protocols which are proposed is [proto_hash :: proto_hashes].
+
     Default [key] is {!Constant.bootstrap1.alias}. *)
 val submit_proposals :
-  ?key:string -> ?wait:string -> proto_hash:string -> t -> unit Lwt.t
+  ?key:string ->
+  ?wait:string ->
+  ?proto_hash:string ->
+  ?proto_hashes:string list ->
+  t ->
+  unit Lwt.t
 
 (** Same as [submit_proposals], but do not wait for the process to exit. *)
 val spawn_submit_proposals :
-  ?key:string -> ?wait:string -> proto_hash:string -> t -> Process.t
+  ?key:string ->
+  ?wait:string ->
+  ?proto_hash:string ->
+  ?proto_hashes:string list ->
+  t ->
+  Process.t
 
 type ballot = Nay | Pass | Yay
 
@@ -726,7 +755,10 @@ val spawn_typecheck_script :
   t ->
   Process.t
 
-(** Run [tezos-client list mode protocols]. *)
+(** Run [tezos-client list mode protocols].
+
+    Note: the [list protocols] command (without mode) is an admin command
+    (see {!Admin.list_protocols}). *)
 val list_protocols : [< `Light | `Mockup | `Proxy] -> t -> string list Lwt.t
 
 (** Same as [list_protocols], but do not wait for the process to exit
@@ -762,6 +794,12 @@ val spawn_originate_tx_rollup :
   src:string ->
   t ->
   Process.t
+
+(** Run [tezos-client show voting period] and return the period name. *)
+val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
+
+(** Same as [show_voting_period], but do not wait for the process to exit. *)
+val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 
 (** {2 High-Level Functions} *)
 
