@@ -90,9 +90,13 @@ let raw_info cctxt ~chain ~block_hash shell payload_hash payload_round
     (* If we are not in the current protocol, do no consider operations *)
     return (None, [], Operation_pool.empty_payload))
   >>=? fun (preendorsements, quorum, payload) ->
-  (if is_in_protocol then Baking_state.round_of_shell_header shell
-  else (* If we are not in the current protocol, the round is 0 *)
-    ok Round.zero)
+  (match Baking_state.round_of_shell_header shell with
+  | Ok round -> ok round
+  | _ ->
+      (* this can occur if the protocol has just changed and the
+         previous protocol does not have a concept of round
+         (e.g. Genesis) *)
+      ok Round.zero)
   >>?= fun round ->
   let prequorum =
     Option.fold ~none:None ~some:extract_prequorum preendorsements
