@@ -15,6 +15,9 @@ to Protocol I.
 Bug Fixes
 ---------
 
+- Expose `consumed_milligas` in the receipt of the `Register_global_constant`
+  operation. (MR :gl:`!3981`)
+
 Minor Changes
 -------------
 
