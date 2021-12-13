@@ -32,7 +32,7 @@
 *)
 open Hacl
 
-let hex s = Hex.to_bytes (`Hex s)
+let hex s = Hex.to_bytes_exn (`Hex s)
 
 type vector = {
   data_in : Bytes.t list;

@@ -44,7 +44,11 @@ let json_parameter =
       | Ok json -> return json
       | Error err -> cctxt#error "%s" err)
 
-let bytes_parameter = parameter (fun _ hex -> return (Hex.to_bytes (`Hex hex)))
+let bytes_parameter =
+  parameter (fun (cctxt : #Client_context.printer) hex ->
+      match Hex.to_bytes (`Hex hex) with
+      | Some s -> return s
+      | None -> cctxt#error "Invalid hex string: %s" hex)
 
 let commands () =
   [

@@ -60,7 +60,7 @@ module Test_Script = struct
       "script serialised incorrectly"
       mbytes_pp
       bytes
-      (`Hex "030b" |> Hex.to_bytes)
+      (`Hex "030b" |> Hex.to_bytes_exn)
 end
 
 module Test_Big_map = struct

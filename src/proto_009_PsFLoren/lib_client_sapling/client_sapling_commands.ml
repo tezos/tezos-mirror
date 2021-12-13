@@ -497,7 +497,7 @@ let submit_shielded_cmd =
         return
         @@ Data_encoding.Binary.of_bytes_exn
              UTXO.transaction_encoding
-             Hex.(to_bytes (`Hex hex)))
+             Hex.(to_bytes_exn (`Hex hex)))
       >>=? fun transaction ->
       return Shielded_tez_contract_input.(as_arg (create transaction))
       >>=? fun contract_input ->

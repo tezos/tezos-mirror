@@ -84,7 +84,7 @@ type error += Unterminated_string of location
 
 type error += Unterminated_integer of location
 
-type error += Odd_lengthed_bytes of location
+type error += Invalid_hex_bytes of location
 
 type error += Unterminated_comment of location
 
