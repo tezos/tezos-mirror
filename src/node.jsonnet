@@ -57,7 +57,7 @@ local prometheus = grafana.prometheus;
 
   savepointLevel:
     singlestat.new(
-      title='Current save pointlevel',
+      title='Current savepoint level',
       datasource='Prometheus',
       format='none',
       valueName='max',
