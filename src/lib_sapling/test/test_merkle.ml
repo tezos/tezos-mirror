@@ -2,7 +2,7 @@ module R = Rustzcash
 module Core = Core.Client
 module Storage = Storage.Make_Storage (Core)
 
-let ba_of_hex h = Hex.to_bytes (`Hex h)
+let ba_of_hex h = Hex.to_bytes_exn (`Hex h)
 
 (* Some test vectors are in bigendian *)
 let ba_of_hex_be h =

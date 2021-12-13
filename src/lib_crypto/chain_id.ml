@@ -64,11 +64,23 @@ let of_string_exn s =
 
 let to_string s = s
 
-let of_hex s = of_string (Hex.to_string s)
+let of_hex s =
+  match Hex.to_string s with
+  | None -> error_with "%s.of_hex: invalid hex string (%a)" name Hex.pp s
+  | Some s -> of_string s
 
-let of_hex_opt s = of_string_opt (Hex.to_string s)
+let of_hex_opt s = Option.bind (Hex.to_string s) of_string_opt
 
-let of_hex_exn s = of_string_exn (Hex.to_string s)
+let of_hex_exn s =
+  match Hex.to_string s with
+  | None ->
+      Format.kasprintf
+        invalid_arg
+        "%s.of_hex_exn: invalid hex string (%a)"
+        name
+        Hex.pp
+        s
+  | Some s -> of_string_exn s
 
 let to_hex s = Hex.of_string (to_string s)
 

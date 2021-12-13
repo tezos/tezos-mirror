@@ -541,7 +541,7 @@ let verification_ctx_free ctx = RS.verification_ctx_free ctx
 
 let tree_uncommitted =
   to_hash
-    (Hex.to_bytes
+    (Hex.to_bytes_exn
        (`Hex "0100000000000000000000000000000000000000000000000000000000000000"))
 
 let merkle_hash ~height a b =

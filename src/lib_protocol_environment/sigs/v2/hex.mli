@@ -30,7 +30,7 @@ val of_char: char -> char * char
     [c]. *)
 
 val to_char: char -> char -> char
-(** [to_char x y] is the character correspondong to the [xy]
+(** [to_char x y] is the character corresponding to the [xy]
     hexadecimal encoding. *)
 
 (** {1:string Strings} *)

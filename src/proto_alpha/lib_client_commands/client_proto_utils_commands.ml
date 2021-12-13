@@ -33,9 +33,10 @@ let unsigned_block_header_param =
     ~name:"unsigned block header"
     ~desc:"A hex or JSON encoded unsigned block header"
   @@ parameter (fun _ s ->
-         let bytes = `Hex s |> Hex.to_bytes in
+         let bytes_opt = `Hex s |> Hex.to_bytes in
          let enc = Protocol.Alpha_context.Block_header.unsigned_encoding in
-         Data_encoding.Binary.of_bytes_opt enc bytes |> function
+         Option.bind bytes_opt (Data_encoding.Binary.of_bytes_opt enc)
+         |> function
          | Some s -> return s
          | None -> (
              let error =

@@ -91,15 +91,15 @@ let commands () =
       ~name
       ~desc
       (parameter (fun (_cctxt : Alpha_client_context.full) s ->
-           try
-             if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then
-               raise Exit
-             else
-               return
-                 (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
-           with _ ->
-             failwith
-               "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"))
+           match
+             if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then None
+             else Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2)))
+           with
+           | Some s -> return s
+           | None ->
+               failwith
+                 "Invalid bytes, expecting hexadecimal notation (e.g. \
+                  0x1234abcd)"))
   in
   let signature_parameter =
     Clic.parameter (fun _cctxt s ->

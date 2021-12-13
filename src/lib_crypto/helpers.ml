@@ -59,10 +59,10 @@ struct
 
   let to_hex s = Hex.of_string (H.to_string s)
 
-  let of_hex_opt s = H.of_string_opt (Hex.to_string s)
+  let of_hex_opt s = Option.bind (Hex.to_string s) H.of_string_opt
 
   let of_hex_exn s =
-    match H.of_string_opt (Hex.to_string s) with
+    match of_hex_opt s with
     | Some x -> x
     | None -> Format.kasprintf invalid_arg "of_hex_exn (%s)" H.name
 

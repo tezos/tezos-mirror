@@ -420,8 +420,8 @@ let test_ivk_to_pkd () =
         Tezos_sapling.Rustzcash.(
           of_pkd
             (ivk_to_pkd
-               (to_ivk (Hex.to_bytes ivk))
-               (Option.get (to_diversifier (Hex.to_bytes diversifier)))))
+               (to_ivk (Hex.to_bytes_exn ivk))
+               (Option.get (to_diversifier (Hex.to_bytes_exn diversifier)))))
       in
       let res = Hex.show (Hex.of_bytes result) in
       if not (res = expected_pkd_hex) then
@@ -446,8 +446,8 @@ let test_failing_ivk_to_pkd () =
         (ignore
         @@ Tezos_sapling.Rustzcash.(
              ivk_to_pkd
-               (to_ivk (Hex.to_bytes ivk))
-               (Option.get (to_diversifier (Hex.to_bytes diversifier))))) ;
+               (to_ivk (Hex.to_bytes_exn ivk))
+               (Option.get (to_diversifier (Hex.to_bytes_exn diversifier))))) ;
         assert (
           Alcotest.failf
             "ivk_to_pkd should have failed on ivk input %s. The first 5 bits \

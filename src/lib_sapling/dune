@@ -9,7 +9,6 @@
   integers
   ctypes
   ctypes.stubs
-  hex
   data-encoding
   tezos-crypto
   tezos-stdlib
