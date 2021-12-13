@@ -68,7 +68,7 @@ let fetch_pipeline_records () =
   let get_record job =
     let job_id = JSON.(job |-> "id" |> as_int) in
     let name = JSON.(job |-> "name" |> as_string) in
-    match name =~* rex "^tezt:(\\d+)$" with
+    match name =~* rex "^tezt (\\d+)/\\d+$" with
     | None -> None
     | Some index ->
         Some
