@@ -61,7 +61,7 @@ module type FILTER = sig
         [oph] from the state of the filter *)
     val remove : filter_state:state -> Operation_hash.t -> state
 
-    (** [precheck config ~filter_state ~validation_state shell_header oph]
+    (** [precheck config ~filter_state ~validation_state oph op]
         should be used to decide whether an operation can be gossiped to the
         network without executing it. This is a wrapper around
         [Proto.precheck_manager] and [Proto.check_signature]. This
@@ -80,9 +80,8 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       validation_state:Proto.validation_state ->
-      Tezos_base.Operation.shell_header ->
       Operation_hash.t ->
-      Proto.operation_data ->
+      Proto.operation ->
       [ `Passed_precheck of state
       | `Passed_precheck_with_replace of Operation_hash.t * state
       | `Branch_delayed of tztrace
@@ -107,7 +106,7 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
-      Proto.operation_data ->
+      Proto.operation ->
       [ `Passed_prefilter of [`High | `Low]
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
@@ -128,7 +127,7 @@ module type FILTER = sig
       filter_state:state ->
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
-      Proto.operation_data * Proto.operation_receipt ->
+      Proto.operation * Proto.operation_receipt ->
       [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
 

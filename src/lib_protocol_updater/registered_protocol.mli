@@ -88,6 +88,7 @@ module Register_embedded_V2
   T
     with type P.block_header_data = Proto.block_header_data
      and type P.operation_data = Proto.operation_data
+     and type P.operation = Proto.operation
      and type P.operation_receipt = Proto.operation_receipt
      and type P.validation_state = Proto.validation_state
 
@@ -101,6 +102,7 @@ module Register_embedded_V3
   T
     with type P.block_header_data = Proto.block_header_data
      and type P.operation_data = Proto.operation_data
+     and type P.operation = Proto.operation
      and type P.operation_receipt = Proto.operation_receipt
      and type P.validation_state = Proto.validation_state
 
@@ -114,5 +116,6 @@ module Register_embedded_V4
   T
     with type P.block_header_data = Proto.block_header_data
      and type P.operation_data = Proto.operation_data
+     and type P.operation = Proto.operation
      and type P.operation_receipt = Proto.operation_receipt
      and type P.validation_state = Proto.validation_state

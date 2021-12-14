@@ -52,9 +52,10 @@ type classification =
 
     All operations must maintain integrity between the 2!
 *)
-type bounded_map = {
+type 'protocol_data bounded_map = {
   ring : Operation_hash.t Ringo.Ring.t;
-  mutable map : (Operation.t * error list) Operation_hash.Map.t;
+  mutable map :
+    ('protocol_data Prevalidation.operation * error list) Operation_hash.Map.t;
 }
 
 let map bounded_map = bounded_map.map
@@ -74,15 +75,20 @@ type parameters = {
     See the mli for detailed documentation.
     All operations must maintain the invariant about [in_mempool]
     described in the mli. *)
-type t = {
+type 'protocol_data t = {
   parameters : parameters;
-  refused : bounded_map;
-  outdated : bounded_map;
-  branch_refused : bounded_map;
-  branch_delayed : bounded_map;
-  mutable applied_rev : (Operation_hash.t * Operation.t) list;
-  mutable prechecked : Operation.t Operation_hash.Map.t;
-  mutable in_mempool : (Operation.t * classification) Operation_hash.Map.t;
+  refused : 'protocol_data bounded_map;
+  outdated : 'protocol_data bounded_map;
+  branch_refused : 'protocol_data bounded_map;
+  branch_delayed : 'protocol_data bounded_map;
+  mutable applied_rev :
+    (Operation_hash.t * 'protocol_data Prevalidation.operation) list;
+  mutable prechecked :
+    'protocol_data Prevalidation.operation Operation_hash.Map.t;
+  mutable unparsable : Operation_hash.Set.t;
+  mutable in_mempool :
+    ('protocol_data Prevalidation.operation * classification)
+    Operation_hash.Map.t;
 }
 
 let create parameters =
@@ -93,6 +99,7 @@ let create parameters =
     branch_refused = mk_empty_bounded_map parameters.map_size_limit;
     branch_delayed = mk_empty_bounded_map parameters.map_size_limit;
     prechecked = Operation_hash.Map.empty;
+    unparsable = Operation_hash.Set.empty;
     in_mempool = Operation_hash.Map.empty;
     applied_rev = [];
   }
@@ -109,12 +116,15 @@ let is_empty
       branch_delayed = _;
       prechecked = _;
       applied_rev = _;
+      unparsable;
       in_mempool;
     } =
   (* By checking only [in_mempool] here, we rely on the invariant that
      [in_mempool] is the union of all other fields (see the MLI for
-     detailed documentation of this invariant). *)
+     detailed documentation of this invariant) except unparsable
+     operations which are not classified yet. *)
   Operation_hash.Map.is_empty in_mempool
+  && Operation_hash.Set.is_empty unparsable
 
 let set_of_bounded_map bounded_map =
   Operation_hash.Map.fold
@@ -122,7 +132,7 @@ let set_of_bounded_map bounded_map =
     bounded_map.map
     Operation_hash.Set.empty
 
-let flush (classes : t) ~handle_branch_refused =
+let flush (classes : 'protocol_data t) ~handle_branch_refused =
   let remove_map_from_in_mempool map =
     classes.in_mempool <-
       Operation_hash.Map.fold
@@ -147,9 +157,13 @@ let flush (classes : t) ~handle_branch_refused =
   remove_list_from_in_mempool classes.applied_rev ;
   classes.applied_rev <- [] ;
   remove_map_from_in_mempool classes.prechecked ;
+  classes.unparsable <- Operation_hash.Set.empty ;
   classes.prechecked <- Operation_hash.Map.empty
 
 let is_in_mempool oph classes = Operation_hash.Map.find oph classes.in_mempool
+
+let is_known_unparsable oph classes =
+  Operation_hash.Set.mem oph classes.unparsable
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
@@ -235,16 +249,21 @@ let handle_error oph op classification classes =
   classes.in_mempool <-
     Operation_hash.Map.add oph (op, classification) classes.in_mempool
 
-let add classification oph op classes =
+let add_unparsable oph classes =
+  classes.unparsable <- Operation_hash.Set.add oph classes.unparsable ;
+  classes.parameters.on_discarded_operation oph
+
+let add classification op classes =
   match classification with
-  | `Applied -> handle_applied oph op classes
-  | `Prechecked -> handle_prechecked oph op classes
+  | `Applied -> handle_applied op.Prevalidation.hash op classes
+  | `Prechecked -> handle_prechecked op.Prevalidation.hash op classes
   | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
     classification ->
-      handle_error oph op classification classes
+      handle_error op.Prevalidation.hash op classification classes
 
 let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
-    ~outdated classes =
+    ~outdated classes :
+    'protocol_data Prevalidation.operation Operation_hash.Map.t =
   let module Map = Operation_hash.Map in
   let ( +> ) accum to_add =
     let merge_fun _k accum_v_opt to_add_v_opt =
@@ -288,9 +307,13 @@ type 'block chain_tools = {
 }
 
 (* There's detailed documentation in the mli *)
-let handle_live_operations ~(block_store : 'block block_tools)
+let handle_live_operations ~classes ~(block_store : 'block block_tools)
     ~(chain : 'block chain_tools) ~(from_branch : 'block) ~(to_branch : 'block)
-    ~(is_branch_alive : Block_hash.t -> bool) old_mempool =
+    ~(is_branch_alive : Block_hash.t -> bool)
+    ~(parse :
+       Operation_hash.t ->
+       Operation.t ->
+       'protocol_data Prevalidation.operation option) old_mempool =
   let rec pop_block ancestor (block : 'block) mempool =
     let hash = block_store.hash block in
     if Block_hash.equal hash ancestor then Lwt.return mempool
@@ -298,9 +321,30 @@ let handle_live_operations ~(block_store : 'block block_tools)
       let operations = block_store.operations block in
       List.fold_left_s
         (List.fold_left_s (fun mempool op ->
-             let h = Operation.hash op in
-             chain.inject_operation h op >|= fun () ->
-             Operation_hash.Map.add h op mempool))
+             let oph = Operation.hash op in
+             chain.inject_operation oph op >|= fun () ->
+             match parse oph op with
+             | None ->
+                 (* There are hidden invariants between the shell and
+                    the economic protocol which should ensure this will
+                    (almost) never happen in practice:
+
+                        1. Decoding/encoding an operation only depends
+                    on the protocol and not the current context.
+
+                        2. It is not possible to have a reorganisation
+                    where one branch is using one protocol and another
+                    branch on another protocol.
+
+                        3. Ok, actually there might be one case using
+                    [user_activated_upgrades] where this could happen,
+                    but this is quite rare.
+
+                      If this happens, we classifies an operation as
+                    unparsable and it is ok. *)
+                 add_unparsable oph classes ;
+                 mempool
+             | Some parsed_op -> Operation_hash.Map.add oph parsed_op mempool))
         mempool
         operations
       >>= fun mempool ->
@@ -333,21 +377,24 @@ let handle_live_operations ~(block_store : 'block block_tools)
   let new_mempool = List.fold_left push_block mempool path in
   let (new_mempool, outdated) =
     Operation_hash.Map.partition
-      (fun _oph op -> is_branch_alive op.Operation.shell.branch)
+      (fun _oph op ->
+        is_branch_alive op.Prevalidation.raw.Operation.shell.branch)
       new_mempool
   in
   Operation_hash.Map.iter (fun oph _op -> chain.clear_or_cancel oph) outdated ;
   new_mempool
 
-let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
+let recycle_operations ~from_branch ~to_branch ~live_blocks ~classes ~parse
     ~pending ~(block_store : 'block block_tools) ~(chain : 'block chain_tools)
     ~handle_branch_refused =
   handle_live_operations
+    ~classes
     ~block_store
     ~chain
     ~from_branch
     ~to_branch
     ~is_branch_alive:(fun branch -> Block_hash.Set.mem branch live_blocks)
+    ~parse
     (Operation_hash.Map.union
        (fun _key v _ -> Some v)
        (to_map
@@ -357,15 +404,19 @@ let recycle_operations ~from_branch ~to_branch ~live_blocks ~classification
           ~branch_refused:handle_branch_refused
           ~refused:false
           ~outdated:false
-          classification)
+          classes)
        pending)
   >|= fun pending ->
-  flush classification ~handle_branch_refused ;
+  (* Non parsable operations that were previously included in a block
+     will be removed by the call to [flush]. However, as explained in
+     [handle_live_operations] it should never happen in practice. *)
+  flush classes ~handle_branch_refused ;
   pending
 
 module Internal_for_tests = struct
   (** [copy_bounded_map bm] returns a deep copy of [bm] *)
-  let copy_bounded_map (bm : bounded_map) : bounded_map =
+  let copy_bounded_map (bm : 'protocol_data bounded_map) :
+      'protocol_data bounded_map =
     let copy_ring (ring : Operation_hash.t Ringo.Ring.t) =
       let result = Ringo.Ring.capacity ring |> Ringo.Ring.create in
       List.iter (Ringo.Ring.add result) (Ringo.Ring.elements ring) ;
@@ -373,7 +424,7 @@ module Internal_for_tests = struct
     in
     {map = bm.map; ring = copy_ring bm.ring}
 
-  let copy (t : t) : t =
+  let copy (t : 'protocol_data t) : 'protocol_data t =
     (* Code could be shorter by doing a functional update thanks to
        the 'with' keyword. We rather list all the fields, so that
        the compiler emits a warning when a field is added. *)
@@ -385,6 +436,7 @@ module Internal_for_tests = struct
       branch_delayed = copy_bounded_map t.branch_delayed;
       applied_rev = t.applied_rev;
       prechecked = t.prechecked;
+      unparsable = t.unparsable;
       in_mempool = t.in_mempool;
     }
 
@@ -402,6 +454,7 @@ module Internal_for_tests = struct
         branch_delayed;
         applied_rev;
         prechecked;
+        unparsable;
         in_mempool;
       } =
     let applied_pp ppf applied =
@@ -417,11 +470,16 @@ module Internal_for_tests = struct
       prechecked |> Operation_hash.Map.bindings |> List.map fst
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
+    let unparsable_pp ppf unparsable =
+      unparsable |> Operation_hash.Set.elements
+      |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
+    in
     Format.fprintf
       ppf
       "Map_size_limit:@.%i@.On discarded operation: \
        <function>@.Refused:%a@.Outdated:%a@.Branch refused:@.%a@.Branch \
-       delayed:@.%a@.Applied:@.%a@.Prechecked:@.%a@.In Mempool:@.%a"
+       delayed:@.%a@.Applied:@.%a@.Prechecked:@.%a@.Unparsable:@.%a@.In \
+       Mempool:@.%a"
       parameters.map_size_limit
       bounded_map_pp
       refused
@@ -435,6 +493,8 @@ module Internal_for_tests = struct
       applied_rev
       prechecked_pp
       prechecked
+      unparsable_pp
+      unparsable
       in_mempool_pp
       in_mempool
 
