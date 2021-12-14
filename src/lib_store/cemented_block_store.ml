@@ -147,7 +147,7 @@ let load_table cemented_blocks_dir =
                     loop ({start_level; end_level; file} :: acc)
                 | _ -> loop acc)
             | _ -> loop acc)
-          (function End_of_file -> Lwt.return acc | _exn -> loop acc)
+          (function End_of_file -> Lwt.return acc | exn -> raise exn)
       in
       Lwt.finalize (fun () -> loop []) (fun () -> Lwt_unix.closedir dir_handle)
       >>= function
