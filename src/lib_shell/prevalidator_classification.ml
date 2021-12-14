@@ -104,7 +104,7 @@ let set_of_bounded_map bounded_map =
     Operation_hash.Set.empty
 
 let flush (classes : t) ~handle_branch_refused =
-  let update_in_mempool_map map =
+  let remove_map_from_in_mempool map =
     classes.in_mempool <-
       Operation_hash.Map.fold
         (fun oph _ mempool -> Operation_hash.Map.remove oph mempool)
@@ -119,15 +119,15 @@ let flush (classes : t) ~handle_branch_refused =
         list
   in
   if handle_branch_refused then (
-    update_in_mempool_map classes.branch_refused.map ;
+    remove_map_from_in_mempool classes.branch_refused.map ;
     Ringo.Ring.clear classes.branch_refused.ring ;
     classes.branch_refused.map <- Operation_hash.Map.empty) ;
-  update_in_mempool_map classes.branch_delayed.map ;
+  remove_map_from_in_mempool classes.branch_delayed.map ;
   Ringo.Ring.clear classes.branch_delayed.ring ;
   classes.branch_delayed.map <- Operation_hash.Map.empty ;
   remove_list_from_in_mempool classes.applied_rev ;
   classes.applied_rev <- [] ;
-  update_in_mempool_map classes.prechecked ;
+  remove_map_from_in_mempool classes.prechecked ;
   classes.prechecked <- Operation_hash.Map.empty
 
 let is_in_mempool oph classes = Operation_hash.Map.mem oph classes.in_mempool
