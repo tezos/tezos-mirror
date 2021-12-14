@@ -34,6 +34,7 @@
   fmt.cli
   fmt.tty
   tls
+  prometheus-app.unix
   lwt-exit
   (select void_for_linking-tezos-embedded-protocol-genesis from
    (tezos-embedded-protocol-genesis -> void_for_linking-tezos-embedded-protocol-genesis.empty)

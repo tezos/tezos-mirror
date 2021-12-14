@@ -396,7 +396,7 @@ let init_rpc (config : Node_config_file.t) node =
     []
 
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
-    (config : Node_config_file.t) =
+    ~prometheus_config (config : Node_config_file.t) =
   Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
   (* Main loop *)
   let log_cfg =
@@ -454,10 +454,11 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
       (fun exit_status ->
         Event.(emit bye) exit_status >>= fun () -> Internal_event_unix.close ())
   in
+  let _ = Prometheus_unix.serve prometheus_config in
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
-    args =
+    prometheus_config args =
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
@@ -507,6 +508,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
           ?target
           ~singleprocess
           ~force_history_mode_switch
+          ~prometheus_config
           config)
       (function exn -> fail_with_exn exn)
   in
@@ -596,7 +598,8 @@ module Term = struct
     Cmdliner.Term.(
       ret
         (const process $ sandbox $ verbosity $ target $ singleprocess
-       $ force_history_mode_switch $ Node_shared_arg.Term.args))
+       $ force_history_mode_switch $ Prometheus_unix.opts
+       $ Node_shared_arg.Term.args))
 end
 
 module Manpage = struct

@@ -166,6 +166,9 @@ Node
 
 - Added the ``ithacanet`` built-in network alias.
 
+- Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
+  expose some metrics using the Prometheus format.
+
 Client
 ------
 
