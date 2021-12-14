@@ -1,0 +1,36 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/map_map_sideeffect.tz]
+
+Well typed
+Gas remaining: 1039986.934 units remaining
+{ parameter nat ;
+  storage (pair (map string nat) nat) ;
+  code { UNPAIR
+         /* [ @parameter nat : @storage pair (map string nat) nat ] */ ;
+         SWAP
+         /* [ @storage pair (map string nat) nat : @parameter nat ] */ ;
+         CAR
+         /* [ map string nat : @parameter nat ] */ ;
+         DIP 2
+             { PUSH @sum nat 0 /* [ @sum nat ] */ }
+         /* [ map string nat : @parameter nat : @sum nat ] */ ;
+         MAP { CDR
+               /* [ @elt nat : @parameter nat : @sum nat ] */ ;
+               DIP { DUP /* [ @parameter nat : @parameter nat : @sum nat ] */ }
+               /* [ @elt nat : @parameter nat : @parameter nat : @sum nat ] */ ;
+               ADD
+               /* [ nat : @parameter nat : @sum nat ] */ ;
+               DUP
+               /* [ nat : nat : @parameter nat : @sum nat ] */ ;
+               DUG 2
+               /* [ nat : @parameter nat : nat : @sum nat ] */ ;
+               DIP 2 { ADD @sum /* [ @sum nat ] */ }
+               /* [ nat : @parameter nat : @sum nat ] */ }
+         /* [ map string nat : @parameter nat : @sum nat ] */ ;
+         DIP { DROP /* [ @sum nat ] */ }
+         /* [ map string nat : @sum nat ] */ ;
+         PAIR
+         /* [ pair (map string nat) (nat @sum) ] */ ;
+         NIL operation
+         /* [ list operation : pair (map string nat) (nat @sum) ] */ ;
+         PAIR
+         /* [ pair (list operation) (map string nat) (nat @sum) ] */ } }

@@ -1,0 +1,20 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/voting_power.tz]
+
+Well typed
+Gas remaining: 1039994.233 units remaining
+{ parameter key ;
+  storage (pair nat nat) ;
+  code { CAR
+         /* [ @parameter key ] */ ;
+         HASH_KEY
+         /* [ key_hash ] */ ;
+         VOTING_POWER
+         /* [ nat ] */ ;
+         DIP { TOTAL_VOTING_POWER /* [ nat ] */ }
+         /* [ nat : nat ] */ ;
+         PAIR
+         /* [ pair nat nat ] */ ;
+         NIL operation
+         /* [ list operation : pair nat nat ] */ ;
+         PAIR
+         /* [ pair (list operation) nat nat ] */ } }

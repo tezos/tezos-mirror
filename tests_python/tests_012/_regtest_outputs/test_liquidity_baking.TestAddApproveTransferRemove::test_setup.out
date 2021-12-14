@@ -1,0 +1,8 @@
+tests_012/test_liquidity_baking.py::TestAddApproveTransferRemove::test_setup
+
+"[CONTRACT_HASH]"
+Pair 1
+     100
+     100
+     "[CONTRACT_HASH]"
+     "[CONTRACT_HASH]"

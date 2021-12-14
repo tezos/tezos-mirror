@@ -1,0 +1,34 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/execution_order_appender.tz]
+
+Well typed
+Gas remaining: 1039989.364 units remaining
+{ parameter unit ;
+  storage (pair address string) ;
+  code { CDR
+         /* [ @storage pair address string ] */ ;
+         DUP
+         /* [ @storage pair address string : @storage pair address string ] */ ;
+         UNPAIR
+         /* [ address : string : @storage pair address string ] */ ;
+         CONTRACT
+           string
+         /* [ @contract option (contract string) : string
+            : @storage pair address string ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez
+              0
+         /* [ mutez : @contract.some contract string : string
+            : @storage pair address string ] */ ;
+         DIG 2
+         /* [ string : mutez : @contract.some contract string
+            : @storage pair address string ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation : @storage pair address string ] */ ;
+         NIL operation
+         /* [ list operation : operation : @storage pair address string ] */ ;
+         SWAP
+         /* [ operation : list operation : @storage pair address string ] */ ;
+         CONS
+         /* [ list operation : @storage pair address string ] */ ;
+         PAIR
+         /* [ pair (list operation) (pair @storage address string) ] */ } }

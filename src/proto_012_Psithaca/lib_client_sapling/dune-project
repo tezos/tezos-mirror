@@ -1,0 +1,3 @@
+(lang dune 2.9)
+(name tezos-client-sapling)
+(formatting (enabled_for ocaml))

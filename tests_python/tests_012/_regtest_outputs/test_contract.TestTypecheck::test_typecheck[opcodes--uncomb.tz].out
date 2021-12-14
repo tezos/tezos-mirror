@@ -1,0 +1,28 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/uncomb.tz]
+
+Well typed
+Gas remaining: 1039992.541 units remaining
+{ parameter (pair nat nat nat) ;
+  storage nat ;
+  code { CAR
+         /* [ @parameter pair nat nat nat ] */ ;
+         UNPAIR 3
+         /* [ nat : nat : nat ] */ ;
+         PUSH nat 100
+         /* [ nat : nat : nat : nat ] */ ;
+         MUL
+         /* [ nat : nat : nat ] */ ;
+         SWAP
+         /* [ nat : nat : nat ] */ ;
+         PUSH nat 10
+         /* [ nat : nat : nat : nat ] */ ;
+         MUL
+         /* [ nat : nat : nat ] */ ;
+         ADD
+         /* [ nat : nat ] */ ;
+         ADD
+         /* [ nat ] */ ;
+         NIL operation
+         /* [ list operation : nat ] */ ;
+         PAIR
+         /* [ pair (list operation) nat ] */ } }

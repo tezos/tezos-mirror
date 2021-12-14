@@ -1,0 +1,32 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/dipn.tz]
+
+Well typed
+Gas remaining: 1039990.690 units remaining
+{ parameter (pair (pair (pair (pair nat nat) nat) nat) nat) ;
+  storage nat ;
+  code { CAR
+         /* [ @parameter pair (pair (pair (pair nat nat) nat) nat) nat ] */ ;
+         UNPAIR
+         /* [ pair (pair (pair nat nat) nat) nat : nat ] */ ;
+         UNPAIR
+         /* [ pair (pair nat nat) nat : nat : nat ] */ ;
+         UNPAIR
+         /* [ pair nat nat : nat : nat : nat ] */ ;
+         UNPAIR
+         /* [ nat : nat : nat : nat : nat ] */ ;
+         DIP 5 { PUSH nat 6 /* [ nat ] */ }
+         /* [ nat : nat : nat : nat : nat : nat ] */ ;
+         DROP
+         /* [ nat : nat : nat : nat : nat ] */ ;
+         DROP
+         /* [ nat : nat : nat : nat ] */ ;
+         DROP
+         /* [ nat : nat : nat ] */ ;
+         DROP
+         /* [ nat : nat ] */ ;
+         DROP
+         /* [ nat ] */ ;
+         NIL operation
+         /* [ list operation : nat ] */ ;
+         PAIR
+         /* [ pair (list operation) nat ] */ } }

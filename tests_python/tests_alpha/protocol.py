@@ -14,9 +14,9 @@ TENDERBAKE_PARAMETERS['consensus_committee_size'] = 67
 
 FOLDER = constants.ALPHA_FOLDER
 
-PREV_HASH = constants.HANGZHOU
-PREV_DAEMON = constants.HANGZHOU_DAEMON
-PREV_PARAMETERS = constants.HANGZHOU_PARAMETERS
+PREV_HASH = constants.ITHACA
+PREV_DAEMON = constants.ITHACA_DAEMON
+PREV_PARAMETERS = constants.ITHACA_PARAMETERS
 
 
 def activate(

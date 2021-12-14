@@ -1,0 +1,19 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_nonexistent_func.tz]
+
+Well typed
+Gas remaining: 1039993.059 units remaining
+{ parameter (pair nat address) ;
+  storage bool ;
+  code { CAR
+         /* [ @parameter pair nat address ] */ ;
+         UNPAIR
+         /* [ nat : address ] */ ;
+         VIEW "not_exist" bool
+         /* [ @contract option bool ] */ ;
+         IF_SOME
+           { DROP /* [] */ ; PUSH bool True /* [ bool ] */ }
+           { PUSH bool False /* [ bool ] */ } ;
+         NIL operation
+         /* [ list operation : bool ] */ ;
+         PAIR
+         /* [ pair (list operation) bool ] */ } }

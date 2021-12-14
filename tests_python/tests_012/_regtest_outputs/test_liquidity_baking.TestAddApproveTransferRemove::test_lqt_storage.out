@@ -1,0 +1,3 @@
+tests_012/test_liquidity_baking.py::TestAddApproveTransferRemove::test_lqt_storage
+
+Pair 2 3 "[CONTRACT_HASH]" 71107

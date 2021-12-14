@@ -1,0 +1,14 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/bls12_381_fr_z_nat.tz]
+
+Well typed
+Gas remaining: 1039996.803 units remaining
+{ parameter nat ;
+  storage bls12_381_fr ;
+  code { UNPAIR
+         /* [ @parameter nat : @storage bls12_381_fr ] */ ;
+         MUL
+         /* [ bls12_381_fr ] */ ;
+         NIL operation
+         /* [ list operation : bls12_381_fr ] */ ;
+         PAIR
+         /* [ pair (list operation) bls12_381_fr ] */ } }

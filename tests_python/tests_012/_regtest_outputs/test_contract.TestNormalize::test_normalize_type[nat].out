@@ -1,0 +1,3 @@
+tests_012/test_contract.py::TestNormalize::test_normalize_type[nat]
+
+nat

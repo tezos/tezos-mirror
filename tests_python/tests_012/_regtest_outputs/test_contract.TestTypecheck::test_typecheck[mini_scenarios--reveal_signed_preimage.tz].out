@@ -1,0 +1,70 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/reveal_signed_preimage.tz]
+
+Well typed
+Gas remaining: 1039977.336 units remaining
+{ parameter (pair bytes signature) ;
+  storage (pair bytes key) ;
+  code { DUP
+         /* [ pair (pair @parameter bytes signature) (pair @storage bytes key)
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         UNPAIR
+         /* [ @parameter pair bytes signature : @storage pair bytes key
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         CAR
+         /* [ bytes : @storage pair bytes key
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         SHA256
+         /* [ bytes : @storage pair bytes key
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         DIP { CAR
+               /* [ bytes : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ }
+         /* [ bytes : bytes
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         ASSERT_CMPEQ ;
+         DUP
+         /* [ pair (pair @parameter bytes signature) (pair @storage bytes key)
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         UNPAIR
+         /* [ @parameter pair bytes signature : @storage pair bytes key
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         SWAP
+         /* [ @storage pair bytes key : @parameter pair bytes signature
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         DIP { UNPAIR
+               /* [ bytes : signature
+                  : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+               SWAP
+               /* [ signature : bytes
+                  : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ }
+         /* [ @storage pair bytes key : signature : bytes
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         CDR
+         /* [ key : signature : bytes
+            : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         CHECK_SIGNATURE
+         /* [ bool : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
+         ASSERT ;
+         CDR
+         /* [ @storage pair bytes key ] */ ;
+         DUP
+         /* [ @storage pair bytes key : @storage pair bytes key ] */ ;
+         CDR
+         /* [ key : @storage pair bytes key ] */ ;
+         HASH_KEY
+         /* [ key_hash : @storage pair bytes key ] */ ;
+         IMPLICIT_ACCOUNT
+         /* [ contract unit : @storage pair bytes key ] */ ;
+         BALANCE
+         /* [ @balance mutez : contract unit : @storage pair bytes key ] */ ;
+         UNIT
+         /* [ unit : @balance mutez : contract unit : @storage pair bytes key ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation : @storage pair bytes key ] */ ;
+         NIL operation
+         /* [ list operation : operation : @storage pair bytes key ] */ ;
+         SWAP
+         /* [ operation : list operation : @storage pair bytes key ] */ ;
+         CONS
+         /* [ list operation : @storage pair bytes key ] */ ;
+         PAIR
+         /* [ pair (list operation) (pair @storage bytes key) ] */ } }

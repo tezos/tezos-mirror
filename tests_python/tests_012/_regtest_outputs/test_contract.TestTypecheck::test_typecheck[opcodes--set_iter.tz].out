@@ -1,0 +1,18 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_iter.tz]
+
+Well typed
+Gas remaining: 1039994.793 units remaining
+{ parameter (set int) ;
+  storage int ;
+  code { CAR
+         /* [ @parameter set int ] */ ;
+         PUSH int 0
+         /* [ int : @parameter set int ] */ ;
+         SWAP
+         /* [ @parameter set int : int ] */ ;
+         ITER { ADD /* [ int ] */ }
+         /* [ int ] */ ;
+         NIL operation
+         /* [ list operation : int ] */ ;
+         PAIR
+         /* [ pair (list operation) int ] */ } }
