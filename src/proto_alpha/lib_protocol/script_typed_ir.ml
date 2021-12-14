@@ -143,6 +143,26 @@ module Script_bls = struct
 
     let to_bytes (G1_tag x) = to_bytes x
   end
+
+  module G2 = struct
+    type t = G2_tag of Bls12_381.G2.t [@@ocaml.unboxed]
+
+    open Bls12_381.G2
+
+    let add (G2_tag x) (G2_tag y) = G2_tag (add x y)
+
+    let mul (G2_tag x) (Fr.Fr_tag y) = G2_tag (mul x y)
+
+    let negate (G2_tag x) = G2_tag (negate x)
+
+    let of_bytes_opt bytes = Option.map (fun x -> G2_tag x) (of_bytes_opt bytes)
+
+    let to_bytes (G2_tag x) = to_bytes x
+  end
+
+  let pairing_check l =
+    let l = List.map (fun (G1.G1_tag x, G2.G2_tag y) -> (x, y)) l in
+    Bls12_381.pairing_check l
 end
 
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
@@ -1012,9 +1032,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (Script_bls.G1.t, 's, 'r, 'f) kinstr
       -> (Script_bls.G1.t, Script_bls.G1.t * 's, 'r, 'f) kinstr
   | IAdd_bls12_381_g2 :
-      (Bls12_381.G2.t, Bls12_381.G2.t * 's) kinfo
-      * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, Bls12_381.G2.t * 's, 'r, 'f) kinstr
+      (Script_bls.G2.t, Script_bls.G2.t * 's) kinfo
+      * (Script_bls.G2.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G2.t, Script_bls.G2.t * 's, 'r, 'f) kinstr
   | IAdd_bls12_381_fr :
       (Script_bls.Fr.t, Script_bls.Fr.t * 's) kinfo
       * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
@@ -1024,9 +1044,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (Script_bls.G1.t, 's, 'r, 'f) kinstr
       -> (Script_bls.G1.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_g2 :
-      (Bls12_381.G2.t, Script_bls.Fr.t * 's) kinfo
-      * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.G2.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.G2.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G2.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_fr :
       (Script_bls.Fr.t, Script_bls.Fr.t * 's) kinfo
       * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
@@ -1046,15 +1066,15 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (Script_bls.G1.t, 's) kinfo * (Script_bls.G1.t, 's, 'r, 'f) kinstr
       -> (Script_bls.G1.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_g2 :
-      (Bls12_381.G2.t, 's) kinfo * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, 's, 'r, 'f) kinstr
+      (Script_bls.G2.t, 's) kinfo * (Script_bls.G2.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G2.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_fr :
       (Script_bls.Fr.t, 's) kinfo * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
       -> (Script_bls.Fr.t, 's, 'r, 'f) kinstr
   | IPairing_check_bls12_381 :
-      ((Script_bls.G1.t, Bls12_381.G2.t) pair boxed_list, 's) kinfo
+      ((Script_bls.G1.t, Script_bls.G2.t) pair boxed_list, 's) kinfo
       * (bool, 's, 'r, 'f) kinstr
-      -> ((Script_bls.G1.t, Bls12_381.G2.t) pair boxed_list, 's, 'r, 'f) kinstr
+      -> ((Script_bls.G1.t, Script_bls.G2.t) pair boxed_list, 's, 'r, 'f) kinstr
   | IComb :
       ('a, 's) kinfo
       * int
@@ -1250,7 +1270,7 @@ and 'ty ty =
   | Chain_id_t : Script_chain_id.t ty_metadata -> Script_chain_id.t ty
   | Never_t : never ty_metadata -> never ty
   | Bls12_381_g1_t : Script_bls.G1.t ty_metadata -> Script_bls.G1.t ty
-  | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty
+  | Bls12_381_g2_t : Script_bls.G2.t ty_metadata -> Script_bls.G2.t ty
   | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
   | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty

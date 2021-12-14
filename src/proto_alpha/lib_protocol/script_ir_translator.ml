@@ -546,7 +546,7 @@ let unparse_bls12_381_g1 ~loc ctxt x =
 
 let unparse_bls12_381_g2 ~loc ctxt x =
   Gas.consume ctxt Unparse_costs.bls12_381_g2 >|? fun ctxt ->
-  let bytes = Bls12_381.G2.to_bytes x in
+  let bytes = Script_bls.G2.to_bytes x in
   (Bytes (loc, bytes), ctxt)
 
 let unparse_bls12_381_fr ~loc ctxt x =
@@ -2760,7 +2760,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   | (Bls12_381_g2_t _, Bytes (_, bs)) -> (
       Gas.consume ctxt Typecheck_costs.bls12_381_g2 >>?= fun ctxt ->
-      match Bls12_381.G2.of_bytes_opt bs with
+      match Script_bls.G2.of_bytes_opt bs with
       | Some pt -> return (pt, ctxt)
       | None -> fail_parse_data ())
   | (Bls12_381_g2_t _, expr) ->
