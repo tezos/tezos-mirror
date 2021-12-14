@@ -532,12 +532,12 @@ let unparse_chain_id ~loc ctxt mode chain_id =
   | Optimized | Optimized_legacy ->
       Gas.consume ctxt Unparse_costs.chain_id_optimized >|? fun ctxt ->
       let bytes =
-        Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
+        Data_encoding.Binary.to_bytes_exn Script_chain_id.encoding chain_id
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       Gas.consume ctxt Unparse_costs.chain_id_readable >|? fun ctxt ->
-      (String (loc, Chain_id.to_b58check chain_id), ctxt)
+      (String (loc, Script_chain_id.to_b58check chain_id), ctxt)
 
 let unparse_bls12_381_g1 ~loc ctxt x =
   Gas.consume ctxt Unparse_costs.bls12_381_g1 >|? fun ctxt ->
@@ -2224,11 +2224,13 @@ let parse_signature ctxt : Script.node -> (signature * context) tzresult =
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_chain_id ctxt : Script.node -> (Chain_id.t * context) tzresult =
-  function
+let parse_chain_id ctxt : Script.node -> (Script_chain_id.t * context) tzresult
+    = function
   | Bytes (loc, bytes) as expr -> (
       Gas.consume ctxt Typecheck_costs.chain_id_optimized >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes_opt Chain_id.encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt Script_chain_id.encoding bytes
+      with
       | Some k -> ok (k, ctxt)
       | None ->
           error
@@ -2236,7 +2238,7 @@ let parse_chain_id ctxt : Script.node -> (Chain_id.t * context) tzresult =
                (loc, strip_locations expr, "a valid chain id"))
   | String (loc, s) as expr -> (
       Gas.consume ctxt Typecheck_costs.chain_id_readable >>? fun ctxt ->
-      match Chain_id.of_b58check_opt s with
+      match Script_chain_id.of_b58check_opt s with
       | Some s -> ok (s, ctxt)
       | None ->
           error

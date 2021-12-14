@@ -74,6 +74,23 @@ type operation = {
   lazy_storage_diff : Lazy_storage.diffs option;
 }
 
+module Script_chain_id = struct
+  type t = Chain_id_tag of Chain_id.t [@@ocaml.unboxed]
+
+  let make x = Chain_id_tag x
+
+  let compare (Chain_id_tag x) (Chain_id_tag y) = Chain_id.compare x y
+
+  let size = Chain_id.size
+
+  let encoding =
+    Data_encoding.conv (fun (Chain_id_tag x) -> x) make Chain_id.encoding
+
+  let to_b58check (Chain_id_tag x) = Chain_id.to_b58check x
+
+  let of_b58check_opt x = Option.map make (Chain_id.of_b58check_opt x)
+end
+
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 module type TYPE_SIZE = sig
@@ -184,7 +201,9 @@ type _ comparable_ty =
   | Timestamp_key :
       Script_timestamp.t ty_metadata
       -> Script_timestamp.t comparable_ty
-  | Chain_id_key : Chain_id.t ty_metadata -> Chain_id.t comparable_ty
+  | Chain_id_key :
+      Script_chain_id.t ty_metadata
+      -> Script_chain_id.t comparable_ty
   | Address_key : address ty_metadata -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
@@ -919,7 +938,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IChainId :
-      ('a, 's) kinfo * (Chain_id.t, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * (Script_chain_id.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | INever : (never, 's) kinfo -> (never, 's, 'r, 'f) kinstr
   | IVoting_power :
@@ -1172,7 +1191,7 @@ and 'ty ty =
       Sapling.Memo_size.t * Sapling.state ty_metadata
       -> Sapling.state ty
   | Operation_t : operation ty_metadata -> operation ty
-  | Chain_id_t : Chain_id.t ty_metadata -> Chain_id.t ty
+  | Chain_id_t : Script_chain_id.t ty_metadata -> Script_chain_id.t ty
   | Never_t : never ty_metadata -> never ty
   | Bls12_381_g1_t : Bls12_381.G1.t ty_metadata -> Bls12_381.G1.t ty
   | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty

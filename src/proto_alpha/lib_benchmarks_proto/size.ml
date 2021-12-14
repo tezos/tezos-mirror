@@ -136,7 +136,8 @@ let key_hash (_keyhash : Signature.public_key_hash) : t =
 let public_key (public_key : Signature.public_key) : t =
   Signature.Public_key.size public_key
 
-let chain_id (_chain_id : Chain_id.t) : t = Chain_id.size
+let chain_id (_chain_id : Script_typed_ir.Script_chain_id.t) : t =
+  Script_typed_ir.Script_chain_id.size
 
 let address (addr : Script_typed_ir.address) : t =
   let entrypoint = addr.entrypoint in

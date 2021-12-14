@@ -55,6 +55,24 @@ type operation = {
   lazy_storage_diff : Lazy_storage.diffs option;
 }
 
+module Script_chain_id : sig
+  (** [t] is made algebraic in order to distinguish it from the other type
+      parameters of [Script_typed_ir.ty]. *)
+  type t = Chain_id_tag of Chain_id.t [@@ocaml.unboxed]
+
+  val make : Chain_id.t -> t
+
+  val compare : t -> t -> int
+
+  val size : int
+
+  val encoding : t Data_encoding.t
+
+  val to_b58check : t -> string
+
+  val of_b58check_opt : string -> t option
+end
+
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 type empty_cell = EmptyCell
@@ -90,7 +108,9 @@ type _ comparable_ty =
   | Timestamp_key :
       Script_timestamp.t ty_metadata
       -> Script_timestamp.t comparable_ty
-  | Chain_id_key : Chain_id.t ty_metadata -> Chain_id.t comparable_ty
+  | Chain_id_key :
+      Script_chain_id.t ty_metadata
+      -> Script_chain_id.t comparable_ty
   | Address_key : address ty_metadata -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
@@ -130,7 +150,7 @@ val key_key : annot:type_annot option -> public_key comparable_ty
 
 val timestamp_key : annot:type_annot option -> Script_timestamp.t comparable_ty
 
-val chain_id_key : annot:type_annot option -> Chain_id.t comparable_ty
+val chain_id_key : annot:type_annot option -> Script_chain_id.t comparable_ty
 
 val address_key : annot:type_annot option -> address comparable_ty
 
@@ -926,7 +946,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IChainId :
-      ('a, 's) kinfo * (Chain_id.t, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * (Script_chain_id.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | INever : (never, 's) kinfo -> (never, 's, 'r, 'f) kinstr
   | IVoting_power :
@@ -1279,7 +1299,7 @@ and 'ty ty =
       Sapling.Memo_size.t * Sapling.state ty_metadata
       -> Sapling.state ty
   | Operation_t : operation ty_metadata -> operation ty
-  | Chain_id_t : Chain_id.t ty_metadata -> Chain_id.t ty
+  | Chain_id_t : Script_chain_id.t ty_metadata -> Script_chain_id.t ty
   | Never_t : never ty_metadata -> never ty
   | Bls12_381_g1_t : Bls12_381.G1.t ty_metadata -> Bls12_381.G1.t ty
   | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty
@@ -1528,7 +1548,7 @@ val sapling_state_t :
 
 val operation_t : annot:type_annot option -> operation ty
 
-val chain_id_t : annot:type_annot option -> Chain_id.t ty
+val chain_id_t : annot:type_annot option -> Script_chain_id.t ty
 
 val never_t : annot:type_annot option -> never ty
 

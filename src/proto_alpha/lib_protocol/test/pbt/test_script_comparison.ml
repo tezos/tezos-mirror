@@ -65,7 +65,7 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   | (Address_key _, x, y) ->
       normalize_compare @@ Script_comparable.compare_address x y
   | (Bytes_key _, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
-  | (Chain_id_key _, x, y) -> normalize_compare @@ Chain_id.compare x y
+  | (Chain_id_key _, x, y) -> normalize_compare @@ Script_chain_id.compare x y
   | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl

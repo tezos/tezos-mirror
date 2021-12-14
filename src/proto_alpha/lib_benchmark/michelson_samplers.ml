@@ -513,7 +513,7 @@ end)
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
-      Data_encoding.Binary.of_string_exn Chain_id.encoding string
+      Data_encoding.Binary.of_string_exn Script_chain_id.encoding string
 
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in

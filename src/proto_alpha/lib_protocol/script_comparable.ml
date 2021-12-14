@@ -61,7 +61,8 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
         (apply [@tailcall]) (Script_timestamp.compare x y) k
     | (Address_key _, x, y) -> (apply [@tailcall]) (compare_address x y) k
     | (Bytes_key _, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
-    | (Chain_id_key _, x, y) -> (apply [@tailcall]) (Chain_id.compare x y) k
+    | (Chain_id_key _, x, y) ->
+        (apply [@tailcall]) (Script_chain_id.compare x y) k
     | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
         (compare_comparable [@tailcall])
           tl

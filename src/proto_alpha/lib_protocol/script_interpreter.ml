@@ -1255,7 +1255,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let transaction = accu in
           let (state, stack) = stack in
           let address = Contract.to_b58check sc.self in
-          let chain_id = Chain_id.to_b58check sc.chain_id in
+          let sc_chain_id = Script_chain_id.make sc.chain_id in
+          let chain_id = Script_chain_id.to_b58check sc_chain_id in
           let anti_replay = address ^ chain_id in
           let ctxt = update_context gas ctxt in
           Sapling.verify_update ctxt state transaction anti_replay
@@ -1268,7 +1269,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks state stack
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
       | IChainId (_, k) ->
-          let accu = sc.chain_id and stack = (accu, stack) in
+          let accu = Script_chain_id.make sc.chain_id
+          and stack = (accu, stack) in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | INever _ -> ( match accu with _ -> .)
       | IVoting_power (_, k) ->
