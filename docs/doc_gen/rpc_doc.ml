@@ -37,6 +37,10 @@ let protocols =
       "011 Hangzhou",
       Some "/include/rpc_introduction.rst.inc",
       "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
+    ( "012",
+      "012 Ithaca",
+      Some "/include/rpc_introduction.rst.inc",
+      "PsithacaTTq3oumpKDw1pVvRrAtqiK4hKnP3Q4FNrXN9yc6KPhp" );
   ]
 
 let pp_name ppf = function
