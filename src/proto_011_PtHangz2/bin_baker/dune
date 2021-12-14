@@ -2,8 +2,7 @@
 (env
  (static
   (flags (:standard
-           -ccopt -static
-           -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+           -ccopt -static))))
 
 (executable
  (name main_baker_011_PtHangz2)
