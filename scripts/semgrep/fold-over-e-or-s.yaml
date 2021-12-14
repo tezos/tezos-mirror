@@ -1,0 +1,71 @@
+rules:
+- id: list-foldl-promise
+  pattern-either:
+  - pattern: List.fold_left (fun $X ... -> $X >>= ...) ... ...
+  - pattern: List.fold_left ... (Lwt.return ...) ...
+  message: You probably want to use List.fold_left_s. See https://tezos.gitlab.io/developer/guidelines.html#folding-over-promise for details.
+  languages: [ocaml]
+  severity: WARNING
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: list-foldr-promise
+  pattern-either:
+  - pattern: List.fold_right (fun ... $X -> $X >>= ...) ... ...
+  - pattern: List.fold_right ... ... (Lwt.return ...)
+  message: You probably want to use List.fold_right_s. See https://tezos.gitlab.io/developer/guidelines.html#folding-over-promise for details.
+  languages: [ocaml]
+  severity: WARNING
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: list-foldl-result
+  pattern-either:
+  - pattern: List.fold_left (fun $X ... -> $X >>? ...) ... ...
+  - pattern: List.fold_left ... (Result.return ...) ...
+  - pattern: List.fold_left ... (ok ...) ...
+  - pattern: List.fold_left ... (Ok ...) ...
+  message: You probably want to use List.fold_left_e. See https://tezos.gitlab.io/developer/guidelines.html#folding-over-promise for details.
+  languages: [ocaml]
+  severity: WARNING
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: list-foldr-result
+  pattern-either:
+  - pattern: List.fold_right (fun ... $X -> $X >>? ...) ... ...
+  - pattern: List.fold_right ... ... (Result.return ...)
+  - pattern: List.fold_right ... ... (ok ...)
+  - pattern: List.fold_right ... ... (Ok ...)
+  message: You probably want to use List.fold_right_e. See https://tezos.gitlab.io/developer/guidelines.html#folding-over-promise for details.
+  languages: [ocaml]
+  severity: WARNING
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: list-foldl-result-promise
+  pattern-either:
+  - pattern: List.fold_left (fun $X ... -> $X >>=? ...) ... ...
+  - pattern: List.fold_left ... (return ...) ...
+  message: You probably want to use List.fold_left_es. See https://tezos.gitlab.io/developer/guidelines.html#folding-over-promise for details.
+  languages: [ocaml]
+  severity: WARNING
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: list-foldr-result-promise
+  pattern-either:
+  - pattern: List.fold_right (fun ... $X -> $X >>=? ...) ... ...
+  - pattern: List.fold_right ... ... (return ...)
+  message: You probably want to use List.fold_right_es. See https://tezos.gitlab.io/developer/guidelines.html#linting-folding-over-promise for details.
+  languages: [ocaml]
+  severity: WARNING
+  metadata:
+    category: performance
+    technology:
+    - ocaml
