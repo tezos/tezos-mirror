@@ -652,7 +652,7 @@ module Make
             handle ~notifier shell (`Parsed op) errs ;
             Lwt.return (filter_state, validation_state, mempool)
         | `Passed_precheck filter_state ->
-            handle ~notifier shell (`Parsed op) `Applied ;
+            handle ~notifier shell (`Parsed op) `Prechecked ;
             let new_mempool = Mempool.cons_valid op.hash mempool in
             Lwt.return (filter_state, validation_state, new_mempool)
         | `Passed_precheck_with_replace (old_oph, filter_state) ->
@@ -792,7 +792,9 @@ module Make
               (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
                  This field does not only contain valid operation *)
               Mempool.known_valid =
-                List.rev_map fst pv.shell.classification.applied_rev;
+                List.rev_map fst pv.shell.classification.applied_rev
+                @ (Operation_hash.Map.to_seq pv.shell.classification.prechecked
+                  |> Seq.map fst |> List.of_seq);
               pending = remaining_pendings;
             }
           in
@@ -1006,7 +1008,13 @@ module Make
             ~mempool
             shell.predecessor
 
-    let remove pv oph =
+    (* If [flush_if_prechecked] is [true], removing a prechecked
+       operation triggers a flush of the mempool. Because flushing may
+       be costly this should be done only when the action is triggered
+       locally by the user. This allows a better UX if the user bans a
+       prechecked operation so that a branch delayed operation becomes
+       [applied] again. *)
+    let remove ~flush_if_prechecked pv oph =
       Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
       pv.shell.advertisement <-
         remove_from_advertisement oph pv.shell.advertisement ;
@@ -1018,8 +1026,8 @@ module Make
           pv.shell.fetching <- Operation_hash.Set.remove oph pv.shell.fetching ;
           return_unit
       | Some (_op, classification) -> (
-          match classification with
-          | `Applied ->
+          match (classification, flush_if_prechecked) with
+          | (`Prechecked, true) | (`Applied, _) ->
               (* Modifying the list of operations classified as [Applied]
                  might change the classification of all the operations in
                  the mempool. Hence if the removed operation has been
@@ -1034,7 +1042,11 @@ module Make
                 pv.shell.live_operations
               >|=? fun () ->
               pv.shell.pending <- Pending_ops.remove oph pv.shell.pending
-          | `Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _ ->
+          | (`Branch_delayed _, _)
+          | (`Branch_refused _, _)
+          | (`Refused _, _)
+          | (`Outdated _, _)
+          | (`Prechecked, false) ->
               pv.filter_state <-
                 Filter.Mempool.remove ~filter_state:pv.filter_state oph ;
               return_unit)
@@ -1042,7 +1054,7 @@ module Make
     let on_ban pv oph_to_ban =
       pv.shell.banned_operations <-
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
-      remove pv oph_to_ban
+      remove ~flush_if_prechecked:true pv oph_to_ban
   end
 
   (** Mimics [Data_encoding.Json.construct] but accepts argument
@@ -1152,7 +1164,6 @@ module Make
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
-
              let refused =
                filter
                  map_op_error
@@ -1182,9 +1193,23 @@ module Make
                  pv.shell.pending
                  Operation_hash.Map.empty
              in
+             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
+
+                We merge prechecked operation with applied operation
+                so that the encoding of the RPC does not need to be
+                changed. Once prechecking will be done by the protocol
+                and not the plugin, we will change the encoding to
+                reflect that. *)
+             let prechecked_with_applied =
+               (Operation_hash.Map.bindings pv.shell.classification.prechecked
+               |> List.rev_filter_map (fun (oph, op) ->
+                      Option.map (fun proto_op -> (oph, proto_op)) (map_op op))
+               )
+               @ applied
+             in
              let pending_operations =
                {
-                 Proto_services.Mempool.applied;
+                 Proto_services.Mempool.applied = prechecked_with_applied;
                  refused;
                  outdated;
                  branch_refused;
@@ -1235,6 +1260,16 @@ module Make
                  List.filter_map (map_op []) pv.shell.classification.applied_rev
                else []
              in
+             (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
+
+                For the moment, applied and prechecked operations are
+                handled the same way for the user point of view. *)
+             let prechecked =
+               if params#applied then
+                 Operation_hash.Map.bindings pv.shell.classification.prechecked
+                 |> List.filter_map (map_op [])
+               else []
+             in
              let refused =
                if params#refused then
                  Operation_hash.Map.fold
@@ -1260,12 +1295,13 @@ module Make
                else []
              in
              let current_mempool =
-               List.concat [applied; refused; branch_refused; branch_delayed]
+               List.concat
+                 [applied; prechecked; refused; branch_refused; branch_delayed]
                |> List.map (fun (hash, op, errors) -> ((hash, op), errors))
              in
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function
-               | `Applied -> params#applied
+               | `Prechecked | `Applied -> params#applied
                | `Refused _ -> params#refused
                | `Outdated _ -> params#outdated
                | `Branch_refused _ -> params#branch_refused
@@ -1282,7 +1318,7 @@ module Make
                      when filter_result kind ->
                        let errors =
                          match kind with
-                         | `Applied -> []
+                         | `Prechecked | `Applied -> []
                          | `Branch_delayed errors
                          | `Branch_refused errors
                          | `Refused errors ->
