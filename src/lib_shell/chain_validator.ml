@@ -67,6 +67,14 @@ type synchronisation_limits = {latency : int; threshold : int}
 type limits = {synchronisation : synchronisation_limits}
 
 module Types = struct
+  type metrics = {
+    head_level : Prometheus.Gauge.t;
+    ignored_head_count : Prometheus.Counter.t;
+    branch_switch_count : Prometheus.Counter.t;
+    head_increment_count : Prometheus.Counter.t;
+    validation_worker_metrics : Worker_metrics.t;
+  }
+
   type parameters = {
     parent : Name.t option;
     (* inherit bootstrap status from parent chain validator *)
@@ -80,6 +88,7 @@ module Types = struct
     prevalidator_limits : Prevalidator.limits;
     peer_validator_limits : Peer_validator.limits;
     limits : limits;
+    metrics : metrics;
   }
 
   type state = {
@@ -483,6 +492,28 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
       let request = Request.Hash (Store.Block.hash block) in
       let level = Store.Block.level block in
       let timestamp = Store.Block.timestamp block in
+      let () =
+        let nv = Worker.state w in
+        let () =
+          Worker_metrics.update
+            nv.parameters.metrics.validation_worker_metrics
+            request_status
+        in
+        match update with
+        | Event.Ignored_head ->
+            Prometheus.Counter.inc_one nv.parameters.metrics.ignored_head_count
+        | Event.Branch_switch ->
+            Prometheus.Counter.inc_one nv.parameters.metrics.branch_switch_count ;
+            Prometheus.Gauge.set
+              nv.parameters.metrics.head_level
+              (Int32.to_float level)
+        | Event.Head_increment ->
+            Prometheus.Counter.inc_one
+              nv.parameters.metrics.head_increment_count ;
+            Prometheus.Gauge.set
+              nv.parameters.metrics.head_level
+              (Int32.to_float level)
+      in
       Worker.record_event
         w
         (Processed_block
@@ -600,6 +631,65 @@ let on_launch w _ parameters =
   Synchronisation_heuristic.Bootstrapping.activate synchronisation_state
   >>= fun () -> return nv
 
+let metrics =
+  let namespace = String.concat "_" Name.base in
+  let subsystem = None in
+  let label_name = "chain_id" in
+  let head_level =
+    let help = "Current level of the node's head" in
+    Prometheus.Gauge.v_label
+      ~label_name
+      ~help
+      ~namespace
+      ?subsystem
+      "head_level"
+  in
+  let ignored_head_count =
+    let help =
+      "Number of requests where the chain validator ignored a new valid block \
+       with a lower fitness than its current head"
+    in
+    Prometheus.Counter.v_label
+      ~label_name
+      ~help
+      ~namespace
+      ?subsystem
+      "ignored_head_count"
+  in
+  let branch_switch_count =
+    let help = "Number of times the chain_validator switched branch" in
+    Prometheus.Counter.v_label
+      ~label_name
+      ~help
+      ~namespace
+      ?subsystem
+      "branch_switch_count"
+  in
+  let head_increment_count =
+    let help =
+      "Number of times the chain_validator incremented its head for a direct \
+       successor"
+    in
+    Prometheus.Counter.v_label
+      ~label_name
+      ~help
+      ~namespace
+      ?subsystem
+      "head_increment_count"
+  in
+  let validation_worker_metrics =
+    Worker_metrics.declare ~label_names:[label_name] ~namespace ?subsystem ()
+  in
+  fun chain_id ->
+    let label = Chain_id.to_short_b58check chain_id in
+    {
+      head_level = head_level label;
+      ignored_head_count = ignored_head_count label;
+      branch_switch_count = branch_switch_count label;
+      head_increment_count = head_increment_count label;
+      validation_worker_metrics = validation_worker_metrics [label];
+    }
+
 let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
     start_prevalidator (peer_validator_limits : Peer_validator.limits)
     (prevalidator_limits : Prevalidator.limits) block_validator
@@ -665,6 +755,7 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
 
     let on_no_request _ = return_unit
   end in
+  let chain_id = Store.Chain.chain_id chain_store in
   let parameters =
     {
       parent;
@@ -678,14 +769,10 @@ let rec create ~start_testchain ~active_chains ?parent ~block_validator_process
       db;
       chain_store;
       limits;
+      metrics = metrics chain_id;
     }
   in
-  Worker.launch
-    table
-    (Store.Chain.chain_id chain_store)
-    parameters
-    (module Handlers)
-  >>=? fun w ->
+  Worker.launch table chain_id parameters (module Handlers) >>=? fun w ->
   Chain_id.Table.add active_chains (Store.Chain.chain_id chain_store) w ;
   Lwt_watcher.notify global_chains_input (Store.Chain.chain_id chain_store, true) ;
   return w
