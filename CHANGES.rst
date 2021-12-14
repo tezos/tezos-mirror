@@ -34,6 +34,10 @@ Node
 - Fixed missing removal of replaced operation in the plugin when another better
   one takes its place (when the mempool is full).
 
+- The output of ``tezos-client get ledger high watermark for <ledger>``
+  now also displays the high-water mark for the round, if available.
+  Rounds are introduced in Tenderbake.
+
 Client
 ------
 
