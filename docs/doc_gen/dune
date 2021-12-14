@@ -8,6 +8,7 @@
             tezos-protocol-updater
             ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-embedded-protocol-011-PtHangz2
+            tezos-embedded-protocol-012-PsiThaCa
             tezos-embedded-protocol-alpha
             data-encoding
             re)
