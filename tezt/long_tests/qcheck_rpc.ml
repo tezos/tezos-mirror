@@ -78,6 +78,7 @@ type path = (string, path_input) Either.t list
 
 (* A type representation for the JSON input to an RPC. *)
 type rpc_input =
+  | Any : rpc_input
   | Boolean : rpc_input
   | Integer : {min : int option; max : int option} -> rpc_input
   | Z : rpc_input (* ["bignum"] *)
@@ -209,7 +210,7 @@ module RPC_Index = struct
         match map_e (parse_input env) schemas with
         | Ok sub -> Ok (One_of sub)
         | Error err -> Error err)
-    | Other {kind = Any; _} -> Error "RPC parse failure"
+    | Other {kind = Any; _} -> Ok Any
 
   let parse_service path env meth service : rpc_description =
     let open Service in
@@ -405,7 +406,7 @@ module Gen = struct
         >|= Ezjsonm.float
     | Even_alphanum -> map Ezjsonm.string even_alpha_num_gen
     | String_enum enum -> oneofl enum |> map Ezjsonm.string
-    | Rand_string -> map Ezjsonm.string string
+    | Any | Rand_string -> map Ezjsonm.string string
     | Array rpc_input ->
         list_size (0 -- 10) (known_input_gen rpc_input) |> map (fun l -> `A l)
     | One_of rpc_inputs -> oneof @@ List.map known_input_gen rpc_inputs
