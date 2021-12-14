@@ -179,6 +179,29 @@ let test_unlimited () =
     ~result:3
     ~remaining_gas:10
 
+(** Test operator [>?$] with successful result. *)
+let test_bind_result_ok () =
+  let* ctxt = new_context ~limit:10 in
+  let gas_monad =
+    let open Gas_monad in
+    GM.consume_gas (Saturation_repr.safe_int 1) >?$ fun () -> Ok 42
+  in
+  assert_success ~loc:__LOC__ ctxt gas_monad ~result:42 ~remaining_gas:9
+
+(** Test operator [>?$] with failing result. *)
+let test_bind_result_error () =
+  let* ctxt = new_context ~limit:10 in
+  let gas_monad =
+    let open Gas_monad in
+    GM.consume_gas (Saturation_repr.safe_int 1) >?$ fun () -> error "Oh no"
+  in
+  assert_inner_errors
+    ~loc:__LOC__
+    ctxt
+    gas_monad
+    ~errors:["Oh no"]
+    ~remaining_gas:9
+
 let tests =
   [
     Tztest.tztest "Test exhaustion" `Quick test_gas_exhaustion;
@@ -193,4 +216,6 @@ let tests =
     Tztest.tztest "Test successful result" `Quick test_successful_with_spare_gas;
     Tztest.tztest "Test inner error" `Quick test_inner_error;
     Tztest.tztest "Test unlimited" `Quick test_unlimited;
+    Tztest.tztest "Test bind result ok" `Quick test_bind_result_ok;
+    Tztest.tztest "Test bind result error" `Quick test_bind_result_error;
   ]
