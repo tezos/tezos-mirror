@@ -159,44 +159,73 @@ module RPC_Index = struct
     path_string |> String.split_on_char '/' |> List.tl
     |> List.map parse_path_input
 
-  let rec parse_input env schema : rpc_input =
+  (** [map_e f l] applies the [f] function (that can return [Ok _] or [Error _])
+      to all elements of [l]. If [f] succeeded on all elements, [Ok _] of
+      all transformed elements is returned, otherwise the first error is returned. *)
+  let rec map_e f = function
+    | [] -> Ok []
+    | x :: xs -> (
+        match f x with
+        | Ok y -> ( match map_e f xs with Ok ys -> Ok (y :: ys) | err -> err)
+        | Error err ->
+            (* No need to continue, in particular, no need to recurse *)
+            Error err)
+
+  let rec parse_input env schema : (rpc_input, string) result =
     let open Schema in
     match schema with
     (* These first two references are circular. *)
-    | Ref "bignum" -> Z
-    | Ref "micheline.alpha.michelson_v1.expression" -> Mich_exp
+    | Ref "bignum" -> Ok Z
+    | Ref "micheline.alpha.michelson_v1.expression" -> Ok Mich_exp
     | Ref str -> parse_input env @@ String_map.find str env
-    | Other {kind = Boolean; _} -> Boolean
+    | Other {kind = Boolean; _} -> Ok Boolean
     | Other {kind = Integer {minimum; maximum; enum = []}; _} ->
-        Integer {min = minimum; max = maximum}
-    | Other {kind = Integer {enum; _}; _} -> Int_enum enum
+        Ok (Integer {min = minimum; max = maximum})
+    | Other {kind = Integer {enum; _}; _} -> Ok (Int_enum enum)
     | Other {kind = Number {minimum; maximum}; _} ->
-        Float {min = minimum; max = maximum}
+        Ok (Float {min = minimum; max = maximum})
     | Other {kind = String {pattern = Some s; _}; _} -> (
         (* Only one regexp is used currently *)
         match s with
-        | "^([a-zA-Z0-9][a-zA-Z0-9])*$" -> Even_alphanum
-        | _ -> assert false)
-    | Other {kind = String {enum = []; _}; _} -> Rand_string
-    | Other {kind = String {enum; _}; _} -> String_enum enum
-    | Other {kind = Array schema'; _} -> Array (parse_input env schema')
+        | "^([a-zA-Z0-9][a-zA-Z0-9])*$" -> Ok Even_alphanum
+        | _ -> Error ("Unexpected regexp: " ^ s))
+    | Other {kind = String {enum = []; _}; _} -> Ok Rand_string
+    | Other {kind = String {enum; _}; _} -> Ok (String_enum enum)
+    | Other {kind = Array schema'; _} -> (
+        match parse_input env schema' with Ok x -> Ok (Array x) | err -> err)
     | Other {kind = Object {additional_properties = Some _; _}; _} ->
         (* Note: Additional properties never occur in input. *)
-        assert false
-    | Other {kind = Object {properties; _}; _} ->
+        Error "Additional properties are unsupported"
+    | Other {kind = Object {properties; _}; _} -> (
         let conv_prop Schema.{name; required; schema} =
-          {name; required; payload = parse_input env schema}
+          match parse_input env schema with
+          | Ok payload -> Ok {name; required; payload}
+          | Error err -> Error err
         in
-        Object (List.map conv_prop properties)
-    | Other {kind = One_of schemas; _} ->
-        One_of (List.map (parse_input env) schemas)
-    | Other {kind = Any; _} ->
-        (* Should not occur as input *)
-        Tezt.Test.fail "Bug: RPC parse failure"
+        match map_e conv_prop properties with
+        | Ok conv_properties -> Ok (Object conv_properties)
+        | Error err -> Error err)
+    | Other {kind = One_of schemas; _} -> (
+        match map_e (parse_input env) schemas with
+        | Ok sub -> Ok (One_of sub)
+        | Error err -> Error err)
+    | Other {kind = Any; _} -> Error "RPC parse failure"
 
   let parse_service path env meth service : rpc_description =
     let open Service in
-    let data = Option.map (parse_input env) service.request_body in
+    let data =
+      match service.request_body with
+      | Some schema -> (
+          match parse_input env schema with
+          | Ok rpc_input -> Some rpc_input
+          | Error err ->
+              Test.fail
+                "Error when parsing service \"%s\": %s. Can function \
+                 parse_input above be generalized?"
+                service.description
+                err)
+      | None -> None
+    in
     let description = service.description in
     {description; meth; path; data}
 
