@@ -148,8 +148,6 @@ val pp_snapshot_format : Format.formatter -> snapshot_format -> unit
 
 val snapshot_format_encoding : snapshot_format Data_encoding.t
 
-type snapshot_kind = Current of snapshot_format | Invalid of error trace
-
 type snapshot_header
 
 (** [version snapshot_header] returns the version of a given
@@ -209,4 +207,4 @@ val import :
 (** [snapshot_file_kind ~snapshot_file] reads the [snapshot_file] and
     returns its kind. Returns [Invalid] if it is a wrong snapshot
     file. *)
-val snapshot_file_kind : snapshot_path:string -> snapshot_kind tzresult Lwt.t
+val snapshot_file_kind : snapshot_path:string -> snapshot_format tzresult Lwt.t
