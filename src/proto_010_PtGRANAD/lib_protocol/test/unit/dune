@@ -1,5 +1,6 @@
-(executable
+(test
  (name main)
+ (package tezos-protocol-010-PtGRANAD-tests)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -15,10 +16,5 @@
                    -open Tezos_client_010_PtGRANAD
                    -open Tezos_protocol_010_PtGRANAD
                    -open Tezos_protocol_environment_010_PtGRANAD
-                   -open Tezos_010_PtGRANAD_test_helpers)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-010-PtGRANAD-tests)
- (deps main.exe)
+                   -open Tezos_010_PtGRANAD_test_helpers))
  (action (run ./main.exe "test" "Unit")))

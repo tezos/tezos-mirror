@@ -1,5 +1,6 @@
-(executable
+(test
  (name main)
+ (package tezos-protocol-011-PtHangz2-tests)
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -15,10 +16,5 @@
                    -open Tezos_client_011_PtHangz2
                    -open Tezos_protocol_011_PtHangz2
                    -open Tezos_protocol_environment_011_PtHangz2
-                   -open Tezos_011_PtHangz2_test_helpers)))
-
-(rule
- (alias runtest)
- (package tezos-protocol-011-PtHangz2-tests)
- (deps main.exe)
+                   -open Tezos_011_PtHangz2_test_helpers))
  (action (run ./main.exe "test" "Unit")))

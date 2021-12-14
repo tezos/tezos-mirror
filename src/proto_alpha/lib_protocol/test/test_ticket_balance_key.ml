@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component: Protocol (Ticket_balance_key)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test \
-    "^ticket balance key"
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe \
+                -- test "^ticket balance key"
     Subject: Ticket balance key hashing
 *)
 

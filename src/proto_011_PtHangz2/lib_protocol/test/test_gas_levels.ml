@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Gas levels)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^gas levels$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^gas levels$"
     Subject:    On gas consumption and exhaustion.
 *)
 

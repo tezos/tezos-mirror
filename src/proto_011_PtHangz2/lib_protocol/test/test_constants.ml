@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (baking)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^constants$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^constants$"
     Subject:    the consistency of parametric constants
  *)
 

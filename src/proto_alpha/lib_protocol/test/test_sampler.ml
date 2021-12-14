@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest_saturation_fuzzing
-    Subject:      Operations in Saturation_repr
+    Invocation:   dune exec src/proto_alpha/lib_protocol/test/test_sampler.exe
+    Subject:      Sampler
 *)
 
 open Lib_test.Qcheck_helpers

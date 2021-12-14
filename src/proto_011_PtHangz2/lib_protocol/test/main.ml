@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
+    Invocation:   dune build @src/proto_011_PtHangz2/lib_protocol/runtest
     Subject:      Entrypoint
 *)
 

@@ -1,8 +1,8 @@
 (** Testing
     -------
     Component:    Protocol (interpretation)
-    Dependencies: src/proto_alpha/lib_protocol/script_interpreter.ml
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^interpretation$"
+    Dependencies: src/proto_011_PtHangz2/lib_protocol/script_interpreter.ml
+    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^interpretation$"
     Subject:      Interpretation of Michelson scripts
 *)
 

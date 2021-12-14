@@ -27,7 +27,7 @@ open Protocol
 open Alpha_context
 
 (** This is a simulation of the CPMM contract, as implemented in mligo
-    in [src/proto_alpha/lib_protocol/contracts/cpmm.mligo]. The
+    in [src/proto_011_PtHangz2/lib_protocol/contracts/cpmm.mligo]. The
     interested reader should look for comments in this file to gain a
     better understanding of the contract logic. *)
 module Simulate_raw = struct

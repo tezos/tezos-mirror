@@ -1,5 +1,7 @@
-(executables
+(tests
  (names main saturation_fuzzing test_gas_properties test_tez_repr)
+ (package tezos-protocol-010-PtGRANAD-tests)
+ (deps (glob_files contracts/*))
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -22,12 +24,6 @@
                    -open Tezos_protocol_environment_010_PtGRANAD
                    -open Tezos_010_PtGRANAD_test_helpers
                    -open Tezos_base_test_helpers)))
-
-(rule
- (alias buildtest)
- (package tezos-protocol-010-PtGRANAD-tests)
- (deps main.exe)
- (action (progn)))
 
 (rule
  (copy %{lib:tezos-protocol-010-PtGRANAD-parameters:test-parameters.json}
@@ -56,9 +52,3 @@
  (alias runtest_test_tez_repr)
  (package tezos-protocol-010-PtGRANAD-tests)
  (action (run %{exe:test_tez_repr.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-010-PtGRANAD-tests)
- (deps (alias runtest_proto_010_PtGRANAD) (alias runtest_saturation_fuzzing) (alias runtest_test_tez_repr))
- (action (progn)))
