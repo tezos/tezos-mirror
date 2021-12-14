@@ -52,9 +52,9 @@ module Map = Operation_hash.Map
    3 - image(priority_of) = preimage (pending)
    4 - map in pending(priority) => map <> empty
 *)
-type t = {
+type 'a t = {
   (* The main map *)
-  pending : Operation.t Operation_hash.Map.t Priority_map.t;
+  pending : 'a Prevalidation.operation Operation_hash.Map.t Priority_map.t;
   (* Used for advertising *)
   hashes : Operation_hash.Set.t;
   (* We need to remember the priority of each hash, to be used when removing
@@ -82,7 +82,8 @@ let mem oph {hashes; priority_of = _; pending = _} = Set.mem oph hashes
 let get_priority_map prio pending =
   match Priority_map.find prio pending with None -> Map.empty | Some mp -> mp
 
-let add oph op prio {pending; hashes; priority_of} =
+let add op prio {pending; hashes; priority_of} =
+  let oph = op.Prevalidation.hash in
   let mp = get_priority_map prio pending |> Map.add oph op in
   {
     pending = Priority_map.add prio mp pending;

@@ -243,7 +243,8 @@ module Mempool = struct
       (fun () -> Wrong_operation)
 
   let pre_filter config ~filter_state:_ ?validation_state_before
-      (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
+      ({shell = _; protocol_data = Operation_data {contents; _} as op} :
+        Main.operation) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
       @@ Data_encoding.Binary.fixed_length
@@ -301,8 +302,7 @@ module Mempool = struct
     | Cons (Manager_operation _, _) as op -> prefilter_manager_op op)
     |> fun res -> Lwt.return res
 
-  let precheck _ ~filter_state:_ ~validation_state:_ _ _ _ =
-    Lwt.return `Undecided
+  let precheck _ ~filter_state:_ ~validation_state:_ _ _ = Lwt.return `Undecided
 
   open Apply_results
 
