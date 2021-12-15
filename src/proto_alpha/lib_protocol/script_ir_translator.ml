@@ -541,7 +541,7 @@ let unparse_chain_id ~loc ctxt mode chain_id =
 
 let unparse_bls12_381_g1 ~loc ctxt x =
   Gas.consume ctxt Unparse_costs.bls12_381_g1 >|? fun ctxt ->
-  let bytes = Bls12_381.G1.to_bytes x in
+  let bytes = Script_bls.G1.to_bytes x in
   (Bytes (loc, bytes), ctxt)
 
 let unparse_bls12_381_g2 ~loc ctxt x =
@@ -2753,7 +2753,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   (* Bls12_381 types *)
   | (Bls12_381_g1_t _, Bytes (_, bs)) -> (
       Gas.consume ctxt Typecheck_costs.bls12_381_g1 >>?= fun ctxt ->
-      match Bls12_381.G1.of_bytes_opt bs with
+      match Script_bls.G1.of_bytes_opt bs with
       | Some pt -> return (pt, ctxt)
       | None -> fail_parse_data ())
   | (Bls12_381_g1_t _, expr) ->

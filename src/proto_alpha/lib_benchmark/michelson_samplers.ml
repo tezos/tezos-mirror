@@ -677,10 +677,10 @@ end)
         Alpha_context.packed_internal_operation sampler =
      fun _rng_state -> fail_sampling "generate_transfer_tokens: unimplemented"
 
-    and generate_bls12_381_g1 : Environment.Bls12_381.G1.t sampler =
+    and generate_bls12_381_g1 : Script_bls.G1.t sampler =
      fun rng_state ->
       let b = Bls12_381.G1.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.G1.of_bytes_opt b with
+      match Script_bls.G1.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 

@@ -1299,7 +1299,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks hash stack
       | IAdd_bls12_381_g1 (_, k) ->
           let x = accu and (y, stack) = stack in
-          let accu = Bls12_381.G1.add x y in
+          let accu = Script_bls.G1.add x y in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IAdd_bls12_381_g2 (_, k) ->
           let x = accu and (y, stack) = stack in
@@ -1311,7 +1311,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IMul_bls12_381_g1 (_, k) ->
           let x = accu and (y, stack) = stack in
-          let accu = Bls12_381.G1.mul x y in
+          let accu = Script_bls.G1.mul x y in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IMul_bls12_381_g2 (_, k) ->
           let x = accu and (y, stack) = stack in
@@ -1337,7 +1337,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks res stack
       | INeg_bls12_381_g1 (_, k) ->
           let x = accu in
-          let accu = Bls12_381.G1.negate x in
+          let accu = Script_bls.G1.negate x in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | INeg_bls12_381_g2 (_, k) ->
           let x = accu in
