@@ -506,7 +506,10 @@ class TestContracts:
                 "invalid_self_entrypoint.tz",
                 r'Contract has no entrypoint named D',
             ),
-            ("contract_annotation_default.tz", r'unexpected annotation'),
+            (
+                "contract_annotation_default.tz",
+                r'unexpected_default_entrypoint',
+            ),
             # Missing field
             (
                 "missing_only_storage_field.tz",
