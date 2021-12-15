@@ -1,9 +1,6 @@
-open Js_of_ocaml
 open Tezos_hacl_glue
 
-let log x = Firebug.console##log x
-
-let log_s x = log (Js.bytestring x)
+let log_s = print_endline
 
 let init_bytes len = Bytes.make len '\x00'
 
@@ -456,7 +453,7 @@ let test_box (v : Bytes.t box_test) : unit =
   assert (not (Hacl.Box.box_open_noalloc ~k ~nonce:(Hacl.Rand.gen 24) ~tag ~buf)) ;
   log_s "[NaCl.box_open_detached_afternm] Success"
 
-let main () =
+let () =
   let () = log_s "STARTING TESTS" in
   List.iter test_ed25519 ed25519_tests ;
   List.iter test_p256 p256_tests ;
@@ -473,20 +470,3 @@ let main () =
   List.iter test_box box_tests ;
   let () = log_s "ENDING TESTS" in
   ()
-
-let[@ocaml.warning "-21"] () =
-  let () = log_s "LOADING @nomadic-labs/tezos-hacl-glue" in
-  Js.Unsafe.eval_string "global._HACL_loader = require('hacl-wasm');" ;
-  let () = log_s "INITIALISING hacl-wasm" in
-  let init_promise =
-    Js.Unsafe.eval_string "_HACL_loader.getInitializedHaclModule()"
-  in
-  let global_setter =
-    Js.Unsafe.inject @@ Js.wrap_callback
-    @@ fun hacl -> Js.Unsafe.(set global (Js.string "_HACL") hacl)
-  in
-  let main = Js.Unsafe.inject @@ Js.wrap_callback main in
-  init_promise |> fun p ->
-  Js.Unsafe.meth_call p "then" [|global_setter|] |> fun p ->
-  Js.Unsafe.meth_call p "then" [|main|] |> fun p ->
-  Js.Unsafe.meth_call p "catch" [|Js.Unsafe.inject @@ Js.wrap_callback log|]

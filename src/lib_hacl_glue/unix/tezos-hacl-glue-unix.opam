@@ -10,6 +10,13 @@ depends: [
   "tezos-hacl-glue"
   "hacl-star" { >= "0.4.2" & < "0.5" }
   "hacl-star-raw"
+  "tezos-stdlib" {with-test}
+  "tezos-error-monad" {with-test}
+  "zarith" {with-test}
+  "zarith_stubs_js" {with-test}
+  "data-encoding" {with-test}
+  "qcheck-alcotest" {with-test}
+  "tezos-test-helpers" {with-test}
 ]
 conflicts: [
   "hacl_x25519"

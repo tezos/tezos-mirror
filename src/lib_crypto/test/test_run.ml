@@ -38,7 +38,6 @@ runtest
     (module Test_crypto_box);
     (module Test_deterministic_nonce);
     (module Test_ed25519);
-    (module Test_hacl);
     (module Test_merkle);
     (module Test_p256);
     (module Test_pvss);
