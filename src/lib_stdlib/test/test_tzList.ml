@@ -84,6 +84,13 @@ let test_drop_n _ =
   Assert.equal ~msg:__LOC__ (TzList.drop_n (-1) [1; 2]) [1; 2] ;
   Assert.equal ~msg:__LOC__ (TzList.drop_n 0 [1; 2]) [1; 2]
 
+let test_filter_some _ =
+  Assert.equal ~msg:__LOC__ (TzList.filter_some []) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [None]) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [None; None]) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [Some 0; None; Some 1]) [0; 1] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [Some 1]) [1]
+
 let list_size = QCheck.Gen.int_range 2 1000
 
 let pp_int_list =
@@ -121,6 +128,19 @@ let test_take_drop =
         ~expected:l
         ())
 
+let test_filter_some_length =
+  QCheck.Test.make
+    ~name:"(length (filter_some l)) = (length (filter (Option.is_some) l))"
+    ~count
+    QCheck.(list_of_size list_size (option int))
+    (fun l ->
+      Lib_test.Qcheck_helpers.qcheck_eq'
+        ~pp:Format.pp_print_int
+        ~eq:( = )
+        ~actual:(List.length (TzList.filter_some l))
+        ~expected:(List.length (List.filter Option.is_some l))
+        ())
+
 let () =
   Alcotest.run
     "stdlib"
@@ -129,7 +149,9 @@ let () =
         [
           ("take_n", `Quick, test_take_n);
           ("drop_n", `Quick, test_drop_n);
+          ("filter_some", `Quick, test_filter_some);
           QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
           QCheck_alcotest.to_alcotest test_take_drop;
+          QCheck_alcotest.to_alcotest test_filter_some_length;
         ] );
     ]
