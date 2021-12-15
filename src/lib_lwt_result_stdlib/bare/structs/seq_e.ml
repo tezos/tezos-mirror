@@ -80,6 +80,14 @@ let rec fold_left_e f acc seq =
       let* acc = f acc item in
       fold_left_e f acc seq
 
+let rec fold_left_e_discriminated f acc seq =
+  let* n = Result.map_error Either.left @@ seq () in
+  match n with
+  | Nil -> Ok acc
+  | Cons (item, seq) ->
+      let* acc = Result.map_error Either.right @@ f acc item in
+      fold_left_e_discriminated f acc seq
+
 let rec fold_left_s f acc seq =
   match seq () with
   | Error _ as e -> Lwt.return e
@@ -116,6 +124,24 @@ let fold_left_es f acc seq =
       let* acc = lwt_apply2 f acc item in
       fold_left_es f acc seq
 
+let rec fold_left_es_discriminated f acc seq =
+  let open Lwt_result_syntax in
+  match seq () with
+  | Error e -> Lwt.return_error (Either.left e)
+  | Ok Nil -> return acc
+  | Ok (Cons (item, seq)) ->
+      let* acc = Lwt_result.map_err Either.right @@ f acc item in
+      fold_left_es_discriminated f acc seq
+
+let fold_left_es_discriminated f acc seq =
+  let open Lwt_result_syntax in
+  match seq () with
+  | Error e -> Lwt.return_error (Either.Left e)
+  | Ok Nil -> return acc
+  | Ok (Cons (item, seq)) ->
+      let* acc = Lwt_result.map_err Either.right @@ lwt_apply2 f acc item in
+      fold_left_es_discriminated f acc seq
+
 let rec iter f seq =
   let* n = seq () in
   match n with
@@ -131,6 +157,14 @@ let rec iter_e f seq =
   | Cons (item, seq) ->
       let* () = f item in
       iter_e f seq
+
+let rec iter_e_discriminated f seq =
+  let* n = Result.map_error Either.left @@ seq () in
+  match n with
+  | Nil -> return_unit
+  | Cons (item, seq) ->
+      let* () = Result.map_error Either.right @@ f item in
+      iter_e_discriminated f seq
 
 let rec iter_s f seq =
   match seq () with
@@ -167,6 +201,24 @@ let iter_es f seq =
   | Ok (Cons (item, seq)) ->
       let* () = Lwt.apply f item in
       iter_es f seq
+
+let rec iter_es_discriminated f seq =
+  let open Lwt_result_syntax in
+  match seq () with
+  | Error e -> Lwt.return_error (Either.Left e)
+  | Ok Nil -> return_unit
+  | Ok (Cons (item, seq)) ->
+      let* () = Lwt_result.map_err Either.right @@ f item in
+      iter_es_discriminated f seq
+
+let iter_es_discriminated f seq =
+  let open Lwt_result_syntax in
+  match seq () with
+  | Error e -> Lwt.return_error (Either.Left e)
+  | Ok Nil -> return_unit
+  | Ok (Cons (item, seq)) ->
+      let* () = Lwt_result.map_err Either.right @@ Lwt.apply f item in
+      iter_es_discriminated f seq
 
 let iter_p f seq =
   let rec iter_p acc f seq =
