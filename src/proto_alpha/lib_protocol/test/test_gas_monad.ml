@@ -158,8 +158,8 @@ let test_inner_error () =
     ~errors:["Oh no"]
     ~remaining_gas:5
 
-(* Test that no gas-exhaustion error is produced when run with unlimited gas
-   mode. Only gas that does not exceed the limit is consumed.
+(* Test that no gas-exhaustion error is produced and that no gas is consumed
+   when run in unlimited mode.
  *)
 let test_unlimited () =
   let* ctxt = new_context ~limit:10 in
@@ -168,10 +168,7 @@ let test_unlimited () =
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* y = GM.return 2 in
-    (* With an initial limit 10, this results in a gas-exhaustion error which is
-       why no gas is consumed. *)
     let* () = GM.consume_gas (Saturation_repr.safe_int 100) in
-    (* This gas is actually consumed as there is still a budget of 5 remaining. *)
     let* () = GM.consume_gas (Saturation_repr.safe_int 3) in
     GM.return (x + y)
   in
@@ -180,7 +177,30 @@ let test_unlimited () =
     (Gas.set_unlimited ctxt)
     gas_monad
     ~result:3
-    ~remaining_gas:2
+    ~remaining_gas:10
+
+(** Test operator [>?$] with successful result. *)
+let test_bind_result_ok () =
+  let* ctxt = new_context ~limit:10 in
+  let gas_monad =
+    let open Gas_monad in
+    GM.consume_gas (Saturation_repr.safe_int 1) >?$ fun () -> Ok 42
+  in
+  assert_success ~loc:__LOC__ ctxt gas_monad ~result:42 ~remaining_gas:9
+
+(** Test operator [>?$] with failing result. *)
+let test_bind_result_error () =
+  let* ctxt = new_context ~limit:10 in
+  let gas_monad =
+    let open Gas_monad in
+    GM.consume_gas (Saturation_repr.safe_int 1) >?$ fun () -> error "Oh no"
+  in
+  assert_inner_errors
+    ~loc:__LOC__
+    ctxt
+    gas_monad
+    ~errors:["Oh no"]
+    ~remaining_gas:9
 
 let tests =
   [
@@ -196,4 +216,6 @@ let tests =
     Tztest.tztest "Test successful result" `Quick test_successful_with_spare_gas;
     Tztest.tztest "Test inner error" `Quick test_inner_error;
     Tztest.tztest "Test unlimited" `Quick test_unlimited;
+    Tztest.tztest "Test bind result ok" `Quick test_bind_result_ok;
+    Tztest.tztest "Test bind result error" `Quick test_bind_result_error;
   ]

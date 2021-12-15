@@ -902,6 +902,10 @@ module Cost_of = struct
       let open S_syntax in
       S.safe_int 14 + (S.safe_int 10 * S.safe_int size)
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
+       Rerun benchmarks due to faster gas monad.
+       With the the redesign of the gas-monad this needs to be benchmarked again.
+    *)
     (* model MERGE_TYPES
        This is the estimated cost of one iteration of merge_types, extracted
        and copied manually from the parameter fit for the MERGE_TYPES benchmark

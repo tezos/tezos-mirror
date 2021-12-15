@@ -62,7 +62,8 @@ val of_result : ('a, 'trace) result -> ('a, 'trace) t
     for details.*)
 val consume_gas : Gas.cost -> (unit, 'trace) t
 
-(** Escaping the gas monad *)
+(** Escaping the gas monad. If the given context has [unlimited] mode enabled,
+    through [Gas.set_unlimited], no gas is consumed. *)
 val run : context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
 
 (** re-export of [Error_monad.record_trace_eval]. This function has no
