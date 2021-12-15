@@ -36,9 +36,22 @@ type ex_ticket =
       'a Script_typed_ir.comparable_ty * 'a Script_typed_ir.ticket
       -> ex_ticket
 
-(** [tickets_of_value ctxt ~include_lazy ty value] extracts all tickets from the
-    given shape [ty] and value [value]. The [include_lazy] flag determines whether
-    or not to traverse lazy structures (values from the context).
+(** A type-witness that contains information about which branches of a type ['a]
+    include tickets. This value is used for traversing only the relevant
+    branches of values when scanning for tickets. *)
+type 'a has_tickets
+
+(** [type_has_tickets ctxt ty] returns a [has_tickets] witness of the given
+    shape [ty].
+ *)
+val type_has_tickets :
+  Alpha_context.context ->
+  'a Script_typed_ir.ty ->
+  ('a has_tickets * Alpha_context.context) tzresult
+
+(** [tickets_of_value ctxt ~include_lazy ht value] extracts all tickets from
+    the given [value], using the type-witness [ht]. The [include_lazy] flag
+    determines whether or not to traverse lazy structures (values from the context).
     In case the [include_lazy] flag is [true], any big-map contained in the value
     must have an empty overlay or else an error of type
     [Unsupported_non_empty_overlay] is returned. The reason for this restriction
@@ -50,6 +63,26 @@ type ex_ticket =
 val tickets_of_value :
   Alpha_context.context ->
   include_lazy:bool ->
-  'a Script_typed_ir.ty ->
+  'a has_tickets ->
   'a ->
+  (ex_ticket list * Alpha_context.context) tzresult Lwt.t
+
+(** [tickets_of_node ctxt ~include_lazy ht node] extracts all tickets from
+    the given [node], using the type-witness [ht].If [ht] indicates that
+    values of the corresponding type may not contain tickets, the node value is
+    not parsed. The [include_lazy] flag determines whether or not to traverse
+    lazy structures (values from the context). In case the [include_lazy] flag
+    is [true], any big-map contained in the value must have an empty overlay or
+    else an error of type [Unsupported_non_empty_overlay] is returned. The
+    reason for this restriction is that we assume that all lazy big-map diffs
+    should be applied before calling this function. Dealing with non-empty
+    overlays would be possible in theory, but practically difficult. The
+    challenge is to distinguish between overlapping keys between the context and
+    the overlay.
+   *)
+val tickets_of_node :
+  Alpha_context.context ->
+  include_lazy:bool ->
+  'a has_tickets ->
+  Alpha_context.Script.node ->
   (ex_ticket list * Alpha_context.context) tzresult Lwt.t

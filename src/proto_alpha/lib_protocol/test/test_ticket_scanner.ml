@@ -121,7 +121,10 @@ let tickets_of_value ctxt ~include_lazy ~type_exp ~value_exp =
          ty
          node
   in
-  wrap @@ Ticket_scanner.tickets_of_value ctxt ~include_lazy ty value
+  let* (ht, ctxt) =
+    wrap @@ Lwt.return @@ Ticket_scanner.type_has_tickets ctxt ty
+  in
+  wrap @@ Ticket_scanner.tickets_of_value ctxt ~include_lazy ht value
 
 let assert_contains_tickets ctxt ~loc ~include_lazy ~type_exp ~value_exp
     expected =
