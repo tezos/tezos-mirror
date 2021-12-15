@@ -1307,7 +1307,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IAdd_bls12_381_fr (_, k) ->
           let x = accu and (y, stack) = stack in
-          let accu = Bls12_381.Fr.add x y in
+          let accu = Script_bls.Fr.add x y in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IMul_bls12_381_g1 (_, k) ->
           let x = accu and (y, stack) = stack in
@@ -1319,21 +1319,21 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IMul_bls12_381_fr (_, k) ->
           let x = accu and (y, stack) = stack in
-          let accu = Bls12_381.Fr.mul x y in
+          let accu = Script_bls.Fr.mul x y in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IMul_bls12_381_fr_z (_, k) ->
           let x = accu and (y, stack) = stack in
-          let x = Bls12_381.Fr.of_z (Script_int.to_zint x) in
-          let res = Bls12_381.Fr.mul x y in
+          let x = Script_bls.Fr.of_z (Script_int.to_zint x) in
+          let res = Script_bls.Fr.mul x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IMul_bls12_381_z_fr (_, k) ->
           let y = accu and (x, stack) = stack in
-          let x = Bls12_381.Fr.of_z (Script_int.to_zint x) in
-          let res = Bls12_381.Fr.mul x y in
+          let x = Script_bls.Fr.of_z (Script_int.to_zint x) in
+          let res = Script_bls.Fr.mul x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IInt_bls12_381_fr (_, k) ->
           let x = accu in
-          let res = Script_int.of_zint (Bls12_381.Fr.to_z x) in
+          let res = Script_int.of_zint (Script_bls.Fr.to_z x) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | INeg_bls12_381_g1 (_, k) ->
           let x = accu in
@@ -1345,7 +1345,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | INeg_bls12_381_fr (_, k) ->
           let x = accu in
-          let accu = Bls12_381.Fr.negate x in
+          let accu = Script_bls.Fr.negate x in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IPairing_check_bls12_381 (_, k) ->
           let pairs = accu in

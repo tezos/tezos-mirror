@@ -691,10 +691,10 @@ end)
       | Some x -> x
       | None -> assert false
 
-    and generate_bls12_381_fr : Environment.Bls12_381.Fr.t sampler =
+    and generate_bls12_381_fr : Script_bls.Fr.t sampler =
      fun rng_state ->
       let b = Bls12_381.Fr.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.Fr.of_bytes_opt b with
+      match Script_bls.Fr.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 

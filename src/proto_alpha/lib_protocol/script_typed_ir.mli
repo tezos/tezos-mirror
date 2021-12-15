@@ -73,6 +73,36 @@ module Script_chain_id : sig
   val of_b58check_opt : string -> t option
 end
 
+module Script_bls : sig
+  module type S = sig
+    type t
+
+    type fr
+
+    val add : t -> t -> t
+
+    val mul : t -> fr -> t
+
+    val negate : t -> t
+
+    val of_bytes_opt : Bytes.t -> t option
+
+    val to_bytes : t -> Bytes.t
+  end
+
+  module Fr : sig
+    (** [t] is made algebraic in order to distinguish it from the other type
+        parameters of [Script_typed_ir.ty]. *)
+    type t = Fr_tag of Bls12_381.Fr.t [@@ocaml.unboxed]
+
+    include S with type t := t and type fr := t
+
+    val of_z : Z.t -> t
+
+    val to_z : t -> Z.t
+  end
+end
+
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 type empty_cell = EmptyCell
@@ -970,30 +1000,32 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
       -> (Bls12_381.G2.t, Bls12_381.G2.t * 's, 'r, 'f) kinstr
   | IAdd_bls12_381_fr :
-      (Bls12_381.Fr.t, Bls12_381.Fr.t * 's) kinfo
-      * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_g1 :
-      (Bls12_381.G1.t, Bls12_381.Fr.t * 's) kinfo
+      (Bls12_381.G1.t, Script_bls.Fr.t * 's) kinfo
       * (Bls12_381.G1.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G1.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      -> (Bls12_381.G1.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_g2 :
-      (Bls12_381.G2.t, Bls12_381.Fr.t * 's) kinfo
+      (Bls12_381.G2.t, Script_bls.Fr.t * 's) kinfo
       * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      -> (Bls12_381.G2.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_fr :
-      (Bls12_381.Fr.t, Bls12_381.Fr.t * 's) kinfo
-      * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_z_fr :
-      (Bls12_381.Fr.t, 'a num * 's) kinfo * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, 'a num * 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, 'a num * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, 'a num * 's, 'r, 'f) kinstr
   | IMul_bls12_381_fr_z :
-      ('a num, Bls12_381.Fr.t * 's) kinfo * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> ('a num, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      ('a num, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> ('a num, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IInt_bls12_381_fr :
-      (Bls12_381.Fr.t, 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, 's) kinfo * (z num, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_g1 :
       (Bls12_381.G1.t, 's) kinfo * (Bls12_381.G1.t, 's, 'r, 'f) kinstr
       -> (Bls12_381.G1.t, 's, 'r, 'f) kinstr
@@ -1001,8 +1033,8 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (Bls12_381.G2.t, 's) kinfo * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
       -> (Bls12_381.G2.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_fr :
-      (Bls12_381.Fr.t, 's) kinfo * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, 's) kinfo * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, 's, 'r, 'f) kinstr
   | IPairing_check_bls12_381 :
       ((Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list, 's) kinfo
       * (bool, 's, 'r, 'f) kinstr
@@ -1303,7 +1335,7 @@ and 'ty ty =
   | Never_t : never ty_metadata -> never ty
   | Bls12_381_g1_t : Bls12_381.G1.t ty_metadata -> Bls12_381.G1.t ty
   | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty
-  | Bls12_381_fr_t : Bls12_381.Fr.t ty_metadata -> Bls12_381.Fr.t ty
+  | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
   | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
   | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
@@ -1556,7 +1588,7 @@ val bls12_381_g1_t : annot:type_annot option -> Bls12_381.G1.t ty
 
 val bls12_381_g2_t : annot:type_annot option -> Bls12_381.G2.t ty
 
-val bls12_381_fr_t : annot:type_annot option -> Bls12_381.Fr.t ty
+val bls12_381_fr_t : annot:type_annot option -> Script_bls.Fr.t ty
 
 val ticket_t :
   Script.location ->
