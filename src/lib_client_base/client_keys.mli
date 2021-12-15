@@ -55,6 +55,14 @@ val sk_uri_param :
   ('a, 'b) Clic.params ->
   (sk_uri -> 'a, 'b) Clic.params
 
+val aggregate_sk_uri_parameter : unit -> (aggregate_sk_uri, 'a) Clic.parameter
+
+val aggregate_sk_uri_param :
+  ?name:string ->
+  ?desc:string ->
+  ('a, 'b) Clic.params ->
+  (aggregate_sk_uri -> 'a, 'b) Clic.params
+
 type error += Unregistered_key_scheme of string
 
 type error += Invalid_uri of Uri.t
@@ -81,6 +89,31 @@ module PVSS_public_key :
   Client_aliases.Alias with type t = Pvss_secp256k1.Public_key.t
 
 module PVSS_secret_key : Client_aliases.Alias with type t = pvss_sk_uri
+
+(** [Aggregate_alias] contains the implementation needed for the wallet to have
+    the correspondence between aliases and keys. It has three sub-module
+    [Public_key] [Public_key_hash] [Secret_key]. The reason of a sub-module
+   inside a sub-module is not confuse them with the alias module for the
+   standard signature (i.e. [Public_key], [Public_key_hash], and [Secret_key]).
+
+    On possible refactor would be to move the alias definition in
+   [Aggregate_signature] (resp. [Signature]).
+
+    See [Client_aliases] for more information about Aliases.*)
+module Aggregate_alias : sig
+  type pk_uri = private Uri.t
+
+  type sk_uri = private Uri.t
+
+  module Public_key_hash :
+    Client_aliases.Alias with type t = Aggregate_signature.Public_key_hash.t
+
+  module Public_key :
+    Client_aliases.Alias
+      with type t = aggregate_pk_uri * Aggregate_signature.Public_key.t option
+
+  module Secret_key : Client_aliases.Alias with type t = aggregate_sk_uri
+end
 
 module Logging : sig
   val tag : string Tag.def
@@ -308,6 +341,44 @@ val get_keys :
   Lwt.t
 
 val force_switch : unit -> (bool, 'ctx) Clic.arg
+
+val aggregate_neuterize : aggregate_sk_uri -> aggregate_pk_uri tzresult Lwt.t
+
+val register_aggregate_key :
+  #Client_context.wallet ->
+  ?force:bool ->
+  Aggregate_signature.Public_key_hash.t * aggregate_pk_uri * aggregate_sk_uri ->
+  ?public_key:Aggregate_signature.Public_key.t ->
+  string ->
+  unit tzresult Lwt.t
+
+val list_aggregate_keys :
+  #Client_context.wallet ->
+  (string
+  * Aggregate_signature.Public_key_hash.t
+  * Aggregate_signature.Public_key.t option
+  * aggregate_sk_uri option)
+  list
+  tzresult
+  Lwt.t
+
+val import_aggregate_secret_key :
+  io:Client_context.io_wallet ->
+  aggregate_pk_uri ->
+  (Aggregate_signature.Public_key_hash.t
+  * Aggregate_signature.Public_key.t option)
+  tzresult
+  Lwt.t
+
+val alias_aggregate_keys :
+  #Client_context.wallet ->
+  string ->
+  (Aggregate_signature.Public_key_hash.t
+  * Aggregate_signature.Public_key.t option
+  * aggregate_sk_uri option)
+  option
+  tzresult
+  Lwt.t
 
 (**/**)
 

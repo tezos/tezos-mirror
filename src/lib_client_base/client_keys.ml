@@ -211,6 +211,22 @@ let sk_uri_param ?name ?desc params =
   in
   Clic.param ~name ~desc (sk_uri_parameter ()) params
 
+let aggregate_sk_uri_parameter () =
+  Clic.parameter (fun _ s ->
+      make_aggregate_sk_uri @@ Uri.of_string s |> Lwt.return)
+
+let aggregate_sk_uri_param ?name ?desc params =
+  let name = Option.value ~default:"uri" name in
+  let desc =
+    Option.value
+      ~default:
+        "secret key\n\
+         Varies from one scheme to the other.\n\
+         Use command `list signing schemes` for more information."
+      desc
+  in
+  Clic.param ~name ~desc (aggregate_sk_uri_parameter ()) params
+
 module Secret_key = Client_aliases.Alias (struct
   let name = "secret_key"
 
@@ -338,6 +354,96 @@ module PVSS_secret_key = Client_aliases.Alias (struct
   let to_source t = Lwt.return_ok (Uri.to_string t)
 end)
 
+module Aggregate_alias = struct
+  module Public_key_hash = struct
+    include Client_aliases.Alias (struct
+      (* includes t, Compare, encoding, of/to_b58check *)
+      include Aggregate_signature.Public_key_hash
+
+      let of_source s = Lwt.return (of_b58check s)
+
+      let to_source p = Lwt_tzresult_syntax.return (to_b58check p)
+
+      let name = "Aggregate_public_key_hash"
+    end)
+  end
+
+  type pk_uri = Uri.t
+
+  let make_pk_uri (x : Uri.t) : pk_uri tzresult =
+    let open Tzresult_syntax in
+    match Uri.scheme x with
+    | None ->
+        fail
+          (Exn
+             (Failure "Error while parsing URI: AGGREGATE_PK_URI needs a scheme"))
+    | Some _ -> return x
+
+  module Public_key = Client_aliases.Alias (struct
+    let name = "Aggregate_public_key"
+
+    type t = pk_uri * Aggregate_signature.Public_key.t option
+
+    include Compare.Make (struct
+      type nonrec t = t
+
+      let compare (apk, aso) (bpk, bso) =
+        Compare.or_else (CompareUri.compare apk bpk) (fun () ->
+            Option.compare Aggregate_signature.Public_key.compare aso bso)
+    end)
+
+    let of_source s =
+      let open Lwt_result_syntax in
+      let*? pk_uri = make_pk_uri @@ Uri.of_string s in
+      return (pk_uri, None)
+
+    let to_source (t, _) = Lwt_tzresult_syntax.return (Uri.to_string t)
+
+    let encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            Json_only
+            uri_encoding
+            ~title:"Locator_only"
+            (function (uri, None) -> Some uri | (_, Some _) -> None)
+            (fun uri -> (uri, None));
+          case
+            Json_only
+            ~title:"Locator_and_full_key"
+            (obj2
+               (req "locator" uri_encoding)
+               (req "key" Aggregate_signature.Public_key.encoding))
+            (function (uri, Some key) -> Some (uri, key) | (_, None) -> None)
+            (fun (uri, key) -> (uri, Some key));
+        ]
+  end)
+
+  type sk_uri = Uri.t
+
+  let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
+    let open Lwt_tzresult_syntax in
+    match Uri.scheme x with
+    | None ->
+        failwith "Error while parsing URI: AGGREGATE_SK_URI needs a scheme"
+    | Some _ -> return x
+
+  module Secret_key = Client_aliases.Alias (struct
+    let name = "Aggregate_secret_key"
+
+    type t = sk_uri
+
+    include CompareUri
+
+    let encoding = uri_encoding
+
+    let of_source s = make_sk_uri @@ Uri.of_string s
+
+    let to_source t = Lwt_tzresult_syntax.return (Uri.to_string t)
+  end)
+end
+
 module Make_common_type (S : sig
   include S.COMMON_SIGNATURE
 
@@ -464,6 +570,13 @@ let find_simple_signer_for_key ~scheme =
   | Simple signer -> return signer
   | Aggregate _signer -> fail (Wrong_key_scheme ("simple", "aggregate"))
 
+let find_aggregate_signer_for_key ~scheme =
+  let open Tzresult_syntax in
+  let* signer = find_signer_for_key ~scheme in
+  match signer with
+  | Simple _signer -> fail (Wrong_key_scheme ("aggregate", "standard"))
+  | Aggregate signer -> return signer
+
 let registered_signers () : (string * signer) list =
   String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
 
@@ -501,6 +614,15 @@ let with_scheme_simple_signer (uri : Uri.t)
   | None -> fail @@ Unexisting_scheme uri
   | Some scheme ->
       let*? signer = find_simple_signer_for_key ~scheme in
+      f signer
+
+let with_scheme_aggregate_signer (uri : Uri.t)
+    (f : (module AGGREGATE_SIGNER) -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  match Uri.scheme uri with
+  | None -> fail @@ Unexisting_scheme uri
+  | Some scheme ->
+      let*? signer = find_aggregate_signer_for_key ~scheme in
       f signer
 
 let neuterize (sk_uri : sk_uri) : pk_uri tzresult Lwt.t =
@@ -738,6 +860,97 @@ let alias_keys cctxt name =
 
 let force_switch () =
   Clic.switch ~long:"force" ~short:'f' ~doc:"overwrite existing keys" ()
+
+let register_aggregate_key cctxt ?(force = false)
+    (public_key_hash, pk_uri, sk_uri) ?public_key name =
+  let open Lwt_result_syntax in
+  let* () =
+    Aggregate_alias.Public_key.add ~force cctxt name (pk_uri, public_key)
+  in
+  let* () = Aggregate_alias.Secret_key.add ~force cctxt name sk_uri in
+  Aggregate_alias.Public_key_hash.add ~force cctxt name public_key_hash
+
+let aggregate_neuterize (sk_uri : sk_uri) : pk_uri tzresult Lwt.t =
+  with_scheme_aggregate_signer sk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
+      Signer.neuterize sk_uri)
+
+let aggregate_public_key pk_uri =
+  with_scheme_aggregate_signer pk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
+      Signer.public_key pk_uri)
+
+(* For efficiency, this function avoids loading the wallet, except for
+   the call to [Public_key.update]. Indeed the arguments [pkhs],
+   [pks], [sks] represent the already loaded list of public key
+   hashes, public keys, and secret keys. *)
+let raw_get_aggregate_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh
+    =
+  let open Lwt_tzresult_syntax in
+  let rev_find_all list pkh =
+    List.filter_map
+      (fun (name, pkh') ->
+        if Aggregate_signature.Public_key_hash.equal pkh pkh' then Some name
+        else None)
+      list
+  in
+  let names = rev_find_all pkhs pkh in
+  let* o =
+    List.fold_left_es
+      (fun keys_opt name ->
+        let sk_uri_opt = List.assoc ~equal:String.equal name sks in
+        let* pk_opt =
+          match List.assoc ~equal:String.equal name pks with
+          | None -> return_none
+          | Some (_, Some pk) -> return_some pk
+          | Some (pk_uri, None) ->
+              let* pk = aggregate_public_key pk_uri in
+              let* () =
+                Aggregate_alias.Public_key.update cctxt name (pk_uri, Some pk)
+              in
+              return_some pk
+        in
+        return @@ join_keys keys_opt (name, pk_opt, sk_uri_opt))
+      None
+      names
+  in
+  match o with
+  | None ->
+      failwith
+        "no keys for the source contract %a"
+        Aggregate_signature.Public_key_hash.pp
+        pkh
+  | Some keys -> return keys
+
+let raw_get_aggregate_key (cctxt : #Client_context.wallet) pkh =
+  let open Lwt_result_syntax in
+  let* pkhs = Aggregate_alias.Public_key_hash.load cctxt in
+  let* pks = Aggregate_alias.Public_key.load cctxt in
+  let* sks = Aggregate_alias.Secret_key.load cctxt in
+  raw_get_aggregate_key_aux cctxt pkhs pks sks pkh
+
+let list_aggregate_keys cctxt =
+  let open Lwt_result_syntax in
+  let* pkhs = Aggregate_alias.Public_key_hash.load cctxt in
+  let* pks = Aggregate_alias.Public_key.load cctxt in
+  let* sks = Aggregate_alias.Secret_key.load cctxt in
+  List.map_es
+    (fun (name, pkh) ->
+      let*! r = raw_get_aggregate_key_aux cctxt pkhs pks sks pkh in
+      match r with
+      | Ok (_name, pk, sk_uri) -> return (name, pkh, pk, sk_uri)
+      | Error _ -> return (name, pkh, None, None))
+    pkhs
+
+let import_aggregate_secret_key ~io pk_uri =
+  with_scheme_aggregate_signer pk_uri (fun (module Signer : AGGREGATE_SIGNER) ->
+      Signer.import_secret_key ~io pk_uri)
+
+let alias_aggregate_keys cctxt name =
+  let open Lwt_result_syntax in
+  let* pkh = Aggregate_alias.Public_key_hash.find cctxt name in
+  let*! r = raw_get_aggregate_key cctxt pkh in
+  match r with
+  | Ok (_name, pk, sk_uri) -> return_some (pkh, pk, sk_uri)
+  | Error _ -> return_none
 
 module Mnemonic = struct
   let new_random = Bip39.of_entropy (Hacl.Rand.gen 32)
