@@ -99,7 +99,7 @@ type error +=
       got : Distributed_db_version.Name.t;
     }
   | Inconsistent_imported_block of Block_hash.t * Block_hash.t
-  | Inconsistent_snapshot_file of string
+  | Wrong_snapshot_file of {filename : string}
   | Invalid_chain_store_export of Chain_id.t * string
 
 let () =
@@ -507,8 +507,8 @@ let () =
     (fun (got, exp) -> Inconsistent_imported_block (got, exp)) ;
   register_error_kind
     `Permanent
-    ~id:"Snapshot.inconsistent_snapshot_file"
-    ~title:"Inconsistent snapshot file"
+    ~id:"Snapshot.wrong_snapshot_file"
+    ~title:"Wrong snapshot file"
     ~description:"Error while opening snapshot file"
     ~pp:(fun ppf filename ->
       Format.fprintf
@@ -517,8 +517,8 @@ let () =
          is from Octez 9.7 (or before) and it cannot be imported anymore."
         filename)
     Data_encoding.(obj1 (req "filename" string))
-    (function Inconsistent_snapshot_file s -> Some s | _ -> None)
-    (fun s -> Inconsistent_snapshot_file s) ;
+    (function Wrong_snapshot_file {filename} -> Some filename | _ -> None)
+    (fun filename -> Wrong_snapshot_file {filename}) ;
   register_error_kind
     `Permanent
     ~id:"Snapshot.invalid_chain_store_export"
@@ -613,8 +613,6 @@ let snapshot_format_encoding =
 let pp_snapshot_format ppf = function
   | Tar -> Format.fprintf ppf "tar (single file)"
   | Raw -> Format.fprintf ppf "directory"
-
-type snapshot_kind = Current of snapshot_format | Invalid
 
 (* To speed up the import of the cemented blocks we increase,
    temporarily the index cache size. *)
@@ -2445,9 +2443,10 @@ module Make_snapshot_loader (Loader : LOADER) : Snapshot_loader = struct
 
   let load_snapshot_header ~snapshot_path =
     load snapshot_path >>= fun loader ->
-    Lwt.finalize
-      (fun () -> Loader.load_snapshot_header loader)
-      (fun () -> close loader)
+    trace (Wrong_snapshot_file {filename = snapshot_path})
+    @@ protect
+         (fun () -> Loader.load_snapshot_header loader)
+         ~on_error:(fun err -> close loader >>= fun () -> Lwt.return_error err)
 end
 
 module type IMPORTER = sig
@@ -3344,8 +3343,8 @@ let snapshot_file_kind ~snapshot_path =
     Lwt.catch
       (fun () ->
         Loader.load_snapshot_header ~snapshot_path:(Naming.file_path file)
-        >>= fun _ -> Lwt.return_true)
-      (fun _ -> Lwt.return_false)
+        >>=? fun _header -> return_unit)
+      (fun e -> fail_with_exn e)
   in
   let is_valid_raw_snapshot snapshot_dir =
     let (module Loader) =
@@ -3355,22 +3354,22 @@ let snapshot_file_kind ~snapshot_path =
       (fun () ->
         Loader.load_snapshot_header
           ~snapshot_path:(Naming.dir_path snapshot_dir)
-        >>= fun _ -> Lwt.return_true)
-      (fun _ -> Lwt.return_false)
+        >>=? fun _header -> return_unit)
+      fail_with_exn
   in
-  if Sys.is_directory snapshot_path then
-    let snapshot_dir = Naming.snapshot_dir ~snapshot_path () in
-    is_valid_raw_snapshot snapshot_dir >>= fun is_raw_snasphot ->
-    if is_raw_snasphot then return (Current Raw) else return Invalid
-  else
-    let snapshot_file =
-      Naming.snapshot_file
-        ~snapshot_filename:(Filename.basename snapshot_path)
-        Naming.(snapshot_dir ~snapshot_path:(Filename.dirname snapshot_path) ())
-    in
-    is_valid_uncompressed_snapshot snapshot_file
-    >>= fun is_uncompressed_snapshot ->
-    if is_uncompressed_snapshot then return (Current Tar) else return Invalid
+  protect (fun () ->
+      Lwt_utils_unix.is_directory snapshot_path >>= fun is_dir ->
+      if is_dir then
+        let snapshot_dir = Naming.snapshot_dir ~snapshot_path () in
+        is_valid_raw_snapshot snapshot_dir >>=? fun () -> return Raw
+      else
+        let snapshot_file =
+          Naming.snapshot_file
+            ~snapshot_filename:(Filename.basename snapshot_path)
+            Naming.(
+              snapshot_dir ~snapshot_path:(Filename.dirname snapshot_path) ())
+        in
+        is_valid_uncompressed_snapshot snapshot_file >>=? fun () -> return Tar)
 
 let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
     ~chain_name genesis =
@@ -3389,41 +3388,33 @@ let export ?snapshot_path export_format ?rolling ~block ~store_dir ~context_dir
     genesis
 
 let read_snapshot_header ~snapshot_path =
-  snapshot_file_kind ~snapshot_path >>=? fun snapshot_kind ->
-  match snapshot_kind with
-  | Current kind ->
-      let (module Loader) =
-        match kind with
-        | Tar -> (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
-        | Raw -> (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
-      in
-      Loader.load_snapshot_header ~snapshot_path >>=? fun (version, metadata) ->
-      return (Current_header (version, metadata))
-  | Invalid -> fail (Inconsistent_snapshot_file snapshot_path)
+  snapshot_file_kind ~snapshot_path >>=? fun kind ->
+  let (module Loader) =
+    match kind with
+    | Tar -> (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
+    | Raw -> (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
+  in
+  Loader.load_snapshot_header ~snapshot_path >>=? fun (version, metadata) ->
+  return (Current_header (version, metadata))
 
 let import ~snapshot_path ?patch_context ?block ?check_consistency
     ~dst_store_dir ~dst_context_dir ~chain_name ~user_activated_upgrades
     ~user_activated_protocol_overrides genesis =
-  snapshot_file_kind ~snapshot_path >>=? fun snapshot_kind ->
-  match snapshot_kind with
-  | Current kind ->
-      let (module Importer) =
-        match kind with
-        | Tar ->
-            (module Make_snapshot_importer (Tar_importer) : Snapshot_importer)
-        | Raw ->
-            (module Make_snapshot_importer (Raw_importer) : Snapshot_importer)
-      in
-      let dst_store_dir = Naming.store_dir ~dir_path:dst_store_dir in
-      Importer.import
-        ~snapshot_path
-        ?patch_context
-        ?block
-        ?check_consistency
-        ~dst_store_dir
-        ~dst_context_dir
-        ~chain_name
-        ~user_activated_upgrades
-        ~user_activated_protocol_overrides
-        genesis
-  | Invalid -> fail (Inconsistent_snapshot_file snapshot_path)
+  snapshot_file_kind ~snapshot_path >>=? fun kind ->
+  let (module Importer) =
+    match kind with
+    | Tar -> (module Make_snapshot_importer (Tar_importer) : Snapshot_importer)
+    | Raw -> (module Make_snapshot_importer (Raw_importer) : Snapshot_importer)
+  in
+  let dst_store_dir = Naming.store_dir ~dir_path:dst_store_dir in
+  Importer.import
+    ~snapshot_path
+    ?patch_context
+    ?block
+    ?check_consistency
+    ~dst_store_dir
+    ~dst_context_dir
+    ~chain_name
+    ~user_activated_upgrades
+    ~user_activated_protocol_overrides
+    genesis
