@@ -2127,13 +2127,13 @@ class TestContractTypeChecking:
         client.typecheck_data(f'{address_opt_a}', 'address')
 
         unexpected_default_error = "unexpected_default_entrypoint"
-        unexpected_annotation_error = "unexpected annotation."
+        not_an_address_error = "not an expression of type address"
 
         with utils.assert_run_failure(unexpected_default_error):
             client.typecheck_data(f'"{address}%default"', 'address')
 
         # 64656661756c74 is "default" in hexa
-        with utils.assert_run_failure(unexpected_annotation_error):
+        with utils.assert_run_failure(not_an_address_error):
             client.typecheck_data(address_opt + '64656661756c74', 'address')
 
     def check_contract_ok(self, client, address, entrypoint, typ):
