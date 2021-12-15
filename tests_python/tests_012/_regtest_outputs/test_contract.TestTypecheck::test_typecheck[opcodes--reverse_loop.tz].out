@@ -1,0 +1,32 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/reverse_loop.tz]
+
+Well typed
+Gas remaining: 1039987.683 units remaining
+{ parameter (list string) ;
+  storage (list string) ;
+  code { CAR
+         /* [ @parameter list string ] */ ;
+         NIL string
+         /* [ list string : @parameter list string ] */ ;
+         SWAP
+         /* [ @parameter list string : list string ] */ ;
+         PUSH bool True
+         /* [ bool : @parameter list string : list string ] */ ;
+         LOOP { IF_CONS
+                  { SWAP
+                    /* [ @parameter.tl list string : @parameter.hd string : list string ] */ ;
+                    DIP { CONS /* [ list string ] */ }
+                    /* [ @parameter.tl list string : list string ] */ ;
+                    PUSH bool True
+                    /* [ bool : @parameter.tl list string : list string ] */ }
+                  { NIL string
+                    /* [ list string : list string ] */ ;
+                    PUSH bool False
+                    /* [ bool : list string : list string ] */ } }
+         /* [ @parameter list string : list string ] */ ;
+         DROP
+         /* [ list string ] */ ;
+         NIL operation
+         /* [ list operation : list string ] */ ;
+         PAIR
+         /* [ pair (list operation) (list string) ] */ } }

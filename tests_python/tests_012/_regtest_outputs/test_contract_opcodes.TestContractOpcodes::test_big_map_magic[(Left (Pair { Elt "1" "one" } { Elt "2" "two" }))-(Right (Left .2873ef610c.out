@@ -1,0 +1,39 @@
+tests_012/test_contract_opcodes.py::TestContractOpcodes::test_big_map_magic[(Left (Pair { Elt "1" "one" } { Elt "2" "two" }))-(Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))-(Left (Pair 4 5))-big_map_diff1]
+
+storage
+  (Left (Pair 4 5))
+emitted operations
+  
+big_map diff
+  New map(5) of type (big_map string string)
+  Set map(5)["4"] to "four"
+  New map(4) of type (big_map string string)
+  Set map(4)["3"] to "three"
+trace
+  - location: 43 (remaining gas: 1039913.797 units remaining)
+    [ (Pair (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))
+            (Left (Pair { Elt "1" "one" } { Elt "2" "two" })))  	 ]
+  - location: 43 (remaining gas: 1039913.787 units remaining)
+    [ (Right (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))))  	@parameter
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
+  - location: 44 (remaining gas: 1039913.777 units remaining)
+    [ (Left (Left (Pair { Elt "3" "three" } { Elt "4" "four" })))  	@parameter.right
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
+  - location: 60 (remaining gas: 1039913.767 units remaining)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	@parameter.right.reset
+      (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage ]
+  - location: 62 (remaining gas: 1039913.757 units remaining)
+    [ (Left (Pair { Elt "1" "one" } { Elt "2" "two" }))  	@storage
+      (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	@parameter.right.reset ]
+  - location: 63 (remaining gas: 1039913.747 units remaining)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
+  - location: 60 (remaining gas: 1039913.732 units remaining)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
+  - location: 44 (remaining gas: 1039913.717 units remaining)
+    [ (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
+  - location: 151 (remaining gas: 1039913.702 units remaining)
+    [ {}  	
+      (Left (Pair { Elt "3" "three" } { Elt "4" "four" }))  	 ]
+  - location: 153 (remaining gas: 1039913.687 units remaining)
+    [ (Pair {} (Left (Pair { Elt "3" "three" } { Elt "4" "four" })))  	 ]
+

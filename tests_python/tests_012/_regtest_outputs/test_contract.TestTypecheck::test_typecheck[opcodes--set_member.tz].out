@@ -1,0 +1,36 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_member.tz]
+
+Well typed
+Gas remaining: 1039988.400 units remaining
+{ parameter string ;
+  storage (pair (set string) (option bool)) ;
+  code { DUP
+         /* [ pair (string @parameter) (pair @storage (set string) (option bool))
+            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         DUP
+         /* [ pair (string @parameter) (pair @storage (set string) (option bool))
+            : pair (string @parameter) (pair @storage (set string) (option bool))
+            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         CAR
+         /* [ @parameter string
+            : pair (string @parameter) (pair @storage (set string) (option bool))
+            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         DIP { CDAR }
+         /* [ @parameter string : set string
+            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         MEM
+         /* [ bool
+            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         SOME
+         /* [ option bool
+            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         DIP { CDAR }
+         /* [ option bool : set string ] */ ;
+         SWAP
+         /* [ set string : option bool ] */ ;
+         PAIR
+         /* [ pair (set string) (option bool) ] */ ;
+         NIL operation
+         /* [ list operation : pair (set string) (option bool) ] */ ;
+         PAIR
+         /* [ pair (list operation) (set string) (option bool) ] */ } }

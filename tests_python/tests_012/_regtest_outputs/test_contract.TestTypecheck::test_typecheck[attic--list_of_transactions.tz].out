@@ -1,0 +1,49 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[attic/list_of_transactions.tz]
+
+Well typed
+Gas remaining: 1039982.122 units remaining
+{ parameter unit ;
+  storage (list address) ;
+  code { CDR
+         /* [ @storage list address ] */ ;
+         DUP
+         /* [ @storage list address : @storage list address ] */ ;
+         DIP { NIL operation /* [ list operation : @storage list address ] */ }
+         /* [ @storage list address : list operation : @storage list address ] */ ;
+         PUSH bool
+              True
+         /* [ bool : @storage list address : list operation : @storage list address ] */ ;
+         LOOP { IF_CONS
+                  { CONTRACT
+                      unit
+                    /* [ @storage.hd.contract option (contract unit) : @storage.tl list address
+                       : list operation : @storage list address ] */ ;
+                    ASSERT_SOME ;
+                    PUSH mutez
+                         1000000
+                    /* [ mutez : @storage.hd.contract.some contract unit : @storage.tl list address
+                       : list operation : @storage list address ] */ ;
+                    UNIT
+                    /* [ unit : mutez : @storage.hd.contract.some contract unit
+                       : @storage.tl list address : list operation : @storage list address ] */ ;
+                    TRANSFER_TOKENS
+                    /* [ operation : @storage.tl list address : list operation
+                       : @storage list address ] */ ;
+                    SWAP
+                    /* [ @storage.tl list address : operation : list operation
+                       : @storage list address ] */ ;
+                    DIP { CONS /* [ list operation : @storage list address ] */ }
+                    /* [ @storage.tl list address : list operation : @storage list address ] */ ;
+                    PUSH bool
+                         True
+                    /* [ bool : @storage.tl list address : list operation : @storage list address ] */ }
+                  { NIL address
+                    /* [ list address : list operation : @storage list address ] */ ;
+                    PUSH bool
+                         False
+                    /* [ bool : list address : list operation : @storage list address ] */ } }
+         /* [ @storage list address : list operation : @storage list address ] */ ;
+         DROP
+         /* [ list operation : @storage list address ] */ ;
+         PAIR
+         /* [ pair (list operation) (list @storage address) ] */ } }

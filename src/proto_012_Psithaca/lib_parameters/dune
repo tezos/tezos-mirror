@@ -1,0 +1,47 @@
+(library
+ (name tezos_protocol_012_Psithaca_parameters)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-protocol-012-Psithaca-parameters)
+ (modules :standard \ gen)
+ (libraries tezos-base
+            tezos-base.unix
+            tezos-protocol-environment
+            tezos-protocol-012-Psithaca)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_012_Psithaca
+                   -linkall))
+)
+
+(executable
+ (name gen)
+ (libraries tezos-base
+            tezos-protocol-012-Psithaca-parameters)
+ (modules gen)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_012_Psithaca_parameters
+                   -open Tezos_protocol_012_Psithaca
+                   -linkall)))
+
+(rule
+ (targets sandbox-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --sandbox)))
+
+(rule
+ (targets test-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --test)))
+
+(rule
+ (targets mainnet-parameters.json)
+ (deps gen.exe)
+ (action (run %{deps} --mainnet)))
+
+(install
+ (section lib)
+ (files sandbox-parameters.json test-parameters.json mainnet-parameters.json))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

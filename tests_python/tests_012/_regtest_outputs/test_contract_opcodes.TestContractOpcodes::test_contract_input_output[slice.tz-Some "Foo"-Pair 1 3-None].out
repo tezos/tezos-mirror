@@ -1,0 +1,37 @@
+tests_012/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[slice.tz-Some "Foo"-Pair 1 3-None]
+
+storage
+  None
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 10 (remaining gas: 1039988.898 units remaining)
+    [ (Pair (Pair 1 3) (Some "Foo"))  	 ]
+  - location: 10 (remaining gas: 1039988.888 units remaining)
+    [ (Pair 1 3)  	@parameter
+      (Some "Foo")  	@storage ]
+  - location: 11 (remaining gas: 1039988.878 units remaining)
+    [ (Some "Foo")  	@storage
+      (Pair 1 3)  	@parameter ]
+  - location: 13 (remaining gas: 1039988.868 units remaining)
+    [ "Foo"  	@storage.some
+      (Pair 1 3)  	@parameter ]
+  - location: 19 (remaining gas: 1039988.858 units remaining)
+    [ (Pair 1 3)  	@parameter
+      "Foo"  	@storage.some ]
+  - location: 20 (remaining gas: 1039988.848 units remaining)
+    [ 1  	
+      3  	
+      "Foo"  	@storage.some ]
+  - location: 21 (remaining gas: 1039988.808 units remaining)
+    [ None  	 ]
+  - location: 13 (remaining gas: 1039988.793 units remaining)
+    [ None  	 ]
+  - location: 22 (remaining gas: 1039988.778 units remaining)
+    [ {}  	
+      None  	 ]
+  - location: 24 (remaining gas: 1039988.763 units remaining)
+    [ (Pair {} None)  	 ]
+

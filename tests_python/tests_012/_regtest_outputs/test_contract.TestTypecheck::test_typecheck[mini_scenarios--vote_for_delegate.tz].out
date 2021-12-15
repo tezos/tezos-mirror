@@ -1,0 +1,168 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/vote_for_delegate.tz]
+
+Well typed
+Gas remaining: 1039933.671 units remaining
+{ parameter (option key_hash) ;
+  storage
+    (pair (pair %mgr1 (address %addr) (option %key key_hash))
+          (pair %mgr2 (address %addr) (option %key key_hash))) ;
+  code { DUP
+         /* [ pair (option @parameter key_hash)
+                 (pair @storage
+                    (pair %mgr1 (address %addr) (option %key key_hash))
+                    (pair %mgr2 (address %addr) (option %key key_hash)))
+            : pair (option @parameter key_hash)
+                 (pair @storage
+                    (pair %mgr1 (address %addr) (option %key key_hash))
+                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+         CDAAR %addr @% ;
+         SENDER
+         /* [ @sender address : @addr address
+            : pair (option @parameter key_hash)
+                 (pair @storage
+                    (pair %mgr1 (address %addr) (option %key key_hash))
+                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+         PAIR %@ %@
+         /* [ pair (address %sender @sender) (address %addr @addr)
+            : pair (option @parameter key_hash)
+                 (pair @storage
+                    (pair %mgr1 (address %addr) (option %key key_hash))
+                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+         UNPAIR
+         /* [ @sender address : @addr address
+            : pair (option @parameter key_hash)
+                 (pair @storage
+                    (pair %mgr1 (address %addr) (option %key key_hash))
+                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+         IFCMPEQ
+           { UNPAIR
+             /* [ @parameter option key_hash
+                : @storage pair (pair %mgr1 (address %addr) (option %key key_hash))
+                     (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
+             SWAP
+             /* [ @storage pair (pair %mgr1 (address %addr) (option %key key_hash))
+                     (pair %mgr2 (address %addr) (option %key key_hash))
+                : @parameter option key_hash ] */ ;
+             SET_CADR %key @changed_mgr1_key }
+           { DUP
+             /* [ pair (option @parameter key_hash)
+                     (pair @storage
+                        (pair %mgr1 (address %addr) (option %key key_hash))
+                        (pair %mgr2 (address %addr) (option %key key_hash)))
+                : pair (option @parameter key_hash)
+                     (pair @storage
+                        (pair %mgr1 (address %addr) (option %key key_hash))
+                        (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+             CDDAR ;
+             SENDER
+             /* [ @sender address : address
+                : pair (option @parameter key_hash)
+                     (pair @storage
+                        (pair %mgr1 (address %addr) (option %key key_hash))
+                        (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+             IFCMPEQ
+               { UNPAIR
+                 /* [ @parameter option key_hash
+                    : @storage pair (pair %mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 SWAP
+                 /* [ @storage pair (pair %mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 (address %addr) (option %key key_hash))
+                    : @parameter option key_hash ] */ ;
+                 SET_CDDR %key }
+               { FAIL } } ;
+         DUP
+         /* [ pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash))
+            : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+         CADR ;
+         DIP { DUP
+               /* [ pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                       (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash))
+                  : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                       (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+               CDDR }
+         /* [ option key_hash : option key_hash
+            : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+         IF_NONE
+           { IF_NONE
+               { NONE key_hash
+                 /* [ option key_hash
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 SET_DELEGATE
+                 /* [ operation
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 NIL operation
+                 /* [ list operation : operation
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 SWAP
+                 /* [ operation : list operation
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 CONS
+                 /* [ list operation
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ }
+               { DROP
+                 /* [ pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 NIL operation
+                 /* [ list operation
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ } }
+           { SWAP
+             /* [ option key_hash : @some key_hash
+                : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                     (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+             IF_SOME
+               { DIP { DUP
+                       /* [ @some key_hash : @some key_hash
+                          : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                               (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ }
+                 /* [ @some key_hash : @some key_hash : @some key_hash
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 IFCMPEQ
+                   { SOME
+                     /* [ option key_hash
+                        : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                     SET_DELEGATE
+                     /* [ operation
+                        : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                     NIL operation
+                     /* [ list operation : operation
+                        : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                     SWAP
+                     /* [ operation : list operation
+                        : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                     CONS
+                     /* [ list operation
+                        : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ }
+                   { DROP
+                     /* [ pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                     NIL operation
+                     /* [ list operation
+                        : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                             (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ } }
+               { DROP
+                 /* [ pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ ;
+                 NIL operation
+                 /* [ list operation
+                    : pair (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                         (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ } } ;
+         PAIR
+         /* [ pair (list operation)
+                 (pair %mgr1 @storage.mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 @storage.mgr2 (address %addr) (option %key key_hash)) ] */ } }

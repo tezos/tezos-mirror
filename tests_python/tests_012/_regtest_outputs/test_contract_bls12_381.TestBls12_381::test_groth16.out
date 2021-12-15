@@ -1,0 +1,9 @@
+tests_012/test_contract_bls12_381.py::TestBls12_381::test_groth16
+
+storage
+  Unit
+emitted operations
+  
+big_map diff
+  
+

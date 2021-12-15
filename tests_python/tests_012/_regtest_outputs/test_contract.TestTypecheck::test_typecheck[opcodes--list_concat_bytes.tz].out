@@ -1,0 +1,18 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/list_concat_bytes.tz]
+
+Well typed
+Gas remaining: 1039995.574 units remaining
+{ parameter (list bytes) ;
+  storage bytes ;
+  code { UNPAIR
+         /* [ @parameter list bytes : @storage bytes ] */ ;
+         SWAP
+         /* [ @storage bytes : @parameter list bytes ] */ ;
+         CONS
+         /* [ list bytes ] */ ;
+         CONCAT
+         /* [ bytes ] */ ;
+         NIL operation
+         /* [ list operation : bytes ] */ ;
+         PAIR
+         /* [ pair (list operation) bytes ] */ } }

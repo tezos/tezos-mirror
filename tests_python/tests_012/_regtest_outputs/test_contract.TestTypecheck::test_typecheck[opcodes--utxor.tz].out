@@ -1,0 +1,109 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/utxor.tz]
+
+Well typed
+Gas remaining: 1039966.683 units remaining
+{ parameter (pair address address) ;
+  storage nat ;
+  code { UNPAIR
+         /* [ @parameter pair address address : @storage nat ] */ ;
+         DIP { DUP /* [ @storage nat : @storage nat ] */ }
+         /* [ @parameter pair address address : @storage nat : @storage nat ] */ ;
+         SWAP
+         /* [ @storage nat : @parameter pair address address : @storage nat ] */ ;
+         PUSH nat
+              5
+         /* [ nat : @storage nat : @parameter pair address address : @storage nat ] */ ;
+         SWAP
+         /* [ @storage nat : nat : @parameter pair address address : @storage nat ] */ ;
+         TICKET
+         /* [ ticket nat : @parameter pair address address : @storage nat ] */ ;
+         PUSH nat
+              2
+         /* [ nat : ticket nat : @parameter pair address address : @storage nat ] */ ;
+         PUSH nat
+              3
+         /* [ nat : nat : ticket nat : @parameter pair address address : @storage nat ] */ ;
+         PAIR
+         /* [ pair nat nat : ticket nat : @parameter pair address address
+            : @storage nat ] */ ;
+         SWAP
+         /* [ ticket nat : pair nat nat : @parameter pair address address
+            : @storage nat ] */ ;
+         SPLIT_TICKET
+         /* [ option (pair (ticket nat) (ticket nat)) : @parameter pair address address
+            : @storage nat ] */ ;
+         ASSERT_SOME ;
+         UNPAIR
+         /* [ ticket nat : ticket nat : @parameter pair address address : @storage nat ] */ ;
+         DIP { DIP { DUP
+                     /* [ @parameter pair address address : @parameter pair address address
+                        : @storage nat ] */ ;
+                     CAR
+                     /* [ address : @parameter pair address address : @storage nat ] */ ;
+                     CONTRACT
+                       (pair (ticket nat) nat)
+                     /* [ @contract option (contract (pair (ticket nat) nat))
+                        : @parameter pair address address : @storage nat ] */ ;
+                     ASSERT_SOME ;
+                     PUSH mutez
+                          0
+                     /* [ mutez : @contract.some contract (pair (ticket nat) nat)
+                        : @parameter pair address address : @storage nat ] */ }
+               /* [ ticket nat : mutez : @contract.some contract (pair (ticket nat) nat)
+                  : @parameter pair address address : @storage nat ] */ ;
+               PUSH nat
+                    2
+               /* [ nat : ticket nat : mutez : @contract.some contract (pair (ticket nat) nat)
+                  : @parameter pair address address : @storage nat ] */ ;
+               SWAP
+               /* [ ticket nat : nat : mutez : @contract.some contract (pair (ticket nat) nat)
+                  : @parameter pair address address : @storage nat ] */ ;
+               PAIR
+               /* [ pair (ticket nat) nat : mutez
+                  : @contract.some contract (pair (ticket nat) nat)
+                  : @parameter pair address address : @storage nat ] */ }
+         /* [ ticket nat : pair (ticket nat) nat : mutez
+            : @contract.some contract (pair (ticket nat) nat)
+            : @parameter pair address address : @storage nat ] */ ;
+         DIP { TRANSFER_TOKENS
+               /* [ operation : @parameter pair address address : @storage nat ] */ }
+         /* [ ticket nat : operation : @parameter pair address address : @storage nat ] */ ;
+         SWAP
+         /* [ operation : ticket nat : @parameter pair address address : @storage nat ] */ ;
+         DIP { DIP { CDR
+                     /* [ address : @storage nat ] */ ;
+                     CONTRACT
+                       (pair (ticket nat) nat)
+                     /* [ @contract option (contract (pair (ticket nat) nat)) : @storage nat ] */ ;
+                     ASSERT_SOME ;
+                     PUSH mutez
+                          0
+                     /* [ mutez : @contract.some contract (pair (ticket nat) nat) : @storage nat ] */ }
+               /* [ ticket nat : mutez : @contract.some contract (pair (ticket nat) nat)
+                  : @storage nat ] */ ;
+               PUSH nat
+                    3
+               /* [ nat : ticket nat : mutez : @contract.some contract (pair (ticket nat) nat)
+                  : @storage nat ] */ ;
+               SWAP
+               /* [ ticket nat : nat : mutez : @contract.some contract (pair (ticket nat) nat)
+                  : @storage nat ] */ ;
+               PAIR
+               /* [ pair (ticket nat) nat : mutez
+                  : @contract.some contract (pair (ticket nat) nat) : @storage nat ] */ }
+         /* [ operation : pair (ticket nat) nat : mutez
+            : @contract.some contract (pair (ticket nat) nat) : @storage nat ] */ ;
+         DIP { TRANSFER_TOKENS /* [ operation : @storage nat ] */ }
+         /* [ operation : operation : @storage nat ] */ ;
+         NIL operation
+         /* [ list operation : operation : operation : @storage nat ] */ ;
+         SWAP
+         /* [ operation : list operation : operation : @storage nat ] */ ;
+         CONS
+         /* [ list operation : operation : @storage nat ] */ ;
+         SWAP
+         /* [ operation : list operation : @storage nat ] */ ;
+         CONS
+         /* [ list operation : @storage nat ] */ ;
+         PAIR
+         /* [ pair (list operation) (nat @storage) ] */ } }

@@ -1,0 +1,14 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/store_now.tz]
+
+Well typed
+Gas remaining: 1039996.803 units remaining
+{ parameter unit ;
+  storage timestamp ;
+  code { DROP
+         /* [] */ ;
+         NOW
+         /* [ @now timestamp ] */ ;
+         NIL operation
+         /* [ list operation : @now timestamp ] */ ;
+         PAIR
+         /* [ pair (list operation) (timestamp @now) ] */ } }

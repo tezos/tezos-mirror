@@ -1,0 +1,17 @@
+(library
+ (name tezos_benchmark_type_inference_012_Psithaca)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-benchmark-type-inference-012-Psithaca)
+ (libraries
+  tezos-stdlib
+  tezos-error-monad
+  tezos-crypto
+  tezos-micheline
+  tezos-protocol-012-Psithaca
+  tezos-micheline-rewriting
+  hashcons)
+ (flags (:standard -open Tezos_stdlib
+                   -open Tezos_error_monad
+                   -open Tezos_micheline
+                   -open Tezos_micheline_rewriting
+                   -open Tezos_protocol_012_Psithaca)))

@@ -1,0 +1,17 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_op_id.tz]
+
+Well typed
+Gas remaining: 1039992.989 units remaining
+{ parameter (pair nat address) ;
+  storage (pair nat nat) ;
+  code { CAR
+         /* [ @parameter pair nat address ] */ ;
+         UNPAIR
+         /* [ nat : address ] */ ;
+         VIEW "id" (pair nat nat)
+         /* [ @contract option (pair nat nat) ] */ ;
+         IF_SOME { /* [ @contract.some pair nat nat ] */ } { FAIL } ;
+         NIL operation
+         /* [ list operation : @contract.some pair nat nat ] */ ;
+         PAIR
+         /* [ pair (list operation) (pair @contract.some nat nat) ] */ } }

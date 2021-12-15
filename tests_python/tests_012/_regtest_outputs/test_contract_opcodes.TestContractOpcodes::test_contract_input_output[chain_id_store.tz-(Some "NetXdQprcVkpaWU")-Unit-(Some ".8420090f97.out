@@ -1,0 +1,23 @@
+tests_012/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[chain_id_store.tz-(Some "NetXdQprcVkpaWU")-Unit-(Some "NetXdQprcVkpaWU")]
+
+storage
+  (Some "NetXdQprcVkpaWU")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039992.257 units remaining)
+    [ (Pair Unit (Some "NetXdQprcVkpaWU"))  	 ]
+  - location: 8 (remaining gas: 1039992.247 units remaining)
+    [  ]
+  - location: 9 (remaining gas: 1039992.232 units remaining)
+    [ "NetXdQprcVkpaWU"  	 ]
+  - location: 10 (remaining gas: 1039992.217 units remaining)
+    [ (Some "NetXdQprcVkpaWU")  	 ]
+  - location: 11 (remaining gas: 1039992.202 units remaining)
+    [ {}  	
+      (Some "NetXdQprcVkpaWU")  	 ]
+  - location: 13 (remaining gas: 1039992.187 units remaining)
+    [ (Pair {} (Some "NetXdQprcVkpaWU"))  	 ]
+

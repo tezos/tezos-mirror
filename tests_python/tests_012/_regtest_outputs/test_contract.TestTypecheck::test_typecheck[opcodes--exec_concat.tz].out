@@ -1,0 +1,34 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/exec_concat.tz]
+
+Well typed
+Gas remaining: 1039991.097 units remaining
+{ parameter string ;
+  storage string ;
+  code { CAR
+         /* [ @parameter string ] */ ;
+         LAMBDA
+           string
+           string
+           { PUSH string "_abc"
+             /* [ string : @arg string ] */ ;
+             NIL string
+             /* [ list string : string : @arg string ] */ ;
+             SWAP
+             /* [ string : list string : @arg string ] */ ;
+             CONS
+             /* [ list string : @arg string ] */ ;
+             SWAP
+             /* [ @arg string : list string ] */ ;
+             CONS
+             /* [ list string ] */ ;
+             CONCAT
+             /* [ string ] */ }
+         /* [ lambda string string : @parameter string ] */ ;
+         SWAP
+         /* [ @parameter string : lambda string string ] */ ;
+         EXEC
+         /* [ string ] */ ;
+         NIL operation
+         /* [ list operation : string ] */ ;
+         PAIR
+         /* [ pair (list operation) string ] */ } }

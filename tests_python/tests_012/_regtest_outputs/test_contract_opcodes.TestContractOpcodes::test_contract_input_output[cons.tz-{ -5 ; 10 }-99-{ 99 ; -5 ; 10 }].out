@@ -1,0 +1,22 @@
+tests_012/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[cons.tz-{ -5 ; 10 }-99-{ 99 ; -5 ; 10 }]
+
+storage
+  { 99 ; -5 ; 10 }
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039994.045 units remaining)
+    [ (Pair 99 { -5 ; 10 })  	 ]
+  - location: 8 (remaining gas: 1039994.035 units remaining)
+    [ 99  	@parameter
+      { -5 ; 10 }  	@storage ]
+  - location: 9 (remaining gas: 1039994.020 units remaining)
+    [ { 99 ; -5 ; 10 }  	 ]
+  - location: 10 (remaining gas: 1039994.005 units remaining)
+    [ {}  	
+      { 99 ; -5 ; 10 }  	 ]
+  - location: 12 (remaining gas: 1039993.990 units remaining)
+    [ (Pair {} { 99 ; -5 ; 10 })  	 ]
+

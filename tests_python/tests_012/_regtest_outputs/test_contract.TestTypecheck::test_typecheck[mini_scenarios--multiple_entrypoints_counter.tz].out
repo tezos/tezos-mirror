@@ -1,0 +1,180 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/multiple_entrypoints_counter.tz]
+
+Well typed
+Gas remaining: 1039924.032 units remaining
+{ parameter unit ;
+  storage (option address) ;
+  code { SENDER
+         /* [ @sender address : pair (unit @parameter) (option @storage address) ] */ ;
+         SELF
+         /* [ @self contract unit : @sender address
+            : pair (unit @parameter) (option @storage address) ] */ ;
+         ADDRESS
+         /* [ @self.address address : @sender address
+            : pair (unit @parameter) (option @storage address) ] */ ;
+         IFCMPEQ
+           { CDR
+             /* [ @storage option address ] */ ;
+             ASSERT_SOME
+             /* [ int
+                : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ ;
+             DIP { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+                   NIL operation
+                   /* [ list operation ] */ }
+             /* [] */ ;
+             DUP
+             /* [ @storage.some address : @storage.some address : list operation ] */ ;
+             CONTRACT %add
+               unit
+               /* [ int ] */
+             /* [ @storage.some.contract option (contract unit) : @storage.some address
+                : list operation ] */ ;
+             ASSERT_NONE ;
+             DUP
+             /* [ @storage.some address : @storage.some address : list operation ] */ ;
+             CONTRACT %fact
+               nat
+               /* [ list operation : int ] */
+             /* [ @storage.some.contract option (contract nat) : @storage.some address
+                : list operation ] */ ;
+             ASSERT_NONE ;
+             DUP
+             /* [ @storage.some address : @storage.some address : list operation ] */ ;
+             CONTRACT %add
+               nat
+             /* [ @storage.some.contract option (contract nat) : @storage.some address
+                : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez
+                  0
+             /* [ mutez : @storage.some.contract.some contract nat : @storage.some address
+                : list operation ] */ ;
+             PUSH nat
+                  12
+             /* [ nat : mutez : @storage.some.contract.some contract nat
+                : @storage.some address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : @storage.some address : list operation ] */ ;
+             SWAP
+             /* [ @storage.some address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ @storage.some address : list operation ] */ ;
+             DUP
+             /* [ @storage.some address : @storage.some address : list operation ] */ ;
+             CONTRACT
+               unit
+             /* [ @storage.some.contract option (contract unit) : @storage.some address
+                : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez
+                  0
+             /* [ mutez : @storage.some.contract.some contract unit : @storage.some address
+                : list operation ] */ ;
+             PUSH unit
+                  Unit
+             /* [ unit : mutez : @storage.some.contract.some contract unit
+                : @storage.some address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : @storage.some address : list operation ] */ ;
+             SWAP
+             /* [ @storage.some address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ @storage.some address : list operation ] */ ;
+             DUP
+             /* [ @storage.some address : @storage.some address : list operation ] */ ;
+             CONTRACT %sub
+               nat
+             /* [ @storage.some.contract option (contract nat) : @storage.some address
+                : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez
+                  0
+             /* [ mutez : @storage.some.contract.some contract nat : @storage.some address
+                : list operation ] */ ;
+             PUSH nat
+                  3
+             /* [ nat : mutez : @storage.some.contract.some contract nat
+                : @storage.some address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : @storage.some address : list operation ] */ ;
+             SWAP
+             /* [ @storage.some address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ @storage.some address : list operation ] */ ;
+             DUP
+             /* [ @storage.some address : @storage.some address : list operation ] */ ;
+             CONTRACT %add
+               nat
+             /* [ @storage.some.contract option (contract nat) : @storage.some address
+                : list operation ] */ ;
+             ASSERT_SOME ;
+             PUSH mutez
+                  0
+             /* [ mutez : @storage.some.contract.some contract nat : @storage.some address
+                : list operation ] */ ;
+             PUSH nat
+                  5
+             /* [ nat : mutez : @storage.some.contract.some contract nat
+                : @storage.some address : list operation ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : @storage.some address : list operation ] */ ;
+             SWAP
+             /* [ @storage.some address : operation : list operation ] */ ;
+             DIP { CONS /* [ list operation ] */ }
+             /* [ @storage.some address : list operation ] */ ;
+             DROP
+             /* [ list operation ] */ ;
+             DIP { NONE address /* [ option address ] */ }
+             /* [ list operation : option address ] */ ;
+             PAIR
+             /* [ pair (list operation) (option address) ] */ }
+           { CAR
+             /* [ @parameter unit ] */ ;
+             DUP
+             /* [ @parameter unit : @parameter unit ] */ ;
+             DIP { DIP { PUSH int 0
+                         /* [ int ] */ ;
+                         PUSH mutez 0
+                         /* [ mutez : int ] */ ;
+                         NONE key_hash
+                         /* [ option key_hash : mutez : int ] */ }
+                   /* [ @parameter unit : option key_hash : mutez : int ] */ ;
+                   DROP
+                   /* [ option key_hash : mutez : int ] */ ;
+                   CREATE_CONTRACT
+                     { parameter (or (or (nat %add) (nat %sub)) (unit %default)) ;
+                       storage int ;
+                       code { AMOUNT ;
+                              PUSH mutez 0 ;
+                              ASSERT_CMPEQ ;
+                              UNPAIR ;
+                              IF_LEFT
+                                { IF_LEFT { ADD } { SWAP ; SUB } }
+                                { DROP ; DROP ; PUSH int 0 } ;
+                              NIL operation ;
+                              PAIR } }
+                   /* [ operation : address ] */ }
+             /* [ @parameter unit : operation : address ] */ ;
+             DIP { SELF
+                   /* [ @self contract unit : operation : address ] */ ;
+                   PUSH mutez 0
+                   /* [ mutez : @self contract unit : operation : address ] */ }
+             /* [ @parameter unit : mutez : @self contract unit : operation : address ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : operation : address ] */ ;
+             NIL operation
+             /* [ list operation : operation : operation : address ] */ ;
+             SWAP
+             /* [ operation : list operation : operation : address ] */ ;
+             CONS
+             /* [ list operation : operation : address ] */ ;
+             SWAP
+             /* [ operation : list operation : address ] */ ;
+             CONS
+             /* [ list operation : address ] */ ;
+             DIP { SOME /* [ option address ] */ }
+             /* [ list operation : option address ] */ ;
+             PAIR
+             /* [ pair (list operation) (option address) ] */ }
+         /* [ @amount mutez
+            : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ } }

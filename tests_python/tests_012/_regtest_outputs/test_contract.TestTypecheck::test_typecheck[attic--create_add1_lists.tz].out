@@ -1,0 +1,30 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[attic/create_add1_lists.tz]
+
+Well typed
+Gas remaining: 1039986.470 units remaining
+{ parameter unit ;
+  storage address ;
+  code { DROP
+         /* [] */ ;
+         NIL int /* [ @parameter list int ] */
+         /* [ list int ] */ ;
+         AMOUNT
+         /* [ list int ] */ ;
+         NONE key_hash
+              /* [ int : @parameter.elt int ] */
+         /* [ option key_hash : @amount mutez : list int ] */ ;
+         CREATE_CONTRACT
+           { parameter (list int /* [ list operation : list int ] */)
+             /* [ int ] */ ;
+             storage (list int)
+             /* [ pair (list operation) (list int) ] */ ;
+             code { CAR ; MAP { PUSH int 1 ; ADD } ; NIL operation ; PAIR } }
+         /* [ operation : address ] */ ;
+         NIL operation
+         /* [ list operation : operation : address ] */ ;
+         SWAP
+         /* [ operation : list operation : address ] */ ;
+         CONS
+         /* [ list operation : address ] */ ;
+         PAIR
+         /* [ pair (list operation) address ] */ } }

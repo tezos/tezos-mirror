@@ -1,0 +1,38 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/amount_after_fib_view.tz]
+
+Well typed
+Gas remaining: 1039985.607 units remaining
+{ parameter address ;
+  storage mutez ;
+  code { CAR
+         /* [ @parameter address ] */ ;
+         DUP
+         /* [ @parameter address : @parameter address ] */ ;
+         PUSH nat 3
+         /* [ nat : @parameter address : @parameter address ] */ ;
+         VIEW "fib" nat
+         /* [ @parameter.contract option nat : @parameter address ] */ ;
+         ASSERT_SOME ;
+         DROP
+         /* [ @parameter address ] */ ;
+         CONTRACT nat
+         /* [ @parameter.contract option (contract nat) ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez 15000000
+         /* [ mutez : @parameter.contract.some contract nat ] */ ;
+         PUSH nat 0
+         /* [ nat : mutez : @parameter.contract.some contract nat ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation ] */ ;
+         AMOUNT
+         /* [ @amount mutez : operation ] */ ;
+         SWAP
+         /* [ operation : @amount mutez ] */ ;
+         NIL operation
+         /* [ list operation : operation : @amount mutez ] */ ;
+         SWAP
+         /* [ operation : list operation : @amount mutez ] */ ;
+         CONS
+         /* [ list operation : @amount mutez ] */ ;
+         PAIR
+         /* [ pair (list operation) (mutez @amount) ] */ } }

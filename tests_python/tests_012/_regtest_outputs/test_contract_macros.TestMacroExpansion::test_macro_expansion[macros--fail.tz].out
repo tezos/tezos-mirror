@@ -1,0 +1,3 @@
+tests_012/test_contract_macros.py::TestMacroExpansion::test_macro_expansion[macros/fail.tz]
+
+{ parameter unit ; storage unit ; code { { UNIT ; FAILWITH } } }
