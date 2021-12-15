@@ -121,6 +121,21 @@ module Script_bls : sig
   val pairing_check : (G1.t * G2.t) list -> bool
 end
 
+module Script_timelock : sig
+  (** [chest] is made algebraic in order to distinguish it from the other type
+      parameters of [Script_typed_ir.ty]. *)
+  type chest = Chest_tag of Timelock.chest [@@ocaml.unboxed]
+
+  val make_chest : Timelock.chest -> chest
+
+  val chest_encoding : chest Data_encoding.t
+
+  val open_chest :
+    chest -> Timelock.chest_key -> time:int -> Timelock.opening_result
+
+  val get_plaintext_size : chest -> int
+end
+
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 type empty_cell = EmptyCell
@@ -1104,9 +1119,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      (Timelock.chest_key, Timelock.chest * (n num * 's)) kinfo
+      (Timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
       * ((bytes, bool) union, 's, 'r, 'f) kinstr
-      -> (Timelock.chest_key, Timelock.chest * (n num * 's), 'r, 'f) kinstr
+      -> ( Timelock.chest_key,
+           Script_timelock.chest * (n num * 's),
+           'r,
+           'f )
+         kinstr
   (*
 
      Internal control instructions
@@ -1356,7 +1375,7 @@ and 'ty ty =
   | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
   | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
-  | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
+  | Chest_t : Script_timelock.chest ty_metadata -> Script_timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
@@ -1616,7 +1635,7 @@ val ticket_t :
 
 val chest_key_t : annot:type_annot option -> Timelock.chest_key ty
 
-val chest_t : annot:type_annot option -> Timelock.chest ty
+val chest_t : annot:type_annot option -> Script_timelock.chest ty
 
 (**
 

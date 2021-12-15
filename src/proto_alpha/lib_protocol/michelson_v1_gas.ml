@@ -1300,7 +1300,9 @@ module Cost_of = struct
         (cost_N_ISplit_ticket (int_bytes amount_a) (int_bytes amount_b))
 
     let open_chest ~chest ~time =
-      let plaintext = Timelock.get_plaintext_size chest in
+      let plaintext =
+        Script_typed_ir.Script_timelock.get_plaintext_size chest
+      in
       let log_time = Z.log2 Z.(add one time) in
       atomic_step_cost (cost_N_IOpen_chest ~chest:plaintext ~time:log_time)
 

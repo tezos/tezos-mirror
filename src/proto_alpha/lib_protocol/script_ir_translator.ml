@@ -2829,7 +2829,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chest_t _, Bytes (_, bytes)) -> (
       Gas.consume ctxt (Typecheck_costs.chest ~bytes:(Bytes.length bytes))
       >>?= fun ctxt ->
-      match Data_encoding.Binary.of_bytes_opt Timelock.chest_encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt Script_timelock.chest_encoding bytes
+      with
       | Some chest -> return (chest, ctxt)
       | None -> fail_parse_data ())
   | (Chest_t _, expr) ->
@@ -5906,8 +5908,9 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         ~loc
         ctxt
         s
-        (Unparse_costs.chest ~plaintext_size:(Timelock.get_plaintext_size s))
-        Timelock.chest_encoding
+        (Unparse_costs.chest
+           ~plaintext_size:(Script_timelock.get_plaintext_size s))
+        Script_timelock.chest_encoding
 
 and unparse_items :
     type k v.

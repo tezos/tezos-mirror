@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Timelock_samplers = Timelock
 open Protocol
 
 (* ------------------------------------------------------------------------- *)
@@ -2794,6 +2795,7 @@ module Registration_section = struct
           halt (union bytes bool @$ bot) )
 
     let resulting_stack chest chest_key time =
+      let chest = Script_timelock.make_chest chest in
       ( chest_key,
         ( chest,
           ( Script_int_repr.is_nat (Script_int_repr.of_int time)
@@ -2807,7 +2809,7 @@ module Registration_section = struct
         ~kinstr
         ~stack_sampler:(fun _ rng_state () ->
           let (chest, chest_key) =
-            Timelock.chest_sampler ~plaintext_size:1 ~time:0 ~rng_state
+            Timelock_samplers.chest_sampler ~plaintext_size:1 ~time:0 ~rng_state
           in
           resulting_stack chest chest_key 0)
         ()
@@ -2830,7 +2832,7 @@ module Registration_section = struct
           in
 
           let (chest, chest_key) =
-            Timelock.chest_sampler ~plaintext_size ~time ~rng_state
+            Timelock_samplers.chest_sampler ~plaintext_size ~time ~rng_state
           in
           resulting_stack chest chest_key time)
         ()

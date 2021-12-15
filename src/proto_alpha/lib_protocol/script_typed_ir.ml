@@ -165,6 +165,23 @@ module Script_bls = struct
     Bls12_381.pairing_check l
 end
 
+module Script_timelock = struct
+  type chest = Chest_tag of Timelock.chest [@@ocaml.unboxed]
+
+  let make_chest chest = Chest_tag chest
+
+  let chest_encoding =
+    Data_encoding.conv
+      (fun (Chest_tag x) -> x)
+      (fun x -> Chest_tag x)
+      Timelock.chest_encoding
+
+  let open_chest (Chest_tag chest) chest_key ~time =
+    Timelock.open_chest chest chest_key ~time
+
+  let get_plaintext_size (Chest_tag x) = Timelock.get_plaintext_size x
+end
+
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
 module type TYPE_SIZE = sig
@@ -1122,9 +1139,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      (Timelock.chest_key, Timelock.chest * (n num * 's)) kinfo
+      (Timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
       * ((bytes, bool) union, 's, 'r, 'f) kinstr
-      -> (Timelock.chest_key, Timelock.chest * (n num * 's), 'r, 'f) kinstr
+      -> ( Timelock.chest_key,
+           Script_timelock.chest * (n num * 's),
+           'r,
+           'f )
+         kinstr
   (*
      Internal control instructions
      -----------------------------
@@ -1274,7 +1295,7 @@ and 'ty ty =
   | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
   | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
-  | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
+  | Chest_t : Script_timelock.chest ty_metadata -> Script_timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty

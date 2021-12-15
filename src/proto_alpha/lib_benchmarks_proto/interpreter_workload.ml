@@ -1432,7 +1432,7 @@ let extract_ir_sized_step :
   | (IHalt _, _) -> Instructions.halt
   | (ILog _, _) -> Instructions.log
   | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
-      let plaintext_size = Timelock.get_plaintext_size chest - 1 in
+      let plaintext_size = Script_timelock.get_plaintext_size chest - 1 in
       let log_time = Z.log2 Z.(one + Script_int_repr.to_zint time) in
       Instructions.open_chest log_time plaintext_size
 

@@ -1476,7 +1476,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             match Alpha_context.Script_int.to_int time_z with
             | None -> R false
             | Some time -> (
-                match open_chest chest chest_key ~time with
+                match Script_timelock.open_chest chest chest_key ~time with
                 | Correct bytes -> L bytes
                 | Bogus_cipher -> R false
                 | Bogus_opening -> R true)
