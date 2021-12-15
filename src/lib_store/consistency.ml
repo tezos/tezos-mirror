@@ -309,104 +309,146 @@ let fix_head chain_dir block_store genesis_block =
     emit fix_head (stored_head, Block_repr.descriptor inferred_head))
   >>= fun () -> return inferred_head
 
-(* [fix_savepoint_and_caboose chain_dir block_store head]
-   Fix the savepoint by setting it to the lowest block with metadata.
-   Assumption:
-   - block store is valid and available.
+(* Search for the lowest block with metadata (for savepoint) and the
+   lowest block (for caboose) from the cemented store.
+   We assume that the given [cemented_block_files] list is sorted in
+   ascending order (lowest block files comes first). *)
+let lowest_cemented_block cemented_block_files =
+  match cemented_block_files with
+  | [] -> None
+  | {Cemented_block_store.start_level; _} :: _ -> Some start_level
 
-   Fix the caboose by setting it to the lowest block.
-   Assumption:
-   - block store is valid and available. *)
-let fix_savepoint_and_caboose chain_dir block_store head =
-  (* Search for the lowest block with metadata (for savepoint) and the
-     lowest block (for caboose) from the cemented store. *)
-  let lowest_cemented_block cemented_block_files =
-    match List.hd cemented_block_files with
-    | None -> None
-    | Some {Cemented_block_store.start_level; _} -> Some start_level
-  in
-  (* Returns the lowest block level of a cemented metadata file. *)
-  let lowest_metadata_entry metadata_file =
-    try
-      let metadata_file_path = Naming.file_path metadata_file in
-      let in_file = Zip.open_in metadata_file_path in
-      let entries = Zip.entries in_file in
-      let asc_entries =
-        List.sort
-          (fun {Zip.filename = a; _} {filename = b; _} ->
-            Int.compare (int_of_string a) (int_of_string b))
-          entries
+(* Returns the lowest block level of a cemented metadata file. *)
+let lowest_metadata_entry metadata_file =
+  try
+    let metadata_file_path = Naming.file_path metadata_file in
+    let in_file = Zip.open_in metadata_file_path in
+    let entries = Zip.entries in_file in
+    let asc_entries =
+      List.sort
+        (fun {Zip.filename = a; _} {filename = b; _} ->
+          Int.compare (int_of_string a) (int_of_string b))
+        entries
+    in
+    match asc_entries with
+    | [] ->
+        (* A metadata file is never empty *)
+        assert false
+    | {Zip.filename; _} :: _ -> return_some (Int32.of_string filename)
+  with exn -> Lwt.fail exn
+
+(* Returns the lowest block level, from the cemented store, which is
+   associated to some block metadata *)
+let lowest_cemented_metadata cemented_dir =
+  Cemented_block_store.load_metadata_table cemented_dir >>=? function
+  | Some metadata_files ->
+      let rec aux = function
+        | [] -> return_none
+        | {Cemented_block_store.metadata_file; start_level; end_level} :: tl
+          -> (
+            Lwt.catch
+              (fun () -> lowest_metadata_entry metadata_file >>=? return_some)
+              (function
+                | _ ->
+                    (* Can be the case if the metadata file is
+                       corrupted. Raise a warning and continue the
+                       search in the next metadata file. *)
+                    Store_events.(
+                      emit warning_missing_metadata (start_level, end_level))
+                    >>= fun () -> return_none)
+            >>=? function
+            | Some v -> return v
+            | None -> aux tl)
       in
-      match List.hd asc_entries with
-      | None ->
-          (* A metadata file is never empty *)
-          assert false
-      | Some {Zip.filename; _} -> return_some (Int32.of_string filename)
-    with exn ->
-      trace (Exn exn)
-      @@ fail
-           (Corrupted_store
-              (Cannot_find_cemented_savepoint (Naming.file_path metadata_file)))
-  in
+      aux (Array.to_list metadata_files)
+  | None -> return_none
+
+(* Returns both the lowest block and the lowest block with metadata
+   from the floating block store.*)
+let lowest_floating_blocks floating_stores =
+  List.map_es
+    (Floating_block_store.fold_left_s
+       (fun (last_min, last_min_with_metadata) block ->
+         let lowest_block =
+           match last_min with
+           | None -> Some (Block_repr.level block)
+           | Some last_min -> Some (min last_min (Block_repr.level block))
+         in
+         let lowest_block_with_metadata =
+           match (last_min_with_metadata, Block_repr.metadata block) with
+           | (Some last_min_with_metadata, Some _) ->
+               Some (min last_min_with_metadata (Block_repr.level block))
+           | (Some last_min_with_metadata, None) -> Some last_min_with_metadata
+           | (None, Some _) -> Some (Block_repr.level block)
+           | (None, None) -> None
+         in
+         return (lowest_block, lowest_block_with_metadata))
+       (None, None))
+    floating_stores
+  >>=? fun l ->
+  let min l = List.fold_left (Option.merge min) None l in
+  let (lw, lwm) = List.split l in
+  (* If we have failed getting a block with metadata from both the
+     RO and RW floating stores, then it is not possible to determine
+     a savepoint. The store is broken. *)
+  let lw = min lw in
+  let lwm = min lwm in
+  return (lw, lwm)
+
+(* Reads and returns the inferred savepoint. *)
+let load_inferred_savepoint chain_dir block_store head savepoint_level =
+  Block_store.read_block
+    ~read_metadata:false
+    block_store
+    (Block_store.Block
+       ( Block_repr.hash head,
+         Int32.(to_int (sub (Block_repr.level head) savepoint_level)) ))
+  >>=? function
+  | Some b ->
+      let inferred_savepoint = (Block_repr.hash b, Block_repr.level b) in
+      Stored_data.write_file
+        (Naming.savepoint_file chain_dir)
+        inferred_savepoint
+      >>=? fun () ->
+      (* Try to load the current savepoint *)
+      (Stored_data.load (Naming.savepoint_file chain_dir) >>= function
+       | Ok savepoint_data -> Stored_data.get savepoint_data >>= Lwt.return_some
+       | Error _ -> Lwt.return_none)
+      >>= fun stored_savepoint ->
+      Store_events.(emit fix_savepoint (stored_savepoint, inferred_savepoint))
+      >>= fun () -> return inferred_savepoint
+  | None ->
+      (* Assumption: the head is valid. Thus, at least the head
+         (with metadata) must be a valid candidate for the
+         savepoint. *)
+      assert false
+
+(* Reads and returns the inferred caboose. *)
+let load_inferred_caboose chain_dir block_store head caboose_level =
+  Block_store.read_block
+    ~read_metadata:false
+    block_store
+    (Block_store.Block
+       ( Block_repr.hash head,
+         Int32.(to_int (sub (Block_repr.level head) caboose_level)) ))
+  >>=? function
+  | Some b ->
+      let inferred_caboose = (Block_repr.hash b, Block_repr.level b) in
+      Stored_data.write_file (Naming.caboose_file chain_dir) inferred_caboose
+      >>=? fun () ->
+      (* Try to load the current caboose *)
+      (Stored_data.load (Naming.caboose_file chain_dir) >>= function
+       | Ok caboose_data -> Stored_data.get caboose_data >>= Lwt.return_some
+       | Error _ -> Lwt.return_none)
+      >>= fun stored_caboose ->
+      Store_events.(emit fix_caboose (stored_caboose, inferred_caboose))
+      >>= fun () -> return inferred_caboose
+  | None -> fail (Corrupted_store Cannot_find_caboose_candidate)
+
+(* Infers an returns both the savepoint and caboose to meet the
+   invariants of the store. *)
+let infer_savepoint_and_caboose chain_dir block_store =
   let cemented_dir = Naming.cemented_blocks_dir chain_dir in
-  let lowest_cemented_metadata cemented_dir =
-    Cemented_block_store.load_metadata_table cemented_dir >>=? function
-    | Some metadata_files ->
-        let rec aux = function
-          | [] -> return_none
-          | {Cemented_block_store.metadata_file; start_level; end_level} :: tl
-            -> (
-              Lwt.catch
-                (fun () -> lowest_metadata_entry metadata_file >>=? return_some)
-                (function
-                  | _ ->
-                      (* Can be the case if the metadata file is
-                         corrupted. Raise a warning and continue the
-                         search in the next metadata file. *)
-                      Store_events.(
-                        emit warning_missing_metadata (start_level, end_level))
-                      >>= fun () -> return_none)
-              >>=? function
-              | Some v -> return v
-              | None -> aux tl)
-        in
-        aux (Array.to_list metadata_files)
-    | None -> return_none
-  in
-  (* Returns both the lowest block and the lowest block with metadata
-     from the floating block store.*)
-  let lowest_floating_blocks floating_stores =
-    (* Ensure that the block is actually available by trying to read it?*)
-    List.map_es
-      (Floating_block_store.fold_left_s
-         (fun (last_min, last_min_with_metadata) block ->
-           let block_level = Block_repr.level block in
-           let lowest_block =
-             match last_min with
-             | None -> Some block_level
-             | Some last_min -> Some (min last_min block_level)
-           in
-           let lowest_block_with_metadata =
-             match last_min_with_metadata with
-             | None -> (
-                 match Block_repr.metadata block with
-                 | Some _ -> Some block_level
-                 | None -> None)
-             | Some last_min_with_metadata -> (
-                 match Block_repr.metadata block with
-                 | Some _ -> Some (min last_min_with_metadata block_level)
-                 | None -> Some last_min_with_metadata)
-           in
-           return (lowest_block, lowest_block_with_metadata))
-         (None, None))
-      floating_stores
-    >>=? fun l ->
-    let min l = List.fold_left (Option.merge min) None l in
-    let (lw, lwm) = List.split l in
-    let lw = min lw in
-    let lwm = min lwm in
-    return (lw, lwm)
-  in
   let cemented_block_store = Block_store.cemented_block_store block_store in
   let cemented_block_files =
     match Cemented_block_store.cemented_blocks_files cemented_block_store with
@@ -416,7 +458,7 @@ let fix_savepoint_and_caboose chain_dir block_store head =
   lowest_cemented_metadata cemented_dir >>=? fun cemented_savepoint_candidate ->
   let cemented_caboose_candidate = lowest_cemented_block cemented_block_files in
   let floating_stores = Block_store.floating_block_stores block_store in
-  (match (cemented_savepoint_candidate, cemented_caboose_candidate) with
+  match (cemented_savepoint_candidate, cemented_caboose_candidate) with
   | (Some cemented_savepoint, Some caboose) ->
       (* Cemented candidates are available. However, we must check
          that the lowest block with metadata from the floating store
@@ -460,56 +502,22 @@ let fix_savepoint_and_caboose chain_dir block_store head =
   | (Some _, None) ->
       (* Inconsistent as a cemented cycle with metadata implies that
          the caboose candidate is known. *)
-      assert false)
+      assert false
+
+(* [fix_savepoint_and_caboose chain_dir block_store head]
+   Fix the savepoint by setting it to the lowest block with metadata.
+   Assumption:
+   - block store is valid and available.
+
+   Fix the caboose by setting it to the lowest block.
+   Assumption:
+   - block store is valid and available. *)
+let fix_savepoint_and_caboose chain_dir block_store head =
+  infer_savepoint_and_caboose chain_dir block_store
   >>=? fun (savepoint_level, caboose_level) ->
-  (* Setting the savepoint *)
-  (Block_store.read_block
-     ~read_metadata:false
-     block_store
-     (Block_store.Block
-        ( Block_repr.hash head,
-          Int32.(to_int (sub (Block_repr.level head) savepoint_level)) ))
-   >>=? function
-   | Some b ->
-       let inferred_savepoint = (Block_repr.hash b, Block_repr.level b) in
-       Stored_data.write_file
-         (Naming.savepoint_file chain_dir)
-         inferred_savepoint
-       >>=? fun () ->
-       (* Try to load the current savepoint *)
-       (Stored_data.load (Naming.savepoint_file chain_dir) >>= function
-        | Ok savepoint_data ->
-            Stored_data.get savepoint_data >>= Lwt.return_some
-        | Error _ -> Lwt.return_none)
-       >>= fun stored_savepoint ->
-       Store_events.(emit fix_savepoint (stored_savepoint, inferred_savepoint))
-       >>= fun () -> return inferred_savepoint
-   | None ->
-       (* Assumption: the head is valid. Thus, at least the head
-          (with metadata) must be a valid candidate for the
-          savepoint. *)
-       assert false)
+  load_inferred_savepoint chain_dir block_store head savepoint_level
   >>=? fun savepoint ->
-  (* Setting the caboose *)
-  (Block_store.read_block
-     ~read_metadata:false
-     block_store
-     (Block_store.Block
-        ( Block_repr.hash head,
-          Int32.(to_int (sub (Block_repr.level head) caboose_level)) ))
-   >>=? function
-   | Some b ->
-       let inferred_caboose = (Block_repr.hash b, Block_repr.level b) in
-       Stored_data.write_file (Naming.caboose_file chain_dir) inferred_caboose
-       >>=? fun () ->
-       (* Try to load the current caboose *)
-       (Stored_data.load (Naming.caboose_file chain_dir) >>= function
-        | Ok caboose_data -> Stored_data.get caboose_data >>= Lwt.return_some
-        | Error _ -> Lwt.return_none)
-       >>= fun stored_caboose ->
-       Store_events.(emit fix_caboose (stored_caboose, inferred_caboose))
-       >>= fun () -> return inferred_caboose
-   | None -> fail (Corrupted_store Cannot_find_caboose_candidate))
+  load_inferred_caboose chain_dir block_store head caboose_level
   >>=? fun caboose -> return (savepoint, caboose)
 
 (* [fix_checkpoint chain_dir block_store head] fixes the checkpoint
