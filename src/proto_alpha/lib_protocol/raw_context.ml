@@ -124,7 +124,7 @@ module Raw_consensus = struct
     register_error_kind
       `Branch
       ~id:"operation.double_inclusion_of_consensus_operation"
-      ~title:"double inclusion of consensus operation"
+      ~title:"Double inclusion of consensus operation"
       ~description:"double inclusion of consensus operation"
       ~pp:(fun ppf () ->
         Format.fprintf ppf "Double inclusion of consensus operation")

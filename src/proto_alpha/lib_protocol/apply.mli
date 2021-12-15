@@ -37,79 +37,9 @@ open Alpha_context
 open Apply_results
 
 type error +=
-  | (* `Temporary *)
-      Wrong_consensus_operation_branch of
-      Block_hash.t * Block_hash.t
-
-type error +=
-  | (* `Permanent *)
-      Wrong_level_for_consensus_operation of {
-      expected : Raw_level.t;
-      provided : Raw_level.t;
-    }
-  | (* `Permanent *)
-      Wrong_round_for_consensus_operation of {
-      expected : Round.t;
-      provided : Round.t;
-    }
-  | (* `Permanent *)
-      Preendorsement_round_too_high of {
-      block_round : Round.t;
-      provided : Round.t;
-    }
-
-type error +=
   | (* `Permanent *) Internal_operation_replay of packed_internal_operation
 
-type denunciation_kind = Preendorsement | Endorsement | Block
-
-type error += (* `Permanent *) Invalid_denunciation of denunciation_kind
-
-type error +=
-  | (* `Permanent *)
-      Inconsistent_denunciation of {
-      kind : denunciation_kind;
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
-    }
-
-type error +=
-  | (* `Temporary *)
-      Too_early_denunciation of {
-      kind : denunciation_kind;
-      level : Raw_level.t;
-      current : Raw_level.t;
-    }
-
-type error +=
-  | (* `Permanent *)
-      Outdated_denunciation of {
-      kind : denunciation_kind;
-      level : Raw_level.t;
-      last_cycle : Cycle.t;
-    }
-
-type error +=
-  | (* `Permanent *)
-      Invalid_double_baking_evidence of {
-      hash1 : Block_hash.t;
-      level1 : Raw_level.t;
-      round1 : Round.t;
-      hash2 : Block_hash.t;
-      level2 : Raw_level.t;
-      round2 : Round.t;
-    }
-
-type error +=
-  | (* Permanent *) Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
-
 type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
-
-type error += (* `Permanent *) Inconsistent_sources
-
-type error += (* `Permanent *) Failing_noop_error
-
-type error += (* `Branch *) Empty_transaction of Contract.t
 
 type error += (* `Permanent *) Tx_rollup_feature_disabled
 

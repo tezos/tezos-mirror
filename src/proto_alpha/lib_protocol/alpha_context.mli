@@ -1459,8 +1459,6 @@ module Contract : sig
     val of_lazy_storage_diff : Lazy_storage.diffs -> t
   end
 
-  type error += Balance_too_low of contract * Tez.t * Tez.t
-
   val update_script_storage :
     context ->
     contract ->
@@ -1858,26 +1856,7 @@ module Block_header : sig
   (** The maximum size of block headers in bytes *)
   val max_header_length : int
 
-  type error +=
-    | Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t
-    | Invalid_stamp
-    | Invalid_payload_hash of {
-        expected : Block_payload_hash.t;
-        provided : Block_payload_hash.t;
-      }
-    | Locked_round_after_block_round of {
-        locked_round : Round_repr.t;
-        round : Round_repr.t;
-      }
-    | Invalid_payload_round of {
-        payload_round : Round_repr.t;
-        round : Round_repr.t;
-      }
-    | Insufficient_locked_round_evidence of {
-        voting_power : int;
-        consensus_threshold : int;
-      }
-    | Invalid_commitment of {expected : bool}
+  type error += Invalid_stamp
 
   val check_timestamp :
     Round.round_durations ->
