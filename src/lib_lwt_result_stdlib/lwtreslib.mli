@@ -285,6 +285,8 @@ module Bare : sig
 
   module Set : Bare_sigs.Set.S
 
+  module Unit : Bare_sigs.Unit.S
+
   module WithExceptions : Bare_sigs.WithExceptions.S
 end
 
