@@ -504,6 +504,15 @@ let infer_savepoint_and_caboose chain_dir block_store =
          the caboose candidate is known. *)
       assert false
 
+let load_genesis block_store genesis =
+  Block_store.read_block
+    ~read_metadata:true
+    block_store
+    (Block_store.Block (genesis.Genesis.block, 0))
+  >>=? function
+  | Some b -> return b
+  | None -> fail (Corrupted_store Missing_genesis)
+
 (* [fix_savepoint_and_caboose chain_dir block_store head]
    Fix the savepoint by setting it to the lowest block with metadata.
    Assumption:
@@ -512,13 +521,24 @@ let infer_savepoint_and_caboose chain_dir block_store =
    Fix the caboose by setting it to the lowest block.
    Assumption:
    - block store is valid and available. *)
-let fix_savepoint_and_caboose chain_dir block_store head =
-  infer_savepoint_and_caboose chain_dir block_store
-  >>=? fun (savepoint_level, caboose_level) ->
-  load_inferred_savepoint chain_dir block_store head savepoint_level
-  >>=? fun savepoint ->
-  load_inferred_caboose chain_dir block_store head caboose_level
-  >>=? fun caboose -> return (savepoint, caboose)
+let fix_savepoint_and_caboose ?history_mode chain_dir block_store head genesis =
+  match history_mode with
+  | Some History_mode.Archive ->
+      (* This case does not cover all the potential cases where the
+         storage is set to archive, as one might have not set the
+         history mode in the config file nor command line. The last
+         check will be done after inferring the history_mode, see
+         [fix_chain_state].*)
+      load_genesis block_store genesis >>=? fun genesis_block ->
+      let genesis_descr = Block_repr.descriptor genesis_block in
+      return (genesis_descr, genesis_descr)
+  | None | Some (Full _) | Some (Rolling _) ->
+      infer_savepoint_and_caboose chain_dir block_store
+      >>=? fun (savepoint_level, caboose_level) ->
+      load_inferred_savepoint chain_dir block_store head savepoint_level
+      >>=? fun savepoint ->
+      load_inferred_caboose chain_dir block_store head caboose_level
+      >>=? fun caboose -> return (savepoint, caboose)
 
 (* [fix_checkpoint chain_dir block_store head] fixes the checkpoint
    by setting it to the lowest block with metadata which is higher
@@ -858,9 +878,9 @@ let fix_protocol_levels context_index block_store genesis genesis_header ~head
    ~checkpoint ~savepoint ~caboose ~alternate_heads ~forked_chains
    ~protocol_levels ~chain_config ~genesis ~genesis_context] writes, as
    [Stored_data.t], the given arguments. *)
-let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
-    ~savepoint ~caboose ~alternate_heads ~forked_chains ~protocol_levels
-    ~chain_config ~genesis ~genesis_context =
+let fix_chain_state chain_dir block_store ~head ~cementing_highwatermark
+    ~checkpoint ~savepoint:tmp_savepoint ~caboose:tmp_caboose ~alternate_heads
+    ~forked_chains ~protocol_levels ~chain_config ~genesis ~genesis_context =
   (* By setting each stored data, we erase the previous content. *)
   let rec init_protocol_table protocol_table = function
     | [] -> protocol_table
@@ -892,6 +912,19 @@ let fix_chain_state chain_dir ~head ~cementing_highwatermark ~checkpoint
     (Naming.cementing_highwatermark_file chain_dir)
     cementing_highwatermark
   >>=? fun () ->
+  (* For archive mode, do not update the savepoint/caboose to the
+     inferred ones if they are breaking the invariants (savepoint =
+     caboose = genesis). *)
+  (match chain_config.history_mode with
+  | History_mode.Archive ->
+      if snd tmp_savepoint = 0l && snd tmp_caboose = 0l then
+        return (tmp_savepoint, tmp_caboose)
+      else
+        load_genesis block_store genesis >>=? fun genesis_block ->
+        let genesis_descr = Block_repr.descriptor genesis_block in
+        return (genesis_descr, genesis_descr)
+  | Full _ | Rolling _ -> return (tmp_savepoint, tmp_caboose))
+  >>=? fun (savepoint, caboose) ->
   Stored_data.write_file (Naming.savepoint_file chain_dir) savepoint
   >>=? fun () ->
   Stored_data.write_file (Naming.caboose_file chain_dir) caboose >>=? fun () ->
@@ -1023,7 +1056,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
   fix_head chain_dir block_store genesis_block >>=? fun head ->
   fix_cementing_highwatermark chain_dir block_store
   >>= fun cementing_highwatermark ->
-  fix_savepoint_and_caboose chain_dir block_store head
+  fix_savepoint_and_caboose chain_dir block_store head genesis
   >>=? fun (savepoint, caboose) ->
   fix_checkpoint chain_dir block_store head >>=? fun checkpoint ->
   fix_chain_config ?history_mode chain_dir block_store genesis caboose savepoint
@@ -1038,6 +1071,7 @@ let fix_consistency ?history_mode chain_dir context_index genesis =
   >>=? fun protocol_levels ->
   fix_chain_state
     chain_dir
+    block_store
     ~head:(Block_repr.descriptor head)
     ~cementing_highwatermark
     ~checkpoint
