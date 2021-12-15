@@ -95,14 +95,14 @@ let double_bake =
   and* _ = Node.wait_for_level node_2 (common_ancestor + 1) in
   Log.info "Both nodes are at level %d." (common_ancestor + 1) ;
   let* () = Node.terminate node_2 in
-  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
-  let* () = Client.bake_for ~key:bootstrap1_key client_1 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_1 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_1 in
   let* _ = Node.wait_for_level node_1 (common_ancestor + 3) in
   let* () = Node.terminate node_1 in
   let* () = Node.run node_2 [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node_2 in
-  let* () = Client.bake_for ~key:bootstrap2_key client_2 in
-  let* () = Client.bake_for ~key:bootstrap1_key client_2 in
+  let* () = Client.bake_for ~keys:[bootstrap2_key] client_2 in
+  let* () = Client.bake_for ~keys:[bootstrap1_key] client_2 in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 3) in
   let* () = Node.run node_1 [Synchronisation_threshold 0] in
   let* () = Node.wait_for_ready node_1 in
@@ -134,7 +134,9 @@ let double_bake =
   Log.info "Level of node3 is %d, waiting for denunciation operation..." level ;
   let* denunciation_oph = denunciation in
   let* _ = denunciation_injection in
-  let* () = Client.bake_for ~endpoint:endpoint_3 ~key:bootstrap1_key client_3 in
+  let* () =
+    Client.bake_for ~endpoint:endpoint_3 ~keys:[bootstrap1_key] client_3
+  in
   let* _ = Node.wait_for_level node_2 (common_ancestor + 4)
   and* _ = Node.wait_for_level node_3 (common_ancestor + 4) in
   let* ops = RPC.get_operations client_1 in
