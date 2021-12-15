@@ -23,61 +23,43 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
+open Script_typed_ir
 
-let rng_state = Random.State.make [|42; 987897; 54120|]
+type in_lambda = bool
 
-let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =
-  Micheline_printer.print_expr
-    fmtr
-    (Micheline_printer.printable
-       Protocol.Michelson_v1_primitives.string_of_prim
-       expr)
+type callsite =
+  | Toplevel : {
+      storage_type : 'sto ty;
+      param_type : 'param ty;
+      root_name : Script_ir_annot.field_annot option;
+    }
+      -> callsite
+  | View : callsite
+  | Data : callsite
 
-let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " :: ")
-    print_script_expr
-    fmtr
-    exprs
+type t = {callsite : callsite; in_lambda : in_lambda}
 
-let typecheck_by_tezos =
-  let context_init_memory ~rng_state =
-    Context.init
-      ~rng_state
-      ~initial_balances:
-        [
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-        ]
-      5
-    >>=? fun (block, _accounts) ->
-    Incremental.begin_construction
-      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
-      block
-    >>=? fun vs ->
-    let ctxt = Incremental.alpha_ctxt vs in
-    (* Required for eg Create_contract *)
-    return
-    @@ Protocol.Alpha_context.Origination_nonce.init
-         ctxt
-         Tezos_crypto.Operation_hash.zero
-  in
-  fun bef node ->
-    Stdlib.Result.get_ok
-      (Lwt_main.run
-         ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
-           in
-           Protocol.Script_ir_translator.parse_instr
-             Protocol.Script_tc_context.data
-             ctxt
-             ~legacy:false
-             (Micheline.root node)
-             bef
-           >|= Protocol.Environment.wrap_tzresult
-           >>=? fun _ -> return_unit ))
+let init callsite = {callsite; in_lambda = false}
+
+let toplevel ~storage_type ~param_type root_name =
+  init (Toplevel {storage_type; param_type; root_name})
+
+let view = init View
+
+(* [data] is prefered over [toplevel] outside [Script_ir_translator], because
+   [toplevel] needs to setup a lot of information. *)
+let data = init Data
+
+let add_lambda tc_context = {tc_context with in_lambda = true}
+
+let is_in_lambda {callsite = _; in_lambda} = in_lambda
+
+let check_not_in_view loc ~legacy tc_context prim =
+  match tc_context.callsite with
+  (* The forbidden (stateful) instructions in views are in facts allowed in
+     lambdas in views, because they could be returned to the caller, and then
+     executed on his responsibility. *)
+  | Toplevel _ | Data -> Result.return_unit
+  | View when is_in_lambda tc_context || legacy -> Result.return_unit
+  | View ->
+      error Script_tc_errors.(Forbidden_instr_in_context (loc, View, prim))

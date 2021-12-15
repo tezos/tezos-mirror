@@ -124,15 +124,7 @@ type ('a, 's, 'b, 'u) descr = {
   instr : ('a, 's, 'b, 'u) cinstr;
 }
 
-type tc_context =
-  | Lambda : tc_context
-  | Dip : ('a, 's) Script_typed_ir.stack_ty * tc_context -> tc_context
-  | Toplevel : {
-      storage_type : 'sto Script_typed_ir.ty;
-      param_type : 'param Script_typed_ir.ty;
-      root_name : Script_ir_annot.field_annot option;
-    }
-      -> tc_context
+type tc_context = Script_tc_context.t
 
 type ('a, 's) judgement =
   | Typed : ('a, 's, 'b, 'u) descr -> ('a, 's) judgement

@@ -868,7 +868,7 @@ let test_contract_not_packable () =
   >>=? fun () ->
   (* Test that elaboration of the [UNPACK unit] instruction succeeds *)
   (Script_ir_translator.parse_instr
-     Lambda
+     Script_tc_context.data
      ctxt
      ~legacy:false
      (Prim (0, I_UNPACK, [Prim (0, T_unit, [], [])], []))
@@ -879,7 +879,7 @@ let test_contract_not_packable () =
   >>=? fun () ->
   (* Test that elaboration of the [UNPACK (contract unit)] instruction fails *)
   Script_ir_translator.parse_instr
-    Lambda
+    Script_tc_context.data
     ctxt
     ~legacy:false
     (Prim (0, I_UNPACK, [contract_unit], []))
@@ -889,6 +889,25 @@ let test_contract_not_packable () =
       Alcotest.failf
         "UNPACK (contract unit) should not be allowed, see \
          https://gitlab.com/tezos/tezos/-/issues/301"
+  | Error _ -> return_unit
+
+(* This test function is used to checks forbidden operations in views. *)
+let test_forbidden_op_in_view op () =
+  let prefix = "./contracts/forbidden_op_in_view_" in
+  let script = read_file (prefix ^ op ^ ".tz") in
+  let contract_expr = Expr.from_string script in
+  test_context () >>=? fun ctxt ->
+  Script_ir_translator.typecheck_code
+    ~legacy:false
+    ~show_types:false
+    ctxt
+    contract_expr
+  >>= function
+  | Ok _ ->
+      Alcotest.failf
+        "%s should not be allowed in views, see \
+         https://gitlab.com/tezos/tezos/-/issues/1922"
+        op
   | Error _ -> return_unit
 
 let tests =
@@ -912,4 +931,20 @@ let tests =
       "test unpackability of the contract type"
       `Quick
       test_contract_not_packable;
+    Tztest.tztest
+      "test forbidden SELF in view"
+      `Quick
+      (test_forbidden_op_in_view "SELF");
+    Tztest.tztest
+      "test forbidden SET_DELEGATE in view"
+      `Quick
+      (test_forbidden_op_in_view "SET_DELEGATE");
+    Tztest.tztest
+      "test forbidden TRANSFER_TOKENS in view"
+      `Quick
+      (test_forbidden_op_in_view "TRANSFER_TOKENS");
+    Tztest.tztest
+      "test forbidden CREATE_CONTRACT in view"
+      `Quick
+      (test_forbidden_op_in_view "CREATE_CONTRACT");
   ]

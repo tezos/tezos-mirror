@@ -32,6 +32,7 @@ open Script_ir_annot
 open Script_typed_ir
 module Typecheck_costs = Michelson_v1_gas.Cost_of.Typechecking
 module Unparse_costs = Michelson_v1_gas.Cost_of.Unparsing
+module Tc_context = Script_tc_context
 
 type ex_stack_ty = Ex_stack_ty : ('a, 's) stack_ty -> ex_stack_ty
 
@@ -93,15 +94,7 @@ let compose_descr :
       };
   }
 
-type tc_context =
-  | Lambda : tc_context
-  | Dip : ('a, 's) stack_ty * tc_context -> tc_context
-  | Toplevel : {
-      storage_type : 'sto ty;
-      param_type : 'param ty;
-      root_name : field_annot option;
-    }
-      -> tc_context
+type tc_context = Tc_context.t
 
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
@@ -110,12 +103,6 @@ type type_logger =
   (Script.expr * Script.annot) list ->
   (Script.expr * Script.annot) list ->
   unit
-
-let add_dip ty annot prev =
-  match prev with
-  | Lambda | Toplevel _ ->
-      Dip (Item_t (ty, Item_t (unit_t ~annot:None, Bot_t, None), annot), prev)
-  | Dip (stack, _) -> Dip (Item_t (ty, stack, annot), prev)
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -2656,7 +2643,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Lambda_t (ta, tr, _ty_name), (Seq (_loc, _) as script_instr)) ->
       traced
       @@ parse_returning
-           Lambda
+           Tc_context.data
            ?type_logger
            ~stack_depth:(stack_depth + 1)
            ctxt
@@ -2887,7 +2874,7 @@ and parse_view_returning :
   parse_instr
     ?type_logger
     ~stack_depth:0
-    Lambda
+    Tc_context.view
     ctxt
     ~legacy
     view_code
@@ -4162,7 +4149,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_kind [Seq_kind] code >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       parse_returning
-        Lambda
+        (Tc_context.add_lambda tc_context)
         ?type_logger
         ~stack_depth:(stack_depth + 1)
         ctxt
@@ -4210,13 +4197,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_DIP, [code], annot), Item_t (v, rest, stack_annot)) -> (
       error_unexpected_annot loc annot >>?= fun () ->
       check_kind [Seq_kind] code >>?= fun () ->
-      non_terminal_recursion
-        ?type_logger
-        (add_dip v stack_annot tc_context)
-        ctxt
-        ~legacy
-        code
-        rest
+      non_terminal_recursion ?type_logger tc_context ctxt ~legacy code rest
       >>=? fun (judgement, ctxt) ->
       match judgement with
       | Typed descr ->
@@ -4238,16 +4219,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Gas.consume ctxt (Typecheck_costs.proof_argument n) >>?= fun ctxt ->
       let rec make_proof_argument :
           type a s.
-          int ->
-          tc_context ->
-          (a, s) stack_ty ->
-          (a, s) dipn_proof_argument tzresult Lwt.t =
-       fun n inner_tc_context stk ->
+          int -> (a, s) stack_ty -> (a, s) dipn_proof_argument tzresult Lwt.t =
+       fun n stk ->
         match (Compare.Int.(n = 0), stk) with
         | (true, rest) -> (
             non_terminal_recursion
               ?type_logger
-              inner_tc_context
+              tc_context
               ctxt
               ~legacy
               code
@@ -4262,7 +4240,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                     : (a, s) dipn_proof_argument)
             | Failed _ -> error (Fail_not_in_tail_position loc))
         | (false, Item_t (v, rest, annot)) ->
-            make_proof_argument (n - 1) (add_dip v annot tc_context) rest
+            make_proof_argument (n - 1) rest
             >|=? fun (Dipn_proof_argument (n', ctxt, descr, aft')) ->
             let kinfo' = {iloc = loc; kstack_ty = aft'} in
             let w = KPrefix (kinfo', n') in
@@ -4273,7 +4251,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                error (Bad_stack (loc, I_DIP, 1, whole_stack)))
       in
       error_unexpected_annot loc result_annot >>?= fun () ->
-      make_proof_argument n tc_context stack
+      make_proof_argument n stack
       >>=? fun (Dipn_proof_argument (n', ctxt, descr, aft)) ->
       let kinfo = {iloc = descr.loc; kstack_ty = descr.bef} in
       let kinfoh = {iloc = descr.loc; kstack_ty = descr.aft} in
@@ -4796,17 +4774,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       let stack = Item_t (res_ty, rest, annot) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_TRANSFER_TOKENS, [], annot),
+  | ( Prim (loc, (I_TRANSFER_TOKENS as prim), [], annot),
       Item_t (p, Item_t (Mutez_t _, Item_t (Contract_t (cp, _), rest, _), _), _)
     ) ->
-      check_item_ty ctxt p cp loc I_TRANSFER_TOKENS 1 4
-      >>?= fun (Eq, _, ctxt) ->
+      Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
+      check_item_ty ctxt p cp loc prim 1 4 >>?= fun (Eq, _, ctxt) ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ITransfer_tokens (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest, annot) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
-  | ( Prim (loc, I_SET_DELEGATE, [], annot),
+  | ( Prim (loc, (I_SET_DELEGATE as prim), [], annot),
       Item_t (Option_t (Key_hash_t _, _), rest, _) ) ->
+      Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
       parse_var_annot loc annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ISet_delegate (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest, annot) in
@@ -4819,11 +4798,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> IImplicit_account (kinfo, k))} in
       let stack = Item_t (contract_unit_t, rest, annot) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_CREATE_CONTRACT, [(Seq _ as code)], annot),
+  | ( Prim (loc, (I_CREATE_CONTRACT as prim), [(Seq _ as code)], annot),
       Item_t
         ( Option_t (Key_hash_t _, _),
           Item_t (Mutez_t _, Item_t (ginit, rest, _), _),
           _ ) ) ->
+      Tc_context.check_not_in_view ~legacy loc tc_context prim >>?= fun () ->
       parse_two_var_annot loc annot >>?= fun (op_annot, addr_annot) ->
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
@@ -4872,7 +4852,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
-           (Toplevel {storage_type; param_type = arg_type; root_name})
+           (Tc_context.toplevel ~storage_type ~param_type:arg_type root_name)
            ctxt
            ~legacy
            ?type_logger
@@ -4958,7 +4938,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> ISender (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack, annot) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_SELF, [], annot), stack) ->
+  | (Prim (loc, (I_SELF as prim), [], annot), stack) ->
       Lwt.return
         ( parse_entrypoint_annot loc annot ~default:default_self_annot
         >>? fun (annot, entrypoint) ->
@@ -4968,24 +4948,30 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               ~none:"default"
               entrypoint
           in
-          let rec get_toplevel_type :
-              tc_context -> ((a, s) judgement * context) tzresult = function
-            | Lambda -> error (Self_in_lambda loc)
-            | Dip (_, prev) -> get_toplevel_type prev
-            | Toplevel {param_type; root_name; storage_type = _} ->
-                find_entrypoint param_type ~root_name entrypoint
-                >>? fun (_, Ex_ty param_type) ->
-                contract_t loc param_type ~annot:None >>? fun res_ty ->
-                let instr =
-                  {
-                    apply =
-                      (fun kinfo k -> ISelf (kinfo, param_type, entrypoint, k));
-                  }
-                in
-                let stack = Item_t (res_ty, stack, annot) in
-                typed_no_lwt ctxt loc instr stack
-          in
-          get_toplevel_type tc_context )
+          let open Tc_context in
+          match tc_context.callsite with
+          | _ when is_in_lambda tc_context ->
+              error
+                (Forbidden_instr_in_context (loc, Script_tc_errors.Lambda, prim))
+          (* [Data] is for pushed instructions of lambda type. *)
+          | Data ->
+              error
+                (Forbidden_instr_in_context (loc, Script_tc_errors.Lambda, prim))
+          | View ->
+              error
+                (Forbidden_instr_in_context (loc, Script_tc_errors.View, prim))
+          | Toplevel {param_type; root_name; storage_type = _} ->
+              find_entrypoint param_type ~root_name entrypoint
+              >>? fun (_, Ex_ty param_type) ->
+              contract_t loc param_type ~annot:None >>? fun res_ty ->
+              let instr =
+                {
+                  apply =
+                    (fun kinfo k -> ISelf (kinfo, param_type, entrypoint, k));
+                }
+              in
+              let stack = Item_t (res_ty, stack, annot) in
+              typed_no_lwt ctxt loc instr stack )
   | (Prim (loc, I_SELF_ADDRESS, [], annot), stack) ->
       parse_var_annot loc annot ~default:default_self_annot >>?= fun annot ->
       let instr = {apply = (fun kinfo k -> ISelf_address (kinfo, k))} in
@@ -5706,7 +5692,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
-       (Toplevel {storage_type; param_type = arg_type; root_name})
+       Tc_context.(toplevel ~storage_type ~param_type:arg_type root_name)
        ctxt
        ~legacy
        ~stack_depth:0
@@ -5836,7 +5822,7 @@ let typecheck_code :
   let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
-      (Toplevel {storage_type; param_type = arg_type; root_name})
+      (Tc_context.toplevel ~storage_type ~param_type:arg_type root_name)
       ctxt
       ~legacy
       ~stack_depth:0

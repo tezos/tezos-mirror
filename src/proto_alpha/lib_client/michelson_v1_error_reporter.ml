@@ -108,7 +108,7 @@ let collect_error_locations errs =
         | Bad_return (loc, _, _)
         | Bad_stack (loc, _, _, _)
         | Unmatched_branches (loc, _, _)
-        | Self_in_lambda loc
+        | Forbidden_instr_in_context (loc, _, _)
         | Invalid_constant (loc, _, _)
         | Invalid_syntactic_constant (loc, _, _)
         | Invalid_contract (loc, _)
@@ -123,6 +123,10 @@ let collect_error_locations errs =
     | _ :: rest -> collect acc rest
   in
   collect [] errs
+
+let string_of_context_desc = function
+  | Script_tc_errors.Lambda -> "lambda"
+  | Script_tc_errors.View -> "view"
 
 let report_errors ~details ~show_source ?parsed ppf errs =
   let rec print_trace locations errs =
@@ -649,12 +653,14 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "%aDUP n expects an argument of at least 1 (passed 0)."
               print_loc
               loc
-        | Self_in_lambda loc ->
+        | Forbidden_instr_in_context (loc, ctxt, prim) ->
             Format.fprintf
               ppf
-              "%aThe SELF instruction cannot appear in a lambda."
+              "%aThe %s instruction cannot appear in a %s."
               print_loc
               loc
+              (Michelson_v1_primitives.string_of_prim prim)
+              (string_of_context_desc ctxt)
         | Non_dupable_type (loc, ty) ->
             Format.fprintf
               ppf

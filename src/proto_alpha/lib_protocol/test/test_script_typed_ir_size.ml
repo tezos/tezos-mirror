@@ -128,7 +128,8 @@ module Samplers = struct
     let (Ex_stack_ty bef) =
       Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
     in
-    Script_ir_translator.(parse_instr Lambda ctxt ~legacy:true code bef)
+    Script_ir_translator.(
+      parse_instr Script_tc_context.data ctxt ~legacy:true code bef)
     >>= wrap
     >>=? fun (ir_code, _) ->
     match ir_code with

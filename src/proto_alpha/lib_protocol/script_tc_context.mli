@@ -23,61 +23,58 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Tezos_error_monad.Error_monad
+open Alpha_context
+open Script_typed_ir
 
-let rng_state = Random.State.make [|42; 987897; 54120|]
+(** This module defines the typechecking context used during the translation
+    from Michelson untyped nodes to typed nodes ([Script_ir_translator]).
+    The context keeps track of the origin of the code (top-level from a contract,
+    in a view, etc.), plus some information to allow or forbid instructions
+    given the context (no `SELF` in a lambda for example). *)
 
-let print_script_expr fmtr (expr : Protocol.Script_repr.expr) =
-  Micheline_printer.print_expr
-    fmtr
-    (Micheline_printer.printable
-       Protocol.Michelson_v1_primitives.string_of_prim
-       expr)
+(** Lambdas are a bit special when considering stateful instructions such as
+    [TRANSFER_TOKENS].
+    For instance, a view containing a [TRANSFER_TOKENS] is not OK, because
+    calling the view would transfer tokens from the view's owner.
+    However, a view returning a lambda containing a [TRANSFER_TOKENS] could be
+    considered OK, as the decision whether to execute it or not falls on
+    the view's caller, whose tokens would be transfered.
+    This type is used to keep track of whether we are inside a lambda: it is
+    [true] when inside a lambda, and [false] otherwise. *)
+type in_lambda = bool
 
-let print_script_expr_list fmtr (exprs : Protocol.Script_repr.expr list) =
-  Format.pp_print_list
-    ~pp_sep:(fun fmtr () -> Format.fprintf fmtr " :: ")
-    print_script_expr
-    fmtr
-    exprs
+(** The calling context when parsing Michelson code: either a top-level contract
+    code, the code of a view, or code in data (when pushing a block of
+    instructions for example). *)
+type callsite =
+  | Toplevel : {
+      storage_type : 'sto ty;
+      param_type : 'param ty;
+      root_name : Script_ir_annot.field_annot option;
+    }
+      -> callsite
+  | View : callsite
+  | Data : callsite
 
-let typecheck_by_tezos =
-  let context_init_memory ~rng_state =
-    Context.init
-      ~rng_state
-      ~initial_balances:
-        [
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-          4_000_000_000_000L;
-        ]
-      5
-    >>=? fun (block, _accounts) ->
-    Incremental.begin_construction
-      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
-      block
-    >>=? fun vs ->
-    let ctxt = Incremental.alpha_ctxt vs in
-    (* Required for eg Create_contract *)
-    return
-    @@ Protocol.Alpha_context.Origination_nonce.init
-         ctxt
-         Tezos_crypto.Operation_hash.zero
-  in
-  fun bef node ->
-    Stdlib.Result.get_ok
-      (Lwt_main.run
-         ( context_init_memory ~rng_state >>=? fun ctxt ->
-           let (Protocol.Script_ir_translator.Ex_stack_ty bef) =
-             Type_helpers.michelson_type_list_to_ex_stack_ty bef ctxt
-           in
-           Protocol.Script_ir_translator.parse_instr
-             Protocol.Script_tc_context.data
-             ctxt
-             ~legacy:false
-             (Micheline.root node)
-             bef
-           >|= Protocol.Environment.wrap_tzresult
-           >>=? fun _ -> return_unit ))
+type t = {callsite : callsite; in_lambda : in_lambda}
+
+val init : callsite -> t
+
+val toplevel :
+  storage_type:'sto ty ->
+  param_type:'param ty ->
+  Script_ir_annot.field_annot option ->
+  t
+
+val view : t
+
+(** This value can be used outside the translation module as a simple context
+    when testing code, for example. *)
+val data : t
+
+val add_lambda : t -> t
+
+val is_in_lambda : t -> bool
+
+val check_not_in_view :
+  Script.location -> legacy:bool -> t -> Script.prim -> unit tzresult

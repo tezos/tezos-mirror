@@ -105,7 +105,10 @@ type error +=
 
 type error += Duplicated_view_name of Script.location
 
-type error += Self_in_lambda of Script.location
+type context_desc = Lambda | View
+
+type error +=
+  | Forbidden_instr_in_context of Script.location * context_desc * prim
 
 type error += Bad_stack_length
 

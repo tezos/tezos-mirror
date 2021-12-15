@@ -239,7 +239,7 @@ end = struct
         match
           Lwt_main.run
             (Script_ir_translator.parse_instr
-               Script_ir_translator.Lambda
+               Script_tc_context.data
                ctxt
                ~legacy:false
                node
