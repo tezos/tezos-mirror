@@ -350,12 +350,13 @@ let read_predecessor_block_by_level_opt block_store ?(read_metadata = false)
 let read_predecessor_block_by_level block_store ?(read_metadata = false) ~head
     level =
   let head_level = Block_repr.level head in
-  read_block
-    block_store
-    ~read_metadata
-    (Block (Block_repr.hash head, Int32.(to_int (sub head_level level))))
+  let head_hash = Block_repr.hash head in
+  let distance = Int32.(to_int (sub head_level level)) in
+  read_block block_store ~read_metadata (Block (head_hash, distance))
   >>=? function
-  | None -> fail (Bad_level {head_level; given_level = level})
+  | None ->
+      if distance < 0 then fail (Bad_level {head_level; given_level = level})
+      else fail (Block_not_found {hash = head_hash; distance})
   | Some b -> return b
 
 (* TODO optimize this by reading chunks of contiguous data and
@@ -1170,15 +1171,6 @@ let merge_temporary_floating block_store =
   (* If RW_TMP exists, merge RW and RW_TMP into one new
      single floating_store RW_RESTORE then swap it with
      the previous one. *)
-  Floating_block_store.all_files_exists chain_dir RW_TMP
-  >>= fun is_rw_tmp_present ->
-  (if is_rw_tmp_present then
-   let rw_tmp_floating_store_dir_path =
-     Naming.floating_blocks_dir chain_dir RW_TMP |> Naming.dir_path
-   in
-   Lwt_utils_unix.remove_dir rw_tmp_floating_store_dir_path
-  else Lwt.return_unit)
-  >>= fun () ->
   Floating_block_store.init chain_dir ~readonly:false (Restore RW)
   >>= fun rw_restore ->
   Lwt.finalize
@@ -1190,7 +1182,6 @@ let merge_temporary_floating block_store =
       >>=? fun () ->
       Floating_block_store.append_floating_store ~from:rw_tmp ~into:rw_restore
       >>=? fun () ->
-      Floating_block_store.close rw_restore >>= fun () ->
       Floating_block_store.swap ~src:rw_restore ~dst:rw >>= fun () ->
       Floating_block_store.delete_files rw_tmp >>= fun () -> return_unit)
     (fun () -> Floating_block_store.delete_files rw_restore)
