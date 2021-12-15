@@ -215,12 +215,12 @@ module type INTERFACE = sig
        no associated value in the subcache. *)
   val identifier_rank : Raw_context.t -> string -> int option
 
-  (** [size ctxt] returns an overapproximation of the subcache size
-        (in bytes). *)
+  (** [size ctxt] returns an overapproximation of the subcache size.
+      Note that the size unit is subcache specific. *)
   val size : Raw_context.t -> int
 
-  (** [size_limit ctxt] returns the maximal size of the subcache
-        (in bytes). *)
+  (** [size_limit ctxt] returns the maximal size of the subcache.
+      Note that the size unit is subcache specific. *)
   val size_limit : Raw_context.t -> int
 end
 
