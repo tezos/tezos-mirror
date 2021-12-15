@@ -98,15 +98,23 @@ let ( =~ ) s (_, r) = Re.execp r s
 
 let ( =~! ) s (_, r) = not (Re.execp r s)
 
+let get_group group index =
+  match Re.Group.get group index with
+  | exception Not_found ->
+      invalid_arg
+        "regular expression has not enough capture groups for its usage, did \
+         you forget parentheses?"
+  | value -> value
+
 let ( =~* ) s (_, r) =
   match Re.exec_opt r s with
   | None -> None
-  | Some group -> Some (Re.Group.get group 1)
+  | Some group -> Some (get_group group 1)
 
 let ( =~** ) s (_, r) =
   match Re.exec_opt r s with
   | None -> None
-  | Some group -> Some (Re.Group.get group 1, Re.Group.get group 2)
+  | Some group -> Some (get_group group 1, get_group group 2)
 
 let replace_string ?pos ?len ?all (_, r) ~by s =
   Re.replace_string ?pos ?len ?all r ~by s
