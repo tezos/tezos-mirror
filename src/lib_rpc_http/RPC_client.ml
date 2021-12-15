@@ -324,7 +324,11 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Ok (body, Some ("application", "octet-stream"), _)
       when List.mem ~equal:( == ) Media_type.octet_stream accept ->
         Cohttp_lwt.Body.to_string body >>= fun body ->
-        return (`Binary (`Ok body))
+        (* The binary RPCs are prefixed with a size header, we remove it here. *)
+        let response =
+          Data_encoding.Binary.of_string_exn Data_encoding.string body
+        in
+        return (`Binary (`Ok response))
     | `Ok (body, Some ("application", "json"), _)
       when List.mem ~equal:( == ) Media_type.json accept ->
         Cohttp_lwt.Body.to_string body >>= fun body ->
