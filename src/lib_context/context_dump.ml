@@ -116,6 +116,7 @@ module Make (I : Dump_interface) = struct
   type command =
     | Root
     | Node of (string * I.Kinded_hash.t) list
+    | Node_seq of (string * I.Kinded_hash.t) Utils.Seq_lwt.t
     | Blob of bytes
     | Eoc of {info : I.commit_info; parents : I.Commit_hash.t list}
     | Eof
@@ -210,20 +211,91 @@ module Make (I : Dump_interface) = struct
     read_string ~len:8 rbuf >>=? fun s ->
     return @@ EndianString.BigEndian.get_int64 s 0
 
+  let get_char rbuf =
+    read_string ~len:1 rbuf >>=? fun s ->
+    return @@ EndianString.BigEndian.get_int8 s 0
+
+  let get_int4 rbuf =
+    read_string ~len:4 rbuf >>=? fun s ->
+    return @@ EndianString.BigEndian.get_int32 s 0
+
   let set_mbytes buf b =
     set_int64 buf (Int64.of_int (Bytes.length b)) ;
     Buffer.add_bytes buf b
 
-  let get_mbytes rbuf =
-    get_int64 rbuf >|=? Int64.to_int >>=? fun l ->
-    let b = Bytes.create l in
-    read_mbytes rbuf b >>=? fun () -> return b
+  (* To decode a variable size string we need to: 1/ read the length of the
+     string, encoded on 4 bytes; 2/ reset the offset to the beginning of the string
+     encoding. *)
+  let get_length_and_reset_offset rbuf =
+    get_int4 rbuf >|=? Int32.to_int >>=? fun length ->
+    let (fd, buf, ofs, total) = !rbuf in
+    rbuf := (fd, buf, ofs - 4, total) ;
+    Lwt.return_ok (length + 4)
 
-  (* Getter and setters *)
+  let read_variable_length_string rbuf =
+    get_length_and_reset_offset rbuf >>=? fun length_name ->
+    let b = Bytes.create length_name in
+    read_mbytes rbuf b >|=? fun () ->
+    let name = Data_encoding.(Binary.of_bytes_exn string) b in
+    (length_name, name)
+
+  let read_fixed_length_hash rbuf =
+    let length_hash = 1 + 4 + 32 (*enum + size + hash*) in
+    let b = Bytes.create length_hash in
+    read_mbytes rbuf b >|=? fun () ->
+    let hash = Data_encoding.Binary.of_bytes_exn I.Kinded_hash.encoding b in
+    (length_hash, hash)
+
+  let read_seq rbuf total =
+    let step i =
+      if i >= total then Lwt.return_ok None
+      else
+        read_variable_length_string rbuf >>=? fun (length_name, name) ->
+        read_fixed_length_hash rbuf >|=? fun (length_hash, hash) ->
+        let node = (name, hash) in
+        let i = i + length_name + length_hash in
+        Some (node, i)
+    in
+    Utils.Seq_lwt.unfold step 0
+
+  let eoc_encoding_raw =
+    let open Data_encoding in
+    obj2
+      (req "info" I.commit_info_encoding)
+      (req "parents" (list I.Commit_hash.encoding))
 
   let get_command rbuf =
-    get_mbytes rbuf >|=? fun bytes ->
-    Data_encoding.Binary.of_bytes_exn command_encoding bytes
+    get_int64 rbuf >|=? Int64.to_int >>=? fun total ->
+    get_char rbuf >|=? Char.chr >>=? fun tag ->
+    let read_empty () =
+      let len = total - 1 in
+      let b = Bytes.create len in
+      read_mbytes rbuf b >|=? fun () ->
+      Data_encoding.Binary.of_bytes_exn Data_encoding.empty b
+    in
+    match tag with
+    | 'r' -> read_empty () >|=? fun () -> Root
+    | 'e' -> read_empty () >|=? fun () -> Eof
+    | 'c' ->
+        let len = total - 1 in
+        let b = Bytes.create len in
+        read_mbytes rbuf b >|=? fun () ->
+        let (info, parents) =
+          Data_encoding.Binary.of_bytes_exn eoc_encoding_raw b
+        in
+        Eoc {info; parents}
+    | 'b' ->
+        let len = total - 1 in
+        let b = Bytes.create len in
+        read_mbytes rbuf b >|=? fun () ->
+        let data = Data_encoding.Binary.of_bytes_exn Data_encoding.bytes b in
+        Blob data
+    | 'n' ->
+        get_int4 rbuf >|=? Int32.to_int >>=? fun list_size ->
+        let data = read_seq rbuf list_size in
+        Lwt.return_ok (Node_seq data)
+    | _ -> fail Restore_context_failure
+  (* Getter and setters *)
 
   let set_root buf =
     let root = Root in
@@ -301,7 +373,7 @@ module Make (I : Dump_interface) = struct
     (* Editing the repository *)
     let add_blob t blob = I.add_bytes t blob >>= fun tree -> return tree in
     let add_dir t keys =
-      I.add_dir t keys >>= function
+      I.add_dir t keys >>=? function
       | None -> fail Restore_context_failure
       | Some tree -> return tree
     in
@@ -314,7 +386,7 @@ module Make (I : Dump_interface) = struct
       let rec second_pass batch ctxt context_hash notify =
         notify () >>= fun () ->
         get_command rbuf >>=? function
-        | Node contents ->
+        | Node_seq contents ->
             add_dir batch contents >>=? fun tree ->
             second_pass batch (I.update_context ctxt tree) context_hash notify
         | Blob data ->

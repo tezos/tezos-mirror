@@ -734,19 +734,18 @@ module Dumpable_context = struct
     Store.save_contents t bytes >|= fun _ -> Store.Tree.of_contents bytes
 
   let add_dir batch l =
-    let rec fold_list sub_tree = function
-      | [] -> Lwt.return_some sub_tree
-      | (step, hash) :: tl -> (
-          add_hash batch sub_tree [step] hash >>= function
-          | None -> Lwt.return_none
-          | Some sub_tree -> fold_list sub_tree tl)
+    let add sub_tree (step, hash) =
+      match sub_tree with
+      | None -> Lwt.return_some Store.Tree.empty
+      | Some sub_tree -> add_hash batch sub_tree [step] hash
     in
-    fold_list Store.Tree.empty l >>= function
-    | None -> Lwt.return_none
+    Utils.Seq_lwt.fold_left add (Some Store.Tree.empty) l >>=? function
+    | None -> Lwt.return_ok None
     | Some tree ->
         let (Batch (repo, x, y)) = batch in
         (* Save the node in the store ... *)
-        Store.save_tree ~clear:true repo x y tree >|= fun _ -> Some tree
+        Store.save_tree ~clear:true repo x y tree >>= fun _ ->
+        Lwt.return_ok (Some tree)
 
   module Commit_hash = Context_hash
   module Block_header = Block_header

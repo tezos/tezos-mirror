@@ -87,6 +87,18 @@ module type String_set = sig
   val mem : t -> string -> bool
 end
 
+module type Seq_lwt = sig
+  type +'a node = Nil | Cons of 'a * 'a t
+
+  and 'a t = unit -> ('a node, error trace) result Lwt.t
+
+  val fold_left :
+    ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b t -> ('a, error trace) result Lwt.t
+
+  val unfold :
+    ('b -> (('a * 'b) option, error trace) result Lwt.t) -> 'b -> 'a t
+end
+
 module type Intf = sig
   (** An implementation of append-only arenas of fixed-length strings, with
       support for manual expansion. *)
@@ -97,4 +109,7 @@ module type Intf = sig
 
   (** A mutable set implementation optimised for storing fixed-length strings. *)
   module String_set : String_set
+
+  (** Similar to [Seq] but uses Lwt.t for the delayed elements of the sequence. *)
+  module Seq_lwt : Seq_lwt
 end
