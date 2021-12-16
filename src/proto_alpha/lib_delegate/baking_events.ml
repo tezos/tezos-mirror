@@ -655,7 +655,7 @@ module Nonces = struct
       ~name:"revealing_nonce"
       ~level:Notice
       ~msg:
-        "revaling nonce of level {level} (chain {chain} with operation \
+        "revealing nonce of level {level} (chain {chain} with operation \
          {ophash})"
       ~pp1:pp_int32
       ("level", Data_encoding.int32)
