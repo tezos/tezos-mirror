@@ -64,7 +64,7 @@ module type S = sig
 
   val default_config : config
 
-  class http_ctxt : config -> Media_type.t list -> RPC_context.json
+  class http_ctxt : config -> Media_type.t list -> RPC_context.generic
 
   (**/**)
 
@@ -427,7 +427,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
       logger = null_logger;
     }
 
-  class http_ctxt config media_types : RPC_context.json =
+  class http_ctxt config media_types : RPC_context.generic =
     let base = config.endpoint in
     let logger = config.logger in
     object

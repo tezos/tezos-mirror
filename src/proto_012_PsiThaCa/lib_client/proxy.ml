@@ -26,7 +26,7 @@
 module L = (val Tezos_proxy.Logger.logger ~protocol_name:Protocol.name
               : Tezos_proxy.Logger.S)
 
-let proxy_block_header (rpc_context : RPC_context.json)
+let proxy_block_header (rpc_context : RPC_context.generic)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
   let rpc_context = new Protocol_client_context.wrap_rpc_context rpc_context in
@@ -111,8 +111,8 @@ end
 let initial_context
     (proxy_builder :
       Tezos_proxy.Proxy_proto.proto_rpc ->
-      Tezos_proxy.Proxy_getter.proxy_m Lwt.t) (rpc_context : RPC_context.json)
-    (mode : Tezos_proxy.Proxy.mode)
+      Tezos_proxy.Proxy_getter.proxy_m Lwt.t)
+    (rpc_context : RPC_context.generic) (mode : Tezos_proxy.Proxy.mode)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Environment_context.Context.t Lwt.t =
@@ -141,7 +141,7 @@ let initial_context
     (Bytes.of_string version_value)
   >>= fun ctxt -> Protocol.Main.init_cache ctxt
 
-let round_durations (rpc_context : RPC_context.json)
+let round_durations (rpc_context : RPC_context.generic)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) =
   let open Protocol in
@@ -154,8 +154,8 @@ let round_durations (rpc_context : RPC_context.json)
 let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
     (proxy_builder :
       Tezos_proxy.Proxy_proto.proto_rpc ->
-      Tezos_proxy.Proxy_getter.proxy_m Lwt.t) (rpc_context : RPC_context.json)
-    (mode : Tezos_proxy.Proxy.mode)
+      Tezos_proxy.Proxy_getter.proxy_m Lwt.t)
+    (rpc_context : RPC_context.generic) (mode : Tezos_proxy.Proxy.mode)
     (chain : Tezos_shell_services.Block_services.chain)
     (block : Tezos_shell_services.Block_services.block) :
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =

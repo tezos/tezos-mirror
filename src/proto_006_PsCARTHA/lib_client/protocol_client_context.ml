@@ -36,7 +36,7 @@ module Alpha_block_services =
 
 class type rpc_context =
   object
-    inherit RPC_context.json
+    inherit RPC_context.generic
 
     inherit
       [Shell_services.chain * Shell_services.block] Protocol.Environment
@@ -44,7 +44,7 @@ class type rpc_context =
                                                     .simple
   end
 
-class wrap_rpc_context (t : RPC_context.json) : rpc_context =
+class wrap_rpc_context (t : RPC_context.generic) : rpc_context =
   object
     method base : Uri.t = t#base
 

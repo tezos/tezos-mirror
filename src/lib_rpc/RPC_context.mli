@@ -93,7 +93,7 @@ type generic_call_result =
     (string * string) option * (string, string option) rest
     (* [(string * string) option] corresponds to the content type *) ]
 
-class type json =
+class type generic =
   object
     inherit t
 

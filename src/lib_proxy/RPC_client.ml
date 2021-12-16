@@ -52,8 +52,8 @@ let method_is_writer = function
   | `GET -> false
 
 class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
-  (http_ctxt : RPC_context.json) (mode : Proxy_services.mode)
-  (proxy_env : Registration.proxy_environment) : RPC_context.json =
+  (http_ctxt : RPC_context.generic) (mode : Proxy_services.mode)
+  (proxy_env : Registration.proxy_environment) : RPC_context.generic =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Proxy_services.build_directory printer http_ctxt mode proxy_env)

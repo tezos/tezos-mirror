@@ -28,12 +28,12 @@ The proxy mode is requested by passing `--mode proxy` to the client. For
 this, `src/lib_client/client_config.ml` contains a `Mode_proxy` value.
 
 This flag is inspected in `src/lib_client/client_main_run.ml` to build
-a `Client_context.full` instance whose underlying `RPC_context.json`
+a `Client_context.full` instance whose underlying `RPC_context.generic`
 behaves differently.
 
-## Custom `RPC_context.json` instance
+## Custom `RPC_context.generic` instance
 
-The proxy mode's `RPC_context.json` instance is defined
+The proxy mode's `RPC_context.generic` instance is defined
 in `src/lib_proxy/RPC_client.ml`. This instance is capable both
 of executing some RPCs locally (by delegating to the mockup's client
 `src/lib_mockup_proxy/RPC_client.ml`) and of delegating RPCs to the
@@ -52,7 +52,7 @@ The main protocol-dependent functions are:
 
 * `Proxy_sig`'s `directory` function: it provides the part of the tree
   of RPCs that is implemented in the protocol. This is the tree of RPCs that
-  can be executed locally by the proxy's custom `RPC_context.json`.
+  can be executed locally by the proxy's custom `RPC_context.generic`.
 * `Proxy_sig`'s `init_env_rpc_context` function: it provides the
   instance of `Tezos_protocol_environment.rpc_context` to use when
   doing an RPC call. This record's main field is an instance of

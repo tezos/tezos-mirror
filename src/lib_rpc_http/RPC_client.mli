@@ -64,7 +64,7 @@ module type S = sig
 
   val default_config : config
 
-  class http_ctxt : config -> Media_type.t list -> RPC_context.json
+  class http_ctxt : config -> Media_type.t list -> RPC_context.generic
 
   (**/**)
 

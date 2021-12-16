@@ -34,4 +34,4 @@ exception Rpc_dir_creation_failure of tztrace
 
 (** The function [local_ctxt directory] creates
     an RPC context that executes RPCs locally. *)
-val local_ctxt : unit RPC_directory.t -> RPC_context.json
+val local_ctxt : unit RPC_directory.t -> RPC_context.generic

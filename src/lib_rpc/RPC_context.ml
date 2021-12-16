@@ -89,7 +89,7 @@ type generic_call_result =
   | `Binary of (string, string option) rest
   | `Other of (string * string) option * (string, string option) rest ]
 
-class type json =
+class type generic =
   object
     inherit t
 
