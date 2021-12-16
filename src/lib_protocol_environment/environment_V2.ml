@@ -889,7 +889,7 @@ struct
     let fork_test_chain = Context.fork_test_chain
 
     module type PROTOCOL =
-      Environment_protocol_T_V2.T
+      Environment_protocol_T_V0.T
         with type context := Context.t
          and type quota := quota
          and type validation_result := validation_result
