@@ -75,6 +75,19 @@ unit:011_PtHangz2:
       src/proto_011_PtHangz2/lib_client.test_proto
       src/proto_011_PtHangz2/lib_protocol.test_proto
 
+unit:012_PsiThaCa:
+  extends:
+  - .unit_test_template_x86_64
+  - .template__coverage_files
+  variables:
+    MAKE_TARGETS: >
+      src/proto_012_PsiThaCa/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_012_PsiThaCa/lib_benchmark.test_proto
+      src/proto_012_PsiThaCa/lib_client.test_proto
+      src/proto_012_PsiThaCa/lib_plugin.test_proto
+      src/proto_012_PsiThaCa/lib_protocol.test_proto
+      src/proto_012_PsiThaCa/lib_delegate.test_proto
+
 unit:alpha:
   extends:
   - .unit_test_template_x86_64
@@ -87,7 +100,6 @@ unit:alpha:
       src/proto_alpha/lib_plugin.test_proto
       src/proto_alpha/lib_protocol.test_proto
       src/proto_alpha/lib_delegate.test_proto
-
 unit:non-proto-x86_64:
   extends:
   - .unit_test_template_x86_64
