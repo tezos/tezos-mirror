@@ -667,12 +667,7 @@ the head of the current local branch to execute the job.
 
 Another limitation is that only single jobs can be executed using
 ``gitlab-runner``. For instance, there is no direct way of executing all
-jobs in the stage ``test``. However, you can run the ``test_coverage`` job
-which runs most tests (alcotest and python tests) in a single job.
-
-.. code-block:: bash
-
-    gitlab-runner exec docker test_coverage
+jobs in the stage ``test``.
 
 Conventions
 -----------

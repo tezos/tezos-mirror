@@ -125,13 +125,6 @@ variables:
     - when: manual
       allow_failure: true
 
-.rules_template__development_coverage:
-  rules:
-    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: always
-    - when: manual
-      allow_failure: true
-
 # The job `unified_coverage` runs on master and one development pipelines. It
 # runs on merge requests, unless the `ci--no-coverage` tag is set.
 .rules_template__development_unified_coverage:
