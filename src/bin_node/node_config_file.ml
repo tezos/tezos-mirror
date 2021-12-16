@@ -1203,8 +1203,9 @@ let string_of_json_encoding_error exn =
   Format.asprintf "%a" (Json_encoding.print_error ?print_unknown:None) exn
 
 let read fp =
+  let open Lwt_tzresult_syntax in
   if Sys.file_exists fp then
-    Lwt_utils_unix.Json.read_file fp >>=? fun json ->
+    let* json = Lwt_utils_unix.Json.read_file fp in
     try return (Data_encoding.Json.destruct encoding json) with
     | Json_encoding.Cannot_destruct (path, exn) ->
         let path = Json_query.json_pointer_of_path path in
@@ -1219,7 +1220,8 @@ let read fp =
   else return default_config
 
 let write fp cfg =
-  Node_data_version.ensure_data_dir (Filename.dirname fp) >>=? fun () ->
+  let open Lwt_tzresult_syntax in
+  let* () = Node_data_version.ensure_data_dir (Filename.dirname fp) in
   Lwt_utils_unix.Json.write_file fp (Data_encoding.Json.construct encoding cfg)
 
 let to_string cfg =
@@ -1235,15 +1237,17 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
+  let open Lwt_tzresult_syntax in
   let disable_config_validation =
     cfg.disable_config_validation || disable_config_validation
   in
   let data_dir = Option.value ~default:cfg.data_dir data_dir in
-  (if List.compare_length_with allow_all_rpc 1 >= 0 then
-   Event.(emit all_rpc_allowed allow_all_rpc)
-  else Lwt.return_unit)
-  >>= fun () ->
-  Node_data_version.ensure_data_dir data_dir >>=? fun () ->
+  let*! () =
+    if List.compare_length_with allow_all_rpc 1 >= 0 then
+      Event.(emit all_rpc_allowed allow_all_rpc)
+    else Lwt.return_unit
+  in
+  let* () = Node_data_version.ensure_data_dir data_dir in
   let peer_table_size = Option.map (fun i -> (i, i / 4 * 3)) peer_table_size in
   let unopt_list ~default = function [] -> default | l -> l in
   let limits : P2p.limits =
@@ -1364,15 +1368,18 @@ let () =
     (fun s -> Failed_to_parse_address s)
 
 let to_ipv4 ipv6_l =
+  let open Lwt_syntax in
   let convert_or_warn (ipv6, port) =
     let ipv4 = Ipaddr.v4_of_v6 ipv6 in
     match ipv4 with
     | None ->
-        Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
-        >>= fun () -> return_none
+        let* () =
+          Event.(emit cannot_convert_to_ipv4) (Ipaddr.V6.to_string ipv6)
+        in
+        return_none
     | Some ipv4 -> return_some (ipv4, port)
   in
-  List.filter_map_es convert_or_warn ipv6_l
+  List.filter_map_s convert_or_warn ipv6_l
 
 (* Parse an address.
 
@@ -1388,6 +1395,7 @@ let to_ipv4 ipv6_l =
 let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
     ?(passive = false) peer :
     (P2p_point.Id.t * P2p_peer.Id.t option) list tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
   match P2p_point.Id.parse_addr_port_id peer with
   | (Error (P2p_point.Id.Bad_id_format _) | Ok {peer_id = Some _; _})
     when no_peer_id_expected ->
@@ -1398,52 +1406,56 @@ let resolve_addr ~default_addr ?(no_peer_id_expected = true) ?default_port
       fail
         (Failed_to_parse_address (peer, P2p_point.Id.string_of_parsing_error err))
   | Ok {addr; port; peer_id} ->
-      (match (port, default_port) with
-      | (None, None) -> return (string_of_int default_p2p_port)
-      | (None, Some default_port) -> return (string_of_int default_port)
-      | (Some port, _) -> return (string_of_int port))
-      >>=? fun service ->
+      let service_port =
+        match (port, default_port) with
+        | (Some port, _) -> port
+        | (None, Some default_port) -> default_port
+        | (None, None) -> default_p2p_port
+      in
+      let service = string_of_int service_port in
       let node = if addr = "" || addr = "_" then default_addr else addr in
-      Lwt_utils_unix.getaddrinfo ~passive ~node ~service >>= fun l ->
+      let*! l = Lwt_utils_unix.getaddrinfo ~passive ~node ~service in
       return (List.map (fun point -> (point, peer_id)) l)
 
 let resolve_addrs ?default_port ?passive ?no_peer_id_expected ~default_addr
     addrs =
-  List.fold_left_es
-    (fun a addr ->
-      resolve_addr
-        ~default_addr
-        ?default_port
-        ?passive
-        ?no_peer_id_expected
-        addr
-      >>=? fun points -> return (List.rev_append points a))
-    []
+  List.concat_map_es
+    (resolve_addr ~default_addr ?default_port ?passive ?no_peer_id_expected)
     addrs
 
 let resolve_discovery_addrs discovery_addr =
-  resolve_addr
-    ~default_addr:Ipaddr.V4.(to_string broadcast)
-    ~default_port:default_discovery_port
-    ~passive:true
-    discovery_addr
-  >>=? fun addrs -> to_ipv4 (List.map fst addrs)
+  let open Lwt_tzresult_syntax in
+  let* addrs =
+    resolve_addr
+      ~default_addr:Ipaddr.V4.(to_string broadcast)
+      ~default_port:default_discovery_port
+      ~passive:true
+      discovery_addr
+  in
+  let*! addrs = to_ipv4 (List.map fst addrs) in
+  return addrs
 
 let resolve_listening_addrs listen_addr =
-  resolve_addr
-    ~default_addr:"::"
-    ~default_port:default_p2p_port
-    ~passive:true
-    listen_addr
-  >|=? List.map fst
+  let open Lwt_tzresult_syntax in
+  let+ addrs =
+    resolve_addr
+      ~default_addr:"::"
+      ~default_port:default_p2p_port
+      ~passive:true
+      listen_addr
+  in
+  List.map fst addrs
 
 let resolve_rpc_listening_addrs listen_addr =
-  resolve_addr
-    ~default_addr:"::"
-    ~default_port:default_rpc_port
-    ~passive:true
-    listen_addr
-  >|=? List.map fst
+  let open Lwt_tzresult_syntax in
+  let+ addrs =
+    resolve_addr
+      ~default_addr:"::"
+      ~default_port:default_rpc_port
+      ~passive:true
+      listen_addr
+  in
+  List.map fst addrs
 
 let resolve_bootstrap_addrs peers =
   resolve_addrs

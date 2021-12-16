@@ -32,12 +32,14 @@ let identity_file data_dir =
   data_dir // Node_data_version.default_identity_file_name
 
 let show {Node_config_file.data_dir; _} =
-  Node_identity_file.read (identity_file data_dir) >>=? fun id ->
+  let open Lwt_result_syntax in
+  let* id = Node_identity_file.read (identity_file data_dir) in
   Format.printf "Peer_id: %a.@." P2p_peer.Id.pp id.peer_id ;
   return_unit
 
 let check {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
-  Node_identity_file.read ~expected_pow (identity_file data_dir) >>=? fun id ->
+  let open Lwt_result_syntax in
+  let* id = Node_identity_file.read ~expected_pow (identity_file data_dir) in
   Format.printf
     "Peer_id: %a. Proof of work is higher than %.2f.@."
     P2p_peer.Id.pp
@@ -46,8 +48,11 @@ let check {Node_config_file.data_dir; p2p = {expected_pow; _}; _} =
   return_unit
 
 let generate {Node_config_file.data_dir; p2p; _} =
-  Node_identity_file.generate (identity_file data_dir) p2p.expected_pow
-  >>=? fun _id -> return_unit
+  let open Lwt_result_syntax in
+  let* _id =
+    Node_identity_file.generate (identity_file data_dir) p2p.expected_pow
+  in
+  return_unit
 
 (** Main *)
 
@@ -56,25 +61,29 @@ module Term = struct
 
   let process subcommand data_dir config_file expected_pow =
     let res =
-      (match (data_dir, config_file) with
-      | (None, None) ->
-          let default_config =
-            Node_config_file.default_data_dir
-            // Node_data_version.default_config_file_name
-          in
-          if Sys.file_exists default_config then
-            Node_config_file.read default_config
-          else return Node_config_file.default_config
-      | (None, Some config_file) -> Node_config_file.read config_file
-      | (Some data_dir, None) ->
-          Node_config_file.read
-            (data_dir // Node_data_version.default_config_file_name)
-          >>=? fun cfg -> return {cfg with data_dir}
-      | (Some data_dir, Some config_file) ->
-          Node_config_file.read config_file >>=? fun cfg ->
-          return {cfg with data_dir})
-      >>=? fun cfg ->
-      Node_config_file.update ?expected_pow cfg >>=? fun cfg ->
+      let open Lwt_result_syntax in
+      let* cfg =
+        match (data_dir, config_file) with
+        | (None, None) ->
+            let default_config =
+              Node_config_file.default_data_dir
+              // Node_data_version.default_config_file_name
+            in
+            let*! config_file_exists = Lwt_unix.file_exists default_config in
+            if config_file_exists then Node_config_file.read default_config
+            else return Node_config_file.default_config
+        | (None, Some config_file) -> Node_config_file.read config_file
+        | (Some data_dir, None) ->
+            let* cfg =
+              Node_config_file.read
+                (data_dir // Node_data_version.default_config_file_name)
+            in
+            return {cfg with data_dir}
+        | (Some data_dir, Some config_file) ->
+            let* cfg = Node_config_file.read config_file in
+            return {cfg with data_dir}
+      in
+      let* cfg = Node_config_file.update ?expected_pow cfg in
       match subcommand with
       | Show -> show cfg
       | Generate -> generate cfg

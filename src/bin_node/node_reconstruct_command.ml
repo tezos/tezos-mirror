@@ -46,23 +46,27 @@ let () =
 module Term = struct
   let process args sandbox_file =
     let run =
-      Internal_event_unix.init () >>= fun () ->
-      Node_shared_arg.read_and_patch_config_file args >>=? fun node_config ->
+      let open Lwt_tzresult_syntax in
+      let*! () = Internal_event_unix.init () in
+      let* node_config = Node_shared_arg.read_and_patch_config_file args in
       let data_dir = node_config.data_dir in
       let ({genesis; _} : Node_config_file.blockchain_network) =
         node_config.blockchain_network
       in
-      (match
-         (node_config.blockchain_network.genesis_parameters, sandbox_file)
-       with
-      | (None, None) -> return_none
-      | (Some parameters, None) ->
-          return_some (parameters.context_key, parameters.values)
-      | (_, Some filename) -> (
-          Lwt_utils_unix.Json.read_file filename >>= function
-          | Error _err -> fail (Node_run_command.Invalid_sandbox_file filename)
-          | Ok json -> return_some ("sandbox_parameter", json)))
-      >>=? fun sandbox_parameters ->
+      let* sandbox_parameters =
+        match
+          (node_config.blockchain_network.genesis_parameters, sandbox_file)
+        with
+        | (None, None) -> return_none
+        | (Some parameters, None) ->
+            return_some (parameters.context_key, parameters.values)
+        | (_, Some filename) -> (
+            let*! r = Lwt_utils_unix.Json.read_file filename in
+            match r with
+            | Error _err ->
+                fail (Node_run_command.Invalid_sandbox_file filename)
+            | Ok json -> return_some ("sandbox_parameter", json))
+      in
       Lwt_lock_file.try_with_lock
         ~when_locked:(fun () -> fail Locked_directory)
         ~filename:(Node_data_version.lock_file data_dir)
@@ -81,7 +85,6 @@ module Term = struct
           node_config.blockchain_network.user_activated_upgrades
         ~user_activated_protocol_overrides:
           node_config.blockchain_network.user_activated_protocol_overrides
-      >>=? fun () -> return_unit
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()

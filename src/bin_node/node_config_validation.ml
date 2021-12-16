@@ -123,8 +123,6 @@ let () =
 
 type t = alert list
 
-let empty = []
-
 let has_error t = List.exists is_error t
 
 let has_warning t = List.exists is_warning t
@@ -175,15 +173,21 @@ module Event = struct
       t
 
   let report t =
+    let open Lwt_syntax in
     let errors = List.filter is_error t in
     let warnings = List.filter is_warning t in
-    (match errors with
-    | [] -> Lwt.return_unit
-    | xs -> emit error_event () >>= fun () -> emit_all xs)
-    >>= fun () ->
+    let* () =
+      match errors with
+      | [] -> Lwt.return_unit
+      | xs ->
+          let* () = emit error_event () in
+          emit_all xs
+    in
     match warnings with
     | [] -> Lwt.return_unit
-    | xs -> emit warning_event () >>= fun () -> emit_all xs
+    | xs ->
+        let* () = emit warning_event () in
+        emit_all xs
 end
 
 let mk_alert ~event ~payload = Alert {event; payload}
@@ -248,7 +252,9 @@ let cannot_resolve_bootstrap_peer_addr =
     ("field", Data_encoding.string)
 
 let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
-  resolver addr >>= function
+  let open Lwt_result_syntax in
+  let*! r = resolver addr in
+  match r with
   | Error [Node_config_file.Failed_to_parse_address (addr, why)] ->
       return_some
         (mk_alert
@@ -263,10 +269,13 @@ let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   | Error _ as e -> Lwt.return e
 
 let validate_addr_opt ?e_resolve ?e_parse ~field ~addr resolver =
-  Option.filter_map_es
-    (fun addr -> validate_addr ?e_resolve ?e_parse ~field ~addr resolver)
-    addr
-  >|=? Option.to_list
+  let open Lwt_result_syntax in
+  let+ o_addr =
+    Option.filter_map_es
+      (fun addr -> validate_addr ?e_resolve ?e_parse ~field ~addr resolver)
+      addr
+  in
+  Option.to_list o_addr
 
 let validate_rpc_listening_addrs (config : Node_config_file.t) =
   let aux addr =
@@ -309,9 +318,8 @@ let validate_p2p_bootstrap_peers (config : Node_config_file.t) =
       validate_p2p_bootstrap_addrs ~field:"p2p.bootstrap-peers" peers
 
 let validate_addresses config : t tzresult Lwt.t =
-  List.fold_left_es
-    (fun acc f -> f config >>=? fun res -> return (res @ acc))
-    empty
+  List.concat_map_es
+    (fun f -> f config)
     [
       validate_rpc_listening_addrs;
       validate_p2p_bootstrap_peers;
@@ -443,19 +451,23 @@ let validation_passes =
   [validate_expected_pow; validate_addresses; validate_connections]
 
 let validate_passes config =
-  List.fold_left_es
-    (fun acc f -> f config >>=? fun res -> return (res @ acc))
-    empty
-    validation_passes
+  List.concat_map_es (fun f -> f config) validation_passes
 
 (* Main validation functions. *)
 
 let check config =
+  let open Lwt_tzresult_syntax in
   if config.Node_config_file.disable_config_validation then
-    Event.(emit disabled_event ()) >>= fun () -> return_unit
+    let*! () = Event.(emit disabled_event ()) in
+    return_unit
   else
-    validate_passes config >>=? fun t ->
+    let* t = validate_passes config in
     if has_error t then
-      Event.report t >>= fun () -> fail Invalid_node_configuration
-    else if has_warning t then Event.report t >>= fun () -> return_unit
-    else Event.(emit success_event ()) >>= fun () -> return_unit
+      let*! () = Event.report t in
+      fail Invalid_node_configuration
+    else if has_warning t then
+      let*! () = Event.report t in
+      return_unit
+    else
+      let*! () = Event.(emit success_event ()) in
+      return_unit

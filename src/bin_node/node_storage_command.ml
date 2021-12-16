@@ -61,21 +61,22 @@ module Term = struct
     |> Option.value ~default:(return Node_config_file.default_config)
 
   let ensure_context_dir context_dir =
+    let open Lwt_tzresult_syntax in
     Lwt.catch
       (fun () ->
-        Lwt_unix.file_exists context_dir >>= function
-        | false ->
+        let*! b = Lwt_unix.file_exists context_dir in
+        if not b then
+          fail
+            (Node_data_version.Invalid_data_dir
+               {data_dir = context_dir; msg = None})
+        else
+          let pack = context_dir // "store.pack" in
+          let*! b = Lwt_unix.file_exists pack in
+          if not b then
             fail
               (Node_data_version.Invalid_data_dir
                  {data_dir = context_dir; msg = None})
-        | true -> (
-            let pack = context_dir // "store.pack" in
-            Lwt_unix.file_exists pack >>= function
-            | false ->
-                fail
-                  (Node_data_version.Invalid_data_dir
-                     {data_dir = context_dir; msg = None})
-            | true -> return_unit))
+          else return_unit)
       (function
         | Unix.Unix_error _ ->
             fail
@@ -84,73 +85,88 @@ module Term = struct
         | exc -> raise exc)
 
   let root config_file data_dir =
-    read_config_file config_file >>=? fun cfg ->
+    let open Lwt_result_syntax in
+    let* cfg = read_config_file config_file in
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
     let context_dir = Node_data_version.context_dir data_dir in
-    ensure_context_dir context_dir >>=? fun () -> return context_dir
+    let* () = ensure_context_dir context_dir in
+    return context_dir
 
   let integrity_check config_file data_dir auto_repair =
-    root config_file data_dir >>=? fun root ->
-    Context.Checks.Pack.Integrity_check.run ~root ~auto_repair >>= fun () ->
+    let open Lwt_result_syntax in
+    let* root = root config_file data_dir in
+    let*! () = Context.Checks.Pack.Integrity_check.run ~root ~auto_repair in
     return_unit
 
   let stat_index config_file data_dir =
-    root config_file data_dir >>=? fun root ->
+    let open Lwt_result_syntax in
+    let* root = root config_file data_dir in
     Context.Checks.Index.Stat.run ~root ;
     return_unit
 
   let stat_pack config_file data_dir =
-    root config_file data_dir >>=? fun root ->
-    Context.Checks.Pack.Stat.run ~root >>= fun () -> return_unit
+    let open Lwt_result_syntax in
+    let* root = root config_file data_dir in
+    let*! () = Context.Checks.Pack.Stat.run ~root in
+    return_unit
 
   let index_dir_exists context_dir output =
+    let open Lwt_tzresult_syntax in
     let index_dir = Option.value output ~default:(context_dir // "index") in
-    Lwt_unix.file_exists index_dir >>= function
-    | false -> return_unit
-    | true -> fail (Existing_index_dir index_dir)
+    let*! b = Lwt_unix.file_exists index_dir in
+    if not b then return_unit else fail (Existing_index_dir index_dir)
 
   let reconstruct_index config_file data_dir output index_log_size =
-    root config_file data_dir >>=? fun root ->
-    index_dir_exists root output >>=? fun () ->
+    let open Lwt_result_syntax in
+    let* root = root config_file data_dir in
+    let* () = index_dir_exists root output in
     Context.Checks.Pack.Reconstruct_index.run ~root ~output ~index_log_size () ;
     return_unit
 
   let to_context_hash chain_store (hash : Block_hash.t) =
-    Store.Block.read_block chain_store hash >>=? fun block ->
+    let open Lwt_result_syntax in
+    let* block = Store.Block.read_block chain_store hash in
     return (Store.Block.context_hash block)
 
   let current_head config_file data_dir block =
-    read_config_file config_file >>=? fun cfg ->
+    let open Lwt_result_syntax in
+    let* cfg = read_config_file config_file in
     let ({genesis; _} : Node_config_file.blockchain_network) =
       cfg.blockchain_network
     in
     let data_dir = Option.value ~default:cfg.data_dir data_dir in
     let store_dir = Node_data_version.store_dir data_dir in
     let context_dir = Node_data_version.context_dir data_dir in
-    Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
-    >>=? fun store ->
+    let* store =
+      Store.init ~store_dir ~context_dir ~allow_testchains:false genesis
+    in
     let genesis = cfg.blockchain_network.genesis in
     let chain_id = Chain_id.of_block_hash genesis.block in
-    Store.get_chain_store store chain_id >>=? fun chain_store ->
+    let* chain_store = Store.get_chain_store store chain_id in
     let to_context_hash = to_context_hash chain_store in
-    (match block with
-    | Some block -> Lwt.return (Block_hash.of_b58check block)
-    | None ->
-        Store.Chain.current_head chain_store >>= fun head ->
-        return (Store.Block.hash head))
-    >>=? fun block_hash ->
-    to_context_hash block_hash >>=? fun context_hash ->
-    Store.close_store store >>= fun () ->
+    let* block_hash =
+      match block with
+      | Some block -> Lwt.return (Block_hash.of_b58check block)
+      | None ->
+          let*! head = Store.Chain.current_head chain_store in
+          return (Store.Block.hash head)
+    in
+    let* context_hash = to_context_hash block_hash in
+    let*! () = Store.close_store store in
     return (Context_hash.to_b58check context_hash)
 
   let integrity_check_inodes config_file data_dir block =
-    root config_file data_dir >>=? fun root ->
-    current_head config_file data_dir block >>=? fun head ->
-    Context.Checks.Pack.Integrity_check_inodes.run ~root ~heads:(Some [head])
-    >>= fun () -> return_unit
+    let open Lwt_result_syntax in
+    let* root = root config_file data_dir in
+    let* head = current_head config_file data_dir block in
+    let*! () =
+      Context.Checks.Pack.Integrity_check_inodes.run ~root ~heads:(Some [head])
+    in
+    return_unit
 
   let check_index config_file data_dir auto_repair =
-    root config_file data_dir >>=? fun root ->
+    let open Lwt_result_syntax in
+    let* root = root config_file data_dir in
     Context.Checks.Pack.Integrity_check_index.run ~root ~auto_repair () ;
     return_unit
 
