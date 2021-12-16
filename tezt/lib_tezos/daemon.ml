@@ -368,16 +368,16 @@ module Make (X : PARAMETERS) = struct
           (Terminated_before_event {daemon = daemon.name; event = name; where})
     | Some x -> return x
 
+  let event_from_full_event_filter filter json =
+    let raw = get_event_from_full_event json in
+    (* If [json] does not match the correct JSON structure, it
+       will be filtered out, which will result in ignoring
+       the current event.
+       @see raw_event_from_event *)
+    Option.bind raw (fun {value; _} -> filter value)
+
   let wait_for ?where daemon name filter =
-    let filter json =
-      let raw = get_event_from_full_event json in
-      (* If [json] does not match the correct JSON structure, it
-         will be filtered out, which will result in ignoring
-         the current event.
-         @see raw_event_from_event *)
-      Option.bind raw (fun {value; _} -> filter value)
-    in
-    wait_for_full ?where daemon name filter
+    wait_for_full ?where daemon name (event_from_full_event_filter filter)
 
   let on_event daemon handler =
     daemon.persistent_event_handlers <-
