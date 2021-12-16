@@ -297,18 +297,26 @@ let round_of_timestamp_perf (duration0_int64, dipr) =
   let max_ts = Int64.(sub (of_int32 Int32.max_int) duration0_int64) in
   let rec loop i =
     if i >= 0L then (
-      let timestamp =
-        ts_add level_start (Period.of_seconds_exn (Int64.sub max_ts i))
+      let repeats = 100 in
+      let rec loop_inner sum j =
+        if j > 0 then
+          let timestamp =
+            ts_add level_start (Period.of_seconds_exn (Int64.sub max_ts i))
+          in
+          let t0 = Unix.gettimeofday () in
+          Round.round_of_timestamp
+            round_durations
+            ~predecessor_timestamp
+            ~timestamp
+            ~predecessor_round:Round.zero
+          >>? fun _round ->
+          let t1 = Unix.gettimeofday () in
+          let time = t1 -. t0 in
+          loop_inner (sum +. time) (j - 1)
+        else ok sum
       in
-      let t0 = Unix.gettimeofday () in
-      Round.round_of_timestamp
-        round_durations
-        ~predecessor_timestamp
-        ~timestamp
-        ~predecessor_round:Round.zero
-      >>? fun _round ->
-      let t1 = Unix.gettimeofday () in
-      let time = t1 -. t0 in
+      loop_inner 0.0 repeats >>? fun sum ->
+      let time = sum /. float_of_int repeats in
       assert (time < 0.01) ;
       loop (Int64.pred i))
     else ok ()
