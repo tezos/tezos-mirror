@@ -29,21 +29,11 @@ include Cache_memory_helpers
 
 let script_string_size s = Script_string.to_string s |> string_size
 
-(* The model assumes that annotations' sizes are counted once in the
-   Micheline representation and that the strings are always
-   shared. (One can check that they are never copied.) Besides, the
-   following types are unboxed so that they have no tags. *)
-let type_annot_size (Script_ir_annot.Type_annot _) = !!0
-
-let field_annot_size (Script_ir_annot.Field_annot _) = !!0
-
-let var_annot_size (Script_ir_annot.Var_annot _) = !!0
-
 (* Memo-sizes are 16-bit integers *)
 let sapling_memo_size_size = !!0
 
 let (comparable_ty_size, ty_size) =
-  let base {annot; size = _} = hh3w +! option_size type_annot_size annot in
+  let base {annot = _; size = _} = hh3w in
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
@@ -62,16 +52,10 @@ let (comparable_ty_size, ty_size) =
     | Bool_key a -> ret_succ_adding accu (base a)
     | Chain_id_key a -> ret_succ_adding accu (base a)
     | Never_key a -> ret_succ_adding accu (base a)
-    | Pair_key ((_ty1, fa1), (_ty2, fa2), a) ->
-        ret_succ_adding accu
-        @@ base a +! hh6w
-           +! option_size field_annot_size fa1
-           +! option_size field_annot_size fa2
-    | Union_key ((_ty1, fa1), (_ty2, fa2), a) ->
-        ret_succ_adding accu
-        @@ base a +! hh6w
-           +! option_size field_annot_size fa1
-           +! option_size field_annot_size fa2
+    | Pair_key ((_ty1, _fa1), (_ty2, _fa2), a) ->
+        ret_succ_adding accu @@ (base a +! hh6w)
+    | Union_key ((_ty1, _fa1), (_ty2, _fa2), a) ->
+        ret_succ_adding accu @@ (base a +! hh6w)
     | Option_key (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
   and apply : type a. nodes_and_size -> a ty -> nodes_and_size =
    fun accu ty ->
@@ -96,18 +80,10 @@ let (comparable_ty_size, ty_size) =
     | Bls12_381_fr_t a -> ret_succ_adding accu @@ base a
     | Chest_key_t a -> ret_succ_adding accu @@ base a
     | Chest_t a -> ret_succ_adding accu @@ base a
-    | Pair_t ((_ty1, fa1, va1), (_ty2, fa2, va2), a) ->
-        ret_succ_adding accu
-        @@ base a +! hh8w
-           +! option_size field_annot_size fa1
-           +! option_size var_annot_size va1
-           +! option_size field_annot_size fa2
-           +! option_size var_annot_size va2
-    | Union_t ((_ty1, fa1), (_ty2, fa2), a) ->
-        ret_succ_adding accu
-        @@ base a +! hh6w
-           +! option_size field_annot_size fa1
-           +! option_size field_annot_size fa2
+    | Pair_t ((_ty1, _fa1, _va1), (_ty2, _fa2, _va2), a) ->
+        ret_succ_adding accu @@ (base a +! hh8w)
+    | Union_t ((_ty1, _fa1), (_ty2, _fa2), a) ->
+        ret_succ_adding accu @@ (base a +! hh6w)
     | Lambda_t (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base a +! (word_size *? 2))
     | Option_t (_ty, a) -> ret_succ_adding accu @@ (base a +! word_size)
@@ -133,10 +109,7 @@ let stack_ty_size s =
    fun accu s ->
     match s with
     | Bot_t -> ret_succ accu
-    | Item_t (ty, _, annot) ->
-        ret_succ_adding
-          (accu ++ ty_size ty)
-          (h3w +! option_size var_annot_size annot)
+    | Item_t (ty, _, _annot) -> ret_succ_adding (accu ++ ty_size ty) h3w
   in
   stack_ty_traverse s zero {apply}
 
@@ -554,13 +527,12 @@ and kinstr_size :
     | ITransfer_tokens (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IImplicit_account (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICreate_contract
-        {kinfo; storage_type; arg_type; lambda; root_name; views; k = _} ->
+        {kinfo; storage_type; arg_type; lambda; root_name = _; views; k = _} ->
         let accu =
           ret_succ_adding
             (accu ++ ty_size storage_type ++ ty_size arg_type
            ++ views_size views)
-            (base kinfo +! (word_size *? 4)
-            +! option_size field_annot_size root_name)
+            (base kinfo +! (word_size *? 4))
         in
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
     | ISet_delegate (kinfo, _) -> ret_succ_adding accu (base kinfo)
