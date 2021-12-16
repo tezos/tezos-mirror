@@ -541,7 +541,7 @@ module Actions = struct
     declare_2
       ~section
       ~name:"preendorsement_injected"
-      ~level:Info
+      ~level:Notice
       ~msg:"injected preendorsement {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
@@ -552,7 +552,7 @@ module Actions = struct
     declare_2
       ~section
       ~name:"endorsement_injected"
-      ~level:Info
+      ~level:Notice
       ~msg:"injected endorsement {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
