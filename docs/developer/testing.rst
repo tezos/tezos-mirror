@@ -399,18 +399,98 @@ developer utilities and old protocols. In particular:
 
 
 
-Known issues
-""""""""""""
+Truncated coverage files
+""""""""""""""""""""""""
 
-1. Report generation may fail spuriously.
+Occasionally, tests write corrupted coverage data. If you run into the
+issue, you will see a message
+like:
 
-   ::
+::
 
-       $ make coverage-report
-       4409 Info: found coverage files in '_coverage_output/'
-       4410  *** invalid file: '_coverage_output/819770417.coverage' error: "unexpected end of file while reading magic number"
+  $ make coverage-report
+  Error: coverage file '_coverage_output/foobar.coverage' is truncated
 
-   In that case, either delete the problematic files or re-launch the tests and re-generate the report.
+  make: *** [Makefile:105: coverage-report] Error 1
+
+or
+
+::
+
+  $ make coverage-report
+  bisect-ppx-report: internal error, uncaught exception:
+                     Bisect_common.Invalid_file("_coverage_output/foobar.coverage", "unexpected end of file while reading magic number")
+
+  make: *** [Makefile:112: coverage-report] Error 125
+
+
+Typically, this indicates that a instrumented binary that was launched
+by the test was terminated abruptly before it had time to finish
+writing coverage data. You can just rerun the test, and most likely, it
+won't produce a corrupted trace on the second run. However, this is
+not a long-term solution. Below, we present some hints on how to debug
+this issue:
+
+Binaries instrumented with ``bisect_ppx`` attach an ``at_exit``
+handler that writes collected coverage data at termination of the
+tested process execution.
+
+To ensure that this process is not disrupted, one should follow these
+guidelines:
+
+For system test frameworks
+   System test frameworks, as :doc:`tezt` and :doc:`python_testing_framework`,
+   run binaries e.g. ``tezos-client`` and
+   ``tezos-node``. Typically, they do so with calls to ``exec`` so the
+   resulting process does not inherit the signal handlers from the
+   parent process (the test framework). When writing tests in these
+   frameworks, the author must ensure that the processes launched are
+   instrumented and that they do proper signal handling: they should
+   catch ``SIGTERM`` and call exit in their ``SIGTERM`` handler. This
+   should already be the case for the binaries in octez.  They should
+   also ensure that the framework terminates the processes with ``SIGTERM``.
+
+For integration test frameworks
+   Some integration test frameworks, such as the ``lib_p2p`` test
+   framework, spawn subprocesses through ``fork``. These
+   subprocesses inherit the signal handler of the parent process
+   (the test framework). Such frameworks should themselves be
+   instrumented and themselves do proper signal handling as described
+   above. Bisect provides a convenience for doing so, through the
+   ``--sigterm`` flag::
+
+      (preprocess (pps bisect_ppx --bisect-sigterm))
+
+   When enabled, it ensures that the instrumented process writes
+   coverage data successfully on receiving ``SIGTERM``. For an
+   illustration of how to implement this, and the problem it resolves,
+   see :gl:`!3792`.
+
+General process handling
+   If possible, do not leave processes "hanging" in tests. Instead,
+   use e.g. ``wait`` or ``Lwt.bind`` to ensure that processes get a
+   chance to terminate before the full test terminates. For an
+   illustration of how to implement this, and the problem it resolves,
+   see :gl:`!3691`.
+
+
+Comparing reports
+"""""""""""""""""
+
+At times, it is convenient to compare two coverage reports. This can
+be used to ensure that coverage does not regress when e.g. migrating a test
+from one framework to another. We provide a `fork of bisect_ppx
+<https://github.com/vch9/bisect_ppx/tree/html-compare>`_ with this
+functionality. It adds the command ``compare-html`` to ``bisect-ppx-report``.
+
+Running::
+
+  bisect-ppx-report compare-html -x x.coverage -y y.coverage
+
+will create an HTML report comparing the coverage of in ``x.coverage``
+and ``y.coverage``. A limitation of this tool is that it assumes that
+only coverage has changed -- not the underlying source files.
+
 
 Executing tests through the GitLab CI
 -------------------------------------
@@ -493,25 +573,67 @@ Other (including Flextesa)
   this task is the `CI Lint tool <https://docs.gitlab.com/ee/ci/lint.html>`_, and ``gitlab-runner``,
   introduced in the :ref:`next section <executing_gitlab_ci_locally>`.
 
-Measuring test coverage in the CI
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Test coverage in merge requests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To measure test coverage in the CI, trigger the jobs ``test_coverage[...]`` in
-stage ``test_coverage`` These jobs can either be triggered manually
-from the Gitlab CI web interface. These jobs build Octez with coverage
-instrumentation, and then run respectively:
+Build and tests are instrumented with ``bisect_ppx`` in the CI for each merge
+request on Tezos. To measure test coverage in the CI, it launches the job
+``unified_job`` in stage ``test_coverage`` which generates the coverage report.
+They are stored as an HTML report that can be downloaded or browsed from the CI page
+upon completion of the job (see the Artifacts produced by the MR pipeline in the GitLab UI).
 
- - ``make test-unit``, executing all unit, integration and property-based tests
- - ``make test-python-alpha``, executing the Python system tests for
-   protocol Alpha. We restrict to protocol Alpha to avoid CI timeouts.
- - ``make test-tezt-coverage``, executing the full set of Tezt tests with a
-   timeout of 30 minutes per test case.
+The summary report gives the merge request an overall test coverage percentage
+(displayed just next to the MR pipeline in the GitLab UI).
 
-Finally the coverage reports are generated: one for
-unit tests, one for the Python system tests and one for the Tezt suite.
+Additionally, using ``bisect-ppx-report cobertura``, we produce and
+upload a Cobertura artifact activating the `test coverage
+visualization
+<https://docs.gitlab.com/ee/user/project/merge_requests/test_coverage_visualization.html>`_
+in GitLab:
 
-The resulting coverage reports are stored as artifacts that can be
-downloaded or browsed from the CI page upon completion of the job.
+.. image:: images/testing-coverage-markers.png
+
+Known issues
+""""""""""""
+
+1. After termination of the ``unified_coverage`` job, test coverage
+   visualization can take some time to load. Once the coverage report
+   is processed by GitLab, you will have to refresh the ``Changes``
+   tab of the MR to see the results.
+
+2. Instrumenting the code with both ``ppx_inline_test`` and ``bisect_ppx`` can produce misplaced locations.
+   This is caused by a bug in ``ppx_inline_test`` version ``0.14.1`` that will be in their next release.
+
+3. Occasionally, tests write corrupted coverage data. In this case, the job ``unified_coverage`` will fail. We've done our best to ensure this happens rarely. If it happens, you can either try:
+
+    - Re-running the full pipeline.
+    - Reading the log of the job ``unified_coverage``. It'll direct
+      you to the test job that produced the corrupted coverage file.  You can
+      then retry the test job, and once finished, retry the
+      ``unified_coverage`` job.
+    - Finally, if the problem persists, adding the label
+      ``ci--no-coverage`` will disable the ``unified_coverage``
+      job. You can add this as a last resort to merge the MR.
+
+
+Test coverage on master
+~~~~~~~~~~~~~~~~~~~~~~~
+
+In addition to computing test coverage on merge request, we also
+associate coverage information to each merge commit on the master
+branch. Instead of running the test suite on master, which would be
+wasteful, we fetch it from the most recent merge request.
+
+The job ``unified_coverage`` detects when it runs on ``master``. In
+this case, it reads the history of the branch to find the latest
+pipeline on the most recently merged branch. It then fetches the
+coverage result from there, and also retrieves the artifacts which
+contains the HTML coverage report.
+GitLab also produces a `graph of the coverage ratio over time
+<https://gitlab.com/tezos/tezos/-/graphs/master/charts>`_.
+
+
+
 
 .. _executing_gitlab_ci_locally:
 
