@@ -23,22 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type ('prefix, 'params) t
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+type ('prefix, 'params) path = ('prefix, 'params) t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+type 'prefix context = ('prefix, 'prefix) path
 
-val component_encoding : component Data_encoding.t
+val root : unit context
 
-val env_version_encoding : env_version Data_encoding.t
+val open_root : 'a context
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val add_suffix : ('prefix, 'params) path -> string -> ('prefix, 'params) path
+
+val ( / ) : ('prefix, 'params) path -> string -> ('prefix, 'params) path
+
+val add_arg :
+  ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a) path
+
+val ( /: ) :
+  ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a) path
+
+val add_final_args :
+  ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path
+
+val ( /:* ) :
+  ('prefix, 'params) path -> 'a RPC_arg.t -> ('prefix, 'params * 'a list) path

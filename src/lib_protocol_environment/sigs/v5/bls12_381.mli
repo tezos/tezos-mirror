@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Metastate AG <hello@metastate.ch>                      *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+module Fr : S.PRIME_FIELD
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+module G1 : S.CURVE with type Scalar.t = Fr.t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+module G2 : S.CURVE with type Scalar.t = Fr.t
 
-val component_encoding : component Data_encoding.t
-
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val pairing_check : (G1.t * G2.t) list -> bool

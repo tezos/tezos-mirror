@@ -23,22 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** HTTP methods. *)
+type meth = [`GET | `POST | `DELETE | `PUT | `PATCH]
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+type (+'meth, 'prefix, 'params, 'query, 'input, 'output) t
+  constraint 'meth = [< meth]
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+type (+'meth, 'prefix, 'params, 'query, 'input, 'output) service =
+  ('meth, 'prefix, 'params, 'query, 'input, 'output) t
 
-val component_encoding : component Data_encoding.t
+val get_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`GET], 'prefix, 'params, 'query, unit, 'output) service
 
-val env_version_encoding : env_version Data_encoding.t
+val post_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`POST], 'prefix, 'params, 'query, 'input, 'output) service
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val delete_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`DELETE], 'prefix, 'params, 'query, unit, 'output) service
+
+val patch_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`PATCH], 'prefix, 'params, 'query, 'input, 'output) service
+
+val put_service :
+  ?description:string ->
+  query:'query RPC_query.t ->
+  input:'input Data_encoding.t ->
+  output:'output Data_encoding.t ->
+  ('prefix, 'params) RPC_path.t ->
+  ([`PUT], 'prefix, 'params, 'query, 'input, 'output) service

@@ -23,22 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Builds a new Hash type using Blake2B. *)
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+(** The parameters for creating a new Hash type using
+    {!Make_Blake2B}. Both {!name} and {!title} are only informative,
+    used in error messages and serializers. *)
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+module type Name = sig
+  val name : string
 
-val component_encoding : component Data_encoding.t
+  val title : string
 
-val env_version_encoding : env_version Data_encoding.t
+  val size : int option
+end
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+module type PrefixedName = sig
+  include Name
+
+  val b58check_prefix : string
+end
+
+module Make_minimal (Name : Name) : S.MINIMAL_HASH
+
+module type Register = sig
+  val register_encoding :
+    prefix:string ->
+    length:int ->
+    to_raw:('a -> string) ->
+    of_raw:(string -> 'a option) ->
+    wrap:('a -> Base58.data) ->
+    'a Base58.encoding
+end
+
+module Make (Register : Register) (Name : PrefixedName) : S.HASH

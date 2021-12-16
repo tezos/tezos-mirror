@@ -23,22 +23,24 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type public_key_hash =
+  | Ed25519 of Ed25519.Public_key_hash.t
+  | Secp256k1 of Secp256k1.Public_key_hash.t
+  | P256 of P256.Public_key_hash.t
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+type public_key =
+  | Ed25519 of Ed25519.Public_key.t
+  | Secp256k1 of Secp256k1.Public_key.t
+  | P256 of P256.Public_key.t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+type watermark =
+  | Block_header of Chain_id.t
+  | Endorsement of Chain_id.t
+  | Generic_operation
+  | Custom of bytes
 
-val component_encoding : component Data_encoding.t
-
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+include
+  S.SIGNATURE
+    with type Public_key_hash.t = public_key_hash
+     and type Public_key.t = public_key
+     and type watermark := watermark

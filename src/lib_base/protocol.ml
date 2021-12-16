@@ -31,7 +31,7 @@ and component = {
   implementation : string;
 }
 
-and env_version = V0 | V1 | V2 | V3 | V4
+and env_version = V0 | V1 | V2 | V3 | V4 | V5
 
 let compare_version = Stdlib.compare
 
@@ -57,18 +57,20 @@ let module_name_of_env_version = function
   | V2 -> "V2"
   | V3 -> "V3"
   | V4 -> "V4"
+  | V5 -> "V5"
 
 let env_version_encoding =
   let open Data_encoding in
   def "protocol.environment_version"
   @@ conv
-       (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3 | V4 -> 4)
+       (function V0 -> 0 | V1 -> 1 | V2 -> 2 | V3 -> 3 | V4 -> 4 | V5 -> 5)
        (function
          | 0 -> V0
          | 1 -> V1
          | 2 -> V2
          | 3 -> V3
          | 4 -> V4
+         | 5 -> V5
          | _ -> failwith "unexpected environment version")
        uint16
 

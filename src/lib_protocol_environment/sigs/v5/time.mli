@@ -23,22 +23,26 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type t
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+include Compare.S with type t := t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+val add : t -> int64 -> t
 
-val component_encoding : component Data_encoding.t
+val diff : t -> t -> int64
 
-val env_version_encoding : env_version Data_encoding.t
+val of_seconds : int64 -> t
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val to_seconds : t -> int64
+
+val of_notation : string -> t option
+
+val of_notation_exn : string -> t
+
+val to_notation : t -> string
+
+val encoding : t Data_encoding.t
+
+val rfc_encoding : t Data_encoding.t
+
+val pp_hum : Format.formatter -> t -> unit

@@ -23,22 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** See [src/lib_rpc/RPC_arg.mli] for documentation *)
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+type 'a t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+type 'a arg = 'a t
 
-val component_encoding : component Data_encoding.t
+val make :
+  ?descr:string ->
+  name:string ->
+  destruct:(string -> ('a, string) result) ->
+  construct:('a -> string) ->
+  unit ->
+  'a arg
 
-val env_version_encoding : env_version Data_encoding.t
+type descr = {name : string; descr : string option}
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val descr : 'a arg -> descr
+
+val bool : bool arg
+
+val int : int arg
+
+val uint : int arg
+
+val int32 : int32 arg
+
+val uint31 : int32 arg
+
+val int64 : int64 arg
+
+val uint63 : int64 arg
+
+val string : string arg
+
+val like : 'a arg -> ?descr:string -> string -> 'a arg
+
+type ('a, 'b) eq = Eq : ('a, 'a) eq
+
+val eq : 'a arg -> 'b arg -> ('a, 'b) eq option

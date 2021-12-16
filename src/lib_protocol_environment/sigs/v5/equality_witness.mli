@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs. <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(**
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+   This module provides support for type equalities and runtime type identifiers.
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+   For two types [a] and [b], [(a, b) eq] is a witness that [a = b]. This is
+   a standard generalized algebraic datatype on top of which type-level
+   programming techniques can be implemented.
 
-val component_encoding : component Data_encoding.t
+   Given a type [a], an inhabitant of [a t] is a dynamic identifier for [a].
+   Identifiers can be compared for equality. They are also equipped with a
+   hash function.
 
-val env_version_encoding : env_version Data_encoding.t
+   WARNING: the hash function changes at every run. Therefore, the result
+   of the hash function should never be stored.
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+   Notice that dynamic identifiers are not unique: two identifiers for [a]
+   can have distinct hash and can be physically distinct. Hence, only [eq]
+   can decide if two type identifiers correspond to the same type.
+
+*)
+
+(** A proof witness that two types are equal. *)
+type (_, _) eq = Refl : ('a, 'a) eq
+
+(** A dynamic representation for ['a]. *)
+type 'a t
+
+(** [make ()] is a dynamic representation for ['a]. A fresh identifier
+   is returned each time [make ()] is evaluated. *)
+val make : unit -> 'a t
+
+(** [eq ida idb] returns a proof that [a = b] if [ida] and [idb]
+   identify the same type. *)
+val eq : 'a t -> 'b t -> ('a, 'b) eq option
+
+(** [hash id] returns a hash for [id]. *)
+val hash : 'a t -> int

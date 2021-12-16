@@ -23,22 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
-
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
+type shell_header = {
+  level : Int32.t;
+      (** The number of preceding block in this chain, i.e. the genesis
+      has level 0. *)
+  proto_level : int;
+      (** The number of preceding protocol change in the chain (modulo 256),
+      i.e. the genesis has proto_level 0. *)
+  predecessor : Block_hash.t;
+  timestamp : Time.t;
+  validation_passes : int;
+  operations_hash : Operation_list_list_hash.t;
+  fitness : Bytes.t list;
+  context : Context_hash.t;
 }
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+val shell_header_encoding : shell_header Data_encoding.t
 
-val component_encoding : component Data_encoding.t
+type t = {shell : shell_header; protocol_data : bytes}
 
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+include S.HASHABLE with type t := t and type hash := Block_hash.t

@@ -23,22 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Committed context hashes / IDs. *)
+include S.HASH
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+(** The module for representing the hash version of a context *)
+module Version : sig
+  (** The type for hash versions. *)
+  type t = private int
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+  include Compare.S with type t := t
 
-val component_encoding : component Data_encoding.t
+  (** [pp] is the pretty-printer for hash versions. *)
+  val pp : Format.formatter -> t -> unit
 
-val env_version_encoding : env_version Data_encoding.t
+  (** [encoding] is the data encoding for hash versions. *)
+  val encoding : t Data_encoding.t
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+  (** [of_int i] is the hash version equivalent to [i].
+      This function raises [Invalid_argument] if [i] is not an unsigned 16-bit integer. *)
+  val of_int : int -> t
+end
+
+type version = Version.t

@@ -23,22 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+type 'a encoding
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+val simple_decode : 'a encoding -> string -> 'a option
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+val simple_encode : 'a encoding -> 'a -> string
 
-val component_encoding : component Data_encoding.t
+type data = ..
 
-val env_version_encoding : env_version Data_encoding.t
+val register_encoding :
+  prefix:string ->
+  length:int ->
+  to_raw:('a -> string) ->
+  of_raw:(string -> 'a option) ->
+  wrap:('a -> data) ->
+  'a encoding
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val check_encoded_prefix : 'a encoding -> string -> int -> unit
+
+val decode : string -> data option

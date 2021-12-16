@@ -23,22 +23,23 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** In memory JSON data *)
+type json =
+  [ `O of (string * json) list
+  | `Bool of bool
+  | `Float of float
+  | `A of json list
+  | `Null
+  | `String of string ]
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+(** Read a JSON document from a string. *)
+val from_string : string -> (json, string) result
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+(** Write a JSON document to a string. This goes via an intermediate
+    buffer and so may be slow on large documents. *)
+val to_string : json -> string
 
-val component_encoding : component Data_encoding.t
+(** Helpers for [Data_encoding] *)
+val cannot_destruct : ('a, Format.formatter, unit, 'b) format4 -> 'a
 
-val env_version_encoding : env_version Data_encoding.t
-
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+val wrap_error : ('a -> 'b) -> 'a -> 'b

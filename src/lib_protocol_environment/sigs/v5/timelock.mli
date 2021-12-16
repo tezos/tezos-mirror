@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,31 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {expected_env : env_version; components : component list}
+(** Contains a value (the decryption of the ciphertext) that can be provably
+recovered in [time] sequential operation or with the rsa secret. *)
+type chest
 
-(** An OCaml source component of a protocol implementation. *)
-and component = {
-  (* The OCaml module name. *)
-  name : string;
-  (* The OCaml interface source code *)
-  interface : string option;
-  (* The OCaml source code *)
-  implementation : string;
-}
+val chest_encoding : chest Data_encoding.t
 
-and env_version = V0 | V1 | V2 | V3 | V4 | V5
+(** Provably opens a chest in a short time. *)
+type chest_key
 
-val component_encoding : component Data_encoding.t
+val chest_key_encoding : chest_key Data_encoding.t
 
-val env_version_encoding : env_version Data_encoding.t
+(** Result of the opening of a chest.
+    The opening can fail in two way which we distinguish to blame the right person.
+    One can provide a false unlocked_value or unlocked_proof, in which case
+    we return [Bogus_opening] and the provider of the chest key is at fault.
+    Otherwise, one can lock the wrong key or put garbage in the ciphertext in which case
+    we return [Bogus_cipher] and the provider of the chest is at fault.
+    Otherwise we return [Correct payload] where payload was what had
+    originally been put in the chest. *)
+type opening_result = Correct of Bytes.t | Bogus_cipher | Bogus_opening
 
-include S.HASHABLE with type t := t and type hash := Protocol_hash.t
+(** Takes a chest, chest key and time and tries to recover the underlying
+    plaintext. See the documentation of opening_result. *)
+val open_chest : chest -> chest_key -> time:int -> opening_result
+
+(** Gives the size of the underlying plaintext in a chest in bytes.
+    Used for gas accounting*)
+val get_plaintext_size : chest -> int
