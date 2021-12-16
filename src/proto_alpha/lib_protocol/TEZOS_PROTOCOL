@@ -92,6 +92,8 @@
         "Tx_rollup_storage",
 
         "Alpha_context",
+        "Carbonated_map_costs",
+        "Carbonated_map",
 
         "Local_gas_counter",
         "Gas_monad",

@@ -62,6 +62,7 @@ let main () =
       "Global_constants_storage_expand_no_constant_branch";
       "cache_model";
       "ir_size_model";
+      "carbonated_map";
     ]
   in
   Lwt_list.iter_s

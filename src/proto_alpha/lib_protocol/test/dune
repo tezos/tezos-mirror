@@ -5,7 +5,8 @@
         test_tez_repr
         liquidity_baking_pbt
         test_script_comparison
-        test_sampler)
+        test_sampler
+        test_carbonated_map)
  (package tezos-protocol-alpha-tests)
  (deps (glob_files contracts/*))
  (libraries tezos-base
@@ -78,3 +79,9 @@
  (alias runtest_liquidity_baking_pbt)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:liquidity_baking_pbt.exe})))
+
+(rule
+ (alias runtest_carbonated_map)
+ (package tezos-protocol-alpha-tests)
+ (action
+  (run %{exe:test_carbonated_map.exe})))
