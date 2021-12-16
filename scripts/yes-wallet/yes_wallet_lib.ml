@@ -29,6 +29,16 @@ open Tezos_base.TzPervasives
 
 type protocol = Florence | Granada | Hangzhou | Ithaca | Alpha
 
+let string_of_protocol = function
+  | Florence -> "Florence"
+  | Granada -> "Granada"
+  | Hangzhou -> "Hangzhou"
+  | Ithaca -> "Ithaca"
+  | Alpha -> "Alpha"
+
+let pp_protocol ppf protocol =
+  Format.fprintf ppf "%s" (string_of_protocol protocol)
+
 (*
    dune exec scripts/yes-wallet/yes-wallet.exe
 
@@ -340,7 +350,9 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only =
   let header = header.shell in
   (match protocol_of_hash protocol_hash with
   | None -> Error_monad.failwith "unknown protocol hash"
-  | Some protocol -> get_delegates protocol context header active_bakers_only)
+  | Some protocol ->
+      Format.printf "Protocol %a detected@." pp_protocol protocol ;
+      get_delegates protocol context header active_bakers_only)
   >>=? fun delegates ->
   Tezos_store.Store.close_store store >>= fun () ->
   return
