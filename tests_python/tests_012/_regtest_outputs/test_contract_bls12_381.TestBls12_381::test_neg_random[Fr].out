@@ -1,0 +1,72 @@
+tests_012/test_contract_bls12_381.py::TestBls12_381::test_neg_random[Fr]
+
+storage
+  (Some 0x9ac69bc1db5f20d9044178b065f5a09c8442bae11c45371f325e816bf721d739)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0x24a3fec4e7f8ad2ed4b6b0284e5d03ad143f3ac4d0ef3aed1f302c3459823c59)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0x0dd533bc546e5dcc64ac9d74ef41109f23d374ad2885194873e582d7700d0d16)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0xc0f43e2aff39fa4bcf5319a48396587b076d0193d9a1c31b676614d9b6a2dc0d)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0xbf12217bfe47d2f1d96db15e3f4a8eb9ba1229c610e2c0ca85205e217fe44422)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0x5b33082c052de9699109edb03ca4961ccdce7dc0b21f35ffa208f0c380d47353)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0x56bd703658653401c10d85274f305dec559e9630f202e307dfa3bb3980829360)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0x8b7fa597cd2d60533467ba57c1a15029a40239dd4cbf50341e7eb8aaa53abf4f)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0xcf62b00037ebd1ad24ffc51831e12878fdd817915f3bfc1f23150099fb2fb81e)
+emitted operations
+  
+big_map diff
+  
+
+storage
+  (Some 0x41df1100e72effd309b1f30f51729681df099140be3fbeeebf55468b9cb35d22)
+emitted operations
+  
+big_map diff
+  
+

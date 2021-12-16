@@ -1,0 +1,27 @@
+(library
+ (name tezos_protocol_plugin_012_PsiThaCa)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-protocol-plugin-012-PsiThaCa)
+ (libraries tezos-base
+            tezos-protocol-012-PsiThaCa
+            tezos-stdlib-unix
+            )
+ (modules (:standard) \ Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_012_PsiThaCa
+                   -open Tezos_stdlib_unix
+                   )))
+
+(library
+ (name tezos_protocol_plugin_012_PsiThaCa_registerer)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-protocol-plugin-012-PsiThaCa-registerer)
+ (libraries tezos-base
+            tezos-embedded-protocol-012-PsiThaCa
+            tezos-protocol-plugin-012-PsiThaCa
+            tezos-shell)
+ (modules Plugin_registerer)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_embedded_protocol_012_PsiThaCa
+                   -open Tezos_protocol_plugin_012_PsiThaCa
+                   -open Tezos_shell)))

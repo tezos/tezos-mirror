@@ -1,0 +1,612 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/xcat_dapp.tz]
+
+Well typed
+Gas remaining: 1039911.852 units remaining
+{ parameter
+    (or (pair %fund
+           (address %dest)
+           (pair %settings (bytes %target_hash) (timestamp %deadline)))
+        (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash))) ;
+  storage
+    (pair (big_map
+             bytes
+             (pair (pair %recipients (address %from) (address %dest))
+                   (pair %settings (mutez %amount) (timestamp %deadline))))
+          unit) ;
+  code { NIL @operations
+           operation
+         /* [ @operations list operation
+            : pair (or @parameter
+                    (pair %fund
+                       (address %dest)
+                       (pair %settings (bytes %target_hash) (timestamp %deadline)))
+                    (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
+                 (pair @storage
+                    (big_map
+                       bytes
+                       (pair (pair %recipients (address %from) (address %dest))
+                             (pair %settings (mutez %amount) (timestamp %deadline))))
+                    unit) ] */ ;
+         SWAP
+         /* [ pair (or @parameter
+                    (pair %fund
+                       (address %dest)
+                       (pair %settings (bytes %target_hash) (timestamp %deadline)))
+                    (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
+                 (pair @storage
+                    (big_map
+                       bytes
+                       (pair (pair %recipients (address %from) (address %dest))
+                             (pair %settings (mutez %amount) (timestamp %deadline))))
+                    unit) : @operations list operation ] */ ;
+         UNPAPAIR @% @% @% ;
+         DIP { DUP
+               /* [ big_map
+                    bytes
+                    (pair (pair %recipients (address %from) (address %dest))
+                          (pair %settings (mutez %amount) (timestamp %deadline)))
+                  : big_map
+                    bytes
+                    (pair (pair %recipients (address %from) (address %dest))
+                          (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                  : @operations list operation ] */ }
+         /* [ @parameter or (pair %fund
+                  (address %dest)
+                  (pair %settings (bytes %target_hash) (timestamp %deadline)))
+               (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash))
+            : big_map
+              bytes
+              (pair (pair %recipients (address %from) (address %dest))
+                    (pair %settings (mutez %amount) (timestamp %deadline)))
+            : big_map
+              bytes
+              (pair (pair %recipients (address %from) (address %dest))
+                    (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+            : @operations list operation ] */ ;
+         IF_LEFT
+           { UNPAIR @% @%
+             /* [ @dest address : @settings pair (bytes %target_hash) (timestamp %deadline)
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             DUP
+             /* [ @dest address : @dest address
+                : @settings pair (bytes %target_hash) (timestamp %deadline)
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             CONTRACT @dest
+               unit
+             /* [ @dest option (contract unit) : @dest address
+                : @settings pair (bytes %target_hash) (timestamp %deadline)
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             ASSERT_SOME ;
+             DROP
+             /* [ @dest address : @settings pair (bytes %target_hash) (timestamp %deadline)
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             SWAP
+             /* [ @settings pair (bytes %target_hash) (timestamp %deadline) : @dest address
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             UNPAIR @% @%
+             /* [ @target_hash bytes : @deadline timestamp : @dest address
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             DIP { AMOUNT @amount
+                   /* [ @amount mutez : @deadline timestamp : @dest address
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   SENDER
+                   /* [ @sender address : @amount mutez : @deadline timestamp : @dest address
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   DUP
+                   /* [ @sender address : @sender address : @amount mutez : @deadline timestamp
+                      : @dest address
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   CONTRACT @from
+                     unit
+                   /* [ @from option (contract unit) : @sender address : @amount mutez
+                      : @deadline timestamp : @dest address
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   ASSERT_SOME ;
+                   DROP
+                   /* [ @sender address : @amount mutez : @deadline timestamp : @dest address
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   DIP { PAIR
+                         /* [ pair (mutez @amount) (timestamp @deadline) : @dest address
+                            : big_map
+                              bytes
+                              (pair (pair %recipients (address %from) (address %dest))
+                                    (pair %settings (mutez %amount) (timestamp %deadline)))
+                            : big_map
+                              bytes
+                              (pair (pair %recipients (address %from) (address %dest))
+                                    (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                            : @operations list operation ] */ ;
+                         SWAP
+                         /* [ @dest address : pair (mutez @amount) (timestamp @deadline)
+                            : big_map
+                              bytes
+                              (pair (pair %recipients (address %from) (address %dest))
+                                    (pair %settings (mutez %amount) (timestamp %deadline)))
+                            : big_map
+                              bytes
+                              (pair (pair %recipients (address %from) (address %dest))
+                                    (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                            : @operations list operation ] */ }
+                   /* [ @sender address : @dest address
+                      : pair (mutez @amount) (timestamp @deadline)
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   PAIR
+                   /* [ pair (address @sender) (address @dest)
+                      : pair (mutez @amount) (timestamp @deadline)
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   PAIR
+                   /* [ pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline)
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   SOME @xcat
+                   /* [ @xcat option
+                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   SWAP
+                   /* [ big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline)))
+                      : @xcat option
+                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ }
+             /* [ @target_hash bytes
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : @xcat option
+                  (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             DUP
+             /* [ @target_hash bytes : @target_hash bytes
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline)))
+                : @xcat option
+                  (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             DIP { MEM
+                   /* [ bool
+                      : @xcat option
+                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   NOT
+                   /* [ bool
+                      : @xcat option
+                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                      : big_map
+                        bytes
+                        (pair (pair %recipients (address %from) (address %dest))
+                              (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                      : @operations list operation ] */ ;
+                   ASSERT }
+             /* [ @target_hash bytes
+                : @xcat option
+                  (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                : @operations list operation ] */ ;
+             UPDATE
+             /* [ big_map bytes (pair (pair address address) mutez timestamp) : unit
+                : @operations list operation ] */ ;
+             PAIR @new_storage
+             /* [ @new_storage pair (big_map bytes (pair (pair address address) mutez timestamp)) unit
+                : @operations list operation ] */ ;
+             SWAP
+             /* [ @operations list operation
+                : @new_storage pair (big_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
+             PAIR
+             /* [ pair (list @operations operation)
+                     (pair @new_storage (big_map bytes (pair (pair address address) mutez timestamp)) unit) ] */ }
+           { IF_LEFT
+               { DUP
+                 /* [ @parameter.claim_refund.preimage_claim bytes
+                    : @parameter.claim_refund.preimage_claim bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline)))
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 SIZE
+                 /* [ nat : @parameter.claim_refund.preimage_claim bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline)))
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 PUSH nat
+                      32
+                 /* [ nat : nat : @parameter.claim_refund.preimage_claim bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline)))
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 ASSERT_CMPGE ;
+                 SHA256 @hash
+                 /* [ @hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline)))
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 DUP
+                 /* [ @hash bytes : @hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline)))
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 DIP { SWAP
+                       /* [ big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : @hash bytes
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ }
+                 /* [ @hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : @hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 DIIP { GET
+                        /* [ option
+                             (pair (pair %recipients (address %from) (address %dest))
+                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                           : @operations list operation ] */ ;
+                        ASSERT_SOME ;
+                        DUP
+                        /* [ @some pair (pair %recipients (address %from) (address %dest))
+                                (pair %settings (mutez %amount) (timestamp %deadline))
+                           : @some pair (pair %recipients (address %from) (address %dest))
+                                (pair %settings (mutez %amount) (timestamp %deadline)) : unit
+                           : @operations list operation ] */ ;
+                        CADR @% ;
+                        CONTRACT @dest
+                          unit
+                        /* [ @dest option (contract unit)
+                           : @some pair (pair %recipients (address %from) (address %dest))
+                                (pair %settings (mutez %amount) (timestamp %deadline)) : unit
+                           : @operations list operation ] */ ;
+                        ASSERT_SOME ;
+                        SWAP
+                        /* [ @some pair (pair %recipients (address %from) (address %dest))
+                                (pair %settings (mutez %amount) (timestamp %deadline))
+                           : @dest.some contract unit : unit : @operations list operation ] */ ;
+                        CDR @%
+                        /* [ @settings pair (mutez %amount) (timestamp %deadline)
+                           : @dest.some contract unit : unit : @operations list operation ] */ ;
+                        UNPAIR @% @%
+                        /* [ @amount mutez : @deadline timestamp : @dest.some contract unit : unit
+                           : @operations list operation ] */ ;
+                        SWAP
+                        /* [ @deadline timestamp : @amount mutez : @dest.some contract unit : unit
+                           : @operations list operation ] */ ;
+                        NOW
+                        /* [ @now timestamp : @deadline timestamp : @amount mutez
+                           : @dest.some contract unit : unit : @operations list operation ] */ ;
+                        ASSERT_CMPLT ;
+                        UNIT
+                        /* [ unit : @amount mutez : @dest.some contract unit : unit
+                           : @operations list operation ] */ ;
+                        TRANSFER_TOKENS
+                        /* [ operation : unit : @operations list operation ] */ }
+                 /* [ @hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : operation
+                    : unit : @operations list operation ] */ }
+               { DUP
+                 /* [ @parameter.claim_refund.refund_hash bytes
+                    : @parameter.claim_refund.refund_hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline)))
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                    : @operations list operation ] */ ;
+                 DIP { GET
+                       /* [ option
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline)))
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       ASSERT_SOME ;
+                       DUP
+                       /* [ @some pair (pair %recipients (address %from) (address %dest))
+                               (pair %settings (mutez %amount) (timestamp %deadline))
+                          : @some pair (pair %recipients (address %from) (address %dest))
+                               (pair %settings (mutez %amount) (timestamp %deadline))
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       CAAR @% ;
+                       CONTRACT @from
+                         unit
+                       /* [ @from option (contract unit)
+                          : @some pair (pair %recipients (address %from) (address %dest))
+                               (pair %settings (mutez %amount) (timestamp %deadline))
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       ASSERT_SOME ;
+                       SWAP
+                       /* [ @some pair (pair %recipients (address %from) (address %dest))
+                               (pair %settings (mutez %amount) (timestamp %deadline))
+                          : @from.some contract unit
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       CDR
+                       /* [ pair (mutez %amount) (timestamp %deadline) : @from.some contract unit
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       UNPAIR @% @%
+                       /* [ @amount mutez : @deadline timestamp : @from.some contract unit
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       SWAP
+                       /* [ @deadline timestamp : @amount mutez : @from.some contract unit
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       NOW
+                       /* [ @now timestamp : @deadline timestamp : @amount mutez
+                          : @from.some contract unit
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       ASSERT_CMPGE ;
+                       UNIT
+                       /* [ unit : @amount mutez : @from.some contract unit
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       TRANSFER_TOKENS
+                       /* [ operation
+                          : big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : unit
+                          : @operations list operation ] */ ;
+                       SWAP
+                       /* [ big_map
+                            bytes
+                            (pair (pair %recipients (address %from) (address %dest))
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : operation
+                          : unit : @operations list operation ] */ }
+                 /* [ @parameter.claim_refund.refund_hash bytes
+                    : big_map
+                      bytes
+                      (pair (pair %recipients (address %from) (address %dest))
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : operation
+                    : unit : @operations list operation ] */ } ;
+             NONE @none
+               (pair (pair address address) (pair mutez timestamp))
+             /* [ @none option (pair (pair address address) mutez timestamp) : bytes
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : operation
+                : unit : @operations list operation ] */ ;
+             SWAP
+             /* [ bytes : @none option (pair (pair address address) mutez timestamp)
+                : big_map
+                  bytes
+                  (pair (pair %recipients (address %from) (address %dest))
+                        (pair %settings (mutez %amount) (timestamp %deadline))) : operation
+                : unit : @operations list operation ] */ ;
+             UPDATE @cleared_map
+             /* [ @cleared_map big_map bytes (pair (pair address address) mutez timestamp)
+                : operation : unit : @operations list operation ] */ ;
+             SWAP
+             /* [ operation
+                : @cleared_map big_map bytes (pair (pair address address) mutez timestamp)
+                : unit : @operations list operation ] */ ;
+             DIP { PAIR
+                   /* [ pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit
+                      : @operations list operation ] */ ;
+                   SWAP
+                   /* [ @operations list operation
+                      : pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit ] */ }
+             /* [ operation : @operations list operation
+                : pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
+             CONS
+             /* [ list operation
+                : pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
+             PAIR
+             /* [ pair (list operation)
+                     (big_map @cleared_map bytes (pair (pair address address) mutez timestamp))
+                     unit ] */ } } }

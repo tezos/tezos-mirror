@@ -1,0 +1,3 @@
+tests_012/test_liquidity_baking.py::TestAddApproveTransferRemove::test_tok_storage
+
+Pair 0 1 "[CONTRACT_HASH]" 100010000

@@ -1,0 +1,49 @@
+tests_012/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[set_car.tz-(Pair "hello" 0)-""-(Pair "" 0)]
+
+storage
+  (Pair "" 0)
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 9 (remaining gas: 1039987.561 units remaining)
+    [ (Pair "" "hello" 0)  	 ]
+  - location: 9 (remaining gas: 1039987.551 units remaining)
+    [ (Pair "" "hello" 0)  	
+      (Pair "" "hello" 0)  	 ]
+  - location: 10 (remaining gas: 1039987.541 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "" "hello" 0)  	 ]
+  - location: 11 (remaining gas: 1039987.526 units remaining)
+    [ (Pair "" "hello" 0)  	 ]
+  - location: 13 (remaining gas: 1039987.516 units remaining)
+    [ ""  	@parameter ]
+  - location: 11 (remaining gas: 1039987.486 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      ""  	@parameter ]
+  - location: 15 (remaining gas: 1039987.476 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      (Pair "hello" 0)  	@storage
+      ""  	@parameter ]
+  - location: 16 (remaining gas: 1039987.466 units remaining)
+    [ "hello"  	
+      (Pair "hello" 0)  	@storage
+      ""  	@parameter ]
+  - location: 17 (remaining gas: 1039987.456 units remaining)
+    [ (Pair "hello" 0)  	@storage
+      ""  	@parameter ]
+  - location: 18 (remaining gas: 1039987.446 units remaining)
+    [ 0  	@storage.n
+      ""  	@parameter ]
+  - location: 19 (remaining gas: 1039987.436 units remaining)
+    [ ""  	@parameter
+      0  	@storage.n ]
+  - location: 20 (remaining gas: 1039987.421 units remaining)
+    [ (Pair "" 0)  	@storage ]
+  - location: 21 (remaining gas: 1039987.406 units remaining)
+    [ {}  	
+      (Pair "" 0)  	@storage ]
+  - location: 23 (remaining gas: 1039987.391 units remaining)
+    [ (Pair {} "" 0)  	 ]
+

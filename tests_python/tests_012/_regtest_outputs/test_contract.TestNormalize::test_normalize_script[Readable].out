@@ -1,0 +1,10 @@
+tests_012/test_contract.py::TestNormalize::test_normalize_script[Readable]
+
+{ parameter unit ;
+  storage unit ;
+  code { PUSH (list (pair nat nat nat nat))
+              { Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 } ;
+         DROP 2 ;
+         UNIT ;
+         NIL operation ;
+         PAIR } }

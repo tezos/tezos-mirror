@@ -1,0 +1,25 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/execution_order_caller.tz]
+
+Well typed
+Gas remaining: 1039991.291 units remaining
+{ parameter unit ;
+  storage (list address) ;
+  code { CDR
+         /* [ @storage list address ] */ ;
+         DUP
+         /* [ @storage list address : @storage list address ] */ ;
+         MAP { CONTRACT
+                 unit
+               /* [ @storage.elt.contract option (contract unit) : @storage list address ] */ ;
+               ASSERT_SOME ;
+               PUSH mutez
+                    0
+               /* [ mutez : @storage.elt.contract.some contract unit : @storage list address ] */ ;
+               UNIT
+               /* [ unit : mutez : @storage.elt.contract.some contract unit
+                  : @storage list address ] */ ;
+               TRANSFER_TOKENS
+               /* [ operation : @storage list address ] */ }
+         /* [ list operation : @storage list address ] */ ;
+         PAIR
+         /* [ pair (list operation) (list @storage address) ] */ } }

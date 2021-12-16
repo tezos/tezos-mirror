@@ -1,0 +1,26 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[macros/pair_macro.tz]
+
+Well typed
+Gas remaining: 1039988.218 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { UNIT
+         /* [ unit : pair (unit @parameter) (unit @storage) ] */ ;
+         UNIT
+         /* [ unit : unit : pair (unit @parameter) (unit @storage) ] */ ;
+         UNIT
+         /* [ unit : unit : unit : pair (unit @parameter) (unit @storage) ] */ ;
+         UNIT
+         /* [ unit : unit : unit : unit : pair (unit @parameter) (unit @storage) ] */ ;
+         UNIT
+         /* [ unit : unit : unit : unit : unit : pair (unit @parameter) (unit @storage) ] */ ;
+         PAPAPAPAIR @name %x1 %x2 %x3 %x4 %x5 ;
+         CDDDAR %x4 @fourth ;
+         DROP
+         /* [ pair (unit @parameter) (unit @storage) ] */ ;
+         CDR
+         /* [ @storage unit ] */ ;
+         NIL operation
+         /* [ list operation : @storage unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @storage) ] */ } }

@@ -1,0 +1,16 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[attic/add1.tz]
+
+Well typed
+Gas remaining: 1039996.134 units remaining
+{ parameter int ;
+  storage int ;
+  code { CAR
+         /* [ @parameter int ] */ ;
+         PUSH int 1
+         /* [ int : @parameter int ] */ ;
+         ADD
+         /* [ int ] */ ;
+         NIL operation
+         /* [ list operation : int ] */ ;
+         PAIR
+         /* [ pair (list operation) int ] */ } }

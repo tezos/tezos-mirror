@@ -1,0 +1,15 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/not_binary.tz]
+
+Well typed
+Gas remaining: 1039994.585 units remaining
+{ parameter (or int nat) ;
+  storage (option int) ;
+  code { CAR
+         /* [ @parameter or int nat ] */ ;
+         IF_LEFT { NOT /* [ int ] */ } { NOT /* [ int ] */ } ;
+         SOME
+         /* [ option int ] */ ;
+         NIL operation
+         /* [ list operation : option int ] */ ;
+         PAIR
+         /* [ pair (list operation) (option int) ] */ } }

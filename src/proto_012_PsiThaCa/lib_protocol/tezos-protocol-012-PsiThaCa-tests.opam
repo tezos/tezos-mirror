@@ -1,0 +1,36 @@
+opam-version: "2.0"
+maintainer: "contact@tezos.com"
+authors: [ "Tezos devteam" ]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
+license: "MIT"
+depends: [
+  "dune" { >= "2.9" }
+  "tezos-protocol-compiler"
+  "alcotest-lwt" { with-test & >= "1.1.0" }
+  "astring" { with-test }
+  "tezos-test-helpers" { with-test }
+  "qcheck-alcotest" { with-test }
+  "tezos-012-PsiThaCa-test-helpers" { with-test }
+  "tezos-stdlib-unix" { with-test }
+  "tezos-protocol-environment" { with-test }
+  "tezos-client-base" { with-test }
+  "tezos-protocol-012-PsiThaCa-parameters" { with-test }
+  "tezos-shell-services" { with-test }
+  "tezos-base-test-helpers" { with-test }
+  "tezos-benchmark" { with-test }
+  "tezos-benchmark-012-PsiThaCa" { with-test }
+]
+build: [
+  [
+    "%{tezos-protocol-compiler:lib}%/replace"
+    "%{tezos-protocol-compiler:lib}%/dune_protocol.template.v1"
+    "dune"
+    "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
+    "012_PsiThaCa"
+  ]
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "Tezos/Protocol: tests for economic-protocol definition"
