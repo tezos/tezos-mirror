@@ -43,7 +43,7 @@ module Small_utilities = struct
       (const (fun state ->
            ( state,
              fun () ->
-               Helpers.Netstat.used_listening_ports state >>= fun ports ->
+               let* ports = Helpers.Netstat.used_listening_ports state in
                let to_display =
                  List.map ports ~f:(fun (p, _) -> p)
                  |> List.sort ~compare:Int.compare

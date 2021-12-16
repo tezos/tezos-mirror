@@ -269,7 +269,7 @@ module Asynchronous_result = struct
 
   (** The module opened everywhere. *)
   module Std = struct
-    let ( >>= ) = bind let return = return let fail = fail
+    let ( >>= ) = bind let ( let* ) = bind let return = return let fail = fail
   end
 
   open Std
