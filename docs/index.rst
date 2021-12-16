@@ -162,15 +162,6 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 012 Ithaca Protocol doc:
-
-   012/protocol
-   012/glossary
-   012/cli-commands
-   012/rpc
-
-.. toctree::
-   :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
    alpha/protocol
@@ -217,7 +208,6 @@ in the :ref:`introduction <howtoget>`.
    protocols/009_florence
    protocols/010_granada
    protocols/011_hangzhou
-   protocols/012_ithaca
    protocols/alpha
 
 .. toctree::
