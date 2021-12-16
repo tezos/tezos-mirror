@@ -29,25 +29,25 @@ module String_map = Map.Make (String)
 (* Very thin layer over JSON constructors, in case we want to change backend
    (and to provide some convenience). *)
 
-let bool value : Json.t = `Bool value
+let bool value : Json.u = `Bool value
 
-let int value : Json.t = `Float (float value)
+let int value : Json.u = `Float (float value)
 
-let float value : Json.t = `Float value
+let float value : Json.u = `Float value
 
-let string value : Json.t = `String value
+let string value : Json.u = `String value
 
-let array values : Json.t = `A values
+let array values : Json.u = `A values
 
-let field name value : (string * Json.t) list = [(name, value)]
+let field name value : (string * Json.u) list = [(name, value)]
 
-let field_opt name value make : (string * Json.t) list =
+let field_opt name value make : (string * Json.u) list =
   match value with None -> [] | Some value -> [(name, make value)]
 
-let field_list name value : (string * Json.t) list =
+let field_list name value : (string * Json.u) list =
   match value with [] -> [] | _ -> [(name, `A value)]
 
-let obj ll : Json.t = `O (List.flatten ll)
+let obj ll : Json.u = `O (List.flatten ll)
 
 module Schema = struct
   type kind =
