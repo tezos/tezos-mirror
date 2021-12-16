@@ -566,6 +566,12 @@ module Make (Proto : Registered_protocol.T) = struct
             ?message:validation_result.message
             context
         in
+        let* () =
+          fail_unless
+            (Context_hash.equal context_hash block_header.shell.context)
+            (Validation_errors.Inconsistent_hash
+               (context_hash, block_header.shell.context))
+        in
         let validation_store =
           {
             context_hash;
