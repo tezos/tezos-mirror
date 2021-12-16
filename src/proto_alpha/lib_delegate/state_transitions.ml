@@ -520,7 +520,11 @@ let end_of_round state current_round =
       new_state.round_state.current_round
   with
   | None ->
-      Events.(emit no_proposal_slot new_round) >>= fun () ->
+      Events.(
+        emit
+          no_proposal_slot
+          (current_round, state.level_state.current_level, new_round))
+      >>= fun () ->
       (* We don't have any delegate that may propose a new block for
          this round -- We will wait for preendorsements when the next
          level block arrive. Meanwhile, we are idle *)
@@ -528,7 +532,11 @@ let end_of_round state current_round =
       let new_state = {state with round_state = new_round_state} in
       do_nothing new_state
   | Some (delegate, _) ->
-      Events.(emit proposal_slot (new_round, delegate)) >>= fun () ->
+      Events.(
+        emit
+          proposal_slot
+          (current_round, state.level_state.current_level, new_round, delegate))
+      >>= fun () ->
       (* We have a delegate, we need to determine what to inject *)
       repropose_block_action
         new_state
@@ -681,9 +689,23 @@ let step (state : Baking_state.t) (event : Baking_state.event) :
       (* If it is time to bake the next level, stop everything currently
          going on and propose the next level block *)
       time_to_bake state at_round
-  | (Idle, New_proposal block_info) -> handle_new_proposal state block_info
+  | (Idle, New_proposal block_info) ->
+      Events.(
+        emit
+          new_head
+          ( block_info.block.hash,
+            block_info.block.shell.level,
+            block_info.block.round ))
+      >>= fun () -> handle_new_proposal state block_info
   | (Awaiting_endorsements, New_proposal block_info)
   | (Awaiting_preendorsements, New_proposal block_info) ->
+      Events.(
+        emit
+          new_head
+          ( block_info.block.hash,
+            block_info.block.shell.level,
+            block_info.block.round ))
+      >>= fun () ->
       Events.(emit new_head_while_waiting_for_qc ()) >>= fun () ->
       handle_new_proposal state block_info
   | ( Awaiting_preendorsements,
