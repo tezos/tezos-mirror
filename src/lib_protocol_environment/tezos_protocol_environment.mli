@@ -32,4 +32,5 @@ include module type of struct
   include Environment_V2
   include Environment_V3
   include Environment_V4
+  include Environment_V5
 end

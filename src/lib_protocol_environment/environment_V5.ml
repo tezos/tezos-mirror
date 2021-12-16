@@ -179,7 +179,13 @@ struct
 
   module Compare = Compare
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
-  module List = Tezos_error_monad.TzLwtreslib.List
+
+  module List = struct
+    include Tezos_error_monad.TzLwtreslib.List
+
+    include Tezos_protocol_environment_structs.V5.M.Lwtreslib_list_combine
+  end
+
   module Char = Char
   module Bytes = Bytes
   module Hex = Hex
