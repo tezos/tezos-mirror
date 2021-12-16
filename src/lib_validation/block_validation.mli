@@ -134,7 +134,6 @@ val precheck :
 
 val preapply :
   chain_id:Chain_id.t ->
-  cache:Environment_context.Context.source_of_cache ->
   user_activated_upgrades:Tezos_base.User_activated.upgrades ->
   user_activated_protocol_overrides:Tezos_base.User_activated.protocol_overrides ->
   timestamp:Time.Protocol.t ->

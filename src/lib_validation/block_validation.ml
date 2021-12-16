@@ -28,6 +28,19 @@
 open Block_validator_errors
 open Validation_errors
 
+module Event = struct
+  include Internal_event.Simple
+
+  let inherited_inconsistent_cache =
+    declare_1
+      ~section:["block"; "validation"]
+      ~name:"block_validation_inconsistent_cache"
+      ~msg:"applied block {hash} with an inconsistent cache: reloading cache"
+      ~level:Warning
+      ~pp1:Block_hash.pp
+      ("hash", Block_hash.encoding)
+end
+
 type validation_store = {
   context_hash : Context_hash.t;
   timestamp : Time.Protocol.t;
@@ -1062,9 +1075,8 @@ let apply ?cached_result
       predecessor_block_metadata_hash;
       predecessor_ops_metadata_hash;
       predecessor_context;
-    } ~cache block_header operations =
+    } ~cache block_hash block_header operations =
   let open Lwt_tzresult_syntax in
-  let block_hash = Block_header.hash block_header in
   let*! pred_protocol_hash = Context.get_protocol predecessor_context in
   let* (module Proto) =
     match Registered_protocol.get pred_protocol_hash with
@@ -1090,8 +1102,26 @@ let apply ?cached_result
     operations
 
 let apply ?cached_result c ~cache block_header operations =
-  let open Lwt_syntax in
-  let* r = apply ?cached_result c ~cache block_header operations in
+  let open Lwt_tzresult_syntax in
+  let block_hash = Block_header.hash block_header in
+  let*! r =
+    (* The cache might be inconsistent with the context. By forcing
+       the reloading of the cache, we restore the consistency. *)
+    let*! r =
+      apply ?cached_result c ~cache block_hash block_header operations
+    in
+    match r with
+    | Error (Validation_errors.Inconsistent_hash _ :: _) ->
+        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
+        apply
+          ?cached_result
+          c
+          ~cache:`Force_load
+          block_hash
+          block_header
+          operations
+    | (Ok _ | Error _) as res -> Lwt.return res
+  in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
       Lwt_tzresult_syntax.fail
@@ -1121,7 +1151,7 @@ let precheck ~chain_id ~predecessor_block_header ~predecessor_block_hash
     ~block_header
     operations
 
-let preapply ~chain_id ~cache ~user_activated_upgrades
+let preapply ~chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~timestamp ~protocol_data ~live_blocks
     ~live_operations ~predecessor_context ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
@@ -1139,6 +1169,8 @@ let preapply ~chain_id ~cache ~user_activated_upgrades
           protocol
     | Some protocol -> return protocol
   in
+  (* The cache might be inconsistent with the context. By forcing the
+     reloading of the cache, we restore the consistency. *)
   let module Block_validation = Make (Proto) in
   let* protocol_data =
     match
@@ -1151,7 +1183,7 @@ let preapply ~chain_id ~cache ~user_activated_upgrades
   in
   Block_validation.preapply
     ~chain_id
-    ~cache
+    ~cache:`Force_load
     ~user_activated_upgrades
     ~user_activated_protocol_overrides
     ~protocol_data
@@ -1166,7 +1198,7 @@ let preapply ~chain_id ~cache ~user_activated_upgrades
     ~predecessor_ops_metadata_hash
     ~operations
 
-let preapply ~chain_id ~cache ~user_activated_upgrades
+let preapply ~chain_id ~user_activated_upgrades
     ~user_activated_protocol_overrides ~timestamp ~protocol_data ~live_blocks
     ~live_operations ~predecessor_context ~predecessor_shell_header
     ~predecessor_hash ~predecessor_max_operations_ttl
@@ -1175,7 +1207,6 @@ let preapply ~chain_id ~cache ~user_activated_upgrades
   let* r =
     preapply
       ~chain_id
-      ~cache
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
       ~timestamp

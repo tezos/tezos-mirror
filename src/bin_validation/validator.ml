@@ -310,16 +310,9 @@ let run input output =
            >>=? fun predecessor_context ->
              Context.get_protocol predecessor_context >>= fun protocol_hash ->
              load_protocol protocol_hash protocol_root >>=? fun () ->
-             let cache =
-               match cache with
-               | None -> `Load
-               | Some cache ->
-                   `Inherited (cache, predecessor_shell_header.context)
-             in
              let preapply () =
                Block_validation.preapply
                  ~chain_id
-                 ~cache
                  ~user_activated_upgrades
                  ~user_activated_protocol_overrides
                  ~timestamp

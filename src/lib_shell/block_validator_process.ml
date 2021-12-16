@@ -247,15 +247,8 @@ module Internal_validator_process = struct
     let user_activated_protocol_overrides =
       validator.user_activated_protocol_overrides
     in
-    let cache =
-      match validator.cache with
-      | None -> `Load
-      | Some block_cache ->
-          `Inherited (block_cache, predecessor_shell_header.context)
-    in
     Block_validation.preapply
       ~chain_id
-      ~cache
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
       ~timestamp
