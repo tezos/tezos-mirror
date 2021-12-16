@@ -33,14 +33,12 @@ depopts: [
   "tezos-client-009-PsFLoren"
   "tezos-client-010-PtGRANAD"
   "tezos-client-011-PtHangz2"
-  "tezos-client-012-Psithaca"
   "tezos-client-alpha"
   "tezos-protocol-plugin-007-PsDELPH1"
   "tezos-protocol-plugin-008-PtEdo2Zk"
   "tezos-protocol-plugin-009-PsFLoren"
   "tezos-protocol-plugin-010-PtGRANAD"
   "tezos-protocol-plugin-011-PtHangz2"
-  "tezos-protocol-plugin-012-Psithaca"
   "tezos-protocol-plugin-alpha"
 ]
 build: [
