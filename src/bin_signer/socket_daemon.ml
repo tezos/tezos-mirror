@@ -28,96 +28,112 @@ module Events = Signer_events.Socket_daemon
 
 let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
     cctxt fd =
-  Tezos_base_unix.Socket.recv ?timeout fd Request.encoding >>=? function
+  let open Lwt_result_syntax in
+  let* recved = Tezos_base_unix.Socket.recv ?timeout fd Request.encoding in
+  match recved with
   | Sign req ->
       let encoding = result_encoding Sign.Response.encoding in
-      Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth
-      >>= fun res -> Tezos_base_unix.Socket.send fd encoding res
+      let*! res =
+        Handler.sign cctxt req ?magic_bytes ~check_high_watermark ~require_auth
+      in
+      Tezos_base_unix.Socket.send fd encoding res
   | Deterministic_nonce req ->
       let encoding = result_encoding Deterministic_nonce.Response.encoding in
-      Handler.deterministic_nonce cctxt req ~require_auth >>= fun res ->
+      let*! res = Handler.deterministic_nonce cctxt req ~require_auth in
       Tezos_base_unix.Socket.send fd encoding res
   | Deterministic_nonce_hash req ->
       let encoding =
         result_encoding Deterministic_nonce_hash.Response.encoding
       in
-      Handler.deterministic_nonce_hash cctxt req ~require_auth >>= fun res ->
+      let*! res = Handler.deterministic_nonce_hash cctxt req ~require_auth in
       Tezos_base_unix.Socket.send fd encoding res
   | Supports_deterministic_nonces req ->
       let encoding =
         result_encoding Supports_deterministic_nonces.Response.encoding
       in
-      Handler.supports_deterministic_nonces cctxt req >>= fun res ->
+      let*! res = Handler.supports_deterministic_nonces cctxt req in
       Tezos_base_unix.Socket.send fd encoding res
   | Public_key pkh ->
       let encoding = result_encoding Public_key.Response.encoding in
-      Handler.public_key cctxt pkh >>= fun res ->
+      let*! res = Handler.public_key cctxt pkh in
       Tezos_base_unix.Socket.send fd encoding res
   | Authorized_keys ->
       let encoding = result_encoding Authorized_keys.Response.encoding in
-      (if require_auth then
-       Handler.Authorized_key.load cctxt >>=? fun keys ->
-       return
-         (Authorized_keys.Response.Authorized_keys
-            (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
-      else return Authorized_keys.Response.No_authentication)
-      >>= fun res -> Tezos_base_unix.Socket.send fd encoding res
+      let*! res =
+        if require_auth then
+          let* keys = Handler.Authorized_key.load cctxt in
+          return
+            (Authorized_keys.Response.Authorized_keys
+               (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
+        else return Authorized_keys.Response.No_authentication
+      in
+      Tezos_base_unix.Socket.send fd encoding res
 
 let handle_client_loop ?magic_bytes ?timeout ~check_high_watermark ~require_auth
     cctxt fd =
   let rec loop () =
-    handle_client_step
-      ?magic_bytes
-      ?timeout
-      ~check_high_watermark
-      ~require_auth
-      cctxt
-      fd
-    >>=? loop
+    let open Lwt_result_syntax in
+    let* () =
+      handle_client_step
+        ?magic_bytes
+        ?timeout
+        ~check_high_watermark
+        ~require_auth
+        cctxt
+        fd
+    in
+    loop ()
   in
   loop ()
 
 let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet) path =
+  let open Lwt_result_syntax in
   let open Tezos_base_unix.Socket in
-  (match path with
-  | Tcp (host, service, _opts) ->
-      Events.(emit accepting_tcp_requests) (host, service)
-  | Unix path ->
-      ListLabels.iter
-        Sys.[sigint; sigterm]
-        ~f:(fun signal ->
-          Sys.set_signal
-            signal
-            (Signal_handle
-               (fun _ ->
-                 Format.printf "Removing the local socket file and quitting.@." ;
-                 Unix.unlink path ;
-                 exit 0))) ;
-      Events.(emit accepting_unix_requests) path)
-  >>= fun () ->
-  bind path >>=? fun fds ->
+  let*! () =
+    match path with
+    | Tcp (host, service, _opts) ->
+        Events.(emit accepting_tcp_requests) (host, service)
+    | Unix path ->
+        ListLabels.iter
+          Sys.[sigint; sigterm]
+          ~f:(fun signal ->
+            Sys.set_signal
+              signal
+              (Signal_handle
+                 (fun _ ->
+                   Format.printf
+                     "Removing the local socket file and quitting.@." ;
+                   Unix.unlink path ;
+                   exit 0))) ;
+        Events.(emit accepting_unix_requests) path
+  in
+  let* fds = bind path in
   let rec loop fd =
-    Lwt_unix.accept fd >>= fun (cfd, _) ->
+    let open Lwt_syntax in
+    let* (cfd, _) = Lwt_unix.accept fd in
     Lwt.dont_wait
       (fun () ->
         Unit.catch_s (fun () ->
             Lwt.finalize
               (fun () ->
-                handle_client_loop
-                  ?magic_bytes
-                  ?timeout
-                  ~check_high_watermark
-                  ~require_auth
-                  cctxt
-                  cfd
-                >>= fun (_ : unit tzresult) -> Lwt.return_unit)
+                let* (_ : unit tzresult) =
+                  handle_client_loop
+                    ?magic_bytes
+                    ?timeout
+                    ~check_high_watermark
+                    ~require_auth
+                    cctxt
+                    cfd
+                in
+                Lwt.return_unit)
               (fun () ->
-                Lwt_utils_unix.safe_close cfd
-                >|= Result.iter_error
-                      (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace))))
+                let+ r = Lwt_utils_unix.safe_close cfd in
+                Result.iter_error
+                  (Format.eprintf "Uncaught error: %a\n%!" pp_print_trace)
+                  r)))
       (fun exc ->
         Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc)) ;
     loop fd
   in
-  List.map_p loop fds >>= return
+  Lwt_result.ok @@ List.map_p loop fds
