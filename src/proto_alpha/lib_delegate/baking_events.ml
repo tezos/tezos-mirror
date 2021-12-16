@@ -598,14 +598,20 @@ module Actions = struct
       ("delegate", Baking_state.delegate_encoding)
 
   let block_injected =
-    declare_2
+    declare_4
       ~section
       ~name:"block_injected"
       ~level:Notice
-      ~msg:"block {block} injected for delegate {delegate}"
+      ~msg:
+        "block {block} at level {level}, round {round} injected for delegate \
+         {delegate}"
       ~pp1:Block_hash.pp
-      ~pp2:Baking_state.pp_delegate
+      ~pp2:pp_int32
+      ~pp3:Round.pp
+      ~pp4:Baking_state.pp_delegate
       ("block", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
       ("delegate", Baking_state.delegate_encoding)
 
   let signing_preendorsement =
