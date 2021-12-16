@@ -67,6 +67,7 @@ let () =
   User_activated_upgrade.register ~migrate_from ~migrate_to ;
   Rpc_config_logging.register ~protocols:[Alpha] ;
   Protocol_table_update.register ~migrate_from ~migrate_to ;
+  Cache_cache.register ~protocols:[Hangzhou; Alpha] ;
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1823
      the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
