@@ -162,7 +162,7 @@ module Revamped = struct
     let* parameter_file =
       Protocol.write_parameter_file
         ~additional_bootstrap_accounts
-        ~base:(Either.right protocol)
+        ~base:(Either.right (protocol, None))
         []
     in
     let* () = Client.activate_protocol ~parameter_file ~protocol client in
@@ -3041,7 +3041,7 @@ let injecting_old_operation_fails =
   let* client = Client.init ~endpoint:(Node node) () in
   let* parameter_file =
     Protocol.write_parameter_file
-      ~base:(Either.Right protocol)
+      ~base:(Either.Right (protocol, None))
       [
         ( ["max_operations_time_to_live"],
           Some (string_of_int max_operations_ttl) );

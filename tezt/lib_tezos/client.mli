@@ -613,6 +613,8 @@ val convert_data_to_json :
     - [--tps <tps>]
     - [--single-op-per-pkh-per-block] (if the argument
       [single_op_per_pkh_per_block] is [true])
+    - [--fresh_probabilty <probability>], probability from 0.0 to 1.0 that
+      new bootstrap accounts will be created during the stress test
 
     [endpoint]: cf {!create} *)
 val stresstest :
@@ -624,6 +626,7 @@ val stresstest :
   ?transfers:int ->
   ?tps:int ->
   ?single_op_per_pkh_per_block:bool ->
+  ?fresh_probability:float ->
   t ->
   unit Lwt.t
 
@@ -637,6 +640,7 @@ val spawn_stresstest :
   ?transfers:int ->
   ?tps:int ->
   ?single_op_per_pkh_per_block:bool ->
+  ?fresh_probability:float ->
   t ->
   Process.t
 
@@ -862,6 +866,7 @@ val init_with_protocol :
   ?additional_bootstrap_account_count:int ->
   ?default_accounts_balance:int ->
   ?parameter_file:string ->
+  ?timestamp_delay:float ->
   [`Client | `Light | `Proxy] ->
   protocol:Protocol.t ->
   unit ->

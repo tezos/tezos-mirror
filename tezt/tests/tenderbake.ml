@@ -48,7 +48,7 @@ let init ?(overrides = default_overrides) protocol =
   let sandbox_endpoint = Client.Node sandbox_node in
   let* sandbox_client = Client.init ~endpoint:sandbox_endpoint () in
   let* parameter_file =
-    let base = Either.Right protocol in
+    let base = Either.Right (protocol, None) in
     Protocol.write_parameter_file ~base overrides
   in
   let* () =

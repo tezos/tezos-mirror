@@ -512,7 +512,7 @@ let wrong_branch_operation_dismissal =
   let minimal_block_delay = 1 in
   let* parameter_file =
     Protocol.write_parameter_file
-      ~base:(Either.Right protocol)
+      ~base:(Either.Right (protocol, None))
       [
         (["consensus_threshold"], Some "1");
         ( ["minimal_block_delay"],

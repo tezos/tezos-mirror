@@ -122,13 +122,13 @@ module Make (X : PARAMETERS) = struct
 
   let name daemon = daemon.name
 
-  let terminate daemon =
+  let terminate ?(kill = false) daemon =
     match daemon.status with
     | Not_running -> unit
     | Running {event_loop_promise = None; _} ->
         invalid_arg "you cannot call Daemon.terminate before Daemon.run returns"
     | Running {process; event_loop_promise = Some event_loop_promise; _} ->
-        Process.terminate process ;
+        if kill then Process.kill process else Process.terminate process ;
         event_loop_promise
 
   let next_name = ref 1

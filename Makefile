@@ -260,7 +260,7 @@ build-tps-deps:
 .PHONY: build-tps
 build-tps:
 	@dune build ./src/bin_tps_evaluation
-	@cp ./_build/install/default/bin/tezos-tps-evaluation .
+	@cp -f ./_build/install/default/bin/tezos-tps-evaluation .
 
 .PHONY: docker-image-build
 docker-image-build:

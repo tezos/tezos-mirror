@@ -69,8 +69,8 @@ val name : t -> string
 (** Get the RPC port of the associated node. *)
 val node_rpc_port : t -> int
 
-(** Send SIGTERM to an accuser and wait for it to terminate. *)
-val terminate : t -> unit Lwt.t
+(** Send SIGTERM (or SIGKILL) to an accuser and wait for it to terminate. *)
+val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
 

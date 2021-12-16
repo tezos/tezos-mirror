@@ -98,7 +98,7 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   Log.info "Test advanced originated contract" ;
   let* parameter_file =
     Protocol.write_parameter_file
-      ~base:(Either.right protocol)
+      ~base:(Either.right (protocol, None))
       [(["hard_storage_limit_per_operation"], Some "\"99999999\"")]
   in
   let* (node, client) =
