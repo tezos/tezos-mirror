@@ -23,6 +23,10 @@ be documented here either.
 Node
 ----
 
+- Fixed an inconsistency of the cache: the shell now reloads the cache
+  from scratch if the application fails because of a hash
+  inconsistency.
+
 -  Removed the ``granadanet`` built-in network alias.
 
 -  Added the ``ithacanet`` built-in network alias.
