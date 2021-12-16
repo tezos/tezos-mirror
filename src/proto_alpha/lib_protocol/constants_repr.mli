@@ -64,14 +64,6 @@ val max_micheline_bytes_limit : int
     in [Script_ir_translator]. *)
 val max_allowed_global_constant_depth : int
 
-(* an over-approximation of the size (in bytes) of an entry in the cache
-   storing the stake distribution for a given cycle *)
-val stake_distribution_size : int
-
-(* an over-approximation of the size (in bytes) of an entry in the
-   cache storing the sampler state for a given cycle *)
-val sampler_state_size : int
-
 (** Each protocol defines the number of subcaches and their respective
     limit size using [cache_layout]. *)
 val cache_layout : int list

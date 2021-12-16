@@ -46,7 +46,7 @@ module Selected_distribution_for_cycle = struct
     let id = identifier_of_cycle cycle in
     Storage.Stake.Selected_distribution_for_cycle.init ctxt cycle stakes
     >>=? fun ctxt ->
-    let size = Constants_repr.stake_distribution_size in
+    let size = 1 (* that's symbolic: 1 cycle = 1 entry *) in
     Cache.update ctxt id (Some (stakes, size)) >>?= fun ctxt -> return ctxt
 
   let get ctxt cycle =
@@ -86,7 +86,7 @@ module Delegate_sampler_state = struct
     let id = identifier_of_cycle cycle in
     Storage.Delegate_sampler_state.init ctxt cycle sampler_state
     >>=? fun ctxt ->
-    let size = Constants_repr.sampler_state_size in
+    let size = 1 (* that's symbolic: 1 cycle = 1 entry *) in
     Cache.update ctxt id (Some (sampler_state, size)) >>?= fun ctxt ->
     return ctxt
 

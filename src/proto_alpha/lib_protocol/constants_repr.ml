@@ -52,21 +52,11 @@ let max_allowed_global_constant_depth = 10_000
    chosen not too exceed 100 000 000 bytes.
 
    * One for the stake distribution for all cycles stored at any
-   moment (* preserved_cycles + max_slashing_period + 1 *)
+   moment (* preserved_cycles + max_slashing_period + 1 = 8 currently. *)
 
-   * One for the sampler state for all cycles stored at any moment.  *)
+   * One for the sampler state for all cycles stored at any moment (as above). *)
 
-let stake_distribution_size = 500 (* delegates*) * 15 (* words *) * 4
-(* bytes *)
-
-let sampler_state_size = 80 (* words *) * 4 (* bytes *)
-
-let cache_layout =
-  [
-    100_000_000;
-    8 (* cycles *) * stake_distribution_size;
-    8 (* cycles *) * sampler_state_size;
-  ]
+let cache_layout = [100_000_000; 8 (* cycles *); 8 (* cycles *)]
 
 (* In previous versions of the protocol, this
    [michelson_maximum_type_size] limit was set to 1000 but
