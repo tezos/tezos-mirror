@@ -312,7 +312,9 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     signed_block_header
     operations
   >>=? fun bh ->
-  Events.(emit block_injected (bh, delegate)) >>= fun () -> return updated_state
+  Events.(
+    emit block_injected (bh, signed_block_header.shell.level, round, delegate))
+  >>= fun () -> return updated_state
 
 let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
     =
