@@ -21,7 +21,7 @@
  (action
   (write-file %{targets}
               "module Name = struct let name = \"demo-noops\" end
-include Tezos_protocol_environment.MakeV4(Name)()
+include Tezos_protocol_environment.MakeV5(Name)()
 module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 ")))
 
