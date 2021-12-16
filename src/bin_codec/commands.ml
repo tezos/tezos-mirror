@@ -23,7 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
 open Clic
 
 let group = {name = "encoding"; title = "Commands to handle encodings"}
@@ -35,13 +34,16 @@ let id_parameter =
       | None -> cctxt#error "Unknown encoding id: %s" id)
 
 let json_parameter =
+  let open Lwt_syntax in
   parameter (fun (cctxt : #Client_context.printer) file_or_data ->
-      (Lwt_unix.file_exists file_or_data >>= function
-       | true -> Tezos_stdlib_unix.Lwt_utils_unix.read_file file_or_data
-       | false -> Lwt.return file_or_data)
-      >>= fun data ->
+      let* data =
+        let* file_exists = Lwt_unix.file_exists file_or_data in
+        if file_exists then
+          Tezos_stdlib_unix.Lwt_utils_unix.read_file file_or_data
+        else Lwt.return file_or_data
+      in
       match Json.from_string data with
-      | Ok json -> return json
+      | Ok json -> return_ok json
       | Error err -> cctxt#error "%s" err)
 
 let bytes_parameter =
@@ -51,6 +53,7 @@ let bytes_parameter =
       | None -> cctxt#error "Invalid hex string: %s" hex)
 
 let commands () =
+  let open Lwt_syntax in
   [
     command
       ~group
@@ -63,22 +66,24 @@ let commands () =
           |> List.map (fun (id, elem) ->
                  (id, Data_encoding.Registration.description elem))
         in
-        cctxt#message
-          "@[<v>%a@]@."
-          (Format.pp_print_list
-             ~pp_sep:Format.pp_print_cut
-             (fun ppf (id, desc) ->
-               let desc =
-                 Option.value ~default:"No description available." desc
-               in
-               Format.fprintf
-                 ppf
-                 "@[<v 2>%s:@ @[%a@]@]"
-                 id
-                 Format.pp_print_text
-                 desc))
-          bindings
-        >>= fun () -> return_unit);
+        let* () =
+          cctxt#message
+            "@[<v>%a@]@."
+            (Format.pp_print_list
+               ~pp_sep:Format.pp_print_cut
+               (fun ppf (id, desc) ->
+                 let desc =
+                   Option.value ~default:"No description available." desc
+                 in
+                 Format.fprintf
+                   ppf
+                   "@[<v 2>%s:@ @[%a@]@]"
+                   id
+                   Format.pp_print_text
+                   desc))
+            bindings
+        in
+        Lwt_result_syntax.return_unit);
     command
       ~group
       ~desc:"Dump a json description of all registered encodings."
@@ -90,26 +95,28 @@ let commands () =
            ())
       (fixed ["dump"; "encodings"])
       (fun minify (cctxt : #Client_context.printer) ->
-        cctxt#message
-          "%s"
-          (Json.to_string
-             ~minify
-             (`A
-               (Registration.list ()
-               |> List.map (fun (id, enc) ->
-                      `O
-                        [
-                          ("id", `String id);
-                          ( "json",
-                            Json.construct
-                              Json.schema_encoding
-                              (Registration.json_schema enc) );
-                          ( "binary",
-                            Json.construct
-                              Binary_schema.encoding
-                              (Registration.binary_schema enc) );
-                        ]))))
-        >>= fun () -> return_unit);
+        let* () =
+          cctxt#message
+            "%s"
+            (Json.to_string
+               ~minify
+               (`A
+                 (Registration.list ()
+                 |> List.map (fun (id, enc) ->
+                        `O
+                          [
+                            ("id", `String id);
+                            ( "json",
+                              Json.construct
+                                Json.schema_encoding
+                                (Registration.json_schema enc) );
+                            ( "binary",
+                              Json.construct
+                                Binary_schema.encoding
+                                (Registration.binary_schema enc) );
+                          ]))))
+        in
+        Lwt_result_syntax.return_unit);
     (* JSON -> Binary *)
     command
       ~group
@@ -133,8 +140,8 @@ let commands () =
               "Impossible to the JSON convert to binary.@,\
                This error should not happen."
         | Some bytes ->
-            cctxt#message "%a" Hex.pp (Hex.of_bytes bytes) >>= fun () ->
-            return_unit);
+            let* () = cctxt#message "%a" Hex.pp (Hex.of_bytes bytes) in
+            Lwt_result_syntax.return_unit);
     (* Binary -> JSON *)
     command
       ~group
@@ -153,7 +160,8 @@ let commands () =
         with
         | None -> cctxt#error "Cannot parse the binary with the given encoding"
         | Some bytes ->
-            cctxt#message "%a" Json.pp bytes >>= fun () -> return_unit);
+            let* () = cctxt#message "%a" Json.pp bytes in
+            Lwt_result_syntax.return_unit);
     command
       ~group
       ~desc:
@@ -172,7 +180,8 @@ let commands () =
             fmt
             bytes
         in
-        cctxt#message "%a" pp_bytes bytes >>= fun () -> return_unit);
+        let* () = cctxt#message "%a" pp_bytes bytes in
+        Lwt_result_syntax.return_unit);
     command
       ~group
       ~desc:
@@ -190,7 +199,8 @@ let commands () =
             fmt
             json
         in
-        cctxt#message "%a" pp_json json >>= fun () -> return_unit);
+        let* () = cctxt#message "%a" pp_json json in
+        Lwt_result_syntax.return_unit);
     command
       ~group
       ~desc:
@@ -205,8 +215,8 @@ let commands () =
         let schema =
           Data_encoding.Registration.binary_schema registered_encoding
         in
-        cctxt#message "%a" Data_encoding.Binary_schema.pp schema >>= fun () ->
-        return_unit);
+        let* () = cctxt#message "%a" Data_encoding.Binary_schema.pp schema in
+        Lwt_result_syntax.return_unit);
     command
       ~group
       ~desc:
@@ -221,5 +231,6 @@ let commands () =
         let schema =
           Data_encoding.Registration.json_schema registered_encoding
         in
-        cctxt#message "%a" Json_schema.pp schema >>= fun () -> return_unit);
+        let* () = cctxt#message "%a" Json_schema.pp schema in
+        Lwt_result_syntax.return_unit);
   ]
