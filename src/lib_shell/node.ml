@@ -130,14 +130,7 @@ let default_block_validator_limits =
   let open Block_validator in
   {protocol_timeout = Time.System.Span.of_seconds_exn 120.}
 
-let default_prevalidator_limits =
-  let open Prevalidator in
-  {
-    operation_timeout = Time.System.Span.of_seconds_exn 10.;
-    max_refused_operations = 1000;
-    operations_batch_size = 50;
-    disable_precheck = false;
-  }
+let default_prevalidator_limits = Prevalidator.default_limits
 
 let default_peer_validator_limits =
   let open Peer_validator in

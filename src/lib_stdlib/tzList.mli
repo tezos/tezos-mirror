@@ -68,6 +68,9 @@ val shuffle : ?rng_state:Random.State.t -> 'a list -> 'a list
 (** Get the index of an element in a list. *)
 val index_of : ?compare:('a -> 'a -> int) -> 'a -> 'a list -> int option
 
+(** [filter_some l] returns all [Some] elements of [l] *)
+val filter_some : 'a option list -> 'a list
+
 (** [find_map f l] applies [f] to the elements of [l] in order, and
     returns the first result of the form [Some v], or [None] if none
     exist.

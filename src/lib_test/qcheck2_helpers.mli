@@ -117,6 +117,17 @@ val bytes_gen : bytes QCheck2.Gen.t
     general [Uri.t] generator. Generalize it if needed. *)
 val endpoint_gen : Uri.t QCheck2.Gen.t
 
+(** A generator that returns a sublist of the given list. Lists returned
+    by this generator are not in the same order as the given list
+    (they are shuffled). This generator can return a list equal to the input list
+    (this generator does not guarantee to return strict sublists of the input list). *)
+val sublist : 'a list -> 'a list QCheck2.Gen.t
+
+(** A generator that returns lists whose elements are from the given list,
+    preserving the order. For example, given the input list [0, 1, 2],
+    this generator can produce [], [0], [0, 2], [1, 2], [1], etc. *)
+val holey : 'a list -> 'a list QCheck2.Gen.t
+
 (** Map-related generators. *)
 module MakeMapGen (Map : Stdlib.Map.S) : sig
   (** [gen_of_size size_gen key_gen val_gen] is a generator of Map where the keys
