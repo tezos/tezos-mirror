@@ -55,6 +55,7 @@ are called *validators*, which are delegates selected at random based on their
 stake, in the same way as endorsers are selected in Emmy*. We let
 ``CONSENSUS_COMMITTEE_SIZE`` be the number of validator slots per level. This
 constant has the role of ``ENDORSERS_PER_BLOCK`` in Emmy*.
+Furthermore, we use ``CONSENSUS_THRESHOLD`` to denote two thirds of ``CONSENSUS_COMMITTEE_SIZE``.
 
 For each level, Tenderbake proceeds in rounds. Each *round* represents an
 attempt by the validators to agree on the content of the block for the current
@@ -85,7 +86,7 @@ Unlike Emmy*, Tenderbake has `two types of
 votes <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
 before endorsing a block ``b``, a validator preendorses ``b``. Furthermore,
 to be able to endorse, a validator must have observed a preendorsement *quorum*, that is a
-set of preendorsements from validators having at least :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE \times \frac{2}{3} \rceil` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least :math:`\lceil CONSENSUS\_COMMITTEE\_SIZE \times \frac{2}{3} \rceil` validator slots. The
+set of preendorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. Similarly, to be able to decide, a validator must have observed an endorsement quorum, that is, a set of endorsements from validators having at least ``CONSENSUS_THRESHOLD`` validator slots. The
 endorsement quorum for a block ``b`` is included in a block ``b'`` on top of ``b``,
 serving as a certification that ``b`` has been agreed upon.
 We also say that block ``b'`` confirms block ``b``.
@@ -392,7 +393,7 @@ Consensus related protocol parameters
    * - ``CONSENSUS_COMMITTEE_SIZE``
      - 7000
    * - ``CONSENSUS_THRESHOLD``
-     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)``
+     - ``ceil(2 * CONSENSUS_COMMITTEE_SIZE / 3)`` = 4667
    * - ``MINIMAL_BLOCK_DELAY``
      - 30s
    * - ``DELAY_INCREMENT_PER_ROUND``
@@ -447,5 +448,5 @@ Further External Resources
 --------------------------
 
 * Tenderbake `report <https://arxiv.org/abs/2001.11965>`_
-* Tenderbake `blog post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_.r
+* Tenderbake `blog post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_.
 * Tenderbake `tzip <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_tenderbake.md>`_.
