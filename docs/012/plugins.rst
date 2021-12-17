@@ -3,7 +3,7 @@ Protocol plugins
 
 Protocol plugins implement extra APIs needed by the shell in order to interact with the economic protocol, beyond the one provided by the protocol environment.
 This code is not strictly speaking part of the protocol code base, so this is not subject to on-chain governance (see :doc:`voting procedure <voting>`), but it is still protocol-dependent, which means that it may vary with different protocols.
-For instance, the plugin code for protocol Alpha is located in file :src:`src/proto_012_Psithaca/lib_plugin/plugin.ml`.
+For instance, the plugin code for protocol Alpha is located in file :src:`src/proto_012_PsiThaCa/lib_plugin/plugin.ml`.
 Thus, a specific version is included in the Octez node for each protocol version (recall that a new release of Octez is usually delivered for each new protocol proposal, see :doc:`../releases/releases`)
 
 So what kind of features may a protocol plugin provide?

@@ -37,9 +37,9 @@
   (select void_for_linking-tezos-client-011-PtHangz2 from
    (tezos-client-011-PtHangz2 -> void_for_linking-tezos-client-011-PtHangz2.empty)
    (-> void_for_linking-tezos-client-011-PtHangz2.empty))
-  (select void_for_linking-tezos-client-012-Psithaca from
-   (tezos-client-012-Psithaca -> void_for_linking-tezos-client-012-Psithaca.empty)
-   (-> void_for_linking-tezos-client-012-Psithaca.empty))
+  (select void_for_linking-tezos-client-012-PsiThaCa from
+   (tezos-client-012-PsiThaCa -> void_for_linking-tezos-client-012-PsiThaCa.empty)
+   (-> void_for_linking-tezos-client-012-PsiThaCa.empty))
   (select void_for_linking-tezos-client-alpha from
    (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
    (-> void_for_linking-tezos-client-alpha.empty)))
@@ -64,5 +64,5 @@
    (write-file void_for_linking-tezos-client-009-PsFLoren.empty "")
    (write-file void_for_linking-tezos-client-010-PtGRANAD.empty "")
    (write-file void_for_linking-tezos-client-011-PtHangz2.empty "")
-   (write-file void_for_linking-tezos-client-012-Psithaca.empty "")
+   (write-file void_for_linking-tezos-client-012-PsiThaCa.empty "")
    (write-file void_for_linking-tezos-client-alpha.empty ""))))

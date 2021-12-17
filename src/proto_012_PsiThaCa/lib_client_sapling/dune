@@ -1,0 +1,19 @@
+(library
+ (name tezos_client_sapling_012_PsiThaCa)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-client-sapling-012-PsiThaCa)
+ (libraries tezos-base
+            tezos-crypto
+            tezos-client-base
+            tezos-signer-backends
+            tezos-client-012-PsiThaCa
+            tezos-client-012-PsiThaCa-commands
+            tezos-protocol-012-PsiThaCa)
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base
+                   -open Tezos_client_012_PsiThaCa
+                   -open Tezos_client_012_PsiThaCa_commands
+                   -open Tezos_protocol_012_PsiThaCa
+                   -open Tezos_protocol_environment_012_PsiThaCa)))
