@@ -211,6 +211,12 @@ variables:
     # the child pipeline triggerer (`opam:trigger`).
     - .rules_template__trigger_opam_pipeline
   stage: packaging
+  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
+  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
+  # At the time of writing, the opam tests were quite flaky.
+  # Therefore, a retry was added. This should be removed once the
+  # underlying tests have been fixed.
+  retry: 2
   script:
     - ./scripts/opam-pin.sh
     - opam depext --yes ${package}
