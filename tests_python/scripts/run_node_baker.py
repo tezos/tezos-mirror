@@ -9,10 +9,9 @@ from launchers.sandbox import Sandbox
 def scenario(contract, storage, round_duration, proto):
     if proto is None:
         proto = 'alpha'
-    assert proto in {'alpha', 'babylon'}, 'unknown protocol'
+    assert proto in {'alpha'}, 'unknown protocol'
     protos = {
         'alpha': (constants.ALPHA, constants.ALPHA_DAEMON),
-        'babylon': (constants.BABYLON, constants.BABYLON_DAEMON),
     }
     proto_hash, proto_daemon = protos[proto]
     if contract:
@@ -79,7 +78,7 @@ def main():
         '--proto',
         dest='proto',
         metavar='PROTO',
-        help='alpha, babylon (default alpha)',
+        help='alpha (default alpha)',
         required=False,
     )
     args = parser.parse_args()

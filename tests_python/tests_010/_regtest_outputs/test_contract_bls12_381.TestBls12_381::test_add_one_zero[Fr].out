@@ -1,9 +1,0 @@
-tests_010/test_contract_bls12_381.py::TestBls12_381::test_add_one_zero[Fr]
-
-storage
-  (Some 0x0100000000000000000000000000000000000000000000000000000000000000)
-emitted operations
-  
-big_map diff
-  
-
