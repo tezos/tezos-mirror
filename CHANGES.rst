@@ -148,6 +148,18 @@ Client
 
 - The output of ``tezos-client``'s RPC commands now uses the format specified by the ``--media-type``.
 
+- Added new option ``--replace`` to ``transfer`` and ``multiple transfers`` commands.
+  This option allows a manager to inject a transfer or a smart contract call
+  operation (with more fees) to replace an existing one in the node's mempool.
+  This option should only be used to inject in nodes whose prevalidators use
+  the new validation scheme of manager operations (called ``operations
+  precheck``) instead of fully applying the operation in a prevalidation block.
+  Note that there are no guarantees on which operation will possibly be
+  included in a block. For instance, the second operation may arrive too late to
+  the baker, in which case, the latter might includes the first operation and
+  the second one becomes invalid.
+
+`
 Baker / Endorser / Accuser
 --------------------------
 
