@@ -322,9 +322,12 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     generic_call meth ?headers ~accept ?body ~media uri >>=? fun response ->
     match response with
     | `Ok (body, Some ("application", "octet-stream"), _)
-      when List.mem ~equal:( == ) Media_type.octet_stream accept ->
+      when List.mem ~equal:( == ) Media_type.octet_stream accept -> (
         Cohttp_lwt.Body.to_string body >>= fun body ->
-        return (`Binary (`Ok body))
+        (* The binary RPCs are prefixed with a size header, we remove it here. *)
+        match Data_encoding.Binary.of_string_opt Data_encoding.string body with
+        | Some response -> return (`Binary (`Ok response))
+        | None -> return (`Binary (`Error (Some body))))
     | `Ok (body, Some ("application", "json"), _)
       when List.mem ~equal:( == ) Media_type.json accept ->
         Cohttp_lwt.Body.to_string body >>= fun body ->

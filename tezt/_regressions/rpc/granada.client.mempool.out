@@ -261,7 +261,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -345,7 +345,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -437,7 +437,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -559,7 +559,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "$ref": "#/definitions/Signature"
                         },
                         "error": {
-                          "$ref": "#/definitions/error"
+                          "$ref": "#/definitions/error_opt"
                         }
                       },
                       "required": [
@@ -1606,8 +1606,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "title": "A nonce hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
-                      "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                      "error_opt": {
+                        "description": "An optional error-trace (None indicates no error). The full list of errors is available with the global RPC `GET errors`"
                       },
                       "fitness": {
                         "title": "Block fitness",
@@ -3503,7 +3503,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "kind": "dyn",
-                              "name": "error",
+                              "name": "error_opt",
                               "num_fields": 1,
                               "size": "Uint30"
                             },
@@ -3529,7 +3529,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5122,7 +5122,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "$ref": "#/definitions/unistring"
                       },
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       },
                       "fitness": {
                         "title": "Block fitness",
@@ -5315,7 +5315,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5423,7 +5423,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5517,7 +5517,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5642,7 +5642,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },

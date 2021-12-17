@@ -1218,7 +1218,7 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
           (merge_objs
              (obj1 (req "hash" Operation_hash.encoding))
              next_operation_encoding)
-          (obj1 (dft "error" RPC_error.encoding []))
+          (obj1 (dft "error" RPC_error.opt_encoding None))
 
       let monitor_operations path =
         RPC_service.get_service

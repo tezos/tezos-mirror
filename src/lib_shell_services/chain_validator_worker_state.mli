@@ -56,7 +56,7 @@ module Event : sig
     | Notify_head of P2p_peer.Id.t
     | Connection of P2p_peer.Id.t
     | Disconnection of P2p_peer.Id.t
-    | Could_not_switch_testchain of error list
+    | Could_not_switch_testchain of error trace
     | Bootstrapped
     | Sync_status of synchronisation_status
     | Bootstrap_active_peers of {active : int; needed : int}
@@ -65,7 +65,8 @@ module Event : sig
         max_head_time : Time.Protocol.t;
         most_recent_validation : Time.Protocol.t;
       }
-    | Request_failure of Request.view * Worker_types.request_status * error list
+    | Request_failure of
+        Request.view * Worker_types.request_status * error trace
 
   type view = t
 

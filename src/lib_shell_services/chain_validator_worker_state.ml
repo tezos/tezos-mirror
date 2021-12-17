@@ -70,7 +70,7 @@ module Event = struct
     | Notify_head of P2p_peer.Id.t
     | Connection of P2p_peer.Id.t
     | Disconnection of P2p_peer.Id.t
-    | Could_not_switch_testchain of error list
+    | Could_not_switch_testchain of error trace
     | Bootstrapped
     | Sync_status of synchronisation_status
     | Bootstrap_active_peers of {active : int; needed : int}
@@ -79,7 +79,8 @@ module Event = struct
         max_head_time : Time.Protocol.t;
         most_recent_validation : Time.Protocol.t;
       }
-    | Request_failure of Request.view * Worker_types.request_status * error list
+    | Request_failure of
+        Request.view * Worker_types.request_status * error trace
 
   type view = t
 
@@ -248,7 +249,7 @@ module Event = struct
                 (obj3
                    (req "failed_validation" Request.encoding)
                    (req "status" Worker_types.request_status_encoding)
-                   (dft "errors" RPC_error.encoding []))))
+                   (req "errors" RPC_error.encoding))))
           (function
             | Request_failure (r, s, err) -> Some (r, s, err) | _ -> None)
           (fun (r, s, err) -> Request_failure (r, s, err));

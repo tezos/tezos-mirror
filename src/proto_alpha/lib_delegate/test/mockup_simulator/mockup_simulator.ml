@@ -416,7 +416,7 @@ let make_mocked_services_hooks (state : state) (user_hooks : (module Hooks)) :
                   Lwt.return (Some [])
               | Some (oph, op) ->
                   streamed := true ;
-                  Lwt.return (Some [((oph, op), [])]))
+                  Lwt.return (Some [((oph, op), None)]))
         in
         pop_until_ok ()
       in
