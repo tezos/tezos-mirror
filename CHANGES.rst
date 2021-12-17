@@ -23,6 +23,10 @@ be documented here either.
 Node
 ----
 
+-  Removed the ``granadanet`` built-in network alias.
+
+-  Added the ``ithacanet`` built-in network alias.
+
 - UNIX errors are now displayed using human-friendly English instead of error codes.
 
 - Manager operations do no longer need to be executed before being
