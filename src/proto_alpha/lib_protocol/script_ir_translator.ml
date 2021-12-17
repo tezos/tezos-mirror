@@ -175,6 +175,7 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Key_key -> Key_t
   | Timestamp_key -> Timestamp_t
   | Address_key -> Address_t
+  | Tx_rollup_l2_address_key -> Tx_rollup_l2_address_t
   | Chain_id_key -> Chain_id_t
   | Pair_key (l, r, meta) ->
       Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta)
@@ -198,6 +199,7 @@ let rec unparse_comparable_ty_uncarbonated :
   | Key_key -> Prim (loc, T_key, [], [])
   | Timestamp_key -> Prim (loc, T_timestamp, [], [])
   | Address_key -> Prim (loc, T_address, [], [])
+  | Tx_rollup_l2_address_key -> Prim (loc, T_tx_rollup_l2_address, [], [])
   | Chain_id_key -> Prim (loc, T_chain_id, [], [])
   | Pair_key (l, r, _meta) -> (
       let tl = unparse_comparable_ty_uncarbonated ~loc l in
@@ -236,6 +238,7 @@ let rec unparse_ty_entrypoints_uncarbonated :
     | Key_t -> (T_key, [])
     | Timestamp_t -> (T_timestamp, [])
     | Address_t -> (T_address, [])
+    | Tx_rollup_l2_address_t -> (T_tx_rollup_l2_address, [])
     | Operation_t -> (T_operation, [])
     | Chain_id_t -> (T_chain_id, [])
     | Never_t -> (T_never, [])
@@ -355,6 +358,7 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
   | Key_t -> ok (Key_key, ctxt)
   | Timestamp_t -> ok (Timestamp_key, ctxt)
   | Address_t -> ok (Address_key, ctxt)
+  | Tx_rollup_l2_address_t -> ok (Tx_rollup_l2_address_key, ctxt)
   | Chain_id_t -> ok (Chain_id_key, ctxt)
   | Pair_t (l, r, pname) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
@@ -427,6 +431,23 @@ let unparse_address ~loc ctxt mode {destination; entrypoint} =
         ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
+
+let unparse_tx_rollup_l2_address ~loc ctxt mode
+    (tx_address : tx_rollup_l2_address) =
+  Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
+  match tx_address with
+  | Value tx_address -> (
+      match mode with
+      | Optimized | Optimized_legacy ->
+          let bytes =
+            Data_encoding.Binary.to_bytes_exn
+              Tx_rollup_l2_address.encoding
+              tx_address
+          in
+          (Bytes (loc, bytes), ctxt)
+      | Readable ->
+          let b58check = Tx_rollup_l2_address.to_b58check tx_address in
+          (String (loc, b58check), ctxt))
 
 let unparse_contract ~loc ctxt mode {arg_ty = _; address} =
   unparse_address ~loc ctxt mode address
@@ -599,6 +620,8 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_comparable_data :
   | (Timestamp_key, t) -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
   | (Address_key, address) ->
       Lwt.return @@ unparse_address ~loc ctxt mode address
+  | (Tx_rollup_l2_address_key, address) ->
+      Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
   | (Signature_key, s) -> Lwt.return @@ unparse_signature ~loc ctxt mode s
   | (Mutez_key, v) -> Lwt.return @@ unparse_mutez ~loc ctxt v
   | (Key_key, k) -> Lwt.return @@ unparse_key ~loc ctxt mode k
@@ -651,7 +674,8 @@ let hash_comparable_data ctxt typ data =
 let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
   | Unit_key | Never_key | Int_key | Nat_key | Signature_key | String_key
   | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
-  | Chain_id_key | Address_key | Pair_key _ | Union_key _ | Option_key _ ->
+  | Chain_id_key | Address_key | Tx_rollup_l2_address_key | Pair_key _
+  | Union_key _ | Option_key _ ->
       ()
 
 let check_dupable_ty ctxt loc ty =
@@ -671,6 +695,7 @@ let check_dupable_ty ctxt loc ty =
     | Key_t -> return_unit
     | Timestamp_t -> return_unit
     | Address_t -> return_unit
+    | Tx_rollup_l2_address_t -> return_unit
     | Bool_t -> return_unit
     | Contract_t _ -> return_unit
     | Operation_t -> return_unit
@@ -782,6 +807,8 @@ let rec merge_comparable_types :
     | (Timestamp_key, Timestamp_key) -> return (Eq, Timestamp_key)
     | (Chain_id_key, Chain_id_key) -> return (Eq, Chain_id_key)
     | (Address_key, Address_key) -> return (Eq, Address_key)
+    | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) ->
+        return (Eq, Tx_rollup_l2_address_key)
     | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
         let* meta = merge_type_metadata meta_a meta_b in
@@ -888,6 +915,8 @@ let merge_types :
     | (Mutez_t, Mutez_t) -> return (Eq, Mutez_t)
     | (Timestamp_t, Timestamp_t) -> return (Eq, Timestamp_t)
     | (Address_t, Address_t) -> return (Eq, Address_t)
+    | (Tx_rollup_l2_address_t, Tx_rollup_l2_address_t) ->
+        return (Eq, Tx_rollup_l2_address_t)
     | (Bool_t, Bool_t) -> return (Eq, Bool_t)
     | (Chain_id_t, Chain_id_t) -> return (Eq, Chain_id_t)
     | (Never_t, Never_t) -> return (Eq, Never_t)
@@ -1125,6 +1154,9 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty address_key, ctxt)
+    | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
+        check_type_annot loc annot >|? fun () ->
+        (Ex_comparable_ty tx_rollup_l2_address_key, ctxt)
     | Prim
         ( loc,
           (( T_unit | T_never | T_int | T_nat | T_string | T_bytes | T_mutez
@@ -1284,6 +1316,9 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         check_type_annot loc annot >|? fun () -> return ctxt timestamp_t
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt address_t
+    | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
+        check_type_annot loc annot >|? fun () ->
+        return ctxt tx_rollup_l2_address_t
     | Prim (loc, T_signature, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt signature_t
     | Prim (loc, T_operation, [], annot) ->
@@ -1489,8 +1524,9 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     | Prim
         ( loc,
           (( T_unit | T_signature | T_int | T_nat | T_string | T_bytes | T_mutez
-           | T_bool | T_key | T_key_hash | T_timestamp | T_address | T_chain_id
-           | T_operation | T_never ) as prim),
+           | T_bool | T_key | T_key_hash | T_timestamp | T_address
+           | T_tx_rollup_l2_address | T_chain_id | T_operation | T_never ) as
+          prim),
           l,
           _ ) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
@@ -1535,6 +1571,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
                T_bls12_381_g2;
                T_bls12_381_fr;
                T_ticket;
+               T_tx_rollup_l2_address;
              ]
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty :
@@ -1716,6 +1753,7 @@ let check_packable ~legacy loc root =
     | Key_t -> Result.return_unit
     | Timestamp_t -> Result.return_unit
     | Address_t -> Result.return_unit
+    | Tx_rollup_l2_address_t -> Result.return_unit
     | Bool_t -> Result.return_unit
     | Chain_id_t -> Result.return_unit
     | Never_t -> Result.return_unit
@@ -2182,6 +2220,31 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
+let parse_tx_rollup_l2_address ctxt :
+    Script.node -> (tx_rollup_l2_address * context) tzresult = function
+  | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
+      Gas.consume ctxt Typecheck_costs.tx_rollup_l2_address >>? fun ctxt ->
+      match Tx_rollup_l2_address.of_bytes_opt bytes with
+      | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               ( loc,
+                 strip_locations expr,
+                 "a valid transaction rollup L2 address" ))
+  | String (loc, str) as expr (* As unparsed with [Readable]. *) -> (
+      Gas.consume ctxt Typecheck_costs.tx_rollup_l2_address >>? fun ctxt ->
+      match Tx_rollup_l2_address.of_b58check_opt str with
+      | Some txa -> ok (Tx_rollup_l2_address.Indexable.value txa, ctxt)
+      | None ->
+          error
+          @@ Invalid_syntactic_constant
+               ( loc,
+                 strip_locations expr,
+                 "a valid transaction rollup L2 address" ))
+  | expr ->
+      error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
+
 let parse_never expr : (never * context) tzresult =
   error @@ Invalid_never_expr (location expr)
 
@@ -2296,6 +2359,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_comparable_data :
       Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | (Address_key, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
+  | (Tx_rollup_l2_address_key, expr) ->
+      Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
   | (Pair_key (tl, tr, _), expr) ->
       let r_witness = comparable_comb_witness1 tr in
       let parse_l ctxt v = parse_comparable_data ?type_logger ctxt tl v in
@@ -2498,6 +2563,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chain_id_t, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | (Address_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
+  | (Tx_rollup_l2_address_t, expr) ->
+      Lwt.return @@ traced_no_lwt @@ parse_tx_rollup_l2_address ctxt expr
   | (Contract_t (arg_ty, _), expr) ->
       traced
         ( parse_address ctxt expr >>?= fun (address, ctxt) ->
@@ -5454,6 +5521,8 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
   | (Bool_t, b) -> Lwt.return @@ unparse_bool ~loc ctxt b
   | (Timestamp_t, t) -> Lwt.return @@ unparse_timestamp ~loc ctxt mode t
   | (Address_t, address) -> Lwt.return @@ unparse_address ~loc ctxt mode address
+  | (Tx_rollup_l2_address_t, address) ->
+      Lwt.return @@ unparse_tx_rollup_l2_address ~loc ctxt mode address
   | (Contract_t _, contract) ->
       Lwt.return @@ unparse_contract ~loc ctxt mode contract
   | (Signature_t, s) -> Lwt.return @@ unparse_signature ~loc ctxt mode s
@@ -5934,6 +6003,7 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Key_t -> False_f
   | Timestamp_t -> False_f
   | Address_t -> False_f
+  | Tx_rollup_l2_address_t -> False_f
   | Bool_t -> False_f
   | Lambda_t (_, _, _) -> False_f
   | Set_t (_, _) -> False_f

@@ -89,6 +89,11 @@ end
 
 type signature = Script_signature.t
 
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2466
+   The various attributes of this type should be checked with
+   appropriate testing. *)
+type tx_rollup_l2_address = Tx_rollup_l2_address.Indexable.value
+
 type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
@@ -326,6 +331,7 @@ type _ comparable_ty =
   | Timestamp_key : Script_timestamp.t comparable_ty
   | Chain_id_key : Script_chain_id.t comparable_ty
   | Address_key : address comparable_ty
+  | Tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
   | Pair_key :
       'a comparable_ty * 'b comparable_ty * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair comparable_ty
@@ -341,7 +347,7 @@ let meta_basic = {size = Type_size.one}
 let comparable_ty_metadata : type a. a comparable_ty -> a ty_metadata = function
   | Unit_key | Never_key | Int_key | Nat_key | Signature_key | String_key
   | Bytes_key | Mutez_key | Bool_key | Key_hash_key | Key_key | Timestamp_key
-  | Chain_id_key | Address_key ->
+  | Chain_id_key | Address_key | Tx_rollup_l2_address_key ->
       meta_basic
   | Pair_key (_, _, meta) -> meta
   | Union_key (_, _, meta) -> meta
@@ -376,6 +382,8 @@ let timestamp_key = Timestamp_key
 let chain_id_key = Chain_id_key
 
 let address_key = Address_key
+
+let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
 
 let pair_key loc l r =
   Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
@@ -1289,6 +1297,7 @@ and 'ty ty =
   | Key_t : public_key ty
   | Timestamp_t : Script_timestamp.t ty
   | Address_t : address ty
+  | Tx_rollup_l2_address_t : tx_rollup_l2_address ty
   | Bool_t : bool ty
   | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
   | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
@@ -1762,7 +1771,7 @@ let kinstr_rewritek :
 let ty_metadata : type a. a ty -> a ty_metadata = function
   | Unit_t | Never_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
-    ->
+  | Tx_rollup_l2_address_t ->
       meta_basic
   | Pair_t (_, _, meta) -> meta
   | Union_t (_, _, meta) -> meta
@@ -1803,6 +1812,8 @@ let timestamp_t = Timestamp_t
 let address_t = Address_t
 
 let bool_t = Bool_t
+
+let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
 
 let pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -2103,7 +2114,7 @@ let (ty_traverse, comparable_ty_traverse) =
     match ty with
     | Unit_key | Int_key | Nat_key | Signature_key | String_key | Bytes_key
     | Mutez_key | Key_hash_key | Key_key | Timestamp_key | Address_key
-    | Bool_key | Chain_id_key | Never_key ->
+    | Tx_rollup_l2_address_key | Bool_key | Chain_id_key | Never_key ->
         (return [@ocaml.tailcall]) ()
     | Pair_key (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2
     | Union_key (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2
@@ -2115,9 +2126,9 @@ let (ty_traverse, comparable_ty_traverse) =
     let accu = f.apply accu ty in
     match (ty : t ty) with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
-    | Key_hash_t | Key_t | Timestamp_t | Address_t | Bool_t
-    | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t | Chain_id_t
-    | Never_t | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t ->
+    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
+    | Bool_t | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t
+    | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t ->
         (continue [@ocaml.tailcall]) accu
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
@@ -2194,10 +2205,10 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     in
     match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
-    | Key_hash_t | Key_t | Timestamp_t | Address_t | Bool_t
-    | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t | Chain_id_t
-    | Never_t | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t | Chest_key_t
-    | Chest_t
+    | Key_hash_t | Key_t | Timestamp_t | Address_t | Tx_rollup_l2_address_t
+    | Bool_t | Sapling_transaction_t _ | Sapling_state_t _ | Operation_t
+    | Chain_id_t | Never_t | Bls12_381_g1_t | Bls12_381_g2_t | Bls12_381_fr_t
+    | Chest_key_t | Chest_t
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
     | Pair_t (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
@@ -2260,7 +2271,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     match ty with
     | Unit_key | Int_key | Nat_key | Signature_key | String_key | Bytes_key
     | Mutez_key | Key_hash_key | Key_key | Timestamp_key | Address_key
-    | Bool_key | Chain_id_key | Never_key ->
+    | Tx_rollup_l2_address_key | Bool_key | Chain_id_key | Never_key ->
         (return [@ocaml.tailcall]) ()
     | Pair_key (ty1, ty2, _) ->
         (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)

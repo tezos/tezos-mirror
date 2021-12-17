@@ -100,6 +100,7 @@ module Make : functor
 module Internal_for_tests : sig
   type type_name =
     [ `TAddress
+    | `TTx_rollup_l2_address
     | `TBig_map
     | `TBls12_381_fr
     | `TBls12_381_g1

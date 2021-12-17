@@ -70,6 +70,7 @@ type type_name =
   | `TKey
   | `TTimestamp
   | `TAddress
+  | `TTx_rollup_l2_address
   | `TBool
   | `TPair
   | `TUnion
@@ -101,6 +102,7 @@ type atomic_type_name =
   | `TKey
   | `TTimestamp
   | `TAddress
+  | `TTx_rollup_l2_address
   | `TBool
   | `TSapling_transaction
   | `TSapling_state
@@ -140,6 +142,7 @@ let all_atomic_type_names : atomic_type_name array =
     `TKey;
     `TTimestamp;
     `TAddress;
+    `TTx_rollup_l2_address;
     `TBool;
     `TSapling_transaction;
     `TSapling_state;
@@ -177,6 +180,7 @@ type comparable_type_name =
   | `TTimestamp
   | `TChain_id
   | `TAddress
+  | `TTx_rollup_l2_address
   | `TPair
   | `TUnion
   | `TOption ]
@@ -202,6 +206,7 @@ let all_comparable_atomic_type_names : 'a comparable_and_atomic array =
     `TTimestamp;
     `TChain_id;
     `TAddress;
+    `TTx_rollup_l2_address;
   |]
 
 type 'a comparable_and_non_atomic = 'a
@@ -295,6 +300,7 @@ end)
       | `TBytes -> Ex_ty bytes_t
       | `TBool -> Ex_ty bool_t
       | `TAddress -> Ex_ty address_t
+      | `TTx_rollup_l2_address -> Ex_ty tx_rollup_l2_address_t
       | `TTimestamp -> Ex_ty timestamp_t
       | `TKey_hash -> Ex_ty key_hash_t
       | `TMutez -> Ex_ty mutez_t
@@ -317,6 +323,7 @@ end)
       | `TBytes -> Ex_comparable_ty bytes_key
       | `TBool -> Ex_comparable_ty bool_key
       | `TAddress -> Ex_comparable_ty address_key
+      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_key
       | `TTimestamp -> Ex_comparable_ty timestamp_key
       | `TKey_hash -> Ex_comparable_ty key_hash_key
       | `TMutez -> Ex_comparable_ty mutez_key
@@ -510,6 +517,15 @@ end)
         in
         {destination = Contract contract; entrypoint = ep}
 
+    let tx_rollup_l2_address rng_state =
+      let seed =
+        Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
+      in
+      let secret_key = Bls12_381.Signature.generate_sk seed in
+      Tx_rollup_l2_address.Indexable.value
+        (Tx_rollup_l2_address.of_bls_pk
+        @@ Bls12_381.Signature.derive_pk secret_key)
+
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
       Data_encoding.Binary.of_string_exn Script_chain_id.encoding string
@@ -534,6 +550,7 @@ end)
         | Timestamp_t -> Michelson_base.timestamp
         | Bool_t -> Base_samplers.uniform_bool
         | Address_t -> address
+        | Tx_rollup_l2_address_t -> tx_rollup_l2_address
         | Pair_t (left_t, right_t, _) ->
             M.(
               let* left_v = value left_t in

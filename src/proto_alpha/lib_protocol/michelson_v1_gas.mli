@@ -445,6 +445,8 @@ module Cost_of : sig
 
     val contract : Gas.cost
 
+    val tx_rollup_l2_address : Gas.cost
+
     val contract_exists : Gas.cost
 
     val proof_argument : int -> Gas.cost
@@ -496,6 +498,8 @@ module Cost_of : sig
     val unit : Gas.cost
 
     val contract : Gas.cost
+
+    val tx_rollup_l2_address : Gas.cost
 
     val operation : bytes -> Gas.cost
 

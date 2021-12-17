@@ -172,6 +172,7 @@ type prim =
   | T_unit
   | T_operation
   | T_address
+  | T_tx_rollup_l2_address
   | T_sapling_transaction
   | T_sapling_state
   | T_chain_id
@@ -215,12 +216,12 @@ let namespace = function
   | I_SWAP | I_TICKET | I_TOTAL_VOTING_POWER | I_TRANSFER_TOKENS | I_UNIT
   | I_UNPACK | I_UNPAIR | I_UPDATE | I_VOTING_POWER | I_XOR | I_OPEN_CHEST ->
       Instr_namespace
-  | T_address | T_big_map | T_bool | T_bytes | T_chain_id | T_contract | T_int
-  | T_key | T_key_hash | T_lambda | T_list | T_map | T_mutez | T_nat | T_never
-  | T_operation | T_option | T_or | T_pair | T_sapling_state
-  | T_sapling_transaction | T_set | T_signature | T_string | T_timestamp
-  | T_unit | T_bls12_381_fr | T_bls12_381_g1 | T_bls12_381_g2 | T_ticket
-  | T_chest_key | T_chest ->
+  | T_address | T_tx_rollup_l2_address | T_big_map | T_bool | T_bytes
+  | T_chain_id | T_contract | T_int | T_key | T_key_hash | T_lambda | T_list
+  | T_map | T_mutez | T_nat | T_never | T_operation | T_option | T_or | T_pair
+  | T_sapling_state | T_sapling_transaction | T_set | T_signature | T_string
+  | T_timestamp | T_unit | T_bls12_381_fr | T_bls12_381_g1 | T_bls12_381_g2
+  | T_ticket | T_chest_key | T_chest ->
       Type_namespace
   | H_constant -> Constant_hash_namespace
 
@@ -376,6 +377,7 @@ let string_of_prim = function
   | T_unit -> "unit"
   | T_operation -> "operation"
   | T_address -> "address"
+  | T_tx_rollup_l2_address -> "tx_rollup_l2_address"
   | T_sapling_state -> "sapling_state"
   | T_sapling_transaction -> "sapling_transaction"
   | T_chain_id -> "chain_id"
@@ -526,6 +528,7 @@ let prim_of_string = function
   | "unit" -> ok T_unit
   | "operation" -> ok T_operation
   | "address" -> ok T_address
+  | "tx_rollup_l2_address" -> ok T_tx_rollup_l2_address
   | "sapling_state" -> ok T_sapling_state
   | "sapling_transaction" -> ok T_sapling_transaction
   | "chain_id" -> ok T_chain_id
@@ -748,6 +751,8 @@ let prim_encoding =
          ("constant", H_constant);
          (* Alpha_012 addition *)
          ("SUB_MUTEZ", I_SUB_MUTEZ);
+         (* Alpha_013 addition *)
+         ("tx_rollup_l2_address", T_tx_rollup_l2_address);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]

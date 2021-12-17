@@ -1747,6 +1747,8 @@ Domain specific data types
 -  ``chest_key``: used to open a chest, also contains a proof
    to check the correctness of the opening. see :doc:`Timelock <timelock>` .
 
+- ``tx_rollup_l2_address``: An address used to identify an account in a transaction rollup ledger. It is the hash of a BLS public key, used to authenticate layer-2 operations to transfer tickets from this account.
+
 
 Domain specific operations
 --------------------------
@@ -3777,6 +3779,7 @@ Full grammar
       | signature
       | timestamp
       | address
+      | tx_rollup_l2_address
       | option <comparable type>
       | or <comparable type> <comparable type>
       | pair <comparable type> <comparable type> ...
