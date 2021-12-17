@@ -128,7 +128,10 @@ module type Dump_interface = sig
 
   val add_bytes : batch -> bytes -> tree Lwt.t
 
-  val add_dir : batch -> (step * Kinded_hash.t) list -> tree option Lwt.t
+  val add_dir :
+    batch ->
+    (step * Kinded_hash.t, error trace) Seq_es.t ->
+    (tree option, error trace) result Lwt.t
 end
 
 module type S = sig

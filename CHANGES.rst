@@ -126,6 +126,8 @@ Node
    from those older versions. It is also no longer possible to import
    snapshots that were exported using this version.
 
+-  Reduced the memory consumption of the snapshot import.
+
 Client
 ------
 
