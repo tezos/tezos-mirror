@@ -34,7 +34,7 @@ module Michelson = struct
       ["--wait"; "none"; "originate"; "contract"; name]
       @ ( match protocol_kind with
         | `Athens -> ["for"; from]
-        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou | `Alpha -> [] )
+        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou | `Ithaca | `Alpha -> [] )
       @ [ "transferring"; amount; "from"; from; "running"; tmp; "--init"
         ; init_storage; "--force"; "--burn-cap"; "300000000000"
         ; (* ; "--fee-cap" ; "20000000000000" *) "--gas-limit"

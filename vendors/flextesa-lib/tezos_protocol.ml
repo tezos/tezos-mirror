@@ -65,12 +65,14 @@ module Protocol_kind = struct
     | `Florence
     | `Granada
     | `Hangzhou
+    | `Ithaca
     | `Alpha ]
 
   let names =
     [ ("Athens", `Athens); ("Babylon", `Babylon); ("Carthage", `Carthage)
     ; ("Delphi", `Delphi); ("Edo", `Edo); ("Florence", `Florence)
-    ; ("Granada", `Granada); ("Hangzhou", `Hangzhou); ("Alpha", `Alpha) ]
+    ; ("Granada", `Granada); ("Hangzhou", `Hangzhou); ("Ithaca", `Ithaca)
+    ; ("Alpha", `Alpha) ]
 
   let ( < ) k1 k2 =
     let rec aux = function
@@ -150,7 +152,7 @@ let protocol_parameters_json t : Ezjsonm.t =
   let extra_post_babylon_stuff subkind =
     let alpha_specific_parameters =
       match subkind with
-      | `Alpha ->
+      | `Ithaca | `Alpha ->
           [ ("max_operations_time_to_live", int 120)
           ; ("blocks_per_stake_snapshot", int t.blocks_per_roll_snapshot)
           ; ("baking_reward_fixed_portion", string "10000000")
@@ -174,7 +176,7 @@ let protocol_parameters_json t : Ezjsonm.t =
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     let pre_alpha_specific_parameters =
       match subkind with
-      | `Alpha -> []
+      | `Ithaca | `Alpha -> []
       | `Granada | `Hangzhou ->
           [ ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
           ; ("initial_endorsers", int 1)
@@ -193,7 +195,7 @@ let protocol_parameters_json t : Ezjsonm.t =
     let granada_specific_parameters =
       match subkind with
       | `Granada -> [("michelson_maximum_type_size", int 1_000)]
-      | `Hangzhou | `Alpha -> []
+      | `Hangzhou | `Ithaca | `Alpha -> []
       | _ -> failwith "unsupported protocol" in
     let open Ezjsonm in
     alpha_specific_parameters @ pre_alpha_specific_parameters

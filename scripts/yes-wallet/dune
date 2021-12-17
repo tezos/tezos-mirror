@@ -13,6 +13,7 @@
   tezos-protocol-009-PsFLoren
   tezos-protocol-010-PtGRANAD
   tezos-protocol-011-PtHangz2
+  tezos-protocol-012-PsiThaCa
   tezos-protocol-alpha)
  (modules yes_wallet_lib))
 
