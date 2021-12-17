@@ -505,7 +505,7 @@ let close index = Store.Repo.close index.repo
 let get_branch chain_id = Format.asprintf "%a" Chain_id.pp chain_id
 
 let commit_genesis index ~chain_id ~time ~protocol =
-  let tree = Store.Tree.empty in
+  let tree = Store.Tree.empty () in
   let ctxt = {index; tree; parents = []; ops = 0} in
   (match index.patch_context with
   | None -> return ctxt
@@ -717,7 +717,7 @@ module Dumpable_context = struct
     aux tree Fun.id >>= fun () -> Lwt.return !total_visited
 
   let make_context index =
-    {index; tree = Store.Tree.empty; parents = []; ops = 0}
+    {index; tree = Store.Tree.empty (); parents = []; ops = 0}
 
   let update_context context tree = {context with tree}
 
@@ -736,10 +736,10 @@ module Dumpable_context = struct
   let add_dir batch l =
     let add sub_tree (step, hash) =
       match sub_tree with
-      | None -> Lwt.return_some Store.Tree.empty
+      | None -> Lwt.return_some (Store.Tree.empty ())
       | Some sub_tree -> add_hash batch sub_tree [step] hash
     in
-    Seq_es.fold_left_s add (Some Store.Tree.empty) l >>=? function
+    Seq_es.fold_left_s add (Some (Store.Tree.empty ())) l >>=? function
     | None -> Lwt.return_ok None
     | Some tree ->
         let (Batch (repo, x, y)) = batch in
@@ -789,7 +789,7 @@ let check_protocol_commit_consistency index ~expected_context_hash
   let data_merkle_root = Hash.of_context_hash data_merkle_root in
   let parents = List.map Hash.of_context_hash parents_contexts in
   let protocol_hash_bytes = Protocol_hash.to_bytes given_protocol_hash in
-  let tree = Store.Tree.empty in
+  let tree = Store.Tree.empty () in
   Store.Tree.add tree current_protocol_key protocol_hash_bytes >>= fun tree ->
   let test_chain_status_bytes =
     Data_encoding.Binary.to_bytes_exn
@@ -831,7 +831,7 @@ let check_protocol_commit_consistency index ~expected_context_hash
   if Context_hash.equal expected_context_hash computed_context_hash then
     let ctxt =
       let parent = Store.of_private_commit index.repo commit in
-      {index; tree = Store.Tree.empty; parents = [parent]; ops = 0}
+      {index; tree = Store.Tree.empty (); parents = [parent]; ops = 0}
     in
     add_test_chain ctxt test_chain_status >>= fun ctxt ->
     add_protocol ctxt given_protocol_hash >>= fun ctxt ->

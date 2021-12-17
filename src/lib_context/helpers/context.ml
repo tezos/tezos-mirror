@@ -41,11 +41,11 @@ module Make_tree (Store : DB) = struct
 
   let pp = Irmin.Type.pp Store.tree_t
 
-  let empty _ = Store.Tree.empty
+  let empty _ = Store.Tree.empty ()
 
   let equal = Irmin.Type.(unstage (equal Store.tree_t))
 
-  let is_empty t = equal Store.Tree.empty t
+  let is_empty t = equal (Store.Tree.empty ()) t
 
   let hash t = Hash.to_context_hash (Store.Tree.hash t)
 
@@ -59,7 +59,7 @@ module Make_tree (Store : DB) = struct
     | `Contents (c, _) -> Store.Tree.Contents.force_exn c >|= Option.some
     | `Node _ -> Lwt.return_none
 
-  let of_value _ v = Store.Tree.add Store.Tree.empty [] v
+  let of_value _ v = Store.Tree.add (Store.Tree.empty ()) [] v
 
   let fold ?depth t k ~(order : [`Sorted | `Undefined]) ~init ~f =
     find_tree t k >>= function

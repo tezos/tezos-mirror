@@ -175,7 +175,7 @@ let create () =
   let cfg = Irmin_pack.config "/tmp" in
   let promise =
     Store.Repo.v cfg >>= fun repo ->
-    Lwt.return {repo; parents = []; tree = Store.Tree.empty}
+    Lwt.return {repo; parents = []; tree = Store.Tree.empty ()}
   in
   match Lwt.state promise with
   | Lwt.Return result -> result
