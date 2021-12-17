@@ -124,41 +124,6 @@ let blockchain_network_mainnet =
       ]
     ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
-let blockchain_network_granadanet =
-  make_blockchain_network
-    ~alias:"granadanet"
-    {
-      time = Time.Protocol.of_notation_exn "2021-05-21T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisd4299hBGVoU";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_GRANADANET_2021-05-21T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(4095l, "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV")]
-    ~default_bootstrap_peers:
-      [
-        "granadanet.smartpy.io";
-        "granadanet.tezos.co.il";
-        "granadanet.kaml.fr";
-        "granadanet.tznode.net";
-      ]
-
 let blockchain_network_hangzhounet =
   make_blockchain_network
     ~alias:"hangzhounet"
@@ -293,7 +258,6 @@ let builtin_blockchain_networks_with_tags =
   [
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (15, blockchain_network_granadanet);
     (16, blockchain_network_hangzhounet);
   ]
   |> List.map (fun (tag, network) ->
