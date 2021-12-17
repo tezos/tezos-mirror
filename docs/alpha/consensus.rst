@@ -447,5 +447,5 @@ Further External Resources
 --------------------------
 
 * Tenderbake `report <https://arxiv.org/abs/2001.11965>`_
-* Tenderbake `blog post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_.
+* Tenderbake `blog post <https://research-development.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_.r
 * Tenderbake `tzip <https://gitlab.com/tezos/tzip/-/blob/master/drafts/current/draft_tenderbake.md>`_.
