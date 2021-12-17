@@ -117,6 +117,35 @@ let string_fixed n = QCheck2.Gen.(string_size (pure n))
 
 let bytes_gen = QCheck2.Gen.(map Bytes.of_string string)
 
+let sublist : 'a list -> 'a list QCheck2.Gen.t =
+  (* [take_n n l] returns the first [n] elements of [l].
+     We do not reuse the implementation from [Stdlib.TzList] to avoid a
+     dependency cycle. *)
+  let rec take_n n = function
+    | x :: xs when n > 0 -> x :: take_n (n - 1) xs
+    | _ -> []
+  in
+  fun elems ->
+    let open QCheck2.Gen in
+    match elems with
+    | [] -> return []
+    | _ ->
+        let* res_len = 0 -- List.length elems in
+        let+ shuffle = shuffle_l elems in
+        take_n res_len shuffle
+
+let holey (l : 'a list) : 'a list QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  (* Generate as many Booleans as there are elements in [l] *)
+  let+ bools = list_size (return (List.length l)) bool in
+  let rev_result =
+    List.fold_left
+      (fun acc (elem, pick) -> if pick then elem :: acc else acc)
+      []
+      (List.combine l bools)
+  in
+  List.rev rev_result
+
 let endpoint_gen =
   let open QCheck2 in
   let open Gen in
