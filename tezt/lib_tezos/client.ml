@@ -373,9 +373,7 @@ let activate_protocol ?endpoint ~protocol ?fitness ?key ?timestamp
   |> Process.check
 
 let empty_mempool_file ?(filename = "mempool.json") () =
-  let mempool_str =
-    {|{"applied":[],"refused":[],"outdated":[],"branch_refused":[],"branch_delayed":[],"unprocessed":[]}|}
-  in
+  let mempool_str = "[]" in
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1928
      a write_file function should be added to the tezt base module *)
   let mempool = Temp.file filename in
@@ -411,16 +409,16 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
         ~some:(fun nanotez ->
           ["--minimal-nanotez-per-byte"; string_of_int nanotez])
         minimal_nanotez_per_byte
-    @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ Option.fold
         ~none:[]
-        ~some:(fun mempool_json -> ["--mempool"; mempool_json])
+        ~some:(fun operations_json -> ["--operation-pool"; operations_json])
         mempool
     @ (match protocol with
       | Some (Ithaca | Alpha) ->
           (* Only Alpha/Tenderbake supports this switch *)
           if ignore_node_mempool then ["--ignore-node-mempool"] else []
       | None | Some Hangzhou -> [])
+    @ (if minimal_timestamp then ["--minimal-timestamp"] else [])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
     )

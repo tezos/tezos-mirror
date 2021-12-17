@@ -44,6 +44,7 @@ module Baker : sig
     ?minimal_nanotez_per_byte:Q.t ->
     ?max_priority:int ->
     ?per_block_vote_file:string ->
+    ?extra_operations:Client_baking_forge.Operations_source.t ->
     chain:Chain_services.chain ->
     context_path:string ->
     keep_alive:bool ->

@@ -28,6 +28,85 @@ open Alpha_context
 open Baking_state
 module Events = Baking_events.Actions
 
+module Operations_source = struct
+  type error +=
+    | Failed_mempool_fetch of {
+        path : string;
+        reason : string;
+        details : Data_encoding.json option;
+      }
+
+  let operations_encoding =
+    Data_encoding.(list (dynamic_size Operation.encoding))
+
+  let retrieve mempool =
+    match mempool with
+    | None -> Lwt.return_none
+    | Some mempool -> (
+        let fail reason details =
+          let path =
+            match mempool with
+            | Baking_configuration.Operations_source.Local {filename} ->
+                filename
+            | Baking_configuration.Operations_source.Remote {uri; _} ->
+                Uri.to_string uri
+          in
+          fail (Failed_mempool_fetch {path; reason; details})
+        in
+        let decode_mempool json =
+          protect
+            ~on_error:(fun _ ->
+              fail "cannot decode the received JSON into mempool" (Some json))
+            (fun () ->
+              return (Data_encoding.Json.destruct operations_encoding json))
+        in
+
+        match mempool with
+        | Baking_configuration.Operations_source.Local {filename} ->
+            if Sys.file_exists filename then
+              Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file filename
+              >>= function
+              | Error _ ->
+                  Events.(emit invalid_json_file filename) >>= fun () ->
+                  Lwt.return_none
+              | Ok json -> (
+                  decode_mempool json >>= function
+                  | Ok mempool -> Lwt.return_some mempool
+                  | Error errs ->
+                      Events.(emit cannot_fetch_mempool errs) >>= fun () ->
+                      Lwt.return_none)
+            else
+              Events.(emit no_mempool_found_in_file filename) >>= fun () ->
+              Lwt.return_none
+        | Baking_configuration.Operations_source.Remote {uri; http_headers} -> (
+            ( ((with_timeout
+                  (Systime_os.sleep (Time.System.Span.of_seconds_exn 5.))
+                  (fun _ ->
+                    Tezos_rpc_http_client_unix.RPC_client_unix
+                    .generic_media_type_call
+                      ~accept:[Media_type.json]
+                      ?headers:http_headers
+                      `GET
+                      uri)
+                >>=? function
+                | `Json json -> return json
+                | _ -> fail "json not returned" None)
+               >>=? function
+               | `Ok json -> return json
+               | `Unauthorized json -> fail "unauthorized request" json
+               | `Gone json -> fail "gone" json
+               | `Error json -> fail "error" json
+               | `Not_found json -> fail "not found" json
+               | `Forbidden json -> fail "forbidden" json
+               | `Conflict json -> fail "conflict" json)
+            >>=? fun json -> decode_mempool json )
+            >>= function
+            | Ok mempool -> Lwt.return_some mempool
+            | Error errs ->
+                Events.(emit cannot_fetch_mempool errs) >>= fun () ->
+                Lwt.return_none))
+end
+
 type block_kind =
   | Fresh of Operation_pool.pool
   | Reproposal of {
@@ -149,9 +228,18 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
        ~predecessor_round:predecessor.round
        ~round)
   >>?= fun timestamp ->
+  let external_operation_source = state.global_state.config.extra_operations in
+  Operations_source.retrieve external_operation_source >>= fun extern_ops ->
   let (simulation_kind, payload_round) =
     match kind with
-    | Fresh pool -> (Block_forge.Filter pool, round)
+    | Fresh pool ->
+        let pool =
+          match extern_ops with
+          | None -> Operation_pool.Prioritized.of_pool pool
+          | Some ops ->
+              Operation_pool.Prioritized.merge_external_operations pool ops
+        in
+        (Block_forge.Filter pool, round)
     | Reproposal {consensus_operations; payload_hash; payload_round; payload} ->
         ( Block_forge.Apply
             {

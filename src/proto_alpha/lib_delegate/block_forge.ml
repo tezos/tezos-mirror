@@ -32,7 +32,7 @@ type unsigned_block = {
 }
 
 type simulation_kind =
-  | Filter of Operation_pool.pool
+  | Filter of Operation_pool.Prioritized.t
   | Apply of {
       ordered_pool : Operation_pool.ordered_pool;
       payload_hash : Block_payload_hash.t;
@@ -110,7 +110,7 @@ let finalize_block_header shell_header timestamp validation_result
   return header
 
 let retain_live_operations_only ~live_blocks operation_pool =
-  Operation_pool.filter_pool
+  Operation_pool.Prioritized.filter
     (fun ({shell; _} : packed_operation) ->
       Block_hash.Set.mem shell.branch live_blocks)
     operation_pool
@@ -221,9 +221,9 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
                  operations_hash;
                  _;
                } ->
-      let _op_pool' =
-        Operation_pool.(add_operations empty (List.concat operations))
-      in
+      (* let _op_pool' =
+       *   Operation_pool.(add_operations empty (List.concat operations))
+       * in *)
       protect
         ~on_error:(fun _ -> return_none)
         (fun () ->

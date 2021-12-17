@@ -54,18 +54,16 @@ type event =
    fetch operations for the baker to process.
 
 
-    @param initial_mempool initial operations to put in the worker's queue
-   (default: [None])
+    @param extra_operations extra operation source to put in the worker's
+   operations set (default: [None])
 
-    @param monitor_node_operations monitor operations on the node (defaults: [true]).  Set
-   [monitor_node] to [false] to only consider the [initial_mempool] operations.
+    @param monitor_node_operations monitor operations on the node (defaults:
+   [true]).  Set [monitor_node_operations] to [false] to only consider the
+   [extra_operations] operations.
 
 *)
 val create :
-  ?initial_mempool:Baking_configuration.Mempool.t ->
-  ?monitor_node_operations:bool ->
-  #Protocol_client_context.full ->
-  t Lwt.t
+  ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
 
 (** {2 Accessors}*)
 

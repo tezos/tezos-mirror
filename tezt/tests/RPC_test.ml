@@ -27,7 +27,7 @@
 (* Testing
    -------
    Component: RPC regression tests
-   Invocation: dune exec tezt/tests/main.exe rpc regression
+   Invocation: dune exec tezt/tests/main.exe -- -f RPC_test.ml
 
                Note that to reset the regression outputs, one can use
                the [--reset-regressions] option. When doing so, it is
@@ -682,6 +682,20 @@ let mempool_node_flags =
          mempool tests *)
     ]
 
+let bake_empty_block ?endpoint client =
+  let* mempool = Client.empty_mempool_file () in
+  (* We defer to using a low-level command here since we enforce using protocol
+     in order to distinguish which form of the option we actually need, since
+     the name has changed. *)
+  Client.spawn_command
+    ?endpoint
+    client
+    (["bake"; "for"; Constant.bootstrap1.alias; "--minimal-timestamp"]
+    @
+    let option_name = "--operation-pool" in
+    [option_name; mempool])
+  |> Process.check
+
 (* Test the mempool RPCs: /chains/<chain>/mempool/...
 
    Tested RPCs:
@@ -709,7 +723,10 @@ let mempool_node_flags =
    - POST request_operations
    - POST ban_operation
    - POST unban_operation
-   - POST unban_all_operations *)
+   - POST unban_all_operations
+*)
+(* [mode] is only useful insofar as it helps adapting the test to specific
+ * `Proxy mode constraint*)
 let test_mempool protocol ?endpoint client =
   let* node = Node.init mempool_node_flags in
   let* () = Client.Admin.trust_address ?endpoint client ~peer:node in
@@ -729,10 +746,12 @@ let test_mempool protocol ?endpoint client =
   in
   let* _ = Client.bake_for ?endpoint client in
 
-  (* Outdated operation: consensus_operation_for_old_level (classified as
-     outdated after the second empty baking). *)
+  let* _ = bake_empty_block ?endpoint client in
+
+  (* Outdated operation after the second empty baking. *)
   let* () = Client.endorse_for ~protocol ~force:true client in
-  let* _ = Mempool.bake_empty_mempool ~protocol client in
+  let* _ = bake_empty_block ?endpoint client in
+
   let monitor_path =
     (* To test the monitor_operations rpc we use curl since the client does
        not support streaming RPCs yet. *)
@@ -792,7 +811,9 @@ let test_mempool protocol ?endpoint client =
   in
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
-  let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
+  let* _ =
+    Mempool.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
+  in
   let* _ = flush_waiter in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
   let* _ =
@@ -803,7 +824,9 @@ let test_mempool protocol ?endpoint client =
   let proc_monitor =
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
-  let* _ = Mempool.bake_empty_mempool ~endpoint:(Client.Node node) client in
+  let* _ =
+    Mempool.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
+  in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
   (* Test RPCs [GET|POST /chains/main/mempool/filter] *)
   let get_filter_variations () =
