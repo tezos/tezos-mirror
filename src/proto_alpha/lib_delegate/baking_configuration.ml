@@ -23,10 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Mempool = struct
+module Operations_source = struct
   type t =
     | Local of {filename : string}
     | Remote of {uri : Uri.t; http_headers : (string * string) list option}
+
+  let pp ppf = function
+    | Local {filename} -> Format.pp_print_string ppf filename
+    | Remote {uri; _} -> Format.fprintf ppf "%a" Uri.pp uri
 
   let encoding =
     let open Data_encoding in
@@ -82,7 +86,7 @@ type t = {
   per_block_vote_file : string option;
   force : bool;
   state_recorder : state_recorder_config;
-  initial_mempool : Mempool.t option;
+  extra_operations : Operations_source.t option;
 }
 
 let default_fees_config =
@@ -109,7 +113,7 @@ let default_force = false
 
 let default_state_recorder_config = Filesystem
 
-let default_initial_mempool = None
+let default_extra_operations = None
 
 let default_per_block_vote_file = None
 
@@ -123,7 +127,7 @@ let default_config =
     liquidity_baking_escape_vote = default_liquidity_baking_escape_vote;
     force = default_force;
     state_recorder = default_state_recorder_config;
-    initial_mempool = default_initial_mempool;
+    extra_operations = default_extra_operations;
     per_block_vote_file = default_per_block_vote_file;
   }
 
@@ -136,7 +140,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     ?(user_activated_upgrades = default_user_activated_upgrades)
     ?(liquidity_baking_escape_vote = default_liquidity_baking_escape_vote)
     ?per_block_vote_file ?(force = default_force)
-    ?(state_recorder = default_state_recorder_config) ?initial_mempool () =
+    ?(state_recorder = default_state_recorder_config) ?extra_operations () =
   let fees =
     {minimal_fees; minimal_nanotez_per_gas_unit; minimal_nanotez_per_byte}
   in
@@ -155,7 +159,7 @@ let make ?(minimal_fees = default_fees_config.minimal_fees)
     per_block_vote_file;
     force;
     state_recorder;
-    initial_mempool;
+    extra_operations;
   }
 
 let fees_config_encoding : fees_config Data_encoding.t =
@@ -257,7 +261,7 @@ let encoding : t Data_encoding.t =
               per_block_vote_file;
               force;
               state_recorder;
-              initial_mempool;
+              extra_operations;
             } ->
          ( fees,
            validation,
@@ -268,7 +272,7 @@ let encoding : t Data_encoding.t =
            per_block_vote_file,
            force,
            state_recorder,
-           initial_mempool ))
+           extra_operations ))
        (fun ( fees,
               validation,
               nonce,
@@ -278,7 +282,7 @@ let encoding : t Data_encoding.t =
               per_block_vote_file,
               force,
               state_recorder,
-              initial_mempool ) ->
+              extra_operations ) ->
          {
            fees;
            validation;
@@ -289,7 +293,7 @@ let encoding : t Data_encoding.t =
            per_block_vote_file;
            force;
            state_recorder;
-           initial_mempool;
+           extra_operations;
          })
        (obj10
           (req "fees" fees_config_encoding)
@@ -303,7 +307,7 @@ let encoding : t Data_encoding.t =
           (opt "per_block_vote_file" Data_encoding.string)
           (req "force" force_config_encoding)
           (req "state_recorder" state_recorder_config_encoding)
-          (opt "initial_mempool" Mempool.encoding))
+          (opt "extra_operations" Operations_source.encoding))
 
 let pp fmt t =
   let json = Data_encoding.Json.construct encoding t in

@@ -966,3 +966,19 @@ val init_light :
   ?nodes_args:Node.argument list ->
   unit ->
   (t * Node.t * Node.t) Lwt.t
+
+(** Spawn a low-level client command.
+
+   Prefer using higher-level functions defined in this module, or adding a new
+   one, to deferring to [spawn_command].
+
+   It can be used, for example, for low-level one-shot customization of client
+   commands.  *)
+val spawn_command :
+  ?env:string String_map.t ->
+  ?endpoint:endpoint ->
+  ?hooks:Process.hooks ->
+  ?admin:bool ->
+  t ->
+  string list ->
+  Process.t

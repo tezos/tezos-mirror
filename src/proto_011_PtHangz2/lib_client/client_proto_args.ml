@@ -129,6 +129,8 @@ let int_parameter =
   parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
+let uri_parameter = parameter (fun _ x -> return (Uri.of_string x))
+
 let bytes_of_prefixed_string s =
   match
     if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then None

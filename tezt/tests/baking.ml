@@ -331,7 +331,7 @@ let sample_next_transfer_for state ~fee ~branch ~account =
   in
   return operation
 
-let bake_with_mempool state mempool =
+let bake_with_mempool ?protocol state mempool =
   let mempool_json = Data_encoding.Json.construct mempool_encoding mempool in
   let mempool_str = Ezjsonm.value_to_string mempool_json in
   let mempool = Temp.file "mempool.json" in
@@ -342,6 +342,7 @@ let bake_with_mempool state mempool =
   (* Use --context's client argument to prevent the node from sorting
      the operations. *)
   Client.bake_for
+    ?protocol
     ~mempool
     ~force:true
     ~context_path:(Node.data_dir state.sandbox_node // "context")
@@ -456,8 +457,8 @@ let distinct_bakers_increasing_fees state : mempool Lwt.t =
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
 
-let bake_and_check state ~mempool =
-  let* () = bake_with_mempool state mempool in
+let bake_and_check state ~protocol ~mempool =
+  let* () = bake_with_mempool ~protocol state mempool in
   let* block =
     Client.(rpc GET ["chains"; "main"; "blocks"; "head"] state.sandbox_client)
   in
@@ -488,10 +489,10 @@ let test_ordering =
   let* mempool =
     single_baker_increasing_fees state ~account:Constant.bootstrap1
   in
-  let* () = bake_and_check state ~mempool in
+  let* () = bake_and_check state ~protocol ~mempool in
   Log.info "Testing ordering by fees" ;
   let* mempool = distinct_bakers_increasing_fees state in
-  bake_and_check state ~mempool
+  bake_and_check state ~protocol ~mempool
 
 let check_op_not_in_baked_block client op =
   let* ops = RPC.get_operations client in

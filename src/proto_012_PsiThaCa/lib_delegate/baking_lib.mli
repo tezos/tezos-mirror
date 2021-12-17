@@ -34,7 +34,7 @@ val bake :
   ?minimal_nanotez_per_byte:Q.t ->
   ?force:bool ->
   ?minimal_timestamp:bool ->
-  ?mempool:Baking_configuration.Mempool.t ->
+  ?extra_operations:Baking_configuration.Operations_source.t ->
   ?monitor_node_mempool:bool ->
   ?context_path:string ->
   Baking_state.delegate list ->
@@ -59,7 +59,7 @@ val propose :
   ?minimal_nanotez_per_byte:Q.t ->
   ?force:bool ->
   ?minimal_timestamp:bool ->
-  ?mempool:Baking_configuration.Mempool.t ->
+  ?extra_operations:Baking_configuration.Operations_source.t ->
   ?context_path:string ->
   Baking_state.delegate list ->
   unit tzresult Lwt.t

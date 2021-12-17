@@ -31,8 +31,7 @@ let create_state cctxt ?synchronize ?monitor_node_mempool ~config
     ~current_proposal delegates =
   let chain = cctxt#chain in
   let monitor_node_operations = monitor_node_mempool in
-  let initial_mempool = config.Baking_configuration.initial_mempool in
-  Operation_worker.create ?initial_mempool ?monitor_node_operations cctxt
+  Operation_worker.create ?monitor_node_operations cctxt
   >>= fun operation_worker ->
   Baking_scheduling.create_initial_state
     cctxt
@@ -167,7 +166,7 @@ let generic_endorsing_power (filter : packed_operation list -> 'a list)
   let block_round = latest_proposal.block.round in
   let shell_level = latest_proposal.block.shell.level in
   let endorsements =
-    filter (Operation_pool.OpSet.elements current_mempool.consensus)
+    filter (Operation_pool.Operation_set.elements current_mempool.consensus)
   in
   let endorsements_in_mempool =
     List.filter_map
@@ -266,17 +265,16 @@ let endorsement_quorum state =
        - No  :: repropose fresh block for current round *)
 let propose (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
-    ?(minimal_timestamp = false) ?mempool ?context_path delegates =
+    ?(minimal_timestamp = false) ?extra_operations ?context_path delegates =
   get_current_proposal cctxt >>=? fun (_block_stream, current_proposal) ->
   let config =
-    let initial_mempool = mempool in
     Baking_configuration.make
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
       ?context_path
       ?force
-      ?initial_mempool
+      ?extra_operations
       ()
   in
   create_state cctxt ~config ~current_proposal delegates >>=? fun state ->
@@ -389,7 +387,7 @@ let baking_minimal_timestamp state =
   in
   let endorsements_in_mempool =
     Operation_pool.(
-      filter_endorsements (OpSet.elements current_mempool.consensus))
+      filter_endorsements (Operation_set.elements current_mempool.consensus))
     |> List.filter_map
          (fun
            ({
@@ -438,7 +436,7 @@ let baking_minimal_timestamp state =
   let pool =
     Operation_pool.add_operations
       current_mempool
-      (List.map snd signed_endorsements)
+      (List.map (fun (_, endorsement) -> endorsement) signed_endorsements)
   in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =
@@ -461,17 +459,16 @@ let baking_minimal_timestamp state =
 
 let bake (cctxt : Protocol_client_context.full) ?minimal_fees
     ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?force
-    ?(minimal_timestamp = false) ?mempool ?monitor_node_mempool ?context_path
-    delegates =
+    ?(minimal_timestamp = false) ?extra_operations ?monitor_node_mempool
+    ?context_path delegates =
   let config =
-    let initial_mempool = mempool in
     Baking_configuration.make
       ?minimal_fees
       ?minimal_nanotez_per_gas_unit
       ?minimal_nanotez_per_byte
       ?context_path
       ?force
-      ?initial_mempool
+      ?extra_operations
       ()
   in
   get_current_proposal cctxt >>=? fun (block_stream, current_proposal) ->

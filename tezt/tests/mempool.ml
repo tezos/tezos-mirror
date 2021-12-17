@@ -1819,17 +1819,17 @@ let forge_and_inject_n_operations ~branch ~fee ~gas_limit ~source ~destination
   loop ([], counter + 1) n
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
-let bake_empty_mempool ?endpoint client =
+let bake_empty_block ?endpoint ~protocol client =
   let* mempool = Client.empty_mempool_file () in
-  Client.bake_for ?endpoint ~mempool client
+  Client.bake_for ~protocol ?endpoint ~mempool client
 
 (** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
     with an empty mempool, then waits for a [flush] event on [node] (which
     will usually be the node corresponding to [client], but could be any
     node with a connection path to it). *)
-let _bake_empty_mempool_and_wait_for_flush ?(log = false) client node =
+let _bake_empty_block_and_wait_for_flush ?(log = false) ~protocol client node =
   let waiter = wait_for_flush node in
-  let* () = bake_empty_mempool client in
+  let* () = bake_empty_block ~protocol client in
   if log then
     Log.info "Baked for %s with an empty mempool." (Client.name client) ;
   waiter
@@ -2464,17 +2464,17 @@ let check_op_removed client op =
   unit
 
 (** Bakes with an empty mempool to force synchronisation between nodes. *)
-let bake_empty_mempool ?protocol ?endpoint client =
+let bake_empty_block ?endpoint ?protocol client =
   let* mempool = Client.empty_mempool_file () in
   Client.bake_for ?protocol ?endpoint ~mempool ~ignore_node_mempool:true client
 
-(** [bake_empty_mempool_and_wait_for_flush client node] bakes for [client]
+(** [bake_empty_block_and_wait_for_flush client node] bakes for [client]
     with an empty mempool, then waits for a [flush] event on [node] (which
     will usually be the node corresponding to [client], but could be any
     node with a connection path to it). *)
-let bake_empty_mempool_and_wait_for_flush ~protocol ?(log = false) client node =
+let bake_empty_block_and_wait_for_flush ~protocol ?(log = false) client node =
   let waiter = wait_for_flush node in
-  let* () = bake_empty_mempool ~protocol client in
+  let* () = bake_empty_block ~protocol client in
   if log then
     Log.info "Baked for %s with an empty mempool." (Client.name client) ;
   waiter
@@ -2875,7 +2875,7 @@ let test_do_not_reclassify =
      refused operation. Indeed, [node1] has the default filter config with \
      [minimal_fees] at 100 mutez." ;
   let* () =
-    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
   let* () = waiter_arrival_node1 in
   let* () = check_mempool_ops ~log:true client1 ~applied:1 ~refused:1 in
@@ -2891,7 +2891,7 @@ let test_do_not_reclassify =
   let* () = inject_transfer Constant.bootstrap3 ~fee:5 in
   let waiter_notify_3_valid_ops = wait_for_notify_n_valid_ops node1 3 in
   let* () =
-    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
   (* Wait for [node1] to receive a mempool containing 3 operations (the
      number of [applied] operations in [node2]), among which will figure
@@ -2970,7 +2970,7 @@ let test_pending_operation_version =
   (* Step 3 *)
   (* Bake empty block to force operation to be classify as refused *)
   let dummy_baking = wait_for_flush node_1 in
-  let* () = bake_empty_mempool client_1 in
+  let* () = bake_empty_block ~protocol client_1 in
   let* () = dummy_baking in
   (* Step 4 *)
   (* Get pending operations using different version of the RPC and check  *)
@@ -3688,7 +3688,7 @@ let test_mempool_filter_operation_arrival =
   let* () = check_mempool_ops_fees ~applied:appliedA2 ~refused:[] client2 in
   log_step 4 step4 ;
   let* () =
-    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
   let* () = waiter_arrival_node1 in
   let* () =
@@ -3704,7 +3704,7 @@ let test_mempool_filter_operation_arrival =
   let waiterB = wait_for_arrival node1 in
   let* () = inject_transfers Constant.[bootstrap3; bootstrap4] feesB in
   let* () =
-    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
   let* () = waiterB in
   let* () =
@@ -3730,7 +3730,7 @@ let test_mempool_filter_operation_arrival =
   in
   let* () = check_mempool_ops_fees ~applied:appliedC2 ~refused:[] client2 in
   let* () =
-    bake_empty_mempool_and_wait_for_flush ~protocol ~log:true client1 node1
+    bake_empty_block_and_wait_for_flush ~protocol ~log:true client1 node1
   in
   let* () = waiterC in
   check_mempool_ops_fees ~applied:appliedC1 ~refused:refusedC1 client1
