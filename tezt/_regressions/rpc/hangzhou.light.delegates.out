@@ -31,18 +31,6 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "4000000000000"
 
-./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-false
-
-./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-"0"
-
-./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-[ "[PUBLIC_KEY_HASH]" ]
-
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance'
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "0"
@@ -51,13 +39,25 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 []
 
-./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
-protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
-5
-
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
 "4000000000000"
+
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+"0"
+
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+false
+
+./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
+protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+5
 
 ./tezos-client --mode light rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
 protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

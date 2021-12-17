@@ -57,7 +57,7 @@ let test_proto_files = ["main.ml"; "main.mli"]
 let test_proto_TEZOS_PROTOCOL =
   {|{
     "modules": ["Main"],
-    "expected_env_version": 2
+    "expected_env_version": 3
 }
 |}
 
@@ -736,7 +736,10 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
         (target_protocol_tag to_protocol) ;
       (* Bake the transition. *)
       Log.info "Baking transition block..." ;
-      let* () = Client.bake_for client in
+      let everybody =
+        List.map (fun x -> x.Account.public_key_hash) Constant.bootstrap_keys
+      in
+      let* () = Client.bake_for ~keys:everybody client in
       let* () =
         check_current_period
           client
@@ -753,7 +756,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
         "Current period: proposal, with protocol: %s."
         (target_protocol_tag to_protocol) ;
       (* Bake one last block to ensure we can still bake after the transition. *)
-      let* () = Client.bake_for client in
+      let* () = Client.bake_for ~keys:everybody client in
       let* () =
         check_current_period
           client

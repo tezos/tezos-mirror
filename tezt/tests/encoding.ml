@@ -175,7 +175,8 @@ let register ~protocols =
   List.iter
     (fun protocol ->
       let samples =
-        if Protocol.(protocol = Alpha) then alpha_samples else default_samples
+        if Protocol.(protocol = Alpha || protocol = Ithaca) then alpha_samples
+        else default_samples
       in
       check_samples_encoding
         ~group_name:(Protocol.tag protocol)

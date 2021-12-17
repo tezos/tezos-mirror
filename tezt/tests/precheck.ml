@@ -139,8 +139,7 @@ let forge_block ~protocol ?client node ~key =
   let* () = Client.Admin.kick_peer ~peer:node2_id client in
   let* () =
     let open Protocol in
-    if protocol = Granada || protocol = Hangzhou then
-      Client.bake_for ~keys:[key] client2
+    if protocol = Hangzhou then Client.bake_for ~keys:[key] client2
     else
       (* We want an empty block, in tenderbake, we can simply propose
          so that there is no endorsement operations. *)

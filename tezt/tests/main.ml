@@ -32,7 +32,7 @@
             other files.
  *)
 
-let protocols = [Protocol.Alpha; Protocol.Hangzhou; Protocol.Granada]
+let protocols = [Protocol.Alpha; Protocol.Ithaca; Protocol.Hangzhou]
 
 let migrate_from = Protocol.Hangzhou
 
@@ -55,7 +55,7 @@ let () =
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
-  Mockup.register ~protocols:[Granada; Hangzhou; Alpha] ;
+  Mockup.register ~protocols:[Hangzhou; Ithaca; Alpha] ;
   Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
@@ -93,11 +93,11 @@ let () =
      Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register () ;
   Voting.register
-    ~from_protocol:Granada
-    ~to_protocol:(Known Hangzhou)
+    ~from_protocol:Hangzhou
+    ~to_protocol:(Known Ithaca)
     ~loser_protocols:[Alpha] ;
   Voting.register
-    ~from_protocol:Granada
+    ~from_protocol:Hangzhou
     ~to_protocol:Injected_test
     ~loser_protocols:[Alpha; Hangzhou] ;
   (* This file tests an RPC added in protocol G *)

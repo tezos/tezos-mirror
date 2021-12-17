@@ -356,7 +356,7 @@ let test_delegates_on_registered_alpha ~contracts ?endpoint client =
 
   unit
 
-let test_delegates_on_registered_granada ~contracts ?endpoint client =
+let test_delegates_on_registered_hangzhou ~contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
 
   let bootstrap = List.hd contracts in
@@ -393,7 +393,7 @@ let test_delegates_on_registered_granada ~contracts ?endpoint client =
 
   unit
 
-(* Test the delegates RPC with unregistered baker for protocol Alpha. *)
+(* Test the delegates RPC with unregistered baker for Tenderbake protocols. *)
 let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
   Log.info "Test with a PKH that is not a registered baker contract" ;
 
@@ -469,8 +469,8 @@ let test_delegates_on_unregistered_alpha ~contracts ?endpoint client =
   in
   unit
 
-(* Test the delegates RPC with unregistered baker for protocol Granada. *)
-let test_delegates_on_unregistered_granada ~contracts ?endpoint client =
+(* Test the delegates RPC with unregistered baker for Emmy protocols. *)
+let test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client =
   Log.info "Test with a PKH that is not a registered baker contract" ;
 
   let unregistered_baker = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
@@ -489,11 +489,12 @@ let test_delegates_on_unregistered_granada ~contracts ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_deactivated
+    RPC.Delegates.spawn_get_deactivated
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
     RPC.Delegates.spawn_get_delegated_balance
@@ -504,25 +505,28 @@ let test_delegates_on_unregistered_granada ~contracts ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_delegated_contracts
+    RPC.Delegates.spawn_get_delegated_contracts
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance
+    RPC.Delegates.spawn_get_frozen_balance
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_frozen_balance_by_cycle
+    RPC.Delegates.spawn_get_frozen_balance_by_cycle
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
     RPC.Delegates.spawn_get_grace_period
@@ -533,18 +537,20 @@ let test_delegates_on_unregistered_granada ~contracts ?endpoint client =
     |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_staking_balance
+    RPC.Delegates.spawn_get_staking_balance
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   let* _ =
-    RPC.Delegates.get_voting_power
+    RPC.Delegates.spawn_get_voting_power
       ?endpoint
       ~hooks
       ~pkh:unregistered_baker
       client
+    |> Process.check ~expect_failure:true
   in
   unit
 
@@ -559,18 +565,16 @@ let test_delegates protocol ?endpoint client =
   let* contracts = get_contracts ?endpoint client in
   let* () =
     match protocol with
-    | Protocol.Alpha ->
+    | Protocol.Ithaca | Protocol.Alpha ->
         let* () =
           test_delegates_on_registered_alpha ~contracts ?endpoint client
         in
         test_delegates_on_unregistered_alpha ~contracts ?endpoint client
-    | Protocol.Granada ->
-        let* () =
-          test_delegates_on_registered_granada ~contracts ?endpoint client
-        in
-        test_delegates_on_unregistered_granada ~contracts ?endpoint client
     | Protocol.Hangzhou ->
-        test_delegates_on_unregistered_alpha ~contracts ?endpoint client
+        let* () =
+          test_delegates_on_registered_hangzhou ~contracts ?endpoint client
+        in
+        test_delegates_on_unregistered_hangzhou ~contracts ?endpoint client
   in
 
   unit
@@ -1010,13 +1014,13 @@ let register () =
   in
   let register_current_mainnet test_mode_tag =
     check_rpc
-      ~group_name:"granada"
-      ~protocols:[Granada]
+      ~group_name:"hangzhou"
+      ~protocols:[Hangzhou]
       ~test_mode_tag
       ~rpcs:
         ([
            ("contracts", test_contracts, None, None);
-           ("delegates", test_delegates Granada, None, None);
+           ("delegates", test_delegates Hangzhou, None, None);
            ( "votes",
              test_votes,
              Some
@@ -1034,7 +1038,7 @@ let register () =
         | _ ->
             [
               ( "mempool",
-                test_mempool Protocol.Granada,
+                test_mempool Protocol.Hangzhou,
                 None,
                 Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
             ])

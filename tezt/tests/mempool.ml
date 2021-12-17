@@ -1930,7 +1930,7 @@ let get_endorsement_has_bytes ~protocol client =
   in
   let wrapped_bytes =
     match protocol with
-    | Protocol.Alpha ->
+    | Protocol.Ithaca | Protocol.Alpha ->
         let signature = get_signature op in
         let kind = JSON.get "kind" contents |> JSON.as_string in
         if not (kind = "endorsement") then
@@ -1975,7 +1975,7 @@ let get_endorsement_has_bytes ~protocol client =
         Data_encoding.Binary.to_bytes_exn
           Tezos_protocol_alpha.Protocol.Operation_repr.encoding
           wrapped
-    | Protocol.Granada | Protocol.Hangzhou ->
+    | Protocol.Hangzhou ->
         let endorsement = JSON.get "endorsement" contents in
         let signature = get_signature endorsement in
         let level =
