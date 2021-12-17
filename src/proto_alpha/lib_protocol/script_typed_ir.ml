@@ -166,6 +166,16 @@ module Script_bls = struct
 end
 
 module Script_timelock = struct
+  type chest_key = Chest_key_tag of Timelock.chest_key [@@ocaml.unboxed]
+
+  let make_chest_key chest_key = Chest_key_tag chest_key
+
+  let chest_key_encoding =
+    Data_encoding.conv
+      (fun (Chest_key_tag x) -> x)
+      (fun x -> Chest_key_tag x)
+      Timelock.chest_key_encoding
+
   type chest = Chest_tag of Timelock.chest [@@ocaml.unboxed]
 
   let make_chest chest = Chest_tag chest
@@ -176,7 +186,7 @@ module Script_timelock = struct
       (fun x -> Chest_tag x)
       Timelock.chest_encoding
 
-  let open_chest (Chest_tag chest) chest_key ~time =
+  let open_chest (Chest_tag chest) (Chest_key_tag chest_key) ~time =
     Timelock.open_chest chest chest_key ~time
 
   let get_plaintext_size (Chest_tag x) = Timelock.get_plaintext_size x
@@ -1139,9 +1149,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      (Timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
+      (Script_timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
       * ((bytes, bool) union, 's, 'r, 'f) kinstr
-      -> ( Timelock.chest_key,
+      -> ( Script_timelock.chest_key,
            Script_timelock.chest * (n num * 's),
            'r,
            'f )
@@ -1294,7 +1304,9 @@ and 'ty ty =
   | Bls12_381_g2_t : Script_bls.G2.t ty_metadata -> Script_bls.G2.t ty
   | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
-  | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
+  | Chest_key_t :
+      Script_timelock.chest_key ty_metadata
+      -> Script_timelock.chest_key ty
   | Chest_t : Script_timelock.chest ty_metadata -> Script_timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =

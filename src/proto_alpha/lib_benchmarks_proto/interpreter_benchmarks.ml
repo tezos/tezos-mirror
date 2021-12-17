@@ -2796,6 +2796,7 @@ module Registration_section = struct
 
     let resulting_stack chest chest_key time =
       let chest = Script_timelock.make_chest chest in
+      let chest_key = Script_timelock.make_chest_key chest_key in
       ( chest_key,
         ( chest,
           ( Script_int_repr.is_nat (Script_int_repr.of_int time)

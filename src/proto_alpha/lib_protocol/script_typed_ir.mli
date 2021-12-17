@@ -122,6 +122,14 @@ module Script_bls : sig
 end
 
 module Script_timelock : sig
+  (** [chest_key] is made algebraic in order to distinguish it from the other
+      type parameters of [Script_typed_ir.ty]. *)
+  type chest_key = Chest_key_tag of Timelock.chest_key [@@ocaml.unboxed]
+
+  val make_chest_key : Timelock.chest_key -> chest_key
+
+  val chest_key_encoding : chest_key Data_encoding.t
+
   (** [chest] is made algebraic in order to distinguish it from the other type
       parameters of [Script_typed_ir.ty]. *)
   type chest = Chest_tag of Timelock.chest [@@ocaml.unboxed]
@@ -130,8 +138,7 @@ module Script_timelock : sig
 
   val chest_encoding : chest Data_encoding.t
 
-  val open_chest :
-    chest -> Timelock.chest_key -> time:int -> Timelock.opening_result
+  val open_chest : chest -> chest_key -> time:int -> Timelock.opening_result
 
   val get_plaintext_size : chest -> int
 end
@@ -1119,9 +1126,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      (Timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
+      (Script_timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
       * ((bytes, bool) union, 's, 'r, 'f) kinstr
-      -> ( Timelock.chest_key,
+      -> ( Script_timelock.chest_key,
            Script_timelock.chest * (n num * 's),
            'r,
            'f )
@@ -1374,7 +1381,9 @@ and 'ty ty =
   | Bls12_381_g2_t : Script_bls.G2.t ty_metadata -> Script_bls.G2.t ty
   | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
-  | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
+  | Chest_key_t :
+      Script_timelock.chest_key ty_metadata
+      -> Script_timelock.chest_key ty
   | Chest_t : Script_timelock.chest ty_metadata -> Script_timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
@@ -1633,7 +1642,7 @@ val ticket_t :
   annot:type_annot option ->
   'a ticket ty tzresult
 
-val chest_key_t : annot:type_annot option -> Timelock.chest_key ty
+val chest_key_t : annot:type_annot option -> Script_timelock.chest_key ty
 
 val chest_t : annot:type_annot option -> Script_timelock.chest ty
 
