@@ -23,13 +23,32 @@ be documented here either.
 Node
 ----
 
-- Fixed an inconsistency of the cache: the shell now reloads the cache
-  from scratch if the application fails because of a hash
-  inconsistency.
+Client
+------
 
--  Removed the ``granadanet`` built-in network alias.
+Baker / Endorser / Accuser
+--------------------------
 
--  Added the ``ithacanet`` built-in network alias.
+Proxy server
+------------
+
+Protocol Compiler And Environment
+---------------------------------
+
+Codec
+-----
+
+Docker Images
+-------------
+
+Miscellaneous
+-------------
+
+Version 12.0~rc1
+================
+
+Node
+----
 
 - UNIX errors are now displayed using human-friendly English instead of error codes.
 
@@ -41,12 +60,14 @@ Node
   (aka the mempool).
 
 - The following RPCs output format changed:
+
   1. ``/workers/block_validator``,
   2. ``/workers/chain_validators``,
   3. ``/workers/chain_validators/<chain_id>``,
   4. ``/workers/chain_validator/<chain_id>/peer_validators``,
   5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``,
   6. ``/workers/prevalidators``.
+
   The field ``backlog`` is removed. Those logs can be obtained via the
   node itself. Logging can be redirected to a file via the option
   ``--log-file``. External tools such as ``logrotate`` can be used to
@@ -54,6 +75,7 @@ Node
 
 - The node configuration format is changed. The
   following paths are removed:
+
   1. ``shell.chain_validator.limits.worker_backlog_size``
   2. ``shell.chain_validator.limits.worker_backlog_level``
   3. ``shell.peer_validator.limits.worker_backlog_size``
@@ -74,32 +96,32 @@ Node
   without having to restart the node. See also the new documentation pages
   related to logging.
 
--  Better handling of mempool cache in the `distributed_db` which
-   should make the `distributed_db` RAM consumption strongly
-   correlated to the one of the mempool.
+- Better handling of mempool cache in the `distributed_db` which
+  should make the `distributed_db` RAM consumption strongly
+  correlated to the one of the mempool.
 
--  Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
-   show fields of the filter configuration that were equal to their
-   default value: e.g. if the configuration was the default one, it
-   just returned ``{}``. Now displays all the fields by default. The
-   old behavior may be brought back by setting the new optional
-   parameter ``include_default`` to ``false``.
+- Fixed RPC GET ``/chains/<chain_id>/mempool/filter``, that did not
+  show fields of the filter configuration that were equal to their
+  default value: e.g. if the configuration was the default one, it
+  just returned ``{}``. Now displays all the fields by default. The
+  old behavior may be brought back by setting the new optional
+  parameter ``include_default`` to ``false``.
 
--  Changed the behavior of RPC POST ``/chains/<chain_id>/mempool/filter``
-   when provided an input json that does not describe a valid filter
-   configuration. It used to revert the filter back to the default
-   configuration in that case, but now it leaves it unchanged. (Note:
-   if the input json is valid but does not provide all the fields of
-   the filter configuration, then any missing field is set back to its
-   default value, rather than left unchanged. This is the same
-   behavior as the previous version of the RPC.) As this behavior may
-   be confusing, the RPC now returns the new filter configuration of
-   the mempool.
+- Changed the behavior of RPC POST ``/chains/<chain_id>/mempool/filter``
+  when provided an input json that does not describe a valid filter
+  configuration. It used to revert the filter back to the default
+  configuration in that case, but now it leaves it unchanged. (Note:
+  if the input json is valid but does not provide all the fields of
+  the filter configuration, then any missing field is set back to its
+  default value, rather than left unchanged. This is the same
+  behavior as the previous version of the RPC.) As this behavior may
+  be confusing, the RPC now returns the new filter configuration of
+  the mempool.
 
--  When encoded in binary, errors now have a single size field. This only
-   affects the binary representation of errors or values that include errors
-   inside. It may break the compatibility for tools that request binary-only
-   answers from the node and parse the errors by hand.
+- When encoded in binary, errors now have a single size field. This only
+  affects the binary representation of errors or values that include errors
+  inside. It may break the compatibility for tools that request binary-only
+  answers from the node and parse the errors by hand.
 
 - Added a new mempool's classification for the recently introduced
   outdated error category of protocols in environment v4.
@@ -129,12 +151,20 @@ Node
   `multiple transfers` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
 
--  Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
-   It is no longer possible to run ``tezos-node upgrade storage`` to upgrade
-   from those older versions. It is also no longer possible to import
-   snapshots that were exported using this version.
+- Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
+  It is no longer possible to run ``tezos-node upgrade storage`` to upgrade
+  from those older versions. It is also no longer possible to import
+  snapshots that were exported using this version.
 
--  Reduced the memory consumption of the snapshot import.
+- Reduced the memory consumption of the snapshot import.
+
+- Fixed an inconsistency of the cache: the shell now reloads the cache
+  from scratch if the application fails because of a hash
+  inconsistency.
+
+- Removed the ``granadanet`` built-in network alias.
+
+- Added the ``ithacanet`` built-in network alias.
 
 Client
 ------
@@ -172,17 +202,7 @@ Baker / Endorser / Accuser
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be ``json``, ``binary`` or ``any``.
 
-Proxy server
-------------
-
-Protocol Compiler And Environment
----------------------------------
-
-Codec
------
-
-Docker Images
--------------
+-  Removed baker, endorser and accuser for Granada.
 
 Miscellaneous
 -------------
