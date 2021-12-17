@@ -56,7 +56,9 @@ the following built-in networks:
 
 - ``sandbox``
 
-- ``hangzhounet`` (available from version 11.0)
+- ``hangzhounet`` (available from version 11.0~rc2)
+
+- ``ithacanet`` (available from version 12.0~rc1)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
