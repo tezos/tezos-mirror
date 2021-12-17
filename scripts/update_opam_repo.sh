@@ -88,8 +88,23 @@ done
 ## Filtering unrequired packages
 cd $tmp_dir
 git reset --hard "$full_opam_repository_tag"
+# Opam < 2.1 requires opam-depext as a plugin, later versions include it
+# natively:
+extra_warning=""
+case $(opam --version) in
+    2.0.* ) opam_depext_dep="opam-depext," ;;
+    * )
+        opam_depext_dep=""
+        extra_warning="
+WARNING you are using opam $(opam --version), your patch
+is potentially removing the opam 2.0.x dependency 'opam-depext', please
+make sure you are not removing it (for instance by editing the patch,
+fixing the resulting merge-request, or re-running with opam 2.0.x)."
+        ;;
+esac
+#shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,opam-depext,js_of_ocaml-ppx,opam-ed
+  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed
 
 ## Adding useful compiler variants
 for variant in afl flambda fp spacetime ; do
@@ -117,4 +132,5 @@ echo
 echo "Wrote proposed update in: $target."
 echo 'Please add this patch to: `https://gitlab.com/tezos/opam-repository`'
 echo 'And update accordingly the commit hash in: `.gitlab-ci.yml` and `scripts/version.sh`'
+echo "$extra_warning"
 echo

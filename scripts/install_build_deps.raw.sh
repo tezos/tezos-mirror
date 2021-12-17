@@ -18,7 +18,17 @@ export OPAMYES=${OPAMYES:=true}
 # Note that install_build_deps.sh calls install_build_deps.rust.sh
 # which checks whether Rust is installed with the right version and explains how
 # to install it if needed, so using opam depext is redundant anyway.
-opam depext conf-gmp conf-libev conf-pkg-config conf-hidapi ctypes-foreign conf-autoconf conf-libffi conf-zlib #conf-rust
+conf_packages="conf-gmp conf-libev conf-pkg-config conf-hidapi ctypes-foreign conf-autoconf conf-libffi conf-zlib" #conf-rust
+
+# Opam < 2.1 uses opam-depext as a plugin, later versions provide the option
+# `--depext-only`:
+case $(opam --version) in
+    2.0.* ) opam_depext_command="opam depext $conf_packages" ;;
+    * ) opam_depext_command="opam install --depext-only $conf_packages" ;;
+esac
+## ShellCheck does not fail when non-quoted variables are at the beginning
+## of a command:
+$opam_depext_command
 
 ## In an ideal world, `--with-test` should be present only when using
 ## `--dev`. But this would probably break the CI, so we postponed this
