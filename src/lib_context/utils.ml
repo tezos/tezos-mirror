@@ -195,21 +195,3 @@ module String_set : String_set = struct
     let elt_idx = elt_index t elt in
     t.hashset.(elt_idx) <- Small_list.cons arena_idx t.hashset.(elt_idx)
 end
-
-module Seq_lwt = struct
-  type +'a node = Nil | Cons of 'a * 'a t
-
-  and 'a t = unit -> ('a node, error trace) result Lwt.t
-
-  let rec unfold f u () =
-    f u >>= function
-    | Error e -> Lwt.return_error e
-    | Ok None -> Lwt.return_ok Nil
-    | Ok (Some (x, u')) -> Lwt.return_ok (Cons (x, unfold f u'))
-
-  let rec fold_left f acc (seq : 'a t) =
-    seq () >>= function
-    | Error e -> Lwt.return_error e
-    | Ok Nil -> Lwt.return_ok acc
-    | Ok (Cons (x, next)) -> f acc x >>= fun acc -> fold_left f acc next
-end

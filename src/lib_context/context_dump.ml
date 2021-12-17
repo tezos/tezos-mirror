@@ -116,7 +116,7 @@ module Make (I : Dump_interface) = struct
   type command =
     | Root
     | Node of (string * I.Kinded_hash.t) list
-    | Node_seq of (string * I.Kinded_hash.t) Utils.Seq_lwt.t
+    | Node_seq of (string * I.Kinded_hash.t, error trace) Seq_es.t
     | Blob of bytes
     | Eoc of {info : I.commit_info; parents : I.Commit_hash.t list}
     | Eof
@@ -256,7 +256,7 @@ module Make (I : Dump_interface) = struct
         let i = i + length_name + length_hash in
         Some (node, i)
     in
-    Utils.Seq_lwt.unfold step 0
+    Seq_es.unfold_es step 0
 
   let eoc_encoding_raw =
     let open Data_encoding in

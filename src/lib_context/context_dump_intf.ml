@@ -131,7 +131,7 @@ module type Dump_interface = sig
 
   val add_dir :
     batch ->
-    (step * Kinded_hash.t) Utils.Seq_lwt.t ->
+    (step * Kinded_hash.t, error trace) Seq_es.t ->
     (tree option, error trace) result Lwt.t
 end
 
