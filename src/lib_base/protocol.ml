@@ -140,8 +140,11 @@ module Meta = struct
 
   let encoding =
     let open Data_encoding in
-    def "protocol.meta"
-    (* FIXME: add ~description argument *)
+    def
+      "protocol.meta"
+      ~description:
+        "Protocol metadata: the hash of the protocol, the expected environment \
+         version and the list of modules comprising the protocol."
     @@ conv
          (fun {hash; expected_env_version; modules} ->
            (hash, expected_env_version, modules))
