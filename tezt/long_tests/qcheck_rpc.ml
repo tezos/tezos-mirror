@@ -267,7 +267,7 @@ module RPC_Index = struct
     let get_url_endpoints url =
       let open Lwt_process in
       let* curl_result = pread ~stderr:`Dev_null ("curl", [|"curl"; url|]) in
-      curl_result |> Ezjsonm.value_from_string |> Api.parse_tree
+      curl_result |> JSON.parse ~origin:url |> Api.parse_tree
       |> Api.parse_services |> Api.flatten
       |> List.map Convert.convert_endpoint
       |> return
