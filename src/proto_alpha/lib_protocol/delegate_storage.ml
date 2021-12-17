@@ -629,36 +629,7 @@ module Random = struct
     return (c, (pk, pkh))
 end
 
-(* Round robin delegate selection. This is only used for testing purposes. *)
-module Round_robin = struct
-  let over level slot delegates =
-    let nth_mod n l =
-      match List.nth_opt l (n mod List.length l) with
-      | None -> assert false
-      | Some x -> x
-    in
-    let level_int = Int32.to_int level.Level_repr.level_position in
-    if Compare.Int.(level_int = 0) then
-      (* dummy case for level 0 *)
-      nth_mod 0 delegates |> nth_mod 0 |> return
-    else
-      let adjusted_level = level_int - 1 in
-      let n_defined_levels = List.length delegates in
-      if Compare.Int.(adjusted_level < n_defined_levels) then
-        nth_mod adjusted_level delegates |> nth_mod slot |> return
-      else
-        let delegates =
-          match List.rev delegates with [] -> assert false | last :: _ -> last
-        in
-        nth_mod (level_int - n_defined_levels + slot) delegates |> return
-end
-
-let slot_owner c level slot =
-  match (Constants_storage.parametric c).delegate_selection with
-  | Random -> Random.owner c level (Slot_repr.to_int slot)
-  | Round_robin_over delegates ->
-      Round_robin.over level (Slot_repr.to_int slot) delegates >|=? fun pk ->
-      (c, (pk, Signature.Public_key.hash pk))
+let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
 
 let baking_rights_owner c (level : Level_repr.t) ~round =
   Round_repr.to_int round >>?= fun round ->

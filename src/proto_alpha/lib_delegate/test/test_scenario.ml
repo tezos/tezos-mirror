@@ -1,5 +1,17 @@
 open Mockup_simulator
 
+let bootstrap1 = Signature.Public_key.hash bootstrap1
+
+let bootstrap2 = Signature.Public_key.hash bootstrap2
+
+let bootstrap3 = Signature.Public_key.hash bootstrap3
+
+let bootstrap4 = Signature.Public_key.hash bootstrap4
+
+let bootstrap5 = Signature.Public_key.hash bootstrap5
+
+let some_seed s = Some (Protocol.State_hash.of_b58check_exn s)
+
 (*
 
 Test that the chain reaches the 5th level.
@@ -71,7 +83,7 @@ let test_scenario_t1 () =
         ~mempool
         ~predicate:
           (op_is_both
-             (op_is_signed_by ~public_key:bootstrap1)
+             (op_is_signed_by ~public_key:Mockup_simulator.bootstrap1)
              (op_is_preendorsement ~level:1l ~round:0l))
         ~var:a_preendorsed
 
@@ -85,11 +97,17 @@ let test_scenario_t1 () =
       (match (!b_endorsed, level, round) with
       | (false, 1l, 0l) ->
           (* If any of the checks fails the whole scenario will fail. *)
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap1
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap1
           >>=? fun () ->
           save_proposal_payload ~protocol_data ~var:original_proposal
       | (true, 1l, 1l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap2
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap2
           >>=? fun () ->
           verify_payload_hash
             ~protocol_data
@@ -106,7 +124,7 @@ let test_scenario_t1 () =
         ~mempool
         ~predicate:
           (op_is_both
-             (op_is_signed_by ~public_key:bootstrap2)
+             (op_is_signed_by ~public_key:Mockup_simulator.bootstrap2)
              (op_is_preendorsement ~level:1l ~round:0l))
         ~var:b_preendorsed
       >>=? fun () ->
@@ -114,7 +132,7 @@ let test_scenario_t1 () =
         ~mempool
         ~predicate:
           (op_is_both
-             (op_is_signed_by ~public_key:bootstrap2)
+             (op_is_signed_by ~public_key:Mockup_simulator.bootstrap2)
              (op_is_preendorsement ~level:1l ~round:0l))
         ~var:b_endorsed
 
@@ -123,7 +141,8 @@ let test_scenario_t1 () =
   let config =
     {
       default_config with
-      delegate_selection = Round_robin_over [[bootstrap1; bootstrap2]];
+      initial_seed = None;
+      delegate_selection = [(1l, [(0l, bootstrap1); (1l, bootstrap2)])];
     }
   in
   run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
@@ -153,7 +172,10 @@ let test_scenario_t2 () =
          proposal for level 1 at round 1. *)
       match (level, round) with
       | (1l, 1l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap2
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap2
           >>=? fun () ->
           b_proposed := true ;
           return_unit
@@ -166,7 +188,8 @@ let test_scenario_t2 () =
   let config =
     {
       default_config with
-      delegate_selection = Round_robin_over [[bootstrap1; bootstrap2]];
+      initial_seed = None;
+      delegate_selection = [(1l, [(0l, bootstrap1); (1l, bootstrap2)])];
     }
   in
   run ~config [(1, (module Node_a_hooks)); (1, (module Node_b_hooks))]
@@ -222,7 +245,10 @@ let test_scenario_t3 () =
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       match (level, round) with
       | (1l, 2l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap2
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap2
           >>=? fun () ->
           we_are_done := true ;
           verify_payload_hash
@@ -267,7 +293,10 @@ let test_scenario_t3 () =
         ~(protocol_data : Protocol.Alpha_context.Block_header.protocol_data) =
       match (level, round) with
       | (1l, 0l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap3
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap3
           >>=? fun () ->
           save_proposal_payload ~protocol_data ~var:original_proposal
           >>=? fun () ->
@@ -314,12 +343,25 @@ let test_scenario_t3 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngFtAUcm1EneHCCrxxSWAaxSukwEhSPvpTnFjVdKLEjgkapUy1pP";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap3; bootstrap4; bootstrap2; bootstrap1];
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap3);
+              (1l, bootstrap4);
+              (2l, bootstrap2);
+              (3l, bootstrap1);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
     }
   in
   run
@@ -366,7 +408,10 @@ let test_scenario_f1 () =
         ~protocol_data:_ =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1, level, round) with
       | (true, true, 2l, 0l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap1
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap1
           >>=? fun () ->
           (a_proposed_l2_r0 := true ;
            return_unit)
@@ -402,7 +447,10 @@ let test_scenario_f1 () =
         ~protocol_data:_ =
       match (!c_proposed_l1_r0, !d_proposed_l1_r1, level, round) with
       | (false, false, 1l, 0l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap3
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap3
           >>=? fun () ->
           (c_proposed_l1_r0 := true ;
            return_unit)
@@ -428,7 +476,10 @@ let test_scenario_f1 () =
         ~protocol_data:_ =
       match (!d_proposed_l1_r1, level, round) with
       | (false, 1l, 1l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap4
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap4
           >>=? fun () ->
           (d_proposed_l1_r1 := true ;
            return_unit)
@@ -450,12 +501,25 @@ let test_scenario_f1 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngGohKUZjXzv69sxvDqAYRd4XPDQSxDoEpP72znu2jduBuhcYiSE";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap3; bootstrap4; bootstrap1; bootstrap2];
-            [bootstrap1; bootstrap4; bootstrap2; bootstrap3];
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap3);
+              (1l, bootstrap4);
+              (2l, bootstrap1);
+              (3l, bootstrap2);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap4);
+              (2l, bootstrap2);
+              (3l, bootstrap3);
+            ] );
+        ];
       timeout = 15;
     }
   in
@@ -503,13 +567,21 @@ let test_scenario_f2 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngGPSm87ZqWxJmZu7rewiLiyKY72ffCQQvxDuWmFBw59dWAL5VTB";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-          ];
-      timeout = 25;
+        [
+          (1l, [(0l, bootstrap1)]);
+          ( 2l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+              (4l, bootstrap1);
+            ] );
+        ];
+      timeout = 1000;
       round0 = 2L;
       round1 = 3L;
     }
@@ -610,12 +682,26 @@ let test_scenario_m2 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngGo77zNC59bYiQMk2M14aDZZu4KXG8BV1C8pi7afjJ7cXyqB3M1";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-            [bootstrap5; bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap5);
+              (1l, bootstrap1);
+              (2l, bootstrap2);
+              (3l, bootstrap3);
+              (4l, bootstrap4);
+            ] );
+        ];
       round0 = 2L;
       round1 = 3L;
       timeout = 20;
@@ -674,7 +760,21 @@ let test_scenario_m3 () =
   let config =
     {
       default_config with
-      delegate_selection = Round_robin_over [[bootstrap1; bootstrap2]];
+      initial_seed =
+        some_seed "rngGaxNJcwEVJLgQXmnN8KN5skn6fhU4Awtu8zVDKViTd5gsfT51M";
+      delegate_selection =
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap1);
+              (3l, bootstrap2);
+              (4l, bootstrap1);
+              (5l, bootstrap2);
+              (6l, bootstrap1);
+            ] );
+        ];
       round0 = 2L;
       round1 = 3L;
       timeout = 30;
@@ -715,7 +815,10 @@ let test_scenario_m4 () =
         ~protocol_data:_ =
       match (level, round) with
       | (1l, 0l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap1
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap1
           >>=? fun () ->
           return
             (block_hash, block_header, operations, [Pass; Pass; Pass; Delay 0.5])
@@ -766,8 +869,18 @@ let test_scenario_m4 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngGJmwLi7kPvGwV2LR3kjNQ6xamGPCZ9ooep9QcafbqRXZhYEciT";
       delegate_selection =
-        Round_robin_over [[bootstrap1; bootstrap2; bootstrap3; bootstrap4]];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
     }
   in
   run
@@ -806,7 +919,10 @@ let test_scenario_m5 () =
         ~protocol_data:_ =
       match (level, round) with
       | (1l, 0l) ->
-          check_block_signature ~block_hash ~block_header ~public_key:bootstrap1
+          check_block_signature
+            ~block_hash
+            ~block_header
+            ~public_key:Mockup_simulator.bootstrap1
           >>=? fun () ->
           return
             (block_hash, block_header, operations, [Pass; Pass; Pass; Delay 1.0])
@@ -835,9 +951,8 @@ let test_scenario_m5 () =
   let config =
     {
       default_config with
-      delegate_selection =
-        Round_robin_over
-          [[bootstrap1; bootstrap2; bootstrap3; bootstrap4]; [bootstrap4]];
+      initial_seed =
+        some_seed "rngGJmwLi7kPvGwV2LR3kjNQ6xamGPCZ9ooep9QcafbqRXZhYEciT";
       round0 = 3L;
       round1 = 4L;
     }
@@ -952,12 +1067,25 @@ let test_scenario_m6 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngGnwG2gApiRzo1kdbCgQheqtZroUsAjsJzyw2RBbtg3gtTeMQ9F";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
       timeout = 20;
     }
   in
@@ -1146,12 +1274,25 @@ let test_scenario_m7 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngGJ7ReXwsjWuzpeqCgHAjudFwJtxdYz44Genz1FnyJ8R226hoKh";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-            [bootstrap2; bootstrap1; bootstrap3; bootstrap4];
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap2);
+              (1l, bootstrap1);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
       timeout = 20;
     }
   in
@@ -1278,12 +1419,25 @@ let test_scenario_m8 () =
   let config =
     {
       default_config with
+      initial_seed =
+        some_seed "rngFy2zFmgg25SXrE6aawqQVhD1kdw9eCCRxc843RLQjz5MZ6MGER";
       delegate_selection =
-        Round_robin_over
-          [
-            [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
-            [bootstrap2; bootstrap3; bootstrap1; bootstrap4];
-          ];
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+          ( 2l,
+            [
+              (0l, bootstrap2);
+              (1l, bootstrap3);
+              (2l, bootstrap1);
+              (3l, bootstrap4);
+            ] );
+        ];
       timeout = 30;
     }
   in

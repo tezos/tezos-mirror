@@ -80,12 +80,6 @@ val ratio_encoding : ratio Data_encoding.t
 
 val pp_ratio : Format.formatter -> ratio -> unit
 
-type delegate_selection =
-  | Random
-  | Round_robin_over of Signature.Public_key.t list list
-
-val delegate_selection_encoding : delegate_selection Data_encoding.encoding
-
 type parametric = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
@@ -124,7 +118,7 @@ type parametric = {
   (* that is, (100 * delegated tz / own tz) *)
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
-  delegate_selection : delegate_selection;
+  initial_seed : State_hash.t option;
   tx_rollup_enable : bool;
   tx_rollup_origination_size : int;
 }

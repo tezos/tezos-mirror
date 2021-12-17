@@ -1,0 +1,16 @@
+(library
+ (name tenderbrute)
+ (public_name tezos-baking-alpha.tenderbrute)
+ (libraries data-encoding
+            tezos-base
+            tezos-base.unix
+            tezos-protocol-alpha
+            tezos-client-base
+            tezos-client-alpha
+ )
+ (flags (:standard -open Data_encoding
+                   -open Tezos_base__TzPervasives
+                   -open Tezos_base
+                   -open Tezos_protocol_alpha
+                   -open Tezos_client_base
+                   -open Tezos_client_alpha)))

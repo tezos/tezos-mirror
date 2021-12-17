@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+open Protocol
+open Alpha_context
 
 (* ------------------------------------------------------------------------- *)
 (* Mockup protocol parameters *)
@@ -62,7 +63,6 @@ module Protocol_constants_overrides = struct
     minimal_participation_ratio : Constants.ratio option;
     consensus_committee_size : int option;
     consensus_threshold : int option;
-    delegate_selection : Constants.delegate_selection option;
     max_slashing_period : int option;
     frozen_deposits_percentage : int option;
     double_baking_punishment : Tez.t option;
@@ -73,6 +73,7 @@ module Protocol_constants_overrides = struct
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
+    initial_seed : State_hash.t option option;
   }
 
   (** Shamefully copied from [Constants_repr.parametric_encoding] and adapted ([opt] instead of [req]). *)
@@ -107,14 +108,14 @@ module Protocol_constants_overrides = struct
                 c.delay_increment_per_round,
                 c.consensus_committee_size,
                 c.consensus_threshold ),
-              ( ( c.delegate_selection,
-                  c.minimal_participation_ratio,
+              ( ( c.minimal_participation_ratio,
                   c.max_slashing_period,
                   c.frozen_deposits_percentage,
                   c.double_baking_punishment,
                   c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                   c.chain_id,
-                  c.timestamp ),
+                  c.timestamp,
+                  c.initial_seed ),
                 (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
@@ -143,14 +144,14 @@ module Protocol_constants_overrides = struct
                    delay_increment_per_round,
                    consensus_committee_size,
                    consensus_threshold ),
-                 ( ( delegate_selection,
-                     minimal_participation_ratio,
+                 ( ( minimal_participation_ratio,
                      max_slashing_period,
                      frozen_deposits_percentage,
                      double_baking_punishment,
                      ratio_of_frozen_deposits_slashed_per_double_endorsement,
                      chain_id,
-                     timestamp ),
+                     timestamp,
+                     initial_seed ),
                    (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
         {
           preserved_cycles;
@@ -183,11 +184,11 @@ module Protocol_constants_overrides = struct
           frozen_deposits_percentage;
           consensus_committee_size;
           consensus_threshold;
-          delegate_selection;
           double_baking_punishment;
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
           chain_id;
           timestamp;
+          initial_seed;
           tx_rollup_enable;
           tx_rollup_origination_size;
         })
@@ -227,9 +228,6 @@ module Protocol_constants_overrides = struct
                (merge_objs
                   (obj8
                      (opt
-                        "delegate_selection"
-                        Constants.delegate_selection_encoding)
-                     (opt
                         "minimal_participation_ratio"
                         Constants.ratio_encoding)
                      (opt "max_slashing_period" int31)
@@ -239,7 +237,8 @@ module Protocol_constants_overrides = struct
                         "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                         Constants.ratio_encoding)
                      (opt "chain_id" Chain_id.encoding)
-                     (opt "initial_timestamp" Time.Protocol.encoding))
+                     (opt "initial_timestamp" Time.Protocol.encoding)
+                     (opt "initial_seed" (option State_hash.encoding)))
                   (obj2
                      (opt "tx_rollup_enable" Data_encoding.bool)
                      (opt "tx_rollup_origination_size" int31))))))
@@ -295,7 +294,6 @@ module Protocol_constants_overrides = struct
         consensus_committee_size = Some parametric.consensus_committee_size;
         (* mockup mode does not support endorsing commands *)
         consensus_threshold = Some 0;
-        delegate_selection = Some Random;
         max_slashing_period = Some parametric.max_slashing_period;
         frozen_deposits_percentage = Some parametric.frozen_deposits_percentage;
         double_baking_punishment = Some parametric.double_baking_punishment;
@@ -307,6 +305,7 @@ module Protocol_constants_overrides = struct
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
+        initial_seed = Some parametric.initial_seed;
       }
 
   let no_overrides : t =
@@ -341,7 +340,6 @@ module Protocol_constants_overrides = struct
       (* Let consensus threshold be overridable for Tenderbake mockup
          simulator tests. *)
       consensus_threshold = None;
-      delegate_selection = None;
       max_slashing_period = None;
       frozen_deposits_percentage = None;
       double_baking_punishment = None;
@@ -350,6 +348,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_origination_size = None;
       chain_id = None;
       timestamp = None;
+      initial_seed = None;
     }
 
   (** Existential wrapper to support heterogeneous lists/maps. *)
@@ -607,8 +606,7 @@ module Protocol_constants_overrides = struct
              o.consensus_committee_size;
          consensus_threshold =
            Option.value ~default:c.consensus_threshold o.consensus_threshold;
-         delegate_selection =
-           Option.value ~default:c.delegate_selection o.delegate_selection;
+         initial_seed = Option.value ~default:c.initial_seed o.initial_seed;
          preserved_cycles =
            Option.value ~default:c.preserved_cycles o.preserved_cycles;
          blocks_per_cycle =

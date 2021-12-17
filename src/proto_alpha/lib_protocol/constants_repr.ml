@@ -131,28 +131,6 @@ let fixed_encoding =
 
 let fixed = ()
 
-type delegate_selection =
-  | Random
-  | Round_robin_over of Signature.Public_key.t list list
-
-let delegate_selection_encoding =
-  let open Data_encoding in
-  union
-    [
-      case
-        (Tag 0)
-        ~title:"Random_delegate_selection"
-        (constant "random")
-        (function Random -> Some () | _ -> None)
-        (fun () -> Random);
-      case
-        (Tag 1)
-        ~title:"Round_robin_over_delegates"
-        (list (list Signature.Public_key.encoding))
-        (function Round_robin_over l -> Some l | _ -> None)
-        (fun l -> Round_robin_over l);
-    ]
-
 (* The encoded representation of this type is stored in the context as
    bytes. Changing the encoding, or the value of these constants from
    the previous protocol may break the context migration, or (even
@@ -193,7 +171,7 @@ type parametric = {
   frozen_deposits_percentage : int;
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
-  delegate_selection : delegate_selection;
+  initial_seed : State_hash.t option;
   tx_rollup_enable : bool;
   tx_rollup_origination_size : int;
 }
@@ -234,7 +212,7 @@ let parametric_encoding =
                 c.frozen_deposits_percentage,
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                c.delegate_selection ),
+                c.initial_seed ),
               (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
@@ -268,7 +246,7 @@ let parametric_encoding =
                    frozen_deposits_percentage,
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
-                   delegate_selection ),
+                   initial_seed ),
                  (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
       {
         preserved_cycles;
@@ -303,7 +281,7 @@ let parametric_encoding =
         frozen_deposits_percentage;
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
-        delegate_selection;
+        initial_seed;
         tx_rollup_enable;
         tx_rollup_origination_size;
       })
@@ -353,7 +331,7 @@ let parametric_encoding =
                    (req
                       "ratio_of_frozen_deposits_slashed_per_double_endorsement"
                       ratio_encoding)
-                   (dft "delegate_selection" delegate_selection_encoding Random))
+                   (opt "initial_seed" State_hash.encoding))
                 (obj2
                    (req "tx_rollup_enable" bool)
                    (req "tx_rollup_origination_size" int31))))))
