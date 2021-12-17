@@ -13,7 +13,7 @@ This page details the process of creating a new environment by copying the lates
 Bootstrap
 ---------
 
-The following steps are roughly the steps taken in the `V4 bootstrap MR <https://gitlab.com/tezos/tezos/-/merge_requests/3379>`__
+The following steps are roughly the steps taken in the `V5 bootstrap MR <https://gitlab.com/tezos/tezos/-/merge_requests/4071>`__
 
 1. Copy the existing environment files:
 
@@ -35,11 +35,18 @@ The following steps are roughly the steps taken in the `V4 bootstrap MR <https:/
 
    * Copy ``src/lib_protocol_environment/environment_V<N-1>.ml[i]`` to ``src/lib_protocol_environment/environment_V<N>.ml[i]``
 
-   * Copy ``environment_protocol_T_V<N-1>.ml`` to ``environment_protocol_T_V<N>.ml``
+   * Change any reference from ``V<N-1>`` to ``V<N>`` in all those copied files the
 
-   * Change any reference from ``V<N-1>`` to ``V<N>`` in all those copied files
+5. If the protocol signature is expected to change then copy and adapt it otherwise leave it as is:
 
-5. Add references to the new environment version number in the rest of the code:
+   ``Environment_protocol_T_V<X>`` is the current protocol signature and ``<X>`` is equal to the environment version that introduce it.
+
+   * Copy ``src/lib_protocol_environment/environment_protocol_T_V<X>.ml`` to ``src/lib_protocol_environment/environment_protocol_T_V<N>.ml``
+
+   * Change ``Environment_protocol_T_V<X>`` to ``Environment_protocol_T_V<N>`` in ``src/lib_protocol_environment/environment_V<N>.ml``
+
+
+6. Add references to the new environment version number in the rest of the code:
 
    * Add references to ``src/lib_base/protocol.ml[i]``
 
@@ -84,9 +91,11 @@ How to activate
 To activate the environment you will need to change the following files, adding references to ``V<N>`` to match the references to ``V<N-1>``:
 
 * ``src/lib_protocol_environment/tezos_protocol_environment.ml[i]``
+* ``src/lib_protocol_environment/dune``
 * ``src/lib_protocol_updater/registered_protocol.ml[i]``
 * ``src/lib_protocol_compiler/registerer.ml[i]``
 * ``src/lib_protocol_compiler/embedded_cmis.mli``
+* ``src/lib_protocol_compiler/compiler.ml``
 * ``src/lib_protocol_compiler/dune``
 
 And finally, bump environment version in ``src/proto_alpha/lib_protocol/dune.inc`` and ``src/proto_alpha/lib_protocol/TEZOS_PROTOCOL``.
