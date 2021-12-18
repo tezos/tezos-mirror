@@ -154,6 +154,8 @@ local prometheus = grafana.prometheus;
     local proposals = 'Proposals';
     local seed_nonce_revelation = 'Seed nonce revelation';
     local reveal = 'Reveal';
+    local register_global_constant = 'Register global constant';
+    local set_deposits_limit = 'Set deposits limit';
     graphPanel.new(
       title='Head operations',
       datasource='Prometheus',
@@ -220,6 +222,16 @@ local prometheus = grafana.prometheus;
       prometheus.target(
         'tezos_metrics_chain_head_double_endorsement_evidence',
         legendFormat=double_endorsement_evidence,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_register_global_constant',
+        legendFormat=register_global_constant,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_set_deposits_limit',
+        legendFormat=set_deposits_limit,
       )
     ),
 
