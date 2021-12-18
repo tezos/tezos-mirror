@@ -128,6 +128,40 @@ local prometheus = grafana.prometheus;
       )
     ),
 
+  gasConsumedHistory:
+    local blocks = 'Gas consumed';
+    graphPanel.new(
+      title='Gas consumed history',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      aliasColors={
+        [blocks]: 'light-green',
+      },
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_current_gas_consumed',
+        legendFormat=blocks,
+      )
+    ),
+
+  priorityHistory:
+    local blocks = 'Priority';
+    graphPanel.new(
+      title='Priority history',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      aliasColors={
+        [blocks]: 'light-green',
+      },
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_current_priority',
+        legendFormat=blocks,
+      )
+    ),
+
   blocksPerSecond:
     heatmapPanel.new(
       title='Blocks per second',
