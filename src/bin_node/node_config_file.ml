@@ -124,41 +124,6 @@ let blockchain_network_mainnet =
       ]
     ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
-let blockchain_network_granadanet =
-  make_blockchain_network
-    ~alias:"granadanet"
-    {
-      time = Time.Protocol.of_notation_exn "2021-05-21T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisd4299hBGVoU";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_GRANADANET_2021-05-21T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(4095l, "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV")]
-    ~default_bootstrap_peers:
-      [
-        "granadanet.smartpy.io";
-        "granadanet.tezos.co.il";
-        "granadanet.kaml.fr";
-        "granadanet.tznode.net";
-      ]
-
 let blockchain_network_hangzhounet =
   make_blockchain_network
     ~alias:"hangzhounet"
@@ -193,6 +158,41 @@ let blockchain_network_hangzhounet =
         "hangzhounet.smartpy.io";
         "hangzhounet.tezos.co.il";
         "hangzhounet.boot.tez.ie";
+      ]
+
+let blockchain_network_ithacanet =
+  make_blockchain_network
+    ~alias:"ithacanet"
+    {
+      time = Time.Protocol.of_notation_exn "2021-12-22T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis39287dcHsWn";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_ITHACANET_2021-12-22T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(8191l, "PsiThaCaT47Zboaw71QWScM8sXeMM7bbQFncK9FLqYc6EKdpjVP")]
+    ~default_bootstrap_peers:
+      [
+        "ithacanet.teztnets.xyz";
+        "ithacanet.smartpy.io";
+        "ithacanet.kaml.fr";
+        "ithacanet.boot.ecadinfra.com";
       ]
 
 let blockchain_network_sandbox =
@@ -293,8 +293,8 @@ let builtin_blockchain_networks_with_tags =
   [
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (15, blockchain_network_granadanet);
     (16, blockchain_network_hangzhounet);
+    (17, blockchain_network_ithacanet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with

@@ -42,9 +42,25 @@ Hangzhounet
 - Run Docker image: ``wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
 Hangzhounet is a test network running the ``PtHangz2`` protocol.
-Hangzhounet will run until Hangzhou is rejected or replaced by another protocol on Mainnet.
+Hangzhounet will run until Hangzhou is replaced by another protocol on Mainnet.
 
 On Hangzhounet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
+
+Ithacanet
+===========
+
+- Built-in network alias: ``ithacanet`` (see :ref:`builtin_networks`)
+
+  * Available from version 12.0~rc1.
+
+- Run Docker image: ``wget -O ithacanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Ithacanet is a test network running the Ithaca protocol.
+Ithacanet will run until Ithaca is rejected or replaced by another protocol on Mainnet.
+
+On Ithacanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
