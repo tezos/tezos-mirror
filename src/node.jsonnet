@@ -180,6 +180,7 @@ local prometheus = grafana.prometheus;
   headOperations:
     local transaction = 'Transaction';
     local endorsement = 'Endorsement';
+    local preendorsement = 'Preendorsement';
     local double_baking_evidence = 'Double baking evidence';
     local delegation = 'Delegation';
     local ballot = 'Ballot';
@@ -214,8 +215,13 @@ local prometheus = grafana.prometheus;
       )
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_head_endorsement_with_slot',
+        'tezos_metrics_chain_head_endorsement',
         legendFormat=endorsement,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_preendorsement',
+        legendFormat=preendorsement,
       )
     ).addTarget(
       prometheus.target(
