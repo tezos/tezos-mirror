@@ -56,7 +56,7 @@ dashboard.new(
 
     node.headOperations { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.invalidBlocksHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
 
-    node.gasConsumedHistory { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.priorityHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
+    node.gasConsumedHistory { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.roundHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
 
     //#######
     row.new(

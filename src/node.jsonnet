@@ -140,15 +140,15 @@ local prometheus = grafana.prometheus;
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_gas_consumed',
+        'tezos_metrics_chain_metadata_consumed_gas',
         legendFormat=blocks,
       )
     ),
 
-  priorityHistory:
-    local blocks = 'Priority';
+  roundHistory:
+    local blocks = 'Round';
     graphPanel.new(
-      title='Priority history',
+      title='Round history',
       datasource='Prometheus',
       linewidth=1,
       format='none',
@@ -157,7 +157,7 @@ local prometheus = grafana.prometheus;
       },
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_current_priority',
+        'tezos_metrics_chain_header_round',
         legendFormat=blocks,
       )
     ),
