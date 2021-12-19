@@ -79,9 +79,6 @@
             ; If you modify this file around here, modify src/bin_proxy_server/dune too! ;
             ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-  (select void_for_linking-tezos-baking-010-PtGRANAD-commands-registration from
-   (tezos-baking-010-PtGRANAD-commands.registration -> void_for_linking-tezos-baking-010-PtGRANAD-commands-registration.empty)
-   (-> void_for_linking-tezos-baking-010-PtGRANAD-commands-registration.empty))
   (select void_for_linking-tezos-baking-011-PtHangz2-commands-registration from
    (tezos-baking-011-PtHangz2-commands.registration -> void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty)
    (-> void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty))
@@ -144,7 +141,6 @@
    (write-file void_for_linking-tezos-client-011-PtHangz2-commands-registration.empty "")
    (write-file void_for_linking-tezos-client-012-PsiThaCa-commands-registration.empty "")
    (write-file void_for_linking-tezos-client-alpha-commands-registration.empty "")
-   (write-file void_for_linking-tezos-baking-010-PtGRANAD-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-012-PsiThaCa-commands-registration.empty "")
    (write-file void_for_linking-tezos-baking-alpha-commands-registration.empty "")

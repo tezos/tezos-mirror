@@ -38,7 +38,6 @@ depopts: [
   "tezos-client-alpha-commands-registration"
   "tezos-baking-010-PtGRANAD-commands"
   "tezos-baking-011-PtHangz2-commands"
-  "tezos-baking-012-PsiThaCa-commands"
   "tezos-baking-alpha-commands"
   "tezos-protocol-plugin-007-PsDELPH1"
   "tezos-protocol-plugin-008-PtEdo2Zk"
