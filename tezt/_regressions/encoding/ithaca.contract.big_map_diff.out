@@ -1,0 +1,70 @@
+tezt/_regressions/encoding/ithaca.contract.big_map_diff.out
+
+./tezos-codec encode 012-PsiThaCa.contract.big_map_diff from '[
+  {
+    "action": "alloc",
+    "big_map": "0",
+    "key_type": [
+      {
+        "prim": "nat"
+      }
+    ],
+    "value_type": [
+      {
+        "prim": "unit"
+      }
+    ]
+  }
+]'
+000000100300020000000203620200000002036c
+
+./tezos-codec decode 012-PsiThaCa.contract.big_map_diff from 000000100300020000000203620200000002036c
+[ { "action": "alloc", "big_map": "0", "key_type": [ { "prim": "nat" } ],
+    "value_type": [ { "prim": "unit" } ] } ]
+
+./tezos-codec encode 012-PsiThaCa.contract.big_map_diff from '[
+  {
+    "action": "copy",
+    "source_big_map": "0",
+    "destination_big_map": "1"
+  }
+]'
+00000003020001
+
+./tezos-codec decode 012-PsiThaCa.contract.big_map_diff from 00000003020001
+[ { "action": "copy", "source_big_map": "0", "destination_big_map": "1" } ]
+
+./tezos-codec encode 012-PsiThaCa.contract.big_map_diff from '[
+  {
+    "action": "remove",
+    "big_map": "0"
+  }
+]'
+000000020100
+
+./tezos-codec decode 012-PsiThaCa.contract.big_map_diff from 000000020100
+[ { "action": "remove", "big_map": "0" } ]
+
+./tezos-codec encode 012-PsiThaCa.contract.big_map_diff from '[
+  {
+    "action": "update",
+    "big_map": "0",
+    "key_hash": "exprv6UsC1sN3Fk2XfgcJCL8NCerP5rCGy1PRESZAqr7L2JdzX55EN",
+    "key": [
+      {
+        "int": "1"
+      }
+    ],
+    "value": [
+      {
+        "prim": "UNIT"
+      }
+    ]
+  }
+]'
+000000310000cffedbaf00cb581448a5683abdefe0d5cd4d4ba4923f1a489791810c3fec332502000000020001ff0200000002034f
+
+./tezos-codec decode 012-PsiThaCa.contract.big_map_diff from 000000310000cffedbaf00cb581448a5683abdefe0d5cd4d4ba4923f1a489791810c3fec332502000000020001ff0200000002034f
+[ { "action": "update", "big_map": "0",
+    "key_hash": "exprv6UsC1sN3Fk2XfgcJCL8NCerP5rCGy1PRESZAqr7L2JdzX55EN",
+    "key": [ { "int": "1" } ], "value": [ { "prim": "UNIT" } ] } ]

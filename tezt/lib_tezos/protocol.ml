@@ -25,22 +25,22 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Granada | Hangzhou | Alpha
+type t = Hangzhou | Ithaca | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
 let name = function
   | Alpha -> "Alpha"
-  | Granada -> "Granada"
   | Hangzhou -> "Hangzhou"
+  | Ithaca -> "Ithaca"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
   | Hangzhou -> "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+  | Ithaca -> "PsiThaCaT47Zboaw71QWScM8sXeMM7bbQFncK9FLqYc6EKdpjVP"
 
 let default_constants = Constants_sandbox
 
@@ -54,15 +54,15 @@ let parameter_file ?(constants = default_constants) protocol =
   let directory =
     match protocol with
     | Alpha -> "proto_alpha"
-    | Granada -> "proto_010_PtGRANAD"
     | Hangzhou -> "proto_011_PtHangz2"
+    | Ithaca -> "proto_012_PsiThaCa"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
 let daemon_name = function
   | Alpha -> "alpha"
-  | Granada -> "010-PtGRANAD"
   | Hangzhou -> "011-PtHangz2"
+  | Ithaca -> "012-PsiThaCa"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -129,16 +129,16 @@ let write_parameter_file :
   Lwt.return overriden_parameters
 
 let next_protocol = function
-  | Granada -> Some Hangzhou
-  | Hangzhou -> Some Alpha
+  | Hangzhou -> Some Ithaca
+  | Ithaca -> None
   | Alpha -> None
 
 let previous_protocol = function
   | Alpha -> Some Hangzhou
-  | Hangzhou -> Some Granada
-  | Granada -> None
+  | Ithaca -> Some Hangzhou
+  | Hangzhou -> None
 
-let all = [Alpha; Granada; Hangzhou]
+let all = [Alpha; Hangzhou; Ithaca]
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)

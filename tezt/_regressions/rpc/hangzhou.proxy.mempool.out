@@ -1,11 +1,11 @@
 tezt/_regressions/rpc/hangzhou.proxy.mempool.out
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":10}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangz2.prefilter.outdated_endorsement"}]}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":4}],"signature":"[SIGNATURE]"}]
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangz2.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":2},"signature":"[SIGNATURE]"},"slot":1}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangz2.prefilter.outdated_endorsement"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangz2.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangz2.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"}]
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/pending_operations
 protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
@@ -14,9 +14,9 @@ protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrc
         "branch": "[BRANCH_HASH]",
         "contents":
           [ { "kind": "transaction",
-              "source": "[PUBLIC_KEY_HASH]", "fee": "402",
-              "counter": "1", "gas_limit": "1520", "storage_limit": "0",
-              "amount": "2000000",
+              "source": "[PUBLIC_KEY_HASH]",
+              "fee": "1000", "counter": "1", "gas_limit": "1040",
+              "storage_limit": "257", "amount": "1000000",
               "destination": "[PUBLIC_KEY_HASH]" } ],
         "signature":
           "[SIGNATURE]" } ],
@@ -26,9 +26,9 @@ protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrc
           "branch": "[BRANCH_HASH]",
           "contents":
             [ { "kind": "transaction",
-                "source": "[PUBLIC_KEY_HASH]",
-                "fee": "10", "counter": "1", "gas_limit": "1040",
-                "storage_limit": "0", "amount": "1000",
+                "source": "[PUBLIC_KEY_HASH]", "fee": "0",
+                "counter": "1", "gas_limit": "1040", "storage_limit": "257",
+                "amount": "1000000",
                 "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
@@ -47,7 +47,7 @@ protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrc
                     "operations": { "kind": "endorsement", "level": 2 },
                     "signature":
                       "[SIGNATURE]" },
-                "slot": 10 } ],
+                "slot": 1 } ],
           "signature":
             "[SIGNATURE]",
           "error":
@@ -60,8 +60,8 @@ protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrc
           "contents":
             [ { "kind": "transaction",
                 "source": "[PUBLIC_KEY_HASH]",
-                "fee": "402", "counter": "1", "gas_limit": "1520",
-                "storage_limit": "0", "amount": "2000000",
+                "fee": "1000", "counter": "1", "gas_limit": "1040",
+                "storage_limit": "257", "amount": "1000000",
                 "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
@@ -75,23 +75,21 @@ protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrc
         { "protocol": "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx",
           "branch": "[BRANCH_HASH]",
           "contents":
-            [ { "kind": "endorsement_with_slot",
-                "endorsement":
-                  { "branch":
-                      "[BRANCH_HASH]",
-                    "operations": { "kind": "endorsement", "level": 3 },
-                    "signature":
-                      "[SIGNATURE]" },
-                "slot": 4 } ],
+            [ { "kind": "transaction",
+                "source": "[PUBLIC_KEY_HASH]",
+                "fee": "1000", "counter": "5", "gas_limit": "1040",
+                "storage_limit": "257", "amount": "1000000",
+                "destination": "[PUBLIC_KEY_HASH]" } ],
           "signature":
             "[SIGNATURE]",
           "error":
             [ { "kind": "temporary",
-                "id": "proto.011-PtHangz2.prefilter.outdated_endorsement" } ] } ] ],
-  "unprocessed": [] }
+                "id": "proto.011-PtHangz2.contract.counter_in_the_future",
+                "contract": "[PUBLIC_KEY_HASH]",
+                "expected": "1", "found": "5" } ] } ] ], "unprocessed": [] }
 
 curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=true&outdated=true&branch_delayed=true&refused=true&branch_refused=true'
-[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"10","counter":"1","gas_limit":"1040","storage_limit":"0","amount":"1000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.011-PtHangz2.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"402","counter":"1","gas_limit":"1520","storage_limit":"0","amount":"2000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangz2.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"endorsement_with_slot","endorsement":{"branch":"[BRANCH_HASH]","operations":{"kind":"endorsement","level":3},"signature":"[SIGNATURE]"},"slot":4}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangz2.prefilter.outdated_endorsement"}]}]
+[{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]"},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"0","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"permanent","id":"proto.011-PtHangz2.prefilter.fees_too_low"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"1","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"branch","id":"proto.011-PtHangz2.contract.counter_in_the_past","contract":"[PUBLIC_KEY_HASH]","expected":"2","found":"1"}]},{"hash":"[OPERATION_HASH]","protocol":"PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx","branch":"[BRANCH_HASH]","contents":[{"kind":"transaction","source":"[PUBLIC_KEY_HASH]","fee":"1000","counter":"5","gas_limit":"1040","storage_limit":"257","amount":"1000000","destination":"[PUBLIC_KEY_HASH]"}],"signature":"[SIGNATURE]","error":[{"kind":"temporary","id":"proto.011-PtHangz2.contract.counter_in_the_future","contract":"[PUBLIC_KEY_HASH]","expected":"1","found":"5"}]}]
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/filter
 protocol of proxy unspecified, using the node's protocol: PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
@@ -279,7 +277,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -363,7 +361,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -455,7 +453,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -577,7 +575,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                           "$ref": "#/definitions/Signature"
                         },
                         "error": {
-                          "$ref": "#/definitions/error"
+                          "$ref": "#/definitions/error_opt"
                         }
                       },
                       "required": [
@@ -1266,7 +1264,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         }
                                       },
                                       {
-                                        "title": "Generic prim (any number of args with or without annot)",
+                                        "title": "Prim__generic",
+                                        "description": "Generic primitive (any number of args with or without annotations)",
                                         "type": "object",
                                         "properties": {
                                           "prim": {
@@ -1493,7 +1492,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     }
                                   },
                                   {
-                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
                                     "type": "object",
                                     "properties": {
                                       "prim": {
@@ -1586,7 +1586,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -1662,7 +1663,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -1740,8 +1742,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "title": "A nonce hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
-                      "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                      "error_opt": {
+                        "description": "An optional error-trace (None indicates no error). The full list of errors is available with the global RPC `GET errors`"
                       },
                       "fitness": {
                         "title": "Block fitness",
@@ -1802,7 +1804,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             }
                           },
                           {
-                            "title": "Generic prim (any number of args with or without annot)",
+                            "title": "Prim__generic",
+                            "description": "Generic primitive (any number of args with or without annotations)",
                             "type": "object",
                             "properties": {
                               "prim": {
@@ -3725,7 +3728,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             },
                             {
                               "kind": "dyn",
-                              "name": "error",
+                              "name": "error_opt",
                               "num_fields": 1,
                               "size": "Uint30"
                             },
@@ -3751,7 +3754,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -4985,7 +4988,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                         }
                                       },
                                       {
-                                        "title": "Generic prim (any number of args with or without annot)",
+                                        "title": "Prim__generic",
+                                        "description": "Generic primitive (any number of args with or without annotations)",
                                         "type": "object",
                                         "properties": {
                                           "prim": {
@@ -5212,7 +5216,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                     }
                                   },
                                   {
-                                    "title": "Generic prim (any number of args with or without annot)",
+                                    "title": "Prim__generic",
+                                    "description": "Generic primitive (any number of args with or without annotations)",
                                     "type": "object",
                                     "properties": {
                                       "prim": {
@@ -5305,7 +5310,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -5381,7 +5387,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                                 }
                               },
                               {
-                                "title": "Generic prim (any number of args with or without annot)",
+                                "title": "Prim__generic",
+                                "description": "Generic primitive (any number of args with or without annotations)",
                                 "type": "object",
                                 "properties": {
                                   "prim": {
@@ -5460,7 +5467,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                         "$ref": "#/definitions/unistring"
                       },
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       },
                       "fitness": {
                         "title": "Block fitness",
@@ -5521,7 +5528,8 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                             }
                           },
                           {
-                            "title": "Generic prim (any number of args with or without annot)",
+                            "title": "Prim__generic",
+                            "description": "Generic primitive (any number of args with or without annotations)",
                             "type": "object",
                             "properties": {
                               "prim": {
@@ -5652,7 +5660,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5760,7 +5768,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5854,7 +5862,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },
@@ -5979,7 +5987,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                     "$ref": "#/definitions/error",
                     "definitions": {
                       "error": {
-                        "description": "The full list of error is available with the global RPC `GET errors`"
+                        "description": "The full list of errors is available with the global RPC `GET errors`"
                       }
                     }
                   },

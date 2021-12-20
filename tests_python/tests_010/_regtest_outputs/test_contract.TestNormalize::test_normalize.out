@@ -1,8 +1,0 @@
-tests_010/test_contract.py::TestNormalize::test_normalize
-
-{ Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 }
-{ Pair 0 3 6 9 ; Pair 1 4 7 10 ; Pair 2 5 8 11 }
-{ { 0 ; 3 ; 6 ; 9 } ; { 1 ; 4 ; 7 ; 10 } ; { 2 ; 5 ; 8 ; 11 } }
-{ Pair 0 (Pair 3 (Pair 6 9)) ;
-  Pair 1 (Pair 4 (Pair 7 10)) ;
-  Pair 2 (Pair 5 (Pair 8 11)) }

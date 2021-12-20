@@ -417,10 +417,10 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
         ~some:(fun mempool_json -> ["--mempool"; mempool_json])
         mempool
     @ (match protocol with
-      | Some Alpha ->
+      | Some (Ithaca | Alpha) ->
           (* Only Alpha/Tenderbake supports this switch *)
           if ignore_node_mempool then ["--ignore-node-mempool"] else []
-      | None | Some (Granada | Hangzhou) -> [])
+      | None | Some Hangzhou -> [])
     @ (match force with None | Some false -> [] | Some true -> ["--force"])
     @ Option.fold ~none:[] ~some:(fun path -> ["--context"; path]) context_path
     )

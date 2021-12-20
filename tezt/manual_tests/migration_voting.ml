@@ -311,15 +311,15 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
   let blocks_per_commitment_alpha =
     JSON.(parameters_alpha |-> "blocks_per_commitment" |> as_int)
   in
-  let parameters_edo =
+  let parameters_hangzhou =
     JSON.parse_file
-    @@ Protocol.parameter_file ~constants:Constants_mainnet Protocol.Granada
+    @@ Protocol.parameter_file ~constants:Constants_mainnet Protocol.Hangzhou
   in
-  let blocks_per_cycle_edo =
-    JSON.(parameters_edo |-> "blocks_per_cycle" |> as_int)
+  let blocks_per_cycle_hangzhou =
+    JSON.(parameters_hangzhou |-> "blocks_per_cycle" |> as_int)
   in
-  let blocks_per_voting_period_edo =
-    JSON.(parameters_edo |-> "blocks_per_voting_period" |> as_int)
+  let blocks_per_voting_period_hangzhou =
+    JSON.(parameters_hangzhou |-> "blocks_per_voting_period" |> as_int)
   in
   let* voting_period_info =
     Client.rpc
@@ -355,10 +355,10 @@ let migration ?yes_node_path ?yes_wallet context protocol levels_till_migration
           (level + i)
           (if edo then "Edo" else "Alpha")
           (if edo_cycle then
-           blocks_per_cycle_edo - levels_till_migration + i - 2
+           blocks_per_cycle_hangzhou - levels_till_migration + i - 2
           else (i - 2 - levels_till_migration) mod blocks_per_cycle_alpha)
           (if edo then
-           blocks_per_voting_period_edo - levels_till_migration + i - 1
+           blocks_per_voting_period_hangzhou - levels_till_migration + i - 1
           else
             (i - 2 - levels_till_migration) mod blocks_per_voting_period_alpha)
           (if check_rpcs_flag then "*" else "") ;

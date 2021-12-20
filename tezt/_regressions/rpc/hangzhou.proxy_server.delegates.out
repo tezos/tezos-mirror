@@ -27,26 +27,26 @@ tezt/_regressions/rpc/hangzhou.proxy_server.delegates.out
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
 "4000000000000"
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
-false
-
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
-"0"
-
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
-[ "[PUBLIC_KEY_HASH]" ]
-
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance'
 "0"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance_by_cycle'
 []
 
-./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
-5
-
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
 "4000000000000"
+
+./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
+[ "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
+"0"
+
+./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
+false
+
+./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
+5
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
 500

@@ -6,10 +6,6 @@ DAEMON = constants.HANGZHOU_DAEMON
 PARAMETERS = constants.HANGZHOU_PARAMETERS
 FOLDER = constants.HANGZHOU_FOLDER
 
-PREV_HASH = constants.GRANADA
-PREV_DAEMON = constants.GRANADA_DAEMON
-PREV_PARAMETERS = constants.GRANADA_PARAMETERS
-
 
 def activate(
     client,

@@ -27,7 +27,7 @@
 
 open Tezos_base.TzPervasives
 
-type protocol = Florence | Granada | Hangzhou | Alpha
+type protocol = Florence | Granada | Hangzhou | Ithaca | Alpha
 
 (*
    dune exec scripts/yes-wallet/yes-wallet.exe
@@ -218,6 +218,37 @@ let get_delegates (proto : protocol) context
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
+  | Ithaca ->
+      let open Tezos_protocol_012_PsiThaCa.Protocol in
+      Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
+      >|= Environment.wrap_tzresult
+      >>=? fun (ctxt, _, _) ->
+      Alpha_context.Delegate.fold
+        ctxt
+        ~order:`Sorted
+        ~init:(ok [])
+        ~f:(fun pkh acc ->
+          Alpha_context.Delegate.pubkey ctxt pkh >|= Environment.wrap_tzresult
+          >>=? fun pk ->
+          acc >>?= fun acc ->
+          Alpha_context.Delegate.staking_balance ctxt pkh
+          >|= Environment.wrap_tzresult
+          >>=? fun staking_balance ->
+          (* Filter deactivated bakers if required *)
+          if active_bakers_only then
+            Alpha_context.Delegate.deactivated ctxt pkh
+            >|= Environment.wrap_tzresult
+            >>=? function
+            | true -> return acc
+            | false -> return ((pkh, pk, staking_balance) :: acc)
+          else return ((pkh, pk, staking_balance) :: acc))
+      >>=? fun delegates ->
+      return
+      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ (* By swapping x and y we do a descending sort *)
+      List.sort
+        (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
+        delegates
   | Alpha ->
       let open Tezos_protocol_alpha.Protocol in
       Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
@@ -259,6 +290,9 @@ let protocol_of_hash protocol_hash =
   else if
     Protocol_hash.equal protocol_hash Tezos_protocol_011_PtHangz2.Protocol.hash
   then Some Hangzhou
+  else if
+    Protocol_hash.equal protocol_hash Tezos_protocol_012_PsiThaCa.Protocol.hash
+  then Some Ithaca
   else if Protocol_hash.equal protocol_hash Tezos_protocol_alpha.Protocol.hash
   then Some Alpha
   else None

@@ -1,0 +1,19 @@
+tezt/_regressions/encoding/ithaca.gas.out
+
+./tezos-codec encode 012-PsiThaCa.gas from '"1238"'
+009613
+
+./tezos-codec decode 012-PsiThaCa.gas from 009613
+"1238"
+
+./tezos-codec encode 012-PsiThaCa.gas from '"unaccounted"'
+01
+
+./tezos-codec decode 012-PsiThaCa.gas from 01
+"unaccounted"
+
+./tezos-codec encode 012-PsiThaCa.gas from '"0"'
+0000
+
+./tezos-codec decode 012-PsiThaCa.gas from 0000
+"0"

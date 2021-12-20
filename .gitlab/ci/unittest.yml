@@ -55,15 +55,6 @@ test-script-gen-genesis:
   tags:
     - arm64
 
-unit:010_PtGRANAD:
-  extends:
-  - .unit_test_template_x86_64
-  - .template__coverage_files
-  variables:
-    MAKE_TARGETS: >
-      src/proto_010_PtGRANAD/lib_client.test_proto
-      src/proto_010_PtGRANAD/lib_protocol.test_proto
-
 unit:011_PtHangz2:
   extends:
   - .unit_test_template_x86_64
