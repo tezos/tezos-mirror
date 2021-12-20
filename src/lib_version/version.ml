@@ -45,6 +45,6 @@ let pp f {major; minor; additional_info} =
 
 let to_string x = Format.asprintf "%a" pp x
 
-let current = {major = 12; minor = 0; additional_info = Dev}
+let current = {major = 12; minor = 0; additional_info = RC 1}
 
 let current_string = to_string current
