@@ -153,7 +153,8 @@ module Context : sig
      which are necessary. *)
 
   type source_of_cache =
-    [ `Load
+    [ `Force_load  (** Force the cache domain to be reloaded from the context. *)
+    | `Load
       (** Load a cache by iterating over the keys of its domain and by
           building a cached value for each key. *)
     | `Lazy

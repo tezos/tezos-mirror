@@ -261,7 +261,7 @@ module Context = struct
   type block_cache = {context_hash : Context_hash.t; cache : cache}
 
   type source_of_cache =
-    [`Load | `Lazy | `Inherited of block_cache * Context_hash.t]
+    [`Force_load | `Load | `Lazy | `Inherited of block_cache * Context_hash.t]
 
   type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
@@ -548,16 +548,23 @@ module Context = struct
   let cache_cache : (Block_hash.t * cache) option ref = ref None
 
   let load_cache block_hash (Context ctxt) mode builder =
-    (match !cache_cache with
-    | Some (block_hash', cached_cache)
-      when Block_hash.equal block_hash block_hash' ->
-        return cached_cache
-    | _ ->
+    match mode with
+    | `Force_load ->
         cache_cache := None ;
-        load_cache (Context ctxt) mode builder >>=? fun cache ->
+        load_cache (Context ctxt) `Load builder >>=? fun cache ->
         cache_cache := Some (block_hash, cache) ;
-        return cache)
-    >>=? fun cache -> return (Context {ctxt with cache})
+        return (Context {ctxt with cache})
+    | (`Load | `Lazy | `Inherited _) as mode ->
+        (match !cache_cache with
+        | Some (block_hash', cached_cache)
+          when Block_hash.equal block_hash block_hash' ->
+            return cached_cache
+        | _ ->
+            cache_cache := None ;
+            load_cache (Context ctxt) mode builder >>=? fun cache ->
+            cache_cache := Some (block_hash, cache) ;
+            return cache)
+        >>=? fun cache -> return (Context {ctxt with cache})
 
   (* misc *)
 

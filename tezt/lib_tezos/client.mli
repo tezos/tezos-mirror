@@ -557,6 +557,9 @@ val submit_ballot :
 val spawn_submit_ballot :
   ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
+(* TODO: [amount] should be named [transferring] *)
+(* TODO: [src] should be named [from] and probably have type [Account.t] *)
+
 (** Run [tezos-client originate contract alias transferring amount from src
     running prg]. Returns the originated contract hash *)
 val originate_contract :
