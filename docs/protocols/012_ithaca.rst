@@ -47,34 +47,19 @@ It requires protocol environment V4, compared to V3 for Hangzhou.
 Tenderbake
 ----------
 
-- Tenderbake is a new consensus algorithm replacing Emmy* in order to provide deterministic finality. (MR :gl:`!3738`)
+- Tenderbake is a new consensus algorithm replacing Emmy* in order to provide
+  deterministic finality. (MRs :gl:`!3738`, :gl:`!3822`, :gl:`!3832`,
+  :gl:`!3811`, :gl:`!3850`, :gl:`!3906`, :gl:`!3977`, :gl:`!3987`)
 
 - The list of breaking changes related to Tenderbake are described in a separate :doc:`change log<tenderbake>`.
 
-- Further, related changes after the main MR has been merged:
-  
-  - Export participation RPC. (MR :gl:`!3822`)
+Precheck of operations
+----------------------
 
-  - Rename Bonds to Deposits. (MR :gl:`!3832`)
+- Expose `precheck_manager` and `check_manager_signature` (MR :gl:`!3872`)
 
-  - Fix issues related to token management in Tenderbake. (MR :gl:`!3811`)
+- Remove the gas block limit for prevalidator mode. (MR :gl:`!3802`)
 
-  - Inherit block times. (MR :gl:`!3850`)
-
-  - Address comments on Tenderbake. (MR :gl:`!3906`)
-
-  - Small updates to the ``../delegates/<pkh>/..`` RPCs. (MR :gl:`!3977`)
-
-- Fix issues with receipts (MR :gl:`!3987`)
-
-Tickets Hardening
------------------
-
-- Add ticket-balance storage module. (MR :gl:`!3495`)
-
-- Add API for scanning values for tickets. (MR :gl:`!3591`)
-
-- Add API for generating ticket-balance key hashes. (MR :gl:`!3788`)
 
 Michelson
 ---------
@@ -97,12 +82,14 @@ Michelson
   the value at the top is wrapped in ``Some`` again. If the value at the top of
   input stack is ``None``, the instruction does nothing. (MR :gl:`!3574`)
 
-Precheck of operations
-----------------------
+Tickets Hardening (ongoing)
+---------------------------
 
-- Expose `precheck_manager` and `check_manager_signature` (MR :gl:`!3872`)
+- Add ticket-balance storage module. (MR :gl:`!3495`)
 
-- Remove the gas block limit for prevalidator mode. (MR :gl:`!3802`)
+- Add API for scanning values for tickets. (MR :gl:`!3591`)
+
+- Add API for generating ticket-balance key hashes. (MR :gl:`!3788`)
 
 Bug Fixes
 ---------
