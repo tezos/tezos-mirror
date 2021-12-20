@@ -294,26 +294,15 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                     let* (module Proto) =
                       Registered_protocol.get_result protocol
                     in
-                    let exp =
-                      Data_encoding.Binary.of_bytes_exn
-                        Proto.block_header_metadata_encoding
-                        expected_block_receipt
-                    in
-                    let got =
-                      Data_encoding.Binary.of_bytes_exn
-                        Proto.block_header_metadata_encoding
-                        result.block_metadata
-                    in
-                    let exp =
+                    let to_json block =
                       Data_encoding.Json.construct
                         Proto.block_header_metadata_encoding
-                        exp
+                      @@ Data_encoding.Binary.of_bytes_exn
+                           Proto.block_header_metadata_encoding
+                           block
                     in
-                    let got =
-                      Data_encoding.Json.construct
-                        Proto.block_header_metadata_encoding
-                        got
-                    in
+                    let exp = to_json expected_block_receipt in
+                    let got = to_json result.block_metadata in
                     let*! () =
                       Event.(emit inconsistent_block_receipt) (exp, got)
                     in
@@ -337,37 +326,25 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                           let* (module Proto) =
                             Registered_protocol.get_result protocol
                           in
-                          let exp =
-                            Data_encoding.Binary.of_bytes_exn
-                              Proto.operation_receipt_encoding
-                              exp
-                          in
-                          let got =
-                            Data_encoding.Binary.of_bytes_exn
-                              Proto.operation_receipt_encoding
-                              got
-                          in
                           let op =
                             operations
                             |> (fun l -> List.nth_opt l i)
-                            |> Option.value_f ~default:(fun () -> assert false)
+                            |> WithExceptions.Option.get ~loc:__LOC__
                             |> (fun l -> List.nth_opt l j)
-                            |> Option.value_f ~default:(fun () -> assert false)
-                            |> fun {proto; _} ->
-                            Data_encoding.Binary.of_bytes_exn
-                              Proto.operation_data_encoding
-                              proto
+                            |> WithExceptions.Option.get ~loc:__LOC__
+                            |> fun {proto; _} -> proto
                           in
-                          let exp =
+                          let to_json receipt =
                             Data_encoding.Json.construct
                               Proto.operation_data_and_receipt_encoding
-                              (op, exp)
+                              Data_encoding.Binary.
+                                ( of_bytes_exn Proto.operation_data_encoding op,
+                                  of_bytes_exn
+                                    Proto.operation_receipt_encoding
+                                    receipt )
                           in
-                          let got =
-                            Data_encoding.Json.construct
-                              Proto.operation_data_and_receipt_encoding
-                              (op, got)
-                          in
+                          let exp = to_json exp in
+                          let got = to_json got in
                           let*! () =
                             Event.(emit inconsistent_operation_receipt)
                               ((i, j), exp, got)

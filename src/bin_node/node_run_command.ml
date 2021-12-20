@@ -287,11 +287,12 @@ let init_node ?sandbox ?target ~identity ~singleprocess
     | (None, None) -> return_none
     | (Some parameters, None) ->
         return_some (parameters.context_key, parameters.values)
-    | (_, Some filename) -> (
-        let*! r = Lwt_utils_unix.Json.read_file filename in
-        match r with
-        | Error _err -> fail (Invalid_sandbox_file filename)
-        | Ok json -> return_some ("sandbox_parameter", json))
+    | (_, Some filename) ->
+        let* json =
+          trace (Invalid_sandbox_file filename)
+          @@ Lwt_utils_unix.Json.read_file filename
+        in
+        return_some ("sandbox_parameter", json)
   in
   let genesis = config.blockchain_network.genesis in
   let patch_context =
@@ -400,8 +401,8 @@ let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port
 
 let init_rpc (config : Node_config_file.t) node =
   let open Lwt_tzresult_syntax in
-  List.fold_right_es
-    (fun addr acc ->
+  List.concat_map_es
+    (fun addr ->
       let* addrs = Node_config_file.resolve_rpc_listening_addrs addr in
       match addrs with
       | [] -> failwith "Cannot resolve listening address: %S" addr
@@ -409,14 +410,10 @@ let init_rpc (config : Node_config_file.t) node =
           let*! acl_policy =
             RPC_server.Acl.resolve_domain_names config.rpc.acl
           in
-          List.fold_right_es
-            (fun x a ->
-              let* o = launch_rpc_server ~acl_policy config node x in
-              return (o :: a))
-            addrs
-            acc)
+          List.map_es
+            (fun addr -> launch_rpc_server ~acl_policy config node addr)
+            addrs)
     config.rpc.listen_addrs
-    []
 
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     ~prometheus_config (config : Node_config_file.t) =
@@ -504,11 +501,9 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
     in
     let* () =
       match sandbox with
-      | Some _ ->
-          if config.data_dir = Node_config_file.default_data_dir then
-            failwith "Cannot use default data directory while in sandbox mode"
-          else return_unit
-      | None -> return_unit
+      | Some _ when config.data_dir = Node_config_file.default_data_dir ->
+          failwith "Cannot use default data directory while in sandbox mode"
+      | _ -> return_unit
     in
     let* target =
       match target with

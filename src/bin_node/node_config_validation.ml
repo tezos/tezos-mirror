@@ -269,13 +269,10 @@ let validate_addr ?e_resolve ?e_parse ~field ~addr resolver =
   | Error _ as e -> Lwt.return e
 
 let validate_addr_opt ?e_resolve ?e_parse ~field ~addr resolver =
-  let open Lwt_result_syntax in
-  let+ o_addr =
-    Option.filter_map_es
-      (fun addr -> validate_addr ?e_resolve ?e_parse ~field ~addr resolver)
-      addr
-  in
-  Option.to_list o_addr
+  let addr = Option.to_list addr in
+  List.filter_map_es
+    (fun addr -> validate_addr ?e_resolve ?e_parse ~field ~addr resolver)
+    addr
 
 let validate_rpc_listening_addrs (config : Node_config_file.t) =
   let aux addr =
