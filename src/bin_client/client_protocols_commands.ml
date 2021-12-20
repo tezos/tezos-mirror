@@ -68,8 +68,10 @@ let commands () =
             let* (_hash, proto) =
               Tezos_base_unix.Protocol_files.read_dir dirname
             in
-            let*! r = Shell_services.Injection.protocol cctxt proto in
-            match r with
+            let*! injection_result =
+              Shell_services.Injection.protocol cctxt proto
+            in
+            match injection_result with
             | Ok hash ->
                 let*! () =
                   cctxt#message
@@ -79,23 +81,17 @@ let commands () =
                 in
                 return_unit
             | Error err ->
-                let*! () =
-                  cctxt#error
-                    "Error while injecting protocol from %s: %a"
-                    dirname
-                    Error_monad.pp_print_trace
-                    err
-                in
-                return_unit)
+                cctxt#error
+                  "Error (error) while injecting protocol from %s: %a"
+                  dirname
+                  Error_monad.pp_print_trace
+                  err)
           (fun exn ->
-            let*! () =
-              cctxt#error
-                "Error while injecting protocol from %s: %a"
-                dirname
-                Error_monad.pp_print_trace
-                [Error_monad.Exn exn]
-            in
-            return_unit));
+            cctxt#error
+              "Error (exn) while injecting protocol from %s: %a"
+              dirname
+              Error_monad.pp_print_trace
+              [Error_monad.Exn exn]));
     command
       ~group
       ~desc:"Dump a protocol from the node's record of protocol."
@@ -140,19 +136,22 @@ let commands () =
       @@ proto_param ~name:"protocol hash" ~desc:""
       @@ stop)
       (fun () hash (cctxt : #Client_context.full) ->
-        let*! r = Shell_services.Protocol.fetch cctxt hash in
-        let*! () =
-          match r with
-          | Ok () ->
+        let*! fetch_result = Shell_services.Protocol.fetch cctxt hash in
+        match fetch_result with
+        | Ok () ->
+            let*! () =
               cctxt#message
                 "Protocol %a successfully fetched."
                 Protocol_hash.pp_short
                 hash
-          | Error err ->
+            in
+            return_unit
+        | Error err ->
+            let*! () =
               cctxt#error
                 "Error while fetching protocol: %a"
                 Error_monad.pp_print_trace
                 err
-        in
-        return_unit);
+            in
+            return_unit);
   ]

@@ -42,11 +42,7 @@ type input = {
 }
 
 let no_service_at_valid_prefix (cctxt : #Client_context.full) =
-  let open Lwt_result_syntax in
-  let*! () =
-    cctxt#error "No service found at this URL (but this is a valid prefix)\n"
-  in
-  return_unit
+  cctxt#error "No service found at this URL (but this is a valid prefix)\n"
 
 (* generic JSON generation from a schema with callback for random or
    interactive filling *)
@@ -67,17 +63,17 @@ let fill_in ?(show_optionals = true) input schema =
           | Some (m, `Inclusive) -> int_of_float m
           | Some (m, `Exclusive) -> int_of_float m - 1
         in
-        let* i = input.int minimum maximum title path in
-        Lwt.return (`Float (float i))
+        let+ i = input.int minimum maximum title path in
+        `Float (float i)
     | Number _ ->
-        let* f = input.float title path in
-        Lwt.return (`Float f)
+        let+ f = input.float title path in
+        `Float f
     | Boolean ->
-        let* f = input.bool title path in
-        Lwt.return (`Bool f)
+        let+ f = input.bool title path in
+        `Bool f
     | String _ ->
-        let* f = input.string title path in
-        Lwt.return (`String f)
+        let+ f = input.string title path in
+        `String f
     | Combine ((One_of | Any_of), elts) ->
         let nb = List.length elts in
         let* n =
@@ -126,8 +122,9 @@ let fill_in ?(show_optionals = true) input schema =
             else Lwt.return (json :: acc)
         in
         let max = Option.value specs.max_items ~default:max_int in
-        let* acc = fill_loop [] specs.min_items 0 max in
-        Lwt.return (`A (List.rev acc))
+        let+ a = fill_loop [] specs.min_items 0 max in
+        let a = List.rev a in
+        `A a
     | Any -> Lwt.fail Unsupported_construct
     | Dummy -> Lwt.fail Unsupported_construct
     | Null -> Lwt.return `Null
@@ -474,7 +471,8 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
                    %!"
           in
           let* answer = cctxt#generic_media_type_call meth ?body uri in
-          Lwt_result.ok @@ display_answer cctxt answer
+          let*! () = display_answer cctxt answer in
+          return_unit
       | Some {input = Some input; _} -> (
           let*! r =
             match body with
@@ -485,7 +483,8 @@ let call ?body meth raw_url (cctxt : #Client_context.full) =
           | Error msg -> cctxt#error "%s" msg
           | Ok body ->
               let* answer = cctxt#generic_media_type_call meth ~body uri in
-              Lwt_result.ok @@ display_answer cctxt answer))
+              let*! () = display_answer cctxt answer in
+              return_unit))
   | _ -> cctxt#error "No service found at this URL\n%!"
 
 let call_with_json meth raw_url json (cctxt : #Client_context.full) =
@@ -503,8 +502,7 @@ let call_with_file_or_json meth url maybe_file (cctxt : #Client_context.full) =
     | ["file"; filename] ->
         Lwt.catch
           (fun () ->
-            let*! content = Lwt_io.(with_file ~mode:Input filename read) in
-            return content)
+            Lwt_result.ok @@ Lwt_io.(with_file ~mode:Input filename read))
           (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
     | _ -> return maybe_file
   in
