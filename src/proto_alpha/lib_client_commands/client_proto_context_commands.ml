@@ -600,7 +600,8 @@ let transfer_command amount source destination cctxt
       force_low_fee,
       fee_cap,
       burn_cap,
-      entrypoint ) =
+      entrypoint,
+      replace_by_fees ) =
   let fee_parameter =
     {
       Injection.minimal_fees;
@@ -660,6 +661,7 @@ let transfer_command amount source destination cctxt
         ?gas_limit
         ?storage_limit
         ?counter
+        ~replace_by_fees
         ())
   >>= report_michelson_errors
         ~no_print_source
@@ -1070,7 +1072,7 @@ let commands_rw () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args16
+      (args17
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1086,7 +1088,8 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg
-         default_entrypoint_arg)
+         default_entrypoint_arg
+         replace_by_fees_arg)
       (prefixes ["multiple"; "transfers"; "from"]
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -1118,7 +1121,8 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap,
-             entrypoint )
+             entrypoint,
+             replace_by_fees )
            (_, source)
            operations_json
            cctxt ->
@@ -1180,6 +1184,7 @@ let commands_rw () =
               ?counter
               ~src_pk
               ~src_sk
+              ~replace_by_fees
               ~fee_parameter
               contents
             >>= report_michelson_errors
@@ -1216,7 +1221,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args16
+      (args17
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1232,7 +1237,8 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg
-         entrypoint_arg)
+         entrypoint_arg
+         replace_by_fees_arg)
       (prefixes ["transfer"]
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
@@ -1259,7 +1265,8 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap,
-             entrypoint )
+             entrypoint,
+             replace_by_fees )
            amount
            (_, source)
            (_, destination)
@@ -1284,7 +1291,8 @@ let commands_rw () =
             force_low_fee,
             fee_cap,
             burn_cap,
-            entrypoint ));
+            entrypoint,
+            replace_by_fees ));
     command
       ~group
       ~desc:"Register a global constant"
@@ -1369,7 +1377,7 @@ let commands_rw () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args16
+      (args17
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1385,7 +1393,8 @@ let commands_rw () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg
-         entrypoint_arg)
+         entrypoint_arg
+         replace_by_fees_arg)
       (prefixes ["call"]
       @@ ContractAlias.destination_param
            ~name:"dst"
@@ -1410,7 +1419,8 @@ let commands_rw () =
              force_low_fee,
              fee_cap,
              burn_cap,
-             entrypoint )
+             entrypoint,
+             replace_by_fees )
            (_, destination)
            (_, source)
            cctxt ->
@@ -1435,7 +1445,8 @@ let commands_rw () =
             force_low_fee,
             fee_cap,
             burn_cap,
-            entrypoint ));
+            entrypoint,
+            replace_by_fees ));
     command
       ~group
       ~desc:"Reveal the public key of the contract manager."

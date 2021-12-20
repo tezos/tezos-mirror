@@ -449,6 +449,17 @@ let burn_cap_arg =
          | Some t -> return t
          | None -> failwith "Bad burn cap"))
 
+let replace_by_fees_arg =
+  switch
+    ~long:"replace"
+    ~doc:
+      "Replace an existing pending transaction from the same source, if any, \
+       with another one with higher fees. There are no guarantees that the \
+       first operation will not be included or that the second one will be. \
+       But, only one of the operations at most will end in a block (in \
+       precheck mode)."
+    ()
+
 let no_waiting_for_endorsements_arg =
   switch
     ~long:"no-waiting-for-late-endorsements"

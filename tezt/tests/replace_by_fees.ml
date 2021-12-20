@@ -44,6 +44,9 @@ open Tezt_tezos
    https://gitlab.com/tezos/tezos/-/merge_requests/3968#note_753442465 once
    helpers and checkers of manager_operations are refactored
 *)
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2275
+   Write tests for the Client part of replace-by-fees feature *)
 module Memchecks = Manager_operations.Memchecks
 module Helpers = Manager_operations.Helpers
 
