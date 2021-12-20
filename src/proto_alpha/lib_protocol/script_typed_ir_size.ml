@@ -739,3 +739,11 @@ let kinstr_size kinstr =
   (Nodes.add kinstr_nodes kinstr_extra_size_nodes, size)
 
 let value_size ty x = value_size ~count_lambda_nodes:true zero (L ty) x
+
+module Internal_for_tests = struct
+  let ty_size = ty_size
+
+  let comparable_ty_size = comparable_ty_size
+
+  let kinstr_size = kinstr_size
+end

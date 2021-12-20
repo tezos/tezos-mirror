@@ -249,7 +249,7 @@ module Tests = struct
           "ty_size"
           2
           (Printf.sprintf "type #%d `%s'" i (Printers.string_of_ty ty))
-          (snd (Script_typed_ir_size.ty_size ty))
+          (snd (Script_typed_ir_size.Internal_for_tests.ty_size ty))
           ty
     | exception _ -> return ()
 
@@ -271,7 +271,7 @@ module Tests = struct
              "comparable type #%d `%s'"
              i
              (Printers.string_of_comparable_ty cty))
-          (snd (Script_typed_ir_size.comparable_ty_size cty))
+          (snd (Script_typed_ir_size.Internal_for_tests.comparable_ty_size cty))
           cty
     | exception _ -> return ()
 
@@ -350,7 +350,7 @@ module Tests = struct
       "lambda_size"
       3
       (Printf.sprintf "code #%d `%s'" i (Printers.string_of_code code))
-      (snd (Script_typed_ir_size.kinstr_size kinstr))
+      (snd (Script_typed_ir_size.Internal_for_tests.kinstr_size kinstr))
       kinstr
 
   let check_lambda_size_stats () =
