@@ -161,8 +161,36 @@ let alias_pkh_pk_list =
       "p2pk67uapBxwkM1JNasGJ6J3rozzYELgrtcqxKZwZLjvsr4XcAr4FqC" );
   ]
 
+(** Assuming that the [keys_list] is sorted in descending order, the
+    function extracts the first keys until reaching the limit of
+    [total_stake] by a percentage of [share]. *)
+let filter_up_to_staking_share share total_stake to_mutez keys_list =
+  let total_stake = to_mutez total_stake in
+  match share with
+  | None -> List.map (fun (pkh, pk, _) -> (pkh, pk)) keys_list
+  | Some share ->
+      let staking_amount_limit =
+        Int64.add (Int64.mul (Int64.div total_stake 100L) share) 100L
+      in
+      Format.printf
+        "@[<v>@[<h>Total staking amount:@;<7 0>%Ld mutez@]@,"
+        total_stake ;
+      Format.printf
+        "@[Staking amount limit (%Ld%%): ~%Ld mutez@]@]@."
+        share
+        staking_amount_limit ;
+      let rec loop ((keys_acc, stb_acc) as acc) = function
+        | [] -> acc
+        | (pkh, pk, stb) :: l ->
+            if Compare.Int64.(stb_acc > staking_amount_limit) then acc
+              (* Stop whenever the limit is exceeded. *)
+            else
+              loop ((pkh, pk) :: keys_acc, Int64.add (to_mutez stb) stb_acc) l
+      in
+      loop ([], 0L) keys_list |> fst |> List.rev
+
 let get_delegates (proto : protocol) context
-    (header : Block_header.shell_header) active_bakers_only =
+    (header : Block_header.shell_header) active_bakers_only staking_share_opt =
   let open Lwt_tzresult_syntax in
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
@@ -264,16 +292,24 @@ let get_delegates (proto : protocol) context
         in
         Lwt.return @@ Environment.wrap_tzresult r
       in
-      let* delegates =
-        Alpha_context.Delegate.fold ctxt ~init:(Ok []) ~f:(fun pkh acc ->
+      (* Loop on delegates to extract keys and compute the total stake. *)
+      let* (delegates, total_stake) =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~init:(Ok ([], Alpha_context.Tez.zero))
+          ~f:(fun pkh acc ->
             let* pk =
               let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
             in
-            let*? acc = acc in
+            let*? (key_list_acc, staking_balance_acc) = acc in
             let* staking_balance =
               let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
               Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? updated_staking_balance_acc =
+              Alpha_context.Tez.(staking_balance_acc +? staking_balance)
+              |> Environment.wrap_tzresult
             in
             (* Filter deactivated bakers if required *)
             if active_bakers_only then
@@ -282,12 +318,23 @@ let get_delegates (proto : protocol) context
                 Lwt.return @@ Environment.wrap_tzresult r
               in
               match b with
-              | true -> return acc
-              | false -> return ((pkh, pk, staking_balance) :: acc)
-            else return ((pkh, pk, staking_balance) :: acc))
+              (* Ignore the baker. *)
+              | true -> return (key_list_acc, staking_balance_acc)
+              (* Consider the baker. *)
+              | false ->
+                  return
+                    ( (pkh, pk, staking_balance) :: key_list_acc,
+                      updated_staking_balance_acc )
+            else
+              return
+                ( (pkh, pk, staking_balance) :: key_list_acc,
+                  updated_staking_balance_acc ))
       in
       return
-      @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
+      @@ filter_up_to_staking_share
+           staking_share_opt
+           total_stake
+           Alpha_context.Tez.to_mutez
       @@ (* By swapping x and y we do a descending sort *)
       List.sort
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
@@ -398,7 +445,8 @@ let protocol_of_hash protocol_hash =
     if [active_bakers_only] then the deactivated delegates are filtered out of
     the list.
 *)
-let load_mainnet_bakers_public_keys base_dir active_bakers_only =
+let load_mainnet_bakers_public_keys base_dir active_bakers_only
+    staking_share_opt =
   let open Lwt_tzresult_syntax in
   let open Tezos_store in
   let mainnet_genesis =
@@ -423,7 +471,7 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only =
   let main_chain_store = Store.main_chain_store store in
   let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
   Format.printf
-    "Head block found and loaded (%a)@."
+    "@[<h>Head block:@;<17 0>%a@]@."
     Block_hash.pp
     (Tezos_store.Store.Block.hash block) ;
   let header = Store.Block.header block in
@@ -437,8 +485,16 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only =
     match protocol_of_hash protocol_hash with
     | None -> Error_monad.failwith "unknown protocol hash"
     | Some protocol ->
-        Format.printf "Protocol %a detected@." pp_protocol protocol ;
-        get_delegates protocol context header active_bakers_only
+        Format.printf
+          "@[<h>Detected protocol:@;<10 0>%a@]@."
+          pp_protocol
+          protocol ;
+        get_delegates
+          protocol
+          context
+          header
+          active_bakers_only
+          staking_share_opt
   in
   let*! () = Tezos_store.Store.close_store store in
   return
@@ -459,9 +515,14 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only =
          (alias, pkh, pk))
        delegates
 
-let load_mainnet_bakers_public_keys base_dir active_bakers_only =
+let load_mainnet_bakers_public_keys base_dir active_bakers_only
+    staking_share_opt =
   match
-    Lwt_main.run (load_mainnet_bakers_public_keys base_dir active_bakers_only)
+    Lwt_main.run
+      (load_mainnet_bakers_public_keys
+         base_dir
+         active_bakers_only
+         staking_share_opt)
   with
   | Ok alias_pkh_pk_list -> alias_pkh_pk_list
   | Error trace ->

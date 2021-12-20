@@ -121,6 +121,8 @@ let active_bakers_only_opt_name = "--active-bakers-only"
 
 let force_opt_name = "--force"
 
+let staking_share_opt_name = "--staking-share"
+
 let force = ref false
 
 let confirm_rewrite wallet =
@@ -134,51 +136,72 @@ let confirm_rewrite wallet =
   String.uppercase_ascii (read_line ()) = "Y"
 
 let usage () =
-  Format.printf "> convert wallet <source-wallet-dir> in <yes-wallet-dir>@." ;
   Format.printf
-    "    creates a yes-wallet in <yes-wallet-dir> with the public keys from \
-     <source-wallet-dir>@." ;
-  Format.printf "> convert wallet <wallet-dir> inplace@." ;
-  Format.printf
-    "    same as above but overwrite th file in the directory <wallet-dir>@." ;
-  Format.printf "> create minimal in <yes_wallet_dir>@." ;
-  Format.printf
-    "    creates a yes-wallet with the foundation baker keys in \
-     <yes_wallet_dir>@." ;
-  Format.printf
-    "> create from context <base_dir> in <yes_wallet_dir> [%s]@."
-    active_bakers_only_opt_name ;
-  Format.printf
-    "    creates a yes-wallet with all delegates in the head block of the \
-     context in <base_dir> and store it in <yes_wallet_dir>@." ;
-  Format.printf
-    "    if %s is used the deactivated bakers are filtered out@."
-    active_bakers_only_opt_name ;
-  Format.printf
-    "if %s is used existing files will be overwritten@."
+    "@[<v>@[<v 4>> convert wallet <source-wallet-dir> in <yes-wallet-dir>@,\
+     creates a yes-wallet in <yes-wallet-dir> with the public keys from \
+     <source-wallet-dir>@]@,\
+     @[<v>@[<v 4>> convert wallet <wallet-dir> inplace@,\
+     same as above but overwrite the file in the directory <wallet-dir>@]@,\
+     @[<v>@[<v 4>> create minimal in <yes_wallet_dir>@,\
+     creates a yes-wallet with the foundation baker keys in <yes_wallet_dir>@]@,\
+     @[<v 4>> create from context <base_dir> in <yes_wallet_dir> [%s] [%s \
+     <NUM>]@,\
+     creates a yes-wallet with all delegates in the head block of the context \
+     in <base_dir> and store it in <yes_wallet_dir>@,\
+     if %s is used the deactivated bakers are filtered out@,\
+     if %s <NUM> is used, the first largest bakers that have an accumulated \
+     stake of at least <NUM> percent of the total stake are kept@]@]@,\
+     @[<v>if %s is used existing files will be overwritten@]@."
+    active_bakers_only_opt_name
+    staking_share_opt_name
+    active_bakers_only_opt_name
+    staking_share_opt_name
     force_opt_name
 
 let () =
   let argv = Array.to_list Sys.argv in
+  let staking_share_opt =
+    let rec aux argv =
+      match argv with
+      | [] -> None
+      | "--staking-share" :: percentage :: _ ->
+          let percentage = Int64.of_string percentage in
+          assert (0L < percentage && percentage < 100L) ;
+          Some percentage
+      | _ :: argv' -> aux argv'
+    in
+    aux argv
+  in
   let (options, argv) =
     List.partition
-      (fun arg -> String.length arg > 0 && String.get arg 0 = '-')
+      (fun arg ->
+        (String.length arg > 0 && String.get arg 0 = '-')
+        || Str.string_match (Str.regexp "[0-9]+") arg 0)
       argv
   in
   let active_bakers_only =
     List.exists (fun opt -> opt = active_bakers_only_opt_name) options
   in
   force := List.exists (fun opt -> opt = force_opt_name) options ;
-  let unknonw_options =
-    List.filter
-      (fun opt -> opt <> active_bakers_only_opt_name && opt <> force_opt_name)
-      options
+  let unknown_options =
+    let rec filter args =
+      match args with
+      | [] -> []
+      | opt :: t when opt = active_bakers_only_opt_name -> filter t
+      | opt :: t when opt = force_opt_name -> filter t
+      | opt :: num :: t
+        when opt = staking_share_opt_name
+             && Str.string_match (Str.regexp "[0-9]+") num 0 ->
+          filter t
+      | h :: t -> h :: filter t
+    in
+    filter options
   in
-  if unknonw_options <> [] then
+  if unknown_options <> [] then
     Format.eprintf
       "Warning: unknown options %a@."
       (Format.pp_print_list Format.pp_print_string)
-      unknonw_options ;
+      unknown_options ;
   match argv with
   | [] -> assert false
   | [_] ->
@@ -200,9 +223,13 @@ let () =
         Yes_wallet_lib.load_mainnet_bakers_public_keys
           base_dir
           active_bakers_only
+          staking_share_opt
       in
+      Format.printf
+        "@[<h>Number of keys to export:@;<3 0>%d@]@."
+        (List.length alias_pkh_pk_list) ;
       if populate_wallet ~replace:!force yes_wallet_dir alias_pkh_pk_list then
-        Format.printf "Created wallet in %s@." yes_wallet_dir
+        Format.printf "@[<h>Exported path:@;<14 0>%s@]@." yes_wallet_dir
   | [_; "convert"; "wallet"; base_dir; "in"; target_dir] ->
       convert_wallet ~replace:!force base_dir target_dir ;
       Format.printf
