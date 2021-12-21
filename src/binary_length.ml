@@ -78,7 +78,8 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Array (Some max_length, _e) when Array.length value > max_length ->
       raise (Write_error Array_too_long)
   | Array (_, e) -> Array.fold_left (fun acc v -> length e v + acc) 0 value
-  | List (Some max_length, _e) when List.length value > max_length ->
+  | List (Some max_length, _e)
+    when List.compare_length_with value max_length > 0 ->
       raise (Write_error List_too_long)
   | List (_, e) -> List.fold_left (fun acc v -> length e v + acc) 0 value
   | Objs {kind = `Variable; left; right} ->
