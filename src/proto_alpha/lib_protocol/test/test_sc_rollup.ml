@@ -33,6 +33,10 @@
 open Protocol
 open Alpha_context
 
+exception Sc_rollup_test_error of string
+
+let err x = Exn (Sc_rollup_test_error x)
+
 (** [test_disable_feature_flag ()] tries to originate a smart contract
    rollup with the feature flag is deactivated and checks that it
    fails. *)
@@ -56,10 +60,44 @@ let test_disable_feature_flag () =
   in
   Incremental.add_operation ~expect_failure i op >>= fun _i -> return_unit
 
+(** [test_sc_rollups_all_well_defined] checks that [Sc_rollups.all]
+    contains all the constructors of [Sc_rollup.Kind.t] and that
+    the [kind_of_string] is consistent with the names declared in
+    the PVM implementations. *)
+let test_sc_rollups_all_well_defined () =
+  let all_contains_all_constructors () =
+    let tickets = ref ["Example_arith"] in
+    let burn x = tickets := List.filter (( <> ) x) !tickets in
+    let pick = function
+      | Sc_rollup.Kind.Example_arith -> burn "Example_arith"
+    in
+    List.iter pick Sc_rollups.all ;
+    if !tickets <> [] then
+      failwith
+        "The following smart-contract rollup kinds should occur in \
+         [Sc_rollups.all]: %s\n"
+        (String.concat ", " !tickets)
+    else return_unit
+  in
+  let all_names_are_valid () =
+    List.iter_es
+      (fun k ->
+        let (module P : Sc_rollups.PVM.S) = Sc_rollups.of_kind k in
+        fail_unless
+          (Sc_rollups.kind_of_string P.name = Some k)
+          (err (Printf.sprintf "PVM name `%s' is not a valid kind name" P.name)))
+      Sc_rollups.all
+  in
+  all_contains_all_constructors () >>=? fun () -> all_names_are_valid ()
+
 let tests =
   [
     Tztest.tztest
       "check effect of disabled feature flag"
       `Quick
       test_disable_feature_flag;
+    Tztest.tztest
+      "check that all rollup kinds are correctly enumerated"
+      `Quick
+      test_sc_rollups_all_well_defined;
   ]
