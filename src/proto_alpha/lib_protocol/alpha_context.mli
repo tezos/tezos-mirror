@@ -760,6 +760,7 @@ module Constants : sig
     tx_rollup_enable : bool;
     tx_rollup_origination_size : int;
     sc_rollup_enable : bool;
+    sc_rollup_origination_size : int;
   }
 
   module Generated : sig
@@ -846,6 +847,8 @@ module Constants : sig
   val tx_rollup_origination_size : context -> int
 
   val sc_rollup_enable : context -> bool
+
+  val sc_rollup_origination_size : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : parametric}

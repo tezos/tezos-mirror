@@ -95,3 +95,5 @@ val minimal_block_delay : Raw_context.t -> Period_repr.t
 val delay_increment_per_round : Raw_context.t -> Period_repr.t
 
 val sc_rollup_enable : Raw_context.t -> bool
+
+val sc_rollup_origination_size : Raw_context.t -> int

@@ -35,5 +35,9 @@ let originate ctxt ~kind ~boot_sector =
       Sc_rollup_repr.PVM.boot_sector_encoding
       boot_sector
   in
-  let size = Z.of_int (stored_kind_size + boot_sector_size + addresses_size) in
+  let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
+  let size =
+    Z.of_int
+      (origination_size + stored_kind_size + boot_sector_size + addresses_size)
+  in
   return (ctxt, address, size)

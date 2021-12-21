@@ -914,6 +914,8 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
             tx_rollup_origination_size = 60_000;
             sc_rollup_enable = false;
+            (* The following value is chosen to prevent spam. *)
+            sc_rollup_origination_size = 6_314;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
