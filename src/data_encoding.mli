@@ -1304,6 +1304,14 @@ end
 
 type json = Json.t
 
+(** [json] is an encoding for JSON values. It is mostly intended for internal
+    use or for defining your own low-level combinators.
+
+    WARNING! Due to a limitation of BSON, this encoding does not safely
+    roundtrip. Specifically, [Json.destruct json (Json.construct json v)]
+    is not guaranteed to be equal to [v]. More specifically, in BSON, Arrays are
+    represented as number-indexed Objects and this library has no way to
+    distinguish between the two, doubly so for empty collections. *)
 val json : json Encoding.t
 
 type json_schema = Json.schema

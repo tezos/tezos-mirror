@@ -76,6 +76,13 @@ let test_json (j : Data_encoding.Json.t) =
 
 let test_jsons () = List.iter test_json all_values
 
+(* The basic binary test would fail. This is because:
+   - The binary encoding of JSON values uses the BSON representation
+   - The BSON representation of Arrays is identical to that of an Object indexed
+     by number ([`A [x; y]] is the same as [`O [("1", x); ("2", y)]]
+
+   Instead of testing a strict equality, we test equality modulo this `A-`O
+   equivalence. *)
 let test_binary (j : Data_encoding.Json.t) =
   let s =
     try Data_encoding.Binary.to_string_exn Data_encoding.Json.encoding j
@@ -85,7 +92,21 @@ let test_binary (j : Data_encoding.Json.t) =
     try Data_encoding.Binary.of_string_exn Data_encoding.Json.encoding s
     with _ -> failwith "Cannot destruct"
   in
-  assert (j = jj)
+  let rec equal a b =
+    match (a, b) with
+    | (`Null, `Null) -> true
+    | (`Bool a, `Bool b) -> a = b
+    | (`Float a, `Float b) -> a = b
+    | (`String a, `String b) -> a = b
+    | (`O a, `O b) ->
+        List.for_all2 (fun (n, a) (m, b) -> n = m && equal a b) a b
+    | (`A a, `A b) -> List.for_all2 equal a b
+    | (`O a, `A b) | (`A b, `O a) ->
+        let b = List.mapi (fun i x -> (string_of_int i, x)) b in
+        List.for_all2 (fun (n, a) (m, b) -> n = m && equal a b) a b
+    | _ -> false
+  in
+  assert (equal j jj)
 
 let test_binaries () = List.iter test_binary all_values
 
