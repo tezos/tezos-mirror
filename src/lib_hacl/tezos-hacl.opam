@@ -13,6 +13,8 @@ depends: [
   "hacl-star" { >= "0.4.2" & < "0.5" }
   "hacl-star-raw"
   "ctypes_stubs_js"
+  "ctypes" { >= "0.18.0" }
+  "ezjsonm" { >= "1.1.0" }
   "tezos-stdlib" {with-test}
   "tezos-error-monad" {with-test}
   "zarith" { with-test & >= "1.12" & < "1.13" }

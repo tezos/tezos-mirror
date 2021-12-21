@@ -26,6 +26,12 @@
 open Manifest
 module V = Version
 
+module JS = struct
+  let secp256k1_version = "1.1.1"
+
+  let hacl_version = "1.1.0"
+end
+
 (* EXTERNAL LIBS *)
 
 let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
@@ -105,7 +111,7 @@ let fmt_tty = external_sublib fmt "fmt.tty"
 let hacl_star =
   external_lib
     ~js_compatible:true
-    ~node_wrapper_flags:["--hacl"; "1.1.0"]
+    ~node_wrapper_flags:["--hacl"; JS.hacl_version]
     "hacl-star"
     V.(at_least "0.4.2" && less_than "0.5")
 
@@ -239,7 +245,7 @@ let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
 
 let secp256k1_internal =
   external_lib
-    ~node_wrapper_flags:["--secp256k1"; "1.1.1"]
+    ~node_wrapper_flags:["--secp256k1"; JS.secp256k1_version]
     "secp256k1-internal"
     V.True
 
@@ -491,14 +497,85 @@ let tezos_error_monad =
     ~js_compatible:true
 
 let tezos_hacl =
+  let js_stubs = ["random.js"; "evercrypt.js"] in
+  let js_generated = "runtime-generated.js" in
+  let js_helper = "helper.js" in
   public_lib
     "tezos-hacl"
     ~path:"src/lib_hacl"
     ~synopsis:"Tezos: thin layer around hacl-star"
     ~ocaml:V.(at_least "4.08")
     ~deps:[hacl_star; hacl_star_raw; ctypes_stubs_js]
-    ~js_of_ocaml:[[S "javascript_files"; S "hacl_stubs.js"]]
+    ~js_of_ocaml:
+      [
+        [
+          S "javascript_files";
+          G (Dune.of_atom_list (js_generated :: js_helper :: js_stubs));
+        ];
+      ]
     ~conflicts:[hacl_x25519]
+    ~dune:
+      Dune.
+        [
+          [
+            S "rule";
+            [S "targets"; S js_generated];
+            [
+              S "deps";
+              S "gen/api.json";
+              S "gen/gen.exe";
+              G (of_atom_list js_stubs);
+            ];
+            [S "mode"; S "promote"];
+            [
+              S "action";
+              [
+                S "with-stdout-to";
+                S "%{targets}";
+                of_list
+                  (List.map
+                     (fun l -> H (of_atom_list l))
+                     Stdlib.List.(
+                       ["run"; "gen/gen.exe"]
+                       ::
+                       ["-api"; "gen/api.json"]
+                       :: List.map (fun s -> ["-stubs"; s]) js_stubs));
+              ];
+            ];
+          ];
+        ]
+
+let _tezos_hacl_gen =
+  private_exe
+    "gen"
+    ~path:"src/lib_hacl/gen/"
+    ~opam:"src/lib_hacl/tezos-hacl"
+    ~bisect_ppx:false
+    ~deps:[ctypes_stubs; ctypes; hacl_star_raw; ezjsonm]
+    ~dune:
+      (let package = "tezos-hacl" in
+       Dune.
+         [
+           [
+             S "rule";
+             [S "alias"; S "runtest_js"];
+             [S "target"; S "api.json.corrected"];
+             [S "package"; S package];
+             [
+               S "action";
+               [
+                 S "run";
+                 S "%{dep:../../tooling/node_wrapper.exe}";
+                 H [S "--hacl"; S JS.hacl_version];
+                 S "%{dep:./check-api.js}";
+               ];
+             ];
+           ];
+           alias_rule
+             ~package
+             "runtest_js"
+             ~action:[S "diff"; S "api.json"; S "api.json.corrected"];
+         ])
 
 let _tezos_hacl_tests =
   tests

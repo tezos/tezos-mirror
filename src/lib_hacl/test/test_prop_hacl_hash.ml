@@ -96,9 +96,12 @@ module SHA512_Props =
     (Hacl.Hash.SHA512)
 
 let () =
-  Alcotest.run
-    "tezos-crypto-shaX-props"
-    [
-      ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
-      ("SHA512_Props", qcheck_wrap SHA512_Props.tests);
-    ]
+  match Sys.backend_type with
+  | Other "js_of_ocaml" -> ()
+  | Other _ | Native | Bytecode ->
+      Alcotest.run
+        "tezos-crypto-shaX-props"
+        [
+          ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
+          ("SHA512_Props", qcheck_wrap SHA512_Props.tests);
+        ]

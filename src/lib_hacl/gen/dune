@@ -1,0 +1,25 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(executable
+ (name gen)
+ (libraries
+  ctypes.stubs
+  ctypes
+  hacl-star-raw
+  ezjsonm))
+
+(rule
+ (alias runtest_js)
+ (target api.json.corrected)
+ (package tezos-hacl)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe}
+   --hacl 1.1.0
+   %{dep:./check-api.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl)
+ (action (diff api.json api.json.corrected)))

@@ -9,4 +9,14 @@
   hacl-star
   hacl-star-raw
   ctypes_stubs_js)
- (js_of_ocaml (javascript_files hacl_stubs.js)))
+ (js_of_ocaml
+  (javascript_files runtime-generated.js helper.js random.js evercrypt.js)))
+
+(rule
+ (targets runtime-generated.js)
+ (deps gen/api.json gen/gen.exe random.js evercrypt.js)
+ (mode promote)
+ (action
+  (with-stdout-to
+   %{targets}
+   (run gen/gen.exe -api gen/api.json -stubs random.js -stubs evercrypt.js))))
