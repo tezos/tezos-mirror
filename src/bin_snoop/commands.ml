@@ -913,10 +913,13 @@ let (list_solvers, list_models) =
         Short) ;
   let result =
     Lwt_main.run
-      ( Clic.parse_global_options Global_options.options () original_args
-      >>=? fun (list_flags, args) ->
-        match autocomplete with
-        | Some (prev_arg, cur_arg, script) ->
+      (let open Lwt_result_syntax in
+      let* (list_flags, args) =
+        Clic.parse_global_options Global_options.options () original_args
+      in
+      match autocomplete with
+      | Some (prev_arg, cur_arg, script) ->
+          let* completions =
             Clic.autocompletion
               ~script
               ~cur_arg
@@ -925,15 +928,15 @@ let (list_solvers, list_models) =
               ~global_options:Global_options.options
               commands_with_man
               ()
-            >>=? fun completions ->
-            List.iter print_endline completions ;
-            return list_flags
-        | None -> (
-            match args with
-            | [] -> return list_flags
-            | _ ->
-                Clic.dispatch commands_with_man () args >>=? fun () ->
-                return list_flags) )
+          in
+          List.iter print_endline completions ;
+          return list_flags
+      | None -> (
+          match args with
+          | [] -> return list_flags
+          | _ ->
+              let* () = Clic.dispatch commands_with_man () args in
+              return list_flags))
   in
   match result with
   | Ok global_options -> global_options
