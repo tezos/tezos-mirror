@@ -115,12 +115,12 @@ enable-time-measurement:
 
 .PHONY: build-sandbox
 build-sandbox:
-	@dune build --profile=$(PROFILE) src/bin_sandbox/main.exe
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) src/bin_sandbox/main.exe
 	@cp -f _build/default/src/bin_sandbox/main.exe tezos-sandbox
 
 .PHONY: build-test
 build-test: build-sandbox
-	@dune build --profile=$(PROFILE) @buildtest
+	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @buildtest
 
 .PHONY: test-protocol-compile
 test-protocol-compile:
