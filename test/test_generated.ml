@@ -92,6 +92,17 @@ let roundtrip_json_stream pp ding v =
       vv
 
 let double_trip_binary pp encode_ding decode_ding v =
+  let length =
+    try Data_encoding.Binary.length encode_ding v
+    with Data_encoding.Binary.Write_error we ->
+      Format.kasprintf
+        Crowbar.fail
+        "Cannot length: %a (%a)"
+        pp
+        v
+        Data_encoding.Binary.pp_write_error
+        we
+  in
   let bin =
     try Data_encoding.Binary.to_bytes_exn encode_ding v
     with Data_encoding.Binary.Write_error we ->
@@ -103,6 +114,7 @@ let double_trip_binary pp encode_ding decode_ding v =
         Data_encoding.Binary.pp_write_error
         we
   in
+  Crowbar.check_eq ~pp:Format.pp_print_int length (Bytes.length bin) ;
   let vv =
     try Data_encoding.Binary.of_bytes_exn decode_ding bin
     with Data_encoding.Binary.Read_error re ->
@@ -119,6 +131,17 @@ let double_trip_binary pp encode_ding decode_ding v =
 let roundtrip_binary_to_bytes pp ding v = double_trip_binary pp ding ding v
 
 let roundtrip_binary_to_string pp ding v =
+  let length =
+    try Data_encoding.Binary.length ding v
+    with Data_encoding.Binary.Write_error we ->
+      Format.kasprintf
+        Crowbar.fail
+        "Cannot length: %a (%a)"
+        pp
+        v
+        Data_encoding.Binary.pp_write_error
+        we
+  in
   let bin =
     try Data_encoding.Binary.to_string_exn ding v
     with Data_encoding.Binary.Write_error we ->
@@ -130,6 +153,7 @@ let roundtrip_binary_to_string pp ding v =
         Data_encoding.Binary.pp_write_error
         we
   in
+  Crowbar.check_eq ~pp:Format.pp_print_int length (String.length bin) ;
   let vv =
     try Data_encoding.Binary.of_string_exn ding bin
     with Data_encoding.Binary.Read_error re ->
