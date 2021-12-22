@@ -121,18 +121,17 @@ let load_protocol proto protocol_root =
       // Format.asprintf "protocol_%a.cmxs" Protocol_hash.pp proto
     in
     let*! () = Events.(emit dynload_protocol proto) in
-    try
-      Dynlink.loadfile_private cmxs_file ;
-      return_unit
-    with Dynlink.Error err ->
-      Format.ksprintf
-        (fun msg ->
-          fail
-            Block_validator_errors.(
-              Validation_process_failed (Protocol_dynlink_failure msg)))
-        "Cannot load file: %s. (Expected location: %s.)"
-        (Dynlink.error_message err)
-        cmxs_file
+    match Dynlink.loadfile_private cmxs_file with
+    | () -> return_unit
+    | exception Dynlink.Error err ->
+        Format.ksprintf
+          (fun msg ->
+            fail
+              Block_validator_errors.(
+                Validation_process_failed (Protocol_dynlink_failure msg)))
+          "Cannot load file: %s. (Expected location: %s.)"
+          (Dynlink.error_message err)
+          cmxs_file
 
 let inconsistent_handshake msg =
   Block_validator_errors.(
@@ -164,12 +163,12 @@ let init input =
        } =
     External_validation.recv input External_validation.parameters_encoding
   in
-  let sandbox_param =
+  let sandbox_parameters =
     Option.map (fun p -> ("sandbox_parameter", p)) sandbox_parameters
   in
   let* context_index =
     Context.init
-      ~patch_context:(Patch_context.patch_context genesis sandbox_param)
+      ~patch_context:(Patch_context.patch_context genesis sandbox_parameters)
       context_root
   in
   Lwt.return
@@ -208,7 +207,7 @@ let run input output =
         let commit_genesis : unit Lwt.t =
           let*! () = Events.(emit commit_genesis_request genesis.block) in
           let*! commit =
-            Error_monad.protect (fun () ->
+            Error_monad.catch_es (fun () ->
                 Context.commit_genesis
                   context_index
                   ~chain_id
@@ -232,11 +231,11 @@ let run input output =
           operations;
           max_operations_ttl;
         } ->
-        let validate =
+        let validate : Environment_context.Context.block_cache option Lwt.t =
           let*! () = Events.(emit validation_request block_header) in
           let*! res =
             let* predecessor_context =
-              Error_monad.protect (fun () ->
+              Error_monad.catch_es (fun () ->
                   let pred_context_hash =
                     predecessor_block_header.shell.context
                   in
@@ -268,7 +267,7 @@ let run input output =
               | None -> `Load
               | Some cache -> `Inherited (cache, predecessor_context)
             in
-            let*! r =
+            let*! res =
               Block_validation.apply
                 ?cached_result
                 env
@@ -276,16 +275,17 @@ let run input output =
                 operations
                 ~cache
             in
-            match r with
+            match res with
             | Error [Block_validator_errors.Unavailable_protocol {protocol; _}]
-              as err -> (
+              as original_error -> (
                 (* If `next_protocol` is missing, try to load it *)
                 let*! r = load_protocol protocol protocol_root in
                 match r with
-                | Error _ -> Lwt.return err (* original error *)
+                | Error _ -> Lwt.return original_error
                 | Ok () ->
+                    (* retry *)
                     Block_validation.apply env block_header operations ~cache)
-            | result -> Lwt.return result
+            | _ -> Lwt.return res
           in
           let (res, cache) =
             match res with
@@ -330,7 +330,7 @@ let run input output =
           let*! cachable_result =
             let*! r =
               let* predecessor_context =
-                Error_monad.protect (fun () ->
+                Error_monad.catch_es (fun () ->
                     let pred_context_hash = predecessor_shell_header.context in
                     let*! context =
                       Context.checkout context_index pred_context_hash
@@ -361,16 +361,16 @@ let run input output =
                   ~predecessor_ops_metadata_hash
                   operations
               in
-              let*! r = preapply () in
-              match r with
+              let*! res = preapply () in
+              match res with
               | Error
                   [Block_validator_errors.Unavailable_protocol {protocol; _}] as
-                err -> (
+                original_error -> (
                   (* If `next_protocol` is missing, try to load it *)
                   let*! r = load_protocol protocol protocol_root in
                   match r with
-                  | Error _ -> Lwt.return err
-                  | Ok () -> preapply ())
+                  | Error _ -> Lwt.return original_error
+                  | Ok () -> (* retry *) preapply ())
               | result -> Lwt.return result
             in
             match r with
@@ -410,7 +410,7 @@ let run input output =
           let*! () = Events.(emit precheck_request hash) in
           let*! res =
             let* predecessor_context =
-              Error_monad.protect (fun () ->
+              Error_monad.catch_es (fun () ->
                   let*! o =
                     Context.checkout
                       context_index
