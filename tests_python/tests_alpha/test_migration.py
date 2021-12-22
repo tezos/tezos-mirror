@@ -10,7 +10,7 @@ from . import protocol
 MIGRATION_LEVEL = 8
 BAKER = 'bootstrap1'
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
-PREV_DEPOSIT = protocol.PREV_PARAMETERS["block_security_deposit"]
+PREV_DEPOSIT = "0"  # FIXME protocol.PREV_PARAMETERS["block_security_deposit"]
 BAKER_BALANCE = next(
     bal for [BAKER_PKH, bal] in protocol.PARAMETERS["bootstrap_accounts"]
 )
