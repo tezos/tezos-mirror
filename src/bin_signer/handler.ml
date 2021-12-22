@@ -150,27 +150,30 @@ module High_watermark = struct
 
   let mark_if_block_or_endorsement (cctxt : #Client_context.wallet) pkh bytes
       sign =
+    let open Lwt_result_syntax in
     let mark art name get_level_and_round =
       let file = name ^ "_high_watermark" in
       cctxt#with_lock @@ fun () ->
-      cctxt#load file ~default:[] encoding >>=? fun all ->
+      let* all = cctxt#load file ~default:[] encoding in
       if Bytes.length bytes < 9 then
         failwith "byte sequence too short to be %s %s" art name
       else
         let hash = Blake2B.hash_bytes [bytes] in
         let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
-        get_level_and_round () >>=? fun (level, round_opt) ->
-        (match
-           Option.bind
-             (List.assoc_opt ~equal:Chain_id.equal chain_id all)
-             (List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh)
-         with
-        | None -> return_none
-        | Some mark -> check_mark name mark level round_opt hash)
-        >>=? function
+        let* (level, round_opt) = get_level_and_round () in
+        let* o =
+          match
+            Option.bind
+              (List.assoc_opt ~equal:Chain_id.equal chain_id all)
+              (List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh)
+          with
+          | None -> return_none
+          | Some mark -> check_mark name mark level round_opt hash
+        in
+        match o with
         | Some signature -> return signature
         | None ->
-            sign bytes >>=? fun signature ->
+            let* signature = sign bytes in
             let rec update = function
               | [] ->
                   [
@@ -185,7 +188,7 @@ module High_watermark = struct
                     (e_chain_id, marks) :: rest
                   else (e_chain_id, marks) :: update rest
             in
-            cctxt#write file (update all) encoding >>=? fun () ->
+            let* () = cctxt#write file (update all) encoding in
             return signature
     in
     if Bytes.length bytes = 0 then sign bytes
@@ -233,12 +236,13 @@ let check_magic_byte magic_bytes data =
       else failwith "magic byte 0x%02X not allowed" byte
 
 let check_authorization cctxt pkh data require_auth signature =
+  let open Lwt_result_syntax in
   match (require_auth, signature) with
   | (false, _) -> return_unit
   | (true, None) -> failwith "missing authentication signature field"
   | (true, Some signature) ->
       let to_sign = Signer_messages.Sign.Request.to_sign ~pkh ~data in
-      Authorized_key.load cctxt >>=? fun keys ->
+      let* keys = Authorized_key.load cctxt in
       if
         List.exists (fun (_, key) -> Signature.check key signature to_sign) keys
       then return_unit
@@ -247,13 +251,15 @@ let check_authorization cctxt pkh data require_auth signature =
 let sign ?magic_bytes ~check_high_watermark ~require_auth
     (cctxt : #Client_context.wallet)
     Signer_messages.Sign.Request.{pkh; data; signature} =
-  Events.(emit request_for_signing)
-    (Bytes.length data, pkh, TzEndian.get_uint8 data 0)
-  >>= fun () ->
-  check_magic_byte magic_bytes data >>=? fun () ->
-  check_authorization cctxt pkh data require_auth signature >>=? fun () ->
-  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
-  Events.(emit signing_data) name >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () =
+    Events.(emit request_for_signing)
+      (Bytes.length data, pkh, TzEndian.get_uint8 data 0)
+  in
+  let* () = check_magic_byte magic_bytes data in
+  let* () = check_authorization cctxt pkh data require_auth signature in
+  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let*! () = Events.(emit signing_data) name in
   let sign = Client_keys.sign cctxt sk_uri in
   if check_high_watermark then
     High_watermark.mark_if_block_or_endorsement cctxt pkh data sign
@@ -262,38 +268,46 @@ let sign ?magic_bytes ~check_high_watermark ~require_auth
 let deterministic_nonce (cctxt : #Client_context.wallet)
     Signer_messages.Deterministic_nonce.Request.{pkh; data; signature}
     ~require_auth =
-  Events.(emit request_for_deterministic_nonce) (Bytes.length data, pkh)
-  >>= fun () ->
-  check_authorization cctxt pkh data require_auth signature >>=? fun () ->
-  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
-  Events.(emit creating_nonce) name >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () =
+    Events.(emit request_for_deterministic_nonce) (Bytes.length data, pkh)
+  in
+  let* () = check_authorization cctxt pkh data require_auth signature in
+  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let*! () = Events.(emit creating_nonce) name in
   Client_keys.deterministic_nonce sk_uri data
 
 let deterministic_nonce_hash (cctxt : #Client_context.wallet)
     Signer_messages.Deterministic_nonce_hash.Request.{pkh; data; signature}
     ~require_auth =
-  Events.(emit request_for_deterministic_nonce_hash) (Bytes.length data, pkh)
-  >>= fun () ->
-  check_authorization cctxt pkh data require_auth signature >>=? fun () ->
-  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
-  Events.(emit creating_nonce_hash) name >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () =
+    Events.(emit request_for_deterministic_nonce_hash) (Bytes.length data, pkh)
+  in
+  let* () = check_authorization cctxt pkh data require_auth signature in
+  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let*! () = Events.(emit creating_nonce_hash) name in
   Client_keys.deterministic_nonce_hash sk_uri data
 
 let supports_deterministic_nonces (cctxt : #Client_context.wallet) pkh =
-  Events.(emit request_for_supports_deterministic_nonces) pkh >>= fun () ->
-  Client_keys.get_key cctxt pkh >>=? fun (name, _pkh, sk_uri) ->
-  Events.(emit supports_deterministic_nonces) name >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit request_for_supports_deterministic_nonces) pkh in
+  let* (name, _pkh, sk_uri) = Client_keys.get_key cctxt pkh in
+  let*! () = Events.(emit supports_deterministic_nonces) name in
   Client_keys.supports_deterministic_nonces sk_uri
 
 let public_key (cctxt : #Client_context.wallet) pkh =
-  Events.(emit request_for_public_key) pkh >>= fun () ->
-  Client_keys.list_keys cctxt >>=? fun all_keys ->
+  let open Lwt_result_syntax in
+  let*! () = Events.(emit request_for_public_key) pkh in
+  let* all_keys = Client_keys.list_keys cctxt in
   match
     List.find_opt
       (fun (_, h, _, _) -> Signature.Public_key_hash.equal h pkh)
       all_keys
   with
   | None | Some (_, _, None, _) ->
-      Events.(emit not_found_public_key) pkh >>= fun () -> Lwt.fail Not_found
+      let*! () = Events.(emit not_found_public_key) pkh in
+      Lwt.fail Not_found
   | Some (name, _, Some pk, _) ->
-      Events.(emit found_public_key) (pkh, name) >>= fun () -> return pk
+      let*! () = Events.(emit found_public_key) (pkh, name) in
+      return pk
