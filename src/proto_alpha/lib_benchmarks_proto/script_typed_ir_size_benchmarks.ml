@@ -145,7 +145,7 @@ module Type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
   let models = [(model_name, size_based_model name)]
 
   let type_size_benchmark (Script_ir_translator.Ex_ty ty) =
-    let open Script_typed_ir_size in
+    let open Script_typed_ir_size.Internal_for_tests in
     let open Cache_memory_helpers in
     let size = Nodes.(to_int (fst (ty_size ty))) in
     let workload = {size} in
@@ -183,12 +183,12 @@ module Comparable_type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
   let models = [(model_name, size_based_model name)]
 
   let type_size_benchmark (Script_ir_translator.Ex_comparable_ty ty) =
+    let open Script_typed_ir_size.Internal_for_tests in
     let workload =
-      let open Script_typed_ir_size in
       let open Cache_memory_helpers in
       {size = Nodes.to_int @@ fst @@ comparable_ty_size ty}
     in
-    let closure () = ignore (Script_typed_ir_size.comparable_ty_size ty) in
+    let closure () = ignore (comparable_ty_size ty) in
     Generator.Plain {workload; closure}
 
   let make_bench rng_state _cfg () =
@@ -249,22 +249,22 @@ end = struct
         | Ok (Failed {descr}, _) ->
             let kdescr = Script_ir_translator.close_descr (descr Bot_t) in
             let kinstr = kdescr.kinstr in
+            let open Script_typed_ir_size.Internal_for_tests in
             let workload =
-              let open Script_typed_ir_size in
               let open Cache_memory_helpers in
               {size = Nodes.to_int @@ fst @@ kinstr_size kinstr}
             in
-            let closure () = ignore (Script_typed_ir_size.kinstr_size kinstr) in
+            let closure () = ignore (kinstr_size kinstr) in
             return (Generator.Plain {workload; closure})
         | Ok (Typed descr, _) ->
             let kdescr = Script_ir_translator.close_descr descr in
             let kinstr = kdescr.kinstr in
+            let open Script_typed_ir_size.Internal_for_tests in
             let workload =
-              let open Script_typed_ir_size in
               let open Cache_memory_helpers in
               {size = Nodes.to_int @@ fst @@ kinstr_size kinstr}
             in
-            let closure () = ignore (Script_typed_ir_size.kinstr_size kinstr) in
+            let closure () = ignore (kinstr_size kinstr) in
             return (Generator.Plain {workload; closure}) )
     |> function
     | Ok closure -> closure
