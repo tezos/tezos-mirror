@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  name : string;
-  path : string;
-  sc_node : Sc_rollup_node.t;
-  base_dir : string;
-  color : Log.Color.t;
-}
+open Clic
+open Protocol.Alpha_context
 
-let next_name = ref 1
+let get_sc_rollup_addresses_command () =
+  command
+    ~desc:
+      "Retrieve the smart-contract rollup address the node is interacting with."
+    no_options
+    (fixed ["get"; "sc"; "rollup"; "address"])
+    (fun () configuration ->
+      RPC.get_sc_rollup_addresses_command configuration >>=? fun addr ->
+      Format.printf "@[%a@]" Sc_rollup.Address.pp addr ;
+      return ())
 
-let fresh_name () =
-  let index = !next_name in
-  incr next_name ;
-  "client" ^ string_of_int index
-
-let () = Test.declare_reset_function @@ fun () -> next_name := 1
-
-let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) sc_node =
-  let name = match name with None -> fresh_name () | Some name -> name in
-  let path =
-    match path with None -> Constant.sc_rollup_client | Some p -> p
-  in
-  let base_dir =
-    match base_dir with None -> Temp.dir name | Some dir -> dir
-  in
-  {name; path; sc_node; base_dir; color}
-
-let base_dir_arg sc_client = ["--base-dir"; sc_client.base_dir]
-
-let endpoint_arg sc_client =
-  ["--endpoint"; Sc_rollup_node.endpoint sc_client.sc_node]
-
-let spawn_command ?hooks sc_client command =
-  Process.spawn
-    ~name:sc_client.name
-    ~color:sc_client.color
-    ?hooks
-    sc_client.path
-    (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
-
-let sc_rollup_address sc_client =
-  let* out =
-    spawn_command sc_client ["get"; "sc"; "rollup"; "address"]
-    |> Process.check_and_read_stdout
-  in
-  return (String.trim out)
+let all () = [get_sc_rollup_addresses_command ()]

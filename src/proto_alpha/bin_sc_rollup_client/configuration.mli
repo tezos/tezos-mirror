@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {
-  name : string;
-  path : string;
-  sc_node : Sc_rollup_node.t;
+(** Client configuration. *)
+type t = private {
   base_dir : string;
-  color : Log.Color.t;
+      (** [base_dir] is a directory where client user data is stored. *)
+  endpoint : Uri.t;
+      (** [endpoint] is used to communicate with the smart-contract rollup
+          node. *)
 }
 
-let next_name = ref 1
+(** [parse argv] parses command-line arguments to return
+   [(configuration, argv')] where [configuration] is deduced from the
+   command-line arguments and [argv'] is the rest of the command-line
+   arguments that have no meaning relatively to [Configuration]. *)
+val parse : string list -> (t * string list) tzresult Lwt.t
 
-let fresh_name () =
-  let index = !next_name in
-  incr next_name ;
-  "client" ^ string_of_int index
-
-let () = Test.declare_reset_function @@ fun () -> next_name := 1
-
-let create ?name ?path ?base_dir ?(color = Log.Color.FG.green) sc_node =
-  let name = match name with None -> fresh_name () | Some name -> name in
-  let path =
-    match path with None -> Constant.sc_rollup_client | Some p -> p
-  in
-  let base_dir =
-    match base_dir with None -> Temp.dir name | Some dir -> dir
-  in
-  {name; path; sc_node; base_dir; color}
-
-let base_dir_arg sc_client = ["--base-dir"; sc_client.base_dir]
-
-let endpoint_arg sc_client =
-  ["--endpoint"; Sc_rollup_node.endpoint sc_client.sc_node]
-
-let spawn_command ?hooks sc_client command =
-  Process.spawn
-    ~name:sc_client.name
-    ~color:sc_client.color
-    ?hooks
-    sc_client.path
-    (base_dir_arg sc_client @ endpoint_arg sc_client @ command)
-
-let sc_rollup_address sc_client =
-  let* out =
-    spawn_command sc_client ["get"; "sc"; "rollup"; "address"]
-    |> Process.check_and_read_stdout
-  in
-  return (String.trim out)
+(** [global_options ()] returns the list of options that have an
+   influence on the configuration. *)
+val global_options : unit -> (string option * Uri.t option, 'a) Clic.options
