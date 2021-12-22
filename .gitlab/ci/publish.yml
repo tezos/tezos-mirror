@@ -202,6 +202,9 @@ publish:documentation:
     - echo "${CI_PK_GITLAB_DOC}" > ~/.ssh/id_ed25519
     - echo "${CI_KH}" > ~/.ssh/known_hosts
     - chmod 400 ~/.ssh/id_ed25519
+    # Load the environment poetry previously created in the docker image.
+    # Give access to the Python dependencies/executables
+    - . $HOME/.venv/bin/activate
   script:
     - if [ "${CI_COMMIT_REF_NAME}" == "master" ] ; then
         make -C docs all ;
