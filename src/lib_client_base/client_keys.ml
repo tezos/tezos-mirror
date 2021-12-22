@@ -468,16 +468,21 @@ let get_public_key cctxt pkh =
 
 let get_keys (cctxt : #Client_context.wallet) =
   Secret_key.load cctxt >>=? fun sks ->
+  Public_key_hash.load cctxt >>=? fun pkhs ->
+  Public_key.load cctxt >>=? fun pks ->
   List.filter_map_s
     (fun (name, sk_uri) ->
-      ( Public_key_hash.find cctxt name >>=? fun pkh ->
-        (Public_key.find cctxt name >>=? function
-         | (_, Some pk) -> return pk
-         | (pk_uri, None) ->
-             public_key pk_uri >>=? fun pk ->
-             Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
-             return pk)
-        >>=? fun pk -> return (name, pkh, pk, sk_uri) )
+      (match List.assoc ~equal:String.equal name pkhs with
+      | Some pkh ->
+          (match List.assoc ~equal:String.equal name pks with
+          | Some (_, Some pk) -> return pk
+          | Some (pk_uri, None) ->
+              public_key pk_uri >>=? fun pk ->
+              Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+              return pk
+          | None -> failwith "no public key alias named %s" name)
+          >>=? fun pk -> return (name, pkh, pk, sk_uri)
+      | None -> failwith "no public key hash alias named %s" name)
       >>= function
       | Ok r -> Lwt.return_some r
       | Error _ -> Lwt.return_none)
