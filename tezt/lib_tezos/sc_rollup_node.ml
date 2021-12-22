@@ -65,6 +65,9 @@ let rpc_host sc_node = sc_node.persistent_state.rpc_host
 
 let rpc_port sc_node = sc_node.persistent_state.rpc_port
 
+let endpoint sc_node =
+  Printf.sprintf "http://%s:%d" (rpc_host sc_node) (rpc_port sc_node)
+
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
 let starting_port = 1000 + Cli.options.starting_port
@@ -170,3 +173,30 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
   in
   on_event sc_node (handle_event sc_node) ;
   sc_node
+
+let make_arguments node =
+  [
+    "--endpoint";
+    Printf.sprintf
+      "http://%s:%d"
+      (Node.rpc_host node.persistent_state.node)
+      (Node.rpc_port node.persistent_state.node);
+  ]
+
+let do_runlike_command node arguments =
+  if node.status <> Not_running then
+    Test.fail "Smart contract rollup node %s is already running" node.name ;
+  let on_terminate _status =
+    trigger_ready node None ;
+    unit
+  in
+  let arguments = make_arguments node @ arguments in
+  run node {ready = false} arguments ~on_terminate
+
+let run node =
+  do_runlike_command node ["run"; "--data-dir"; node.persistent_state.data_dir]
+
+let run node =
+  let* () = run node in
+  let* () = wait_for_ready node in
+  return ()

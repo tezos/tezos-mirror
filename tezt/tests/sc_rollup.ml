@@ -29,12 +29,12 @@
    =======
 
 *)
-let test ~__FILE__ ~output_file ?(tags = []) title =
-  Protocol.register_regression_test
-    ~output_file
-    ~__FILE__
-    ~title
-    ~tags:("sc_rollup" :: tags)
+let test ~__FILE__ ?output_file ?(tags = []) title f =
+  let tags = "sc_rollup" :: tags in
+  match output_file with
+  | Some output_file ->
+      Protocol.register_regression_test ~output_file ~__FILE__ ~title ~tags f
+  | None -> Protocol.register_test ~__FILE__ ~title ~tags f
 
 let setup f ~protocol =
   let sc_rollup_enable = [(["sc_rollup_enable"], Some "true")] in
@@ -45,6 +45,17 @@ let setup f ~protocol =
   in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f node client bootstrap1_key
+
+let sc_rollup_node_rpc sc_node service =
+  let* curl = RPC.Curl.get () in
+  match curl with
+  | None -> return None
+  | Some curl ->
+      let url =
+        Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint sc_node) service
+      in
+      let* response = curl ~url in
+      return (Some response)
 
 (*
 
@@ -122,6 +133,41 @@ let test_rollup_node_configuration =
       Regression.capture read_configuration ;
       return ())
 
+(* Launching a rollup node
+   -----------------------
+
+   A running rollup node can be asked the address of the rollup it is
+   interacting with.
+
+*)
+let test_rollup_node_running =
+  test
+    ~__FILE__
+    ~tags:["run"]
+    "running a smart contract rollup node"
+    (fun protocol ->
+      setup ~protocol @@ with_fresh_rollup
+      @@ fun rollup_address sc_rollup_node _filename ->
+      let* () = Sc_rollup_node.run sc_rollup_node in
+      let* rollup_address_from_rpc =
+        sc_rollup_node_rpc sc_rollup_node "sc_rollup_address"
+      in
+      match rollup_address_from_rpc with
+      | None ->
+          (* No curl, no check. *)
+          failwith "Please install curl"
+      | Some rollup_address_from_rpc ->
+          let rollup_address = "\"" ^ rollup_address ^ "\"" in
+          if String.trim rollup_address_from_rpc <> rollup_address then
+            failwith
+              (Printf.sprintf
+                 "Expecting %s, got %s when we query the sc rollup node RPC \
+                  address"
+                 rollup_address
+                 rollup_address_from_rpc)
+          else return ())
+
 let register ~protocols =
   test_origination ~protocols ;
-  test_rollup_node_configuration ~protocols
+  test_rollup_node_configuration ~protocols ;
+  test_rollup_node_running ~protocols

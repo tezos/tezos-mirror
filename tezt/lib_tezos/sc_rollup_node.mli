@@ -74,6 +74,9 @@ val rpc_host : t -> string
 (** Get the RPC port given as [--rpc-addr] to an sc node. *)
 val rpc_port : t -> int
 
+(** Return the endpoint of the sc node, i.e., http://rpc_host:rpc_port. *)
+val endpoint : t -> string
+
 (** Get the data-dir of an sc node. *)
 val data_dir : t -> string
 
@@ -94,6 +97,9 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
     it is not already in use by another sc node, and only if you let
     the [Sc_Rollup_Node] module choose all ports for you. *)
 val fresh_port : unit -> int
+
+(** [run node] launches the given smart contract rollup node. *)
+val run : t -> unit Lwt.t
 
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
