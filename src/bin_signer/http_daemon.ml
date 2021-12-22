@@ -46,8 +46,10 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
     RPC_directory.register0 dir Signer_services.authorized_keys (fun () () ->
         if require_auth then
           let* keys = Handler.Authorized_key.load cctxt in
-          return_some
-            (keys |> List.split |> snd |> List.map Signature.Public_key.hash)
+          let hashes =
+            List.map (fun (_, k) -> Signature.Public_key.hash k) keys
+          in
+          return_some hashes
         else return_none)
   in
   Lwt.catch
@@ -62,7 +64,7 @@ let run (cctxt : #Client_context.wallet) ~hosts ?magic_bytes
               dir
               ~media_types:Media_type.all_media_types
           in
-          fst (Lwt.wait ()))
+          Lwt_utils.never_ending ())
         hosts
       |> Lwt.choose)
     (function
@@ -82,7 +84,7 @@ let run_https ~host ~port ~cert ~key ?magic_bytes ~check_high_watermark
   match points with
   | [] -> failwith "Cannot resolve listening address: %S" host
   | points ->
-      let hosts = fst (List.split points) in
+      let hosts = List.map fst points in
       let* () = Events.(emit accepting_requests) ("HTTPS", port) in
       let mode : Conduit_lwt_unix.server =
         `TLS (`Crt_file_path cert, `Key_file_path key, `No_password, `Port port)
@@ -107,7 +109,7 @@ let run_http ~host ~port ?magic_bytes ~check_high_watermark ~require_auth
   match points with
   | [] -> failwith "Cannot resolve listening address: %S" host
   | points ->
-      let hosts = fst (List.split points) in
+      let hosts = List.map fst points in
       let* () = Events.(emit accepting_requests) ("HTTP", port) in
       let mode : Conduit_lwt_unix.server = `TCP (`Port port) in
       run

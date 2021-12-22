@@ -62,9 +62,10 @@ let handle_client_step ?magic_bytes ?timeout ~check_high_watermark ~require_auth
       let*! res =
         if require_auth then
           let* keys = Handler.Authorized_key.load cctxt in
-          return
-            (Authorized_keys.Response.Authorized_keys
-               (keys |> List.split |> snd |> List.map Signature.Public_key.hash))
+          let hashes =
+            List.map (fun (_, k) -> Signature.Public_key.hash k) keys
+          in
+          return (Authorized_keys.Response.Authorized_keys hashes)
         else return Authorized_keys.Response.No_authentication
       in
       Tezos_base_unix.Socket.send fd encoding res
@@ -95,17 +96,15 @@ let run ?magic_bytes ?timeout ~check_high_watermark ~require_auth
     | Tcp (host, service, _opts) ->
         Events.(emit accepting_tcp_requests) (host, service)
     | Unix path ->
-        ListLabels.iter
-          Sys.[sigint; sigterm]
-          ~f:(fun signal ->
-            Sys.set_signal
-              signal
-              (Signal_handle
-                 (fun _ ->
-                   Format.printf
-                     "Removing the local socket file and quitting.@." ;
-                   Unix.unlink path ;
-                   exit 0))) ;
+        let signal_handle =
+          Sys.Signal_handle
+            (fun _ ->
+              Format.printf "Removing the local socket file and quitting.@." ;
+              Unix.unlink path ;
+              exit 0)
+        in
+        Sys.set_signal Sys.sigint signal_handle ;
+        Sys.set_signal Sys.sigterm signal_handle ;
         Events.(emit accepting_unix_requests) path
   in
   let* fds = bind path in
