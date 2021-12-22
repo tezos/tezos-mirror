@@ -70,6 +70,8 @@ module Protocol_constants_overrides = struct
       Constants.ratio option;
     tx_rollup_enable : bool option;
     tx_rollup_origination_size : int option;
+    sc_rollup_enable : bool option;
+    sc_rollup_origination_size : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
@@ -116,7 +118,8 @@ module Protocol_constants_overrides = struct
                   c.chain_id,
                   c.timestamp,
                   c.initial_seed ),
-                (c.tx_rollup_enable, c.tx_rollup_origination_size) ) ) ) ))
+                ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
+                  (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -152,7 +155,8 @@ module Protocol_constants_overrides = struct
                      chain_id,
                      timestamp,
                      initial_seed ),
-                   (tx_rollup_enable, tx_rollup_origination_size) ) ) ) ) ->
+                   ( (tx_rollup_enable, tx_rollup_origination_size),
+                     (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -186,11 +190,13 @@ module Protocol_constants_overrides = struct
           consensus_threshold;
           double_baking_punishment;
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
+          tx_rollup_enable;
+          tx_rollup_origination_size;
+          sc_rollup_enable;
+          sc_rollup_origination_size;
           chain_id;
           timestamp;
           initial_seed;
-          tx_rollup_enable;
-          tx_rollup_origination_size;
         })
       (merge_objs
          (obj9
@@ -239,9 +245,13 @@ module Protocol_constants_overrides = struct
                      (opt "chain_id" Chain_id.encoding)
                      (opt "initial_timestamp" Time.Protocol.encoding)
                      (opt "initial_seed" (option State_hash.encoding)))
-                  (obj2
-                     (opt "tx_rollup_enable" Data_encoding.bool)
-                     (opt "tx_rollup_origination_size" int31))))))
+                  (merge_objs
+                     (obj2
+                        (opt "tx_rollup_enable" Data_encoding.bool)
+                        (opt "tx_rollup_origination_size" int31))
+                     (obj2
+                        (opt "sc_rollup_enable" bool)
+                        (opt "sc_rollup_origination_size" int31)))))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -302,6 +312,8 @@ module Protocol_constants_overrides = struct
             parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement;
         tx_rollup_enable = Some parametric.tx_rollup_enable;
         tx_rollup_origination_size = Some parametric.tx_rollup_origination_size;
+        sc_rollup_enable = Some parametric.sc_rollup_enable;
+        sc_rollup_origination_size = Some parametric.sc_rollup_origination_size;
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -346,6 +358,8 @@ module Protocol_constants_overrides = struct
       ratio_of_frozen_deposits_slashed_per_double_endorsement = None;
       tx_rollup_enable = None;
       tx_rollup_origination_size = None;
+      sc_rollup_enable = None;
+      sc_rollup_origination_size = None;
       chain_id = None;
       timestamp = None;
       initial_seed = None;
@@ -559,6 +573,18 @@ module Protocol_constants_overrides = struct
               o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
             pp = Constants.pp_ratio;
           };
+        O
+          {
+            name = "sc_rollup_enable";
+            override_value = o.sc_rollup_enable;
+            pp = pp_print_bool;
+          };
+        O
+          {
+            name = "sc_rollup_origination_size";
+            override_value = o.sc_rollup_origination_size;
+            pp = pp_print_int;
+          };
         O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
@@ -695,15 +721,21 @@ module Protocol_constants_overrides = struct
          ratio_of_frozen_deposits_slashed_per_double_endorsement =
            Option.value
              ~default:c.ratio_of_frozen_deposits_slashed_per_double_endorsement
-             o.ratio_of_frozen_deposits_slashed_per_double_endorsement
-           (* Notice that the chain_id and the timestamp are not used here
-              as they are not protocol constants... *);
+             o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
+         (* Notice that the chain_id and the timestamp are not used here
+            as they are not protocol constants... *)
          tx_rollup_enable =
            Option.value ~default:c.tx_rollup_enable o.tx_rollup_enable;
          tx_rollup_origination_size =
            Option.value
              ~default:c.tx_rollup_origination_size
              o.tx_rollup_origination_size;
+         sc_rollup_enable =
+           Option.value ~default:c.sc_rollup_enable o.sc_rollup_enable;
+         sc_rollup_origination_size =
+           Option.value
+             ~default:c.sc_rollup_origination_size
+             o.sc_rollup_origination_size;
        }
         : Constants.parametric)
 end

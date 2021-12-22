@@ -42,7 +42,8 @@
       - origination
       - delegation
       - set deposits limitation
-    - tx rollup origination
+      - tx rollup origination
+      - smart contract rollup origination
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -97,6 +98,8 @@ module Kind : sig
 
   type tx_rollup_origination = Tx_rollup_origination_kind
 
+  type sc_rollup_originate = Sc_rollup_originate_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -105,6 +108,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
+    | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
 end
 
 type 'a consensus_operation_type =
@@ -236,6 +240,11 @@ and _ manager_operation =
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
+  | Sc_rollup_originate : {
+      kind : Sc_rollup_repr.Kind.t;
+      boot_sector : Sc_rollup_repr.PVM.boot_sector;
+    }
+      -> Kind.sc_rollup_originate manager_operation
 
 and counter = Z.t
 
@@ -357,6 +366,8 @@ module Encoding : sig
 
   val tx_rollup_origination_case : Kind.tx_rollup_origination Kind.manager case
 
+  val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -382,5 +393,7 @@ module Encoding : sig
     val set_deposits_limit_case : Kind.set_deposits_limit case
 
     val tx_rollup_origination_case : Kind.tx_rollup_origination case
+
+    val sc_rollup_originate_case : Kind.sc_rollup_originate case
   end
 end

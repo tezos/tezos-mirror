@@ -73,6 +73,8 @@ module Kind = struct
 
   type tx_rollup_origination = Tx_rollup_origination_kind
 
+  type sc_rollup_originate = Sc_rollup_originate_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -81,6 +83,7 @@ module Kind = struct
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
+    | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
 end
 
 type 'a consensus_operation_type =
@@ -259,6 +262,11 @@ and _ manager_operation =
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
+  | Sc_rollup_originate : {
+      kind : Sc_rollup_repr.Kind.t;
+      boot_sector : Sc_rollup_repr.PVM.boot_sector;
+    }
+      -> Kind.sc_rollup_originate manager_operation
 
 and counter = Z.t
 
@@ -271,6 +279,7 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
   | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
   | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
+  | Sc_rollup_originate _ -> Kind.Sc_rollup_originate_manager_kind
 
 type 'kind internal_operation = {
   source : Contract_repr.contract;
@@ -329,6 +338,8 @@ let of_list l =
   | Error s -> error @@ Contents_list_error s
 
 let tx_rollup_operation_tag_offset = 150
+
+let sc_rollup_operation_tag_offset = 200
 
 module Encoding = struct
   open Data_encoding
@@ -513,6 +524,25 @@ module Encoding = struct
           inj = (fun () -> Tx_rollup_origination);
         }
 
+    let[@coq_axiom_with_reason "gadt"] sc_rollup_originate_case =
+      MCase
+        {
+          tag = sc_rollup_operation_tag_offset + 0;
+          name = "sc_rollup_originate";
+          encoding =
+            obj2
+              (req "kind" Sc_rollup_repr.Kind.encoding)
+              (req "boot_sector" Sc_rollup_repr.PVM.boot_sector_encoding);
+          select =
+            (function
+            | Manager (Sc_rollup_originate _ as op) -> Some op | _ -> None);
+          proj =
+            (function
+            | Sc_rollup_originate {kind; boot_sector} -> (kind, boot_sector));
+          inj =
+            (fun (kind, boot_sector) -> Sc_rollup_originate {kind; boot_sector});
+        }
+
     let encoding =
       let make (MCase {tag; name; encoding; select; proj; inj}) =
         case
@@ -533,6 +563,7 @@ module Encoding = struct
           make register_global_constant_case;
           make set_deposits_limit_case;
           make tx_rollup_origination_case;
+          make sc_rollup_originate_case;
         ]
   end
 
@@ -836,6 +867,11 @@ module Encoding = struct
       tx_rollup_operation_tag_offset
       Manager_operations.tx_rollup_origination_case
 
+  let sc_rollup_originate_case =
+    make_manager_case
+      sc_rollup_operation_tag_offset
+      Manager_operations.sc_rollup_originate_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -865,6 +901,7 @@ module Encoding = struct
            make failing_noop_case;
            make register_global_constant_case;
            make tx_rollup_origination_case;
+           make sc_rollup_originate_case;
          ]
 
   let contents_list_encoding =
@@ -1066,6 +1103,8 @@ let equal_manager_operation_kind :
   | (Set_deposits_limit _, _) -> None
   | (Tx_rollup_origination, Tx_rollup_origination) -> Some Eq
   | (Tx_rollup_origination, _) -> None
+  | (Sc_rollup_originate _, Sc_rollup_originate _) -> Some Eq
+  | (Sc_rollup_originate _, _) -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
@@ -1157,6 +1196,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
         +! option_size
              (fun _ -> Contract_repr.public_key_hash_in_memory_size)
              pkh_opt )
+  | Sc_rollup_originate _ -> (Nodes.zero, h2w)
   | Reveal _ ->
       (* Reveals can't occur as internal operations *)
       assert false

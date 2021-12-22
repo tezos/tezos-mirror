@@ -808,6 +808,26 @@ val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
 (** Same as [show_voting_period], but do not wait for the process to exit. *)
 val spawn_show_voting_period : ?endpoint:endpoint -> t -> Process.t
 
+(** Run [tezos-client originate sc rollup from <src> of kind <kind> booting with <boot_sector>]. *)
+val originate_sc_rollup :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  kind:string ->
+  boot_sector:string ->
+  t ->
+  string Lwt.t
+
+(** Same as [originate_sc_rollup], but do not wait for the process to exit. *)
+val spawn_originate_sc_rollup :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  src:string ->
+  kind:string ->
+  boot_sector:string ->
+  t ->
+  Process.t
+
 (** {2 High-Level Functions} *)
 
 (** Create a client with mode [Client] and import all secret keys

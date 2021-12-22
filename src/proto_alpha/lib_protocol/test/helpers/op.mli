@@ -194,3 +194,17 @@ val tx_rollup_origination :
   Context.t ->
   Contract.t ->
   (Operation.packed * Tx_rollup.t) tzresult Lwt.t
+
+(** [sc_rollup_origination ctxt source kind boot_sector] originates a new
+    smart contract rollup of some given [kind] booting using [boot_sector].
+    The process is the same as in [tx_rollup_origination]. *)
+val sc_rollup_origination :
+  ?counter:counter ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:counter ->
+  Context.t ->
+  Contract.t ->
+  Sc_rollup.Kind.t ->
+  Sc_rollup.PVM.boot_sector ->
+  packed_operation tzresult Lwt.t

@@ -84,3 +84,13 @@ val burn_tx_rollup_origination_fees :
   storage_limit:Z.t ->
   payer:Token.source ->
   (Raw_context.t * Z.t * Receipt_repr.balance_updates) tzresult Lwt.t
+
+(** [burn_sc_rollup_origination_fees ~origin ctxt ~storage_limit ~payer consumed]
+    burns the storage fees for smart contract rollup creation fees. *)
+val burn_sc_rollup_origination_fees :
+  ?origin:Receipt_repr.update_origin ->
+  Raw_context.t ->
+  storage_limit:Z.t ->
+  payer:Token.source ->
+  Z.t ->
+  (Raw_context.t * Z.t * Receipt_repr.balance_updates) tzresult Lwt.t

@@ -759,6 +759,8 @@ module Constants : sig
     initial_seed : State_hash.t option;
     tx_rollup_enable : bool;
     tx_rollup_origination_size : int;
+    sc_rollup_enable : bool;
+    sc_rollup_origination_size : int;
   }
 
   module Generated : sig
@@ -843,6 +845,10 @@ module Constants : sig
   val tx_rollup_enable : context -> bool
 
   val tx_rollup_origination_size : context -> int
+
+  val sc_rollup_enable : context -> bool
+
+  val sc_rollup_origination_size : context -> int
 
   (** All constants: fixed and parametric *)
   type t = private {fixed : fixed; parametric : parametric}
@@ -1888,6 +1894,31 @@ module Block_header : sig
     unit tzresult
 end
 
+(** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
+module Sc_rollup : sig
+  module PVM : sig
+    type boot_sector
+
+    val boot_sector_of_string : string -> boot_sector
+  end
+
+  module Address : S.HASH
+
+  type t = Address.t
+
+  module Kind : sig
+    type t = Example_arith
+
+    val encoding : t Data_encoding.t
+  end
+
+  val originate :
+    context ->
+    kind:Kind.t ->
+    boot_sector:PVM.boot_sector ->
+    (context * t * Z.t) tzresult Lwt.t
+end
+
 module Kind : sig
   type preendorsement_consensus_kind = Preendorsement_consensus_kind
 
@@ -1936,6 +1967,8 @@ module Kind : sig
 
   type tx_rollup_origination = Tx_rollup_origination_kind
 
+  type sc_rollup_originate = Sc_rollup_originate_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -1944,6 +1977,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
+    | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
 end
 
 type 'a consensus_operation_type =
@@ -2062,6 +2096,11 @@ and _ manager_operation =
       Tez.t option
       -> Kind.set_deposits_limit manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
+  | Sc_rollup_originate : {
+      kind : Sc_rollup.Kind.t;
+      boot_sector : Sc_rollup.PVM.boot_sector;
+    }
+      -> Kind.sc_rollup_originate manager_operation
 
 and counter = Z.t
 
@@ -2207,6 +2246,8 @@ module Operation : sig
 
     val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
+    val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -2232,6 +2273,8 @@ module Operation : sig
       val set_deposits_limit_case : Kind.set_deposits_limit case
 
       val tx_rollup_origination_case : Kind.tx_rollup_origination case
+
+      val sc_rollup_originate_case : Kind.sc_rollup_originate case
     end
   end
 
@@ -2485,6 +2528,14 @@ module Fees : sig
     context ->
     storage_limit:Z.t ->
     payer:Token.source ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_sc_rollup_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    Z.t ->
     (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
 
   type error += Cannot_pay_storage_fee (* `Temporary *)

@@ -320,6 +320,7 @@ let estimated_gas_single (type kind)
     | Applied (Set_deposits_limit_result {consumed_gas}) -> Ok consumed_gas
     | Applied (Tx_rollup_origination_result {consumed_gas; _}) ->
         Ok consumed_gas
+    | Applied (Sc_rollup_originate_result {consumed_gas; _}) -> Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
@@ -353,6 +354,7 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
         Ok size_of_constant
     | Applied (Set_deposits_limit_result _) -> Ok Z.zero
     | Applied (Tx_rollup_origination_result _) -> Ok tx_rollup_origination_size
+    | Applied (Sc_rollup_originate_result {size; _}) -> Ok size
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Z.zero (* there must be another error for this to happen *)
@@ -400,6 +402,7 @@ let originated_contracts_single (type kind)
     | Applied (Delegation_result _) -> Ok []
     | Applied (Set_deposits_limit_result _) -> Ok []
     | Applied (Tx_rollup_origination_result _) -> Ok []
+    | Applied (Sc_rollup_originate_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok [] (* there must be another error for this to happen *)

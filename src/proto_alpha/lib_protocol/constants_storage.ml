@@ -156,3 +156,11 @@ let tx_rollup_origination_size c =
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
+
+let sc_rollup_enable c =
+  let constants = Raw_context.constants c in
+  constants.sc_rollup_enable
+
+let sc_rollup_origination_size c =
+  let constants = Raw_context.constants c in
+  constants.sc_rollup_origination_size

@@ -328,7 +328,7 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
     ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?tx_rollup_enable n =
+    ?blocks_per_cycle ?tx_rollup_enable ?sc_rollup_enable n =
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -349,6 +349,7 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?origination_size
     ?blocks_per_cycle
     ?tx_rollup_enable
+    ?sc_rollup_enable
     accounts
   >|=? fun blk -> (blk, contracts)
 

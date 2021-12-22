@@ -80,5 +80,6 @@ let () =
       ("receipt encodings", Test_receipt.tests);
       ("tx rollup", Test_tx_rollup.tests);
       ("gas monad", Test_gas_monad.tests);
+      ("sc rollup", Test_sc_rollup.tests);
     ]
   |> Lwt_main.run

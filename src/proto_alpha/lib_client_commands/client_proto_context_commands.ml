@@ -48,17 +48,25 @@ let report_michelson_errors ?(no_print_source = false) ~msg
       cctxt#error "%s" msg >>= fun () -> Lwt.return_none
   | Ok data -> Lwt.return_some data
 
+let parse_file parse path =
+  Lwt_utils_unix.read_file path >>= fun contents -> parse contents
+
+let file_or_text_parameter ~from_text
+    ?(from_path = parse_file (from_text ~heuristic:false)) () =
+  Clic.parameter @@ fun _ p ->
+  match String.split ~limit:1 ':' p with
+  | ["text"; text] -> from_text ~heuristic:false text
+  | ["file"; path] -> from_path path
+  | _ -> if Sys.file_exists p then from_path p else from_text ~heuristic:true p
+
 let json_file_or_text_parameter =
-  Clic.parameter (fun _ p ->
-      match String.split ~limit:1 ':' p with
-      | ["text"; text] -> return (Ezjsonm.from_string text)
-      | ["file"; path] -> Lwt_utils_unix.Json.read_file path
-      | _ -> (
-          if Sys.file_exists p then Lwt_utils_unix.Json.read_file p
-          else
-            try return (Ezjsonm.from_string p)
-            with Ezjsonm.Parse_error _ ->
-              failwith "Neither an existing file nor valid JSON: '%s'" p))
+  let from_text ~heuristic s =
+    try return (Ezjsonm.from_string s)
+    with Ezjsonm.Parse_error _ when heuristic ->
+      failwith "Neither an existing file nor valid JSON: '%s'" s
+  in
+  let from_path = Lwt_utils_unix.Json.read_file in
+  file_or_text_parameter ~from_text ~from_path ()
 
 let non_negative_param =
   Clic.parameter (fun _ s ->
@@ -70,6 +78,25 @@ let block_hash_param =
   Clic.parameter (fun _ s ->
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
+
+let rollup_kind_param =
+  Clic.parameter (fun _ name ->
+      match Sc_rollups.from ~name with
+      | None ->
+          failwith
+            "Parameter '%s' is not a valid rollup name (must be one of %s)"
+            name
+            (String.concat ", " Sc_rollups.all_names)
+      | Some k -> return k)
+
+let boot_sector_param =
+  let from_text ~heuristic:_ s =
+    return (fun (module R : Sc_rollups.PVM.S) ->
+        R.parse_boot_sector s |> function
+        | None -> failwith "Invalid boot sector"
+        | Some boot_sector -> return boot_sector)
+  in
+  file_or_text_parameter ~from_text ()
 
 let group =
   {
@@ -2029,6 +2056,90 @@ let commands_rw () =
               ~src_pk
               ~src_sk
               ~fee_parameter
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Originate a new smart-contract rollup."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["originate"; "sc"; "rollup"; "from"]
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account originating the smart-contract rollup"
+      @@ prefixes ["of"; "kind"]
+      @@ param
+           ~name:"sc_rollup_kind"
+           ~desc:"kind of the smart-contract rollup to be originated"
+           rollup_kind_param
+      @@ prefixes ["booting"; "with"]
+      @@ param
+           ~name:"boot_sector"
+           ~desc:"the initialization state for the smart-contract rollup"
+           boot_sector_param
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           (_, source)
+           pvm
+           boot_sector
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit accounts can originate smart-contract rollups"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            let (module R : Sc_rollups.PVM.S) = pvm in
+            boot_sector pvm >>=? fun boot_sector ->
+            sc_rollup_originate
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~kind:(Sc_rollups.kind_of pvm)
+              ~boot_sector
               ()
             >>=? fun _res -> return_unit);
   ]

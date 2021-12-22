@@ -108,6 +108,8 @@ type error +=
   | (* `Branch *) Empty_transaction of Contract.t
   | (* `Permanent *)
       Tx_rollup_disabled
+  | (* `Permanent *)
+      Sc_rollup_feature_disabled
 
 let () =
   register_error_kind
@@ -480,6 +482,7 @@ let () =
     Data_encoding.(obj1 (req "contract" Contract.encoding))
     (function Empty_transaction c -> Some c | _ -> None)
     (fun c -> Empty_transaction c) ;
+
   register_error_kind
     `Permanent
     ~id:"operation.tx_rollup_is_disabled"
@@ -492,7 +495,20 @@ let () =
          will be enabled in a future proposal")
     Data_encoding.unit
     (function Tx_rollup_disabled -> Some () | _ -> None)
-    (fun () -> Tx_rollup_disabled)
+    (fun () -> Tx_rollup_disabled) ;
+
+  let description =
+    "Smart contract rollups will be enabled in a future proposal."
+  in
+  register_error_kind
+    `Permanent
+    ~id:"operation.sc_rollup_disabled"
+    ~title:"Smart contract rollups are disabled"
+    ~description
+    ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
+    Data_encoding.unit
+    (function Sc_rollup_feature_disabled -> Some () | _ -> None)
+    (fun () -> Sc_rollup_feature_disabled)
 
 type error += (* `Temporary *) Wrong_voting_period of int32 * int32
 
@@ -776,6 +792,9 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate)
 
 open Apply_results
+
+let assert_sc_rollup_feature_enabled ctxt =
+  fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
 let cache_layout = Constants_repr.cache_layout
 
@@ -1120,6 +1139,16 @@ let apply_manager_operation_content :
           }
       in
       return (ctxt, result, [])
+  | Sc_rollup_originate {kind; boot_sector} ->
+      let open Sc_rollup_operations in
+      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
+      originate ctxt ~kind ~boot_sector >>=? fun (ctxt, {address; size}) ->
+      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let result =
+        Sc_rollup_originate_result
+          {address; consumed_gas; size; balance_updates = []}
+      in
+      return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -1329,6 +1358,16 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_origination_result {payload with balance_updates} )
+  | Sc_rollup_originate_result payload ->
+      let payer = `Contract payer in
+      Fees.burn_sc_rollup_origination_fees
+        ctxt
+        ~storage_limit
+        ~payer
+        payload.size
+      >>=? fun (ctxt, storage_limit, balance_updates) ->
+      let result = Sc_rollup_originate_result {payload with balance_updates} in
+      return (ctxt, storage_limit, result)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :

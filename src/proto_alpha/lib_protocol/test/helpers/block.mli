@@ -120,6 +120,7 @@ val genesis :
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?tx_rollup_enable:bool ->
+  ?sc_rollup_enable:bool ->
   (Account.t * Tez.tez) list ->
   block tzresult Lwt.t
 
@@ -253,6 +254,7 @@ val prepare_initial_context_params :
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
   ?tx_rollup_enable:bool ->
+  ?sc_rollup_enable:bool ->
   (Account.t * Tez.t) list ->
   ( Constants.parametric * Block_header.shell_header * Block_hash.t,
     tztrace )

@@ -170,7 +170,9 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("double_baking_punishment", string "640000000")
           ; ("tx_rollup_enable", bool false)
           ; (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
-            ("tx_rollup_origination_size", int 60_000) ]
+            ("tx_rollup_origination_size", int 60_000)
+          ; ("sc_rollup_enable", bool false)
+          ; ("sc_rollup_origination_size", int 6_314) ]
       | `Granada | `Hangzhou -> []
       | _ -> failwith "unsupported protocol" in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
