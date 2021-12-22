@@ -417,28 +417,38 @@ let join_keys keys1_opt keys2 =
   | (Some (_, _, Some _), _) -> keys1_opt
   | _ -> Some keys2
 
-let raw_get_key (cctxt : #Client_context.wallet) pkh =
-  ( Public_key_hash.rev_find_all cctxt pkh >>=? fun names ->
-    List.fold_left_es
-      (fun keys_opt n ->
-        Secret_key.find_opt cctxt n >>=? fun sk_uri ->
-        (Public_key.find_opt cctxt n >>=? function
-         | None -> return_none
-         | Some (_, Some pk) -> return_some pk
-         | Some (pk_uri, None) ->
-             public_key pk_uri >>=? fun pk ->
-             Public_key.update cctxt n (pk_uri, Some pk) >>=? fun () ->
-             return_some pk)
-        >>=? fun pk -> return @@ join_keys keys_opt (n, pk, sk_uri))
-      None
-      names
-    >>=? function
-    | None ->
-        failwith
-          "no keys for the source contract %a"
-          Signature.Public_key_hash.pp
-          pkh
-    | Some keys -> return keys )
+(* For efficiency, this function avoids loading the wallet, except for
+   the call to [Public_key.update]. Indeed the arguments [pkhs],
+   [pks], [sks] represent the already loaded list of public key
+   hashes, public keys, and secret keys. *)
+let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
+  let rev_find_all list pkh =
+    List.filter_map
+      (fun (name, pkh') ->
+        if Signature.Public_key_hash.equal pkh pkh' then Some name else None)
+      list
+  in
+  (let names = rev_find_all pkhs pkh in
+   List.fold_left_es
+     (fun keys_opt name ->
+       let sk_uri_opt = List.assoc ~equal:String.equal name sks in
+       (match List.assoc ~equal:String.equal name pks with
+       | None -> return_none
+       | Some (_, Some pk) -> return_some pk
+       | Some (pk_uri, None) ->
+           public_key pk_uri >>=? fun pk ->
+           Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
+           return_some pk)
+       >>=? fun pk_opt -> return @@ join_keys keys_opt (name, pk_opt, sk_uri_opt))
+     None
+     names
+   >>=? function
+   | None ->
+       failwith
+         "no keys for the source contract %a"
+         Signature.Public_key_hash.pp
+         pkh
+   | Some keys -> return keys)
   >>= function
   | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
@@ -451,6 +461,11 @@ let raw_get_key (cctxt : #Client_context.wallet) pkh =
       | Error _ -> Lwt.return initial_result
       | Ok _ as success -> Lwt.return success)
   | Ok _ as success -> Lwt.return success
+
+let raw_get_key (cctxt : #Client_context.wallet) pkh =
+  Public_key_hash.load cctxt >>=? fun pkhs ->
+  Public_key.load cctxt >>=? fun pks ->
+  Secret_key.load cctxt >>=? fun sks -> raw_get_key_aux cctxt pkhs pks sks pkh
 
 let get_key cctxt pkh =
   raw_get_key cctxt pkh >>=? function
@@ -490,13 +505,15 @@ let get_keys (cctxt : #Client_context.wallet) =
   >>= fun keys -> return keys
 
 let list_keys cctxt =
-  Public_key_hash.load cctxt >>=? fun l ->
+  Public_key_hash.load cctxt >>=? fun pkhs ->
+  Public_key.load cctxt >>=? fun pks ->
+  Secret_key.load cctxt >>=? fun sks ->
   List.map_es
     (fun (name, pkh) ->
-      raw_get_key cctxt pkh >>= function
+      raw_get_key_aux cctxt pkhs pks sks pkh >>= function
       | Ok (_name, pk, sk_uri) -> return (name, pkh, pk, sk_uri)
       | Error _ -> return (name, pkh, None, None))
-    l
+    pkhs
 
 let alias_keys cctxt name =
   Public_key_hash.find cctxt name >>=? fun pkh ->
