@@ -109,11 +109,7 @@ let main_promise (config_file : string option)
     int tzresult Lwt.t =
   let open Lwt_result_syntax in
   let* (config_from_file : Proxy_server_config.t option) =
-    match config_file with
-    | None -> return_none
-    | Some config_file ->
-        let* config = load_config_from_file config_file in
-        return_some config
+    Option.map_es load_config_from_file config_file
   in
   let open Proxy_server_config in
   let* {

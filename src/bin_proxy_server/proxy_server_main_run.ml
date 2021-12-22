@@ -63,14 +63,12 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
   in
   Lwt.catch
     (fun () ->
-      let*! server =
-        Tezos_rpc_http_server.RPC_server.launch
-          ~host
-          mode
-          dir
-          ~media_types:Tezos_rpc_http.Media_type.all_media_types
-      in
-      return server)
+      Lwt_result.ok
+      @@ Tezos_rpc_http_server.RPC_server.launch
+           ~host
+           mode
+           dir
+           ~media_types:Tezos_rpc_http.Media_type.all_media_types)
     (function
       | Unix.Unix_error (Unix.EADDRINUSE, "bind", "") ->
           fail (Proxy_server_RPC_Port_already_in_use [(address, port)])
