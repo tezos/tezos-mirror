@@ -34,7 +34,7 @@
 
 let protocols = [Protocol.Alpha; Protocol.Ithaca; Protocol.Hangzhou]
 
-let migrate_from = Protocol.Hangzhou
+let migrate_from = Protocol.Ithaca
 
 let migrate_to = Protocol.Alpha
 
