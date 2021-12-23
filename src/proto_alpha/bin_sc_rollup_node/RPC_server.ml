@@ -26,21 +26,12 @@
 open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
-open Protocol
-open Alpha_context
-
-module S = struct
-  let sc_rollup_address =
-    RPC_service.get_service
-      ~description:"Smart-contract rollup address"
-      ~query:RPC_query.empty
-      ~output:Sc_rollup.Address.encoding
-      RPC_path.(open_root / "sc_rollup_address")
-end
 
 let register_sc_rollup_address configuration dir =
-  RPC_directory.register0 dir S.sc_rollup_address (fun () () ->
-      return @@ configuration.Configuration.sc_rollup_address)
+  RPC_directory.register0
+    dir
+    (Sc_rollup_services.sc_rollup_address ())
+    (fun () () -> return @@ configuration.Configuration.sc_rollup_address)
 
 let register configuration =
   RPC_directory.empty |> register_sc_rollup_address configuration
