@@ -38,6 +38,8 @@ let tezos_snoop = "./tezos-snoop"
 
 let sc_rollup_node = "./tezos-sc-rollup-node-alpha"
 
+let sc_rollup_client = "./tezos-sc-rollup-client-alpha"
+
 let activator : Account.key =
   {
     alias = "activator";

@@ -167,7 +167,39 @@ let test_rollup_node_running =
                  rollup_address_from_rpc)
           else return ())
 
+(* Interacting with a rollup node through a rollup client
+   ------------------------------------------------------
+
+   When a rollup node is running, a rollup client can ask this
+   node its rollup address.
+
+*)
+let test_rollup_client_gets_address =
+  let output_file = "sc_rollup_client_gets_address" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["run"; "client"]
+    "getting a smart-contract rollup address through the client"
+    (fun protocol ->
+      setup ~protocol @@ with_fresh_rollup
+      @@ fun rollup_address sc_rollup_node _filename ->
+      let* () = Sc_rollup_node.run sc_rollup_node in
+      let sc_client = Sc_rollup_client.create sc_rollup_node in
+      let* rollup_address_from_client =
+        Sc_rollup_client.sc_rollup_address sc_client
+      in
+      if rollup_address_from_client <> rollup_address then
+        failwith
+          (Printf.sprintf
+             "Expecting %s, got %s when the client asks for the sc rollup \
+              address"
+             rollup_address
+             rollup_address_from_client) ;
+      return ())
+
 let register ~protocols =
   test_origination ~protocols ;
   test_rollup_node_configuration ~protocols ;
-  test_rollup_node_running ~protocols
+  test_rollup_node_running ~protocols ;
+  test_rollup_client_gets_address ~protocols
