@@ -185,7 +185,7 @@ let iter_s f = function None -> Lwt.return_unit | Some v -> f v
 
 let iter_e f = function None -> Ok () | Some v -> f v
 
-let iter_es f = function None -> Lwt.return_ok () | Some v -> f v
+let iter_es f = function None -> Lwt_syntax.return_ok_unit | Some v -> f v
 
 let of_result = function Ok v -> Some v | Error _ -> None
 

@@ -90,7 +90,7 @@ module Default_answerer = struct
         P2p_pool.list_known_points ~ignore_private:true config.pool
       in
       match points with
-      | [] -> Lwt_result_syntax.return_unit
+      | [] -> return_unit
       | points -> (
           match conn.write_advertise points with
           | Ok true ->

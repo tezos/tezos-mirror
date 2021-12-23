@@ -456,7 +456,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
                   List.map
                     (fun remain ->
                       let* _ = remain in
-                      Lwt_result_syntax.return_unit)
+                      return_ok_unit)
                     remaining )
         in
         handle finished

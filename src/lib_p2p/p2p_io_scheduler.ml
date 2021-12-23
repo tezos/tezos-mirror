@@ -227,7 +227,7 @@ module Scheduler (IO : IO) = struct
           conn.current_push <-
             (let* r = IO.push conn.out_param msg in
              match r with
-             | Ok () | Error (Canceled :: _) -> Lwt_result_syntax.return_unit
+             | Ok () | Error (Canceled :: _) -> return_ok_unit
              | Error (P2p_errors.Connection_closed :: _ as err)
              | Error (Exn (Unix.Unix_error (EBADF, _, _)) :: _ as err)
              | Error (Exn Lwt_pipe.Closed :: _ as err) ->
@@ -235,13 +235,13 @@ module Scheduler (IO : IO) = struct
                    Events.(emit connection_closed) ("push", conn.id, IO.name)
                  in
                  let* () = cancel conn err in
-                 Lwt_result_syntax.return_unit
+                 return_ok_unit
              | Error err ->
                  let* () =
                    Events.(emit unexpected_error) ("push", conn.id, IO.name, err)
                  in
                  let* () = cancel conn err in
-                 Lwt.return_error err) ;
+                 return_error err) ;
           let len = IO.length msg in
           let* () = Events.(emit handle_connection) (len, conn.id, IO.name) in
           Moving_average.add st.counter len ;

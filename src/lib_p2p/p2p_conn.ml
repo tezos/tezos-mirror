@@ -136,7 +136,7 @@ let create ~conn ~point_info ~peer_info ~messages ~canceler ~greylister
   t
 
 let pipe_exn_handler = function
-  | Lwt_pipe.Closed -> Lwt_tzresult_syntax.fail P2p_errors.Connection_closed
+  | Lwt_pipe.Closed -> Error_monad.fail P2p_errors.Connection_closed
   | exc -> Lwt.fail exc
 
 (* see [Lwt_pipe.Maybe_bounded.pop] *)
