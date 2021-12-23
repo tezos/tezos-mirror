@@ -25,49 +25,56 @@ let wait_for_voting_period ?level_within_period state ~protocol ~client
          ~default:""
          ~f:(sprintf " (and level-within-period ≥ %d)"))
   in
-  Console.say state EF.(wf "%s" message) >>= fun () ->
+  let* () = Console.say state EF.(wf "%s" message) in
   Helpers.wait_for state ~attempts ~seconds:10. (fun nth ->
-      Asynchronous_result.map_option level_within_period ~f:(fun lvl ->
-          Tezos_client.rpc
-            state
-            ~client
-            `Get
-            ~path:"/chains/main/blocks/head/metadata"
-          >>= fun json ->
-          try
-            let voting_period_position =
-              Jqo.field ~k:"voting_period_info" json
-              |> Jqo.field ~k:"position" |> Jqo.get_int
+      let* lvl_ok =
+        Asynchronous_result.map_option level_within_period ~f:(fun lvl ->
+            let* json =
+              Tezos_client.rpc
+                state
+                ~client
+                `Get
+                ~path:"/chains/main/blocks/head/metadata"
             in
-            return (voting_period_position >= lvl)
-          with e ->
-            failf
-              "Cannot get level.voting_period_position: %s"
-              (Exn.to_string e))
-      >>= fun lvl_ok ->
-      Tezos_client.rpc
-        state
-        ~client
-        `Get
-        ~path:"/chains/main/blocks/head/votes/current_period"
-      >>= function
+            try
+              let voting_period_position =
+                Jqo.field ~k:"voting_period_info" json
+                |> Jqo.field ~k:"position" |> Jqo.get_int
+              in
+              return (voting_period_position >= lvl)
+            with e ->
+              failf
+                "Cannot get level.voting_period_position: %s"
+                (Exn.to_string e))
+      in
+      let* json =
+        Tezos_client.rpc
+          state
+          ~client
+          `Get
+          ~path:"/chains/main/blocks/head/votes/current_period"
+      in
+      match json with
       | `O voting_period
         when is_expected_period voting_period period_name
              && Poly.(lvl_ok = None || lvl_ok = Some true) ->
           return (`Done (nth - 1))
       | _ ->
-          Tezos_client.successful_client_cmd
-            state
-            ~client
-            ["show"; "voting"; "period"]
-          >>= fun res ->
-          Console.say
-            state
-            EF.(
-              desc_list
-                (wf "Voting period:")
-                [markdown_verbatim (String.concat ~sep:"\n" res#out)])
-          >>= fun () -> return (`Not_done message))
+          let* res =
+            Tezos_client.successful_client_cmd
+              state
+              ~client
+              ["show"; "voting"; "period"]
+          in
+          let* () =
+            Console.say
+              state
+              EF.(
+                desc_list
+                  (wf "Voting period:")
+                  [markdown_verbatim (String.concat ~sep:"\n" res#out)])
+          in
+          return (`Not_done message))
 
 let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ?generate_kiln_config ~node_exec ~client_exec ~first_baker_exec
@@ -75,38 +82,41 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     ~second_endorser_exec ~second_accuser_exec ~admin_exec ~new_protocol_path
     ~extra_dummy_proposals_batch_size ~extra_dummy_proposals_batch_levels
     ~waiting_attempts test_variant () =
-  Helpers.clear_root state >>= fun () ->
-  Helpers.System_dependencies.precheck
-    state
-    `Or_fail
-    ~protocol_paths:[new_protocol_path]
-    ~executables:
-      [
-        node_exec;
-        client_exec;
-        first_baker_exec;
-        first_endorser_exec;
-        first_accuser_exec;
-        second_baker_exec;
-        second_endorser_exec;
-        second_accuser_exec;
-      ]
-  >>= fun () ->
-  Test_scenario.network_with_protocol
-    ?external_peer_ports
-    ~protocol
-    ~size
-    ~base_port
-    state
-    ~node_exec
-    ~client_exec
-  >>= fun (nodes, protocol) ->
-  Tezos_client.rpc
-    state
-    ~client:(Tezos_client.of_node (List.hd_exn nodes) ~exec:client_exec)
-    `Get
-    ~path:"/chains/main/chain_id"
-  >>= fun chain_id_json ->
+  let* () = Helpers.clear_root state in
+  let* () =
+    Helpers.System_dependencies.precheck
+      state
+      `Or_fail
+      ~protocol_paths:[new_protocol_path]
+      ~executables:
+        [
+          node_exec;
+          client_exec;
+          first_baker_exec;
+          first_endorser_exec;
+          first_accuser_exec;
+          second_baker_exec;
+          second_endorser_exec;
+          second_accuser_exec;
+        ]
+  in
+  let* (nodes, protocol) =
+    Test_scenario.network_with_protocol
+      ?external_peer_ports
+      ~protocol
+      ~size
+      ~base_port
+      state
+      ~node_exec
+      ~client_exec
+  in
+  let* chain_id_json =
+    Tezos_client.rpc
+      state
+      ~client:(Tezos_client.of_node (List.hd_exn nodes) ~exec:client_exec)
+      `Get
+      ~path:"/chains/main/chain_id"
+  in
   let network_id =
     match chain_id_json with `String s -> s | _ -> assert false
   in
@@ -126,10 +136,13 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
             ~name_tag:"second";
         ])
   in
-  List_sequential.iter accusers ~f:(fun acc ->
-      Running_processes.start state (Tezos_daemon.process state acc)
-      >>= fun _ -> return ())
-  >>= fun () ->
+  let* () =
+    List_sequential.iter accusers ~f:(fun acc ->
+        let* _ =
+          Running_processes.start state (Tezos_daemon.process state acc)
+        in
+        return ())
+  in
   let keys_and_daemons =
     let pick_a_node_and_client idx =
       match List.nth nodes ((1 + idx) % List.length nodes) with
@@ -172,36 +185,44 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
                      ~key;
                  ] ))
   in
-  List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
-      Tezos_client.wait_for_node_bootstrap state client >>= fun () ->
-      let (key, priv) = Tezos_protocol.Account.(name acc, private_key acc) in
-      Tezos_client.import_secret_key state client ~name:key ~key:priv
-      >>= fun () ->
-      say
-        state
-        EF.(
-          desc_list
-            (haf "Registration-as-delegate:")
-            [
-              desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key);
-            ])
-      >>= fun () ->
-      Tezos_client.register_as_delegate state client ~key_name:key >>= fun () ->
-      say
-        state
-        EF.(
-          desc_list
-            (haf "Starting daemons:")
-            [
-              desc (af "Client:") (af "%S" client.Tezos_client.id);
-              desc (af "Key:") (af "%S" key);
-            ])
-      >>= fun () ->
-      List_sequential.iter daemons ~f:(fun daemon ->
-          Running_processes.start state (Tezos_daemon.process state daemon)
-          >>= fun _ -> return ()))
-  >>= fun () ->
+  let* () =
+    List_sequential.iter keys_and_daemons ~f:(fun (acc, client, daemons) ->
+        let* () = Tezos_client.wait_for_node_bootstrap state client in
+        let (key, priv) = Tezos_protocol.Account.(name acc, private_key acc) in
+        let* () =
+          Tezos_client.import_secret_key state client ~name:key ~key:priv
+        in
+        let* () =
+          say
+            state
+            EF.(
+              desc_list
+                (haf "Registration-as-delegate:")
+                [
+                  desc (af "Client:") (af "%S" client.Tezos_client.id);
+                  desc (af "Key:") (af "%S" key);
+                ])
+        in
+        let* () =
+          Tezos_client.register_as_delegate state client ~key_name:key
+        in
+        let* () =
+          say
+            state
+            EF.(
+              desc_list
+                (haf "Starting daemons:")
+                [
+                  desc (af "Client:") (af "%S" client.Tezos_client.id);
+                  desc (af "Key:") (af "%S" key);
+                ])
+        in
+        List_sequential.iter daemons ~f:(fun daemon ->
+            let* _ =
+              Running_processes.start state (Tezos_daemon.process state daemon)
+            in
+            return ()))
+  in
   let client_0 =
     Tezos_client.of_node (List.nth_exn nodes 0) ~exec:client_exec
   in
@@ -220,129 +241,159 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
      if it does we're good, if not we inject it.
      This is because `inject` fails when the node already knows a protocol.
   *)
-  List.fold ~init:(return None) nodes ~f:(fun prevm nod ->
-      prevm >>= fun _ ->
-      System.read_file state (new_protocol_path // "TEZOS_PROTOCOL")
-      >>= fun protocol ->
-      (try return Jqo.(of_string protocol |> field ~k:"hash" |> get_string)
-       with e ->
-         failf
-           "Cannot parse %s/TEZOS_PROTOCOL: %s"
-           new_protocol_path
-           (Exn.to_string e))
-      >>= fun hash ->
-      let client = Tezos_client.of_node ~exec:client_exec nod in
-      Tezos_client.rpc state ~client `Get ~path:"/protocols"
-      >>= fun protocols ->
-      match protocols with
-      | `A l
-        when List.exists l ~f:(function
-                 | `String h -> String.equal h hash
-                 | _ -> false) ->
-          Console.say
+  let* prot_opt =
+    List.fold ~init:(return None) nodes ~f:(fun prevm nod ->
+        let* _ = prevm in
+        let* protocol =
+          System.read_file state (new_protocol_path // "TEZOS_PROTOCOL")
+        in
+        let* hash =
+          try return Jqo.(of_string protocol |> field ~k:"hash" |> get_string)
+          with e ->
+            failf
+              "Cannot parse %s/TEZOS_PROTOCOL: %s"
+              new_protocol_path
+              (Exn.to_string e)
+        in
+        let client = Tezos_client.of_node ~exec:client_exec nod in
+        let* protocols =
+          Tezos_client.rpc state ~client `Get ~path:"/protocols"
+        in
+        match protocols with
+        | `A l
+          when List.exists l ~f:(function
+                   | `String h -> String.equal h hash
+                   | _ -> false) ->
+            let* () =
+              Console.say
+                state
+                EF.(
+                  wf
+                    "Node `%s` already knows protocol `%s`."
+                    nod.Tezos_node.id
+                    hash)
+            in
+            return (Some hash)
+        | _ ->
+            let admin = make_admin client in
+            let* (_, new_protocol_hash) =
+              Tezos_admin_client.inject_protocol
+                admin
+                state
+                ~path:new_protocol_path
+            in
+            let* () =
+              if String.equal new_protocol_hash hash then
+                Console.say
+                  state
+                  EF.(
+                    wf
+                      "Injected protocol `%s` in `%s`"
+                      new_protocol_hash
+                      nod.Tezos_node.id)
+              else
+                failf
+                  "Injecting protocol %s failed (≠ %s)"
+                  new_protocol_hash
+                  hash
+            in
+            return (Some hash))
+  in
+  let* new_protocol_hash =
+    match prot_opt with
+    | Some s -> return s
+    | None -> failf "protocol injection problem?"
+  in
+  let* kiln_info_opt =
+    Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
+        let* () =
+          Kiln.Configuration_directory.generate
             state
-            EF.(
-              wf "Node `%s` already knows protocol `%s`." nod.Tezos_node.id hash)
-          >>= fun () -> return (Some hash)
-      | _ ->
-          let admin = make_admin client in
-          Tezos_admin_client.inject_protocol admin state ~path:new_protocol_path
-          >>= fun (_, new_protocol_hash) ->
-          (if String.equal new_protocol_hash hash then
-           Console.say
-             state
-             EF.(
-               wf
-                 "Injected protocol `%s` in `%s`"
-                 new_protocol_hash
-                 nod.Tezos_node.id)
-          else
-            failf "Injecting protocol %s failed (≠ %s)" new_protocol_hash hash)
-          >>= fun () -> return (Some hash))
-  >>= fun prot_opt ->
-  (match prot_opt with
-  | Some s -> return s
-  | None -> failf "protocol injection problem?")
-  >>= fun new_protocol_hash ->
-  Asynchronous_result.map_option generate_kiln_config ~f:(fun kiln_config ->
-      Kiln.Configuration_directory.generate
-        state
-        kiln_config
-        ~peers:(List.map nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
-        ~sandbox_json:(Tezos_protocol.sandbox_path state protocol)
-        ~nodes:
-          (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
-               sprintf "http://localhost:%d" rpc_port))
-        ~bakers:
-          (List.map
-             protocol.Tezos_protocol.bootstrap_accounts
-             ~f:(fun (account, _) ->
-               Tezos_protocol.Account.(name account, pubkey_hash account)))
-        ~network_string:network_id
-        ~node_exec
-        ~client_exec
-        ~protocol_execs:
-          [
-            (protocol.Tezos_protocol.hash, first_baker_exec, first_endorser_exec);
-            (new_protocol_hash, second_baker_exec, second_endorser_exec);
-          ]
-      >>= fun () ->
-      let msg =
-        EF.(
-          desc
-            (shout "Kiln-Configuration DONE")
-            (wf "Kiln was configured at `%s`" kiln_config.path))
-      in
-      Console.say state msg >>= fun () -> return msg)
-  >>= fun kiln_info_opt ->
-  Test_scenario.Queries.wait_for_all_levels_to_be
-    state
-    ~attempts:waiting_attempts
-    ~seconds:10.
-    nodes
-    (* TODO: wait for /chains/main/blocks/head/votes/listings to be
-       non-empty instead of counting blocks *)
-    (`At_least protocol.Tezos_protocol.blocks_per_voting_period)
-  >>= fun () ->
-  Interactive_test.Pauser.generic
-    state
-    EF.
-      [
-        wf "Test becomes interactive.";
-        Option.value kiln_info_opt ~default:(wf "");
-        wf "Please type `q` to start a voting/protocol-change period.";
-      ]
-  >>= fun () ->
-  wait_for_voting_period
-    state
-    ~protocol
-    ~client:client_0
-    ~attempts:waiting_attempts
-    `Proposal
-    ~level_within_period:3
-  >>= fun _ ->
-  let submit_prop acc client hash =
-    Tezos_client.successful_client_cmd
+            kiln_config
+            ~peers:
+              (List.map nodes ~f:(fun {Tezos_node.p2p_port; _} -> p2p_port))
+            ~sandbox_json:(Tezos_protocol.sandbox_path state protocol)
+            ~nodes:
+              (List.map nodes ~f:(fun {Tezos_node.rpc_port; _} ->
+                   sprintf "http://localhost:%d" rpc_port))
+            ~bakers:
+              (List.map
+                 protocol.Tezos_protocol.bootstrap_accounts
+                 ~f:(fun (account, _) ->
+                   Tezos_protocol.Account.(name account, pubkey_hash account)))
+            ~network_string:network_id
+            ~node_exec
+            ~client_exec
+            ~protocol_execs:
+              [
+                ( protocol.Tezos_protocol.hash,
+                  first_baker_exec,
+                  first_endorser_exec );
+                (new_protocol_hash, second_baker_exec, second_endorser_exec);
+              ]
+        in
+        let msg =
+          EF.(
+            desc
+              (shout "Kiln-Configuration DONE")
+              (wf "Kiln was configured at `%s`" kiln_config.path))
+        in
+        let* () = Console.say state msg in
+        return msg)
+  in
+  let* () =
+    Test_scenario.Queries.wait_for_all_levels_to_be
       state
-      ~client
-      [
-        "submit";
-        "proposals";
-        "for";
-        Tezos_protocol.Account.name acc;
-        hash;
-        "--force";
-      ]
-    >>= fun _ ->
+      ~attempts:waiting_attempts
+      ~seconds:10.
+      nodes
+      (* TODO: wait for /chains/main/blocks/head/votes/listings to be
+         non-empty instead of counting blocks *)
+      (`At_least protocol.Tezos_protocol.blocks_per_voting_period)
+  in
+  let* () =
+    Interactive_test.Pauser.generic
+      state
+      EF.
+        [
+          wf "Test becomes interactive.";
+          Option.value kiln_info_opt ~default:(wf "");
+          wf "Please type `q` to start a voting/protocol-change period.";
+        ]
+  in
+  let* _ =
+    wait_for_voting_period
+      state
+      ~protocol
+      ~client:client_0
+      ~attempts:waiting_attempts
+      `Proposal
+      ~level_within_period:3
+  in
+  let submit_prop acc client hash =
+    let* _ =
+      Tezos_client.successful_client_cmd
+        state
+        ~client
+        [
+          "submit";
+          "proposals";
+          "for";
+          Tezos_protocol.Account.name acc;
+          hash;
+          "--force";
+        ]
+    in
     Console.sayf
       state
       Fmt.(
         fun ppf () ->
           pf ppf "%s voted for %s" (Tezos_protocol.Account.name acc) hash)
   in
-  List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
-      submit_prop acc client new_protocol_hash)
-  >>= fun () ->
+  let* () =
+    List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
+        submit_prop acc client new_protocol_hash)
+  in
   let make_dummy_protocol_hashes t tag =
     List.map
       (List.init extra_dummy_proposals_batch_size ~f:(fun s ->
@@ -354,129 +405,147 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
     List.bind extra_dummy_proposals_batch_levels ~f:(fun l ->
         make_dummy_protocol_hashes l (sprintf "%d" l))
   in
-  Console.say
-    state
-    EF.(
-      wf
-        "Going to also vote for %s"
-        (String.concat ~sep:", " (List.map extra_dummy_protocols ~f:snd)))
-  >>= fun () ->
-  List_sequential.iteri extra_dummy_protocols ~f:(fun nth (level, proto_hash) ->
-      match List.nth keys_and_daemons (nth / 19) with
-      | None ->
-          failf "Too many dummy protocols Vs available voting power (%d)" nth
-      | Some (acc, client, _) ->
-          wait_for_voting_period
+  let* () =
+    Console.say
+      state
+      EF.(
+        wf
+          "Going to also vote for %s"
+          (String.concat ~sep:", " (List.map extra_dummy_protocols ~f:snd)))
+  in
+  let* () =
+    List_sequential.iteri
+      extra_dummy_protocols
+      ~f:(fun nth (level, proto_hash) ->
+        match List.nth keys_and_daemons (nth / 19) with
+        | None ->
+            failf "Too many dummy protocols Vs available voting power (%d)" nth
+        | Some (acc, client, _) ->
+            let* _ =
+              wait_for_voting_period
+                state
+                ~protocol
+                ~client:client_0
+                ~attempts:waiting_attempts
+                `Proposal
+                ~level_within_period:level
+            in
+            submit_prop acc client proto_hash)
+  in
+  let* _ =
+    wait_for_voting_period
+      state
+      ~protocol
+      ~client:client_0
+      ~attempts:waiting_attempts
+      `Exploration
+  in
+  let* () =
+    List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
+        let* _ =
+          Tezos_client.successful_client_cmd
             state
-            ~protocol
-            ~client:client_0
-            ~attempts:waiting_attempts
-            `Proposal
-            ~level_within_period:level
-          >>= fun _ -> submit_prop acc client proto_hash)
-  >>= fun () ->
-  wait_for_voting_period
-    state
-    ~protocol
-    ~client:client_0
-    ~attempts:waiting_attempts
-    `Exploration
-  >>= fun _ ->
-  List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
-      Tezos_client.successful_client_cmd
-        state
-        ~client
-        [
-          "submit";
-          "ballot";
-          "for";
-          Tezos_protocol.Account.name acc;
-          new_protocol_hash;
-          "yea";
-        ]
-      >>= fun _ ->
-      Console.sayf
-        state
-        Fmt.(
-          fun ppf () ->
-            pf
-              ppf
-              "%s voted Yea to test %s"
-              (Tezos_protocol.Account.name acc)
-              new_protocol_hash))
-  >>= fun () ->
-  wait_for_voting_period
-    state
-    ~protocol
-    ~client:client_0
-    ~attempts:waiting_attempts
-    `Promotion
-  >>= fun _ ->
+            ~client
+            [
+              "submit";
+              "ballot";
+              "for";
+              Tezos_protocol.Account.name acc;
+              new_protocol_hash;
+              "yea";
+            ]
+        in
+        Console.sayf
+          state
+          Fmt.(
+            fun ppf () ->
+              pf
+                ppf
+                "%s voted Yea to test %s"
+                (Tezos_protocol.Account.name acc)
+                new_protocol_hash))
+  in
+  let* _ =
+    wait_for_voting_period
+      state
+      ~protocol
+      ~client:client_0
+      ~attempts:waiting_attempts
+      `Promotion
+  in
   let protocol_switch_will_happen =
     match test_variant with
     | `Full_upgrade -> true
     | `Nay_for_promotion -> false
   in
-  List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
-      Tezos_client.successful_client_cmd
-        state
-        ~client
-        [
-          "submit";
-          "ballot";
-          "for";
-          Tezos_protocol.Account.name acc;
-          new_protocol_hash;
-          (if protocol_switch_will_happen then "yea" else "nay");
-        ]
-      >>= fun _ ->
-      Console.sayf
-        state
-        Fmt.(
-          fun ppf () ->
-            pf
-              ppf
-              "%s voted Yea to promote %s"
-              (Tezos_protocol.Account.name acc)
-              new_protocol_hash))
-  >>= fun () ->
-  wait_for_voting_period
-    state
-    ~protocol
-    ~client:client_0
-    ~attempts:waiting_attempts
-    `Proposal
-  >>= fun _ ->
-  Tezos_client.successful_client_cmd
-    state
-    ~client:client_0
-    ["show"; "voting"; "period"]
-  >>= fun res ->
+  let* () =
+    List_sequential.iter keys_and_daemons ~f:(fun (acc, client, _) ->
+        let* _ =
+          Tezos_client.successful_client_cmd
+            state
+            ~client
+            [
+              "submit";
+              "ballot";
+              "for";
+              Tezos_protocol.Account.name acc;
+              new_protocol_hash;
+              (if protocol_switch_will_happen then "yea" else "nay");
+            ]
+        in
+        Console.sayf
+          state
+          Fmt.(
+            fun ppf () ->
+              pf
+                ppf
+                "%s voted Yea to promote %s"
+                (Tezos_protocol.Account.name acc)
+                new_protocol_hash))
+  in
+  let* _ =
+    wait_for_voting_period
+      state
+      ~protocol
+      ~client:client_0
+      ~attempts:waiting_attempts
+      `Proposal
+  in
+  let* res =
+    Tezos_client.successful_client_cmd
+      state
+      ~client:client_0
+      ["show"; "voting"; "period"]
+  in
   let protocol_to_wait_for =
     if protocol_switch_will_happen then new_protocol_hash
     else protocol.Tezos_protocol.hash
   in
-  Helpers.wait_for state ~attempts:waiting_attempts ~seconds:4. (fun _ ->
-      Console.say state EF.(wf "Checking actual protocol transition")
-      >>= fun () ->
-      Tezos_client.rpc
-        state
-        ~client:client_0
-        `Get
-        ~path:"/chains/main/blocks/head/metadata"
-      >>= fun json ->
-      (try Jqo.field ~k:"protocol" json |> Jqo.get_string |> return
-       with e -> failf "Cannot parse metadata: %s" (Exn.to_string e))
-      >>= fun proto_hash ->
-      if not (String.equal proto_hash protocol_to_wait_for) then
-        return
-          (`Not_done
-            (sprintf
-               "Protocol not done: %s Vs %s"
-               proto_hash
-               protocol_to_wait_for))
-      else return (`Done ()))
-  >>= fun () ->
+  let* () =
+    Helpers.wait_for state ~attempts:waiting_attempts ~seconds:4. (fun _ ->
+        let* () =
+          Console.say state EF.(wf "Checking actual protocol transition")
+        in
+        let* json =
+          Tezos_client.rpc
+            state
+            ~client:client_0
+            `Get
+            ~path:"/chains/main/blocks/head/metadata"
+        in
+        let* proto_hash =
+          try Jqo.field ~k:"protocol" json |> Jqo.get_string |> return
+          with e -> failf "Cannot parse metadata: %s" (Exn.to_string e)
+        in
+        if not (String.equal proto_hash protocol_to_wait_for) then
+          return
+            (`Not_done
+              (sprintf
+                 "Protocol not done: %s Vs %s"
+                 proto_hash
+                 protocol_to_wait_for))
+        else return (`Done ()))
+  in
   Interactive_test.Pauser.generic
     state
     EF.
