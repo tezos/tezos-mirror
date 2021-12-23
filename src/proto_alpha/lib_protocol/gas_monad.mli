@@ -52,7 +52,7 @@ val ( >?$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) result) -> ('b, 'trace) t
 
 (** Another variant of [( >>$ )] that lets recover from inner errors *)
 val ( >??$ ) :
-  ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace) t) -> ('b, 'trace) t
+  ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace') t) -> ('b, 'trace') t
 
 (** gas-free embedding of tzresult values. [of_result x] is equivalent to [return () >?$ fun () -> x] *)
 val of_result : ('a, 'trace) result -> ('a, 'trace) t
