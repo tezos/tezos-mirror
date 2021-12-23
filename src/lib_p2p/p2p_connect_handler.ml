@@ -182,7 +182,8 @@ let create_connection t p2p_conn id_point point_info peer_info
   P2p_pool.Peers.add_connected t.pool peer_id peer_info ;
   P2p_trigger.broadcast_new_connection t.triggers ;
   Lwt_canceler.on_cancel canceler (fun () ->
-      Events.(emit disconnected) (peer_id, id_point) >>= fun () ->
+      let open Lwt_syntax in
+      let* () = Events.(emit disconnected) (peer_id, id_point) in
       let timestamp = Systime_os.now () in
       Option.iter
         (P2p_point_state.set_disconnected
@@ -207,6 +208,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   conn
 
 let is_acceptable t connection_point_info peer_info incoming version =
+  let open Tzresult_syntax in
   (* Private mode only accept trusted *)
   let unexpected =
     t.config.private_mode
@@ -219,19 +221,20 @@ let is_acceptable t connection_point_info peer_info incoming version =
   in
   if unexpected then (
     Events.(emit__dont_wait__use_with_care peer_rejected) () ;
-    error P2p_errors.Private_mode)
+    fail P2p_errors.Private_mode)
   else
     (* checking if point is acceptable *)
-    Option.fold
-      connection_point_info
-      ~none:(ok version)
-      ~some:(fun connection_point_info ->
-        match P2p_point_state.get connection_point_info with
-        | Accepted _ | Running _ -> P2p_rejection.(rejecting Already_connected)
-        | Requested _ when incoming ->
-            P2p_rejection.(rejecting Already_connected)
-        | Requested _ | Disconnected -> ok version)
-    >>? fun version ->
+    let* version =
+      match connection_point_info with
+      | None -> return version
+      | Some connection_point_info -> (
+          match P2p_point_state.get connection_point_info with
+          | Accepted _ | Running _ ->
+              P2p_rejection.(rejecting Already_connected)
+          | Requested _ when incoming ->
+              P2p_rejection.(rejecting Already_connected)
+          | Requested _ | Disconnected -> return version)
+    in
     (* Point is acceptable, checking if peer is. *)
     match P2p_peer_state.get peer_info with
     | Accepted _
@@ -239,7 +242,7 @@ let is_acceptable t connection_point_info peer_info incoming version =
     | Running _ ->
         P2p_rejection.(rejecting Already_connected)
     (* All right, welcome ! *)
-    | Disconnected -> ok version
+    | Disconnected -> return version
 
 let may_register_my_id_point pool = function
   | [P2p_errors.Myself (addr, Some port)] ->
@@ -253,17 +256,22 @@ let may_register_my_id_point pool = function
    *)
 let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
     (conn_info : 'b P2p_connection.Info.t) =
-  Option.iter_es
-    (* if no point info, nothing is expected from the point, it cannot
-       even be set to trusted. *)
-      (fun point_info ->
+  let open Lwt_tzresult_syntax in
+  match point_info with
+  | None ->
+      (* if no point info, nothing is expected from the point, it cannot
+         even be set to trusted. *)
+      return_unit
+  | Some point_info -> (
       let point = P2p_point_state.Info.point point_info in
-      Option.iter_es
-        (fun expected_peer_id ->
+      match P2p_point_state.Info.get_expected_peer_id point_info with
+      | None -> return_unit
+      | Some expected_peer_id ->
           if P2p_peer.Id.(expected_peer_id <> conn_info.peer_id) then
-            Events.(emit authenticate_status_peer_id_incorrect)
-              ("peer_id", point, expected_peer_id, conn_info.peer_id)
-            >>= fun () ->
+            let*! () =
+              Events.(emit authenticate_status_peer_id_incorrect)
+                ("peer_id", point, expected_peer_id, conn_info.peer_id)
+            in
             fail
               P2p_errors.(
                 Identity_check_failure
@@ -273,67 +281,73 @@ let check_expected_peer_id (point_info : 'a P2p_point_state.Info.t option)
                     received_peer_id = conn_info.peer_id;
                   })
           else
-            Events.(emit authenticate_status_peer_id_correct)
-              (point, conn_info.peer_id)
-            >>= return)
-        (P2p_point_state.Info.get_expected_peer_id point_info))
-    point_info
+            let*! () =
+              Events.(emit authenticate_status_peer_id_correct)
+                (point, conn_info.peer_id)
+            in
+            return_unit)
 
 let raw_authenticate t ?point_info canceler scheduled_conn point =
+  let open Lwt_tzresult_syntax in
   let incoming = point_info = None in
   let incoming_str = if incoming then "incoming" else "outgoing" in
-  Events.(emit authenticate_start) (point, incoming_str) >>= fun () ->
-  protect
-    ~canceler
-    (fun () ->
-      t.dependencies.socket_authenticate
-        ~canceler
-        ~proof_of_work_target:t.config.proof_of_work_target
-        ~incoming
-        scheduled_conn
-        point
-        ?advertised_port:t.config.advertised_port
-        t.config.identity
-        t.announced_version
-        t.conn_meta_config)
-    ~on_error:(fun err ->
-      (match err with
-      | [Canceled] ->
-          (* Currently only on time out *)
-          Events.(emit authenticate) (point, incoming_str, "canceled")
-      | err ->
-          (* Authentication incorrect! Temp ban the offending points/peers *)
-          List.iter
-            (function
-              | P2p_errors.Not_enough_proof_of_work _ | P2p_errors.Invalid_auth
-              | P2p_errors.Decipher_error | P2p_errors.Invalid_message_size
-              | Tezos_base.Data_encoding_wrapper.Encoding_error _
-              | Tezos_base.Data_encoding_wrapper
-                .Unexpected_size_of_encoded_value | P2p_errors.Decoding_error _
-              | P2p_errors.Invalid_chunks_size _ ->
-                  P2p_pool.greylist_addr t.pool (fst point)
-              | _ -> ())
-            err ;
-          Events.(emit authenticate) (point, incoming_str, "failed"))
-      >>= fun () ->
-      Events.(emit authenticate_error) (point, err) >>= fun () ->
-      may_register_my_id_point t.pool err ;
-      t.log (Authentication_failed point) ;
-      (if not incoming then
-       let timestamp = Systime_os.now () in
-       Option.iter
-         (P2p_point_state.set_disconnected
-            ~timestamp
-            t.config.reconnection_config)
-         point_info) ;
-      Lwt.return_error err)
-  >>=? fun (info, auth_conn) ->
+  let*! () = Events.(emit authenticate_start) (point, incoming_str) in
+  let* (info, auth_conn) =
+    protect
+      ~canceler
+      (fun () ->
+        t.dependencies.socket_authenticate
+          ~canceler
+          ~proof_of_work_target:t.config.proof_of_work_target
+          ~incoming
+          scheduled_conn
+          point
+          ?advertised_port:t.config.advertised_port
+          t.config.identity
+          t.announced_version
+          t.conn_meta_config)
+      ~on_error:(fun err ->
+        let*! () =
+          match err with
+          | [Canceled] ->
+              (* Currently only on time out *)
+              Events.(emit authenticate) (point, incoming_str, "canceled")
+          | err ->
+              (* Authentication incorrect! Temp ban the offending points/peers *)
+              List.iter
+                (function
+                  | P2p_errors.Not_enough_proof_of_work _
+                  | P2p_errors.Invalid_auth | P2p_errors.Decipher_error
+                  | P2p_errors.Invalid_message_size
+                  | Tezos_base.Data_encoding_wrapper.Encoding_error _
+                  | Tezos_base.Data_encoding_wrapper
+                    .Unexpected_size_of_encoded_value
+                  | P2p_errors.Decoding_error _
+                  | P2p_errors.Invalid_chunks_size _ ->
+                      P2p_pool.greylist_addr t.pool (fst point)
+                  | _ -> ())
+                err ;
+              Events.(emit authenticate) (point, incoming_str, "failed")
+        in
+        let*! () = Events.(emit authenticate_error) (point, err) in
+        may_register_my_id_point t.pool err ;
+        t.log (Authentication_failed point) ;
+        (if not incoming then
+         let timestamp = Systime_os.now () in
+         Option.iter
+           (P2p_point_state.set_disconnected
+              ~timestamp
+              t.config.reconnection_config)
+           point_info) ;
+        Lwt.return_error err)
+  in
   (* Authentication correct! *)
-  Events.(emit authenticate_status) ("auth", point, info.peer_id) >>= fun () ->
-  fail_when
-    (P2p_pool.Peers.banned t.pool info.peer_id)
-    (P2p_errors.Peer_banned info.peer_id)
-  >>=? fun () ->
+  let*! () = Events.(emit authenticate_status) ("auth", point, info.peer_id) in
+  let* () =
+    fail_when
+      (P2p_pool.Peers.banned t.pool info.peer_id)
+      (P2p_errors.Peer_banned info.peer_id)
+  in
   let remote_point_info =
     match info.id_point with
     | (addr, Some port) -> P2p_pool.register_new_point t.pool (addr, port)
@@ -341,25 +355,28 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
   in
   let connection_point_info = Option.either point_info remote_point_info in
   (* Check if there is an expected peer id for this point. *)
-  check_expected_peer_id connection_point_info info >>=? fun () ->
+  let* () = check_expected_peer_id connection_point_info info in
   let peer_info = P2p_pool.register_peer t.pool info.peer_id in
   (* [acceptable] is either Ok with a network version, or a Rejecting
      error with a motive *)
   let acceptable =
-    Network_version.select
-      ~chain_name:t.message_config.chain_name
-      ~distributed_db_versions:t.message_config.distributed_db_versions
-      ~p2p_versions:t.custom_p2p_versions
-      info.announced_version
-    >>? fun version ->
+    let open Tzresult_syntax in
+    let* version =
+      Network_version.select
+        ~chain_name:t.message_config.chain_name
+        ~distributed_db_versions:t.message_config.distributed_db_versions
+        ~p2p_versions:t.custom_p2p_versions
+        info.announced_version
+    in
     (* we have a common version, checking if there is an available slot *)
-    (if
-     (* randomly allow one additional incoming connection *)
-     t.config.max_connections + Random.int 2
-     > P2p_pool.active_connections t.pool
-    then ok version
-    else P2p_rejection.(rejecting Too_many_connections))
-    >>? fun version ->
+    let* () =
+      if
+        (* randomly allow one additional incoming connection *)
+        t.config.max_connections + Random.int 2
+        > P2p_pool.active_connections t.pool
+      then return_unit
+      else P2p_rejection.(rejecting Too_many_connections)
+    in
     (* we have a slot, checking if point and peer are acceptable *)
     is_acceptable t connection_point_info peer_info incoming version
   in
@@ -381,41 +398,47 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       :: _) -> (
       (* non-acceptable point, nack-ing it. *)
       t.log (Rejecting_request (point, info.id_point, info.peer_id)) ;
-      Events.(emit authenticate_status ("nack", point, info.peer_id))
-      >>= fun () ->
-      P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
-      (* Never send more than 100 points, you would be greylisted *)
-      >>= fun point_list ->
-      P2p_socket.nack auth_conn motive point_list >>= fun () ->
-      (if not incoming then
-       let timestamp = Systime_os.now () in
-       Option.iter
-         (P2p_point_state.set_disconnected
-            ~timestamp
-            ~requested:true
-            t.config.reconnection_config)
-         point_info) ;
+      let*! () =
+        Events.(emit authenticate_status ("nack", point, info.peer_id))
+      in
+      let*! point_list =
+        (* Never send more than 100 points, you would be greylisted *)
+        P2p_pool.list_known_points ~ignore_private:true ~size:50 t.pool
+      in
+      let*! () = P2p_socket.nack auth_conn motive point_list in
+      let () =
+        if not incoming then
+          let timestamp = Systime_os.now () in
+          Option.iter
+            (P2p_point_state.set_disconnected
+               ~timestamp
+               ~requested:true
+               t.config.reconnection_config)
+            point_info
+      in
       match motive with
       | Unknown_chain_name | Deprecated_distributed_db_version
       | Deprecated_p2p_version ->
-          Events.(emit authenticate_reject_protocol_mismatch)
-            ( point,
-              info.peer_id,
-              t.message_config.chain_name,
-              info.announced_version.chain_name,
-              t.message_config.distributed_db_versions,
-              info.announced_version.distributed_db_version,
-              t.custom_p2p_versions,
-              info.announced_version.p2p_version )
-          >>= fun () ->
+          let*! () =
+            Events.(emit authenticate_reject_protocol_mismatch)
+              ( point,
+                info.peer_id,
+                t.message_config.chain_name,
+                info.announced_version.chain_name,
+                t.message_config.distributed_db_versions,
+                info.announced_version.distributed_db_version,
+                t.custom_p2p_versions,
+                info.announced_version.p2p_version )
+          in
           fail
             (P2p_errors.Rejected_no_common_protocol
                {announced = info.announced_version})
       | _ -> fail (P2p_errors.Rejected {peer = info.peer_id; motive}))
   | Error errs as err ->
-      Events.(emit authenticate_status) ("reject", point, info.peer_id)
-      >>= fun () ->
-      Events.(emit authenticate_error) (point, errs) >>= fun () ->
+      let*! () =
+        Events.(emit authenticate_status) ("reject", point, info.peer_id)
+      in
+      let*! () = Events.(emit authenticate_error) (point, errs) in
       Lwt.return err
   | Ok version ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
@@ -429,51 +452,61 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
             canceler)
         connection_point_info ;
       P2p_peer_state.set_accepted ~timestamp peer_info info.id_point canceler ;
-      Events.(emit authenticate_status) ("accept", point, info.peer_id)
-      >>= fun () ->
-      protect
-        ~canceler
-        (fun () ->
-          t.dependencies.socket_accept
-            ?incoming_message_queue_size:t.config.incoming_message_queue_size
-            ?outgoing_message_queue_size:t.config.outgoing_message_queue_size
-            ?binary_chunks_size:t.config.binary_chunks_size
-            ~canceler
-            auth_conn
-            t.encoding
-          >>=? fun conn ->
-          Events.(emit authenticate_status) ("connected", point, info.peer_id)
-          >>= fun () -> return conn)
-        ~on_error:(fun err ->
-          if incoming then
-            t.log (Request_rejected (point, Some (info.id_point, info.peer_id))) ;
-          (match err with
-          | P2p_errors.Rejected_by_nack
-              {alternative_points = Some points; motive}
-            :: _ ->
-              Events.(emit connection_rejected_by_peers)
-                (point, info.peer_id, motive, points)
-              >>= fun () ->
-              P2p_pool.register_list_of_new_points
-                ~medium:"Nack"
-                ~source:info.peer_id
-                t.pool
-                points
-          | _ ->
-              Events.(emit connection_error) (point, err) >>= fun () ->
-              Lwt.return_unit)
-          >>= fun () ->
-          Events.(emit authenticate_status) ("rejected", point, info.peer_id)
-          >>= fun () ->
-          let timestamp = Systime_os.now () in
-          Option.iter
-            (P2p_point_state.set_disconnected
-               ~timestamp
-               t.config.reconnection_config)
-            connection_point_info ;
-          P2p_peer_state.set_disconnected ~timestamp peer_info ;
-          Lwt.return_error err)
-      >>=? fun conn ->
+      let*! () =
+        Events.(emit authenticate_status) ("accept", point, info.peer_id)
+      in
+      let* conn =
+        protect
+          ~canceler
+          (fun () ->
+            let* conn =
+              t.dependencies.socket_accept
+                ?incoming_message_queue_size:
+                  t.config.incoming_message_queue_size
+                ?outgoing_message_queue_size:
+                  t.config.outgoing_message_queue_size
+                ?binary_chunks_size:t.config.binary_chunks_size
+                ~canceler
+                auth_conn
+                t.encoding
+            in
+            let*! () =
+              Events.(emit authenticate_status)
+                ("connected", point, info.peer_id)
+            in
+            return conn)
+          ~on_error:(fun err ->
+            if incoming then
+              t.log
+                (Request_rejected (point, Some (info.id_point, info.peer_id))) ;
+            let*! () =
+              match err with
+              | P2p_errors.Rejected_by_nack
+                  {alternative_points = Some points; motive}
+                :: _ ->
+                  let*! () =
+                    Events.(emit connection_rejected_by_peers)
+                      (point, info.peer_id, motive, points)
+                  in
+                  P2p_pool.register_list_of_new_points
+                    ~medium:"Nack"
+                    ~source:info.peer_id
+                    t.pool
+                    points
+              | _ -> Events.(emit connection_error) (point, err)
+            in
+            let*! () =
+              Events.(emit authenticate_status) ("rejected", point, info.peer_id)
+            in
+            let timestamp = Systime_os.now () in
+            Option.iter
+              (P2p_point_state.set_disconnected
+                 ~timestamp
+                 t.config.reconnection_config)
+              connection_point_info ;
+            P2p_peer_state.set_disconnected ~timestamp peer_info ;
+            Lwt.return_error err)
+      in
       let id_point =
         match
           (info.id_point, Option.map P2p_point_state.Info.point point_info)
@@ -491,12 +524,16 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
           version
       in
       let peer_id = P2p_peer_state.Info.peer_id peer_info in
-      Events.(emit new_connection) (fst id_point, snd id_point, peer_id)
-      >>= fun () -> return conn
+      let*! () =
+        Events.(emit new_connection) (fst id_point, snd id_point, peer_id)
+      in
+      return conn
 
 let authenticate t ?point_info canceler fd point =
+  let open Lwt_tzresult_syntax in
   let scheduled_conn = P2p_io_scheduler.register t.io_sched fd in
-  raw_authenticate t ?point_info canceler scheduled_conn point >>= function
+  let*! r = raw_authenticate t ?point_info canceler scheduled_conn point in
+  match r with
   | Ok connection -> return connection
   | Error
       (P2p_errors.Rejected {motive = P2p_rejection.Unknown_chain_name; _} :: _)
@@ -507,11 +544,14 @@ let authenticate t ?point_info canceler fd point =
          network on the same IP.
       *)
       P2p_pool.unregister_point t.pool point ;
-      P2p_io_scheduler.close scheduled_conn >>=? fun () -> Lwt.return err
+      let* () = P2p_io_scheduler.close scheduled_conn in
+      Lwt.return err
   | Error _ as err ->
-      P2p_io_scheduler.close scheduled_conn >>=? fun () -> Lwt.return err
+      let* () = P2p_io_scheduler.close scheduled_conn in
+      Lwt.return err
 
 let accept t fd point =
+  let open Lwt_syntax in
   t.log (Incoming_connection point) ;
   if
     t.config.max_incoming_connections <= P2p_point.Table.length t.incoming
@@ -529,11 +569,12 @@ let accept t fd point =
     P2p_point.Table.add t.incoming point canceler ;
     Lwt.dont_wait
       (fun () ->
-        with_timeout
-          ~canceler
-          (Systime_os.sleep t.config.authentication_timeout)
-          (fun canceler -> authenticate t canceler fd point)
-        >>= fun _ ->
+        let* _ =
+          with_timeout
+            ~canceler
+            (Systime_os.sleep t.config.authentication_timeout)
+            (fun canceler -> authenticate t canceler fd point)
+        in
         P2p_point.Table.remove t.incoming point ;
         Lwt.return_unit)
       (fun exc ->
@@ -552,54 +593,59 @@ let fail_unless_disconnected_point point_info =
   | Running _ -> fail P2p_errors.Connected
 
 let connect ?timeout t point =
-  fail_when
-    (P2p_pool.Points.banned t.pool point)
-    (P2p_errors.Point_banned point)
-  >>=? fun () ->
+  let open Lwt_tzresult_syntax in
+  let* () =
+    fail_when
+      (P2p_pool.Points.banned t.pool point)
+      (P2p_errors.Point_banned point)
+  in
   let timeout = Option.value ~default:t.config.connection_timeout timeout in
-  fail_unless
-    (P2p_pool.active_connections t.pool <= t.config.max_connections)
-    P2p_errors.Too_many_connections
-  >>=? fun () ->
+  let* () =
+    fail_unless
+      (P2p_pool.active_connections t.pool <= t.config.max_connections)
+      P2p_errors.Too_many_connections
+  in
   let canceler = Lwt_canceler.create () in
   with_timeout ~canceler (Systime_os.sleep timeout) (fun canceler ->
       let point_info = P2p_pool.register_point t.pool point in
       let ((addr, port) as point) = P2p_point_state.Info.point point_info in
-      fail_unless
-        ((not t.config.private_mode)
-        || t.dependencies.point_state_info_trusted point_info)
-        P2p_errors.Private_mode
-      >>=? fun () ->
-      fail_unless_disconnected_point point_info >>=? fun () ->
+      let* () =
+        fail_unless
+          ((not t.config.private_mode)
+          || t.dependencies.point_state_info_trusted point_info)
+          P2p_errors.Private_mode
+      in
+      let* () = fail_unless_disconnected_point point_info in
       let timestamp = Systime_os.now () in
       P2p_point_state.set_requested ~timestamp point_info canceler ;
-      P2p_fd.socket PF_INET6 SOCK_STREAM 0 >>= fun fd ->
+      let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
       let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
-      Events.(emit connect_status) ("start", point) >>= fun () ->
-      protect
-        ~canceler
-        (fun () ->
-          t.log (Outgoing_connection point) ;
-          t.dependencies.fd_connect fd uaddr >>= fun () -> return_unit)
-        ~on_error:(fun err ->
-          Events.(emit connect_error) (point, err) >>= fun () ->
-          let timestamp = Systime_os.now () in
-          P2p_point_state.set_disconnected
-            ~timestamp
-            t.config.reconnection_config
-            point_info ;
-          (P2p_fd.close fd >>= function
-           | Error trace ->
-               Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-               Lwt.return_unit
-           | Ok () -> Lwt.return_unit)
-          >>= fun () ->
-          match err with
-          | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
-              fail P2p_errors.Connection_refused
-          | err -> Lwt.return_error err)
-      >>=? fun () ->
-      Events.(emit connect_status) ("authenticate", point) >>= fun () ->
+      let*! () = Events.(emit connect_status) ("start", point) in
+      let* () =
+        protect
+          ~canceler
+          (fun () ->
+            t.log (Outgoing_connection point) ;
+            let*! () = t.dependencies.fd_connect fd uaddr in
+            return_unit)
+          ~on_error:(fun err ->
+            let*! () = Events.(emit connect_error) (point, err) in
+            let timestamp = Systime_os.now () in
+            P2p_point_state.set_disconnected
+              ~timestamp
+              t.config.reconnection_config
+              point_info ;
+            let*! close_res = P2p_fd.close fd in
+            Result.iter_error
+              (fun trace ->
+                Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
+              close_res ;
+            match err with
+            | [Exn (Unix.Unix_error (Unix.ECONNREFUSED, _, _))] ->
+                fail P2p_errors.Connection_refused
+            | err -> Lwt.return_error err)
+      in
+      let*! () = Events.(emit connect_status) ("authenticate", point) in
       authenticate t ~point_info canceler fd point)
 
 let stat t = P2p_io_scheduler.global_stat t.io_sched

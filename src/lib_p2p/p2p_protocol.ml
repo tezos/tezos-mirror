@@ -45,8 +45,7 @@ module Private_answerer = struct
     Events.(emit private_node_new_peers) conn.peer_id
 
   let bootstrap conn _request =
-    Events.(emit private_node_peers_request) conn.peer_id >>= fun () ->
-    return_unit
+    Lwt_result.ok @@ Events.(emit private_node_peers_request) conn.peer_id
 
   let swap_request conn _request _new_point _peer =
     Events.(emit private_node_swap_request) conn.peer_id
@@ -79,14 +78,19 @@ module Default_answerer = struct
       points
 
   let bootstrap config conn _request_info =
+    let open Lwt_result_syntax in
     let log = config.log in
     let source_peer_id = conn.peer_id in
     log (Bootstrap_received {source = source_peer_id}) ;
     if conn.is_private then
-      Events.(emit private_node_request) conn.peer_id >>= fun () -> return_unit
+      let*! () = Events.(emit private_node_request) conn.peer_id in
+      return_unit
     else
-      P2p_pool.list_known_points ~ignore_private:true config.pool >>= function
-      | [] -> return_unit
+      let*! points =
+        P2p_pool.list_known_points ~ignore_private:true config.pool
+      in
+      match points with
+      | [] -> Lwt_result_syntax.return_unit
       | points -> (
           match conn.write_advertise points with
           | Ok true ->
@@ -95,17 +99,21 @@ module Default_answerer = struct
           | Ok false ->
               (* if not sent then ?? TODO count dropped message ?? *)
               return_unit
-          | Error err ->
-              Events.(emit advertise_sending_failed) (source_peer_id, err)
-              >>= fun () -> Lwt.return (Error err))
+          | Error err as error ->
+              let*! () =
+                Events.(emit advertise_sending_failed) (source_peer_id, err)
+              in
+              Lwt.return error)
 
   let swap t pool source_peer_id ~connect current_peer_id new_point =
+    let open Lwt_syntax in
     t.latest_accepted_swap <- Systime_os.now () ;
-    connect new_point >>= function
+    let* r = connect new_point in
+    match r with
     | Ok _new_conn -> (
         t.latest_successful_swap <- Systime_os.now () ;
         t.log (Swap_success {source = source_peer_id}) ;
-        Events.(emit swap_succeeded) new_point >>= fun () ->
+        let* () = Events.(emit swap_succeeded) new_point in
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
         | None -> Lwt.return_unit
         | Some conn -> P2p_conn.disconnect conn)
@@ -117,29 +125,30 @@ module Default_answerer = struct
         | _ -> Events.(emit swap_failed) (new_point, err))
 
   let swap_ack config conn request new_point _peer =
+    let open Lwt_syntax in
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
     let connect = config.connect in
     let log = config.log in
     log (Swap_ack_received {source = source_peer_id}) ;
-    Events.(emit swap_ack_received) source_peer_id >>= fun () ->
+    let* () = Events.(emit swap_ack_received) source_peer_id in
     match request.last_sent_swap_request with
     | None -> Lwt.return_unit (* ignore *)
     | Some (_time, proposed_peer_id) -> (
         match P2p_pool.Connection.find_by_peer_id pool proposed_peer_id with
         | None ->
             swap config pool source_peer_id ~connect proposed_peer_id new_point
-            >>= fun () -> Lwt.return_unit
         | Some _ -> Lwt.return_unit)
 
   let swap_request config conn _request new_point _peer =
+    let open Lwt_syntax in
     let source_peer_id = conn.peer_id in
     let pool = config.pool in
     let swap_linger = config.swap_linger in
     let connect = config.connect in
     let log = config.log in
     log (Swap_request_received {source = source_peer_id}) ;
-    Events.(emit swap_request_received) source_peer_id >>= fun () ->
+    let* () = Events.(emit swap_request_received) source_peer_id in
     (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
       Ptime.diff
@@ -169,9 +178,7 @@ module Default_answerer = struct
                 ~connect
                 proposed_peer_id
                 new_point
-              >>= fun () -> Lwt.return_unit
-          | Ok false -> Lwt.return_unit
-          | Error _ -> Lwt.return_unit)
+          | Ok false | Error _ -> Lwt.return_unit)
 
   let create config conn =
     P2p_answerer.

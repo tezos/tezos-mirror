@@ -41,9 +41,9 @@ include Compare.Make (struct
   type nonrec t = t
 
   let compare o1 o2 =
-    let ( >> ) x y = if x = 0 then y () else x in
-    Block_hash.compare o1.shell.branch o2.shell.branch >> fun () ->
-    Bytes.compare o1.proto o2.proto
+    Compare.or_else
+      (Block_hash.compare o1.shell.branch o2.shell.branch)
+      (fun () -> Bytes.compare o1.proto o2.proto)
 end)
 
 let encoding =

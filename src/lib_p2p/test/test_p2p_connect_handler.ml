@@ -39,14 +39,16 @@ let dependencies :
 let point_id : P2p_point.Id.t = (P2p_addr.of_string_exn "0.0.0.0", 0)
 
 let test_connect_destroy =
+  let open Lwt_result_syntax in
   tztest "Connect then destroy" `Quick @@ fun () ->
   let t =
     P2p_connect_handler.Internal_for_tests.create
       (`Make_default_pool ())
       (`Dependencies dependencies)
   in
-  P2p_connect_handler.connect t point_id >>=? fun _conn ->
-  P2p_connect_handler.destroy t >|= ok
+  let* _conn = P2p_connect_handler.connect t point_id in
+  let*! () = P2p_connect_handler.destroy t in
+  return_unit
 
 (** Check that we don't remove the accepted connection too early (before the authentication succeeds or fails),
    otherwise there is a risk of too many open file descriptors.
@@ -54,6 +56,7 @@ let test_connect_destroy =
    The trick is to have an inner function (like [socket_accept]) hang to avoid a race condition in the test
    between [accept] and the assertion. *)
 let test_correct_incoming_connection_number =
+  let open Lwt_result_syntax in
   tztest "Don't remove incoming connections too early" `Quick @@ fun () ->
   let config =
     {
@@ -64,7 +67,10 @@ let test_correct_incoming_connection_number =
   in
   let socket_accept_hanging_forever ?incoming_message_queue_size:_
       ?outgoing_message_queue_size:_ ?binary_chunks_size:_ ~canceler:_ _ _ =
-    let rec loop () = Lwt_unix.sleep 1. >>= fun () -> loop () in
+    let rec loop () =
+      let*! () = Lwt_unix.sleep 1. in
+      loop ()
+    in
     loop ()
   in
   let dependencies =
@@ -78,7 +84,7 @@ let test_correct_incoming_connection_number =
       (`Make_default_pool ())
       (`Dependencies dependencies)
   in
-  P2p_fd.socket PF_INET6 SOCK_STREAM 0 >>= fun fd ->
+  let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
   Alcotest.(
     check'
       int
@@ -95,6 +101,7 @@ let test_correct_incoming_connection_number =
   return_unit
 
 let test_on_new_connection =
+  let open Lwt_result_syntax in
   tztest "on_new_connection hook is triggered on new connection" `Quick
   @@ fun () ->
   let t =
@@ -111,21 +118,21 @@ let test_on_new_connection =
       ~msg:"Before any connection, on_new_connection is never called"
       ~expected:0
       ~actual:!callbacks_nb) ;
-  P2p_connect_handler.connect t point_id >>=? fun _conn ->
+  let*! _conn = P2p_connect_handler.connect t point_id in
   Alcotest.(
     check'
       int
       ~msg:"After connect, on_new_connection called"
       ~expected:1
       ~actual:!callbacks_nb) ;
-  P2p_connect_handler.destroy t >|= fun () ->
+  let*! () = P2p_connect_handler.destroy t in
   Alcotest.(
     check'
       int
       ~msg:"After destruction, no new call to on_new_connection"
       ~expected:1
       ~actual:!callbacks_nb) ;
-  ok ()
+  return_unit
 
 let tests =
   [

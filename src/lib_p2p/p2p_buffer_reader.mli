@@ -57,8 +57,7 @@ val mk_readable :
 
     If invalid values are passed, fails with [Invalid_read_request].
 *)
-val mk_buffer :
-  ?pos:int -> ?length_to_copy:int -> bytes -> (buffer, tztrace) result
+val mk_buffer : ?pos:int -> ?length_to_copy:int -> bytes -> buffer tzresult
 
 (** [mk_buffer_safe bytes] creates a {!buffer} that uses the entirety of [bytes].
 

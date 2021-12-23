@@ -72,36 +72,39 @@ let announced ~chain_name ~distributed_db_versions ~p2p_versions =
   }
 
 let may_select_version ~compare accepted_versions remote_version motive =
-  let open Error_monad in
+  let open Error_monad.Result_syntax in
   let best_local_version = greatest accepted_versions in
-  if compare best_local_version remote_version <= 0 then ok best_local_version
+  if compare best_local_version remote_version <= 0 then
+    return best_local_version
   else if
     List.mem
       ~equal:(fun a b -> compare a b = 0)
       remote_version
       accepted_versions
-  then ok remote_version
+  then return remote_version
   else P2p_rejection.rejecting motive
 
 let select ~chain_name ~distributed_db_versions ~p2p_versions remote =
+  let open Error_monad.Tzresult_syntax in
   assert (distributed_db_versions <> []) ;
   assert (p2p_versions <> []) ;
   if chain_name <> remote.chain_name then
     P2p_rejection.rejecting Unknown_chain_name
   else
-    let open Error_monad in
-    may_select_version
-      ~compare:Distributed_db_version.compare
-      distributed_db_versions
-      remote.distributed_db_version
-      Deprecated_distributed_db_version
-    >>? fun distributed_db_version ->
-    may_select_version
-      ~compare:P2p_version.compare
-      p2p_versions
-      remote.p2p_version
-      Deprecated_p2p_version
-    >>? fun p2p_version -> ok {chain_name; distributed_db_version; p2p_version}
+    let+ distributed_db_version =
+      may_select_version
+        ~compare:Distributed_db_version.compare
+        distributed_db_versions
+        remote.distributed_db_version
+        Deprecated_distributed_db_version
+    and+ p2p_version =
+      may_select_version
+        ~compare:P2p_version.compare
+        p2p_versions
+        remote.p2p_version
+        Deprecated_p2p_version
+    in
+    {chain_name; distributed_db_version; p2p_version}
 
 let () = Data_encoding.Registration.register ~pp encoding
 

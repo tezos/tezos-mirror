@@ -119,11 +119,17 @@ let build_rpc_directory net =
   in
   let dir =
     RPC_directory.register1 dir P2p_services.S.connect (fun point q () ->
+        let open Lwt_tzresult_syntax in
         match P2p.connect_handler net with
         | None -> fail P2p_errors.P2p_layer_disabled
         | Some connect_handler ->
-            P2p_connect_handler.connect ~timeout:q#timeout connect_handler point
-            >>=? fun _conn -> return_unit)
+            let* _conn =
+              P2p_connect_handler.connect
+                ~timeout:q#timeout
+                connect_handler
+                point
+            in
+            return_unit)
   in
   (* Network : Connection *)
   let dir =
@@ -191,6 +197,7 @@ let build_rpc_directory net =
       dir
       P2p_services.Peers.S.events
       (fun peer_id q () ->
+        let open Lwt_syntax in
         match P2p.pool net with
         | None -> RPC_answer.fail [P2p_errors.P2p_layer_disabled]
         | Some pool -> (
@@ -205,7 +212,8 @@ let build_rpc_directory net =
                   let first_request = ref true in
                   let next () =
                     if not !first_request then
-                      Lwt_stream.get stream >|= Option.map (fun i -> [i])
+                      let+ o = Lwt_stream.get stream in
+                      Option.map (fun i -> [i]) o
                     else (
                       first_request := false ;
                       Lwt.return_some evts)
@@ -217,25 +225,27 @@ let build_rpc_directory net =
       dir
       P2p_services.Peers.S.patch
       (fun peer_id () acl ->
+        let open Lwt_result_syntax in
         match P2p.pool net with
         | None -> return_none
         | Some pool ->
-            (match acl with
-            | None -> Lwt.return_unit
-            | Some `Ban ->
-                (* ban *)
-                P2p_pool.Peers.untrust pool peer_id ;
-                P2p_pool.Peers.ban pool peer_id
-            | Some `Trust ->
-                (* trust *)
-                P2p_pool.Peers.trust pool peer_id ;
-                Lwt.return_unit
-            | Some `Open ->
-                (* unban, untrust *)
-                P2p_pool.Peers.unban pool peer_id ;
-                P2p_pool.Peers.untrust pool peer_id ;
-                Lwt.return_unit)
-            >>= fun () ->
+            let*! () =
+              match acl with
+              | None -> Lwt.return_unit
+              | Some `Ban ->
+                  (* ban *)
+                  P2p_pool.Peers.untrust pool peer_id ;
+                  P2p_pool.Peers.ban pool peer_id
+              | Some `Trust ->
+                  (* trust *)
+                  P2p_pool.Peers.trust pool peer_id ;
+                  Lwt.return_unit
+              | Some `Open ->
+                  (* unban, untrust *)
+                  P2p_pool.Peers.unban pool peer_id ;
+                  P2p_pool.Peers.untrust pool peer_id ;
+                  Lwt.return_unit
+            in
             return
             @@ Option.map
                  (info_of_peer_info pool)
@@ -246,11 +256,13 @@ let build_rpc_directory net =
       dir
       P2p_services.Peers.S.ban
       (fun peer_id () () ->
+        let open Lwt_syntax in
         match P2p.pool net with
         | None -> RPC_answer.fail [P2p_errors.P2p_layer_disabled]
         | Some pool ->
             P2p_pool.Peers.untrust pool peer_id ;
-            P2p_pool.Peers.ban pool peer_id >>= fun () -> RPC_answer.return_unit)
+            let* () = P2p_pool.Peers.ban pool peer_id in
+            RPC_answer.return_unit)
   in
   let dir =
     RPC_directory.gen_register1
@@ -335,13 +347,16 @@ let build_rpc_directory net =
       dir
       P2p_services.Points.S.patch
       (fun point () (acl, peer_id) ->
+        let open Lwt_result_syntax in
         match P2p.pool net with
         | None -> return_none
         | Some pool ->
-            ( (match peer_id with
+            let*! () =
+              match peer_id with
               | None -> Lwt.return_unit
-              | Some peer_id -> P2p_pool.set_expected_peer_id pool point peer_id)
-            >>= fun () ->
+              | Some peer_id -> P2p_pool.set_expected_peer_id pool point peer_id
+            in
+            let*! () =
               match acl with
               | None -> Lwt.return_unit
               | Some `Ban ->
@@ -356,8 +371,8 @@ let build_rpc_directory net =
                   (* unban and untrust *)
                   P2p_pool.Points.unban pool point ;
                   P2p_pool.Points.untrust pool point ;
-                  Lwt.return_unit )
-            >>= fun () ->
+                  Lwt.return_unit
+            in
             return
             @@ Option.map info_of_point_info (P2p_pool.Points.info pool point))
   in
@@ -366,6 +381,7 @@ let build_rpc_directory net =
       dir
       P2p_services.Points.S.events
       (fun point_id q () ->
+        let open Lwt_syntax in
         match P2p.pool net with
         | None -> RPC_answer.fail [P2p_errors.P2p_layer_disabled]
         | Some pool -> (
@@ -380,7 +396,8 @@ let build_rpc_directory net =
                   let first_request = ref true in
                   let next () =
                     if not !first_request then
-                      Lwt_stream.get stream >|= Option.map (fun i -> [i])
+                      let+ o = Lwt_stream.get stream in
+                      Option.map (fun i -> [i]) o
                     else (
                       first_request := false ;
                       Lwt.return_some evts)
@@ -392,11 +409,13 @@ let build_rpc_directory net =
       dir
       P2p_services.Points.S.ban
       (fun point () () ->
+        let open Lwt_syntax in
         match P2p.pool net with
         | None -> RPC_answer.fail [P2p_errors.P2p_layer_disabled]
         | Some pool ->
             P2p_pool.Points.untrust pool point ;
-            P2p_pool.Points.ban pool point >>= fun () -> RPC_answer.return_unit)
+            let* () = P2p_pool.Points.ban pool point in
+            RPC_answer.return_unit)
   in
   let dir =
     RPC_directory.gen_register1
