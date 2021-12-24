@@ -23,6 +23,7 @@ depends: [
   "cmdliner"
   "fmt"
   "tls" { >= "0.10" }
+  "prometheus-app"
   "lwt-exit"
 ]
 depopts: [
