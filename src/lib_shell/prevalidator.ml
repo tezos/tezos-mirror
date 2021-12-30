@@ -1019,13 +1019,17 @@ module Make
 
     let on_advertise (shell : types_state_shell) =
       match shell.advertisement with
-      | `None -> () (* should not happen *)
+      | `None ->
+          () (* May happen if nothing to advertise since last advertisement. *)
       | `Pending mempool ->
           shell.advertisement <- `None ;
-          Distributed_db.Advertise.current_head
-            shell.parameters.chain_db
-            ~mempool
-            shell.predecessor
+          (* In this case, mempool is not empty, but let's avoid advertising
+             empty mempools in case this invariant is broken. *)
+          if not (Mempool.is_empty mempool) then
+            Distributed_db.Advertise.current_head
+              shell.parameters.chain_db
+              ~mempool
+              shell.predecessor
 
     (* If [flush_if_prechecked] is [true], removing a prechecked
        operation triggers a flush of the mempool. Because flushing may
