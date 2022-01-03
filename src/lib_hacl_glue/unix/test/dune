@@ -1,9 +1,7 @@
 (tests
- (names
-   test_hacl
-   test_prop_hacl_hash
-   test_prop_signature_pk)
+ (names test_hacl test_prop_hacl_hash test_prop_signature_pk)
  (package tezos-hacl-glue-unix)
+ (modes native)
  (libraries
   tezos-stdlib
   tezos-error-monad
@@ -14,7 +12,6 @@
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
- (modes native)
  (js_of_ocaml)
  (flags
   (:standard

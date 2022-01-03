@@ -56,7 +56,4 @@
  (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix))
  (modules Replace))
 
-(install
- (section libexec)
- (files (replace.exe as replace)
-))
+(install (section libexec) (files (replace.exe as replace)))

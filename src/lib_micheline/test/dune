@@ -1,21 +1,10 @@
-(test
- (name test_parser)
+(tests
+ (names test_parser test_diff)
  (package tezos-micheline)
  (modes native js)
  (libraries
   tezos-micheline
   alcotest)
- (modules Assert Test_parser)
- (flags (:standard -open Tezos_micheline)))
-
-(test
- (name test_diff)
- (package tezos-micheline)
- (libraries
-   tezos-micheline
-   alcotest)
- (modes native js)
- (modules Test_diff)
  (flags (:standard -open Tezos_micheline)))
 
 (rule

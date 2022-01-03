@@ -4,4 +4,5 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   ezjsonm
-  json-data-encoding tezt))
+  json-data-encoding
+  tezt))
