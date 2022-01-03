@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Client_keys
-
 let scheme = "unencrypted"
 
 let title = "Built-in signer using raw unencrypted keys."
@@ -37,6 +35,8 @@ let description =
    Valid public key URIs are of the form\n\
   \ - unencrypted:<public_key>\n\
    where <public_key> is the public key in Base58."
+
+include Client_keys.Signature_type
 
 let secret_key sk_uri =
   Lwt.return

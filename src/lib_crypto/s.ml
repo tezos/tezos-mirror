@@ -337,7 +337,7 @@ module type MERKLE_TREE = sig
   val check_path : path -> elt -> t * int
 end
 
-module type SIGNATURE = sig
+module type COMMON_SIGNATURE = sig
   module Public_key_hash : sig
     type t
 
@@ -403,13 +403,22 @@ module type SIGNATURE = sig
   include B58_DATA with type t := t
 
   include ENCODER with type t := t
+end
+
+module type SIGNATURE = sig
+  include COMMON_SIGNATURE
 
   val zero : t
 
   type watermark
 
+  (** [sign ?watermark sk message] produce the signature of [message] (with
+      possibly [watermark]) using [sk].*)
   val sign : ?watermark:watermark -> Secret_key.t -> Bytes.t -> t
 
+  (** [check pk ?watermark signature message] check that [signature] is the
+      signature produced by signing [message] (with possibly [watermark]) with
+      the secret key of [pk]. *)
   val check : ?watermark:watermark -> Public_key.t -> t -> Bytes.t -> bool
 
   val generate_key :

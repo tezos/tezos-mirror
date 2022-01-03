@@ -399,6 +399,8 @@ struct
     \ - encrypted:<public_key>\n\
      where <public_key> is the public key in Base58."
 
+  include Client_keys.Signature_type
+
   let public_key = Unencrypted.public_key
 
   let public_key_hash = Unencrypted.public_key_hash

@@ -345,7 +345,7 @@ let commands network : Client_context.full Clic.command list =
         in
         let*! () =
           List.iter_s
-            (fun (n, (module S : SIGNER)) ->
+            (fun (n, Simple (module S : SIGNER)) ->
               cctxt#message
                 "@[<v 2>Scheme `%s`: %s@,@[<hov 0>%a@]@]"
                 n

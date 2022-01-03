@@ -54,6 +54,7 @@ struct
     \ - $TEZOS_SIGNER_HTTP_HOST and $TEZOS_SIGNER_HTTP_PORT (default: 6732),\n\
     \ - $TEZOS_SIGNER_HTTPS_HOST and $TEZOS_SIGNER_HTTPS_PORT (default: 443)."
 
+  include Client_keys.Signature_type
   module Socket = Socket.Make (S)
   module Http = Http.Make (RPC_client) (S)
   module Https = Https.Make (RPC_client) (S)

@@ -76,6 +76,24 @@ let uri_encoding =
   in
   Data_encoding.(conv Uri.to_string to_uri string)
 
+type error += Unexisting_scheme of Uri.t
+
+let () =
+  register_error_kind
+    `Permanent
+    ~id:"cli.unexisting_scheme"
+    ~title:"Unexisting scheme"
+    ~description:"The requested scheme does not exist"
+    ~pp:(fun ppf uri ->
+      Format.fprintf
+        ppf
+        "The uri %a does specify a scheme to use"
+        Uri.pp_hum
+        uri)
+    Data_encoding.(obj1 (req "uri" uri_encoding))
+    (function Unexisting_scheme uri -> Some uri | _ -> None)
+    (fun uri -> Unexisting_scheme uri)
+
 type pk_uri = Uri.t
 
 module Pk_uri_hashtbl = Hashtbl.Make (struct
@@ -282,25 +300,71 @@ module PVSS_secret_key = Client_aliases.Alias (struct
   let to_source t = Lwt.return_ok (Uri.to_string t)
 end)
 
-module type SIGNER = sig
+module Make_common_type (S : sig
+  include S.COMMON_SIGNATURE
+
+  type pk_uri
+
+  type sk_uri
+end) =
+struct
+  type pk_uri = S.pk_uri
+
+  type sk_uri = S.sk_uri
+
+  type public_key_hash = S.Public_key_hash.t
+
+  type public_key = S.Public_key.t
+
+  type secret_key = S.Secret_key.t
+end
+
+module Signature_type = Make_common_type (struct
+  include Signature
+
+  type nonrec pk_uri = pk_uri
+
+  type nonrec sk_uri = sk_uri
+end)
+
+module type COMMON_SIGNER = sig
   val scheme : string
 
   val title : string
 
   val description : string
 
+  type pk_uri = private Uri.t
+
+  type sk_uri = private Uri.t
+
+  type public_key_hash
+
+  type public_key
+
+  type secret_key
+
   val neuterize : sk_uri -> pk_uri tzresult Lwt.t
 
   val import_secret_key :
     io:Client_context.io_wallet ->
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+    (public_key_hash * public_key option) tzresult Lwt.t
 
-  val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
+  val public_key : pk_uri -> public_key tzresult Lwt.t
 
   val public_key_hash :
-    pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+    pk_uri -> (public_key_hash * public_key option) tzresult Lwt.t
+end
+
+module type SIGNER = sig
+  include
+    COMMON_SIGNER
+      with type public_key_hash = Signature.Public_key_hash.t
+       and type public_key = Signature.Public_key.t
+       and type secret_key = Signature.Secret_key.t
+       and type pk_uri = pk_uri
+       and type sk_uri = sk_uri
 
   val sign :
     ?watermark:Signature.watermark ->
@@ -315,19 +379,26 @@ module type SIGNER = sig
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
-let signers_table : (module SIGNER) String.Hashtbl.t = String.Hashtbl.create 13
+type signer = Simple of (module SIGNER)
+
+let signers_table : signer String.Hashtbl.t = String.Hashtbl.create 13
 
 let register_signer signer =
   let module Signer = (val signer : SIGNER) in
-  String.Hashtbl.replace signers_table Signer.scheme signer
+  String.Hashtbl.replace signers_table Signer.scheme (Simple signer)
 
-let find_signer_for_key ~scheme : (module SIGNER) tzresult =
+let find_signer_for_key ~scheme : signer tzresult =
   let open Tzresult_syntax in
   match String.Hashtbl.find signers_table scheme with
   | None -> fail (Unregistered_key_scheme scheme)
   | Some signer -> return signer
 
-let registered_signers () : (string * (module SIGNER)) list =
+let find_simple_signer_for_key ~scheme =
+  let open Tzresult_syntax in
+  let* signer = find_signer_for_key ~scheme in
+  match signer with Simple signer -> return signer
+
+let registered_signers () : (string * signer) list =
   String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
 
 type error += Signature_mismatch of sk_uri
@@ -348,34 +419,43 @@ let () =
     (function Signature_mismatch sk -> Some sk | _ -> None)
     (fun sk -> Signature_mismatch sk)
 
-let with_scheme_signer (uri : Uri.t) (f : (module SIGNER) -> 'a tzresult Lwt.t)
-    =
+let with_scheme_signer (uri : Uri.t) (f : signer -> 'a tzresult Lwt.t) :
+    'a tzresult Lwt.t =
   let open Lwt_tzresult_syntax in
   match Uri.scheme uri with
-  | None -> assert false
+  | None -> fail @@ Unexisting_scheme uri
   | Some scheme ->
       let*? signer = find_signer_for_key ~scheme in
       f signer
 
-let neuterize sk_uri =
-  with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
+let with_scheme_simple_signer (uri : Uri.t)
+    (f : (module SIGNER) -> 'a tzresult Lwt.t) : 'a tzresult Lwt.t =
+  let open Lwt_tzresult_syntax in
+  match Uri.scheme uri with
+  | None -> fail @@ Unexisting_scheme uri
+  | Some scheme ->
+      let*? signer = find_simple_signer_for_key ~scheme in
+      f signer
+
+let neuterize (sk_uri : sk_uri) : pk_uri tzresult Lwt.t =
+  with_scheme_simple_signer sk_uri (fun (module Signer : SIGNER) ->
       Signer.neuterize sk_uri)
 
 let public_key pk_uri =
-  with_scheme_signer pk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_simple_signer pk_uri (fun (module Signer : SIGNER) ->
       Signer.public_key pk_uri)
 
 let public_key_hash pk_uri =
-  with_scheme_signer pk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_simple_signer pk_uri (fun (module Signer : SIGNER) ->
       Signer.public_key_hash pk_uri)
 
 let import_secret_key ~io pk_uri =
-  with_scheme_signer pk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_simple_signer pk_uri (fun (module Signer : SIGNER) ->
       Signer.import_secret_key ~io pk_uri)
 
 let sign cctxt ?watermark sk_uri buf =
   let open Lwt_tzresult_syntax in
-  with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_simple_signer sk_uri (fun (module Signer : SIGNER) ->
       let* signature = Signer.sign ?watermark sk_uri buf in
       let* pk_uri = Signer.neuterize sk_uri in
       let* pubkey =
@@ -409,15 +489,15 @@ let check ?watermark pk_uri signature buf =
   return (Signature.check ?watermark pk signature buf)
 
 let deterministic_nonce sk_uri data =
-  with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_simple_signer sk_uri (fun (module Signer : SIGNER) ->
       Signer.deterministic_nonce sk_uri data)
 
 let deterministic_nonce_hash sk_uri data =
-  with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_simple_signer sk_uri (fun (module Signer : SIGNER) ->
       Signer.deterministic_nonce_hash sk_uri data)
 
 let supports_deterministic_nonces sk_uri =
-  with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
+  with_scheme_signer sk_uri (function Simple (module Signer : SIGNER) ->
       Signer.supports_deterministic_nonces sk_uri)
 
 let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
@@ -425,8 +505,7 @@ let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
   let open Lwt_result_syntax in
   let* () = Public_key.add ~force cctxt name (pk_uri, public_key) in
   let* () = Secret_key.add ~force cctxt name sk_uri in
-  let* () = Public_key_hash.add ~force cctxt name public_key_hash in
-  return_unit
+  Public_key_hash.add ~force cctxt name public_key_hash
 
 let register_keys cctxt xs =
   let open Lwt_result_syntax in
@@ -502,7 +581,7 @@ let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
   | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
       let*! r =
-        let*? signer = find_signer_for_key ~scheme:"remote" in
+        let*? signer = find_simple_signer_for_key ~scheme:"remote" in
         let module Signer = (val signer : SIGNER) in
         let path = Signature.Public_key_hash.to_b58check pkh in
         let uri = Uri.make ~scheme:Signer.scheme ~path () in

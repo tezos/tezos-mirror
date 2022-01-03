@@ -84,7 +84,17 @@ end
 
 (** {2 Interface for external signing modules.} *)
 
-module type SIGNER = sig
+module type COMMON_SIGNER = sig
+  type pk_uri = private Uri.t
+
+  type sk_uri = private Uri.t
+
+  type public_key_hash
+
+  type public_key
+
+  type secret_key
+
   (** [scheme] is the name of the scheme implemented by this signer
       module. *)
   val scheme : string
@@ -109,17 +119,40 @@ module type SIGNER = sig
   val import_secret_key :
     io:Client_context.io_wallet ->
     pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+    (public_key_hash * public_key option) tzresult Lwt.t
 
   (** [public_key pk] is the Ed25519 version of [pk].*)
-  val public_key : pk_uri -> Signature.Public_key.t tzresult Lwt.t
+  val public_key : pk_uri -> public_key tzresult Lwt.t
 
   (** [public_key_hash pk] is the hash of [pk].
       As some signers will query the full public key to obtain the hash,
       it can be optionally returned to reduce the amount of queries. *)
   val public_key_hash :
-    pk_uri ->
-    (Signature.Public_key_hash.t * Signature.Public_key.t option) tzresult Lwt.t
+    pk_uri -> (public_key_hash * public_key option) tzresult Lwt.t
+end
+
+(** [Signature_type] is a small module to be included in signer to conform to
+    the module type [SIGNER] instead of rewriting all type. *)
+module Signature_type : sig
+  type public_key_hash = Signature.Public_key_hash.t
+
+  type public_key = Signature.Public_key.t
+
+  type secret_key = Signature.Secret_key.t
+
+  type nonrec pk_uri = pk_uri
+
+  type nonrec sk_uri = sk_uri
+end
+
+module type SIGNER = sig
+  include
+    COMMON_SIGNER
+      with type public_key_hash = Signature.Public_key_hash.t
+       and type public_key = Signature.Public_key.t
+       and type secret_key = Signature.Secret_key.t
+       and type pk_uri = pk_uri
+       and type sk_uri = sk_uri
 
   (** [sign ?watermark sk data] is signature obtained by signing [data] with
         [sk]. *)
@@ -142,11 +175,13 @@ module type SIGNER = sig
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
+type signer = Simple of (module SIGNER)
+
 (** [register_signer signer] registers first-class module [signer] as
     signer for keys with scheme [(val signer : SIGNER).scheme]. *)
 val register_signer : (module SIGNER) -> unit
 
-val registered_signers : unit -> (string * (module SIGNER)) list
+val registered_signers : unit -> (string * signer) list
 
 val import_secret_key :
   io:Client_context.io_wallet ->

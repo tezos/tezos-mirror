@@ -27,8 +27,6 @@ module Make (N : sig
   val scheme : string
 end) =
 struct
-  open Client_keys
-
   let scheme = N.scheme
 
   module Make
@@ -41,6 +39,8 @@ struct
         val logger : RPC_client.logger
       end) =
   struct
+    include Client_keys.Signature_type
+
     let scheme = scheme
 
     let title =

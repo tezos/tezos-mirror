@@ -158,6 +158,8 @@ struct
     let description =
       "Valid locators are of the form\n - unix:/path/to/socket?pkh=tz1..."
 
+    include Client_keys.Signature_type
+
     let parse uri =
       let open Tzresult_syntax in
       assert (Uri.scheme uri = Some scheme) ;
@@ -215,6 +217,8 @@ struct
 
     let description =
       "Valid locators are of the form\n - tcp://host:port/tz1..."
+
+    include Client_keys.Signature_type
 
     let parse uri =
       let open Tzresult_syntax in

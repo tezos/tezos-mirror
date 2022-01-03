@@ -44,6 +44,8 @@ let () =
 
 (** The implementation of the “signer-plugin.” *)
 module Signer_implementation : Client_keys.SIGNER = struct
+  include Client_keys.Signature_type
+
   let scheme = "no_ledger"
 
   let title = "Fake signer when Ledger Nano device support is disabled"
