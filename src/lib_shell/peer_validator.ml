@@ -174,6 +174,9 @@ let validate_new_head w hash (header : Block_header.t) =
             header.shell.operations_hash))
     (0 -- (header.shell.validation_passes - 1))
   >>=? fun operations ->
+  (* We redo a check for the fitness here because while waiting for the
+     operations, a new head better than this block might be validated. *)
+  only_if_fitness_increases w header @@ fun () ->
   Worker.log_event w (Requesting_new_head_validation block_received)
   >>= fun () ->
   Block_validator.validate
