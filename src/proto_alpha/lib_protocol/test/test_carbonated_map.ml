@@ -296,7 +296,7 @@ let test_size =
   int_map_test "Size returns the number of elements" @@ fun map ->
   let ctxt = unsafe_new_context () in
   let* (kvs, _) = CM.to_list ctxt map in
-  Result.ok (CM.size map = List.length kvs)
+  Result.ok Compare.List_length_with.(kvs = CM.size map)
 
 (** Test that all keys of a map are found. *)
 let test_find_existing =

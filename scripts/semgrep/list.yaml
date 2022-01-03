@@ -1,0 +1,49 @@
+rules:
+- id: ocamllint-length-list-compare-length
+  pattern-either:
+  - pattern: compare (List.length $X) (List.length $Y)
+  - pattern: List.length $X = List.length $Y
+  - pattern: List.length $X <= List.length $Y
+  - pattern: List.length $X >= List.length $Y
+  - pattern: List.length $X < List.length $Y
+  - pattern: List.length $X > List.length $Y
+  - pattern: List.length $X <> List.length $Y
+  message: You probably want to use Compare.List_lengths or List.compare_lengths, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-lengths-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: ocamllint-length-list-compare
+  pattern-either:
+  - pattern: compare (List.length $X) $Y
+  - pattern: List.length $X = $Y
+  - pattern: List.length $X <= $Y
+  - pattern: List.length $X >= $Y
+  - pattern: List.length $X < $Y
+  - pattern: List.length $X > $Y
+  - pattern: List.length $X <> $Y
+  message: You probably want to use Compare.List_length_with or List.compare_length_with, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
+- id: ocamllint-length-list-compare
+  pattern-either:
+  - pattern: compare $Y (List.length $X)
+  - pattern: $X = List.length $Y
+  - pattern: $X <= List.length $Y
+  - pattern: $X >= List.length $Y
+  - pattern: $X < List.length $Y
+  - pattern: $X > List.length $Y
+  - pattern: $X <> List.length $Y
+  message: You probably want to use Compare.List_length_with or List.compare_length_with, which are faster. See https://tezos.gitlab.io/developer/guidelines.html#linting-list-length-comparison for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml
