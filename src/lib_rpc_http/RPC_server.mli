@@ -76,6 +76,10 @@ module Acl : sig
       for testing. *)
   val empty_policy : policy
 
+  (** [policy_type p] returns the "type" of [p], either
+      ["Secure"] or ["AllowAll"] or ["Custom"]. *)
+  val policy_type : t -> string
+
   val policy_encoding : policy Data_encoding.t
 
   (** Returns the JSON representation of the policy. *)

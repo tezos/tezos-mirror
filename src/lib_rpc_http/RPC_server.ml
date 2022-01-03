@@ -164,6 +164,11 @@ module Acl = struct
     in
     conv addr_port_id_to_string parse string
 
+  let policy_type p =
+    if p = secure then "Secure"
+    else if p = allow_all then "AllowAll"
+    else "Custom"
+
   let policy_encoding : (endpoint * t) list Data_encoding.t =
     let open Data_encoding in
     list
