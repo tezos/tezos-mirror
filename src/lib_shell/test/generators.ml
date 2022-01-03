@@ -51,7 +51,7 @@ let operation_gen ?(string_gen = string_gen) ?block_hash_t () :
   and+ proto = string_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
 
-(** Like {operation_gen} with a hash. *)
+(** Like {!operation_gen} with a hash. *)
 let operation_with_hash_gen ?string_gen ?block_hash_t () :
     (Operation_hash.t * Operation.t) QCheck.Gen.t =
   let open QCheck.Gen in
