@@ -181,7 +181,7 @@ let test_stresstest_applied =
       ()
   in
   let waiter = wait_for_n_injections transfers node in
-  Background.register @@ Client.stresstest ~transfers client ;
+  let* () = Client.stresstest ~transfers client in
   let* () = wait_or_timeout waiter in
   check_n_applied_operations ~log:true ~expected:transfers client
 
@@ -225,7 +225,7 @@ let test_stresstest_applied_new_bootstraps =
   in
   let source_aliases = List.map (sf "bootstrap%d") bootstrap_nums in
   let waiter = wait_for_n_injections transfers node in
-  Background.register @@ Client.stresstest ~source_aliases ~transfers client ;
+  let* () = Client.stresstest ~source_aliases ~transfers client in
   let* () = wait_or_timeout waiter in
   check_n_applied_operations ~log:true ~expected:transfers client
 
