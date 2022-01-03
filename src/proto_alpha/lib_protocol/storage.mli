@@ -711,7 +711,7 @@ module Sc_rollup : sig
 
      - a PVM kind (provided at creation time, read-only) ;
      - a boot sector (provided at creation time, read-only).
-
+     - a merkelized inbox, of which only the root hash is stored
   *)
   module PVM_kind :
     Indexed_data_storage
@@ -723,5 +723,11 @@ module Sc_rollup : sig
     Indexed_data_storage
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_repr.PVM.boot_sector
+       and type t := Raw_context.t
+
+  module Inbox :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Sc_rollup_inbox.t
        and type t := Raw_context.t
 end

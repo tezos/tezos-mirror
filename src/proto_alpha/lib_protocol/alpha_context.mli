@@ -1798,6 +1798,21 @@ module Sc_rollup : sig
     (t * Z.t * context) tzresult Lwt.t
 
   val kind : context -> t -> Kind.t option tzresult Lwt.t
+
+  module Inbox : sig
+    type t
+
+    val encoding : t Data_encoding.encoding
+
+    val pp : Format.formatter -> t -> unit
+  end
+
+  val rpc_arg : t RPC_arg.t
+
+  val add_messages :
+    context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
+
+  val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
 end
 
 module Block_payload : sig

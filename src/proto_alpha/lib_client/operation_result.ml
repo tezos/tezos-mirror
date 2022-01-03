@@ -435,8 +435,13 @@ let pp_manager_operation_contents_and_result ppf
     pp_balance_updates_opt ppf balance_updates
   in
   let pp_sc_rollup_add_messages_result
-      (Sc_rollup_add_messages_result {consumed_gas}) =
-    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+      (Sc_rollup_add_messages_result {consumed_gas; inbox_after}) =
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf
+      ppf
+      "@,Resulting inbox state: %a"
+      Sc_rollup.Inbox.pp
+      inbox_after
   in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;

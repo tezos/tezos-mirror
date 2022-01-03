@@ -23,37 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let originate ctxt ~kind ~boot_sector =
-  Raw_context.increment_origination_nonce ctxt >>?= fun (ctxt, nonce) ->
-  Sc_rollup_repr.Address.from_nonce nonce >>?= fun address ->
-  Storage.Sc_rollup.PVM_kind.add ctxt address kind >>= fun ctxt ->
-  Storage.Sc_rollup.Boot_sector.add ctxt address boot_sector >>= fun ctxt ->
-  Storage.Sc_rollup.Inbox.init ctxt address Sc_rollup_inbox.empty
-  >>=? fun (ctxt, size_diff) ->
-  let addresses_size = 2 * Sc_rollup_repr.Address.size in
-  let stored_kind_size = 2 (* because tag_size of kind encoding is 16bits. *) in
-  let boot_sector_size =
-    Data_encoding.Binary.length
-      Sc_rollup_repr.PVM.boot_sector_encoding
-      boot_sector
-  in
-  let origination_size = Constants_storage.sc_rollup_origination_size ctxt in
-  let size =
-    Z.of_int
-      (origination_size + stored_kind_size + boot_sector_size + addresses_size
-     + size_diff)
-  in
-  return (address, size, ctxt)
+(** Merkelizing inbox for smart contract rollups. *)
 
-let kind ctxt address = Storage.Sc_rollup.PVM_kind.find ctxt address
+(** The type of the in-memory state of the inbox for a smart contract rollup. *)
+type t
 
-let add_messages ctxt rollup messages =
-  Storage.Sc_rollup.Inbox.get ctxt rollup >>=? fun (ctxt, inbox) ->
-  let {Level_repr.level; _} = Raw_context.current_level ctxt in
-  let inbox = Sc_rollup_inbox.add_messages messages level inbox in
-  Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->
-  return (inbox, Z.of_int size, ctxt)
+val pp : Format.formatter -> t -> unit
 
-let inbox ctxt rollup =
-  Storage.Sc_rollup.Inbox.get ctxt rollup >>=? fun (ctxt, res) ->
-  return (res, ctxt)
+val encoding : t Data_encoding.t
+
+(** [number_of_available_messages inbox] returns the number of
+   messages that can be consumed in [inbox]. *)
+val number_of_available_messages : t -> Z.t
+
+(** The empty inbox. *)
+val empty : t
+
+(** [add_messages msg_list level inbox] adds [msg_list] to [inbox] at
+    level [level] (preserving their order). *)
+val add_messages : string list -> Raw_level_repr.t -> t -> t
+
+(** [consume_n_messages n inbox] returns an inbox where [n] messages have
+    been consumed, or [None] if there are strictly less than [n] messages
+    available in [inbox].
+
+    @raise Invalid_argument if [n <= 0]
+ *)
+val consume_n_messages : int -> t -> t option

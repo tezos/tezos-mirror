@@ -173,6 +173,7 @@ and _ successful_manager_operation_result =
       -> Kind.sc_rollup_originate successful_manager_operation_result
   | Sc_rollup_add_messages_result : {
       consumed_gas : Gas.Arith.fp;
+      inbox_after : Sc_rollup.Inbox.t;
     }
       -> Kind.sc_rollup_add_messages successful_manager_operation_result
 

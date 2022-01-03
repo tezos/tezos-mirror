@@ -39,6 +39,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
@@ -176,6 +177,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
@@ -313,6 +315,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
@@ -472,6 +475,7 @@ include Tezos_raw_protocol_alpha.Main
    Blinded_public_key_hash
    Block_payload_hash
    Origination_nonce
+   Sc_rollup_inbox
    Sc_rollup_repr
    Slot_repr
    Tez_repr
@@ -650,6 +654,7 @@ include Tezos_raw_protocol_alpha.Main
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
