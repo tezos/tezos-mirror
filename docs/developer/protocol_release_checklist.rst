@@ -1,5 +1,3 @@
-:orphan:
-
 Protocol Release Checklist
 ==========================
 
@@ -91,7 +89,7 @@ In the below, “Protocol Shepherd” is abbreviated “Shepherd”.
 -  **Developer Meeting Agrees to Freeze the Code** (up to bug fixes)
 
 -  **Shepherd compiles the doc page with the changelog**
-   (e.g. :doc:`006_carthage`),
+   (e.g. :doc:`../protocols/006_carthage`),
    and resets the changelog, as the diff between protocol Alpha and the proposed
    protocol restarts at zero (e.g. :gl:`!3123`)
 
@@ -101,7 +99,7 @@ In the below, “Protocol Shepherd” is abbreviated “Shepherd”.
 injection to give time for the test network and the release to be
 ready and tested before the injection. If some features
 need to be dropped to meet this deadline (including because they were
-not reviewed thoroughly enough), they can be dropped.
+not reviewed thoroughly enough), they should be dropped.
 
 -  **Protocol Hash**: a vanity hash for the new protocol is computed and
    chosen by its developers
@@ -147,7 +145,7 @@ the point of no return.**
 -  **Test Network**: the test network for the new protocol is started, see
    https://gitlab.com/romain.nl/howtos/-/blob/master/HOWTO-launch-a-test-network.md
 
--  **Injection**: a user injects the protocol
+-  **Injection**: a baker injects the protocol using a Proposal operation.
 
 **One Month Before Potential Activation**
 
