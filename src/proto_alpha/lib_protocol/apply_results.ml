@@ -390,10 +390,11 @@ module Manager_result = struct
       ~op_case:
         Operation.Encoding.Manager_operations.register_global_constant_case
       ~encoding:
-        (obj4
-           (req "balance_updates" Receipt.balance_updates_encoding)
-           (req "consumed_gas" Gas.Arith.n_integral_encoding)
-           (req "storage_size" z)
+        (obj5
+           (dft "balance_updates" Receipt.balance_updates_encoding [])
+           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+           (dft "storage_size" z Z.zero)
            (req "global_address" Script_expr_hash.encoding))
       ~iselect:(function
         | Internal_operation_result
@@ -407,12 +408,26 @@ module Manager_result = struct
       ~proj:(function
         | Register_global_constant_result
             {balance_updates; consumed_gas; size_of_constant; global_address} ->
-            (balance_updates, consumed_gas, size_of_constant, global_address))
+            ( balance_updates,
+              Gas.Arith.ceil consumed_gas,
+              consumed_gas,
+              size_of_constant,
+              global_address ))
       ~kind:Kind.Register_global_constant_manager_kind
       ~inj:
-        (fun (balance_updates, consumed_gas, size_of_constant, global_address) ->
+        (fun ( balance_updates,
+               consumed_gas,
+               consumed_milligas,
+               size_of_constant,
+               global_address ) ->
+        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Register_global_constant_result
-          {balance_updates; consumed_gas; size_of_constant; global_address})
+          {
+            balance_updates;
+            consumed_gas = consumed_milligas;
+            size_of_constant;
+            global_address;
+          })
 
   let delegation_case =
     make
@@ -709,7 +724,7 @@ module Encoding = struct
         op_case = Operation.Encoding.preendorsement_case;
         encoding =
           obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "delegate" Signature.Public_key_hash.encoding)
             (req "preendorsement_power" int31);
         select =
@@ -737,7 +752,7 @@ module Encoding = struct
         op_case = Operation.Encoding.endorsement_case;
         encoding =
           obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "delegate" Signature.Public_key_hash.encoding)
             (req "endorsement_power" int31);
         select =
@@ -760,7 +775,8 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.seed_nonce_revelation_case;
-        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Seed_nonce_revelation_result _ as op) -> Some op
@@ -778,7 +794,8 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.double_endorsement_evidence_case;
-        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_endorsement_evidence_result _ as op) ->
@@ -797,7 +814,8 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.double_preendorsement_evidence_case;
-        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_preendorsement_evidence_result _ as op) ->
@@ -817,7 +835,8 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.double_baking_evidence_case;
-        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Double_baking_evidence_result _ as op) -> Some op
@@ -835,7 +854,8 @@ module Encoding = struct
     Case
       {
         op_case = Operation.Encoding.activate_account_case;
-        encoding = obj1 (req "balance_updates" Receipt.balance_updates_encoding);
+        encoding =
+          obj1 (dft "balance_updates" Receipt.balance_updates_encoding []);
         select =
           (function
           | Contents_result (Activate_account_result _ as op) -> Some op
@@ -890,7 +910,7 @@ module Encoding = struct
         op_case = Operation.Encoding.Case op_case;
         encoding =
           obj3
-            (req "balance_updates" Receipt.balance_updates_encoding)
+            (dft "balance_updates" Receipt.balance_updates_encoding [])
             (req "operation_result" res_case.t)
             (dft
                "internal_operation_results"
@@ -1628,7 +1648,7 @@ let block_metadata_encoding =
           (req "nonce_hash" (option Nonce_hash.encoding))
           (req "consumed_gas" Gas.Arith.n_fp_encoding)
           (req "deactivated" (list Signature.Public_key_hash.encoding))
-          (req "balance_updates" Receipt.balance_updates_encoding)
+          (dft "balance_updates" Receipt.balance_updates_encoding [])
           (req "liquidity_baking_escape_ema" int32)
           (req
              "implicit_operations_results"
