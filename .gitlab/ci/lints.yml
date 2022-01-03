@@ -32,7 +32,9 @@ semgrep:
   # burden for fixing the code on the wrong dev (the devs who happen to open an
   # MR coinciding with the semgrep update rather than the dev who wrote the
   # infringing code in the first place).
-  image: returntocorp/semgrep-agent:sha-932a84b
+  # Update the hash in scripts/semgrep/README.md too when updating it here
+  # Last update: 20212-01-03
+  image: returntocorp/semgrep-agent:sha-c6cd7cf
   stage: test
   needs: []
   script:
