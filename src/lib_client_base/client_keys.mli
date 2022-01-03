@@ -35,6 +35,10 @@ type sapling_uri = private Uri.t
 
 type pvss_sk_uri = private Uri.t
 
+type aggregate_pk_uri = private Uri.t
+
+type aggregate_sk_uri = private Uri.t
+
 val pk_uri_parameter : unit -> (pk_uri, 'a) Clic.parameter
 
 val pk_uri_param :
@@ -145,6 +149,18 @@ module Signature_type : sig
   type nonrec sk_uri = sk_uri
 end
 
+module Aggregate_type : sig
+  type public_key_hash = Aggregate_signature.Public_key_hash.t
+
+  type public_key = Aggregate_signature.Public_key.t
+
+  type secret_key = Aggregate_signature.Secret_key.t
+
+  type pk_uri = aggregate_pk_uri
+
+  type sk_uri = aggregate_sk_uri
+end
+
 module type SIGNER = sig
   include
     COMMON_SIGNER
@@ -175,13 +191,32 @@ module type SIGNER = sig
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
-type signer = Simple of (module SIGNER)
+module type AGGREGATE_SIGNER = sig
+  include
+    COMMON_SIGNER
+      with type public_key_hash = Aggregate_signature.Public_key_hash.t
+       and type public_key = Aggregate_signature.Public_key.t
+       and type secret_key = Aggregate_signature.Secret_key.t
+       and type pk_uri = aggregate_pk_uri
+       and type sk_uri = aggregate_sk_uri
+
+  (** [sign sk data] is signature obtained by signing [data] with [sk]. *)
+  val sign : aggregate_sk_uri -> Bytes.t -> Aggregate_signature.t tzresult Lwt.t
+end
+
+type signer =
+  | Simple of (module SIGNER)
+  | Aggregate of (module AGGREGATE_SIGNER)
 
 (** [register_signer signer] registers first-class module [signer] as
     signer for keys with scheme [(val signer : SIGNER).scheme]. *)
 val register_signer : (module SIGNER) -> unit
 
 val registered_signers : unit -> (string * signer) list
+
+(** [register_aggregate_signer signer] registers first-class module [signer] as
+    signer for keys with scheme [(val signer : AGGREGATE_SIGNER).scheme]. *)
+val register_aggregate_signer : (module AGGREGATE_SIGNER) -> unit
 
 val import_secret_key :
   io:Client_context.io_wallet ->
@@ -279,6 +314,10 @@ val force_switch : unit -> (bool, 'ctx) Clic.arg
 val make_pk_uri : Uri.t -> pk_uri tzresult
 
 val make_sk_uri : Uri.t -> sk_uri tzresult
+
+val make_aggregate_pk_uri : Uri.t -> aggregate_pk_uri tzresult
+
+val make_aggregate_sk_uri : Uri.t -> aggregate_sk_uri tzresult
 
 val make_sapling_uri : Uri.t -> sapling_uri tzresult
 

@@ -25,6 +25,8 @@
 
 type error += Unregistered_key_scheme of string
 
+type error += Wrong_key_scheme of (string * string)
+
 type error += Invalid_uri of Uri.t
 
 let () =
@@ -48,7 +50,19 @@ let () =
     ~pp:(fun ppf s -> Format.fprintf ppf "Cannot parse the key uri: %s" s)
     Data_encoding.(obj1 (req "value" string))
     (function Invalid_uri s -> Some (Uri.to_string s) | _ -> None)
-    (fun s -> Invalid_uri (Uri.of_string s))
+    (fun s -> Invalid_uri (Uri.of_string s)) ;
+  register_error_kind
+    `Permanent
+    ~id:"cli.wrong_key_scheme"
+    ~title:"Wrong key scheme"
+    ~description:
+      "A certain scheme type has been requested but another one was found"
+    ~pp:(fun ppf (expected, found) ->
+      Format.fprintf ppf "Expected a %s scheme found a %s one" expected found)
+    Data_encoding.(obj2 (req "expected" string) (req "found" string))
+    (function
+      | Wrong_key_scheme (expected, found) -> Some (expected, found) | _ -> None)
+    (fun (expected, found) -> Wrong_key_scheme (expected, found))
 
 module Public_key_hash = struct
   include Client_aliases.Alias (struct
@@ -141,6 +155,30 @@ let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult =
   match Uri.scheme x with
   | None ->
       fail (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
+  | Some _ -> return x
+
+type aggregate_pk_uri = Uri.t
+
+type aggregate_sk_uri = Uri.t
+
+let make_aggregate_pk_uri (x : Uri.t) : aggregate_pk_uri tzresult =
+  let open Tzresult_syntax in
+  match Uri.scheme x with
+  | None ->
+      fail
+        (Exn
+           (Failure "Error while parsing URI: AGGREGATE_PK_URI needs a scheme"))
+  (* because it's possible to make an aggregate pk uri without having the signer
+     in the client we can't check that scheme is linked to a known signer *)
+  | Some _ -> return x
+
+let make_aggregate_sk_uri (x : Uri.t) : aggregate_sk_uri tzresult =
+  let open Tzresult_syntax in
+  match Uri.scheme x with
+  | None ->
+      fail
+        (Exn
+           (Failure "Error while parsing URI: AGGREGATE_SK_URI needs a scheme"))
   | Some _ -> return x
 
 let pk_uri_parameter () =
@@ -327,6 +365,14 @@ module Signature_type = Make_common_type (struct
   type nonrec sk_uri = sk_uri
 end)
 
+module Aggregate_type = Make_common_type (struct
+  include Aggregate_signature
+
+  type pk_uri = aggregate_pk_uri
+
+  type sk_uri = aggregate_sk_uri
+end)
+
 module type COMMON_SIGNER = sig
   val scheme : string
 
@@ -379,13 +425,31 @@ module type SIGNER = sig
   val supports_deterministic_nonces : sk_uri -> bool tzresult Lwt.t
 end
 
-type signer = Simple of (module SIGNER)
+module type AGGREGATE_SIGNER = sig
+  include
+    COMMON_SIGNER
+      with type public_key_hash = Aggregate_signature.Public_key_hash.t
+       and type public_key = Aggregate_signature.Public_key.t
+       and type secret_key = Aggregate_signature.Secret_key.t
+       and type pk_uri = aggregate_pk_uri
+       and type sk_uri = aggregate_sk_uri
+
+  val sign : aggregate_sk_uri -> Bytes.t -> Aggregate_signature.t tzresult Lwt.t
+end
+
+type signer =
+  | Simple of (module SIGNER)
+  | Aggregate of (module AGGREGATE_SIGNER)
 
 let signers_table : signer String.Hashtbl.t = String.Hashtbl.create 13
 
 let register_signer signer =
   let module Signer = (val signer : SIGNER) in
   String.Hashtbl.replace signers_table Signer.scheme (Simple signer)
+
+let register_aggregate_signer signer =
+  let module Signer = (val signer : AGGREGATE_SIGNER) in
+  String.Hashtbl.replace signers_table Signer.scheme (Aggregate signer)
 
 let find_signer_for_key ~scheme : signer tzresult =
   let open Tzresult_syntax in
@@ -396,7 +460,9 @@ let find_signer_for_key ~scheme : signer tzresult =
 let find_simple_signer_for_key ~scheme =
   let open Tzresult_syntax in
   let* signer = find_signer_for_key ~scheme in
-  match signer with Simple signer -> return signer
+  match signer with
+  | Simple signer -> return signer
+  | Aggregate _signer -> fail (Wrong_key_scheme ("simple", "aggregate"))
 
 let registered_signers () : (string * signer) list =
   String.Hashtbl.fold (fun k v acc -> (k, v) :: acc) signers_table []
@@ -497,8 +563,11 @@ let deterministic_nonce_hash sk_uri data =
       Signer.deterministic_nonce_hash sk_uri data)
 
 let supports_deterministic_nonces sk_uri =
-  with_scheme_signer sk_uri (function Simple (module Signer : SIGNER) ->
-      Signer.supports_deterministic_nonces sk_uri)
+  let open Lwt_tzresult_syntax in
+  with_scheme_signer sk_uri (function
+      | Simple (module Signer : SIGNER) ->
+          Signer.supports_deterministic_nonces sk_uri
+      | Aggregate _ -> return_false)
 
 let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
     ?public_key name =

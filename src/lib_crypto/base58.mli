@@ -53,6 +53,8 @@ module Prefix : sig
 
   val p256_public_key_hash : string
 
+  val bls12_381_public_key_hash : string
+
   val cryptobox_public_key_hash : string
 
   val ed25519_seed : string
@@ -85,6 +87,8 @@ module Prefix : sig
 
   val generic_signature : string
 
+  val generic_aggregate_signature : string
+
   val chain_id : string
 
   val secp256k1_element : string
@@ -94,6 +98,12 @@ module Prefix : sig
   val sapling_spending_key : string
 
   val sapling_address : string
+
+  val bls12_381_signature : string
+
+  val bls12_381_public_key : string
+
+  val bls12_381_secret_key : string
 end
 
 (** An extensible sum-type for decoded data: one case per known

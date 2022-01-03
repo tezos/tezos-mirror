@@ -345,13 +345,22 @@ let commands network : Client_context.full Clic.command list =
         in
         let*! () =
           List.iter_s
-            (fun (n, Simple (module S : SIGNER)) ->
-              cctxt#message
-                "@[<v 2>Scheme `%s`: %s@,@[<hov 0>%a@]@]"
-                n
-                S.title
-                Format.pp_print_text
-                S.description)
+            (fun (n, signer) ->
+              match signer with
+              | Simple (module S : SIGNER) ->
+                  cctxt#message
+                    "@[<v 2>Scheme `%s`: %s@,@[<hov 0>%a@]@]"
+                    n
+                    S.title
+                    Format.pp_print_text
+                    S.description
+              | Aggregate (module S : AGGREGATE_SIGNER) ->
+                  cctxt#message
+                    "@[<v 2>Aggregate scheme `%s`: %s@,@[<hov 0>%a@]@]"
+                    n
+                    S.title
+                    Format.pp_print_text
+                    S.description)
             signers
         in
         return_unit);
