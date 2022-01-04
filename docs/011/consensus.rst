@@ -326,7 +326,7 @@ Note that these parameters are part of the larger set of :ref:`protocol constant
      - ``ENDORSEMENT_SECURITY_DEPOSIT``
      - 2.5 ꜩ
 
-Since blocks are at least ``TIME_BETWEEN_BLOCKS[0]``, that is 30 seconds apart,
+Since blocks are at least ``MINIMAL_BLOCK_DELAY``, that is 30 seconds apart,
 and since a cycle has ``BLOCKS_PER_CYCLE``, that is :ref:`8192
 blocks<ps_constants_011>`, a cycle lasts *at least* 2 days, 20 hours, and 16
 minutes, and ``PRESERVED_CYCLES`` cycles, that is 5 cycles, last *at least* 14
