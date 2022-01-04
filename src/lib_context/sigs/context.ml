@@ -63,6 +63,13 @@ module type VIEW = sig
   val list :
     t -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t
 
+  (** [length t key] is an Lwt promise that resolve to the number of
+      files and sub-nodes stored under [k] in [t].
+
+      It is equivalent to [list t k >|= List.length] but has a
+      constant-time complexity. *)
+  val length : t -> key -> int Lwt.t
+
   (** {2 Setters} *)
 
   (** [add t k v] is an Lwt promise that resolves to [c] such that:

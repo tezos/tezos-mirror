@@ -294,6 +294,8 @@ module Make_tree (Store : DB) = struct
   let list tree ?offset ?length key =
     Store.Tree.list ~cache:true tree ?offset ?length key
 
+  let length tree key = Store.Tree.length ~cache:true tree key
+
   exception Context_dangling_hash of string
 
   exception Dangling_hash = Store.Private.Node.Val.Dangling_hash
