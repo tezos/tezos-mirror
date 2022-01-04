@@ -280,6 +280,7 @@ type value = bytes
 type tree = Store.tree
 
 module Tree = Tezos_context_helpers.Context.Make_tree (Store)
+module Proof = Tree.Proof
 
 let mem ctxt key = Tree.mem ctxt.tree (data_key key)
 
