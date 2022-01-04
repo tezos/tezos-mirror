@@ -130,7 +130,7 @@ let test_create ctxt =
     all different). Returned maps are exactly of size [n]. *)
 let prevalidation_operations_gen
     (module P : Prevalidation.T with type operation_data = unit) ~(n : int) :
-    unit Prevalidation.operation list QCheck.Gen.t =
+    unit Prevalidation.operation list QCheck2.Gen.t =
   let mk_operation (_, (raw : Operation.t)) : unit Prevalidation.operation =
     match P.parse raw with
     | Ok x -> x
@@ -138,13 +138,13 @@ let prevalidation_operations_gen
         Format.printf "%a" Error_monad.pp_print_trace err ;
         assert false
   in
-  let open QCheck.Gen in
+  let open QCheck2.Gen in
   (* We need to specify the protocol bytes generator to always generate the
      empty string, otherwise the call to [P.parse] will fail with the
      bytes being too long (hereby looking like an attack). *)
-  let string_gen : string QCheck.Gen.t = QCheck.Gen.return "" in
+  let string_gen : string QCheck2.Gen.t = QCheck2.Gen.return "" in
   let+ (ops : Operation.t Operation_hash.Map.t) =
-    Generators.op_map_gen_n ~string_gen ?block_hash_t:None ~n
+    Generators.op_map_gen_n ~string_gen ?block_hash_t:None n
   in
   List.map mk_operation (Operation_hash.Map.bindings ops)
 
@@ -154,8 +154,7 @@ let nb_ops = 100
 let mk_ops (module P : Prevalidation.T with type operation_data = unit) :
     unit Prevalidation.operation list =
   let ops =
-    QCheck.Gen.generate ~n:1 (prevalidation_operations_gen (module P) ~n:nb_ops)
-    |> List.concat
+    QCheck2.Gen.generate1 (prevalidation_operations_gen (module P) ~n:nb_ops)
   in
   assert (Compare.List_length_with.(ops = nb_ops)) ;
   ops
@@ -188,11 +187,12 @@ let test_apply_operation_crash ctxt =
 (** Logical implication *)
 let ( ==> ) a b = (not a) || b
 
-(** Returns a random generator initialized with a seed from [QCheck] *)
+(** Returns a random generator initialized with a seed from [QCheck2] *)
 let mk_rand () =
-  (* We use QCheck as the source of randomness, as we hope one day
-     this will become a traditional QCheck test. *)
-  QCheck.Gen.generate ~n:8 QCheck.Gen.int |> Array.of_list |> Random.State.make
+  (* We use QCheck2 as the source of randomness, as we hope one day
+     this will become a traditional QCheck2 test. *)
+  QCheck2.Gen.generate ~n:8 QCheck2.Gen.int
+  |> Array.of_list |> Random.State.make
 
 (** [mk_live_operations rand ops] returns a subset of [ops], which is
     appropriate for being passed as the [live_operations] argument
