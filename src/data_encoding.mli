@@ -906,8 +906,14 @@ module Json : sig
     (Bytes.t * int * int) Seq.t
 
   (** Destruct a JSON object into a value.
-      Fail with an exception if the JSON object and encoding do not match.. *)
-  val destruct : 't Encoding.t -> json -> 't
+      Fail with an exception if the JSON object and encoding do not match.
+
+      @param [bson_relaxation] (default to [false]) works around a limitation of
+      the BSON format. Specifically, in BSON, top-level arrays are represented as
+      number-indexed objects. When [bson_relaxation] is [true], then the
+      destructor attempts to automatically translate the indistinguishable
+      values as guided by the encoding. *)
+  val destruct : ?bson_relaxation:bool -> 't Encoding.t -> json -> 't
 
   (** JSON Error. *)
 
@@ -1309,9 +1315,11 @@ type json = Json.t
 
     WARNING! Due to a limitation of BSON, this encoding does not safely
     roundtrip. Specifically, [Json.destruct json (Json.construct json v)]
-    is not guaranteed to be equal to [v]. More specifically, in BSON, Arrays are
-    represented as number-indexed Objects and this library has no way to
-    distinguish between the two, doubly so for empty collections. *)
+    is not guaranteed to be equal to [v]. More specifically, in BSON, top-level
+    Arrays are represented as number-indexed Objects and this library has no way
+    to distinguish between the two, doubly so for empty collections.
+
+    See {!Json.destruct}'s [?bson_relaxation] optional parameter. *)
 val json : json Encoding.t
 
 type json_schema = Json.schema

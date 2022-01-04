@@ -52,7 +52,7 @@ val construct :
   't ->
   json
 
-val destruct : 't Encoding.t -> json -> 't
+val destruct : ?bson_relaxation:bool -> 't Encoding.t -> json -> 't
 
 type path = path_item list
 

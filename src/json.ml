@@ -377,7 +377,8 @@ type jsonm_lexeme =
 
 let construct_seq e v = construct_seq (get_json e) v
 
-let destruct e v = destruct (get_json e) v
+let destruct ?(bson_relaxation = false) e v =
+  destruct ~bson_relaxation (get_json e) v
 
 let schema ?definitions_path e = schema ?definitions_path (get_json e)
 
