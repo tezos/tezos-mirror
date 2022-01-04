@@ -1,6 +1,5 @@
 (library
  (name tezos_benchmarks_proto_alpha)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmarks-proto-alpha)
  (libraries
   tezos-base
