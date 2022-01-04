@@ -307,16 +307,18 @@ let block_gen : Block.t QCheck2.Gen.t =
   let hash = Block.hash_of_block ops in
   return Block.{hash; operations = ops}
 
-(* A generator of lists of {!Block.t} where all elements are guaranteed
-   to be different. *)
-let unique_block_gen : Block.Set.t QCheck2.Gen.t =
-  QCheck2.Gen.(small_list block_gen >|= Block.Set.of_list)
+(* A generator of sets of {!Block.t} where all elements are guaranteed
+   to be different. [list_gen] is an optional list generator. If omitted
+   it is defaulted to {!QCheck2.Gen.small_list}. *)
+let unique_block_gen ?(list_gen = QCheck2.Gen.small_list) () :
+    Block.Set.t QCheck2.Gen.t =
+  QCheck2.Gen.(list_gen block_gen >|= Block.Set.of_list)
 
-(* A generator of lists of {!Block.t} where all elements are guaranteed
-   to be different and returned lists are guaranteed to be non empty. *)
+(* A generator of sets of {!Block.t} where all elements are guaranteed
+   to be different and returned sets are guaranteed to be non empty. *)
 let unique_nonempty_block_gen =
   let open QCheck2.Gen in
-  let+ block = block_gen and+ l = unique_block_gen in
+  let+ block = block_gen and+ l = unique_block_gen () in
   Block.Set.add block l
 
 (** A tree generator. Written in a slightly unusual style because it
