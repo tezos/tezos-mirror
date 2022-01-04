@@ -126,18 +126,20 @@ val gen_access_annot :
     and different, unless [legacy] *)
 val merge_type_annot :
   legacy:bool ->
+  error_details:'error_trace Script_tc_errors.error_details ->
   type_annot option ->
   type_annot option ->
-  type_annot option tzresult
+  (type_annot option, 'error_trace) result
 
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)
 val merge_field_annot :
   legacy:bool ->
+  error_details:'error_trace Script_tc_errors.error_details ->
   field_annot option ->
   field_annot option ->
-  field_annot option tzresult
+  (field_annot option, 'error_trace) result
 
 (** Merge variable annotations, does not fail ([None] if different). *)
 val merge_var_annot : var_annot option -> var_annot option -> var_annot option

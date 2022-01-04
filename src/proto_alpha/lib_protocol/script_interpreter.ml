@@ -1074,14 +1074,14 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                       let open Gas_monad in
                       let io_ty =
                         Script_ir_translator.merge_types
-                          ~merge_type_error_flag:Default_merge_type_error
+                          ~error_details:Fast
                           ~legacy:true
                           kloc
                           aft_ty
                           output_ty
                         >>$ fun (out_eq, _ty) ->
                         merge_types
-                          ~merge_type_error_flag:Default_merge_type_error
+                          ~error_details:Fast
                           ~legacy:true
                           kloc
                           bef_ty
@@ -1090,7 +1090,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                       in
                       Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->
                       match eq with
-                      | Error _ -> (return_none [@ocaml.tailcall]) ctxt
+                      | Error Inconsistent_types_fast ->
+                          (return_none [@ocaml.tailcall]) ctxt
                       | Ok (Eq, Eq) -> (
                           let kkinfo = kinfo_of_kinstr k in
                           match kkinfo.kstack_ty with
@@ -1683,7 +1684,7 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
              ctxt ) ->
   record_trace
     (Bad_contract_parameter step_constants.self)
-    (find_entrypoint arg_type ~root_name entrypoint)
+    (find_entrypoint ~error_details:Informative arg_type ~root_name entrypoint)
   >>?= fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)

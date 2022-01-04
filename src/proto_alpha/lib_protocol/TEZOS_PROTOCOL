@@ -98,8 +98,8 @@
         "Carbonated_map",
 
         "Local_gas_counter",
-        "Gas_monad",
         "Script_tc_errors",
+        "Gas_monad",
         "Script_ir_annot",
         "Script_typed_ir",
         "Script_typed_ir_size",

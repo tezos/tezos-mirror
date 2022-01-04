@@ -778,17 +778,25 @@ let rec check_dupable_ty :
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let record_inconsistent_types loc ta tb =
-  record_trace_eval (fun () ->
-      let ta = serialize_ty_for_error ta in
-      let tb = serialize_ty_for_error tb in
-      Inconsistent_types (Some loc, ta, tb))
-
 let merge_type_metadata :
-    legacy:bool -> 'a ty_metadata -> 'b ty_metadata -> 'a ty_metadata tzresult =
- fun ~legacy {size = size_a; annot = annot_a} {size = size_b; annot = annot_b} ->
-  Type_size.merge size_a size_b >>? fun size ->
-  merge_type_annot ~legacy annot_a annot_b >|? fun annot -> {annot; size}
+    type error_trace.
+    legacy:bool ->
+    error_details:error_trace error_details ->
+    'a ty_metadata ->
+    'b ty_metadata ->
+    ('a ty_metadata, error_trace) result =
+ fun ~legacy
+     ~error_details
+     {size = size_a; annot = annot_a}
+     {size = size_b; annot = annot_b} ->
+  Type_size.merge ~error_details size_a size_b >>? fun size ->
+  merge_type_annot ~legacy ~error_details annot_a annot_b >|? fun annot ->
+  {annot; size}
+
+let default_merge_type_error ty1 ty2 =
+  let ty1 = serialize_ty_for_error ty1 in
+  let ty2 = serialize_ty_for_error ty2 in
+  Inconsistent_types (None, ty1, ty2)
 
 (* Takes two comparable types and simultaneously merge their annotations and
    check that they represent the same type.
@@ -806,25 +814,26 @@ let merge_type_metadata :
    reverting the gas consumption.
  *)
 let rec merge_comparable_types :
-    type ta tb.
+    type ta tb error_trace.
     legacy:bool ->
+    error_details:error_trace error_details ->
     ta comparable_ty ->
     tb comparable_ty ->
     ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
-      error trace )
+      error_trace )
     Gas_monad.t =
   let open Gas_monad in
-  fun ~legacy ta tb ->
+  fun ~legacy ~error_details ta tb ->
     consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
     let merge_type_metadata ~legacy meta_a meta_b =
-      of_result @@ merge_type_metadata ~legacy meta_a meta_b
+      of_result @@ merge_type_metadata ~legacy ~error_details meta_a meta_b
     in
     let merge_field_annot ~legacy annot_a annot_b =
-      of_result @@ merge_field_annot ~legacy annot_a annot_b
+      of_result @@ merge_field_annot ~legacy ~error_details annot_a annot_b
     in
     let return f eq annot_a annot_b :
         ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
-          error trace )
+          error_trace )
         gas_monad =
       merge_type_metadata ~legacy annot_a annot_b >>$ fun annot ->
       return (eq, f annot)
@@ -866,8 +875,10 @@ let rec merge_comparable_types :
         >>$ fun annot_left ->
         merge_field_annot ~legacy annot_right_a annot_right_b
         >>$ fun annot_right ->
-        merge_comparable_types ~legacy left_a left_b >>$ fun (Eq, left) ->
-        merge_comparable_types ~legacy right_a right_b >|$ fun (Eq, right) ->
+        merge_comparable_types ~legacy ~error_details left_a left_b
+        >>$ fun (Eq, left) ->
+        merge_comparable_types ~legacy ~error_details right_a right_b
+        >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Pair_key ((left, annot_left), (right, annot_right), annot) )
     | ( Union_key ((left_a, annot_left_a), (right_a, annot_right_a), annot_a),
@@ -878,18 +889,26 @@ let rec merge_comparable_types :
         >>$ fun annot_left ->
         merge_field_annot ~legacy annot_right_a annot_right_b
         >>$ fun annot_right ->
-        merge_comparable_types ~legacy left_a left_b >>$ fun (Eq, left) ->
-        merge_comparable_types ~legacy right_a right_b >|$ fun (Eq, right) ->
+        merge_comparable_types ~legacy ~error_details left_a left_b
+        >>$ fun (Eq, left) ->
+        merge_comparable_types ~legacy ~error_details right_a right_b
+        >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Union_key ((left, annot_left), (right, annot_right), annot) )
     | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
         merge_type_metadata ~legacy annot_a annot_b >>$ fun annot ->
-        merge_comparable_types ~legacy ta tb >|$ fun (Eq, t) ->
+        merge_comparable_types ~legacy ~error_details ta tb >|$ fun (Eq, t) ->
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
     | (_, _) ->
-        let ta = serialize_ty_for_error (ty_of_comparable_ty ta) in
-        let tb = serialize_ty_for_error (ty_of_comparable_ty tb) in
-        of_result @@ error (Inconsistent_types (None, ta, tb))
+        of_result
+        @@ Error
+             (match error_details with
+             | Fast -> (Inconsistent_types_fast : error_trace)
+             | Informative ->
+                 trace_of_error
+                 @@ default_merge_type_error
+                      (ty_of_comparable_ty ta)
+                      (ty_of_comparable_ty tb))
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -902,67 +921,64 @@ let comparable_ty_eq :
     tb comparable_ty ->
     ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
  fun ctxt ta tb ->
-  Gas_monad.run ctxt (merge_comparable_types ~legacy:true ta tb)
+  Gas_monad.run
+    ctxt
+    (merge_comparable_types ~legacy:true ~error_details:Informative ta tb)
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
-let merge_memo_sizes ms1 ms2 =
+let merge_memo_sizes :
+    type error_trace.
+    error_details:error_trace error_details ->
+    Sapling.Memo_size.t ->
+    Sapling.Memo_size.t ->
+    (Sapling.Memo_size.t, error_trace) result =
+ fun ~error_details ms1 ms2 ->
   if Sapling.Memo_size.equal ms1 ms2 then ok ms1
-  else error (Inconsistent_memo_sizes (ms1, ms2))
-
-type merge_type_error_flag = Default_merge_type_error | Fast_merge_type_error
-
-let default_merge_type_error ty1 ty2 =
-  let ty1 = serialize_ty_for_error ty1 in
-  let ty2 = serialize_ty_for_error ty2 in
-  Inconsistent_types (None, ty1, ty2)
-
-type error += Inconsistent_types_fast
-
-let fast_merge_type_error _ty1 _ty2 = Inconsistent_types_fast
-
-let merge_type_error ~merge_type_error_flag =
-  match merge_type_error_flag with
-  | Default_merge_type_error -> default_merge_type_error
-  | Fast_merge_type_error -> fast_merge_type_error
-
-let record_inconsistent_carbonated ta tb =
-  Gas_monad.record_trace_eval (fun () ->
-      let ta = serialize_ty_for_error ta in
-      let tb = serialize_ty_for_error tb in
-      Inconsistent_types (None, ta, tb))
+  else
+    Error
+      (match error_details with
+      | Fast -> Inconsistent_types_fast
+      | Informative -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
 (* Same as merge_comparable_types but for any types *)
 let merge_types :
-    type a b.
+    type a b error_trace.
     legacy:bool ->
-    merge_type_error_flag:merge_type_error_flag ->
+    error_details:error_trace error_details ->
     Script.location ->
     a ty ->
     b ty ->
-    ((a ty, b ty) eq * a ty, error trace) Gas_monad.t =
+    ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
   let open Gas_monad in
-  fun ~legacy ~merge_type_error_flag loc ty1 ty2 ->
+  fun ~legacy ~error_details loc ty1 ty2 ->
     let merge_type_metadata tn1 tn2 =
-      of_result
-        (merge_type_metadata ~legacy tn1 tn2
-        |> record_inconsistent_types loc ty1 ty2)
+      of_result @@ merge_type_metadata ~legacy ~error_details tn1 tn2
+      |> Gas_monad.record_trace_eval ~error_details (fun () ->
+             let ty1 = serialize_ty_for_error ty1 in
+             let ty2 = serialize_ty_for_error ty2 in
+             Inconsistent_types (Some loc, ty1, ty2))
     in
     let merge_field_annot ~legacy tn1 tn2 =
-      of_result (merge_field_annot ~legacy tn1 tn2)
+      of_result (merge_field_annot ~legacy ~error_details tn1 tn2)
     in
-    let merge_memo_sizes ms1 ms2 = of_result (merge_memo_sizes ms1 ms2) in
+    let merge_memo_sizes ms1 ms2 =
+      of_result (merge_memo_sizes ~error_details ms1 ms2)
+    in
     let rec help :
         type ta tb.
-        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
-     fun ty1 ty2 -> help0 ty1 ty2 |> record_inconsistent_carbonated ty1 ty2
+        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
+     fun ty1 ty2 ->
+      help0 ty1 ty2
+      |> Gas_monad.record_trace_eval ~error_details (fun () ->
+             default_merge_type_error ty1 ty2)
     and help0 :
         type ta tb.
-        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
+        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
      fun ty1 ty2 ->
       consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
       let return f eq annot_a annot_b :
-          ((ta ty, tb ty) eq * ta ty, error trace) gas_monad =
+          ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
         merge_type_metadata annot_a annot_b >>$ fun annot -> return (eq, f annot)
       in
       match (ty1, ty2) with
@@ -1002,20 +1018,22 @@ let merge_types :
       | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~legacy tal tbl >|$ fun (Eq, tk) ->
+          merge_comparable_types ~legacy ~error_details tal tbl
+          >|$ fun (Eq, tk) ->
           ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname))
       | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
           help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~legacy tal tbl >|$ fun (Eq, tk) ->
+          merge_comparable_types ~legacy ~error_details tal tbl
+          >|$ fun (Eq, tk) ->
           ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname))
       | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_comparable_types ~legacy ea eb >|$ fun (Eq, e) ->
+          merge_comparable_types ~legacy ~error_details ea eb >|$ fun (Eq, e) ->
           ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
       | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
           merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_comparable_types ~legacy ea eb >|$ fun (Eq, e) ->
+          merge_comparable_types ~legacy ~error_details ea eb >|$ fun (Eq, e) ->
           ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
       | ( Pair_t ((tal, l_field1, l_var1), (tar, r_field1, r_var1), tn1),
           Pair_t ((tbl, l_field2, l_var2), (tbr, r_field2, r_var2), tn2) ) ->
@@ -1068,7 +1086,12 @@ let merge_types :
       | (Chest_key_t tn1, Chest_key_t tn2) ->
           return (fun tname -> Chest_key_t tname) Eq tn1 tn2
       | (_, _) ->
-          of_result @@ error @@ merge_type_error ~merge_type_error_flag ty1 ty2
+          of_result
+          @@ Error
+               (match error_details with
+               | Fast -> (Inconsistent_types_fast : error_trace)
+               | Informative ->
+                   trace_of_error @@ default_merge_type_error ty1 ty2)
     in
     help ty1 ty2
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
@@ -1086,13 +1109,7 @@ let ty_eq :
     tb ty ->
     ((ta ty, tb ty) eq * context) tzresult =
  fun ~legacy ctxt loc ta tb ->
-  Gas_monad.run ctxt
-  @@ merge_types
-       ~merge_type_error_flag:Default_merge_type_error
-       ~legacy
-       loc
-       ta
-       tb
+  Gas_monad.run ctxt @@ merge_types ~error_details:Informative ~legacy loc ta tb
   >>? fun (eq_ty, ctxt) ->
   eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
 
@@ -1123,12 +1140,7 @@ let merge_stacks :
     | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
     | (Item_t (ty1, rest1, annot1), Item_t (ty2, rest2, annot2)) ->
         Gas_monad.run ctxt
-        @@ merge_types
-             ~merge_type_error_flag:Default_merge_type_error
-             ~legacy
-             loc
-             ty1
-             ty2
+        @@ merge_types ~error_details:Informative ~legacy loc ty1 ty2
         |> record_trace (Bad_stack_item lvl)
         >>? fun (eq_ty, ctxt) ->
         eq_ty >>? fun (Eq, ty) ->
@@ -1921,7 +1933,9 @@ type 'before dup_n_proof_argument =
       ('before, 'a) dup_n_gadt_witness * 'a ty
       -> 'before dup_n_proof_argument
 
-let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
+let find_entrypoint (type full error_trace)
+    ~(error_details : error_trace error_details) (full : full ty) ~root_name
+    entrypoint : ((Script.node -> Script.node) * ex_ty, error_trace) result =
   let annot_is_entrypoint entrypoint = function
     | None -> false
     | Some (Field_annot l) -> Compare.String.((l :> string) = entrypoint)
@@ -1950,7 +1964,10 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
     if Compare.String.(entrypoint = "") then "default" else entrypoint
   in
   if Compare.Int.(String.length entrypoint > 31) then
-    error (Entrypoint_name_too_long entrypoint)
+    Error
+      (match error_details with
+      | Fast -> (Inconsistent_types_fast : error_trace)
+      | Informative -> trace_of_error @@ Entrypoint_name_too_long entrypoint)
   else
     match root_name with
     | Some (Field_annot root_name)
@@ -1962,26 +1979,31 @@ let find_entrypoint (type full) (full : full ty) ~root_name entrypoint =
         | None -> (
             match entrypoint with
             | "default" -> ok ((fun e -> e), Ex_ty full)
-            | _ -> error (No_such_entrypoint entrypoint)))
+            | _ ->
+                Error
+                  (match error_details with
+                  | Fast -> (Inconsistent_types_fast : error_trace)
+                  | Informative ->
+                      trace_of_error @@ No_such_entrypoint entrypoint)))
 
-let find_entrypoint_for_type (type full exp) ~legacy ~merge_type_error_flag
+let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
-    (string * exp ty, error trace) Gas_monad.t =
+    (string * exp ty, error_trace) Gas_monad.t =
   let open Gas_monad in
-  match find_entrypoint full ~root_name entrypoint with
+  match find_entrypoint ~error_details full ~root_name entrypoint with
   | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
-      merge_types ~legacy ~merge_type_error_flag loc ty expected
-      >??$ fun eq_ty ->
       match (entrypoint, root_name) with
       | ("default", Some (Field_annot fa))
         when Compare.String.((fa :> string) = "root") -> (
-          match eq_ty with
+          merge_types ~legacy ~error_details:Fast loc ty expected >??$ function
           | Ok (Eq, ty) -> return ("default", (ty : exp ty))
-          | Error _ ->
-              merge_types ~legacy ~merge_type_error_flag loc full expected
+          | Error Inconsistent_types_fast ->
+              merge_types ~legacy ~error_details loc full expected
               >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
-      | _ -> of_result (eq_ty >|? fun (Eq, ty) -> (entrypoint, (ty : exp ty))))
+      | _ ->
+          merge_types ~legacy ~error_details loc ty expected >|$ fun (Eq, ty) ->
+          (entrypoint, (ty : exp ty)))
 
 module Entrypoints = Set.Make (String)
 
@@ -2803,8 +2825,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           | None -> return (transaction, ctxt)
           | Some transac_memo_size ->
               Lwt.return
-                ( merge_memo_sizes memo_size transac_memo_size >|? fun _ms ->
-                  (transaction, ctxt) ))
+                ( merge_memo_sizes
+                    ~error_details:Informative
+                    memo_size
+                    transac_memo_size
+                >|? fun _ms -> (transaction, ctxt) ))
       | None -> fail_parse_data ())
   | (Sapling_transaction_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
@@ -2813,7 +2838,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         let id = Sapling.Id.parse_z id in
         Sapling.state_from_id ctxt id >>=? fun (state, ctxt) ->
         Lwt.return
-          ( traced_no_lwt @@ merge_memo_sizes memo_size state.Sapling.memo_size
+          ( traced_no_lwt
+          @@ merge_memo_sizes
+               ~error_details:Informative
+               memo_size
+               state.Sapling.memo_size
           >|? fun _memo_size -> (state, ctxt) )
       else traced_fail (Unexpected_forged_value loc)
   | (Sapling_state_t (memo_size, _), Seq (_, [])) ->
@@ -2989,12 +3018,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     @@ record_trace
          (Bad_stack_item n)
          ( Gas_monad.run ctxt
-         @@ merge_types
-              ~legacy
-              ~merge_type_error_flag:Default_merge_type_error
-              loc
-              exp
-              got
+         @@ merge_types ~legacy ~error_details:Informative loc exp got
          >>? fun (eq_ty, ctxt) ->
            eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
   in
@@ -3978,7 +4002,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               rest,
               stack_annot ),
           _ ) ) ->
-      merge_memo_sizes state_memo_size transaction_memo_size
+      merge_memo_sizes
+        ~error_details:Informative
+        state_memo_size
+        transaction_memo_size
       >>?= fun _memo_size ->
       let instr =
         {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
@@ -4308,7 +4335,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           Item_t (Timestamp_t {annot = tn2; size = _}, rest, _),
           _ ) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_annot ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_annot ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IDiff_timestamps (kinfo, k))} in
       let stack = Item_t (int_t ~annot:tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4316,7 +4344,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (String_t tn1, Item_t (String_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IConcat_string_pair (kinfo, k))} in
       typed ctxt loc instr (Item_t (String_t tname, rest, annot))
   | ( Prim (loc, I_CONCAT, [], annot),
@@ -4346,7 +4375,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes_pair (kinfo, k))} in
       let stack = Item_t (Bytes_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4378,7 +4408,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_tez (kinfo, k))} in
       let stack = Item_t (Mutez_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4386,7 +4417,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       if legacy then
         parse_var_annot loc annot >>?= fun annot ->
-        merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+        merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+        >>?= fun tname ->
         let instr = {apply = (fun kinfo k -> ISub_tez_legacy (kinfo, k))} in
         let stack = Item_t (Mutez_t tname, rest, annot) in
         typed ctxt loc instr stack
@@ -4394,7 +4426,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_SUB_MUTEZ, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_tez (kinfo, k))} in
       let stack = Item_t (option_mutez'_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4416,21 +4449,24 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IOr (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAnd (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IXor (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4468,7 +4504,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4487,14 +4524,16 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4513,14 +4552,16 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun _tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (int_t ~annot:None, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4539,7 +4580,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4552,14 +4594,16 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_tez (kinfo, k))} in
       let stack = Item_t (option_pair_nat_mutez'_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Int_t tn1, Item_t (Int_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
       let stack = Item_t (option_pair_int'_nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4578,35 +4622,40 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
       let stack = Item_t (option_pair_nat'_nat'_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_LSL, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ILsl_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_LSR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ILsr_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_OR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IOr_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAnd_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4619,7 +4668,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IXor_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -4961,7 +5011,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               error
                 (Forbidden_instr_in_context (loc, Script_tc_errors.View, prim))
           | Toplevel {param_type; root_name; storage_type = _} ->
-              find_entrypoint param_type ~root_name entrypoint
+              find_entrypoint
+                ~error_details:Informative
+                param_type
+                ~root_name
+                entrypoint
               >>? fun (_, Ex_ty param_type) ->
               contract_t loc param_type ~annot:None >>? fun res_ty ->
               let instr =
@@ -5018,21 +5072,24 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_g1_t tn1, Item_t (Bls12_381_g1_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g1 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g1_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_g2_t tn1, Item_t (Bls12_381_g2_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g2 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g2_t tname, rest, annot) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_fr_t tn1, Item_t (Bls12_381_fr_t tn2, rest, _), _) ) ->
       parse_var_annot loc annot >>?= fun annot ->
-      merge_type_metadata ~legacy tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
+      >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_fr (kinfo, k))} in
       let stack = Item_t (Bls12_381_fr_t tname, rest, annot) in
       typed ctxt loc instr stack
@@ -5151,12 +5208,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           _ ) ) -> (
       parse_var_annot loc annot >>?= fun annot ->
       Gas_monad.run ctxt
-      @@ merge_types
-           ~legacy
-           ~merge_type_error_flag:Default_merge_type_error
-           loc
-           ty_a
-           ty_b
+      @@ merge_types ~legacy ~error_details:Informative loc ty_a ty_b
       >>?= fun (eq_ty, ctxt) ->
       eq_ty >>?= fun (Eq, ty) ->
       match ty with
@@ -5427,7 +5479,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               Gas_monad.run ctxt
               @@ find_entrypoint_for_type
                    ~legacy
-                   ~merge_type_error_flag:Default_merge_type_error
+                   ~error_details:Informative
                    ~full:targ
                    ~expected:arg
                    ~root_name
@@ -5579,7 +5631,7 @@ let parse_contract_for_script :
             ( Gas_monad.run ctxt
             @@ merge_types
                  ~legacy:true
-                 ~merge_type_error_flag:Fast_merge_type_error
+                 ~error_details:Fast
                  loc
                  arg
                  (unit_t ~annot:None)
@@ -5590,7 +5642,7 @@ let parse_contract_for_script :
                     (arg, (contract, entrypoint))
                   in
                   (ctxt, Some contract)
-              | Error _ -> (ctxt, None) )
+              | Error Inconsistent_types_fast -> (ctxt, None) )
       | _ ->
           Lwt.return
             ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
@@ -5623,7 +5675,7 @@ let parse_contract_for_script :
                       Gas_monad.run ctxt
                       @@ find_entrypoint_for_type
                            ~legacy:false
-                           ~merge_type_error_flag:Fast_merge_type_error
+                           ~error_details:Fast
                            ~full:targ
                            ~expected:arg
                            ~root_name
@@ -5636,7 +5688,7 @@ let parse_contract_for_script :
                             (arg, (contract, entrypoint))
                           in
                           (ctxt, Some contract)
-                      | Error _ -> (ctxt, None))) ))
+                      | Error Inconsistent_types_fast -> (ctxt, None))) ))
 
 let parse_code :
     ?type_logger:type_logger ->

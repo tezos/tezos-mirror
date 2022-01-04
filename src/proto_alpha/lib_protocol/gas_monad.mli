@@ -52,7 +52,7 @@ val ( >?$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) result) -> ('b, 'trace) t
 
 (** Another variant of [( >>$ )] that lets recover from inner errors *)
 val ( >??$ ) :
-  ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace) t) -> ('b, 'trace) t
+  ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace') t) -> ('b, 'trace') t
 
 (** gas-free embedding of tzresult values. [of_result x] is equivalent to [return () >?$ fun () -> x] *)
 val of_result : ('a, 'trace) result -> ('a, 'trace) t
@@ -67,6 +67,10 @@ val consume_gas : Gas.cost -> (unit, 'trace) t
 val run : context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
 
 (** re-export of [Error_monad.record_trace_eval]. This function has no
-    effect in the case of a gas-exhaustion error. *)
+    effect in the case of a gas-exhaustion error
+    or if [error_details] is [Fast]. *)
 val record_trace_eval :
-  (unit -> 'err) -> ('a, 'err trace) t -> ('a, 'err trace) t
+  error_details:'error_trace Script_tc_errors.error_details ->
+  (unit -> error) ->
+  ('a, 'error_trace) t ->
+  ('a, 'error_trace) t

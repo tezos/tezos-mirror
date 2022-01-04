@@ -75,5 +75,15 @@ let run ctxt m =
           ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
 
-let record_trace_eval f m gas =
-  m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
+let record_trace_eval :
+    type error_trace.
+    error_details:error_trace Script_tc_errors.error_details ->
+    (unit -> error) ->
+    ('a, error_trace) t ->
+    ('a, error_trace) t =
+ fun ~error_details ->
+  match error_details with
+  | Fast -> fun _f m -> m
+  | Informative ->
+      fun f m gas ->
+        m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas

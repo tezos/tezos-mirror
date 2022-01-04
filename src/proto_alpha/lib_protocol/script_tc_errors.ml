@@ -202,3 +202,16 @@ type error += Non_dupable_type of Script.location * Script.expr
 
 (* Impossible errors *)
 type error += Unparsing_invariant_violated
+
+(* Merge type errors *)
+
+type inconsistent_types_fast_error =
+  | Inconsistent_types_fast
+      (** This value is only used when the details of the error don't matter because
+the error will be ignored later. For example, when types are compared during
+the interpretation of the [CONTRACT] instruction any error will lead to
+returning [None] but the content of the error will be ignored. *)
+
+type _ error_details =
+  | Informative : error trace error_details
+  | Fast : inconsistent_types_fast_error error_details
