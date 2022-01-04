@@ -121,6 +121,19 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
+let batch_operations ~source ctxt (operations : packed_operation list) =
+  let operations =
+    List.map
+      (function
+        | {Alpha_context.protocol_data = Operation_data {contents; _}; _} ->
+            Operation.to_list (Contents_list contents))
+      operations
+    |> List.flatten
+  in
+  Context.Contract.manager ctxt source >>=? fun account ->
+  Environment.wrap_tzresult @@ Operation.of_list operations
+  >>?= fun operations -> return @@ sign account.sk ctxt operations
+
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (match packed_operations with [] -> false | _ :: _ -> true) ;
