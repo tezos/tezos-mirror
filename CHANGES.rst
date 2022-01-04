@@ -176,6 +176,10 @@ Node
   in order to control when the mempool accepts a manager operation replacement,
   and how many manager operations we keep in the prechecked classification.
 
+- Fixed an incorrect behaviour of the store which could cause the node
+  to freeze for a few seconds.
+
+
 Client
 ------
 
