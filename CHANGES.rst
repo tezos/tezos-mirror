@@ -95,6 +95,9 @@ Node
 
 -  Reduced the memory consumption of the snapshot import.
 
+- Fixed an incorrect behaviour of the store which could cause the node
+  to freeze for a few seconds.
+
 Client
 ------
 
