@@ -6,7 +6,8 @@
   test_prevalidation
   test_prevalidation_t
   test_prevalidator_classification
-  test_prevalidator_classification_operations)
+  test_prevalidator_classification_operations
+  test_prevalidator_pending_operations)
  (package tezos-shell)
  (libraries
   tezos-base
