@@ -1,9 +1,3 @@
-docs/introduction/compile-sources.sh
-docs/introduction/install-bin-fedora.sh
-docs/introduction/install-bin-ubuntu.sh
-docs/introduction/install-opam-scratch.sh
-docs/introduction/install-opam.sh
-docs/introduction/use-docker-hangzhounet.sh
 scripts/baker-version-stats.sh
 scripts/ci/create_docker_image.build.sh
 scripts/ci/create_docker_image.minimal.sh
