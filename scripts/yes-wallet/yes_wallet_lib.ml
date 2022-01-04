@@ -94,6 +94,45 @@ let json_to_file json file =
   Ezjsonm.to_channel ~minify:false chan json ;
   close_out chan
 
+let json_of_file file =
+  let chan = open_in file in
+  let json = Ezjsonm.from_channel chan in
+  close_in chan ;
+  json
+
+let pk_of_json (json : Ezjsonm.value) =
+  match json with
+  | `O
+      [
+        ("name", `String alias);
+        ("value", `O [("locator", _); ("key", `String pk_s)]);
+      ] ->
+      (alias, pk_s)
+  | `O [("name", `String alias); ("value", `String locator)] -> (
+      match String.split_on_char ':' locator with
+      | ["unencrypted"; pk_s] -> (alias, pk_s)
+      | _ ->
+          raise (Failure ("unsupported locator in public key file" ^ locator)))
+  | json ->
+      raise
+        (Failure
+           ("unsupported public key file format: "
+           ^ Ezjsonm.decode_string_exn json))
+
+let map_bind_of_json f (list : Ezjsonm.t) =
+  match list with
+  | `O _ -> raise (Failure "not a list")
+  | `A val_lst -> List.map f val_lst
+
+let pk_list_of_json = map_bind_of_json pk_of_json
+
+let pk_list_of_file file = pk_list_of_json @@ json_of_file file
+
+let sk_list_of_pk_file file =
+  let list = pk_list_of_file file in
+  Format.printf "found %d keys@." (List.length list) ;
+  map_bind_to_json (fun (alias, pk_s) -> sk_json (alias, alias, pk_s)) list
+
 let alias_pkh_pk_list =
   [
     ( "foundation1",
