@@ -109,7 +109,14 @@ module Encoding = struct
     let json =
       Encoding.conv
         (fun le ->
-          match force_decode le with Some r -> r | None -> raise Exit)
+          match force_decode le with
+          | Some r -> r
+          | None ->
+              raise
+                (Json_encoding.Cannot_destruct
+                   ( [],
+                     Invalid_argument "error when decoding lazily encoded value"
+                   )))
         (fun value -> {state = Value value; encoding})
         encoding
     in
