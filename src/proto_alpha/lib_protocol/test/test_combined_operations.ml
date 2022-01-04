@@ -281,7 +281,9 @@ let expect_wrong_signature list =
   else
     failwith
       "Packed operation has invalid source in the middle : operation expected \
-       to fail."
+       to fail but got errors: %a."
+      Error_monad.pp_print_trace
+      list
 
 let test_wrong_signature_in_the_middle () =
   Context.init 2 >>=? function
@@ -295,6 +297,16 @@ let test_wrong_signature_in_the_middle () =
       (* Make legit transfers, performing reveals *)
       Incremental.add_operation inc op1 >>=? fun inc ->
       Incremental.add_operation inc op2 >>=? fun inc ->
+      (* Make c2 reach counter 5 *)
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+      >>=? fun op ->
+      Incremental.add_operation inc op >>=? fun inc ->
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+      >>=? fun op ->
+      Incremental.add_operation inc op >>=? fun inc ->
+      Op.transaction ~gas_limit ~fee:Tez.one (I inc) c2 c1 Tez.one
+      >>=? fun op ->
+      Incremental.add_operation inc op >>=? fun inc ->
       (* Cook transactions for actual test *)
       Op.transaction ~gas_limit ~fee:Tez.one (I inc) c1 c2 Tez.one
       >>=? fun op1 ->
@@ -312,6 +324,67 @@ let test_wrong_signature_in_the_middle () =
         inc
         operation
       >>=? fun _inc -> return_unit
+
+let expect_inconsistent_counters list =
+  if
+    List.exists
+      (function
+        | Environment.Ecoproto_error Apply.Inconsistent_counters -> true
+        | _ -> false)
+      list
+  then return_unit
+  else
+    failwith
+      "Packed operation has inconsistent counters : operation expected to fail \
+       but got errors: %a."
+      Error_monad.pp_print_trace
+      list
+
+let test_inconsistent_counters () =
+  Context.init 2 >>=? fun (blk, contracts) ->
+  let (c1, c2) =
+    match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
+  in
+  Op.transaction ~gas_limit ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
+  Op.transaction ~gas_limit ~fee:Tez.one (B blk) c2 c1 Tez.one >>=? fun op2 ->
+  Incremental.begin_construction blk >>=? fun inc ->
+  (* Make legit transfers, performing reveals *)
+  Incremental.add_operation inc op1 >>=? fun inc ->
+  Incremental.add_operation inc op2 >>=? fun inc ->
+  (* Now, Counter c1 = counter c2 = 1, Op.transaction builds with counter + 1 *)
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 ~counter:(Z.of_int 1) Tez.one
+  >>=? fun op1 ->
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 ~counter:(Z.of_int 2) Tez.one
+  >>=? fun op2 ->
+  Op.transaction
+    ~fee:Tez.one
+    (B blk)
+    c1
+    c2
+    ~counter:(Z.of_int 2)
+    (Tez.of_mutez_exn 5_000L)
+  >>=? fun op2' ->
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 ~counter:(Z.of_int 3) Tez.one
+  >>=? fun op3 ->
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 ~counter:(Z.of_int 4) Tez.one
+  >>=? fun op4 ->
+  (* Canari: Check counters are ok *)
+  Op.batch_operations ~source:c1 (I inc) [op1; op2; op3; op4] >>=? fun op ->
+  Incremental.add_operation inc op >>=? fun _ ->
+  (* Gap in counter in the following op *)
+  Op.batch_operations ~source:c1 (I inc) [op1; op2; op4] >>=? fun op ->
+  Incremental.add_operation
+    ~expect_apply_failure:expect_inconsistent_counters
+    inc
+    op
+  >>=? fun _ ->
+  (* Same counter used twice in the following op *)
+  Op.batch_operations ~source:c1 (I inc) [op1; op2; op2'] >>=? fun op ->
+  Incremental.add_operation
+    ~expect_apply_failure:expect_inconsistent_counters
+    inc
+    op
+  >>=? fun _ -> return_unit
 
 let tests =
   [
@@ -332,4 +405,8 @@ let tests =
       "Failing operation (wrong manager in the middle of a pack)"
       `Quick
       test_wrong_signature_in_the_middle;
+    Tztest.tztest
+      "Inconsistent counters in batch"
+      `Quick
+      test_inconsistent_counters;
   ]

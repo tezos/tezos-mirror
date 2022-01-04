@@ -157,6 +157,14 @@ val combine_operations :
   packed_operation list ->
   packed_operation tzresult Lwt.t
 
+(** Batch a list of (already signed) operations and (re-)sign with the [source].
+    No revelation is inserted and the counters are kept as they are. *)
+val batch_operations :
+  source:Contract.t ->
+  Context.t ->
+  packed_operation list ->
+  packed_operation tzresult Lwt.t
+
 (** Reveals a seed_nonce that was previously committed at a certain level *)
 val seed_nonce_revelation :
   Context.t -> Raw_level.t -> Nonce.t -> Operation.packed

@@ -110,6 +110,8 @@ type error +=
       Tx_rollup_disabled
   | (* `Permanent *)
       Sc_rollup_feature_disabled
+  | (* `Permanent *)
+      Inconsistent_counters
 
 let () =
   register_error_kind
@@ -508,7 +510,23 @@ let () =
     ~pp:(fun ppf () -> Format.fprintf ppf "%s" description)
     Data_encoding.unit
     (function Sc_rollup_feature_disabled -> Some () | _ -> None)
-    (fun () -> Sc_rollup_feature_disabled)
+    (fun () -> Sc_rollup_feature_disabled) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"operation.inconsistent_counters"
+    ~title:"Inconsistent counters in operation"
+    ~description:
+      "Inconsistent counters in operation. Counters of an operation must be \
+       successive."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Inconsistent counters in operation. Counters of an operation must be \
+         successive.")
+    Data_encoding.empty
+    (function Inconsistent_counters -> Some () | _ -> None)
+    (fun () -> Inconsistent_counters)
 
 type error += (* `Temporary *) Wrong_voting_period of int32 * int32
 
@@ -1491,6 +1509,33 @@ let rec mark_skipped :
             },
           mark_skipped ~payload_producer level rest )
 
+(** Check that counters are consistent, i.e. that they are successive within a
+    batch. Fail with a {b permanent} error otherwise.
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2301
+    Remove when format of operation is changed to save space.
+ *)
+let check_counters_consistency contents_list =
+  let check_counter ~previous_counter counter =
+    match previous_counter with
+    | None -> return_unit
+    | Some previous_counter ->
+        let expected = Z.succ previous_counter in
+        if Compare.Z.(expected = counter) then return_unit
+        else fail Inconsistent_counters
+  in
+  let rec check_counters_rec :
+      type kind.
+      counter option -> kind Kind.manager contents_list -> unit tzresult Lwt.t =
+   fun previous_counter contents_list ->
+    match[@coq_match_with_default] contents_list with
+    | Single (Manager_operation {counter; _}) ->
+        check_counter ~previous_counter counter
+    | Cons (Manager_operation {counter; _}, rest) ->
+        check_counter ~previous_counter counter >>=? fun () ->
+        check_counters_rec (Some counter) rest
+  in
+  check_counters_rec None contents_list
+
 (** Returns an updated context, and a list of prechecked contents containing
     balance updates for fees related to each manager operation in
     [contents_list]. *)
@@ -1514,6 +1559,7 @@ let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
         return (ctxt, PrecheckedCons ({contents; result}, results_rest))
   in
   let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  check_counters_consistency contents_list >>=? fun () ->
   rec_precheck_manager_contents_list ctxt contents_list
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)

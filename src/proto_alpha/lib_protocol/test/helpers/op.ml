@@ -121,6 +121,19 @@ let preendorsement ?delegate ?slot ?level ?round ?block_payload_hash
 let sign ?watermark sk ctxt (Contents_list contents) =
   Operation.pack (sign ?watermark sk ctxt contents)
 
+let batch_operations ~source ctxt (operations : packed_operation list) =
+  let operations =
+    List.map
+      (function
+        | {Alpha_context.protocol_data = Operation_data {contents; _}; _} ->
+            Operation.to_list (Contents_list contents))
+      operations
+    |> List.flatten
+  in
+  Context.Contract.manager ctxt source >>=? fun account ->
+  Environment.wrap_tzresult @@ Operation.of_list operations
+  >>?= fun operations -> return @@ sign account.sk ctxt operations
+
 let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
     (packed_operations : packed_operation list) =
   assert (match packed_operations with [] -> false | _ :: _ -> true) ;
@@ -172,7 +185,7 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
    | true -> (None, counter))
   >>=? fun (manager_op, counter) ->
   (* Update counters and transform into a contents_list *)
-  let operations =
+  let (counter, rev_operations) =
     List.fold_left
       (fun (counter, acc) -> function
         | Contents (Manager_operation m) ->
@@ -181,13 +194,13 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
         | x -> (counter, x :: acc))
       (counter, match manager_op with None -> [] | Some op -> [op])
       unpacked_operations
-    |> snd |> List.rev
   in
+  let operations = List.rev rev_operations in
   (* patch a random operation with a corrupted pkh *)
   let operations =
     match spurious_operation with
     | None -> operations
-    | Some op -> (
+    | Some op ->
         let op =
           match op with
           | {protocol_data; shell = _} -> (
@@ -195,14 +208,13 @@ let combine_operations ?public_key ?counter ?spurious_operation ~source ctxt
               | Operation_data {contents; _} -> (
                   match contents with
                   | Cons _ -> assert false
-                  | Single op -> Alpha_context.Contents op))
+                  | Single (Manager_operation m) ->
+                      Alpha_context.Contents
+                        (Manager_operation {m with counter})
+                  | Single op -> Contents op))
         in
-        (* Select where to insert spurious op *)
-        let legit_ops = List.length operations in
-        let index = Random.int legit_ops in
-        match List.split_n index operations with
-        | (preserved_prefix, preserved_suffix) ->
-            preserved_prefix @ op :: preserved_suffix)
+        (* Insert at the end *)
+        operations @ [op]
   in
   Environment.wrap_tzresult @@ Operation.of_list operations
   >>?= fun operations -> return @@ sign account.sk ctxt operations
