@@ -68,4 +68,13 @@ module Event = struct
       ~name:"reconstruct_success"
       ~msg:"the storage was successfully reconstructed"
       ()
+
+  let reconstruct_block_success =
+    declare_1
+      ~section
+      ~level:Debug
+      ~name:"reconstruct_block_success"
+      ~msg:"the block {block_descr} was successfully reconstructed"
+      ~pp1:pp_block_descriptor
+      ("block_descr", block_descriptor_encoding)
 end
