@@ -1,22 +1,25 @@
-(executables
-  (names main_tps_evaluation)
-  (instrumentation (backend bisect_ppx))
-  (public_names tezos-tps-evaluation)
-  (package tezos-tps-evaluation)
-  (libraries caqti
-             caqti-driver-postgresql
-             caqti-lwt
-             cmdliner
-             data-encoding
-             lwt
-             ppx_blob
-             tezos-client-base-unix
-             tezos-protocol-alpha
-             tezt
-             tezt-tezos)
-  (preprocess (pps ppx_blob))
-  (preprocessor_deps (file ./sql/get_all_operations.sql))
-  (flags (:standard -open Tezos_base__TzPervasives
-                    -open Tezt
-                    -open Tezt_tezos
-                    -open Tezt.Base)))
+(executable
+ (name main_tps_evaluation)
+ (public_name tezos-tps-evaluation)
+ (package tezos-tps-evaluation)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  caqti
+  caqti-driver-postgresql
+  caqti-lwt
+  cmdliner
+  data-encoding
+  lwt
+  ppx_blob
+  tezos-client-base-unix
+  tezos-protocol-alpha
+  tezt
+  tezt-tezos)
+ (preprocess (pps ppx_blob))
+ (preprocessor_deps (file ./sql/get_all_operations.sql))
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezt
+   -open Tezt_tezos
+   -open Tezt.Base)))

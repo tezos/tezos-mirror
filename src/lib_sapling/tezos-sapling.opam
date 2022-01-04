@@ -10,7 +10,6 @@ depends: [
   "conf-rust"
   "integers"
   "ctypes"
-  "hex"
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-crypto"
   "tezos-stdlib"

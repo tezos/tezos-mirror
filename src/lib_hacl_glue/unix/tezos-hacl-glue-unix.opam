@@ -12,9 +12,9 @@ depends: [
   "hacl-star-raw"
   "tezos-stdlib" {with-test}
   "tezos-error-monad" {with-test}
-  "zarith" {with-test}
+  "zarith" { with-test & >= "1.12" & < "1.13" }
   "zarith_stubs_js" {with-test}
-  "data-encoding" {with-test}
+  "data-encoding" { with-test & >= "0.4" & < "0.5" }
   "qcheck-alcotest" {with-test}
   "tezos-test-helpers" {with-test}
 ]

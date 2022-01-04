@@ -1,7 +1,5 @@
 (tests
- (names
-  test_run
-  test_prop_signature)
+ (names test_run test_prop_signature)
  (package tezos-crypto)
  (libraries
   tezos-crypto

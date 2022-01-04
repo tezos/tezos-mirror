@@ -17,6 +17,7 @@
  (modules run_js_inline_tests))
 
 (executable
-  (name node_wrapper)
-  (libraries unix)
-  (modules node_wrapper))
+ (name node_wrapper)
+ (libraries
+  unix)
+ (modules node_wrapper))

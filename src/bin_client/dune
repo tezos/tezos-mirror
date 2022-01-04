@@ -2,9 +2,7 @@
 ; the alternative dependency mechanism of dune to implement optional
 ; dependencies.
 
-(env
- (static
-  (flags (:standard -ccopt -static))))
+(env (static (flags (:standard -ccopt -static))))
 
 (executables
  (names main_client main_admin)

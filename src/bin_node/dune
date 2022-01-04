@@ -7,8 +7,7 @@
 ; and copy always the same (generated itself) empty file
 ; "void_for_linking".
 
-(env
- (static (flags (:standard -ccopt -static))))
+(env (static (flags (:standard -ccopt -static))))
 
 (executable
  (name main)

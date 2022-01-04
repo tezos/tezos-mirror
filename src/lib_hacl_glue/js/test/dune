@@ -3,32 +3,9 @@
 ;; directory and change the library providing the implementation of
 ;; the virtual lib (tezos-hacl-glue-js)
 
-(rule
-  (action (copy ../../unix/test/test_hacl.ml test_hacl.ml.from-unix)))
-
-(rule
-  (action (copy ../../unix/test/vectors_p256.ml vectors_p256.ml.from-unix)))
-
-(rule
-  (action (copy ../../unix/test/test_prop_signature_pk.ml test_prop_signature_pk.ml.from-unix)))
-
-(rule
-  (alias runtest_js)
-  (action (diff test_hacl.ml test_hacl.ml.from-unix )))
-
-(rule
-  (alias runtest_js)
-  (action (diff vectors_p256.ml vectors_p256.ml.from-unix)))
-
-(rule
-  (alias runtest_js)
-  (action (diff test_prop_signature_pk.ml test_prop_signature_pk.ml.from-unix)))
-
 (executables
- (names
-  test_hacl
-  test_prop_signature_pk)
- (modules (:standard \ test))
+ (names test_hacl test_prop_signature_pk)
+ (modes js)
  (libraries
   tezos-stdlib
   tezos-error-monad
@@ -39,41 +16,71 @@
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
- (modes js)
  (flags
   (:standard
    -open Tezos_stdlib
    -open Tezos_error_monad.TzLwtreslib
    -open Data_encoding
-   -open Tezos_hacl_glue)))
+   -open Tezos_hacl_glue))
+ (modules (:standard \ test)))
 
 (executable
  (name test)
- (modules test)
  (modes js)
  (libraries
-  tezos-hacl-glue-js))
+  tezos-hacl-glue-js)
+ (modules test))
+
+(rule (action (copy ../../unix/test/test_hacl.ml test_hacl.ml.from-unix)))
+
+(rule
+ (action (copy ../../unix/test/vectors_p256.ml vectors_p256.ml.from-unix)))
+
+(rule
+ (action
+  (copy
+   ../../unix/test/test_prop_signature_pk.ml
+   test_prop_signature_pk.ml.from-unix)))
+
+(rule (alias runtest_js) (action (diff test_hacl.ml test_hacl.ml.from-unix)))
+
+(rule
+ (alias runtest_js)
+ (action (diff vectors_p256.ml vectors_p256.ml.from-unix)))
+
+(rule
+ (alias runtest_js)
+ (action (diff test_prop_signature_pk.ml test_prop_signature_pk.ml.from-unix)))
 
 (rule
  (alias runtest_js)
  (package tezos-hacl-glue-js)
  (deps ../.npmrc ../package.json ../package-lock.json)
- (action (progn
-            (run npm install hacl-wasm)
-            (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js}))))
+ (action
+  (progn
+   (run npm install hacl-wasm)
+   (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js}))))
 
 (rule
-  (alias runtest_js)
-  (package tezos-hacl-glue-js)
-  (deps ../.npmrc ../package.json ../package-lock.json)
-  (action (progn
-            (run npm install hacl-wasm)
-            (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test_hacl.bc.js}))))
+ (alias runtest_js)
+ (package tezos-hacl-glue-js)
+ (deps ../.npmrc ../package.json ../package-lock.json)
+ (action
+  (progn
+   (run npm install hacl-wasm)
+   (run
+    %{dep:../../../tooling/node_wrapper.exe}
+    --hacl
+    %{dep:./test_hacl.bc.js}))))
 
 (rule
-  (alias runtest_js)
-  (package tezos-hacl-glue-js)
-  (deps ../.npmrc ../package.json ../package-lock.json)
-  (action (progn
-            (run npm install hacl-wasm)
-            (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test_prop_signature_pk.bc.js}))))
+ (alias runtest_js)
+ (package tezos-hacl-glue-js)
+ (deps ../.npmrc ../package.json ../package-lock.json)
+ (action
+  (progn
+   (run npm install hacl-wasm)
+   (run
+    %{dep:../../../tooling/node_wrapper.exe}
+    --hacl
+    %{dep:./test_prop_signature_pk.bc.js}))))

@@ -21,5 +21,4 @@
    -open Tezos_shell_services
    -open Tezos_validation
    -open Tezos_protocol_updater
-   -open Tezos_shell_context))
-)
+   -open Tezos_shell_context)))
