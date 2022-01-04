@@ -59,6 +59,18 @@ let operation_with_hash_gen ?string_gen ?block_hash_t () :
   let hash = Operation.hash op in
   (hash, op)
 
+let priority_gen () : [`High | `Low] QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* bool_value = bool in
+  if bool_value then pure `High else pure `Low
+
+let operation_with_hash_and_priority_gen ?string_gen ?block_hash_t () :
+    (Operation_hash.t * Operation.t * [`High | `Low]) QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* (hash, op) = operation_with_hash_gen ?string_gen ?block_hash_t () in
+  let* priority = priority_gen () in
+  return (hash, op, priority)
+
 (** A generator of maps of operations and their hashes. Parameters are:
     - [string_gen] is an optional generator for the protocol bytes.
     - [?block_hash_t] is an optional generator for the branch of operations.
