@@ -344,7 +344,7 @@ let cement_blocks_metadata cemented_store blocks =
       if List.exists (fun block -> Block_repr.metadata block <> None) blocks
       then (
         let out_file = Zip.open_out tmp_metadata_file_path in
-        List.iter
+        List.iter_s
           (fun block ->
             let level = Block_repr.level block in
             match Block_repr.metadata block with
@@ -358,9 +358,11 @@ let cement_blocks_metadata cemented_store blocks =
                   ~level:default_compression_level
                   metadata
                   out_file
-                  (Int32.to_string level)
-            | None -> ())
-          blocks ;
+                  (Int32.to_string level) ;
+                Lwt.pause ()
+            | None -> Lwt.return_unit)
+          blocks
+        >>= fun () ->
         Zip.close_out out_file ;
         let metadata_file_path =
           Naming.cemented_blocks_metadata_file cemented_metadata_dir file
