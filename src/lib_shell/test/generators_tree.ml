@@ -401,8 +401,74 @@ let old_mempool_gen (tree : Block.t Tree.tree) :
         |> Operation_hash.Map.of_seq)
       list_gen
 
-(** Returns an instance of [block chain_tools] as well as:
-      - the tree of blocks
+(** Function to implement
+    {!Prevalidator_classification.chain_tools.new_blocks} *)
+let new_blocks (type a) ~(equal : a -> a -> bool) (tree : a Tree.tree)
+    ~from_block ~to_block =
+  match Tree.find_ancestor ~equal tree from_block to_block with
+  | None -> assert false (* Like the production implementation *)
+  | Some ancestor -> (
+      let to_parents = Tree.predecessors ~equal tree to_block in
+      match
+        ( to_parents,
+          List_extra.take_until_if_found ~pred:(( = ) ancestor) to_parents )
+      with
+      | ([], _) ->
+          (* This case is not supported, because the production
+             implementation of new_blocks doesn't support it either
+             (since it MUST return an ancestor, acccording to its return
+             type). If you end up here, this means generated
+             data is not constrained enough: this pair [(from_block,
+             to_block)] should NOT be tried. Ideally the return type
+             of new_blocks should allow this case, hereby allowing
+             a more general test. *)
+          assert false
+      | (_, None) ->
+          (* Should not happen, because [ancestor]
+             is a member of [to_parents] *)
+          assert false
+      | (_, Some path) ->
+          (* Because [to_block] must be included in new_blocks'
+             returned value. *)
+          let path = to_block :: path in
+          Lwt.return (ancestor, List.rev path))
+
+(** Function to implement
+  {!Prevalidator_classification.chain_tools.read_predecessor_opt} *)
+let read_predecessor_opt (type a) ~(compare : a -> a -> int)
+    (tree : a Tree.tree) (a : a) : a option Lwt.t =
+  let module Ord = struct
+    type t = a
+
+    let compare = compare
+  end in
+  let module Map = Map.Make (Ord) in
+  let predecessors_map =
+    Tree.predecessor_pairs tree |> List.to_seq |> Map.of_seq
+  in
+  Map.find a predecessors_map |> Lwt.return
+
+(** Function providing the instance of
+    {!Prevalidator_classification.chain_tools} for a given {!Tree.tree} *)
+let generic_classification_chain_tools (type a) ~(compare : a -> a -> int)
+    (tree : a Tree.tree) : a Classification.chain_tools =
+  let equal a b = compare a b = 0 in
+  Classification.
+    {
+      clear_or_cancel = Fun.const ();
+      inject_operation = (fun _ _ -> Lwt.return_unit);
+      new_blocks = new_blocks ~equal tree;
+      read_predecessor_opt = read_predecessor_opt ~compare tree;
+    }
+
+(** A specific instance of {!generic_classification_chain_tools},
+    for handiness of users. *)
+let classification_chain_tools (tree : Block.t Tree.tree) :
+    Block.t Classification.chain_tools =
+  generic_classification_chain_tools ~compare:Block.compare tree
+
+(** Returns:
+      - An instance of [Tree.tree]: the tree of blocks
       - a pair of blocks (that belong to the tree) and is
         fine for being passed as [(~from_branch, ~to_branch)]; i.e.
         the two blocks have a common ancestor.
@@ -411,50 +477,16 @@ let old_mempool_gen (tree : Block.t Tree.tree) :
 
       If given, the specified [?blocks] are used. Otherwise they are
       generated. *)
-let chain_tools_gen ?blocks () :
-    (Block.t Classification.chain_tools
-    * Block.t Tree.tree
+let tree_gen ?blocks () :
+    (Block.t Tree.tree
     * (Block.t * Block.t) option
     * unit Prevalidation.operation Operation_hash.Map.t)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* tree = tree_gen ?blocks () in
   assert (Tree.well_formed Block.compare tree) ;
-  let predecessor_pairs = Tree.predecessor_pairs tree in
   let equal = Block.equal in
   let not_equal x y = not @@ equal x y in
-  let read_predecessor_opt (block : Block.t) : Block.t option Lwt.t =
-    List.assoc ~equal block predecessor_pairs |> Lwt.return
-  in
-  let new_blocks ~from_block ~to_block =
-    match Tree.find_ancestor ~equal tree from_block to_block with
-    | None -> assert false (* Like the production implementation *)
-    | Some ancestor -> (
-        let to_parents = Tree.predecessors ~equal tree to_block in
-        match
-          ( to_parents,
-            List_extra.take_until_if_found ~pred:(( = ) ancestor) to_parents )
-        with
-        | ([], _) ->
-            (* This case is not supported, because the production
-               implementation of new_blocks doesn't support it either
-               (since it MUST return an ancestor, acccording to its return
-               type). If you end up here, this means generated
-               data is not constrained enough: this pair [(from_block,
-               to_block)] should NOT be tried. Ideally the return type
-               of new_blocks should allow this case, hereby allowing
-               a more general test. *)
-            assert false
-        | (_, None) ->
-            (* Should not happen, because [ancestor]
-               is a member of [to_parents] *)
-            assert false
-        | (_, Some path) ->
-            (* Because [to_block] must be included in new_blocks'
-               returned value. *)
-            let path = to_block :: path in
-            Lwt.return (ancestor, List.rev path))
-  in
   let tree_elems : Block.t list = Tree.elems tree in
   (* Pairs of blocks that are valid for being ~from_block and ~to_block *)
   let heads_pairs : (Block.t * Block.t) list =
@@ -476,16 +508,8 @@ let chain_tools_gen ?blocks () :
     if heads_pairs = [] then return None
     else map Option.some (oneofl heads_pairs)
   in
-  let* old_mempool = old_mempool_gen tree in
-  let res : Block.t Classification.chain_tools =
-    {
-      clear_or_cancel = Fun.const ();
-      inject_operation = (fun _ _ -> Lwt.return_unit);
-      new_blocks;
-      read_predecessor_opt;
-    }
-  in
-  return (res, tree, chosen_pair, old_mempool)
+  let+ old_mempool = old_mempool_gen tree in
+  (tree, chosen_pair, old_mempool)
 
 (** [split_in_two l] is a generator producing [(l1, l2)] such that [l1 @ l2 = l] *)
 let split_in_two (l : 'a list) : ('a list * 'a list) QCheck2.Gen.t =

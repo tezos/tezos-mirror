@@ -138,26 +138,23 @@ module Handle_operations = struct
        it would be overkill. *)
     let gen =
       let open QCheck2.Gen in
-      let* (chain, tree, pair_blocks_opt, old_mempool) =
-        Generators_tree.chain_tools_gen ?blocks:None ()
+      let* (tree, pair_blocks_opt, old_mempool) =
+        Generators_tree.tree_gen ?blocks:None ()
       in
       let* live_blocks =
         sublist (Tree.values tree)
         >|= List.map (fun (blk : Block.t) -> blk.hash)
       in
       return
-        ( chain,
-          tree,
-          pair_blocks_opt,
-          old_mempool,
-          Block_hash.Set.of_list live_blocks )
+        (tree, pair_blocks_opt, old_mempool, Block_hash.Set.of_list live_blocks)
     in
     QCheck2.Test.make
       ~name:"[handle_live_operations] is a subset of alive blocks"
       gen
-    @@ fun (chain, tree, pair_blocks_opt, old_mempool, live_blocks) ->
+    @@ fun (tree, pair_blocks_opt, old_mempool, live_blocks) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let expected_superset : unit Prevalidation.operation Op_map.t =
       (* Take all blocks *)
       Tree.values tree
@@ -192,10 +189,11 @@ module Handle_operations = struct
   let test_handle_live_operations_path_spec =
     QCheck2.Test.make
       ~name:"[handle_live_operations] path specification"
-      (Generators_tree.chain_tools_gen ())
-    @@ fun (chain, tree, pair_blocks_opt, _) ->
+      (Generators_tree.tree_gen ())
+    @@ fun (tree, pair_blocks_opt, _) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let equal = Block.equal in
     let ancestor : Block.t =
       Tree.find_ancestor ~equal tree from_branch to_branch
@@ -237,10 +235,11 @@ module Handle_operations = struct
   let test_handle_live_operations_clear =
     QCheck2.Test.make
       ~name:"[handle_live_operations] clear approximation"
-      Generators_tree.(chain_tools_gen ())
-    @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
+      Generators_tree.(tree_gen ())
+    @@ fun (tree, pair_blocks_opt, old_mempool) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let cleared = ref Operation_hash.Set.empty in
     let clearer oph = cleared := Operation_hash.Set.add oph !cleared in
     let chain = {chain with clear_or_cancel = clearer} in
@@ -277,10 +276,11 @@ module Handle_operations = struct
   let test_handle_live_operations_inject =
     QCheck2.Test.make
       ~name:"[handle_live_operations] inject approximation"
-      (Generators_tree.chain_tools_gen ())
-    @@ fun (chain, tree, pair_blocks_opt, old_mempool) ->
+      (Generators_tree.tree_gen ())
+    @@ fun (tree, pair_blocks_opt, old_mempool) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let injected = ref Operation_hash.Set.empty in
     let inject_operation oph _op =
       injected := Operation_hash.Set.add oph !injected ;
@@ -393,11 +393,9 @@ module Recyle_operations = struct
       Op_map.bindings classification_pendings_ops
       |> Generators_tree.split_in_two >|= both oph_op_list_to_map
     in
-    let* (chain_tools, tree, from_to, _) =
-      Generators_tree.chain_tools_gen ~blocks ()
-    in
+    let* (tree, from_to, _) = Generators_tree.tree_gen ~blocks () in
     let+ classification = classification_of_ops_gen classification_ops in
-    (chain_tools, tree, from_to, classification, pending_ops)
+    (tree, from_to, classification, pending_ops)
 
   (** Test that {!Classification.recycle_operations} returns an empty map when
       live blocks are empty.
@@ -416,10 +414,10 @@ module Recyle_operations = struct
     Test.make
       ~name:"[recycle_operations ~live_blocks:empty] is empty"
       Gen.(pair gen bool)
-    @@ fun ( (chain, _tree, pair_blocks_opt, classes, pending),
-             handle_branch_refused ) ->
+    @@ fun ((tree, pair_blocks_opt, classes, pending), handle_branch_refused) ->
     assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let parse raw hash =
       Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
     in
@@ -447,10 +445,10 @@ module Recyle_operations = struct
     QCheck2.Test.make
       ~name:"[recycle_operations] returned value can be approximated"
       QCheck2.Gen.(pair gen bool)
-    @@ fun ( (chain, tree, pair_blocks_opt, classes, pending),
-             handle_branch_refused ) ->
+    @@ fun ((tree, pair_blocks_opt, classes, pending), handle_branch_refused) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let equal = Block.equal in
     let ancestor : Block.t =
       Tree.find_ancestor ~equal tree from_branch to_branch
@@ -519,8 +517,7 @@ module Recyle_operations = struct
     QCheck2.Test.make
       ~name:"[recycle_operations] correctly trims its input classification"
       QCheck2.Gen.(pair gen bool)
-    @@ fun ( (chain, tree, pair_blocks_opt, classes, pending),
-             handle_branch_refused ) ->
+    @@ fun ((tree, pair_blocks_opt, classes, pending), handle_branch_refused) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let live_blocks : Block_hash.Set.t =
       Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
@@ -536,6 +533,7 @@ module Recyle_operations = struct
         classes
     in
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let chain = Generators_tree.classification_chain_tools tree in
     let parse raw hash =
       Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
     in
