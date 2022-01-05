@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,8 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Script_expr_hash
-
-let of_script_expr_hash t = t
-
-module Index = Script_expr_hash
+(** [make ctxt ~ticketer ~typ ~contents ~owner] creates a hashed
+    representation of the given [ticketer], [typ], [contents] and
+    [owner].
+*)
+val make :
+  Raw_context.t ->
+  ticketer:Script_repr.node ->
+  typ:Script_repr.node ->
+  contents:Script_repr.node ->
+  owner:Script_repr.node ->
+  (Ticket_hash_repr.t * Raw_context.t) tzresult

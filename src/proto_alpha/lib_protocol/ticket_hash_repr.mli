@@ -46,16 +46,6 @@ val equal : t -> t -> bool
 
 val compare : t -> t -> int
 
-(** [make ctxt ~ticketer ~typ ~contents ~owner] creates a hashed
-    representation of the given [ticketer], [typ], [contents] and
-    [owner].
-*)
-val make :
-  Raw_context.t ->
-  ticketer:Script_repr.node ->
-  typ:Script_repr.node ->
-  contents:Script_repr.node ->
-  owner:Script_repr.node ->
-  (t * Raw_context.t) tzresult
+val of_script_expr_hash : Script_expr_hash.t -> t
 
 module Index : Storage_description.INDEX with type t = t

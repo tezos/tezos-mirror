@@ -61,6 +61,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
@@ -69,6 +70,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -84,14 +87,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
-   ticket_hash_repr.mli ticket_hash_repr.ml
-   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
    cache_repr.mli cache_repr.ml
+   ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
@@ -211,6 +212,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
@@ -219,6 +221,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -234,14 +238,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
-   ticket_hash_repr.mli ticket_hash_repr.ml
-   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
    cache_repr.mli cache_repr.ml
+   ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
@@ -361,6 +363,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
@@ -369,6 +372,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -384,14 +389,12 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
-   ticket_hash_repr.mli ticket_hash_repr.ml
-   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
    cache_repr.mli cache_repr.ml
+   ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
@@ -533,6 +536,7 @@ include Tezos_raw_protocol_alpha.Main
    Script_string_repr
    Script_int_repr
    Script_timestamp_repr
+   Ticket_hash_repr
    Michelson_v1_primitives
    Script_repr
    Cache_memory_helpers
@@ -541,6 +545,8 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_l2_address
    Tx_rollup_repr
    Tx_rollup_state_repr
+   Tx_rollup_message_repr
+   Tx_rollup_inbox_repr
    Roll_repr_legacy
    Vote_repr
    Block_header_repr
@@ -556,14 +562,12 @@ include Tezos_raw_protocol_alpha.Main
    Migration_repr
    Raw_context_intf
    Raw_context
-   Ticket_hash_repr
-   Tx_rollup_message_repr
-   Tx_rollup_inbox_repr
    Storage_costs
    Storage_sigs
    Storage_functors
    Storage
    Cache_repr
+   Ticket_hash_builder
    Constants_storage
    Level_storage
    Nonce_storage
@@ -724,6 +728,7 @@ include Tezos_raw_protocol_alpha.Main
    script_string_repr.mli script_string_repr.ml
    script_int_repr.mli script_int_repr.ml
    script_timestamp_repr.mli script_timestamp_repr.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
@@ -732,6 +737,8 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -747,14 +754,12 @@ include Tezos_raw_protocol_alpha.Main
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
-   ticket_hash_repr.mli ticket_hash_repr.ml
-   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
    cache_repr.mli cache_repr.ml
+   ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
    nonce_storage.mli nonce_storage.ml
