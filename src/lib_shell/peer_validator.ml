@@ -260,8 +260,7 @@ let may_validate_new_branch w distant_hash locator =
   let pv = Worker.state w in
   let (distant_header, _) = (locator : Block_locator.t :> Block_header.t * _) in
   only_if_fitness_increases w distant_header @@ fun () ->
-  assert_acceptable_head w (Block_header.hash distant_header) distant_header
-  >>=? fun () ->
+  assert_acceptable_head w distant_hash distant_header >>=? fun () ->
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   (* TODO: should we consider level as well ? Rolling could have
      difficulties boostrapping. *)
