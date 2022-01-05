@@ -488,9 +488,12 @@ end)
   end = struct
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
-        ( Alpha_context.Contract.implicit_contract
-            (Crypto_samplers.pkh rng_state),
-          Alpha_context.Entrypoint.default )
+        {
+          contract =
+            Alpha_context.Contract.implicit_contract
+              (Crypto_samplers.pkh rng_state);
+          entrypoint = Alpha_context.Entrypoint.default;
+        }
       else
         (* For a description of the format, see
            tezos-codec describe alpha.contract binary encoding *)
@@ -506,7 +509,7 @@ end)
           Alpha_context.Entrypoint.of_string_strict_exn
           @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
         in
-        (contract, ep)
+        {contract; entrypoint = ep}
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
@@ -662,8 +665,8 @@ end)
         arg Script_typed_ir.ty -> arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
-      let* addr = value (address_t ~annot:None) in
-      return (arg_ty, addr)
+      let* address = value (address_t ~annot:None) in
+      return (arg_ty, address)
 
     and generate_operation :
         (Alpha_context.packed_internal_operation

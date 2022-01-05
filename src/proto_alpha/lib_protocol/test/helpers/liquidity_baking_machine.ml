@@ -737,7 +737,7 @@ module ConcreteBaseMachine :
     Lqt_fa12_repr.Storage.getBalance_opt
       (B blk)
       ~contract:env.tzbtc_contract
-      (contract, Entrypoint.default)
+      {contract; entrypoint = Entrypoint.default}
     >>=? fun mamount ->
     pure (Option.value (Option.map Z.to_int mamount) ~default:0)
 
@@ -745,7 +745,7 @@ module ConcreteBaseMachine :
     Lqt_fa12_repr.Storage.getBalance_opt
       (B blk)
       ~contract:env.liquidity_contract
-      (contract, Entrypoint.default)
+      {contract; entrypoint = Entrypoint.default}
     >>=? fun mamount ->
     pure (Option.value (Option.map Z.to_int mamount) ~default:0)
 

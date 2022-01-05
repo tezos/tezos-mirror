@@ -465,19 +465,19 @@ let unparse_timestamp ~loc ctxt mode t =
       | None -> ok (Int (loc, Script_timestamp.to_zint t), ctxt)
       | Some s -> ok (String (loc, s), ctxt))
 
-let unparse_address ~loc ctxt mode (c, entrypoint) =
+let unparse_address ~loc ctxt mode {contract; entrypoint} =
   Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
   match mode with
   | Optimized | Optimized_legacy ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
           Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
-          (c, entrypoint)
+          (contract, entrypoint)
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       let notation =
-        Contract.to_b58check c ^ Entrypoint.to_address_suffix entrypoint
+        Contract.to_b58check contract ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
 
@@ -2253,7 +2253,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
           bytes
       with
-      | Some addr -> Ok (addr, ctxt)
+      | Some (contract, entrypoint) -> Ok ({contract; entrypoint}, ctxt)
       | None ->
           error
           @@ Invalid_syntactic_constant
@@ -2268,7 +2268,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Entrypoint.of_string_strict ~loc name >|? fun entrypoint ->
           (String.sub s 0 pos, entrypoint))
       >>? fun (addr, entrypoint) ->
-      Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt)
+      Contract.of_b58check addr >|? fun contract ->
+      ({contract; entrypoint}, ctxt)
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
@@ -2592,7 +2593,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
   | (Contract_t (ty, _), expr) ->
       traced
-        ( parse_address ctxt expr >>?= fun ((c, entrypoint), ctxt) ->
+        ( parse_address ctxt expr >>?= fun (address, ctxt) ->
           let loc = location expr in
           parse_contract
             ~stack_depth:(stack_depth + 1)
@@ -2600,9 +2601,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             ctxt
             loc
             ty
-            c
-            ~entrypoint
-          >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt) )
+            address.contract
+            ~entrypoint:address.entrypoint
+          >|=? fun (ctxt, _) -> ((ty, address), ctxt) )
   (* Pairs *)
   | (Pair_t ((tl, _, _), (tr, _, _), _), expr) ->
       let r_witness = comb_witness1 tr in
@@ -2658,8 +2659,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       if allow_forged then
         opened_ticket_type (location expr) t >>?= fun ty ->
         parse_comparable_data ?type_logger ctxt ty expr
-        >|=? fun (((ticketer, _entrypoint), (contents, amount)), ctxt) ->
-        ({ticketer; contents; amount}, ctxt)
+        >|=? fun (({contract; entrypoint = _}, (contents, amount)), ctxt) ->
+        ({ticketer = contract; contents; amount}, ctxt)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
@@ -5216,7 +5217,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
         Lwt.return
           ( ty_eq ~legacy:true ctxt loc arg (unit_t ~annot:None)
           >|? fun (Eq, ctxt) ->
-            let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+            let contract : arg typed_contract = (arg, {contract; entrypoint}) in
             (ctxt, contract) )
       else fail (No_such_entrypoint entrypoint)
   | None -> (
@@ -5255,7 +5256,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               >>? fun (entrypoint_arg, ctxt) ->
               entrypoint_arg >|? fun (entrypoint, arg) ->
               let contract : arg typed_contract =
-                (arg, (contract, entrypoint))
+                (arg, {contract; entrypoint})
               in
               (ctxt, contract) ))
 
@@ -5405,7 +5406,7 @@ let parse_contract_for_script :
             match eq_ty with
             | Ok (Eq, _ty) ->
                 let contract : arg typed_contract =
-                  (arg, (contract, entrypoint))
+                  (arg, {contract; entrypoint})
                 in
                 (ctxt, Some contract)
             | Error Inconsistent_types_fast -> (ctxt, None) )
@@ -5451,7 +5452,7 @@ let parse_contract_for_script :
                       match entrypoint_arg with
                       | Ok (entrypoint, arg) ->
                           let contract : arg typed_contract =
-                            (arg, (contract, entrypoint))
+                            (arg, {contract; entrypoint})
                           in
                           (ctxt, Some contract)
                       | Error Inconsistent_types_fast -> (ctxt, None))) ))
@@ -5800,12 +5801,13 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
       opened_ticket_type loc t >>?= fun opened_ticket_ty ->
       let t = ty_of_comparable_ty opened_ticket_ty in
+      let addr = {contract = ticketer; entrypoint = Entrypoint.default} in
       (unparse_data [@tailcall])
         ctxt
         ~stack_depth
         mode
         t
-        ((ticketer, Entrypoint.default), (contents, amount))
+        (addr, (contents, amount))
   | (Set_t (t, _), set) ->
       List.fold_left_es
         (fun (l, ctxt) item ->

@@ -986,11 +986,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let (_, address) = accu in
           (step [@ocaml.tailcall]) g gas k ks address stack
       | IContract (kinfo, t, entrypoint, k) -> (
-          let (contract, contract_entrypoint) = accu in
+          let addr = accu in
           let entrypoint_opt =
-            if Entrypoint.is_default contract_entrypoint then Some entrypoint
-            else if Entrypoint.is_default entrypoint then
-              Some contract_entrypoint
+            if Entrypoint.is_default addr.entrypoint then Some entrypoint
+            else if Entrypoint.is_default entrypoint then Some addr.entrypoint
             else (* both entrypoints are non-default *) None
           in
           match entrypoint_opt with
@@ -1000,7 +999,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 ctxt
                 kinfo.iloc
                 t
-                contract
+                addr.contract
                 ~entrypoint
               >>=? fun (ctxt, maybe_contract) ->
               let gas = update_local_gas_counter ctxt in
@@ -1010,18 +1009,22 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
       | ITransfer_tokens (_, k) ->
           let p = accu in
-          let (amount, ((tp, (destination, entrypoint)), stack)) = stack in
+          let (amount, ((tp, addr_dst), stack)) = stack in
+          let destination = addr_dst.contract in
+          let entrypoint = addr_dst.entrypoint in
           transfer (ctxt, sc) gas amount tp p destination entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
           let key = accu in
           let contract = Contract.implicit_contract key in
-          let res = (unit_t ~annot:None, (contract, Entrypoint.default)) in
+          let entrypoint = Entrypoint.default in
+          let res = (unit_t ~annot:None, {contract; entrypoint}) in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IView (_, View_signature {name; input_ty; output_ty}, k) -> (
           let input = accu in
-          let ((c, _entrypoint_is_ignored), stack) = stack in
+          let (addr, stack) = stack in
+          let c = addr.contract in
           let ctxt = update_context gas ctxt in
           Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
           let return_none ctxt =
@@ -1144,7 +1147,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             credit
             init
           >>=? fun (res, contract, ctxt, gas) ->
-          let stack = ((contract, Entrypoint.default), stack) in
+          let stack = ({contract; entrypoint = Entrypoint.default}, stack) in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | ISet_delegate (_, k) ->
           let delegate = accu in
@@ -1187,16 +1190,16 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let hash = Raw_hashes.sha512 bytes in
           (step [@ocaml.tailcall]) g gas k ks hash stack
       | ISource (_, k) ->
-          let res = (sc.payer, Entrypoint.default) in
+          let res = {contract = sc.payer; entrypoint = Entrypoint.default} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISender (_, k) ->
-          let res = (sc.source, Entrypoint.default) in
+          let res = {contract = sc.source; entrypoint = Entrypoint.default} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf (_, ty, entrypoint, k) ->
-          let res = (ty, (sc.self, entrypoint)) in
+          let res = (ty, {contract = sc.self; entrypoint}) in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf_address (_, k) ->
-          let res = (sc.self, Entrypoint.default) in
+          let res = {contract = sc.self; entrypoint = Entrypoint.default} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | IAmount (_, k) ->
           let accu = sc.amount and stack = (accu, stack) in
@@ -1423,7 +1426,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | IRead_ticket (_, k) ->
           let {ticketer; contents; amount} = accu in
           let stack = (accu, stack) in
-          let accu = ((ticketer, Entrypoint.default), (contents, amount)) in
+          let addr = {contract = ticketer; entrypoint = Entrypoint.default} in
+          let accu = (addr, (contents, amount)) in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | ISplit_ticket (_, k) ->
           let ticket = accu and ((amount_a, amount_b), stack) = stack in

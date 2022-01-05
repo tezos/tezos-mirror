@@ -44,8 +44,12 @@ let ticket_balance_key ctxt ~owner
   Gas.consume ctxt (Script.strip_annotations_cost cont_ty_unstripped)
   >>?= fun ctxt ->
   let typ = Script.strip_annotations cont_ty_unstripped in
-  let ticketer_address = (ticketer, Entrypoint.default) in
-  let owner_address = (owner, Entrypoint.default) in
+  let ticketer_address =
+    Script_typed_ir.{contract = ticketer; entrypoint = Entrypoint.default}
+  in
+  let owner_address =
+    Script_typed_ir.{contract = owner; entrypoint = Entrypoint.default}
+  in
   let address_t = Script_typed_ir.address_t ~annot:None in
   Script_ir_translator.unparse_data
     ctxt

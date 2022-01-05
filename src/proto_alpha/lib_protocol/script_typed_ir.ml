@@ -63,7 +63,7 @@ type step_constants = {
 
 type never = |
 
-type address = Contract.t * Entrypoint.t
+type address = {contract : Contract.t; entrypoint : Entrypoint.t}
 
 type ('a, 'b) pair = 'a * 'b
 

@@ -28,9 +28,11 @@
 open Alpha_context
 open Script_typed_ir
 
-let compare_address (x, ex) (y, ey) =
-  let lres = Contract.compare x y in
-  if Compare.Int.(lres = 0) then Entrypoint.compare ex ey else lres
+let compare_address {contract = contract1; entrypoint = entrypoint1}
+    {contract = contract2; entrypoint = entrypoint2} =
+  let lres = Contract.compare contract1 contract2 in
+  if Compare.Int.(lres = 0) then Entrypoint.compare entrypoint1 entrypoint2
+  else lres
 
 type compare_comparable_cont =
   | Compare_comparable :

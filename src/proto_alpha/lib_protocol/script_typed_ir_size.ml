@@ -137,8 +137,10 @@ let timestamp_size x = Script_timestamp.to_zint x |> z_size
 
 let contract_size = Contract.in_memory_size
 
-let address_size ((c, s) : address) =
-  h2w +! contract_size c +! Entrypoint.in_memory_size s
+let address_size addr =
+  h2w
+  +! contract_size addr.contract
+  +! Entrypoint.in_memory_size addr.entrypoint
 
 let view_signature_size (View_signature {name; input_ty; output_ty}) =
   ret_adding
