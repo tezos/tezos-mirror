@@ -32,11 +32,3 @@ let of_string_exn = function
   | s -> s
 
 let cat2 a ?(sep = "") b = String.concat sep [a; b]
-
-let split_on_last sep s =
-  match String.rindex_opt s sep with
-  | Some i when Compare.Int.(i > 0 && i < String.length s - 1) ->
-      let s1 = String.sub s 0 i in
-      let s2 = String.sub s (i + 1) (String.length s - 1 - i) in
-      Some (s1, s2)
-  | _ -> None

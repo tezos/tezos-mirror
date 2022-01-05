@@ -193,8 +193,6 @@ val is_allowed_char : char -> bool
 
 val parse_constr_annot :
   Script.location ->
-  ?if_special_first:field_annot option ->
-  ?if_special_second:field_annot option ->
   string list ->
   (var_annot option
   * type_annot option

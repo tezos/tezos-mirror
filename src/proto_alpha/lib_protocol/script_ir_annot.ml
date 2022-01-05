@@ -384,26 +384,11 @@ let parse_var_annot :
   | Some _ as a -> a
   | None -> ( match default with Some a -> a | None -> None)
 
-let split_last_dot = function
-  | None -> (None, None)
-  | Some (Field_annot s) -> (
-      match Non_empty_string.split_on_last '.' s with
-      | Some (s1, s2) ->
-          let f =
-            match (s2 :> string) with
-            | "car" | "cdr" -> None
-            | _ -> Some (Field_annot s2)
-          in
-          (Some (Var_annot s1), f)
-      | None -> (None, Some (Field_annot s)))
-
-let split_if_special ~loc ~if_special v f =
+let split_if_special ~loc v f =
   match f with
-  | Some (Field_annot fa) when Non_empty_string.(fa = at) -> (
-      match if_special with
-      | Some special_var -> ok @@ split_last_dot special_var
-      | None -> error (Unexpected_annotation loc))
-  | _ -> ok (v, f)
+  | Some (Field_annot fa) when Non_empty_string.(fa = at) ->
+      error (Unexpected_annotation loc)
+  | _ -> ok v
 
 let common_prefix v1 v2 =
   match (v1, v2) with
@@ -416,22 +401,20 @@ let common_prefix v1 v2 =
 
 let parse_constr_annot :
     Script.location ->
-    ?if_special_first:field_annot option ->
-    ?if_special_second:field_annot option ->
     string list ->
     (var_annot option
     * type_annot option
     * field_annot option
     * field_annot option)
     tzresult =
- fun loc ?if_special_first ?if_special_second annot ->
+ fun loc annot ->
   parse_annots ~allow_special_field:true loc annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   get_one_annot loc vars >>? fun v ->
   get_one_annot loc types >>? fun t ->
   get_two_annot loc fields >>? fun (f1, f2) ->
-  split_if_special ~loc ~if_special:if_special_first v f1 >>? fun (v1, f1) ->
-  split_if_special ~loc ~if_special:if_special_second v f2 >|? fun (v2, f2) ->
+  split_if_special ~loc v f1 >>? fun v1 ->
+  split_if_special ~loc v f2 >|? fun v2 ->
   let v = match v with None -> common_prefix v1 v2 | Some _ -> v in
   (v, t, f1, f2)
 
