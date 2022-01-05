@@ -167,6 +167,41 @@ let monitor_heads cctxt ~next_protocols chain =
          raw_info cctxt ~chain block shell)
        block_stream)
 
+type error +=
+  | Unexpected_empty_block_list of {
+      chain : string;
+      block_hash : Block_hash.t;
+      length : int;
+    }
+
+let () =
+  Error_monad.register_error_kind
+    `Permanent
+    ~id:"Client_baking_blocks.unexpected_empty_block_list"
+    ~title:"Unexpected empty blocklist"
+    ~description:
+      "The block list retrieved by Shell_services.Blocks.list is empty"
+    ~pp:(fun ppf (chain, block_hash, length) ->
+      Format.fprintf
+        ppf
+        "Unexpected empty block list retrieved from chain %s at block %a, \
+         length %d"
+        chain
+        Block_hash.pp
+        block_hash
+        length)
+    Data_encoding.(
+      obj3
+        (req "chain" string)
+        (req "block_hash" Block_hash.encoding)
+        (req "length" int31))
+    (function
+      | Unexpected_empty_block_list {chain; block_hash; length} ->
+          Some (chain, block_hash, length)
+      | _ -> None)
+    (fun (chain, block_hash, length) ->
+      Unexpected_empty_block_list {chain; block_hash; length})
+
 let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   Shell_services.Blocks.hash cctxt ~chain ~block () >>=? fun hash ->
   Shell_services.Blocks.Header.shell_header cctxt ~chain ~block ()
@@ -176,10 +211,18 @@ let blocks_from_current_cycle cctxt ?(chain = `Main) block ?(offset = 0l) () =
   | Error _ as err -> Lwt.return err
   | Ok (first, last) ->
       let length = Int32.to_int (Int32.sub level (Raw_level.to_int32 first)) in
-      Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
-      >>=? fun blocks ->
-      (* TODO-TB change this *)
-      let head = match blocks with hd :: _ -> hd | _ -> assert false in
+      (Shell_services.Blocks.list cctxt ~chain ~heads:[hash] ~length ()
+       >>=? function
+       | hd :: _ -> return hd
+       | [] ->
+           fail
+             (Unexpected_empty_block_list
+                {
+                  chain = Block_services.chain_to_string chain;
+                  block_hash = hash;
+                  length;
+                }))
+      >>=? fun head ->
       let blocks =
         List.drop_n (length - Int32.to_int (Raw_level.diff last first)) head
       in
