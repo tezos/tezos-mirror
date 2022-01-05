@@ -98,7 +98,7 @@ module Block_seen_event = struct
       let v0_encoding =
         conv
           (function {hash; header; occurrence} -> (hash, occurrence, header))
-          (fun (b, o, h) -> make b h o ())
+          (fun (hash, occurrence, header) -> make hash header occurrence ())
           (obj3
              (req "hash" Block_hash.encoding)
              (* Occurrence has to come before header, because:
