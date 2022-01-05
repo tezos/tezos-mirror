@@ -27,37 +27,41 @@
 (** Commands *)
 
 let show (args : Node_shared_arg.t) =
-  Internal_event_unix.init () >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Internal_event_unix.init () in
   if not @@ Sys.file_exists args.config_file then
     Format.eprintf
       "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
        displaying the default configuration@]@]@."
       args.config_file ;
-  Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
+  let* config = Node_shared_arg.read_and_patch_config_file args in
   print_endline @@ Node_config_file.to_string config ;
   return_unit
 
 let reset (args : Node_shared_arg.t) =
-  Internal_event_unix.init () >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Internal_event_unix.init () in
   if Sys.file_exists args.config_file then
     Format.eprintf
       "Ignoring previous configuration file: %s.@."
       args.config_file ;
-  Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
-  Node_config_validation.check config >>=? fun () ->
+  let* config = Node_shared_arg.read_and_patch_config_file args in
+  let* () = Node_config_validation.check config in
   Node_config_file.write args.config_file config
 
 let init (args : Node_shared_arg.t) =
-  Internal_event_unix.init () >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Internal_event_unix.init () in
   if Sys.file_exists args.config_file then
     failwith
       "Pre-existing configuration file at %s, use `reset`."
       args.config_file
   else
-    Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
-    >>=? fun config ->
-    Node_config_validation.check config >>=? fun () ->
-    Node_config_file.write args.config_file config >>=? fun () ->
+    let* config =
+      Node_shared_arg.read_and_patch_config_file ~may_override_network:true args
+    in
+    let* () = Node_config_validation.check config in
+    let* () = Node_config_file.write args.config_file config in
     let default = if args.network = None then " default" else "" in
     let alias =
       match config.blockchain_network.alias with
@@ -74,7 +78,8 @@ let init (args : Node_shared_arg.t) =
     return_unit
 
 let update (args : Node_shared_arg.t) =
-  Internal_event_unix.init () >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Internal_event_unix.init () in
   if not (Sys.file_exists args.config_file) then
     failwith
       "Missing configuration file at %s. Use `%s config init [options]` to \
@@ -82,19 +87,21 @@ let update (args : Node_shared_arg.t) =
       args.config_file
       Sys.argv.(0)
   else
-    Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
-    Node_config_validation.check config >>=? fun () ->
+    let* config = Node_shared_arg.read_and_patch_config_file args in
+    let* () = Node_config_validation.check config in
     Node_config_file.write args.config_file config
 
 let validate (args : Node_shared_arg.t) =
-  Internal_event_unix.init () >>= fun () ->
+  let open Lwt_result_syntax in
+  let*! () = Internal_event_unix.init () in
   if not (Sys.file_exists args.config_file) then
     Format.eprintf
       "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
        validating the default configuration@]@]@."
       args.config_file ;
-  Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
-  Node_config_validation.check config >>= function
+  let* config = Node_shared_arg.read_and_patch_config_file args in
+  let*! r = Node_config_validation.check config in
+  match r with
   (* Here we do not consider the node configuration file
      being invalid as a failure. *)
   | Error (Node_config_validation.Invalid_node_configuration :: _) | Ok () ->

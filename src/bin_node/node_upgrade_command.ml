@@ -59,44 +59,52 @@ module Term = struct
 
   let process subcommand args status sandbox_file =
     let run =
-      Internal_event_unix.init () >>= fun () ->
+      let open Lwt_tzresult_syntax in
+      let*! () = Internal_event_unix.init () in
       match subcommand with
       | Storage -> (
-          Node_config_file.read args.Node_shared_arg.config_file
-          >>=? fun config ->
+          let* config =
+            Node_config_file.read args.Node_shared_arg.config_file
+          in
           (* Use the command-line argument data-dir if present: the
              configuration data-dir may be inconsistent if the
              directory was moved. *)
           let data_dir = Option.value ~default:config.data_dir args.data_dir in
-          Lwt_lock_file.try_with_lock
-            ~when_locked:(fun () ->
-              failwith
-                "Failed to lock the data directory '%s'. Is a `tezos-node` \
-                 running?"
-                data_dir)
-            ~filename:(Node_data_version.lock_file data_dir)
-            (fun () ->
-              let genesis = config.blockchain_network.genesis in
-              if status then Node_data_version.upgrade_status data_dir
-              else
-                (match
-                   (config.blockchain_network.genesis_parameters, sandbox_file)
-                 with
-                | (None, None) -> return_none
-                | (Some parameters, None) ->
-                    return_some (parameters.context_key, parameters.values)
-                | (_, Some filename) -> (
-                    Lwt_utils_unix.Json.read_file filename >>= function
-                    | Error _err ->
-                        fail (Node_run_command.Invalid_sandbox_file filename)
-                    | Ok json -> return_some ("sandbox_parameter", json)))
-                >>=? fun sandbox_parameters ->
-                Node_data_version.upgrade_data_dir
-                  ~data_dir
-                  genesis
-                  ~chain_name:config.blockchain_network.chain_name
-                  ~sandbox_parameters)
-          >>= function
+          let*! r =
+            Lwt_lock_file.try_with_lock
+              ~when_locked:(fun () ->
+                failwith
+                  "Failed to lock the data directory '%s'. Is a `tezos-node` \
+                   running?"
+                  data_dir)
+              ~filename:(Node_data_version.lock_file data_dir)
+              (fun () ->
+                let genesis = config.blockchain_network.genesis in
+                if status then Node_data_version.upgrade_status data_dir
+                else
+                  let* sandbox_parameters =
+                    match
+                      ( config.blockchain_network.genesis_parameters,
+                        sandbox_file )
+                    with
+                    | (None, None) -> return_none
+                    | (Some parameters, None) ->
+                        return_some (parameters.context_key, parameters.values)
+                    | (_, Some filename) -> (
+                        let*! r = Lwt_utils_unix.Json.read_file filename in
+                        match r with
+                        | Error _err ->
+                            fail
+                              (Node_run_command.Invalid_sandbox_file filename)
+                        | Ok json -> return_some ("sandbox_parameter", json))
+                  in
+                  Node_data_version.upgrade_data_dir
+                    ~data_dir
+                    genesis
+                    ~chain_name:config.blockchain_network.chain_name
+                    ~sandbox_parameters)
+          in
+          match r with
           | Error (Exn (Unix.Unix_error (Unix.ENOENT, _, _)) :: _) ->
               (* The provided data directory to upgrade cannot be
                  found. *)

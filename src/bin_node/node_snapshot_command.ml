@@ -122,31 +122,33 @@ module Term = struct
   let process subcommand args snapshot_path block disable_check export_format
       rolling reconstruct sandbox_file =
     let run =
-      Internal_event_unix.init () >>= fun () ->
+      let open Lwt_tzresult_syntax in
+      let*! () = Internal_event_unix.init () in
       match subcommand with
       | Export ->
-          Node_shared_arg.read_data_dir args >>=? fun data_dir ->
-          fail_unless
-            (Sys.file_exists data_dir)
-            (Data_dir_not_found {path = data_dir})
-          >>=? fun () ->
-          Node_shared_arg.read_and_patch_config_file args
-          >>=? fun node_config ->
+          let* data_dir = Node_shared_arg.read_data_dir args in
+          let* () =
+            fail_unless
+              (Sys.file_exists data_dir)
+              (Data_dir_not_found {path = data_dir})
+          in
+          let* node_config = Node_shared_arg.read_and_patch_config_file args in
           let ({genesis; chain_name; _} : Node_config_file.blockchain_network) =
             node_config.blockchain_network
           in
-          Node_data_version.ensure_data_dir data_dir >>=? fun () ->
+          let* () = Node_data_version.ensure_data_dir data_dir in
           let context_dir = Node_data_version.context_dir data_dir in
           let store_dir = Node_data_version.store_dir data_dir in
-          (match block with
-          | None ->
-              Event.(emit export_unspecified_hash) () >>= fun () ->
-              return (`Alias (`Checkpoint, 0))
-          | Some block -> (
-              match Block_services.parse_block block with
-              | Error err -> failwith "%s: %s" block err
-              | Ok block -> return block))
-          >>=? fun block ->
+          let* block =
+            match block with
+            | None ->
+                let*! () = Event.(emit export_unspecified_hash) () in
+                return (`Alias (`Checkpoint, 0))
+            | Some block -> (
+                match Block_services.parse_block block with
+                | Error err -> failwith "%s: %s" block err
+                | Ok block -> return block)
+          in
           Snapshots.export
             ?snapshot_path
             (Option.value export_format ~default:Snapshots.Tar)
@@ -162,75 +164,81 @@ module Term = struct
               args.data_dir
               ~default:Node_config_file.default_data_dir
           in
-          Lwt_unix.file_exists data_dir >>= fun existing_data_dir ->
-          Node_shared_arg.read_and_patch_config_file args
-          >>=? fun node_config ->
+          let*! existing_data_dir = Lwt_unix.file_exists data_dir in
+          let* node_config = Node_shared_arg.read_and_patch_config_file args in
           let ({genesis; _} : Node_config_file.blockchain_network) =
             node_config.blockchain_network
           in
-          check_snapshot_path snapshot_path >>=? fun snapshot_path ->
+          let* snapshot_path = check_snapshot_path snapshot_path in
           let dir_cleaner () =
-            Event.(emit cleaning_up_after_failure) data_dir >>= fun () ->
+            let*! () = Event.(emit cleaning_up_after_failure) data_dir in
             if existing_data_dir then
               (* Remove only context and store if the import directory
                  was previously existing. *)
-              Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
-              >>= fun () ->
+              let*! () =
+                Lwt_utils_unix.remove_dir (Node_data_version.store_dir data_dir)
+              in
               Lwt_utils_unix.remove_dir (Node_data_version.context_dir data_dir)
             else Lwt_utils_unix.remove_dir data_dir
           in
-          Node_config_file.write args.config_file node_config >>=? fun () ->
-          Node_data_version.ensure_data_dir ~bare:true data_dir >>=? fun () ->
+          let* () = Node_config_file.write args.config_file node_config in
+          let* () = Node_data_version.ensure_data_dir ~bare:true data_dir in
           (* Lock only on snapshot import *)
           Lwt_lock_file.try_with_lock
             ~when_locked:(fun () ->
               failwith "Data directory is locked by another process")
             ~filename:(Node_data_version.lock_file data_dir)
           @@ fun () ->
-          (match
-             (node_config.blockchain_network.genesis_parameters, sandbox_file)
-           with
-          | (None, None) -> return_none
-          | (Some parameters, None) ->
-              return_some (parameters.context_key, parameters.values)
-          | (_, Some filename) -> (
-              Lwt_utils_unix.Json.read_file filename >>= function
-              | Error _err ->
-                  fail (Node_run_command.Invalid_sandbox_file filename)
-              | Ok json -> return_some ("sandbox_parameter", json)))
-          >>=? fun sandbox_parameters ->
+          let* sandbox_parameters =
+            match
+              (node_config.blockchain_network.genesis_parameters, sandbox_file)
+            with
+            | (None, None) -> return_none
+            | (Some parameters, None) ->
+                return_some (parameters.context_key, parameters.values)
+            | (_, Some filename) -> (
+                let*! r = Lwt_utils_unix.Json.read_file filename in
+                match r with
+                | Error _err ->
+                    fail (Node_run_command.Invalid_sandbox_file filename)
+                | Ok json -> return_some ("sandbox_parameter", json))
+          in
           let context_root = Node_data_version.context_dir data_dir in
           let store_root = Node_data_version.store_dir data_dir in
           let patch_context =
             Patch_context.patch_context genesis sandbox_parameters
           in
-          protect
-            ~on_error:(fun err ->
-              dir_cleaner () >>= fun () -> Lwt.return (Error err))
-            (fun () ->
-              (match block with
-              | Some s -> (
-                  match Block_hash.of_b58check_opt s with
-                  | Some bh -> return_some bh
-                  | None -> failwith "%s is not a valid block identifier." s)
-              | None -> return_none)
-              >>=? fun block ->
-              let check_consistency = not disable_check in
-              Snapshots.import
-                ~snapshot_path
-                ~patch_context
-                ?block
-                ~check_consistency
-                ~dst_store_dir:store_root
-                ~dst_context_dir:context_root
-                ~chain_name:node_config.blockchain_network.chain_name
-                ~user_activated_upgrades:
-                  node_config.blockchain_network.user_activated_upgrades
-                ~user_activated_protocol_overrides:
-                  node_config.blockchain_network
-                    .user_activated_protocol_overrides
-                genesis)
-          >>=? fun () ->
+          let* () =
+            protect
+              ~on_error:(fun err ->
+                let*! () = dir_cleaner () in
+                Lwt.return (Error err))
+              (fun () ->
+                let* block =
+                  match block with
+                  | Some s -> (
+                      match Block_hash.of_b58check_opt s with
+                      | Some bh -> return_some bh
+                      | None -> failwith "%s is not a valid block identifier." s
+                      )
+                  | None -> return_none
+                in
+                let check_consistency = not disable_check in
+                Snapshots.import
+                  ~snapshot_path
+                  ~patch_context
+                  ?block
+                  ~check_consistency
+                  ~dst_store_dir:store_root
+                  ~dst_context_dir:context_root
+                  ~chain_name:node_config.blockchain_network.chain_name
+                  ~user_activated_upgrades:
+                    node_config.blockchain_network.user_activated_upgrades
+                  ~user_activated_protocol_overrides:
+                    node_config.blockchain_network
+                      .user_activated_protocol_overrides
+                  genesis)
+          in
           if reconstruct then
             Reconstruction.reconstruct
               ~patch_context
@@ -243,9 +251,10 @@ module Term = struct
                 node_config.blockchain_network.user_activated_protocol_overrides
           else return_unit
       | Info ->
-          check_snapshot_path snapshot_path >>=? fun snapshot_path ->
-          Snapshots.read_snapshot_header ~snapshot_path
-          >>=? fun snapshot_header ->
+          let* snapshot_path = check_snapshot_path snapshot_path in
+          let* snapshot_header =
+            Snapshots.read_snapshot_header ~snapshot_path
+          in
           Format.printf
             "@[<v 2>Snapshot information:@ %a@]@."
             Snapshots.pp_snapshot_header

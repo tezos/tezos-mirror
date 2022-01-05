@@ -200,84 +200,100 @@ end
 open Filename.Infix
 
 let init_identity_file (config : Node_config_file.t) =
+  let open Lwt_result_syntax in
   let identity_file =
     config.data_dir // Node_data_version.default_identity_file_name
   in
   if Sys.file_exists identity_file then
-    Node_identity_file.read identity_file >>=? fun identity ->
-    Event.(emit read_identity) identity.peer_id >>= fun () -> return identity
+    let* identity = Node_identity_file.read identity_file in
+    let*! () = Event.(emit read_identity) identity.peer_id in
+    return identity
   else
-    Event.(emit generating_identity) () >>= fun () ->
-    Node_identity_file.generate identity_file config.p2p.expected_pow
-    >>=? fun identity ->
-    Event.(emit identity_generated) identity.peer_id >>= fun () ->
+    let*! () = Event.(emit generating_identity) () in
+    let* identity =
+      Node_identity_file.generate identity_file config.p2p.expected_pow
+    in
+    let*! () = Event.(emit identity_generated) identity.peer_id in
     return identity
 
 let init_node ?sandbox ?target ~identity ~singleprocess
     ~force_history_mode_switch (config : Node_config_file.t) =
+  let open Lwt_tzresult_syntax in
   (* TODO "WARN" when pow is below our expectation. *)
-  (match config.disable_config_validation with
-  | true -> Event.(emit disabled_config_validation) ()
-  | false -> Lwt.return_unit)
-  >>= fun () ->
-  (match config.p2p.discovery_addr with
-  | None ->
-      Event.(emit disabled_discovery_addr) () >>= fun () -> return (None, None)
-  | Some addr -> (
-      Node_config_file.resolve_discovery_addrs addr >>=? function
-      | [] -> failwith "Cannot resolve P2P discovery address: %S" addr
-      | (addr, port) :: _ -> return (Some addr, Some port)))
-  >>=? fun (discovery_addr, discovery_port) ->
-  (match config.p2p.listen_addr with
-  | None ->
-      Event.(emit disabled_listen_addr) () >>= fun () -> return (None, None)
-  | Some addr -> (
-      Node_config_file.resolve_listening_addrs addr >>=? function
-      | [] -> failwith "Cannot resolve P2P listening address: %S" addr
-      | (addr, port) :: _ -> return (Some addr, Some port)))
-  >>=? fun (listening_addr, listening_port) ->
-  (match (listening_addr, sandbox) with
-  | (Some addr, Some _) when Ipaddr.V6.(compare addr unspecified) = 0 ->
-      return_none
-  | (Some addr, Some _) when not (Ipaddr.V6.is_private addr) ->
-      fail (Non_private_sandbox addr)
-  | (None, Some _) -> return_none
-  | _ ->
-      Node_config_file.resolve_bootstrap_addrs
-        (Node_config_file.bootstrap_peers config)
-      >>=? fun trusted_points ->
-      let advertised_port : P2p_addr.port option =
-        Option.either config.p2p.advertised_net_port listening_port
-      in
-      let p2p_config : P2p.config =
-        {
-          listening_addr;
-          listening_port;
-          advertised_port;
-          discovery_addr;
-          discovery_port;
-          trusted_points;
-          peers_file =
-            config.data_dir // Node_data_version.default_peers_file_name;
-          private_mode = config.p2p.private_mode;
-          reconnection_config = config.p2p.reconnection_config;
-          identity;
-          proof_of_work_target =
-            Crypto_box.make_pow_target config.p2p.expected_pow;
-          trust_discovered_peers = sandbox <> None;
-        }
-      in
-      return_some (p2p_config, config.p2p.limits))
-  >>=? fun p2p_config ->
-  (match (config.blockchain_network.genesis_parameters, sandbox) with
-  | (None, None) -> return_none
-  | (Some parameters, None) ->
-      return_some (parameters.context_key, parameters.values)
-  | (_, Some filename) -> (
-      Lwt_utils_unix.Json.read_file filename >>= function
-      | Error _err -> fail (Invalid_sandbox_file filename)
-      | Ok json -> return_some ("sandbox_parameter", json)))
-  >>=? fun sandbox_param ->
+  let*! () =
+    if config.disable_config_validation then
+      Event.(emit disabled_config_validation) ()
+    else Lwt.return_unit
+  in
+  let* (discovery_addr, discovery_port) =
+    match config.p2p.discovery_addr with
+    | None ->
+        let*! () = Event.(emit disabled_discovery_addr) () in
+        return (None, None)
+    | Some addr -> (
+        let* addrs = Node_config_file.resolve_discovery_addrs addr in
+        match addrs with
+        | [] -> failwith "Cannot resolve P2P discovery address: %S" addr
+        | (addr, port) :: _ -> return (Some addr, Some port))
+  in
+  let* (listening_addr, listening_port) =
+    match config.p2p.listen_addr with
+    | None ->
+        let*! () = Event.(emit disabled_listen_addr) () in
+        return (None, None)
+    | Some addr -> (
+        let* addrs = Node_config_file.resolve_listening_addrs addr in
+        match addrs with
+        | [] -> failwith "Cannot resolve P2P listening address: %S" addr
+        | (addr, port) :: _ -> return (Some addr, Some port))
+  in
+  let* p2p_config =
+    match (listening_addr, sandbox) with
+    | (Some addr, Some _) when Ipaddr.V6.(compare addr unspecified) = 0 ->
+        return_none
+    | (Some addr, Some _) when not (Ipaddr.V6.is_private addr) ->
+        fail (Non_private_sandbox addr)
+    | (None, Some _) -> return_none
+    | _ ->
+        let* trusted_points =
+          Node_config_file.resolve_bootstrap_addrs
+            (Node_config_file.bootstrap_peers config)
+        in
+        let advertised_port : P2p_addr.port option =
+          Option.either config.p2p.advertised_net_port listening_port
+        in
+        let p2p_config : P2p.config =
+          {
+            listening_addr;
+            listening_port;
+            advertised_port;
+            discovery_addr;
+            discovery_port;
+            trusted_points;
+            peers_file =
+              config.data_dir // Node_data_version.default_peers_file_name;
+            private_mode = config.p2p.private_mode;
+            reconnection_config = config.p2p.reconnection_config;
+            identity;
+            proof_of_work_target =
+              Crypto_box.make_pow_target config.p2p.expected_pow;
+            trust_discovered_peers = sandbox <> None;
+          }
+        in
+        return_some (p2p_config, config.p2p.limits)
+  in
+  let* sandbox_param =
+    match (config.blockchain_network.genesis_parameters, sandbox) with
+    | (None, None) -> return_none
+    | (Some parameters, None) ->
+        return_some (parameters.context_key, parameters.values)
+    | (_, Some filename) ->
+        let* json =
+          trace (Invalid_sandbox_file filename)
+          @@ Lwt_utils_unix.Json.read_file filename
+        in
+        return_some ("sandbox_parameter", json)
+  in
   let genesis = config.blockchain_network.genesis in
   let patch_context =
     Some (Patch_context.patch_context genesis sandbox_param)
@@ -302,15 +318,16 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       disable_mempool = config.p2p.disable_mempool;
     }
   in
-  (match config.shell.history_mode with
-  | Some history_mode when force_history_mode_switch ->
-      Store.may_switch_history_mode
-        ~store_dir:node_config.store_root
-        ~context_dir:node_config.context_root
-        genesis
-        ~new_history_mode:history_mode
-  | _ -> return_unit)
-  >>=? fun () ->
+  let* () =
+    match config.shell.history_mode with
+    | Some history_mode when force_history_mode_switch ->
+        Store.may_switch_history_mode
+          ~store_dir:node_config.store_root
+          ~context_dir:node_config.context_root
+          genesis
+          ~new_history_mode:history_mode
+    | _ -> return_unit
+  in
   Node.create
     ~sandboxed:(sandbox <> None)
     ?sandbox_parameters:(Option.map snd sandbox_param)
@@ -331,6 +348,7 @@ let sanitize_cors_headers ~default headers =
 
 let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port)
     =
+  let open Lwt_tzresult_syntax in
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
   let dir = Node.build_rpc_directory node in
@@ -351,25 +369,28 @@ let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port
     find_policy acl_policy (Ipaddr.V6.to_string addr, Some port)
     |> Option.value ~default:(default addr)
   in
-  Event.(emit starting_rpc_server) (host, port, rpc_config.tls <> None)
-  >>= fun () ->
+  let*! () =
+    Event.(emit starting_rpc_server) (host, port, rpc_config.tls <> None)
+  in
   let cors_headers =
     sanitize_cors_headers ~default:["Content-Type"] rpc_config.cors_headers
   in
   Lwt.catch
     (fun () ->
-      RPC_server.launch
-        ~host
-        mode
-        dir
-        ~acl
-        ~media_types:Media_type.all_media_types
-        ~cors:
-          {
-            allowed_origins = rpc_config.cors_origins;
-            allowed_headers = cors_headers;
-          }
-      >>= return)
+      let*! server =
+        RPC_server.launch
+          ~host
+          mode
+          dir
+          ~acl
+          ~media_types:Media_type.all_media_types
+          ~cors:
+            {
+              allowed_origins = rpc_config.cors_origins;
+              allowed_headers = cors_headers;
+            }
+      in
+      return server)
     (function
       (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1312
          This exception seems to be unreachable.
@@ -379,122 +400,132 @@ let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port
       | exn -> fail_with_exn exn)
 
 let init_rpc (config : Node_config_file.t) node =
-  List.fold_right_es
-    (fun addr acc ->
-      Node_config_file.resolve_rpc_listening_addrs addr >>=? function
+  let open Lwt_tzresult_syntax in
+  List.concat_map_es
+    (fun addr ->
+      let* addrs = Node_config_file.resolve_rpc_listening_addrs addr in
+      match addrs with
       | [] -> failwith "Cannot resolve listening address: %S" addr
       | addrs ->
-          RPC_server.Acl.resolve_domain_names config.rpc.acl
-          >>= fun acl_policy ->
-          List.fold_right_es
-            (fun x a ->
-              launch_rpc_server ~acl_policy config node x >>=? fun o ->
-              return (o :: a))
-            addrs
-            acc)
+          let*! acl_policy =
+            RPC_server.Acl.resolve_domain_names config.rpc.acl
+          in
+          List.map_es
+            (fun addr -> launch_rpc_server ~acl_policy config node addr)
+            addrs)
     config.rpc.listen_addrs
-    []
 
 let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     ~prometheus_config (config : Node_config_file.t) =
-  Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
+  let open Lwt_tzresult_syntax in
+  let* () = Node_data_version.ensure_data_dir config.data_dir in
   (* Main loop *)
   let log_cfg =
     match verbosity with
     | None -> config.log
     | Some default_level -> {config.log with default_level}
   in
-  Internal_event_unix.init
-    ~lwt_log_sink:log_cfg
-    ~configuration:config.internal_events
-    ()
-  >>= fun () ->
-  Node_config_validation.check config >>=? fun () ->
-  init_identity_file config >>=? fun identity ->
+  let*! () =
+    Internal_event_unix.init
+      ~lwt_log_sink:log_cfg
+      ~configuration:config.internal_events
+      ()
+  in
+  let* () = Node_config_validation.check config in
+  let* identity = init_identity_file config in
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
-  Event.(emit starting_node)
-    ( config.blockchain_network.chain_name,
-      Tezos_version.Version.current,
-      Tezos_version.Current_git_info.abbreviated_commit_hash )
-  >>= fun () ->
-  (init_node
-     ?sandbox
-     ?target
-     ~identity
-     ~singleprocess
-     ~force_history_mode_switch
-     config
-   >>= function
-   | Ok node -> return node
-   | Error
-       (Store_errors.Cannot_switch_history_mode {previous_mode; next_mode} :: _)
-     as err ->
-       Event.(emit incorrect_history_mode) (previous_mode, next_mode)
-       >>= fun () -> Lwt.return err
-   | Error _ as err -> Lwt.return err)
-  >>=? fun node ->
+  let*! () =
+    Event.(emit starting_node)
+      ( config.blockchain_network.chain_name,
+        Tezos_version.Version.current,
+        Tezos_version.Current_git_info.abbreviated_commit_hash )
+  in
+  let*! node =
+    init_node
+      ?sandbox
+      ?target
+      ~identity
+      ~singleprocess
+      ~force_history_mode_switch
+      config
+  in
+  let*! () =
+    Result.iter_error_s
+      (function
+        | Store_errors.Cannot_switch_history_mode {previous_mode; next_mode}
+          :: _ ->
+            Event.(emit incorrect_history_mode) (previous_mode, next_mode)
+        | _ -> Lwt.return_unit)
+      node
+  in
+  let*? node = node in
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
-        Event.(emit shutting_down_node) () >>= fun () -> Node.shutdown node)
+        let*! () = Event.(emit shutting_down_node) () in
+        Node.shutdown node)
   in
-  init_rpc config node >>=? fun rpc ->
+  let* rpc = init_rpc config node in
   let rpc_downer =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[node_downer]
       (fun _ ->
-        Event.(emit shutting_down_rpc_server) () >>= fun () ->
+        let*! () = Event.(emit shutting_down_rpc_server) () in
         List.iter_p RPC_server.shutdown rpc)
   in
-  Event.(emit node_is_ready) () >>= fun () ->
+  let*! () = Event.(emit node_is_ready) () in
   let _ =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[rpc_downer]
       (fun exit_status ->
-        Event.(emit bye) exit_status >>= fun () -> Internal_event_unix.close ())
+        let*! () = Event.(emit bye) exit_status in
+        Internal_event_unix.close ())
   in
   let _ = Prometheus_unix.serve prometheus_config in
   Lwt_utils.never_ending ()
 
 let process sandbox verbosity target singleprocess force_history_mode_switch
     prometheus_config args =
+  let open Lwt_tzresult_syntax in
   let verbosity =
     let open Internal_event in
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
   let main_promise =
-    Node_shared_arg.read_and_patch_config_file
-      ~ignore_bootstrap_peers:
-        (match sandbox with Some _ -> true | None -> false)
-      args
-    >>=? fun config ->
-    (match sandbox with
-    | Some _ ->
-        if config.data_dir = Node_config_file.default_data_dir then
+    let* config =
+      Node_shared_arg.read_and_patch_config_file
+        ~ignore_bootstrap_peers:
+          (match sandbox with Some _ -> true | None -> false)
+        args
+    in
+    let* () =
+      match sandbox with
+      | Some _ when config.data_dir = Node_config_file.default_data_dir ->
           failwith "Cannot use default data directory while in sandbox mode"
-        else return_unit
-    | None -> return_unit)
-    >>=? fun () ->
-    (match target with
-    | None -> return_none
-    | Some s ->
-        let l = String.split_on_char ',' s in
-        Lwt.catch
-          (fun () ->
-            assert (Compare.List_length_with.(l = 2)) ;
-            let target =
-              match l with
-              | [block_hash; level] ->
-                  (Block_hash.of_b58check_exn block_hash, Int32.of_string level)
-              | _ -> assert false
-            in
-            return_some target)
-          (fun _ ->
-            failwith
-              "Failed to parse the provided target. A '<block_hash>,<level>' \
-               value was expected."))
-    >>=? fun target ->
+      | _ -> return_unit
+    in
+    let* target =
+      match target with
+      | None -> return_none
+      | Some s ->
+          let l = String.split_on_char ',' s in
+          Lwt.catch
+            (fun () ->
+              assert (Compare.List_length_with.(l = 2)) ;
+              let target =
+                match l with
+                | [block_hash; level] ->
+                    ( Block_hash.of_b58check_exn block_hash,
+                      Int32.of_string level )
+                | _ -> assert false
+              in
+              return_some target)
+            (fun _ ->
+              failwith
+                "Failed to parse the provided target. A '<block_hash>,<level>' \
+                 value was expected.")
+    in
     Lwt_lock_file.try_with_lock
       ~when_locked:(fun () ->
         failwith "Data directory is locked by another process")
@@ -513,11 +544,14 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
       (function exn -> fail_with_exn exn)
   in
   Lwt_main.run
-    (Lwt_exit.wrap_and_exit main_promise >>= function
-     | Ok () -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
+    (let*! r = Lwt_exit.wrap_and_exit main_promise in
+     match r with
+     | Ok () ->
+         let*! _ = Lwt_exit.exit_and_wait 0 in
+         Lwt.return (`Ok ())
      | Error err ->
-         Lwt_exit.exit_and_wait 1 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_trace err))
+         let*! _ = Lwt_exit.exit_and_wait 1 in
+         Lwt.return @@ `Error (false, Format.asprintf "%a" pp_print_trace err))
 
 module Term = struct
   let verbosity =

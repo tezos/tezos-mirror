@@ -152,6 +152,7 @@ let () =
     (fun () -> Cannot_replay_below_savepoint)
 
 let replay ~singleprocess (config : Node_config_file.t) blocks =
+  let open Lwt_tzresult_syntax in
   let store_root = Node_data_version.store_dir config.data_dir in
   let context_root = Node_data_version.context_dir config.data_dir in
   let protocol_root = Node_data_version.protocol_dir config.data_dir in
@@ -163,40 +164,47 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
         config.blockchain_network.user_activated_protocol_overrides;
     }
   in
-  (if singleprocess then
-   Store.init
-     ~store_dir:store_root
-     ~context_dir:context_root
-     ~allow_testchains:false
-     genesis
-   >>=? fun store ->
-   let main_chain_store = Store.main_chain_store store in
-   Block_validator_process.init validator_env (Internal main_chain_store)
-   >>=? fun validator_process -> return (validator_process, store)
-  else
-    Block_validator_process.init
-      validator_env
-      (External
-         {
-           data_dir = config.data_dir;
-           genesis;
-           context_root;
-           protocol_root;
-           process_path = Sys.executable_name;
-           sandbox_parameters = None;
-         })
-    >>=? fun validator_process ->
-    let commit_genesis =
-      Block_validator_process.commit_genesis validator_process
-    in
-    Store.init
-      ~store_dir:store_root
-      ~context_dir:context_root
-      ~allow_testchains:false
-      ~commit_genesis
-      genesis
-    >>=? fun store -> return (validator_process, store))
-  >>=? fun (validator_process, store) ->
+  let* (validator_process, store) =
+    if singleprocess then
+      let* store =
+        Store.init
+          ~store_dir:store_root
+          ~context_dir:context_root
+          ~allow_testchains:false
+          genesis
+      in
+      let main_chain_store = Store.main_chain_store store in
+      let* validator_process =
+        Block_validator_process.init validator_env (Internal main_chain_store)
+      in
+      return (validator_process, store)
+    else
+      let* validator_process =
+        Block_validator_process.init
+          validator_env
+          (External
+             {
+               data_dir = config.data_dir;
+               genesis;
+               context_root;
+               protocol_root;
+               process_path = Sys.executable_name;
+               sandbox_parameters = None;
+             })
+      in
+      let commit_genesis =
+        Block_validator_process.commit_genesis validator_process
+      in
+      let* store =
+        Store.init
+          ~store_dir:store_root
+          ~context_dir:context_root
+          ~allow_testchains:false
+          ~commit_genesis
+          genesis
+      in
+      return (validator_process, store)
+  in
   let main_chain_store = Store.main_chain_store store in
   Lwt.finalize
     (fun () ->
@@ -208,27 +216,34 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 Some (Block_services.to_string block)
             | _ -> None
           in
-          protect
-            ~on_error:(fun _ -> fail Block_not_found)
-            (fun () ->
-              Store.Chain.block_of_identifier_opt main_chain_store block
-              >>= function
-              | None -> fail Block_not_found
-              | Some block -> return block)
-          >>=? fun block ->
+          let* block =
+            protect
+              ~on_error:(fun _ -> fail Block_not_found)
+              (fun () ->
+                let*! o =
+                  Store.Chain.block_of_identifier_opt main_chain_store block
+                in
+                match o with
+                | None -> fail Block_not_found
+                | Some block -> return block)
+          in
           let predecessor_hash = Store.Block.predecessor block in
-          Store.Block.read_block_opt main_chain_store predecessor_hash
-          >>= function
+          let*! predecessor_opt =
+            Store.Block.read_block_opt main_chain_store predecessor_hash
+          in
+          match predecessor_opt with
           | None -> fail Cannot_replay_orphan
           | Some predecessor ->
-              Store.Chain.savepoint main_chain_store
-              >>= fun (_, savepoint_level) ->
+              let*! (_, savepoint_level) =
+                Store.Chain.savepoint main_chain_store
+              in
               if Store.Block.level block <= savepoint_level then
                 fail Cannot_replay_below_savepoint
               else
                 let expected_context_hash = Store.Block.context_hash block in
-                Store.Block.get_block_metadata main_chain_store block
-                >>=? fun metadata ->
+                let* metadata =
+                  Store.Block.get_block_metadata main_chain_store block
+                in
                 let expected_block_receipt =
                   Store.Block.block_metadata metadata
                 in
@@ -238,60 +253,62 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 let operations = Store.Block.operations block in
                 let header = Store.Block.header block in
                 let start_time = Systime_os.now () in
-                Event.(emit block_validation_start)
-                  (block_alias, Store.Block.hash block, Store.Block.level block)
-                >>= fun () ->
-                Block_validator_process.apply_block
-                  validator_process
-                  main_chain_store
-                  ~predecessor
-                  header
-                  operations
-                >>=? fun result ->
+                let*! () =
+                  Event.(emit block_validation_start)
+                    ( block_alias,
+                      Store.Block.hash block,
+                      Store.Block.level block )
+                in
+                let* result =
+                  Block_validator_process.apply_block
+                    validator_process
+                    main_chain_store
+                    ~predecessor
+                    header
+                    operations
+                in
                 let now = Systime_os.now () in
-                Event.(emit block_validation_end) (Ptime.diff now start_time)
-                >>= fun () ->
-                (if
-                 not
-                   (Context_hash.equal
-                      expected_context_hash
-                      result.validation_store.context_hash)
-                then
-                 Event.(emit inconsistent_context_hash)
-                   (expected_context_hash, result.validation_store.context_hash)
-                else Lwt.return_unit)
-                >>= fun () ->
-                (if
-                 not (Bytes.equal expected_block_receipt result.block_metadata)
-                then
-                 Store.Block.protocol_hash main_chain_store block
-                 >>=? fun protocol ->
-                 Registered_protocol.get_result protocol
-                 >>=? fun (module Proto) ->
-                 let exp =
-                   Data_encoding.Binary.of_bytes_exn
-                     Proto.block_header_metadata_encoding
-                     expected_block_receipt
-                 in
-                 let got =
-                   Data_encoding.Binary.of_bytes_exn
-                     Proto.block_header_metadata_encoding
-                     result.block_metadata
-                 in
-                 let exp =
-                   Data_encoding.Json.construct
-                     Proto.block_header_metadata_encoding
-                     exp
-                 in
-                 let got =
-                   Data_encoding.Json.construct
-                     Proto.block_header_metadata_encoding
-                     got
-                 in
-                 Event.(emit inconsistent_block_receipt) (exp, got)
-                 >>= fun () -> return_unit
-                else return_unit)
-                >>=? fun () ->
+                let*! () =
+                  Event.(emit block_validation_end) (Ptime.diff now start_time)
+                in
+                let*! () =
+                  if
+                    not
+                      (Context_hash.equal
+                         expected_context_hash
+                         result.validation_store.context_hash)
+                  then
+                    Event.(emit inconsistent_context_hash)
+                      ( expected_context_hash,
+                        result.validation_store.context_hash )
+                  else Lwt.return_unit
+                in
+                let* () =
+                  if
+                    not
+                      (Bytes.equal expected_block_receipt result.block_metadata)
+                  then
+                    let* protocol =
+                      Store.Block.protocol_hash main_chain_store block
+                    in
+                    let* (module Proto) =
+                      Registered_protocol.get_result protocol
+                    in
+                    let to_json block =
+                      Data_encoding.Json.construct
+                        Proto.block_header_metadata_encoding
+                      @@ Data_encoding.Binary.of_bytes_exn
+                           Proto.block_header_metadata_encoding
+                           block
+                    in
+                    let exp = to_json expected_block_receipt in
+                    let got = to_json result.block_metadata in
+                    let*! () =
+                      Event.(emit inconsistent_block_receipt) (exp, got)
+                    in
+                    return_unit
+                  else return_unit
+                in
                 let rec check_receipts i j exp got =
                   match (exp, got) with
                   | ([], []) -> return_unit
@@ -301,47 +318,40 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                   | ((_ :: _) :: _, [] :: _) | ([] :: _, (_ :: _) :: _) ->
                       assert false
                   | ((exp :: exps) :: expss, (got :: gots) :: gotss) ->
-                      (if not (Bytes.equal exp got) then
-                       Store.Block.protocol_hash main_chain_store block
-                       >>=? fun protocol ->
-                       Registered_protocol.get_result protocol
-                       >>=? fun (module Proto) ->
-                       let exp =
-                         Data_encoding.Binary.of_bytes_exn
-                           Proto.operation_receipt_encoding
-                           exp
-                       in
-                       let got =
-                         Data_encoding.Binary.of_bytes_exn
-                           Proto.operation_receipt_encoding
-                           got
-                       in
-                       let op =
-                         operations
-                         |> (fun l -> List.nth_opt l i)
-                         |> Option.value_f ~default:(fun () -> assert false)
-                         |> (fun l -> List.nth_opt l j)
-                         |> Option.value_f ~default:(fun () -> assert false)
-                         |> fun {proto; _} ->
-                         Data_encoding.Binary.of_bytes_exn
-                           Proto.operation_data_encoding
-                           proto
-                       in
-                       let exp =
-                         Data_encoding.Json.construct
-                           Proto.operation_data_and_receipt_encoding
-                           (op, exp)
-                       in
-                       let got =
-                         Data_encoding.Json.construct
-                           Proto.operation_data_and_receipt_encoding
-                           (op, got)
-                       in
-                       Event.(emit inconsistent_operation_receipt)
-                         ((i, j), exp, got)
-                       >>= fun () -> return_unit
-                      else return_unit)
-                      >>=? fun () ->
+                      let* () =
+                        if not (Bytes.equal exp got) then
+                          let* protocol =
+                            Store.Block.protocol_hash main_chain_store block
+                          in
+                          let* (module Proto) =
+                            Registered_protocol.get_result protocol
+                          in
+                          let op =
+                            operations
+                            |> (fun l -> List.nth_opt l i)
+                            |> WithExceptions.Option.get ~loc:__LOC__
+                            |> (fun l -> List.nth_opt l j)
+                            |> WithExceptions.Option.get ~loc:__LOC__
+                            |> fun {proto; _} -> proto
+                          in
+                          let to_json receipt =
+                            Data_encoding.Json.construct
+                              Proto.operation_data_and_receipt_encoding
+                              Data_encoding.Binary.
+                                ( of_bytes_exn Proto.operation_data_encoding op,
+                                  of_bytes_exn
+                                    Proto.operation_receipt_encoding
+                                    receipt )
+                          in
+                          let exp = to_json exp in
+                          let got = to_json got in
+                          let*! () =
+                            Event.(emit inconsistent_operation_receipt)
+                              ((i, j), exp, got)
+                          in
+                          return_unit
+                        else return_unit
+                      in
                       check_receipts i (succ j) (exps :: expss) (gots :: gotss)
                 in
                 check_receipts
@@ -351,11 +361,12 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                   result.ops_metadata)
         blocks)
     (fun () ->
-      Block_validator_process.close validator_process >>= fun () ->
+      let*! () = Block_validator_process.close validator_process in
       Store.close_store store)
 
 let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
-  Node_data_version.ensure_data_dir config.data_dir >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = Node_data_version.ensure_data_dir config.data_dir in
   Lwt_lock_file.try_with_lock
     ~when_locked:(fun () ->
       failwith "Data directory is locked by another process")
@@ -367,19 +378,22 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
     | None -> config.log
     | Some default_level -> {config.log with default_level}
   in
-  Internal_event_unix.init
-    ~lwt_log_sink:log_cfg
-    ~configuration:config.internal_events
-    ()
-  >>= fun () ->
+  let*! () =
+    Internal_event_unix.init
+      ~lwt_log_sink:log_cfg
+      ~configuration:config.internal_events
+      ()
+  in
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
   Lwt_exit.(
     wrap_and_exit
-    @@ ( protect (fun () -> replay ~singleprocess config block) >>= fun res ->
-         Internal_event_unix.close () >>= fun () -> Lwt.return res ))
+    @@ let*! res = protect (fun () -> replay ~singleprocess config block) in
+       let*! () = Internal_event_unix.close () in
+       Lwt.return res)
 
 let check_data_dir dir =
-  Lwt_unix.file_exists dir >>= fun dir_exists ->
+  let open Lwt_syntax in
+  let* dir_exists = Lwt_unix.file_exists dir in
   fail_unless
     dir_exists
     (Node_data_version.Invalid_data_dir
@@ -394,9 +408,10 @@ let process verbosity singleprocess block args =
     match verbosity with [] -> None | [_] -> Some Info | _ -> Some Debug
   in
   let run =
-    Node_shared_arg.read_data_dir args >>=? fun data_dir ->
-    check_data_dir data_dir >>=? fun () ->
-    Node_shared_arg.read_and_patch_config_file args >>=? fun config ->
+    let open Lwt_result_syntax in
+    let* data_dir = Node_shared_arg.read_data_dir args in
+    let* () = check_data_dir data_dir in
+    let* config = Node_shared_arg.read_and_patch_config_file args in
     run ?verbosity ~singleprocess config block
   in
   match Lwt_main.run run with

@@ -127,33 +127,33 @@ let () =
       Identity_keys_mismatch {filename; expected_key})
 
 let read ?expected_pow filename =
-  Lwt_unix.file_exists filename >>= function
-  | false -> fail (No_identity_file filename)
-  | true -> (
-      Lwt_utils_unix.Json.read_file filename >>=? fun json ->
-      let id = Data_encoding.Json.destruct P2p_identity.encoding json in
-      let pkh = Crypto_box.hash id.public_key in
-      (* check public_key hash *)
-      if not (Crypto_box.Public_key_hash.equal pkh id.peer_id) then
-        fail (Identity_mismatch {filename; peer_id = pkh})
-        (* check public/private keys correspondence *)
-      else if not Crypto_box.(equal (neuterize id.secret_key) id.public_key)
-      then
-        fail (Identity_keys_mismatch {filename; expected_key = id.public_key})
-      else
-        (* check PoW level *)
-        match expected_pow with
-        | None -> return id
-        | Some expected ->
-            let target = Crypto_box.make_pow_target expected in
-            if
-              not
-                (Crypto_box.check_proof_of_work
-                   id.public_key
-                   id.proof_of_work_stamp
-                   target)
-            then fail (Insufficient_proof_of_work {expected})
-            else return id)
+  let open Lwt_tzresult_syntax in
+  let*! file_exists = Lwt_unix.file_exists filename in
+  if not file_exists then fail (No_identity_file filename)
+  else
+    let* json = Lwt_utils_unix.Json.read_file filename in
+    let id = Data_encoding.Json.destruct P2p_identity.encoding json in
+    let pkh = Crypto_box.hash id.public_key in
+    (* check public_key hash *)
+    if not (Crypto_box.Public_key_hash.equal pkh id.peer_id) then
+      fail (Identity_mismatch {filename; peer_id = pkh})
+      (* check public/private keys correspondence *)
+    else if not Crypto_box.(equal (neuterize id.secret_key) id.public_key) then
+      fail (Identity_keys_mismatch {filename; expected_key = id.public_key})
+    else
+      (* check PoW level *)
+      match expected_pow with
+      | None -> return id
+      | Some expected ->
+          let target = Crypto_box.make_pow_target expected in
+          if
+            not
+              (Crypto_box.check_proof_of_work
+                 id.public_key
+                 id.proof_of_work_stamp
+                 target)
+          then fail (Insufficient_proof_of_work {expected})
+          else return id
 
 type error += Existent_identity_file of string
 
@@ -175,21 +175,24 @@ let () =
     (fun file -> Existent_identity_file file)
 
 let write file identity =
+  let open Lwt_tzresult_syntax in
   if Sys.file_exists file then fail (Existent_identity_file file)
   else
-    Node_data_version.ensure_data_dir (Filename.dirname file) >>=? fun () ->
+    let* () = Node_data_version.ensure_data_dir (Filename.dirname file) in
     Lwt_utils_unix.Json.write_file
       file
       (Data_encoding.Json.construct P2p_identity.encoding identity)
 
 let generate_with_animation ppf target =
+  let open Lwt_syntax in
   let duration = 1200 / Animation.number_of_frames in
   Animation.make_with_animation
     ppf
     ~make:(fun count ->
       Lwt.catch
         (fun () ->
-          P2p_identity.generate_with_bound ~max:count target >|= fun id -> Ok id)
+          let+ id = P2p_identity.generate_with_bound ~max:count target in
+          Ok id)
         (function
           | Not_found -> Lwt.return @@ Error count | exc -> Lwt.fail exc))
     ~on_retry:(fun time count ->
@@ -197,17 +200,19 @@ let generate_with_animation ppf target =
       let count =
         if ms <= 1 then max 10 (count * 10) else count * duration / ms
       in
-      Lwt.pause () >>= fun () -> Lwt.return count)
+      let* () = Lwt.pause () in
+      Lwt.return count)
     10000
 
 let generate identity_file expected_pow =
+  let open Lwt_tzresult_syntax in
   if Sys.file_exists identity_file then
     fail (Existent_identity_file identity_file)
   else
     let target = Crypto_box.make_pow_target expected_pow in
     Format.eprintf "Generating a new identity... (level: %.2f) " expected_pow ;
-    generate_with_animation Format.err_formatter target >>= fun id ->
-    write identity_file id >>=? fun () ->
+    let*! id = generate_with_animation Format.err_formatter target in
+    let* () = write identity_file id in
     Format.eprintf
       "Stored the new identity (%a) into '%s'.@."
       P2p_peer.Id.pp
