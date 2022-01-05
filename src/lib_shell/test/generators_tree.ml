@@ -320,6 +320,21 @@ let unique_nonempty_block_gen =
   let+ block = block_gen and+ l = unique_block_gen () in
   Block.Set.add block l
 
+(** [unique_block_gen n] returns sets of {!Block.t} such that:
+    - all blocks are different
+    - the cardinal of returned sets is equal or greater than [n] *)
+let unique_block_gen_gt ~(n : int) : Block.Set.t QCheck2.Gen.t =
+  assert (n >= 0) ;
+  let open QCheck2.Gen in
+  let list_gen = list_size (return n) in
+  let rec go generated =
+    if Block.Set.cardinal generated >= n then return generated
+    else
+      let* new_blocks = unique_block_gen ~list_gen () in
+      go (Block.Set.union generated new_blocks)
+  in
+  go Block.Set.empty
+
 (** A tree generator. Written in a slightly unusual style because it
       generates all values beforehand, to make sure they are all different.
       This is a property we want for trees of blocks. To do so,
