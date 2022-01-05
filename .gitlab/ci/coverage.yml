@@ -26,7 +26,9 @@ unified_coverage:
       if [ "$CORRUPTED_FILES" != 0 ]; then
         echo "Corrupted files were found, please report this in https://gitlab.com/tezos/tezos/-/issues/1529:";
         find "$BISECT_FILE" -name \*.corrupted.coverage -type f -print;
-        scripts/send_slack_alert_coverage.sh $SLACK_COVERAGE_TOKEN $SLACK_COVERAGE_CHANNEL $CI_PIPELINE_URL;
+        if [ "$SLACK_COVERAGE_TOKEN" != "" ]; then
+          scripts/send_slack_alert_coverage.sh $SLACK_COVERAGE_TOKEN $SLACK_COVERAGE_CHANNEL $CI_PIPELINE_URL;
+        fi
         exit 1;
       fi
       make coverage-report;
