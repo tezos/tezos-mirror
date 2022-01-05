@@ -1046,7 +1046,7 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 [@@coq_force_gadt]
 
-and 'arg typed_contract = 'arg ty * address
+and 'arg typed_contract = {arg_ty : 'arg ty; address : address}
 
 and (_, _, _, _) continuation =
   | KNil : ('r, 'f, 'r, 'f) continuation

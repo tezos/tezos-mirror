@@ -666,7 +666,7 @@ end)
      fun arg_ty ->
       let open M in
       let* address = value (address_t ~annot:None) in
-      return (arg_ty, address)
+      return {arg_ty; address}
 
     and generate_operation :
         (Alpha_context.packed_internal_operation

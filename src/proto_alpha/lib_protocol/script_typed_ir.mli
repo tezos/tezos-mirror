@@ -1057,7 +1057,7 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 [@@coq_force_gadt]
 
-and 'arg typed_contract = 'arg ty * address
+and 'arg typed_contract = {arg_ty : 'arg ty; address : address}
 
 (*
 

@@ -168,7 +168,7 @@ let comb_set_gadt_witness_size = peano_shape_proof
 
 let dup_n_gadt_witness_size = peano_shape_proof
 
-let contract_size (arg_ty, address) =
+let contract_size {arg_ty; address} =
   ret_adding (ty_size arg_ty) (h2w +! address_size address)
 
 let sapling_state_size {Sapling.id; diff; memo_size = _} =
