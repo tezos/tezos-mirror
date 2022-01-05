@@ -858,6 +858,8 @@ end
 module Selection = struct
   include Internal_event.Simple
 
+  let section = section @ ["operation_selection"]
+
   let invalid_operation_filtered =
     declare_2
       ~section
