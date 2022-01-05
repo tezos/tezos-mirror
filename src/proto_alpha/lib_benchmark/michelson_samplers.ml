@@ -668,13 +668,10 @@ end)
       let* address = value (address_t ~annot:None) in
       return {arg_ty; address}
 
-    and generate_operation :
-        (Alpha_context.packed_internal_operation
-        * Alpha_context.Lazy_storage.diffs option)
-        sampler =
+    and generate_operation : Script_typed_ir.operation sampler =
      fun rng_state ->
       let transfer = generate_transfer_tokens rng_state in
-      (transfer, None)
+      Script_typed_ir.{piop = transfer; lazy_storage_diff = None}
 
     and generate_transfer_tokens :
         Alpha_context.packed_internal_operation sampler =

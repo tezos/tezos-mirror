@@ -50,7 +50,10 @@ type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
 
-type operation = packed_internal_operation * Lazy_storage.diffs option
+type operation = {
+  piop : packed_internal_operation;
+  lazy_storage_diff : Lazy_storage.diffs option;
+}
 
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 

@@ -524,7 +524,7 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
-  let res = (Internal_operation iop, lazy_storage_diff) in
+  let res = {piop = Internal_operation iop; lazy_storage_diff} in
   let gas = update_local_gas_counter ctxt in
   let ctxt = outdated ctxt in
   return (res, ctxt, gas)
@@ -599,9 +599,8 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
       }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let res =
-    (Internal_operation {source = sc.self; operation; nonce}, lazy_storage_diff)
-  in
+  let piop = Internal_operation {source = sc.self; operation; nonce} in
+  let res = {piop; lazy_storage_diff} in
   let gas = update_local_gas_counter ctxt in
   let ctxt = outdated ctxt in
   return (res, contract, ctxt, gas)

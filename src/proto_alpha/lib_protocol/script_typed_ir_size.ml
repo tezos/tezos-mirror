@@ -177,13 +177,10 @@ let sapling_state_size {Sapling.id; diff; memo_size = _} =
   +! Sapling.diff_in_memory_size diff
   +! sapling_memo_size_size
 
-let operation_size
-    (operation :
-      packed_internal_operation * Lazy_storage.diffs_item list option) =
-  let (poi, diffs) = operation in
+let operation_size {piop; lazy_storage_diff} =
   ret_adding
-    (Operation.packed_internal_operation_in_memory_size poi
-    ++ option_size_vec Lazy_storage.diffs_in_memory_size diffs)
+    (Operation.packed_internal_operation_in_memory_size piop
+    ++ option_size_vec Lazy_storage.diffs_in_memory_size lazy_storage_diff)
     h2w
 
 let chain_id_size = h1w +? Chain_id.size

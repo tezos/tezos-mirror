@@ -1155,9 +1155,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let operation = Delegation delegate in
           let ctxt = update_context gas ctxt in
           fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-          let res =
-            (Internal_operation {source = sc.self; operation; nonce}, None)
-          in
+          let piop = Internal_operation {source = sc.self; operation; nonce} in
+          let res = {piop; lazy_storage_diff = None} in
           let gas = update_local_gas_counter ctxt in
           let ctxt = outdated ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
@@ -1732,7 +1731,10 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     )
   >>=? fun (unparsed_storage, ctxt) ->
   Lwt.return
-    (let (ops, op_diffs) = List.split ops.elements in
+    (let op_to_couple op = (op.piop, op.lazy_storage_diff) in
+     let (ops, op_diffs) =
+       ops.elements |> List.map op_to_couple |> List.split
+     in
      let lazy_storage_diff =
        match
          List.flatten
