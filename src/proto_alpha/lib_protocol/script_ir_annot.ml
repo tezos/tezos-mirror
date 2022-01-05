@@ -139,12 +139,6 @@ let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
 
 let default_annot ~default = function None -> default | annot -> annot
 
-let gen_access_annot : field_annot option -> var_annot option =
- fun field_annot ->
-  match field_annot with
-  | None -> None
-  | Some (Field_annot f) -> Some (Var_annot f)
-
 let merge_type_annot :
     type error_trace.
     legacy:bool ->
