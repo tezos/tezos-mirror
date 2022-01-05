@@ -144,21 +144,6 @@ let really_run ~progress_state ~iteration test =
   List.iter (fun reset -> reset ()) !reset_functions ;
   Lwt_main.run
   @@
-  let (fail_promise, fail_awakener) = Lwt.task () in
-  (* Ensure that errors raised from background promises are logged
-     and cause the test to fail immediately. *)
-  let already_woke_up_fail_promise = ref false in
-  let handle_background_exception exn =
-    let message = Printexc.to_string exn in
-    Log.error "%s" message ;
-    (match test.result with
-    | Some _ -> ()
-    | None -> test.result <- Some (Log.Failed message)) ;
-    if not !already_woke_up_fail_promise then (
-      already_woke_up_fail_promise := true ;
-      Lwt.wakeup_later fail_awakener ())
-  in
-  Background.start handle_background_exception ;
   (* It may happen that the promise of the function resolves successfully
      at the same time as a background promise is rejected or that we
      receive SIGINT. To handle those race conditions, setting the value
@@ -175,6 +160,19 @@ let really_run ~progress_state ~iteration test =
             test.result <- Some new_result
         | (Failed _, (Successful | Failed _)) | (Aborted, _) -> ())
   in
+  let (fail_promise, fail_awakener) = Lwt.task () in
+  (* Ensure that errors raised from background promises are logged
+     and cause the test to fail immediately. *)
+  let already_woke_up_fail_promise = ref false in
+  let handle_background_exception exn =
+    let message = Printexc.to_string exn in
+    Log.error "%s" message ;
+    set_test_result (Log.Failed message) ;
+    if not !already_woke_up_fail_promise then (
+      already_woke_up_fail_promise := true ;
+      Lwt.wakeup_later fail_awakener ())
+  in
+  Background.start handle_background_exception ;
   (* Run the test until it succeeds, fails, or we receive SIGINT. *)
   let main_temporary_directory = Temp.start () in
   let* () =
