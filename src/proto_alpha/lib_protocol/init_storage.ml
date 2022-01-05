@@ -54,10 +54,12 @@
 let prepare_first_block ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
-  let cycle = (Raw_context.current_level ctxt).cycle in
   (match previous_protocol with
   | Genesis param ->
       (* This is the genesis protocol: initialise the state *)
+      Storage.Block_round.init ctxt Round_repr.zero >>=? fun ctxt ->
+      Raw_level_repr.of_int32 level >>?= fun first_level ->
+      Storage.Tenderbake.First_level.init ctxt first_level >>=? fun ctxt ->
       let init_commitment (ctxt, balance_updates)
           Commitment_repr.{blinded_public_key_hash; amount} =
         Token.transfer
@@ -83,34 +85,28 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
       >>=? fun (ctxt, bootstrap_balance_updates) ->
       Stake_storage.init_first_cycles ctxt Delegate_storage.pubkey
       >>=? fun ctxt ->
+      let cycle = (Raw_context.current_level ctxt).cycle in
+      Delegate_storage.freeze_deposits_do_not_call_except_for_migration
+        ~new_cycle:cycle
+        ~balance_updates:[]
+        ctxt
+      >>=? fun (ctxt, deposits_balance_updates) ->
       Vote_storage.init
         ctxt
         ~start_position:(Level_storage.current ctxt).level_position
       >>=? fun ctxt ->
-      Storage.Block_round.init ctxt Round_repr.zero >>=? fun ctxt ->
       Vote_storage.update_listings ctxt >>=? fun ctxt ->
-      (* Must be called after other originations since it unsets the origination nonce.*)
+      (* Must be called after other originations since it unsets the origination nonce. *)
       Liquidity_baking_migration.init ctxt ~typecheck
       >>=? fun (ctxt, operation_results) ->
       Storage.Pending_migration.Operation_results.init ctxt operation_results
       >>=? fun ctxt ->
-      Raw_level_repr.of_int32 level >>?= fun first_level ->
-      Storage.Tenderbake.First_level.init ctxt first_level >>=? fun ctxt ->
-      return (ctxt, commitments_balance_updates @ bootstrap_balance_updates)
+      return
+        ( ctxt,
+          commitments_balance_updates @ bootstrap_balance_updates
+          @ deposits_balance_updates )
   | Ithaca_012 -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
-  Stake_storage.snapshot ctxt >>=? fun ctxt ->
-  Delegate_storage.freeze_deposits_do_not_call_except_for_migration
-    ~new_cycle:cycle
-    ~balance_updates
-    ctxt
-  >>=? fun (ctxt, balance_updates) ->
-  (match Level_storage.dawn_of_a_new_cycle ctxt with
-  | None -> return ctxt
-  | Some last_cycle ->
-      assert (Cycle_repr.(last_cycle = cycle)) ;
-      Stake_storage.clear_at_cycle_end ctxt ~new_cycle:(Cycle_repr.succ cycle))
-  >>=? fun ctxt ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates
   >>= fun ctxt -> return ctxt
