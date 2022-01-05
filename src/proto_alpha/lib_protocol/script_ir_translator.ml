@@ -1512,9 +1512,9 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
          (* legacy semantics with (broken) field annotations *)
          extract_field_annot ut >>? fun (ut, _some_constr) ->
          parse_composed_type_annot loc annot
-         >>? fun (ty_name, _none_constr, _) -> ok (ut, ty_name)
-        else parse_type_annot loc annot >>? fun annot -> ok (ut, annot))
-        >>? fun (ut, _annot) ->
+         >>? fun (_ty_name, _none_constr, _) -> ok ut
+        else parse_type_annot loc annot >>? fun _annot -> ok ut)
+        >>? fun ut ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
