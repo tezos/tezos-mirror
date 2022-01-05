@@ -89,15 +89,9 @@ type generic_call_result =
   | `Binary of (string, string option) rest
   | `Other of (string * string) option * (string, string option) rest ]
 
-class type json =
+class type generic =
   object
     inherit t
-
-    method generic_json_call :
-      RPC_service.meth ->
-      ?body:Data_encoding.json ->
-      Uri.t ->
-      (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
 
     method generic_media_type_call :
       RPC_service.meth ->

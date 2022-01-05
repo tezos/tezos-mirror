@@ -93,15 +93,9 @@ type generic_call_result =
     (string * string) option * (string, string option) rest
     (* [(string * string) option] corresponds to the content type *) ]
 
-class type json =
+class type generic =
   object
     inherit t
-
-    method generic_json_call :
-      RPC_service.meth ->
-      ?body:Data_encoding.json ->
-      Uri.t ->
-      (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
 
     method generic_media_type_call :
       RPC_service.meth ->

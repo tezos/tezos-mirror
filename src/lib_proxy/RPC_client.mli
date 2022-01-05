@@ -26,13 +26,13 @@
 (** The class [http_local_ctxt] creates an RPC context that executes
     some RPCs locally and delegates others over http. Arguments are:
 
-    - an instance of [RPC_context.json] to perform RPC calls (for delegation
+    - an instance of [RPC_context.generic] to perform RPC calls (for delegation
       over http), and whether [tezos-proxy-server] or [tezos-client] is running
     - the protocol-dependent implementation of the proxy (the proxy mode
       obtains data from endpoints with protocol-dependent RPCs). *)
 class http_local_ctxt :
   Tezos_client_base.Client_context.printer
-  -> RPC_context.json
+  -> RPC_context.generic
   -> Proxy_services.mode
   -> Registration.proxy_environment
-  -> RPC_context.json
+  -> RPC_context.generic

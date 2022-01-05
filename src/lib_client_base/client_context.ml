@@ -116,7 +116,7 @@ class type io_rpcs =
 
     inherit prompter
 
-    inherit RPC_context.json
+    inherit RPC_context.generic
   end
 
 class type ui =
@@ -136,7 +136,7 @@ class type full =
 
     inherit wallet
 
-    inherit RPC_context.json
+    inherit RPC_context.generic
 
     inherit chain
 
@@ -182,8 +182,6 @@ class proxy_context (obj : full) =
       obj#call_streamed_service
 
     method error : type a b. (a, b) lwt_format -> a = obj#error
-
-    method generic_json_call = obj#generic_json_call
 
     method generic_media_type_call = obj#generic_media_type_call
 

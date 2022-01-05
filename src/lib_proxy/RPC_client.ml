@@ -52,8 +52,8 @@ let method_is_writer = function
   | `GET -> false
 
 class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
-  (http_ctxt : RPC_context.json) (mode : Proxy_services.mode)
-  (proxy_env : Registration.proxy_environment) : RPC_context.json =
+  (http_ctxt : RPC_context.generic) (mode : Proxy_services.mode)
+  (proxy_env : Registration.proxy_environment) : RPC_context.generic =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Proxy_services.build_directory printer http_ctxt mode proxy_env)
@@ -135,37 +135,6 @@ class http_local_ctxt (printer : Tezos_client_base.Client_context.printer)
           ~distant
           meth
         @@ print_service service
-
-    method generic_json_call
-        : RPC_service.meth ->
-          ?body:Data_encoding.json ->
-          Uri.t ->
-          ( Data_encoding.json,
-            Data_encoding.json option )
-          RPC_context.rest_result
-          Lwt.t =
-      let open Lwt_syntax in
-      fun meth ?body uri ->
-        let meth_string = RPC_service.string_of_meth meth in
-        let uri_string = Uri.to_string uri in
-        let delegate () =
-          let* () =
-            Events.(emit delegate_json_call_to_http) (meth_string, uri_string)
-          in
-          http_ctxt#generic_json_call meth ?body uri
-        in
-        if method_is_writer meth then delegate ()
-        else
-          let* answer = local_ctxt#generic_json_call meth ?body uri in
-          match answer with
-          | Ok (`Not_found _) | Error [Tezos_rpc.RPC_context.Not_found _] ->
-              delegate ()
-          | Ok x ->
-              let* () =
-                Events.(emit done_json_call_locally) (meth_string, uri_string)
-              in
-              return_ok x
-          | Error _ as err -> Lwt.return err
 
     method generic_media_type_call
         : Service.meth ->

@@ -57,7 +57,7 @@ module Call =
     (RPC_encoding)
     (NullLogger)
 
-let local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
+let local_ctxt (directory : unit RPC_directory.t) : RPC_context.generic =
   let local_client =
     Call.launch ?cors:None ?agent:None ~media_types directory
   in
@@ -65,8 +65,6 @@ let local_ctxt (directory : unit RPC_directory.t) : RPC_context.json =
   let base = Uri.empty in
   object
     method base = base
-
-    method generic_json_call meth ?body uri = C.generic_json_call meth ?body uri
 
     method generic_media_type_call meth ?body uri =
       C.generic_media_type_call ~accept:media_types meth ?body uri

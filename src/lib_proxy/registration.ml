@@ -68,14 +68,14 @@ module type Proxy_sig = sig
   val init_env_rpc_context :
     Tezos_client_base.Client_context.printer ->
     (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
-    RPC_context.json ->
+    RPC_context.generic ->
     Proxy.mode ->
     Block_services.chain ->
     Block_services.block ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
 
   val time_between_blocks :
-    RPC_context.json ->
+    RPC_context.generic ->
     Block_services.chain ->
     Block_services.block ->
     int64 option tzresult Lwt.t

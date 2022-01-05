@@ -37,7 +37,7 @@ type mode =
 (** [build_directory printer rpc_context env mode] returns the directory
     of RPCs that is served locally by the client's light and proxy modes and
     by the proxy server. Parameters are:
-    
+
     - [printer] is used for logging.
     - [rpc_context] is used to perform RPCs to distant endpoints.
     - [mode] specifies whether [tezos-client] (light or proxy mode)
@@ -45,7 +45,7 @@ type mode =
     - [env] is a protocol-specific module used to create the context passed when executing a RPC. *)
 val build_directory :
   Tezos_client_base.Client_context.printer ->
-  RPC_context.json ->
+  RPC_context.generic ->
   mode ->
   Registration.proxy_environment ->
   unit RPC_directory.t
