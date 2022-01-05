@@ -156,22 +156,45 @@ module Context : sig
     [ `Force_load  (** Force the cache domain to be reloaded from the context. *)
     | `Load
       (** Load a cache by iterating over the keys of its domain and by
-          building a cached value for each key. *)
+          building a cached value for each key.
+
+          This operation can introduce a significant slowdown
+          proportional to the number of entries in the cache, and depending on
+          their nature. As a consequence, loading a cache from that
+          source should be done when the system has no  strict constraint
+          on execution time, e.g., during startup.
+
+      *)
     | `Lazy
       (** Same as Load except that cached values are built on demand.
-          This strategy makes [load_cache] run faster but it may also
-          introduces latencies during block validations.
 
-          To avoid any discrepancy between a node that has reloaded
-          its cache and the other nodes of the network, it is recommended
-          to avoid using this function in time-critical components.
+          This strategy makes [load_cache] run a lot faster and the
+          overall cost of loading the cache is only proportional to
+          the number of entries *actually used* (and also depends on
+          their nature).
+
+          Notice that, contrary to the [`Load] source of cache, this
+          loading mode may also introduce latencies when entries are
+          actually used since they are reconstructed on-the-fly.
 
           RPCs are a typical place where this Lazy loading makes
-          sense, though. *)
+          sense since the number of entries used is generally low,
+          and the cache cannot be inherited (as in the next case).
+
+      *)
     | `Inherited of block_cache * Context_hash.t
-      (** When we already have some [block_cache] in memory, we can
-         reuse or recycle its entries to have a cache to check some
-         other block. *)
+      (** When we already have some [block_cache.cache] in memory coming
+          from the validation of some block [block_cache.context_hash],
+          we can reuse or recycle its entries to reconstruct a cache to
+          check some other block identified by a given [Context_hash.t],
+          which typically comes after [block_cache.context_hash] in the
+          chain.
+
+          This source is usually the most efficient way to build a
+          cache in memory since the cache entries only change
+          marginally from one block to one of its close descendants.
+
+      *)
     ]
 
   (** To [load_cache] in memory, we need to iterate over its domain
