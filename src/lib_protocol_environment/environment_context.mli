@@ -23,25 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module type CONTEXT = sig
-  (** @inline *)
-  include Environment_context_intf.S
-end
-
-module type VIEW = sig
-  (** @inline *)
-  include Environment_context_intf.VIEW
-end
-
-module type TREE = sig
-  (** @inline *)
-  include Environment_context_intf.TREE
-end
-
-module type CACHE = sig
-  (** @inline *)
-  include Environment_context_intf.CACHE
-end
+include Environment_context_intf.Sigs
 
 module Equality_witness : sig
   type (_, _) eq = Refl : ('a, 'a) eq
@@ -56,8 +38,7 @@ module Equality_witness : sig
 end
 
 module Context : sig
-  type ('ctxt, 'tree) ops =
-    (module CONTEXT with type t = 'ctxt and type tree = 'tree)
+  type ('ctxt, 'tree) ops = (module S with type t = 'ctxt and type tree = 'tree)
 
   type _ kind = private ..
 
@@ -87,7 +68,7 @@ module Context : sig
       }
         -> t
 
-  include CONTEXT with type t := t
+  include S with type t := t
 
   (** [make kind impl_name ctxt ops equality_witness] builds a context
      value. In this context, the cache is uninitialized: one must call
@@ -225,7 +206,7 @@ module Context : sig
     Block_hash.t -> t -> source_of_cache -> builder -> t tzresult Lwt.t
 end
 
-module Register (C : CONTEXT) : sig
+module Register (C : S) : sig
   type _ Context.kind += Context : C.t Context.kind
 
   val equality_witness : (C.t, C.tree) Context.equality_witness

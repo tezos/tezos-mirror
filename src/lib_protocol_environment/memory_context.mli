@@ -33,7 +33,7 @@ val empty : Context.t
 
 val encoding : Context.t Data_encoding.t
 
-module M : CONTEXT with type t = t
+module M : S with type t = t
 
 val wrap_memory_context : t -> Context.t
 

@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+include Environment_context_intf
 open Error_monad
 
 let err_implementation_mismatch ~expected ~got =
@@ -31,14 +32,6 @@ let err_implementation_mismatch ~expected ~got =
     "Context implementation mismatch: expecting %s, got %s"
     expected
     got
-
-module type CONTEXT = Environment_context_intf.S
-
-module type VIEW = Environment_context_intf.VIEW
-
-module type TREE = Environment_context_intf.TREE
-
-module type CACHE = Environment_context_intf.CACHE
 
 module Equality_witness : sig
   type (_, _) eq = Refl : ('a, 'a) eq
@@ -85,8 +78,7 @@ module Context = struct
 
   type value = Bytes.t
 
-  type ('ctxt, 'tree) ops =
-    (module CONTEXT with type t = 'ctxt and type tree = 'tree)
+  type ('ctxt, 'tree) ops = (module S with type t = 'ctxt and type tree = 'tree)
 
   type _ kind = ..
 
@@ -173,6 +165,8 @@ module Context = struct
       []
       (List.rev ls)
 
+  let length (Context {ops = (module Ops); ctxt; _}) key = Ops.length ctxt key
+
   let fold ?depth
       (Context
         {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
@@ -243,6 +237,9 @@ module Context = struct
           (k, v) :: acc)
         []
         (List.rev ls)
+
+    let length (Tree {ops = (module Ops); tree; _}) key =
+      Ops.Tree.length tree key
 
     let fold ?depth
         (Tree
@@ -598,13 +595,13 @@ module Context = struct
     Ops.set_hash_version ctxt v >|=? fun ctxt -> Context {c with ctxt}
 end
 
-module Register (C : CONTEXT) = struct
+module Register (C : S) = struct
   type _ Context.kind += Context : C.t Context.kind
 
   let equality_witness : (C.t, C.tree) Context.equality_witness =
     Context.equality_witness ()
 
-  let ops = (module C : CONTEXT with type t = 'ctxt and type tree = 'tree)
+  let ops = (module C : S with type t = 'ctxt and type tree = 'tree)
 end
 
 type validation_result = {

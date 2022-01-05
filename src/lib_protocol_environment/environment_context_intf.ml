@@ -25,6 +25,208 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Kind = struct
+  type t = [`Value | `Tree]
+end
+
+module type CORE = sig
+  type t
+
+  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
+
+  val get_protocol : t -> Protocol_hash.t Lwt.t
+
+  val fork_test_chain :
+    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
+
+  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
+
+  val get_hash_version : t -> Context_hash.Version.t
+end
+
+module type TREE_CORE = sig
+  type t
+
+  type tree
+
+  type value
+
+  val empty : t -> tree
+
+  val is_empty : tree -> bool
+
+  val kind : tree -> Kind.t
+
+  val to_value : tree -> value option Lwt.t
+
+  val of_value : t -> value -> tree Lwt.t
+
+  val hash : tree -> Context_hash.t
+
+  val equal : tree -> tree -> bool
+
+  val clear : ?depth:int -> tree -> unit
+end
+
+module V2 = struct
+  type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
+
+  module type VIEW = sig
+    type t
+
+    type key
+
+    type value
+
+    type tree
+
+    val mem : t -> key -> bool Lwt.t
+
+    val mem_tree : t -> key -> bool Lwt.t
+
+    val find : t -> key -> value option Lwt.t
+
+    val find_tree : t -> key -> tree option Lwt.t
+
+    val list :
+      t -> ?offset:int -> ?length:int -> key -> (string * tree) trace Lwt.t
+
+    val add : t -> key -> value -> t Lwt.t
+
+    val add_tree : t -> key -> tree -> t Lwt.t
+
+    val remove : t -> key -> t Lwt.t
+
+    val fold :
+      ?depth:depth ->
+      t ->
+      key ->
+      init:'a ->
+      f:(key -> tree -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
+  end
+
+  module Kind = Kind
+
+  module type TREE = sig
+    type t
+
+    type tree
+
+    include VIEW with type t := tree and type tree := tree
+
+    include
+      TREE_CORE with type t := t and type tree := tree and type value := value
+  end
+
+  module type S = sig
+    include VIEW with type key = string list and type value = bytes
+
+    module Tree : sig
+      include
+        TREE
+          with type t := t
+           and type key := key
+           and type value := value
+           and type tree := tree
+
+      val pp : Format.formatter -> tree -> unit
+    end
+
+    include CORE with type t := t
+  end
+end
+
+module V3 = V2
+
+module V4 = struct
+  type depth = V3.depth
+
+  module type VIEW = sig
+    include V3.VIEW
+
+    val fold :
+      ?depth:depth ->
+      t ->
+      key ->
+      order:[`Sorted | `Undefined] ->
+      init:'a ->
+      f:(key -> tree -> 'a -> 'a Lwt.t) ->
+      'a Lwt.t
+  end
+
+  module Kind = Kind
+
+  module type TREE = sig
+    type t
+
+    type tree
+
+    include VIEW with type t := tree and type tree := tree
+
+    include
+      TREE_CORE with type t := t and type tree := tree and type value := value
+  end
+
+  module type S = sig
+    include VIEW with type key = string list and type value = bytes
+
+    module Tree : sig
+      include
+        TREE
+          with type t := t
+           and type key := key
+           and type value := value
+           and type tree := tree
+
+      val pp : Format.formatter -> tree -> unit
+    end
+
+    include CORE with type t := t
+  end
+
+  (* Copy of sigs/v3/context.mli:CACHE *)
+  module type CACHE = sig
+    type t
+
+    type size
+
+    type index
+
+    type identifier
+
+    type key
+
+    type value = ..
+
+    val key_of_identifier : cache_index:index -> identifier -> key
+
+    val identifier_of_key : key -> identifier
+
+    val pp : Format.formatter -> t -> unit
+
+    val find : t -> key -> value option Lwt.t
+
+    val set_cache_layout : t -> size list -> t Lwt.t
+
+    val update : t -> key -> (value * size) option -> t
+
+    val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
+
+    val clear : t -> t
+
+    val list_keys : t -> cache_index:index -> (key * size) list option
+
+    val key_rank : t -> key -> int option
+
+    val future_cache_expectation : t -> time_in_blocks:int -> t
+
+    val cache_size : t -> cache_index:index -> size option
+
+    val cache_size_limit : t -> cache_index:index -> size option
+  end
+end
+
 module type VIEW = sig
   (** @inline *)
   include Tezos_context_sigs.Context.VIEW
@@ -54,55 +256,23 @@ module type S = sig
     val pp : Format.formatter -> tree -> unit
   end
 
-  val set_protocol : t -> Protocol_hash.t -> t Lwt.t
-
-  val get_protocol : t -> Protocol_hash.t Lwt.t
-
-  val fork_test_chain :
-    t -> protocol:Protocol_hash.t -> expiration:Time.Protocol.t -> t Lwt.t
-
-  val set_hash_version : t -> Context_hash.Version.t -> t tzresult Lwt.t
-
-  val get_hash_version : t -> Context_hash.Version.t
+  include CORE with type t := t
 end
 
-(* Copy of sigs/v3/context.mli:CACHE *)
-module type CACHE = sig
-  type t
+module type CACHE = V4.CACHE
 
-  type size
+module type Sigs = sig
+  module V2 = V2
+  module V3 = V3
+  module V4 = V4
 
-  type index
+  module type VIEW = VIEW
 
-  type identifier
+  module type TREE = TREE
 
-  type key
+  module type S = S
 
-  type value = ..
+  module type HASH_VERSION = HASH_VERSION
 
-  val key_of_identifier : cache_index:index -> identifier -> key
-
-  val identifier_of_key : key -> identifier
-
-  val pp : Format.formatter -> t -> unit
-
-  val find : t -> key -> value option Lwt.t
-
-  val set_cache_layout : t -> size list -> t Lwt.t
-
-  val update : t -> key -> (value * size) option -> t
-
-  val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
-
-  val clear : t -> t
-
-  val list_keys : t -> cache_index:index -> (key * size) list option
-
-  val key_rank : t -> key -> int option
-
-  val future_cache_expectation : t -> time_in_blocks:int -> t
-
-  val cache_size : t -> cache_index:index -> size option
-
-  val cache_size_limit : t -> cache_index:index -> size option
+  module type CACHE = CACHE
 end

@@ -182,6 +182,8 @@ module C = struct
   let list t ?offset ?length k =
     data_tree t >>= fun tree -> raw_list tree ?offset ?length k
 
+  let length t k = data_tree t >>= fun t -> Local.Tree.length t.tree k
+
   let fold ?depth (t : t) root ~order ~init ~f =
     find_tree t root >>= function
     | None -> Lwt.return init
@@ -240,6 +242,8 @@ module C = struct
     let remove t k =
       Local.Tree.remove t.tree k >|= fun tree ->
       if tree == t.tree then t else {t with tree}
+
+    let length t k = Local.Tree.length t.tree k
 
     let fold ?depth (t : tree) k ~order ~init ~f =
       Local.Tree.fold ?depth t.tree k ~order ~init ~f:(fun k tree acc ->
