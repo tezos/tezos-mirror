@@ -4112,9 +4112,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         typed ctxt loc instr stack
       else fail (Deprecated_instruction I_SUB)
   | ( Prim (loc, I_SUB_MUTEZ, [], annot),
-      Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
+      Item_t (Mutez_t _, Item_t (Mutez_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> ISub_tez (kinfo, k))} in
       let stack = Item_t (option_mutez_t, rest) in
       typed ctxt loc instr stack
@@ -4230,10 +4229,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t _, Item_t (Nat_t _, rest))) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
@@ -4263,42 +4260,35 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_EDIV, [], annot),
-      Item_t (Mutez_t _, Item_t (Nat_t _, rest)) ) ->
+  | (Prim (loc, I_EDIV, [], annot), Item_t (Mutez_t _, Item_t (Nat_t _, rest)))
+    ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEdiv_teznat (kinfo, k))} in
       let stack = Item_t (option_pair_mutez_mutez_t, rest) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_EDIV, [], annot),
-      Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
+  | (Prim (loc, I_EDIV, [], annot), Item_t (Mutez_t _, Item_t (Mutez_t _, rest)))
+    ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_tez (kinfo, k))} in
       let stack = Item_t (option_pair_nat_mutez_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_EDIV, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
-    ->
-      check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun _tname ->
-      let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
-      let stack = Item_t (option_pair_int_nat_t, rest) in
-      typed ctxt loc instr stack
-  | (Prim (loc, I_EDIV, [], annot), Item_t (Int_t _, Item_t (Nat_t _, rest)))
-    ->
+  | (Prim (loc, I_EDIV, [], annot), Item_t (Int_t _, Item_t (Int_t _, rest))) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
       let stack = Item_t (option_pair_int_nat_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_EDIV, [], annot), Item_t (Nat_t _, Item_t (Int_t _, rest)))
-    ->
+  | (Prim (loc, I_EDIV, [], annot), Item_t (Int_t _, Item_t (Nat_t _, rest))) ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
+      let stack = Item_t (option_pair_int_nat_t, rest) in
+      typed ctxt loc instr stack
+  | (Prim (loc, I_EDIV, [], annot), Item_t (Nat_t _, Item_t (Int_t _, rest))) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
       let stack = Item_t (option_pair_int_nat_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_EDIV, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | (Prim (loc, I_EDIV, [], annot), Item_t (Nat_t _, Item_t (Nat_t _, rest))) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
       let stack = Item_t (option_pair_nat_nat_t, rest) in
       typed ctxt loc instr stack
