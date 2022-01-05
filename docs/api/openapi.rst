@@ -43,7 +43,7 @@ and specific to the Hangzhou protocol can be found at:
 How to Generate
 ---------------
 
-To generate the above files, run the ``src/openapi/generate.sh`` script
+To generate the above files, run the ``src/bin_openapi/generate.sh`` script
 from the root of the Tezos repository.
 It will start a sandbox node, activate the protocol,
 get the RPC specifications from this node and convert them to OpenAPI specifications.
