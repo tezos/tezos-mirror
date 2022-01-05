@@ -97,6 +97,25 @@ let create parameters =
     applied_rev = [];
   }
 
+let is_empty
+    {
+      (* All fields are intentionaly mentioned, so that we get a warning
+         when we add a field. This will force to think whether this
+         function needs to be updated or not. *)
+      parameters = _;
+      refused = _;
+      outdated = _;
+      branch_refused = _;
+      branch_delayed = _;
+      prechecked = _;
+      applied_rev = _;
+      in_mempool;
+    } =
+  (* By checking only [in_mempool] here, we rely on the invariant that
+     [in_mempool] is the union of all other fields (see the MLI for
+     detailed documentation of this invariant). *)
+  Operation_hash.Map.is_empty in_mempool
+
 let set_of_bounded_map bounded_map =
   Operation_hash.Map.fold
     (fun oph _ acc -> Operation_hash.Set.add oph acc)

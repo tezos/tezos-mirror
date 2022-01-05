@@ -762,6 +762,27 @@ module To_map = struct
       ()
 end
 
+(** Tests the relationship between [Classification.create]
+      and [Classification.is_empty] *)
+let test_create_is_empty =
+  let open QCheck2 in
+  Test.make ~name:"[is_empty (create params)] holds" Generators.parameters_gen
+  @@ fun parameters ->
+  let t = Classification.create parameters in
+  qcheck_eq' ~expected:true ~actual:(Classification.is_empty t) ()
+
+(** Tests that after adding something to a classification, it is not empty. *)
+let test_create_add_not_empty =
+  let open QCheck2 in
+  Test.make
+    ~name:"[not (is_empty (add _ _ _ t))] holds"
+    (Gen.pair
+       (Generators.t_with_operation_gen ())
+       Generators.classification_gen)
+  @@ fun ((t, (oph, op)), classification) ->
+  Classification.add classification oph op t ;
+  qcheck_eq' ~expected:false ~actual:(Classification.is_empty t) ()
+
 let () =
   let mk_tests label tests = (label, qcheck_wrap tests) in
   Alcotest.run
@@ -791,4 +812,5 @@ let () =
             test_is_in_mempool;
             test_none;
           ];
+      mk_tests "is_empty" [test_create_is_empty; test_create_add_not_empty];
     ]
