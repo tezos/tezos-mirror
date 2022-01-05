@@ -48,6 +48,18 @@ from the root of the Tezos repository.
 It will start a sandbox node, activate the protocol,
 get the RPC specifications from this node and convert them to OpenAPI specifications.
 
+To generate the OpenAPI specification for the RPCs provided by a specific protocol,
+update the following variables in :src:`src/bin_openapi/generate.sh`:
+
+```sh
+protocol_hash=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+protocol_parameters=src/proto_alpha/parameters/sandbox-parameters.json
+protocol_name=alpha
+```
+
+For ``protocol_hash``, use the value defined in ``TEZOS_PROTOCOL``.
+
+
 How to Test
 -----------
 
