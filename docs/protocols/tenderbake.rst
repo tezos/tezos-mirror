@@ -109,7 +109,7 @@ The balance updates have been updated as follows:
   - block fees, with the kind ``accumulator`` and category ``block fees``;
   - storage fees, with the kind ``burned`` and category ``storage fees``;
   - double signing punishments, with the kind ``burned`` and category ``punishments``;
-  - lost endorsing rewards, with the kind ``burned``, category ``lost endorsing rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of unsufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
+  - lost endorsing rewards, with the kind ``burned``, category ``lost endorsing rewards``, 3rd field ``delegate``, 4th field ``participation`` (a boolean with value ``true`` if and only if the reward was lost because of insufficient participation), and 5th field ``revelation`` (a boolean with value ``true`` if and only if the reward was lost because of unrevealed nonces);
   - liquidity baking subsidies, with the kind ``minted`` and category ``subsidy``;
   - commitments, with the kind ``commitment`` and category ``commitment``;
   - invoices, with the kind ``minted`` and category ``invoice``;
@@ -138,6 +138,8 @@ The receipt for (pre)endorsement operations contains three fields:
 The receipt for double preendorsement evidence operations has the same format as for double endorsement evidence operations.
 
 The receipt for set deposits limit operations has one field: the ``consumed_gas``.
+
+A more detailed documentation of balance updates is available :doc:`here<../alpha/token_management>`.
 
 RPCs
 ----
