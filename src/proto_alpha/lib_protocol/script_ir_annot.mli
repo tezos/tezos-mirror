@@ -109,8 +109,6 @@ val field_to_var_annot : field_annot option -> var_annot option
 
 val type_to_var_annot : type_annot option -> var_annot option
 
-val var_to_field_annot : var_annot option -> field_annot option
-
 (** Converts a field annot option to an entrypoint.
     An error is returned if the field annot is too long or is "default".
     [None] is converted to [Some default].

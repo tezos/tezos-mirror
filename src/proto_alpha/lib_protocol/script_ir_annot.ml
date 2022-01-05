@@ -125,10 +125,6 @@ let type_to_var_annot : type_annot option -> var_annot option = function
   | None -> None
   | Some (Type_annot s) -> Some (Var_annot s)
 
-let var_to_field_annot : var_annot option -> field_annot option = function
-  | None -> None
-  | Some (Var_annot s) -> Some (Field_annot s)
-
 let field_annot_opt_to_entrypoint_strict ~loc = function
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a

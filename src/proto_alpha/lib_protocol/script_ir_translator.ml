@@ -3250,8 +3250,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_constr_annot
         loc
         annot
-        ~if_special_first:(var_to_field_annot None)
-        ~if_special_second:(var_to_field_annot None)
+        ~if_special_first:None
+        ~if_special_second:None
       >>?= fun (_annot, ty_name, l_field, r_field) ->
       pair_t loc (a, l_field, None) (b, r_field, None) ~annot:ty_name
       >>?= fun ty ->
@@ -3425,7 +3425,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_LEFT, [tr], annot), Item_t (tl, rest)) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tr
       >>?= fun (Ex_ty tr, ctxt) ->
-      parse_constr_annot loc annot ~if_special_first:(var_to_field_annot None)
+      parse_constr_annot loc annot ~if_special_first:None
       >>?= fun (_annot, tname, l_field, r_field) ->
       let cons_left = {apply = (fun kinfo k -> ICons_left (kinfo, k))} in
       union_t loc (tl, l_field) (tr, r_field) ~annot:tname >>?= fun ty ->
@@ -3434,7 +3434,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_RIGHT, [tl], annot), Item_t (tr, rest)) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tl
       >>?= fun (Ex_ty tl, ctxt) ->
-      parse_constr_annot loc annot ~if_special_second:(var_to_field_annot None)
+      parse_constr_annot loc annot ~if_special_second:None
       >>?= fun (_annot, tname, l_field, r_field) ->
       let cons_right = {apply = (fun kinfo k -> ICons_right (kinfo, k))} in
       union_t loc (tl, l_field) (tr, r_field) ~annot:tname >>?= fun ty ->
