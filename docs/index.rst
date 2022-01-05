@@ -190,6 +190,7 @@ in the :ref:`introduction <howtoget>`.
    developer/michelson_anti_patterns
    developer/michelson_instructions
    developer/entering_alpha
+   developer/protocol_release_checklist
    developer/howto-freeze-protocols
    developer/protocol_environment
    developer/protocol_environment_upgrade
