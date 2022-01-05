@@ -1853,11 +1853,11 @@ let lambda_t loc l r =
 let option_t loc t =
   Type_size.compound1 loc (ty_size t) >|? fun size -> Option_t (t, {size})
 
-let option_mutez'_t _meta = Option_t (mutez_t, {size = Type_size.two})
+let option_mutez_t = Option_t (mutez_t, {size = Type_size.two})
 
-let option_string'_t _meta = Option_t (string_t, {size = Type_size.two})
+let option_string_t = Option_t (string_t, {size = Type_size.two})
 
-let option_bytes'_t _meta = Option_t (bytes_t, {size = Type_size.two})
+let option_bytes_t = Option_t (bytes_t, {size = Type_size.two})
 
 let option_nat_t = Option_t (nat_t, {size = Type_size.two})
 
@@ -1866,27 +1866,17 @@ let option_pair_nat_nat_t =
     ( Pair_t ((nat_t, None), (nat_t, None), {size = Type_size.three}),
       {size = Type_size.four} )
 
-let option_pair_nat'_nat'_t _meta =
-  Option_t
-    ( Pair_t ((nat_t, None), (nat_t, None), {size = Type_size.three}),
-      {size = Type_size.four} )
-
-let option_pair_nat_mutez'_t _meta =
+let option_pair_nat_mutez_t =
   Option_t
     ( Pair_t ((nat_t, None), (mutez_t, None), {size = Type_size.three}),
       {size = Type_size.four} )
 
-let option_pair_mutez'_mutez'_t _meta =
+let option_pair_mutez_mutez_t =
   Option_t
     ( Pair_t ((mutez_t, None), (mutez_t, None), {size = Type_size.three}),
       {size = Type_size.four} )
 
-let option_pair_int'_nat_t _meta =
-  Option_t
-    ( Pair_t ((int_t, None), (nat_t, None), {size = Type_size.three}),
-      {size = Type_size.four} )
-
-let option_pair_int_nat'_t _meta =
+let option_pair_int_nat_t =
   Option_t
     ( Pair_t ((int_t, None), (nat_t, None), {size = Type_size.three}),
       {size = Type_size.four} )

@@ -1579,27 +1579,21 @@ val lambda_t :
 
 val option_t : Script.location -> 'v ty -> 'v option ty tzresult
 
-(* the quote is used to indicate where the annotation will go *)
+val option_mutez_t : Tez.t option ty
 
-val option_mutez'_t : _ ty_metadata -> Tez.t option ty
+val option_string_t : Script_string.t option ty
 
-val option_string'_t : _ ty_metadata -> Script_string.t option ty
-
-val option_bytes'_t : _ ty_metadata -> Bytes.t option ty
+val option_bytes_t : Bytes.t option ty
 
 val option_nat_t : n num option ty
 
 val option_pair_nat_nat_t : (n num, n num) pair option ty
 
-val option_pair_nat'_nat'_t : _ ty_metadata -> (n num, n num) pair option ty
+val option_pair_nat_mutez_t : (n num, Tez.t) pair option ty
 
-val option_pair_nat_mutez'_t : _ ty_metadata -> (n num, Tez.t) pair option ty
+val option_pair_mutez_mutez_t : (Tez.t, Tez.t) pair option ty
 
-val option_pair_mutez'_mutez'_t : _ ty_metadata -> (Tez.t, Tez.t) pair option ty
-
-val option_pair_int'_nat_t : _ ty_metadata -> (z num, n num) pair option ty
-
-val option_pair_int_nat'_t : _ ty_metadata -> (z num, n num) pair option ty
+val option_pair_int_nat_t : (z num, n num) pair option ty
 
 val list_t : Script.location -> 'v ty -> 'v boxed_list ty tzresult
 
