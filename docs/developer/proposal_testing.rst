@@ -16,10 +16,9 @@ contains both the new protocol and its migration code from the current active
 protocol. The current protocol proposal under development is referred to as the
 `Alpha protocol`.
 
-Since the commits for migration code are only used once, we keep them clearly
-separated by marking them with the tag ``Migration:``. The first step when
-developing a new protocol is to revert the migration commits from the previous
-protocol. The rest of the commits are used as a base for current proposals.
+Since the migration code is only used once, it is a good practice to keep them clearly
+separated by marking them with the tag ``Proto/Migration:``.
+Note that a first step when developing a new protocol is to revert the migration code from the previous protocol.
 
 We next describe how to run unit tests and how to activate the Alpha protocol in
 sandboxed node.

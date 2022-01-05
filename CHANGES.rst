@@ -146,7 +146,7 @@ Node
 - The prevalidator (which handles operations which have been received but not
   yet included in a block) was made more restrictive: it now accepts a single
   manager operation from a given manager for a given block. This limitation
-  was already present implicitely if you were using the `tezos-client` commands.
+  was already present implicitly if you were using the `tezos-client` commands.
   Batches of operations can be used to get around this restriction, see the
   `multiple transfers` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
@@ -179,7 +179,7 @@ Client
   The value can be  ``json``, ``binary`` or ``any``.
 
 - Added two options, ``--now`` and ``--level`` to the ``run script``
-  and ``run view`` commands simulating exectution of Michelson
+  and ``run view`` commands simulating execution of Michelson
   code. These options can be used to override the values normally
   returned by the ``NOW`` and ``LEVEL`` instructions.
 

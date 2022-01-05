@@ -60,7 +60,7 @@ The following protocol parameters have been removed:
 The following protocol parameters have been introduced:
 
 * ``baking_reward_fixed_portion`` = 10 tez
-* ``baking_reward_bonus_per_slot`` = 0.004285 tez
+* ``baking_reward_bonus_per_slot`` = 0.004286 tez
 * ``endorsing_reward_per_slot`` = 0.002857 tez
 * ``delay_increment_per_round`` = 15
 * ``minimal_participation_ratio`` = 2/3
