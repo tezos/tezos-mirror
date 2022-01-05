@@ -29,21 +29,24 @@ open Test_tez
 
 let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
     ?expect_failure src dst amount =
-  fee +? amount >>?= fun amount_fee ->
-  Context.Contract.balance (I b) src >>=? fun bal_src ->
-  Context.Contract.balance (I b) dst >>=? fun bal_dst ->
-  Op.transaction
-    ~gas_limit:(Alpha_context.Gas.Arith.integral_of_int_exn 3000)
-    (I b)
-    ~fee
-    src
-    dst
-    amount
-  >>=? fun op ->
-  Incremental.add_operation ?expect_failure b op >>=? fun b ->
-  Context.get_constants (I b)
-  >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
+  let open Lwt_tzresult_syntax in
+  let*? amount_fee = fee +? amount in
+  let* bal_src = Context.Contract.balance (I b) src in
+  let* bal_dst = Context.Contract.balance (I b) dst in
+  let* op =
+    Op.transaction
+      ~gas_limit:(Alpha_context.Gas.Arith.integral_of_int_exn 3000)
+      (I b)
+      ~fee
+      src
+      dst
+      amount
+  in
+  let* b = Incremental.add_operation ?expect_failure b op in
+  let* {parametric = {origination_size; cost_per_byte; _}; _} =
+    Context.get_constants (I b)
+  in
+  let*? origination_burn = cost_per_byte *? Int64.of_int origination_size in
   let amount_fee_maybe_burn =
     if with_burn then
       match Tez.(amount_fee +? origination_burn) with
@@ -51,9 +54,10 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
       | Error _ -> assert false
     else amount_fee
   in
-  Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
-  >>=? fun () ->
-  Assert.balance_was_credited ~loc (I b) dst bal_dst amount >|=? fun () ->
+  let* () =
+    Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
+  in
+  let+ () = Assert.balance_was_credited ~loc (I b) dst bal_dst amount in
   (b, op)
 
 let n_transactions n b ?fee source dest amount =
