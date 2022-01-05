@@ -89,6 +89,9 @@ end
 module Blake2b : sig
   type t
 
+  (** This type could be unboxed. However, forward dependencies may
+     hash values of this type, and unboxing this type would give a
+     different hash, hence breaking the compatibility. *)
   type hash = Hash of Bytes.t
 
   (** [direct ?key inbuf len] is the Blake2b hash of length [len],
