@@ -68,6 +68,9 @@ module Protocol_constants_overrides = struct
     double_baking_punishment : Tez.t option;
     ratio_of_frozen_deposits_slashed_per_double_endorsement :
       Constants.ratio option;
+    cache_script_size : int option;
+    cache_stake_distribution_cycles : int option;
+    cache_sampler_state_cycles : int option;
     tx_rollup_enable : bool option;
     tx_rollup_origination_size : int option;
     sc_rollup_enable : bool option;
@@ -118,8 +121,12 @@ module Protocol_constants_overrides = struct
                   c.chain_id,
                   c.timestamp,
                   c.initial_seed ),
-                ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
-                  (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) ) ))
+                ( ( c.cache_script_size,
+                    c.cache_stake_distribution_cycles,
+                    c.cache_sampler_state_cycles ),
+                  ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
+                    (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) )
+          ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -155,8 +162,12 @@ module Protocol_constants_overrides = struct
                      chain_id,
                      timestamp,
                      initial_seed ),
-                   ( (tx_rollup_enable, tx_rollup_origination_size),
-                     (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) ) ->
+                   ( ( cache_script_size,
+                       cache_stake_distribution_cycles,
+                       cache_sampler_state_cycles ),
+                     ( (tx_rollup_enable, tx_rollup_origination_size),
+                       (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) )
+           ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -190,6 +201,9 @@ module Protocol_constants_overrides = struct
           consensus_threshold;
           double_baking_punishment;
           ratio_of_frozen_deposits_slashed_per_double_endorsement;
+          cache_script_size;
+          cache_stake_distribution_cycles;
+          cache_sampler_state_cycles;
           tx_rollup_enable;
           tx_rollup_origination_size;
           sc_rollup_enable;
@@ -246,12 +260,17 @@ module Protocol_constants_overrides = struct
                      (opt "initial_timestamp" Time.Protocol.encoding)
                      (opt "initial_seed" (option State_hash.encoding)))
                   (merge_objs
-                     (obj2
-                        (opt "tx_rollup_enable" Data_encoding.bool)
-                        (opt "tx_rollup_origination_size" int31))
-                     (obj2
-                        (opt "sc_rollup_enable" bool)
-                        (opt "sc_rollup_origination_size" int31)))))))
+                     (obj3
+                        (opt "cache_script_size" int31)
+                        (opt "cache_stake_distribution_cycles" int8)
+                        (opt "cache_sampler_state_cycles" int8))
+                     (merge_objs
+                        (obj2
+                           (opt "tx_rollup_enable" Data_encoding.bool)
+                           (opt "tx_rollup_origination_size" int31))
+                        (obj2
+                           (opt "sc_rollup_enable" bool)
+                           (opt "sc_rollup_origination_size" int31))))))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -310,6 +329,10 @@ module Protocol_constants_overrides = struct
         ratio_of_frozen_deposits_slashed_per_double_endorsement =
           Some
             parametric.ratio_of_frozen_deposits_slashed_per_double_endorsement;
+        cache_script_size = Some parametric.cache_script_size;
+        cache_stake_distribution_cycles =
+          Some parametric.cache_stake_distribution_cycles;
+        cache_sampler_state_cycles = Some parametric.cache_sampler_state_cycles;
         tx_rollup_enable = Some parametric.tx_rollup_enable;
         tx_rollup_origination_size = Some parametric.tx_rollup_origination_size;
         sc_rollup_enable = Some parametric.sc_rollup_enable;
@@ -356,6 +379,9 @@ module Protocol_constants_overrides = struct
       frozen_deposits_percentage = None;
       double_baking_punishment = None;
       ratio_of_frozen_deposits_slashed_per_double_endorsement = None;
+      cache_script_size = None;
+      cache_stake_distribution_cycles = None;
+      cache_sampler_state_cycles = None;
       tx_rollup_enable = None;
       tx_rollup_origination_size = None;
       sc_rollup_enable = None;
@@ -724,6 +750,16 @@ module Protocol_constants_overrides = struct
              o.ratio_of_frozen_deposits_slashed_per_double_endorsement;
          (* Notice that the chain_id and the timestamp are not used here
             as they are not protocol constants... *)
+         cache_script_size =
+           Option.value ~default:c.cache_script_size o.cache_script_size;
+         cache_stake_distribution_cycles =
+           Option.value
+             ~default:c.cache_stake_distribution_cycles
+             o.cache_stake_distribution_cycles;
+         cache_sampler_state_cycles =
+           Option.value
+             ~default:c.cache_sampler_state_cycles
+             o.cache_sampler_state_cycles;
          tx_rollup_enable =
            Option.value ~default:c.tx_rollup_enable o.tx_rollup_enable;
          tx_rollup_origination_size =

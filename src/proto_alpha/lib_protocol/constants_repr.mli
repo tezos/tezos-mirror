@@ -64,10 +64,6 @@ val max_micheline_bytes_limit : int
     in [Script_ir_translator]. *)
 val max_allowed_global_constant_depth : int
 
-(** Each protocol defines the number of subcaches and their respective
-    limit size using [cache_layout]. *)
-val cache_layout : int list
-
 val michelson_maximum_type_size : int
 
 type fixed
@@ -119,6 +115,12 @@ type parametric = {
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
   initial_seed : State_hash.t option;
+  cache_script_size : int;
+  (* in bytes *)
+  cache_stake_distribution_cycles : int;
+  (* in cycles *)
+  cache_sampler_state_cycles : int;
+  (* in cycles *)
   tx_rollup_enable : bool;
   tx_rollup_origination_size : int;
   sc_rollup_enable : bool;
@@ -185,3 +187,16 @@ module Proto_previous : sig
 
   val parametric_encoding : parametric Data_encoding.encoding
 end
+
+(** For each subcache, a size limit needs to be declared once. However,
+    depending how the protocol will be instantiated (sandboxed mode,
+    test network, ...) we may want to change this limit. For each
+    subcache, a parametric constant can be used to change the limit
+    (see {parametric}).
+
+    The number of subcaches and the limits for all those subcaches form 
+    together what is called the [cache_layout]. *)
+val cache_layout_size : int
+
+(** The [cache_layout] depends on parametric constants. *)
+val cache_layout : parametric -> int list

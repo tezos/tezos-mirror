@@ -46,18 +46,6 @@ let max_micheline_bytes_limit = 50_000
 
 let max_allowed_global_constant_depth = 10_000
 
-(* In this version of the protocol, there are the following subcaches:
-
-   * One for contract source code and storage. Its size has been
-   chosen not too exceed 100 000 000 bytes.
-
-   * One for the stake distribution for all cycles stored at any
-   moment (* preserved_cycles + max_slashing_period + 1 = 8 currently. *)
-
-   * One for the sampler state for all cycles stored at any moment (as above). *)
-
-let cache_layout = [100_000_000; 8 (* cycles *); 8 (* cycles *)]
-
 (* In previous versions of the protocol, this
    [michelson_maximum_type_size] limit was set to 1000 but
    the contract input types (pair <parameter_type> <storage_type>)
@@ -65,6 +53,10 @@ let cache_layout = [100_000_000; 8 (* cycles *); 8 (* cycles *)]
    <storage_type> where however checked hence it was possible to build
    types as big as 2001. *)
 let michelson_maximum_type_size = 2001
+
+(* This constant declares the number of subcaches used by the cache
+   mechanism (see {Context.Cache}). *)
+let cache_layout_size = 3
 
 type fixed = unit
 
@@ -84,17 +76,6 @@ let pp_ratio fmt {numerator; denominator} =
 
 let fixed_encoding =
   let open Data_encoding in
-  let uint62 =
-    let max_int_int64 = Int64.of_int max_int in
-    conv_with_guard
-      (fun int -> Int64.of_int int)
-      (fun int64 ->
-        if Compare.Int64.(int64 < 0L) then Error "Negative integer"
-        else if Compare.Int64.(int64 > max_int_int64) then
-          Error "Integer does not fit in 62 bits"
-        else ok @@ Int64.to_int int64)
-      int64
-  in
   conv
     (fun () ->
       ( proof_of_work_nonce_size,
@@ -105,7 +86,7 @@ let fixed_encoding =
         max_micheline_node_count,
         max_micheline_bytes_limit,
         max_allowed_global_constant_depth,
-        cache_layout,
+        cache_layout_size,
         michelson_maximum_type_size ))
     (fun ( _proof_of_work_nonce_size,
            _nonce_length,
@@ -115,7 +96,7 @@ let fixed_encoding =
            _max_micheline_node_count,
            _max_micheline_bytes_limit,
            _max_allowed_global_constant_depth,
-           _cache_layout,
+           _cache_layout_size,
            _michelson_maximum_type_size ) -> ())
     (obj10
        (req "proof_of_work_nonce_size" uint8)
@@ -126,7 +107,7 @@ let fixed_encoding =
        (req "max_micheline_node_count" int31)
        (req "max_micheline_bytes_limit" int31)
        (req "max_allowed_global_constants_depth" int31)
-       (req "cache_layout" (list uint62))
+       (req "cache_layout_size" uint8)
        (req "michelson_maximum_type_size" uint16))
 
 let fixed = ()
@@ -172,6 +153,11 @@ type parametric = {
   double_baking_punishment : Tez_repr.t;
   ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
   initial_seed : State_hash.t option;
+  (* If a new cache is added, please also modify the
+     [cache_layout_size] value. *)
+  cache_script_size : int;
+  cache_stake_distribution_cycles : int;
+  cache_sampler_state_cycles : int;
   tx_rollup_enable : bool;
   tx_rollup_origination_size : int;
   sc_rollup_enable : bool;
@@ -215,8 +201,12 @@ let parametric_encoding =
                 c.double_baking_punishment,
                 c.ratio_of_frozen_deposits_slashed_per_double_endorsement,
                 c.initial_seed ),
-              ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
-                (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) ) ))
+              ( ( c.cache_script_size,
+                  c.cache_stake_distribution_cycles,
+                  c.cache_sampler_state_cycles ),
+                ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
+                  (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) ) )
+      ))
     (fun ( ( preserved_cycles,
              blocks_per_cycle,
              blocks_per_commitment,
@@ -250,8 +240,11 @@ let parametric_encoding =
                    double_baking_punishment,
                    ratio_of_frozen_deposits_slashed_per_double_endorsement,
                    initial_seed ),
-                 ( (tx_rollup_enable, tx_rollup_origination_size),
-                   (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) ) ->
+                 ( ( cache_script_size,
+                     cache_stake_distribution_cycles,
+                     cache_sampler_state_cycles ),
+                   ( (tx_rollup_enable, tx_rollup_origination_size),
+                     (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) ) ) ->
       {
         preserved_cycles;
         blocks_per_cycle;
@@ -286,6 +279,9 @@ let parametric_encoding =
         double_baking_punishment;
         ratio_of_frozen_deposits_slashed_per_double_endorsement;
         initial_seed;
+        cache_script_size;
+        cache_stake_distribution_cycles;
+        cache_sampler_state_cycles;
         tx_rollup_enable;
         tx_rollup_origination_size;
         sc_rollup_enable;
@@ -339,12 +335,17 @@ let parametric_encoding =
                       ratio_encoding)
                    (opt "initial_seed" State_hash.encoding))
                 (merge_objs
-                   (obj2
-                      (req "tx_rollup_enable" bool)
-                      (req "tx_rollup_origination_size" int31))
-                   (obj2
-                      (req "sc_rollup_enable" bool)
-                      (req "sc_rollup_origination_size" int31)))))))
+                   (obj3
+                      (req "cache_script_size" int31)
+                      (req "cache_stake_distribution_cycles" int8)
+                      (req "cache_sampler_state_cycles" int8))
+                   (merge_objs
+                      (obj2
+                         (req "tx_rollup_enable" bool)
+                         (req "tx_rollup_origination_size" int31))
+                      (obj2
+                         (req "sc_rollup_enable" bool)
+                         (req "sc_rollup_origination_size" int31))))))))
 
 type t = {fixed : fixed; parametric : parametric}
 
@@ -630,3 +631,10 @@ module Proto_previous = struct
                (req "liquidity_baking_sunset_level" int32)
                (req "liquidity_baking_escape_ema_threshold" int32))))
 end
+
+let cache_layout p =
+  [
+    p.cache_script_size;
+    p.cache_stake_distribution_cycles;
+    p.cache_sampler_state_cycles;
+  ]

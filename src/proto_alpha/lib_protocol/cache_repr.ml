@@ -184,7 +184,7 @@ let register_exn (type cvalue)
     (module INTERFACE with type cached_value = cvalue) =
   if
     Compare.Int.(C.cache_index < 0)
-    || Compare.List_length_with.(Constants_repr.cache_layout <= C.cache_index)
+    || Compare.Int.(Constants_repr.cache_layout_size <= C.cache_index)
   then invalid_arg "Cache index is invalid" ;
   let mk = make_key ~cache_index:C.cache_index ~namespace:C.namespace in
   (module struct

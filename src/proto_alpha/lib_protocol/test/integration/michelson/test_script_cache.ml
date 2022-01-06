@@ -304,7 +304,9 @@ let test_size_adds_entries_sizes () =
    [test_size_limit] is the value found in [Constants_repr.cache_layout].
 
 *)
-let defined_size_limit = Stdlib.List.hd Constants_repr.cache_layout
+let defined_size_limit =
+  Tezos_protocol_alpha_parameters.Default_parameters.constants_mainnet
+    .cache_script_size
 
 let test_size_limit_is_in_constants_repr () =
   init () >>=? fun (block, _baker, _src, _) ->

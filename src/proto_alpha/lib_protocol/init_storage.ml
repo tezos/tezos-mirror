@@ -117,6 +117,12 @@ let migrate_nonces ctxt migration_cycle =
 let prepare_first_block ctxt ~typecheck ~level ~timestamp =
   Raw_context.prepare_first_block ~level ~timestamp ctxt
   >>=? fun (previous_protocol, ctxt) ->
+  let parametric = Raw_context.constants ctxt in
+  ( Raw_context.Cache.set_cache_layout
+      ctxt
+      (Constants_repr.cache_layout parametric)
+  >|= fun ctxt -> Raw_context.Cache.clear ctxt )
+  >>= fun ctxt ->
   let cycle = (Raw_context.current_level ctxt).cycle in
   (match previous_protocol with
   | Genesis param ->

@@ -767,6 +767,9 @@ module Constants : sig
     double_baking_punishment : Tez.t;
     ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
     initial_seed : State_hash.t option;
+    cache_script_size : int;
+    cache_stake_distribution_cycles : int;
+    cache_sampler_state_cycles : int;
     tx_rollup_enable : bool;
     tx_rollup_origination_size : int;
     sc_rollup_enable : bool;
@@ -977,11 +980,7 @@ module Cache : sig
 
     val pp : Format.formatter -> context -> unit
 
-    val set_cache_layout : context -> size list -> context Lwt.t
-
     val sync : context -> cache_nonce:Bytes.t -> context Lwt.t
-
-    val clear : context -> context
 
     val future_cache_expectation : context -> time_in_blocks:int -> context
 
