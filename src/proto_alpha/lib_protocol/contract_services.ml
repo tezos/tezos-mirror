@@ -105,7 +105,7 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Script.expr_encoding
       RPC_path.(
-        custom_root /: Contract.rpc_arg / "entrypoints" /: RPC_arg.string)
+        custom_root /: Contract.rpc_arg / "entrypoints" /: Entrypoint.rpc_arg)
 
   let list_entrypoints =
     RPC_service.get_service
@@ -402,9 +402,10 @@ let[@coq_axiom_with_reason "gadt"] register () =
             >|? fun (unreachable_entrypoint, map) ->
               Some
                 ( unreachable_entrypoint,
-                  Entrypoints_map.fold
+                  Entrypoint.Map.fold
                     (fun entry (_, ty) acc ->
-                      (entry, Micheline.strip_locations ty) :: acc)
+                      (Entrypoint.to_string entry, Micheline.strip_locations ty)
+                      :: acc)
                     map
                     [] ) )) ;
   opt_register1

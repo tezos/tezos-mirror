@@ -62,7 +62,7 @@ val transaction :
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?parameters:Script.lazy_expr ->
-  ?entrypoint:string ->
+  ?entrypoint:Entrypoint.t ->
   Context.t ->
   Contract.t ->
   Contract.t ->

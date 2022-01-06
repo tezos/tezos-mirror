@@ -220,7 +220,7 @@ let () =
     ~id:"michelson_v1.no_such_entrypoint"
     ~title:"No such entrypoint (type error)"
     ~description:"An entrypoint was not found when calling a contract."
-    (obj1 (req "entrypoint" string))
+    (obj1 (req "entrypoint" Entrypoint.simple_encoding))
     (function No_such_entrypoint entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> No_such_entrypoint entrypoint) ;
   (* Unreachable entrypoint *)
@@ -238,20 +238,9 @@ let () =
     ~id:"michelson_v1.duplicate_entrypoint"
     ~title:"Duplicate entrypoint (type error)"
     ~description:"Two entrypoints have the same name."
-    (obj1 (req "path" string))
+    (obj1 (req "path" Entrypoint.simple_encoding))
     (function Duplicate_entrypoint entrypoint -> Some entrypoint | _ -> None)
     (fun entrypoint -> Duplicate_entrypoint entrypoint) ;
-  (* Entrypoint name too long *)
-  register_error_kind
-    `Permanent
-    ~id:"michelson_v1.entrypoint_name_too_long"
-    ~title:"Entrypoint name too long (type error)"
-    ~description:
-      "An entrypoint name exceeds the maximum length of 31 characters."
-    (obj1 (req "name" string))
-    (function
-      | Entrypoint_name_too_long entrypoint -> Some entrypoint | _ -> None)
-    (fun entrypoint -> Entrypoint_name_too_long entrypoint) ;
   (* Unexpected contract *)
   register_error_kind
     `Permanent

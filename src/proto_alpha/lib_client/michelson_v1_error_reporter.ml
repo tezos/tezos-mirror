@@ -209,11 +209,19 @@ let report_errors ~details ~show_source ?parsed ppf errs =
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace (parsed_locations parsed) rest
     | Environment.Ecoproto_error (No_such_entrypoint entrypoint) :: rest ->
-        Format.fprintf ppf "Contract has no entrypoint named %s" entrypoint ;
+        Format.fprintf
+          ppf
+          "Contract has no entrypoint named %a"
+          Entrypoint.pp
+          entrypoint ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Duplicate_entrypoint entrypoint) :: rest ->
-        Format.fprintf ppf "Contract has two entrypoints named %s" entrypoint ;
+        Format.fprintf
+          ppf
+          "Contract has two entrypoints named %a"
+          Entrypoint.pp
+          entrypoint ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Unreachable_entrypoint path) :: rest ->

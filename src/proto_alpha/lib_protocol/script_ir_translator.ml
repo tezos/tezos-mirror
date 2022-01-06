@@ -468,26 +468,18 @@ let unparse_timestamp ~loc ctxt mode t =
       | Some s -> ok (String (loc, s), ctxt))
 
 let unparse_address ~loc ctxt mode (c, entrypoint) =
-  Gas.consume ctxt Unparse_costs.contract >>? fun ctxt ->
-  (match entrypoint with
-  (* given parse_address, this should not happen *)
-  | "" -> error Unparsing_invariant_violated
-  | _ -> ok ())
-  >|? fun () ->
+  Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
   match mode with
   | Optimized | Optimized_legacy ->
-      let entrypoint = match entrypoint with "default" -> "" | name -> name in
       let bytes =
         Data_encoding.Binary.to_bytes_exn
-          Data_encoding.(tup2 Contract.encoding Variable.string)
+          Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
           (c, entrypoint)
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       let notation =
-        match entrypoint with
-        | "default" -> Contract.to_b58check c
-        | entrypoint -> Contract.to_b58check c ^ "%" ^ entrypoint
+        Contract.to_b58check c ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
 
@@ -1936,19 +1928,16 @@ type 'before dup_n_proof_argument =
 let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty) ~root_name
     entrypoint : ((Script.node -> Script.node) * ex_ty, error_trace) result =
-  let annot_is_entrypoint entrypoint = function
-    | None -> false
-    | Some (Field_annot l) -> Compare.String.((l :> string) = entrypoint)
-  in
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
-      type t. t ty -> string -> ((Script.node -> Script.node) * ex_ty) option =
+      type t.
+      t ty -> Entrypoint.t -> ((Script.node -> Script.node) * ex_ty) option =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
-        if annot_is_entrypoint entrypoint al then
+        if field_annot_opt_eq_entrypoint_lax al entrypoint then
           Some ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
-        else if annot_is_entrypoint entrypoint ar then
+        else if field_annot_opt_eq_entrypoint_lax ar entrypoint then
           Some ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
         else
           match find_entrypoint tl entrypoint with
@@ -1960,52 +1949,38 @@ let find_entrypoint (type full error_trace)
               | None -> None))
     | _ -> None
   in
-  let entrypoint =
-    if Compare.String.(entrypoint = "") then "default" else entrypoint
-  in
-  if Compare.Int.(String.length entrypoint > 31) then
-    Error
-      (match error_details with
-      | Fast -> (Inconsistent_types_fast : error_trace)
-      | Informative -> trace_of_error @@ Entrypoint_name_too_long entrypoint)
+  if field_annot_opt_eq_entrypoint_lax root_name entrypoint then
+    ok ((fun e -> e), Ex_ty full)
   else
-    match root_name with
-    | Some (Field_annot root_name)
-      when Compare.String.(entrypoint = (root_name :> string)) ->
-        ok ((fun e -> e), Ex_ty full)
-    | _ -> (
-        match find_entrypoint full entrypoint with
-        | Some result -> ok result
-        | None -> (
-            match entrypoint with
-            | "default" -> ok ((fun e -> e), Ex_ty full)
-            | _ ->
-                Error
-                  (match error_details with
-                  | Fast -> (Inconsistent_types_fast : error_trace)
-                  | Informative ->
-                      trace_of_error @@ No_such_entrypoint entrypoint)))
+    match find_entrypoint full entrypoint with
+    | Some result -> ok result
+    | None ->
+        if Entrypoint.is_default entrypoint then ok ((fun e -> e), Ex_ty full)
+        else
+          Error
+            (match error_details with
+            | Fast -> (Inconsistent_types_fast : error_trace)
+            | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
 
 let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
-    (string * exp ty, error_trace) Gas_monad.t =
+    (Entrypoint.t * exp ty, error_trace) Gas_monad.t =
   let open Gas_monad in
   match find_entrypoint ~error_details full ~root_name entrypoint with
   | Error _ as err -> of_result err
   | Ok (_, Ex_ty ty) -> (
-      match (entrypoint, root_name) with
-      | ("default", Some (Field_annot fa))
-        when Compare.String.((fa :> string) = "root") -> (
+      match root_name with
+      | Some (Field_annot fa)
+        when Compare.String.((fa :> string) = "root")
+             && Entrypoint.is_default entrypoint -> (
           merge_types ~legacy ~error_details:Fast loc ty expected >??$ function
-          | Ok (Eq, ty) -> return ("default", (ty : exp ty))
+          | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
           | Error Inconsistent_types_fast ->
               merge_types ~legacy ~error_details loc full expected
-              >?$ fun (Eq, full) -> ok ("root", (full : exp ty)))
+              >?$ fun (Eq, full) -> ok (Entrypoint.root, (full : exp ty)))
       | _ ->
           merge_types ~legacy ~error_details loc ty expected >|$ fun (Eq, ty) ->
           (entrypoint, (ty : exp ty)))
-
-module Entrypoints = Set.Make (String)
 
 let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
@@ -2022,19 +1997,17 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
                 | None -> (Some (List.rev path), all)
                 | Some _ -> acc))
     | Some (Field_annot name) ->
-        let name = (name :> string) in
-        if Compare.Int.(String.length name > 31) then
-          error (Entrypoint_name_too_long name)
-        else if Entrypoints.mem name all then error (Duplicate_entrypoint name)
-        else ok (first_unreachable, Entrypoints.add name all)
+        Entrypoint.of_annot_lax name >>? fun name ->
+        if Entrypoint.Set.mem name all then error (Duplicate_entrypoint name)
+        else ok (first_unreachable, Entrypoint.Set.add name all)
   in
   let rec check :
       type t.
       t ty ->
       prim list ->
       bool ->
-      prim list option * Entrypoints.t ->
-      (prim list option * Entrypoints.t) tzresult =
+      prim list option * Entrypoint.Set.t ->
+      (prim list option * Entrypoint.Set.t) tzresult =
    fun t path reachable acc ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) ->
@@ -2055,11 +2028,14 @@ let well_formed_entrypoints (type full) (full : full ty) ~root_name =
   in
   let (init, reachable) =
     match root_name with
-    | None -> (Entrypoints.empty, false)
-    | Some (Field_annot name) -> (Entrypoints.singleton (name :> string), true)
+    | None -> (Entrypoint.Set.empty, false)
+    | Some (Field_annot name) -> (
+        match Entrypoint.of_annot_lax_opt name with
+        | None -> (Entrypoint.Set.empty, false)
+        | Some name -> (Entrypoint.Set.singleton name, true))
   in
   check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
-  if not (Entrypoints.mem "default" all) then Result.return_unit
+  if not (Entrypoint.Set.mem Entrypoint.default all) then Result.return_unit
   else
     match first_unreachable with
     | None -> Result.return_unit
@@ -2278,17 +2254,10 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       match
         Data_encoding.Binary.of_bytes_opt
-          Data_encoding.(tup2 Contract.encoding Variable.string)
+          Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
           bytes
       with
-      | Some (c, entrypoint) -> (
-          if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint_name_too_long entrypoint)
-          else
-            match entrypoint with
-            | "" -> ok ((c, "default"), ctxt)
-            | "default" -> error (Unexpected_annotation loc)
-            | name -> ok ((c, name), ctxt))
+      | Some addr -> Ok (addr, ctxt)
       | None ->
           error
           @@ Invalid_syntactic_constant
@@ -2296,16 +2265,12 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
   | String (loc, s) (* As unparsed with [Readable]. *) ->
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       (match String.index_opt s '%' with
-      | None -> ok (s, "default")
-      | Some pos -> (
+      | None -> ok (s, Entrypoint.default)
+      | Some pos ->
           let len = String.length s - pos - 1 in
           let name = String.sub s (pos + 1) len in
-          if Compare.Int.(len > 31) then error (Entrypoint_name_too_long name)
-          else
-            match (String.sub s 0 pos, name) with
-            | (addr, "") -> ok (addr, "default")
-            | (_, "default") -> error @@ Unexpected_annotation loc
-            | addr_and_name -> ok addr_and_name))
+          Entrypoint.of_string_strict ~loc name >|? fun entrypoint ->
+          (String.sub s 0 pos, entrypoint))
       >>? fun (addr, entrypoint) ->
       Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt)
   | expr ->
@@ -4788,15 +4753,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         annot
         ~default:(gen_access_annot addr_annot default_contract_annot)
       >>?= fun (annot, entrypoint) ->
-      (match entrypoint with
-      | None -> Ok "default"
-      | Some (Field_annot entrypoint) ->
-          let entrypoint = (entrypoint :> string) in
-          if Compare.String.(entrypoint = "default") then
-            error (Unexpected_annotation loc)
-          else if Compare.Int.(String.length entrypoint > 31) then
-            error (Entrypoint_name_too_long entrypoint)
-          else Ok entrypoint)
+      Script_ir_annot.field_annot_opt_to_entrypoint_strict ~loc entrypoint
       >>?= fun entrypoint ->
       let instr =
         {apply = (fun kinfo k -> IContract (kinfo, t, entrypoint, k))}
@@ -4992,12 +4949,10 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Lwt.return
         ( parse_entrypoint_annot loc annot ~default:default_self_annot
         >>? fun (annot, entrypoint) ->
-          let entrypoint =
-            Option.fold
-              ~some:(fun (Field_annot annot) -> (annot :> string))
-              ~none:"default"
-              entrypoint
-          in
+          (match entrypoint with
+          | None -> Ok Entrypoint.default
+          | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot)
+          >>? fun entrypoint ->
           let open Tc_context in
           match tc_context.callsite with
           | _ when is_in_lambda tc_context ->
@@ -5436,22 +5391,19 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
     Script.location ->
     arg ty ->
     Contract.t ->
-    entrypoint:string ->
+    entrypoint:Entrypoint.t ->
     (context * arg typed_contract) tzresult Lwt.t =
  fun ~stack_depth ~legacy ctxt loc arg contract ~entrypoint ->
   match Contract.is_implicit contract with
-  | Some _ -> (
-      match entrypoint with
-      | "default" ->
-          (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-          Lwt.return
-            ( ty_eq ~legacy:true ctxt loc arg (unit_t ~annot:None)
-            >|? fun (Eq, ctxt) ->
-              let contract : arg typed_contract =
-                (arg, (contract, entrypoint))
-              in
-              (ctxt, contract) )
-      | _ -> fail (No_such_entrypoint entrypoint))
+  | Some _ ->
+      if Entrypoint.is_default entrypoint then
+        (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+        Lwt.return
+          ( ty_eq ~legacy:true ctxt loc arg (unit_t ~annot:None)
+          >|? fun (Eq, ctxt) ->
+            let contract : arg typed_contract = (arg, (contract, entrypoint)) in
+            (ctxt, contract) )
+      else fail (No_such_entrypoint entrypoint)
   | None -> (
       (* Originated account *)
       trace (Invalid_contract (loc, contract))
@@ -5619,35 +5571,34 @@ let parse_contract_for_script :
     Script.location ->
     arg ty ->
     Contract.t ->
-    entrypoint:string ->
+    entrypoint:Entrypoint.t ->
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg contract ~entrypoint ->
   match Contract.is_implicit contract with
-  | Some _ -> (
-      match entrypoint with
-      | "default" ->
-          (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-          Lwt.return
-            ( Gas_monad.run ctxt
-            @@ merge_types
-                 ~legacy:true
-                 ~error_details:Fast
-                 loc
-                 arg
-                 (unit_t ~annot:None)
-            >|? fun (eq_ty, ctxt) ->
-              match eq_ty with
-              | Ok (Eq, _ty) ->
-                  let contract : arg typed_contract =
-                    (arg, (contract, entrypoint))
-                  in
-                  (ctxt, Some contract)
-              | Error Inconsistent_types_fast -> (ctxt, None) )
-      | _ ->
-          Lwt.return
-            ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
-              (* An implicit account on any other entrypoint is not a valid contract. *)
-              (ctxt, None) ))
+  | Some _ ->
+      if Entrypoint.is_default entrypoint then
+        (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+        Lwt.return
+          ( Gas_monad.run ctxt
+          @@ merge_types
+               ~legacy:true
+               ~error_details:Fast
+               loc
+               arg
+               (unit_t ~annot:None)
+          >|? fun (eq_ty, ctxt) ->
+            match eq_ty with
+            | Ok (Eq, _ty) ->
+                let contract : arg typed_contract =
+                  (arg, (contract, entrypoint))
+                in
+                (ctxt, Some contract)
+            | Error Inconsistent_types_fast -> (ctxt, None) )
+      else
+        Lwt.return
+          ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
+            (* An implicit account on any other entrypoint is not a valid contract. *)
+            (ctxt, None) )
   | None -> (
       (* Originated account *)
       trace (Invalid_contract (loc, contract))
@@ -5896,8 +5847,6 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
-module Entrypoints_map = Map.Make (String)
-
 let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   let merge path annot (type t) (ty : t ty) reachable
       ((unreachables, all) as acc) =
@@ -5910,17 +5859,17 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
           match ty with
           | Union_t _ -> acc
           | _ -> (List.rev path :: unreachables, all))
-    | Some (Field_annot name) ->
-        let name = (name :> string) in
-        if Compare.Int.(String.length name > 31) then
-          ok (List.rev path :: unreachables, all)
-        else if Entrypoints_map.mem name all then
-          ok (List.rev path :: unreachables, all)
-        else
-          unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
-          ok
-            ( unreachables,
-              Entrypoints_map.add name (List.rev path, unparsed_ty) all )
+    | Some (Field_annot name) -> (
+        match Entrypoint.of_annot_lax_opt name with
+        | None -> ok (List.rev path :: unreachables, all)
+        | Some name ->
+            if Entrypoint.Map.mem name all then
+              ok (List.rev path :: unreachables, all)
+            else
+              unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
+              ok
+                ( unreachables,
+                  Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
   in
   let rec fold_tree :
       type t.
@@ -5928,9 +5877,9 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
       prim list ->
       bool ->
       prim list list
-      * (prim list * Script.unlocated_michelson_node) Entrypoints_map.t ->
+      * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t ->
       (prim list list
-      * (prim list * Script.unlocated_michelson_node) Entrypoints_map.t)
+      * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t)
       tzresult =
    fun t path reachable acc ->
     match t with
@@ -5953,9 +5902,12 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
   unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
     match root_name with
-    | None -> (Entrypoints_map.empty, false)
-    | Some (Field_annot name) ->
-        (Entrypoints_map.singleton (name :> string) ([], unparsed_full), true)
+    | None -> (Entrypoint.Map.empty, false)
+    | Some (Field_annot name) -> (
+        match Entrypoint.of_annot_lax_opt name with
+        | None -> (Entrypoint.Map.empty, false)
+        | Some name -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
+        )
   in
   fold_tree full [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]
@@ -6038,7 +5990,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         ~stack_depth
         mode
         t
-        ((ticketer, "default"), (contents, amount))
+        ((ticketer, Entrypoint.default), (contents, amount))
   | (Set_t (t, _), set) ->
       List.fold_left_es
         (fun (l, ctxt) item ->

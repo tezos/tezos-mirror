@@ -449,6 +449,8 @@ module Gas : sig
   val cost_of_repr : Gas_limit_repr.cost -> cost
 end
 
+module Entrypoint : module type of Entrypoint_repr
+
 module Script_string : module type of Script_string_repr
 
 module Script_int : module type of Script_int_repr
@@ -2074,7 +2076,7 @@ and _ manager_operation =
   | Transaction : {
       amount : Tez.tez;
       parameters : Script.lazy_expr;
-      entrypoint : string;
+      entrypoint : Entrypoint.t;
       destination : Contract.contract;
     }
       -> Kind.transaction manager_operation

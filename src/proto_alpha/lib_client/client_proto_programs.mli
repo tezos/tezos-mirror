@@ -47,7 +47,7 @@ type simulation_params = {
 type run_view_params = {
   shared_params : simulation_params;
   contract : Contract.t;
-  entrypoint : string;
+  entrypoint : Entrypoint.t;
 }
 
 (* Parameters specific to simulations of contract calls *)
@@ -57,7 +57,7 @@ type run_params = {
   balance : Tez.t;
   program : Michelson_v1_parser.parsed;
   storage : Michelson_v1_parser.parsed;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
 }
 
 val run_view :
@@ -158,7 +158,7 @@ val entrypoint_type :
   chain:Shell_services.chain ->
   block:Shell_services.block ->
   Michelson_v1_parser.parsed ->
-  entrypoint:string ->
+  entrypoint:Entrypoint.t ->
   Script.expr option tzresult Lwt.t
 
 val print_entrypoint_type :
@@ -167,7 +167,7 @@ val print_entrypoint_type :
   ?script_name:string ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
-  entrypoint:string ->
+  entrypoint:Entrypoint.t ->
   Script_repr.expr option tzresult ->
   unit tzresult Lwt.t
 

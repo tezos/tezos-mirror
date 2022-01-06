@@ -43,9 +43,8 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         Contract.pp
         destination ;
-      (match entrypoint with
-      | "default" -> ()
-      | _ -> Format.fprintf ppf "@,Entrypoint: %s" entrypoint) ;
+      if not (Entrypoint.is_default entrypoint) then
+        Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;
       (if not (Script_repr.is_unit_parameter parameters) then
        let expr =
          WithExceptions.Option.to_exn

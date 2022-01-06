@@ -59,7 +59,7 @@ type error += Unsupported_feature_generic_call_ty of Script.expr
 type error += Unsupported_feature_lambda of string
 
 type error +=
-  | Ill_typed_argument of Contract.t * string * Script.expr * Script.expr
+  | Ill_typed_argument of Contract.t * Entrypoint.t * Script.expr * Script.expr
 
 type error += Ill_typed_lambda of Script.expr * Script.expr
 
@@ -307,8 +307,9 @@ let () =
     ~pp:(fun ppf (destination, entrypoint, parameter_ty, parameter) ->
       Format.fprintf
         ppf
-        "The entrypoint %s of contract %a called from a multisig contract is \
+        "The entrypoint %a of contract %a called from a multisig contract is \
          of type %a; the provided parameter %a is ill-typed."
+        Entrypoint.pp
         entrypoint
         Contract.pp
         destination
@@ -319,7 +320,7 @@ let () =
     Data_encoding.(
       obj4
         (req "destination" Contract.encoding)
-        (req "entrypoint" string)
+        (req "entrypoint" Entrypoint.simple_encoding)
         (req "parameter_ty" Script.expr_encoding)
         (req "parameter" Script.expr_encoding))
     (function
@@ -472,13 +473,15 @@ type multisig_contract_description = {
   (* The hash of the contract script *)
   requires_chain_id : bool;
   (* The signatures should contain the chain identifier *)
-  main_entrypoint : string option;
+  main_entrypoint : Entrypoint.t option;
   (* name of the main entrypoint of the multisig contract, None means use the default entrypoint *)
   generic : bool;
       (* False means that the contract uses a custom action type, true
                        means that the contract expects the action as a (lambda unit
                        (list operation)). *)
 }
+
+let entrypoint_main = Entrypoint.of_string_strict_exn "main"
 
 (* List of known multisig contracts hashes with their kinds *)
 let known_multisig_contracts : multisig_contract_description list =
@@ -491,7 +494,7 @@ let known_multisig_contracts : multisig_contract_description list =
          See docs/user/multisig.rst for more details. *)
       hash = multisig_script_hash;
       requires_chain_id = true;
-      main_entrypoint = Some "main";
+      main_entrypoint = Some entrypoint_main;
       generic = true;
     };
     {
@@ -582,12 +585,12 @@ let optimized_key_hash ~loc (key_hash : Signature.Public_key_hash.t) =
        Signature.Public_key_hash.encoding
        key_hash)
 
-let optimized_address ~loc ~(address : Contract.t) ~(entrypoint : string) =
-  let entrypoint = match entrypoint with "default" -> "" | name -> name in
+let optimized_address ~loc ~(address : Contract.t) ~(entrypoint : Entrypoint.t)
+    =
   bytes
     ~loc
     (Data_encoding.Binary.to_bytes_exn
-       Data_encoding.(tup2 Contract.encoding Variable.string)
+       Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
        (address, entrypoint))
 
 let optimized_key ~loc (key : Signature.Public_key.t) =
@@ -601,7 +604,7 @@ type multisig_action =
   | Transfer of {
       amount : Tez.t;
       destination : Contract.t;
-      entrypoint : string;
+      entrypoint : Entrypoint.t;
       parameter_type : Script.expr;
       parameter : Script.expr;
     }
@@ -737,7 +740,7 @@ let action_of_expr_not_generic e =
                  amount;
                  destination =
                    Data_encoding.Binary.of_bytes_exn Contract.encoding s;
-                 entrypoint = "default";
+                 entrypoint = Entrypoint.default;
                  parameter_type =
                    Tezos_micheline.Micheline.strip_locations @@ unit_t ~loc:();
                  parameter =
@@ -953,7 +956,7 @@ type multisig_prepared_action = {
   threshold : Z.t;
   keys : public_key list;
   counter : Z.t;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
   generic : bool;
 }
 

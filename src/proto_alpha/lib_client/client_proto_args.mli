@@ -30,6 +30,8 @@ open Protocol_client_context
 
 val tez_sym : string
 
+val entrypoint_parameter : (Entrypoint.t, full) Clic.parameter
+
 val init_arg : (string, full) Clic.arg
 
 val fee_arg : (Tez.t option, full) Clic.arg
@@ -54,9 +56,9 @@ val default_arg_arg : (string option, full) Clic.arg
 
 val source_arg : (string option, full) Clic.arg
 
-val entrypoint_arg : (string option, full) Clic.arg
+val entrypoint_arg : (Entrypoint.t option, full) Clic.arg
 
-val default_entrypoint_arg : (string option, full) Clic.arg
+val default_entrypoint_arg : (Entrypoint.t option, full) Clic.arg
 
 val delegate_arg : (Signature.Public_key_hash.t option, full) Clic.arg
 

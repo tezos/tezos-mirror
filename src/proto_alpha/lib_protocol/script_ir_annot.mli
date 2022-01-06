@@ -111,6 +111,18 @@ val type_to_var_annot : type_annot option -> var_annot option
 
 val var_to_field_annot : var_annot option -> field_annot option
 
+(** Converts a field annot option to an entrypoint.
+    An error is returned if the field annot is too long or is "default".
+    [None] is converted to [Some default].
+*)
+val field_annot_opt_to_entrypoint_strict :
+  loc:Script.location -> field_annot option -> Entrypoint.t tzresult
+
+(** Checks whether a field annot option equals an entrypoint.
+    When the field annot option is [None], the result is always [false]. *)
+val field_annot_opt_eq_entrypoint_lax :
+  field_annot option -> Entrypoint.t -> bool
+
 (** Replace an annotation by its default value if it is [None] *)
 val default_annot : default:'a option -> 'a option -> 'a option
 

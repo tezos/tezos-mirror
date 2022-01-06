@@ -330,7 +330,10 @@ let commands_ro () =
       ~desc:"Get the type of an entrypoint of a contract."
       no_options
       (prefixes ["get"; "contract"; "entrypoint"; "type"; "of"]
-      @@ Clic.string ~name:"entrypoint" ~desc:"the entrypoint to describe"
+      @@ Clic.param
+           ~name:"entrypoint"
+           ~desc:"the entrypoint to describe"
+           entrypoint_parameter
       @@ prefixes ["for"]
       @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
       @@ stop)

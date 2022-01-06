@@ -95,10 +95,16 @@ let build_lambda_for_set_delegate ~delegate =
         delegate
   | None -> "{ DROP ; NIL operation ; NONE key_hash ; SET_DELEGATE ; CONS }"
 
+let entrypoint_do = Entrypoint.do_
+
+let entrypoint_set_delegate = Entrypoint.set_delegate
+
+let entrypoint_remove_delegate = Entrypoint.remove_delegate
+
 let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
     contract (* the KT1 to delegate *)
     (delegate : Signature.public_key_hash option) =
-  let entrypoint = "do" in
+  let entrypoint = entrypoint_do in
   (Michelson_v1_entrypoints.contract_entrypoint_type
      cctxt
      ~chain
@@ -114,8 +120,8 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
        (*  their is no "do" entrypoint trying "set/remove_delegate" *)
        let entrypoint =
          match delegate with
-         | Some _ -> "set_delegate"
-         | None -> "remove_delegate"
+         | Some _ -> entrypoint_set_delegate
+         | None -> entrypoint_remove_delegate
        in
        Michelson_v1_entrypoints.contract_entrypoint_type
          cctxt
@@ -195,7 +201,7 @@ let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
   in
   let amount = Tez.to_mutez amount in
   let (`Hex destination) = Hex.of_bytes destination in
-  let entrypoint = match entrypoint with "default" -> "" | s -> "%" ^ s in
+  let entrypoint = Entrypoint.to_address_suffix entrypoint in
   if parameter_type = t_unit then
     Format.asprintf
       "{ DROP ; NIL operation ;PUSH address 0x%s; CONTRACT %s %a; \
@@ -220,15 +226,16 @@ let build_lambda_for_transfer_to_originated ~destination ~entrypoint ~amount
       parameter
 
 let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
-    ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ~destination ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee ?gas_limit
     ?storage_limit () =
   (match Alpha_context.Contract.is_implicit destination with
-  | Some destination when entrypoint = "default" ->
+  | Some destination when Entrypoint.is_default entrypoint ->
       return @@ build_lambda_for_transfer_to_implicit ~destination ~amount
   | Some _ ->
       cctxt#error
-        "Implicit accounts have no entrypoints. (targeted entrypoint %%%s on \
+        "Implicit accounts have no entrypoints. (targeted entrypoint %%%a on \
          contract %a)"
+        Entrypoint.pp
         entrypoint
         Contract.pp
         destination
@@ -242,9 +249,10 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
        >>=? function
        | None ->
            cctxt#error
-             "Contract %a has no entrypoint named %s"
+             "Contract %a has no entrypoint named %a"
              Contract.pp
              destination
+             Entrypoint.pp
              entrypoint
        | Some parameter_type -> return parameter_type)
       >>=? fun parameter_type ->
@@ -265,7 +273,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
            ~parameter)
   >>=? fun lambda ->
   parse lambda >>=? fun parameters ->
-  let entrypoint = "do" in
+  let entrypoint = entrypoint_do in
   return
     (Client_proto_context.build_transaction_operation
        ~amount:Tez.zero
@@ -278,7 +286,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~contract
-    ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ~destination ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee ?gas_limit
     ?storage_limit ?counter ~fee_parameter () :
     (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
     Lwt.t =

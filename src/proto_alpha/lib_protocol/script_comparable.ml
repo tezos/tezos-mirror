@@ -29,7 +29,7 @@ open Script_typed_ir
 
 let compare_address (x, ex) (y, ey) =
   let lres = Contract.compare x y in
-  if Compare.Int.(lres = 0) then Compare.String.compare ex ey else lres
+  if Compare.Int.(lres = 0) then Entrypoint.compare ex ey else lres
 
 type compare_comparable_cont =
   | Compare_comparable :

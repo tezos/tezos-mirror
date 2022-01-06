@@ -389,7 +389,7 @@ let manager_op_of_transfer parameters
       @@ Micheline.strip_locations
            (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
     in
-    let entrypoint = "default" in
+    let entrypoint = Entrypoint.default in
     let destination = Contract.implicit_contract dst in
     Transaction {amount; parameters; entrypoint; destination}
   in

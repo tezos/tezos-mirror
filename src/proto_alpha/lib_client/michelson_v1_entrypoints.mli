@@ -31,7 +31,7 @@ val script_entrypoint_type :
   chain:Chain_services.chain ->
   block:Block_services.block ->
   Alpha_context.Script.expr ->
-  entrypoint:string ->
+  entrypoint:Alpha_context.Entrypoint.t ->
   Alpha_context.Script.expr option tzresult Lwt.t
 
 (** Returns [Some type] if the script has an entrypoint of type [type]. None if it does not exists.  *)
@@ -40,7 +40,7 @@ val contract_entrypoint_type :
   chain:Chain_services.chain ->
   block:Block_services.block ->
   contract:Alpha_context.Contract.t ->
-  entrypoint:string ->
+  entrypoint:Alpha_context.Entrypoint.t ->
   Alpha_context.Script.expr option tzresult Lwt.t
 
 val print_entrypoint_type :
@@ -49,7 +49,7 @@ val print_entrypoint_type :
   emacs:bool ->
   ?contract:Alpha_context.Contract.t ->
   ?script_name:string ->
-  entrypoint:string ->
+  entrypoint:Alpha_context.Entrypoint.t ->
   Alpha_context.Script.expr option tzresult ->
   unit tzresult Lwt.t
 

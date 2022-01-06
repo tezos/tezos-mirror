@@ -490,7 +490,7 @@ end)
       if Base_samplers.uniform_bool rng_state then
         ( Alpha_context.Contract.implicit_contract
             (Crypto_samplers.pkh rng_state),
-          "default" )
+          Alpha_context.Entrypoint.default )
       else
         (* For a description of the format, see
            tezos-codec describe alpha.contract binary encoding *)
@@ -502,7 +502,10 @@ end)
             Alpha_context.Contract.encoding
             string
         in
-        let ep = Base_samplers.string ~size:{min = 1; max = 31} rng_state in
+        let ep =
+          Alpha_context.Entrypoint.of_string_strict_exn
+          @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
+        in
         (contract, ep)
 
     let chain_id rng_state =

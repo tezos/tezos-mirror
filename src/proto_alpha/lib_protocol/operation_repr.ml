@@ -240,7 +240,7 @@ and _ manager_operation =
   | Transaction : {
       amount : Tez_repr.tez;
       parameters : Script_repr.lazy_expr;
-      entrypoint : string;
+      entrypoint : Entrypoint_repr.t;
       destination : Contract_repr.contract;
     }
       -> Kind.transaction manager_operation
@@ -376,35 +376,6 @@ module Encoding = struct
           inj = (fun pkh -> Reveal pkh);
         }
 
-    let entrypoint_encoding =
-      def
-        ~title:"entrypoint"
-        ~description:"Named entrypoint to a Michelson smart contract"
-        "entrypoint"
-      @@
-      let builtin_case tag name =
-        Data_encoding.case
-          (Tag tag)
-          ~title:name
-          (constant name)
-          (fun n -> if Compare.String.(n = name) then Some () else None)
-          (fun () -> name)
-      in
-      union
-        [
-          builtin_case 0 "default";
-          builtin_case 1 "root";
-          builtin_case 2 "do";
-          builtin_case 3 "set_delegate";
-          builtin_case 4 "remove_delegate";
-          Data_encoding.case
-            (Tag 255)
-            ~title:"named"
-            (Bounded.string 31)
-            (fun s -> Some s)
-            (fun s -> s);
-        ]
-
     let[@coq_axiom_with_reason "gadt"] transaction_case =
       MCase
         {
@@ -417,7 +388,7 @@ module Encoding = struct
               (opt
                  "parameters"
                  (obj2
-                    (req "entrypoint" entrypoint_encoding)
+                    (req "entrypoint" Entrypoint_repr.smart_encoding)
                     (req "value" Script_repr.lazy_expr_encoding)));
           select =
             (function Manager (Transaction _ as op) -> Some op | _ -> None);
@@ -427,7 +398,7 @@ module Encoding = struct
                 let parameters =
                   if
                     Script_repr.is_unit_parameter parameters
-                    && Compare.String.(entrypoint = "default")
+                    && Entrypoint_repr.is_default entrypoint
                   then None
                   else Some (entrypoint, parameters)
                 in
@@ -436,7 +407,7 @@ module Encoding = struct
             (fun (amount, destination, parameters) ->
               let (entrypoint, parameters) =
                 match parameters with
-                | None -> ("default", Script_repr.unit_parameter)
+                | None -> (Entrypoint_repr.default, Script_repr.unit_parameter)
                 | Some (entrypoint, value) -> (entrypoint, value)
               in
               Transaction {amount; destination; parameters; entrypoint});
@@ -1179,7 +1150,7 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
       ret_adding
         (script_lazy_expr_size parameters)
         (h4w +! int64_size
-        +! string_size_gen (String.length entrypoint)
+        +! Entrypoint_repr.in_memory_size entrypoint
         +! Contract_repr.in_memory_size destination)
   | Origination {delegate; script; credit = _; preorigination} ->
       ret_adding

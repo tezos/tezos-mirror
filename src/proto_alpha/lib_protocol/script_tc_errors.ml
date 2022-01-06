@@ -62,13 +62,11 @@ type error += Unexpected_operation of Script.location
 
 type error += Unexpected_contract of Script.location
 
-type error += No_such_entrypoint of string
+type error += No_such_entrypoint of Entrypoint.t
 
-type error += Duplicate_entrypoint of string
+type error += Duplicate_entrypoint of Entrypoint.t
 
 type error += Unreachable_entrypoint of prim list
-
-type error += Entrypoint_name_too_long of string
 
 (* Instruction typing errors *)
 type error += Fail_not_in_tail_position of Script.location
@@ -199,9 +197,6 @@ type error += Unexpected_ticket of Script.location
 type error += Unexpected_forged_value of Script.location
 
 type error += Non_dupable_type of Script.location * Script.expr
-
-(* Impossible errors *)
-type error += Unparsing_invariant_violated
 
 (* Merge type errors *)
 

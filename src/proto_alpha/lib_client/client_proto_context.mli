@@ -193,7 +193,7 @@ val parse_arg_transfer : string option -> Script.lazy_expr tzresult Lwt.t
 val build_transaction_operation :
   amount:Tez.t ->
   parameters:Script.lazy_expr ->
-  ?entrypoint:string ->
+  ?entrypoint:Entrypoint.t ->
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
@@ -213,7 +213,7 @@ val transfer :
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
   destination:Contract.t ->
-  ?entrypoint:string ->
+  ?entrypoint:Entrypoint.t ->
   ?arg:string ->
   amount:Tez.t ->
   ?fee:Tez.t ->
@@ -267,7 +267,7 @@ type batch_transfer_operation = {
   storage_limit : Z.t option;
   amount : string;
   arg : string option;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
 }
 
 val batch_transfer_operation_encoding : batch_transfer_operation Data_encoding.t

@@ -912,13 +912,13 @@ module View_helpers = struct
   type Environment.Error_monad.error += View_callback_origination_failed
 
   type Environment.Error_monad.error +=
-    | Illformed_view_type of string * Script.expr
+    | Illformed_view_type of Entrypoint.t * Script.expr
 
   type Environment.Error_monad.error +=
-    | View_never_returns of string * Contract.t
+    | View_never_returns of Entrypoint.t * Contract.t
 
   type Environment.Error_monad.error +=
-    | View_unexpected_return of string * Contract.t
+    | View_unexpected_return of Entrypoint.t * Contract.t
 
   let () =
     Environment.Error_monad.register_error_kind
@@ -949,15 +949,18 @@ module View_helpers = struct
       ~pp:(fun ppf (entrypoint, typ) ->
         Format.fprintf
           ppf
-          "The view %s has type %a, it is not compatible with a TZIP-4 view \
+          "The view %a has type %a, it is not compatible with a TZIP-4 view \
            type."
+          Entrypoint.pp
           entrypoint
           Micheline_printer.print_expr
           (Micheline_printer.printable
              (fun x -> x)
              (Michelson_v1_primitives.strings_of_prims typ)))
       Data_encoding.(
-        obj2 (req "entrypoint" string) (req "type" Script.expr_encoding))
+        obj2
+          (req "entrypoint" Entrypoint.simple_encoding)
+          (req "type" Script.expr_encoding))
       (function Illformed_view_type (etp, exp) -> Some (etp, exp) | _ -> None)
       (fun (etp, exp) -> Illformed_view_type (etp, exp)) ;
     Environment.Error_monad.register_error_kind
@@ -970,13 +973,16 @@ module View_helpers = struct
       ~pp:(fun ppf (entrypoint, callback) ->
         Format.fprintf
           ppf
-          "The view %s never initiated a transaction to the given callback \
+          "The view %a never initiated a transaction to the given callback \
            contract %a."
+          Entrypoint.pp
           entrypoint
           Contract.pp
           callback)
       Data_encoding.(
-        obj2 (req "entrypoint" string) (req "callback" Contract.encoding))
+        obj2
+          (req "entrypoint" Entrypoint.simple_encoding)
+          (req "callback" Contract.encoding))
       (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
       (fun (e, c) -> View_never_returns (e, c)) ;
     Environment.Error_monad.register_error_kind
@@ -989,14 +995,17 @@ module View_helpers = struct
       ~pp:(fun ppf (entrypoint, callback) ->
         Format.fprintf
           ppf
-          "The view %s initiated a list of operations while the TZIP-4 \
+          "The view %a initiated a list of operations while the TZIP-4 \
            standard expects only a transaction to the given callback contract \
            %a."
+          Entrypoint.pp
           entrypoint
           Contract.pp
           callback)
       Data_encoding.(
-        obj2 (req "entrypoint" string) (req "callback" Contract.encoding))
+        obj2
+          (req "entrypoint" Entrypoint.simple_encoding)
+          (req "callback" Contract.encoding))
       (function View_never_returns (e, c) -> Some (e, c) | _ -> None)
       (fun (e, c) -> View_never_returns (e, c))
 
@@ -1187,7 +1196,7 @@ module RPC = struct
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
              (opt "gas" Gas.Arith.z_integral_encoding)
-             (dft "entrypoint" string "default"))
+             (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
           (obj3
              (opt "unparsing_mode" unparsing_mode_encoding)
              (opt "now" Script_timestamp.encoding)
@@ -1245,7 +1254,7 @@ module RPC = struct
         let open Data_encoding in
         obj10
           (req "contract" Contract.encoding)
-          (req "entrypoint" string)
+          (req "entrypoint" Entrypoint.simple_encoding)
           (req "input" Script.expr_encoding)
           (req "chain_id" Chain_id.encoding)
           (opt "source" Contract.encoding)
@@ -1406,7 +1415,7 @@ module RPC = struct
           ~input:
             (obj2
                (req "script" Script.expr_encoding)
-               (dft "entrypoint" string "default"))
+               (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
           ~output:(obj1 (req "entrypoint_type" Script.expr_encoding))
           RPC_path.(path / "entrypoint")
 
@@ -2170,15 +2179,16 @@ module RPC = struct
               Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
               >|? fun (unreachable_entrypoint, map) ->
               ( unreachable_entrypoint,
-                Entrypoints_map.fold
+                Entrypoint.Map.fold
                   (fun entry (_, ty) acc ->
-                    (entry, Micheline.strip_locations ty) :: acc)
+                    (Entrypoint.to_string entry, Micheline.strip_locations ty)
+                    :: acc)
                   map
                   [] ) ))
 
-    let run_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script ~storage
-        ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level ctxt block
-        =
+    let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ~script
+        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
+        ctxt block =
       RPC_context.make_call0
         S.run_code
         ctxt
@@ -2196,9 +2206,9 @@ module RPC = struct
             entrypoint ),
           (unparsing_mode, now, level) )
 
-    let trace_code ?unparsing_mode ?gas ?(entrypoint = "default") ~script
-        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
-        ctxt block =
+    let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
+        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now
+        ~level ctxt block =
       RPC_context.make_call0
         S.trace_code
         ctxt
@@ -2574,7 +2584,7 @@ module RPC = struct
           []
 
       let transaction ctxt block ~branch ~source ?sourcePubKey ~counter ~amount
-          ~destination ?(entrypoint = "default") ?parameters ~gas_limit
+          ~destination ?(entrypoint = Entrypoint.default) ?parameters ~gas_limit
           ~storage_limit ~fee () =
         let parameters =
           Option.fold

@@ -156,9 +156,10 @@ let get_parameter_type (cctxt : #Protocol_client_context.full) ~destination
       >>=? function
       | None ->
           cctxt#error
-            "Contract %a has no entrypoint named %s"
+            "Contract %a has no entrypoint named %a"
             Contract.pp
             destination
+            Entrypoint.pp
             entrypoint
       | Some parameter_type -> return parameter_type)
 
@@ -332,7 +333,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, destination)
              sk
              (cctxt : #Protocol_client_context.full) ->
-          let entrypoint = Option.value ~default:"default" entrypoint in
+          let entrypoint =
+            Option.value ~default:Entrypoint.default entrypoint
+          in
           let parameter = Option.value ~default:"Unit" parameter in
           Lwt.return @@ Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression parameter
@@ -514,7 +517,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              (_, source)
              signatures
              (cctxt : #Protocol_client_context.full) ->
-          let entrypoint = Option.value ~default:"default" entrypoint in
+          let entrypoint =
+            Option.value ~default:Entrypoint.default entrypoint
+          in
           let parameter = Option.value ~default:"Unit" parameter in
           Lwt.return @@ Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression parameter
@@ -1000,7 +1005,9 @@ let commands_rw () : #Protocol_client_context.full Clic.command list =
              amount
              (_, destination)
              (cctxt : #Protocol_client_context.full) ->
-          let entrypoint = Option.value ~default:"default" entrypoint in
+          let entrypoint =
+            Option.value ~default:Entrypoint.default entrypoint
+          in
           let parameter = Option.value ~default:"Unit" parameter in
           Lwt.return @@ Micheline_parser.no_parsing_error
           @@ Michelson_v1_parser.parse_expression parameter

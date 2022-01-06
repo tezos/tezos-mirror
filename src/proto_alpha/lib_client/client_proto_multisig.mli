@@ -36,7 +36,7 @@ type multisig_action =
   | Transfer of {
       amount : Tez.t;
       destination : Contract.t;
-      entrypoint : string;
+      entrypoint : Entrypoint.t;
       parameter_type : Script.expr;
       parameter : Script.expr;
     }
@@ -57,7 +57,7 @@ type multisig_prepared_action = {
   (* Information needed to execute the action ones enough signatures have been
      gathered. *)
   counter : Z.t;
-  entrypoint : string option;
+  entrypoint : Entrypoint.t option;
   generic : bool;
 }
 

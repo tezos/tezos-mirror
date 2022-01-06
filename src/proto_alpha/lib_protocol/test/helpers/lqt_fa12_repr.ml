@@ -69,9 +69,9 @@ module Parameter = struct
     | Approve p -> Format.asprintf "Approve %s" (approve_to_string p)
     | MintOrBurn p -> Format.asprintf "MintOrBurn %s" (mint_or_burn_to_string p)
 
-  let entrypoint_of_parameter : t -> string = function
-    | Approve _ -> "approve"
-    | MintOrBurn _ -> "mintOrBurn"
+  let entrypoint_of_parameter : t -> Entrypoint.t = function
+    | Approve _ -> Entrypoint.of_string_strict_exn "approve"
+    | MintOrBurn _ -> Entrypoint.of_string_strict_exn "mintOrBurn"
 
   let pp fmt s = Format.fprintf fmt "%s" (to_string s)
 
