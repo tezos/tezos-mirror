@@ -1817,6 +1817,7 @@ let tezos_shell =
       [
         lwt_watcher;
         lwt_canceler;
+        prometheus;
         tezos_base |> open_ ~m:"TzPervasives" |> open_;
         tezos_base_unix |> open_;
         tezos_context |> open_;
