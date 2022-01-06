@@ -1,5 +1,5 @@
-(test
- (name test_consensus_filter)
+(tests
+ (names test_consensus_filter test_filter_state)
  (package tezos-protocol-plugin-012-Psithaca)
  (libraries tezos-base
             alcotest-lwt
