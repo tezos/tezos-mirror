@@ -41,11 +41,6 @@ let print_expr_unwrapped ppf expr =
   |> Micheline.inject_locations (fun _ -> anon)
   |> print_expr_unwrapped ppf
 
-let print_var_annots ppf = List.iter (Format.fprintf ppf "%s ")
-
-let print_annot_expr_unwrapped ppf (expr, annot) =
-  Format.fprintf ppf "%a%a" print_var_annots annot print_expr_unwrapped expr
-
 let print_stack ppf = function
   | [] -> Format.fprintf ppf "[]"
   | more ->
@@ -54,7 +49,7 @@ let print_stack ppf = function
         "@[<hov 0>[ %a ]@]"
         (Format.pp_print_list
            ~pp_sep:(fun ppf () -> Format.fprintf ppf "@ : ")
-           print_annot_expr_unwrapped)
+           print_expr_unwrapped)
         more
 
 let print_execution_trace ppf trace =

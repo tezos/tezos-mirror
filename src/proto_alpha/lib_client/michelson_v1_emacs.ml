@@ -57,10 +57,7 @@ let print_expr ppf expr =
   let root = root (Michelson_v1_primitives.strings_of_prims expr) in
   Format.fprintf ppf "@[<h>%a@]" print_expr root
 
-let print_var_annots ppf = List.iter (Format.fprintf ppf "%s ")
-
-let print_annot_expr ppf (expr, annot) =
-  Format.fprintf ppf "(%a%a)" print_var_annots annot print_expr expr
+let print_annot_expr ppf expr = Format.fprintf ppf "(%a)" print_expr expr
 
 open Micheline_parser
 open Script_tc_errors
