@@ -101,7 +101,7 @@ if [ -n "$dev" ]; then
     # Note: ocaml-lsp-server.1.6.0 dependencies are not constrained
     # enough (for [ppx_yojson_conv_lib] in particular), so we add a
     # minimal bound to ensure it won’t be picked by opam.
-    opam install --yes merlin odoc utop ocp-indent "ocaml-lsp-server>=1.6.1" --criteria="-changed,-removed"
+    opam install --yes merlin odoc utop ocp-indent "ocaml-lsp-server>=1.6.1" js_of_ocaml-compiler --criteria="-changed,-removed"
 fi
 
 "$script_dir"/install_sapling_parameters.sh
