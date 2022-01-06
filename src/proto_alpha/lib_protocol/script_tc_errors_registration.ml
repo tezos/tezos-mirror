@@ -30,7 +30,14 @@ open Script_tc_errors
 (* Helpers for encoding *)
 let type_map_enc =
   let open Data_encoding in
-  let stack_enc = list (tup2 Script.expr_encoding (list string)) in
+  (* TODO? simplify this encoding *)
+  let stack_enc =
+    list
+      (conv
+         (fun ty -> (ty, []))
+         (fun (ty, _annots) -> ty)
+         (tup2 Script.expr_encoding (list string)))
+  in
   list
     (conv
        (fun (loc, (bef, aft)) -> (loc, bef, aft))
@@ -42,7 +49,12 @@ let type_map_enc =
 
 let stack_ty_enc =
   let open Data_encoding in
-  list (obj2 (req "type" Script.expr_encoding) (dft "annots" (list string) []))
+  (* TODO? simplify this encoding *)
+  list
+    (conv
+       (fun ty -> (ty, []))
+       (fun (ty, _annots) -> ty)
+       (obj2 (req "type" Script.expr_encoding) (dft "annots" (list string) [])))
 
 (* main registration *)
 let () =

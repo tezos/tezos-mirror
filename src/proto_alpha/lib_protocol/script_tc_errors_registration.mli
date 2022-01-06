@@ -28,7 +28,6 @@ open Alpha_context
 open Script
 
 val type_map_enc :
-  (location * ((expr * string list) list * (expr * string list) list)) list
-  Data_encoding.encoding
+  (location * (expr list * expr list)) list Data_encoding.encoding
 
-val stack_ty_enc : (expr * string list) list Data_encoding.encoding
+val stack_ty_enc : expr list Data_encoding.encoding

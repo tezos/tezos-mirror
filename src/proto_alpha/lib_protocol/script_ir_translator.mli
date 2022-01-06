@@ -148,10 +148,7 @@ type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 (** {2 High-level Michelson Data Types} *)
 type type_logger =
-  Script.location ->
-  (Script.expr * Script.annot) list ->
-  (Script.expr * Script.annot) list ->
-  unit
+  Script.location -> Script.expr list -> Script.expr list -> unit
 
 (** Create an empty big_map *)
 val empty_big_map :

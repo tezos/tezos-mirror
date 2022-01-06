@@ -99,10 +99,7 @@ type tc_context = Tc_context.t
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type type_logger =
-  Script.location ->
-  (Script.expr * Script.annot) list ->
-  (Script.expr * Script.annot) list ->
-  unit
+  Script.location -> Script.expr list -> Script.expr list -> unit
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -397,12 +394,12 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
       error (Comparable_type_expected (loc, t))
 
 let rec unparse_stack_uncarbonated :
-    type a s. (a, s) stack_ty -> (Script.expr * Script.annot) list = function
+    type a s. (a, s) stack_ty -> Script.expr list = function
   | Bot_t -> []
   | Item_t (ty, rest) ->
       let uty = unparse_ty_uncarbonated ~loc:() ty in
       let urest = unparse_stack_uncarbonated rest in
-      (strip_locations uty, []) :: urest
+      strip_locations uty :: urest
 
 let serialize_stack_for_error ctxt stack_ty =
   match Gas.level ctxt with
