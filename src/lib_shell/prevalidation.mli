@@ -123,6 +123,10 @@ module Internal_for_tests : sig
   (** Returns the {!Operation.t} underlying an {!operation} *)
   val to_raw : _ operation -> Operation.t
 
+  (** A constructor for the [operation] datatype. It by-passes the
+     checks done by the [parse] function. *)
+  val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
+
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
 
       If one day the functor signature is simplified, tests could use [parse_unsafe] directly rather than relying on this function to

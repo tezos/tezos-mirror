@@ -266,6 +266,8 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 module Internal_for_tests = struct
   let to_raw {raw; _} = raw
 
+  let make_operation op oph data = {hash = oph; raw = op; protocol = data}
+
   let safe_binary_of_bytes = safe_binary_of_bytes
 
   module type CHAIN_STORE = CHAIN_STORE
