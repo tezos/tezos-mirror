@@ -27,7 +27,7 @@ open Prevalidator_classification
 
 let add_if_not_present classification oph op t =
   Prevalidator_classification.(
-    if not (is_in_mempool oph t) then add classification oph op t)
+    if is_in_mempool oph t = None then add classification oph op t)
 
 let string_gen = QCheck2.Gen.small_string ?gen:None
 
