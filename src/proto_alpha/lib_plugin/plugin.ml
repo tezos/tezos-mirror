@@ -1492,12 +1492,7 @@ module RPC = struct
                 v
               >>=? fun (data, _ctxt) ->
               unparse_stack (rest_ty, rest) >|=? fun rest ->
-              let annot =
-                match Script_ir_annot.unparse_var_annot None with
-                | [] -> None
-                | [a] -> Some a
-                | _ -> assert false
-              in
+              let annot = None in
               let data = Micheline.strip_locations data in
               (data, annot) :: rest
         in

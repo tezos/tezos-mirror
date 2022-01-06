@@ -402,7 +402,7 @@ let rec unparse_stack_uncarbonated :
   | Item_t (ty, rest) ->
       let uty = unparse_ty_uncarbonated ~loc:() ty in
       let urest = unparse_stack_uncarbonated rest in
-      (strip_locations uty, unparse_var_annot None) :: urest
+      (strip_locations uty, []) :: urest
 
 let serialize_stack_for_error ctxt stack_ty =
   match Gas.level ctxt with
