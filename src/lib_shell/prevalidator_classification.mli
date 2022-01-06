@@ -81,8 +81,10 @@ val create : parameters -> t
 val is_empty : t -> bool
 
 (** [is_in_mempool oph classes] indicates whether [oph] is present
-    in field [in_mempool] of [classes]. *)
-val is_in_mempool : Operation_hash.t -> t -> bool
+    in field [in_mempool] of [classes]. It returns the corresponding
+    operation and its classification if present, and None otherwise. *)
+val is_in_mempool :
+  Operation_hash.t -> t -> (Operation.t * classification) option
 
 (** [remove oph classes] removes operation of hash [oph] from all
     fields of [classes]. If the [oph] was classified as [Applied], the
@@ -108,7 +110,7 @@ val remove : Operation_hash.t -> t -> (Operation.t * classification) option
 
     - the corresponding error class field is full. In that case, the
    new operation is added to the class, and the removed one is
-   discarded. 
+   discarded.
 
     - an operation is classified as [Refused].
 

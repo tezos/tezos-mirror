@@ -481,7 +481,7 @@ module Make
         (Pending_ops.mem oph shell.pending
         || Operation_hash.Set.mem oph shell.fetching
         || Operation_hash.Set.mem oph shell.live_operations
-        || Classification.is_in_mempool oph shell.classification)
+        || Classification.is_in_mempool oph shell.classification <> None)
 
   let advertise (w : worker) (shell : types_state_shell) mempool =
     match shell.advertisement with
