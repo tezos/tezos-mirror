@@ -504,7 +504,7 @@ module Make
 
   (* Each classified operation should be notified exactly ONCE for a
      given stream. Operations which cannot be parsed are not notified. *)
-  let handle
+  let handle_classification
       ~(notifier :
          Classification.classification ->
          Operation_hash.t ->
@@ -555,7 +555,7 @@ module Make
         >|= function
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
           errs ->
-            handle ~notifier shell (`Parsed parsed_op, errs) ;
+            handle_classification ~notifier shell (`Parsed parsed_op, errs) ;
             `Drop
         | `Passed_prefilter priority -> (priority :> [`High | `Low | `Drop]))
 
@@ -777,7 +777,7 @@ module Make
                     new_validation_state,
                     new_mempool,
                     to_handle ) ->
-          List.iter (handle ~notifier shell) to_handle ;
+          List.iter (handle_classification ~notifier shell) to_handle ;
           ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
       shell.pending
       ( filter_state,
@@ -824,7 +824,10 @@ module Make
            code since [Proto.begin_construction] cannot fail. *)
         Pending_ops.iter
           (fun _prio oph op ->
-            handle ~notifier pv.shell (`Unparsed (oph, op), `Branch_delayed err))
+            handle_classification
+              ~notifier
+              pv.shell
+              (`Unparsed (oph, op), `Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Pending_ops.empty ;
         Lwt.return_unit
