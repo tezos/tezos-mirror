@@ -311,6 +311,8 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
           ~predecessor_block
           block)
       >>=? fun metadata ->
+      Event.(emit reconstruct_block_success) (Store.Block.descriptor block)
+      >>= fun () ->
       protocol_env_of_protocol_level
         chain_store
         (Store.Block.proto_level block)
@@ -563,6 +565,10 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                            predecessor_block)
                       ~predecessor_block
                       block
+                    >>=? fun res ->
+                    Event.(emit reconstruct_block_success)
+                      (Store.Block.descriptor block)
+                    >>= fun () -> return res
                 | Some m -> return m)
               >>=? fun metadata ->
               protocol_env_of_protocol_level
