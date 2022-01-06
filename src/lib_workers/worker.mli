@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Lwt based local event loops with automated introspection *)
+(** Workers, their types and signatures, and a functor to make them. *)
 
 (** {2 Worker group maker} *)
 
