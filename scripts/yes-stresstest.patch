@@ -1,0 +1,11 @@
+--- a/src/proto_alpha/lib_client_commands/client_proto_stresstest_commands.ml
++++ b/src/proto_alpha/lib_client_commands/client_proto_stresstest_commands.ml
+@@ -998,7 +998,4 @@ let generate_random_transactions =
+                (fun _retcode -> save_injected_operations ())) ;
+           launch cctxt parameters state rng_state save_pool)
+ 
+-let commands network () =
+-  match network with
+-  | Some `Mainnet -> []
+-  | Some `Testnet | None -> [generate_random_transactions]
++let commands _network () = [generate_random_transactions]
