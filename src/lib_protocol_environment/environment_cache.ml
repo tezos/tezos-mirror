@@ -159,6 +159,11 @@ let empty_cache =
   }
 
 let make_caches (layout : size list) =
+  List.iter
+    (fun size ->
+      if size < 0 then
+        invalid_arg_with_callstack "sizes in layout must be nonnegative")
+    layout ;
   let default = FunctionalArray.make (List.length layout) empty_cache in
   let folder index array limit =
     FunctionalArray.set array index {empty_cache with limit; index}
