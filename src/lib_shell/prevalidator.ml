@@ -510,7 +510,7 @@ module Make
          Operation_hash.t ->
          Operation.shell_header ->
          Filter.Proto.operation_data ->
-         unit) shell op kind =
+         unit) shell (op, kind) =
     (match op with
     | `Parsed ({hash; raw; _} : Filter.Proto.operation_data operation)
     | `Unparsed (hash, raw) ->
@@ -555,7 +555,7 @@ module Make
         >|= function
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
           errs ->
-            handle ~notifier shell (`Parsed parsed_op) errs ;
+            handle ~notifier shell (`Parsed parsed_op, errs) ;
             `Drop
         | `Passed_prefilter priority -> (priority :> [`High | `Low | `Drop]))
 
@@ -589,7 +589,7 @@ module Make
      unparsable or not found in any class in case this invariant is broken
      for some reason.
   *)
-  let reclassify_replaced_manager_op ~notifier old_hash new_hash shell =
+  let reclassify_replaced_manager_op old_hash new_hash shell =
     shell.advertisement <-
       remove_from_advertisement old_hash shell.advertisement ;
     match Classification.remove old_hash shell.classification with
@@ -600,15 +600,16 @@ module Make
         match Prevalidation_t.parse op with
         | Error errors ->
             (* This should likely not happen, as we already parsed the op *)
-            handle ~notifier shell (`Unparsed (old_hash, op)) (`Refused errors)
+            [(`Unparsed (old_hash, op), `Refused errors)]
         | Ok op ->
             let err = Manager_operation_replaced {old_hash; new_hash} in
-            handle ~notifier shell (`Parsed op) (`Outdated [err]))
+            [(`Parsed op, `Outdated [err])])
     | None ->
         (* This case should not happen. *)
         Distributed_db.Operation.clear_or_cancel
           shell.parameters.chain_db
-          old_hash
+          old_hash ;
+        []
 
   let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
       oph (op : Filter.Proto.operation_data operation) =
@@ -641,66 +642,97 @@ module Make
              function. *)
           `Undecided
 
-  let classify_operation ~notifier shell ~filter_config ~filter_state
-      ~validation_state mempool op oph =
+  (* [classify_operation shell filter_config filter_state validation_state
+      mempool op oph] allows to determine the class of a given operation.
+
+     Once it's parsed, the operation is prechecked and/or applied in the current
+     filter/validation state to determine if it could be included in a block on
+     top of the current head or not. If yes, the operation is accumulated in
+     the given [mempool].
+
+     The function returns a tuple
+     [(filter_state, validation_state, mempool, to_handle)], where:
+     - [filter_state] is the (possibly) updated filter_state,
+     - [validation_state] is the (possibly) updated validation_state,
+     - [mempool] is the (possibly) updated mempool,
+     - [to_handle] contains the given operation and its classification, and all
+       operations whose classes are changed/impacted by this classification
+       (eg. in case of operation replacement).
+  *)
+  let classify_operation shell ~filter_config ~filter_state ~validation_state
+      mempool op oph :
+      (filter_state
+      * prevalidation_t
+      * Mempool.t
+      * ([> `Parsed of operation_data operation
+         | `Unparsed of Operation_hash.t * Operation.t ]
+        * Classification.classification)
+        trace)
+      Lwt.t =
     match Prevalidation_t.parse op with
     | Error errors ->
-        handle ~notifier shell (`Unparsed (oph, op)) (`Refused errors) ;
-        Lwt.return (filter_state, validation_state, mempool)
+        (* not even able to parse the operation *)
+        Lwt.return
+          ( filter_state,
+            validation_state,
+            mempool,
+            [(`Unparsed (oph, op), `Refused errors)] )
     | Ok op -> (
-        precheck
-          ~disable_precheck:shell.parameters.limits.disable_precheck
-          ~filter_config
-          ~filter_state
-          ~validation_state
-          oph
-          op
+        (precheck
+           ~disable_precheck:shell.parameters.limits.disable_precheck
+           ~filter_config
+           ~filter_state
+           ~validation_state
+           oph
+           op
+         >>= function
+         | `Fail errs ->
+             (* Precheck rejected the operation *)
+             Lwt.return_error errs
+         | `Passed_precheck filter_state ->
+             (* Precheck succeeded *)
+             Lwt.return_ok ((filter_state, validation_state), [], `Prechecked)
+         | `Passed_precheck_with_replace (old_oph, filter_state) ->
+             (* Precheck succeeded, but an old operation is replaced *)
+             let to_handle = reclassify_replaced_manager_op old_oph oph shell in
+             Lwt.return_ok
+               ((filter_state, validation_state), to_handle, `Prechecked)
+         | `Undecided -> (
+             (* Precheck was not able to classify *)
+             Prevalidation_t.apply_operation validation_state op
+             >>= function
+             | Applied (new_validation_state, receipt) -> (
+                 (* Apply succeeded, call post_filter *)
+                 post_filter
+                   ~filter_config
+                   ~filter_state
+                   ~validation_state_before:
+                     (Prevalidation_t.validation_state validation_state)
+                   ~validation_state_after:
+                     (Prevalidation_t.validation_state new_validation_state)
+                   op.protocol_data
+                   receipt
+                 >>= function
+                 | `Passed_postfilter new_filter_state ->
+                     (* Post_filter ok, accept operation *)
+                     Lwt.return_ok
+                       ((new_filter_state, new_validation_state), [], `Applied)
+                 | `Refused _ as op_class ->
+                     (* Post_filter refused the operation *)
+                     Lwt.return_error op_class)
+             (* Apply rejected the operation *)
+             | Branch_delayed e -> Lwt.return_error (`Branch_delayed e)
+             | Branch_refused e -> Lwt.return_error (`Branch_refused e)
+             | Refused e -> Lwt.return_error (`Refused e)
+             | Outdated e -> Lwt.return_error (`Outdated e)))
         >>= function
-        | `Fail errs ->
-            handle ~notifier shell (`Parsed op) errs ;
-            Lwt.return (filter_state, validation_state, mempool)
-        | `Passed_precheck filter_state ->
-            handle ~notifier shell (`Parsed op) `Prechecked ;
-            let new_mempool = Mempool.cons_valid op.hash mempool in
-            Lwt.return (filter_state, validation_state, new_mempool)
-        | `Passed_precheck_with_replace (old_oph, filter_state) ->
-            reclassify_replaced_manager_op ~notifier old_oph oph shell ;
-            handle ~notifier shell (`Parsed op) `Applied ;
-            let new_mempool = Mempool.cons_valid op.hash mempool in
-            Lwt.return (filter_state, validation_state, new_mempool)
-        | `Undecided -> (
-            Prevalidation_t.apply_operation validation_state op >>= function
-            | Applied (new_validation_state, receipt) -> (
-                post_filter
-                  ~filter_config
-                  ~filter_state
-                  ~validation_state_before:
-                    (Prevalidation_t.validation_state validation_state)
-                  ~validation_state_after:
-                    (Prevalidation_t.validation_state new_validation_state)
-                  op.protocol_data
-                  receipt
-                >>= function
-                | `Passed_postfilter new_filter_state ->
-                    handle ~notifier shell (`Parsed op) `Applied ;
-                    let new_mempool = Mempool.cons_valid op.hash mempool in
-                    Lwt.return
-                      (new_filter_state, new_validation_state, new_mempool)
-                | `Refused _ as classification ->
-                    handle ~notifier shell (`Parsed op) classification ;
-                    Lwt.return (filter_state, validation_state, mempool))
-            | Branch_delayed errors ->
-                handle ~notifier shell (`Parsed op) (`Branch_delayed errors) ;
-                Lwt.return (filter_state, validation_state, mempool)
-            | Branch_refused errors ->
-                handle ~notifier shell (`Parsed op) (`Branch_refused errors) ;
-                Lwt.return (filter_state, validation_state, mempool)
-            | Refused errors ->
-                handle ~notifier shell (`Parsed op) (`Refused errors) ;
-                Lwt.return (filter_state, validation_state, mempool)
-            | Outdated errors ->
-                handle ~notifier shell (`Parsed op) (`Outdated errors) ;
-                Lwt.return (filter_state, validation_state, mempool)))
+        | Error op_class ->
+            Lwt.return
+              (filter_state, validation_state, mempool, [(`Parsed op, op_class)])
+        | Ok ((f_state, v_state), to_handle, op_class) ->
+            let mempool = Mempool.cons_valid op.hash mempool in
+            let to_handle = (`Parsed op, op_class) :: to_handle in
+            Lwt.return (f_state, v_state, mempool, to_handle))
 
   (* Classify pending operations into either: [Refused |
      Branch_delayed | Branch_refused | Applied | Outdated].
@@ -734,7 +766,6 @@ module Make
         else (
           shell.pending <- Pending_ops.remove oph shell.pending ;
           classify_operation
-            ~notifier
             shell
             ~filter_config
             ~filter_state:acc_filter_state
@@ -742,7 +773,11 @@ module Make
             acc_mempool
             op
             oph
-          >|= fun (new_filter_state, new_validation_state, new_mempool) ->
+          >|= fun ( new_filter_state,
+                    new_validation_state,
+                    new_mempool,
+                    to_handle ) ->
+          List.iter (handle ~notifier shell) to_handle ;
           ok (new_filter_state, new_validation_state, new_mempool, limit - 1)))
       shell.pending
       ( filter_state,
@@ -789,11 +824,7 @@ module Make
            code since [Proto.begin_construction] cannot fail. *)
         Pending_ops.iter
           (fun _prio oph op ->
-            handle
-              ~notifier
-              pv.shell
-              (`Unparsed (oph, op))
-              (`Branch_delayed err))
+            handle ~notifier pv.shell (`Unparsed (oph, op), `Branch_delayed err))
           pv.shell.pending ;
         pv.shell.pending <- Pending_ops.empty ;
         Lwt.return_unit
