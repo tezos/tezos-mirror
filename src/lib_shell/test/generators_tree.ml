@@ -30,7 +30,11 @@ module Classification = Prevalidator_classification
 
 (** Various functions about {!list} *)
 module List_extra = struct
-  (** [common_elem [0; 2; 3] [3; 2]] returns [Some 2]
+  (** [common_elem l1 l2] returns the first element of [l1] that
+      occurs in [l2]. If [l1] and [l2] do not have a common element,
+      [Nothing] is returned. Examples:
+
+      [common_elem [0; 2; 3] [3; 2]] returns [Some 2]
       [common_elem [0; 2; 3] [2; 3]] returns [Some 3]
       [common_elem [0; 2; 3] [4]] returns [Nothing] *)
   let rec common_elem ~(equal : 'a -> 'a -> bool) (l1 : 'a list) (l2 : 'a list)
@@ -114,6 +118,7 @@ module Tree = struct
     | Node1 (a, _) -> a
     | Node2 (a, _, _) -> a
 
+  (** [values t] returns all values within [t] *)
   let rec values : 'a tree -> 'a list = function
     | Leaf a -> [a]
     | Node1 (a, t1) -> a :: values t1
@@ -183,12 +188,6 @@ module Tree = struct
     (* If this assertion breaks, the tree is illformed *)
     assert (not (List.mem ~equal e res)) ;
     res
-
-  (** [elems t] returns all values within [t] *)
-  let rec elems : 'a tree -> 'a list = function
-    | Leaf a -> [a]
-    | Node1 (a, t1) -> a :: elems t1
-    | Node2 (a, t1, t2) -> a :: elems t1 @ elems t2
 
   (** [find_ancestor tree e1 e2] returns the common ancestor of [e1] and [e2]
       in [tree], if any *)
@@ -487,7 +486,7 @@ let tree_gen ?blocks () :
   assert (Tree.well_formed Block.compare tree) ;
   let equal = Block.equal in
   let not_equal x y = not @@ equal x y in
-  let tree_elems : Block.t list = Tree.elems tree in
+  let tree_elems : Block.t list = Tree.values tree in
   (* Pairs of blocks that are valid for being ~from_block and ~to_block *)
   let heads_pairs : (Block.t * Block.t) list =
     List.product tree_elems tree_elems
