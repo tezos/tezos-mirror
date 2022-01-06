@@ -10,43 +10,19 @@ Gas remaining: 1039968.110 units remaining
             : pair (mutez @parameter)
                  (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat) ] */ ;
          CAR
-         /* [ @parameter mutez
+         /* [ mutez
             : pair (mutez @parameter)
                  (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat) ] */ ;
          SWAP
          /* [ pair (mutez @parameter)
                  (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat)
-            : @parameter mutez ] */ ;
+            : mutez ] */ ;
          CDR
-         /* [ @storage pair (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
-            : @parameter mutez ] */ ;
+         /* [ pair (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
+            : mutez ] */ ;
          SET_CADDAADR @toplevel_pair_name %value ;
          NIL operation
          /* [ list operation
-            : @toplevel_pair_name pair (pair @storage.car
-                    (nat @storage.car.car)
-                    (pair @storage.car.cdr
-                       (nat @storage.car.cdr.car)
-                       (pair @storage.car.cdr.cdr
-                          (pair @storage.car.cdr.cdr.car
-                             (pair @storage.car.cdr.cdr.car.car
-                                (nat %p @storage.car.cdr.cdr.car.car.p)
-                                (mutez %value @parameter))
-                             (nat @storage.car.cdr.cdr.car.cdr))
-                          (nat @storage.car.cdr.cdr.cdr))))
-                 (nat @storage.cdr) ] */ ;
+            : pair (pair nat nat (pair (pair nat (mutez %value)) nat) nat) nat ] */ ;
          PAIR
-         /* [ pair (list operation)
-                 (pair @toplevel_pair_name
-                    (pair @storage.car
-                       (nat @storage.car.car)
-                       (pair @storage.car.cdr
-                          (nat @storage.car.cdr.car)
-                          (pair @storage.car.cdr.cdr
-                             (pair @storage.car.cdr.cdr.car
-                                (pair @storage.car.cdr.cdr.car.car
-                                   (nat %p @storage.car.cdr.cdr.car.car.p)
-                                   (mutez %value @parameter))
-                                (nat @storage.car.cdr.cdr.car.cdr))
-                             (nat @storage.car.cdr.cdr.cdr))))
-                    (nat @storage.cdr)) ] */ } }
+         /* [ pair (list operation) (pair nat nat (pair (pair nat (mutez %value)) nat) nat) nat ] */ } }

@@ -13,37 +13,37 @@ trace
     [ (Pair "abc" "hello" 0)  	
       (Pair "abc" "hello" 0)  	 ]
   - location: 10 (remaining gas: 1039987.511 units remaining)
-    [ (Pair "hello" 0)  	@storage
+    [ (Pair "hello" 0)  	
       (Pair "abc" "hello" 0)  	 ]
   - location: 11 (remaining gas: 1039987.496 units remaining)
     [ (Pair "abc" "hello" 0)  	 ]
   - location: 13 (remaining gas: 1039987.486 units remaining)
-    [ "abc"  	@parameter ]
+    [ "abc"  	 ]
   - location: 11 (remaining gas: 1039987.456 units remaining)
-    [ (Pair "hello" 0)  	@storage
-      "abc"  	@parameter ]
+    [ (Pair "hello" 0)  	
+      "abc"  	 ]
   - location: 15 (remaining gas: 1039987.446 units remaining)
-    [ (Pair "hello" 0)  	@storage
-      (Pair "hello" 0)  	@storage
-      "abc"  	@parameter ]
+    [ (Pair "hello" 0)  	
+      (Pair "hello" 0)  	
+      "abc"  	 ]
   - location: 16 (remaining gas: 1039987.436 units remaining)
     [ "hello"  	
-      (Pair "hello" 0)  	@storage
-      "abc"  	@parameter ]
+      (Pair "hello" 0)  	
+      "abc"  	 ]
   - location: 17 (remaining gas: 1039987.426 units remaining)
-    [ (Pair "hello" 0)  	@storage
-      "abc"  	@parameter ]
+    [ (Pair "hello" 0)  	
+      "abc"  	 ]
   - location: 18 (remaining gas: 1039987.416 units remaining)
-    [ 0  	@storage.n
-      "abc"  	@parameter ]
+    [ 0  	
+      "abc"  	 ]
   - location: 19 (remaining gas: 1039987.406 units remaining)
-    [ "abc"  	@parameter
-      0  	@storage.n ]
+    [ "abc"  	
+      0  	 ]
   - location: 20 (remaining gas: 1039987.391 units remaining)
-    [ (Pair "abc" 0)  	@storage ]
+    [ (Pair "abc" 0)  	 ]
   - location: 21 (remaining gas: 1039987.376 units remaining)
     [ {}  	
-      (Pair "abc" 0)  	@storage ]
+      (Pair "abc" 0)  	 ]
   - location: 23 (remaining gas: 1039987.361 units remaining)
     [ (Pair {} "abc" 0)  	 ]
 

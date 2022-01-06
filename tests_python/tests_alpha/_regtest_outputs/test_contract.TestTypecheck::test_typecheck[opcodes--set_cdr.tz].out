@@ -8,12 +8,12 @@ Gas remaining: 1039991.782 units remaining
          /* [ pair (nat @parameter) (pair @storage (string %s) (nat %n))
             : pair (nat @parameter) (pair @storage (string %s) (nat %n)) ] */ ;
          CDR
-         /* [ @storage pair (string %s) (nat %n)
+         /* [ pair (string %s) (nat %n)
             : pair (nat @parameter) (pair @storage (string %s) (nat %n)) ] */ ;
-         DIP { CAR /* [ @parameter nat ] */ }
-         /* [ @storage pair (string %s) (nat %n) : @parameter nat ] */ ;
+         DIP { CAR /* [ nat ] */ }
+         /* [ pair (string %s) (nat %n) : nat ] */ ;
          SET_CDR %n ;
          NIL operation
-         /* [ list operation : @storage pair (string %s @storage.s) (nat %n @parameter) ] */ ;
+         /* [ list operation : pair string (nat %n) ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage (string %s @storage.s) (nat %n @parameter)) ] */ } }
+         /* [ pair (list operation) string (nat %n) ] */ } }
