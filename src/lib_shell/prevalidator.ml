@@ -529,12 +529,12 @@ module Make
       (classification, hash, shell_header, op_data)
 
   let pre_filter shell ~filter_config ~filter_state ~validation_state ~chain_db
-      ~notifier oph raw : ([`High | `Low], unit) result Lwt.t =
+      ~notifier oph raw : [`High | `Low | `Drop] Lwt.t =
     match Prevalidation_t.parse raw with
     | Error _ ->
         Event.(emit unparsable_operation) oph >|= fun () ->
         Distributed_db.Operation.clear_or_cancel chain_db oph ;
-        Error ()
+        `Drop
     | Ok parsed_op -> (
         let op =
           {
@@ -556,8 +556,8 @@ module Make
         | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
           errs ->
             handle ~notifier shell (`Parsed parsed_op) errs ;
-            Error ()
-        | `Passed_prefilter priority -> Ok priority)
+            `Drop
+        | `Passed_prefilter priority -> (priority :> [`High | `Low | `Drop]))
 
   let post_filter ~filter_config ~filter_state ~validation_state_before
       ~validation_state_after op receipt =
@@ -879,7 +879,8 @@ module Make
           oph
           op
         >>= function
-        | Ok prio ->
+        | `Drop -> return_unit
+        | (`High | `Low) as prio ->
             if
               not
                 (Block_hash.Set.mem
@@ -895,7 +896,6 @@ module Make
                  Should this have an influence on the peer's score ? *)
               pv.shell.pending <- Pending_ops.add oph op prio pv.shell.pending ;
               return_unit)
-        | Error () -> return_unit
 
     let on_inject (pv : state) ~force op =
       let oph = Operation.hash op in
@@ -1005,11 +1005,11 @@ module Make
             oph
             op
           >|= function
-          | Ok prio ->
+          | `Drop -> (pending, nb_pending)
+          | (`High | `Low) as prio ->
               (* Here, an operation injected in this node with `High priority will
                  now get its approriate priority. *)
-              (Pending_ops.add oph op prio pending, nb_pending + 1)
-          | Error () -> (pending, nb_pending))
+              (Pending_ops.add oph op prio pending, nb_pending + 1))
         new_pending_operations
         (Pending_ops.empty, 0)
       >>= fun (new_pending_operations, nb_pending) ->
