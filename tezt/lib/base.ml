@@ -90,6 +90,11 @@ let rec take n l =
   else if n = 0 then []
   else match l with [] -> [] | hd :: rest -> hd :: take (n - 1) rest
 
+let rec drop n l =
+  if n < 0 then invalid_arg "Tezt.Base.drop: argument cannot be negative"
+  else if n = 0 then l
+  else match l with [] -> [] | _ :: rest -> drop (n - 1) rest
+
 let rex ?opts r = (r, Re.compile (Re.Perl.re ?opts r))
 
 let show_rex = fst
@@ -124,6 +129,15 @@ let rec repeat n f =
   else
     let* () = f () in
     repeat (n - 1) f
+
+let fold n init f =
+  let rec aux k accu =
+    if k >= n then return accu
+    else
+      let* accu = f k accu in
+      aux (k + 1) accu
+  in
+  aux 0 init
 
 let with_open_out file write_f =
   let chan = open_out file in

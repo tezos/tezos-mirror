@@ -217,10 +217,6 @@ val lookup : 'value t -> key -> ('value * value_metadata) option
 *)
 val update : 'value t -> key -> ('value * size) option -> 'value t
 
-(** [update_cache_key caches key value meta] updates the cache to
-    associate [key] to the [value] with some [meta]data. *)
-val update_cache_key : 'value t -> key -> 'value -> value_metadata -> 'value t
-
 (** [future_cache_expectation cache ~time_in_blocks] returns a
    predicted cache that tries to anticipate the state of [cache]
    in [time_in_blocks]. This function is using an heuristic. *)
@@ -293,3 +289,9 @@ val key_rank : 'value t -> key -> int option
 
 (** [pp fmt cache] is a pretty printter for a [cache]. *)
 val pp : Format.formatter -> 'value t -> unit
+
+(**/**)
+
+module Internal_for_tests : sig
+  val equal_domain : domain -> domain -> bool
+end

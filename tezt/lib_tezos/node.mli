@@ -408,6 +408,23 @@ val on_event : t -> (event -> unit) -> unit
     Usually you do not want to keep that in the final versions of your tests. *)
 val log_events : t -> unit
 
+(** Values returned by {!memory_consumption}. *)
+type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
+
+(** Observe memory consumption of the node.
+
+    This function requires [perf] and [heaptrack] in the PATH.
+    Otherwise, the observation will always return [None].
+
+    The returned function gives the peak of memory consumption
+    observed since the observation has started.
+
+    [memory_consumption node] starts the observation and returns
+    [Some (Observe get)]. [get ()] stops the observation and
+    returns the observation memory consumption.
+*)
+val memory_consumption : t -> observe_memory_consumption Lwt.t
+
 (** {2 High-Level Functions} *)
 
 (** Initialize a node.

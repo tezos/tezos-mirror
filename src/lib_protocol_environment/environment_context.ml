@@ -499,6 +499,17 @@ module Context = struct
 
     let cache_size_limit (Context ctxt) ~cache_index =
       Environment_cache.cache_size_limit ctxt.cache ~cache_index
+
+    module Internal_for_tests = struct
+      let same_cache_domains ctxt ctxt' =
+        find_domain ctxt >>= fun domain ->
+        find_domain ctxt' >>= fun domain' ->
+        return
+        @@ Option.equal
+             Environment_cache.Internal_for_tests.equal_domain
+             domain
+             domain'
+    end
   end
 
   let load_cache (Context ctxt) mode builder =

@@ -389,4 +389,69 @@ module Make (X : PARAMETERS) = struct
   let log_events daemon =
     on_event daemon @@ fun event ->
     Log.info "Received event: %s = %s" event.name (JSON.encode event.value)
+
+  type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
+
+  let memory_consumption daemon =
+    let from_command ~cmd ~args ~expect_failure r =
+      let p = Process.spawn ~log_output:true cmd args in
+      fun () ->
+        let* output = Process.check_and_read_stdout ~expect_failure p in
+        match output =~* rex r with
+        | None -> Test.fail "Unable to find `%s' in process stdout" r
+        | Some v -> return v
+    in
+    let cannot_observe = return @@ Observe (fun () -> return None) in
+    match daemon.status with
+    | Not_running -> cannot_observe
+    | Running {process; _} -> (
+        let* perf = Process.program_path "perf" in
+        let* heaptrack_print = Process.program_path "heaptrack_print" in
+        match (perf, heaptrack_print) with
+        | (None, _) | (_, None) -> cannot_observe
+        | (Some perf, Some heaptrack_print) -> (
+            try
+              let pid = Process.pid process |> string_of_int in
+              let get_trace =
+                from_command
+                  ~cmd:perf
+                  ~args:["stat"; "-r"; "5"; "heaptrack"; "-p"; pid]
+                  ~expect_failure:true
+                  ".* heaptrack --analyze \"(.*)\""
+              in
+              return
+              @@ Observe
+                   (fun () ->
+                     let* dump = get_trace () in
+                     let* peak =
+                       from_command
+                         ~cmd:heaptrack_print
+                         ~args:[dump]
+                         ~expect_failure:false
+                         "peak heap memory consumption: (\\d+\\.?\\d*\\w)"
+                         ()
+                     in
+                     match peak =~** rex "(\\d+\\.?\\d*)(\\w)" with
+                     | None ->
+                         Test.fail
+                           "Invalid memory consumption format: %s\n"
+                           peak
+                     | Some (size, unit) ->
+                         let factor_of_unit =
+                           match unit with
+                           | "K" -> 1024
+                           | "M" -> 1024 * 1024
+                           | "G" -> 1024 * 1024 * 1024
+                           | _ -> 1
+                         in
+                         let size =
+                           int_of_float
+                           @@ float_of_string size
+                              *. float_of_int factor_of_unit
+                         in
+                         return @@ Some size)
+            with exn ->
+              Test.fail
+                "failed to set up memory consumption measurement: %s"
+                (Printexc.to_string exn)))
 end

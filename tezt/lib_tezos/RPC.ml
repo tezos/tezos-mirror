@@ -618,6 +618,15 @@ module Votes = struct
     Client.rpc ?endpoint ?hooks GET path client
 end
 
+module Script_cache = struct
+  let get_cached_contracts ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      client =
+    let path =
+      ["chains"; chain; "blocks"; block; "context"; "cache"; "contracts"; "all"]
+    in
+    Client.rpc ?endpoint ?hooks GET path client
+end
+
 module Tx_rollup = struct
   let sub_path ~chain ~block ~tx_rollup_hash sub =
     [

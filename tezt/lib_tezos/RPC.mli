@@ -952,6 +952,17 @@ module Votes : sig
     JSON.t Lwt.t
 end
 
+module Script_cache : sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/cache/contracts/all *)
+  val get_cached_contracts :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+end
+
 module Tx_rollup : sig
   (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/state *)
   val get_state :

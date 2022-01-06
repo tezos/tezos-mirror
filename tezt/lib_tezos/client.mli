@@ -448,7 +448,7 @@ val multiple_transfers :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
-  ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?counter:int ->
@@ -463,7 +463,7 @@ val spawn_multiple_transfers :
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
-  ?fee:Tez.t ->
+  ?fee_cap:Tez.t ->
   ?gas_limit:int ->
   ?storage_limit:int ->
   ?counter:int ->

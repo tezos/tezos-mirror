@@ -1,5 +1,5 @@
 (tests
- (names test test_mem_context_array_theory)
+ (names test test_mem_context_array_theory test_cache)
  (package tezos-protocol-environment)
  (libraries
   bls12-381-unix

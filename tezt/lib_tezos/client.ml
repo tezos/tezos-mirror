@@ -613,7 +613,7 @@ let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?counter
     client
   |> Process.check
 
-let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee
+let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee_cap
     ?gas_limit ?storage_limit ?counter ?arg ~giver ~json_batch client =
   spawn_command
     ?endpoint
@@ -622,8 +622,8 @@ let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee
     @ ["multiple"; "transfers"; "from"; giver; "using"; json_batch]
     @ Option.fold
         ~none:[]
-        ~some:(fun f -> ["--fee"; Tez.to_string f; "--force-low-fee"])
-        fee
+        ~some:(fun f -> ["--fee-cap"; Tez.to_string f; "--force-low-fee"])
+        fee_cap
     @ Option.fold
         ~none:[]
         ~some:(fun b -> ["--burn-cap"; Tez.to_string b])
@@ -642,13 +642,13 @@ let spawn_multiple_transfers ?endpoint ?(wait = "none") ?burn_cap ?fee
         counter
     @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg)
 
-let multiple_transfers ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit
-    ?counter ?arg ~giver ~json_batch client =
+let multiple_transfers ?endpoint ?wait ?burn_cap ?fee_cap ?gas_limit
+    ?storage_limit ?counter ?arg ~giver ~json_batch client =
   spawn_multiple_transfers
     ?endpoint
     ?wait
     ?burn_cap
-    ?fee
+    ?fee_cap
     ?gas_limit
     ?storage_limit
     ?counter

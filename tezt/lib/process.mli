@@ -153,6 +153,9 @@ val stderr : t -> Lwt_io.input_channel
 (** Get the name which was given to {!spawn}. *)
 val name : t -> string
 
+(** Get the PID of the given process. *)
+val pid : t -> int
+
 (** Spawn a process such as [run] and return its standard output.
 
     Fail the test if the process failed, unless [expect_failure],
@@ -180,3 +183,7 @@ val run_and_read_stderr :
   string ->
   string list ->
   string Lwt.t
+
+(** [program_path p] returns [Some path] if the shell command [command -v p]
+    succeeds and prints [path]. Returns [None] otherwise. *)
+val program_path : string -> string option Lwt.t
