@@ -15,7 +15,7 @@
 .docker_registry_auth:
   before_script:
     - mkdir ~/.docker || true
-    - if [ "$MASTER_OR_RELEASE" = "true" ]; then
+    - if [ "$MASTER_OR_RELEASE" = "true" ] && [ "$TEZOS_DEFAULT_NAMESPACE/$TEZOS_DEFAULT_BRANCH" = "tezos/tezos" ]; then
         export DOCKER_IMAGE_NAME="docker.io/${CI_PROJECT_PATH}-" ;
         echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json ;
       else
