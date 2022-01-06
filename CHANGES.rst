@@ -169,6 +169,9 @@ Node
 - Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
   expose some metrics using the Prometheus format.
 
+- Fixed an incorrect behaviour of the store which could cause the node
+  to freeze for a few seconds.
+
 Client
 ------
 
