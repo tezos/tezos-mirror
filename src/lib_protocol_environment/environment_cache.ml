@@ -194,7 +194,10 @@ let dean cache : (int64 * key) option = Int64Map.min_binding cache.lru
 
 let remove_dean cache =
   match dean cache with
-  | None -> cache
+  | None ->
+      (* This case is unreachable because [remove_dean] is always called
+         by [enforce_size_limit] with a nonempty cache. *)
+      cache
   | Some (_, key) -> (
       match KeyMap.find key cache.map with
       | None -> assert false
