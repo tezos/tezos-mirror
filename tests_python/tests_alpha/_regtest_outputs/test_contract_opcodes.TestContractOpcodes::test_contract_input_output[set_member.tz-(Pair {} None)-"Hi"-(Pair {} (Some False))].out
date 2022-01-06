@@ -17,20 +17,20 @@ trace
       (Pair "Hi" {} None)  	
       (Pair "Hi" {} None)  	 ]
   - location: 13 (remaining gas: 1039984.076 units remaining)
-    [ "Hi"  	@parameter
+    [ "Hi"  	
       (Pair "Hi" {} None)  	
       (Pair "Hi" {} None)  	 ]
   - location: 14 (remaining gas: 1039984.061 units remaining)
     [ (Pair "Hi" {} None)  	
       (Pair "Hi" {} None)  	 ]
   - location: 17 (remaining gas: 1039984.051 units remaining)
-    [ (Pair {} None)  	@storage
+    [ (Pair {} None)  	
       (Pair "Hi" {} None)  	 ]
   - location: 18 (remaining gas: 1039984.041 units remaining)
     [ {}  	
       (Pair "Hi" {} None)  	 ]
   - location: 14 (remaining gas: 1039984.011 units remaining)
-    [ "Hi"  	@parameter
+    [ "Hi"  	
       {}  	
       (Pair "Hi" {} None)  	 ]
   - location: 19 (remaining gas: 1039983.861 units remaining)
@@ -42,7 +42,7 @@ trace
   - location: 21 (remaining gas: 1039983.831 units remaining)
     [ (Pair "Hi" {} None)  	 ]
   - location: 24 (remaining gas: 1039983.821 units remaining)
-    [ (Pair {} None)  	@storage ]
+    [ (Pair {} None)  	 ]
   - location: 25 (remaining gas: 1039983.811 units remaining)
     [ {}  	 ]
   - location: 21 (remaining gas: 1039983.781 units remaining)

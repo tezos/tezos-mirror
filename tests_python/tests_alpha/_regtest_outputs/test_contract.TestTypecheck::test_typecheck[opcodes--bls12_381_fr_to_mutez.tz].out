@@ -5,14 +5,14 @@ Gas remaining: 1039992.954 units remaining
 { parameter bls12_381_fr ;
   storage mutez ;
   code { CAR
-         /* [ @parameter bls12_381_fr ] */ ;
+         /* [ bls12_381_fr ] */ ;
          INT
          /* [ int ] */ ;
          ISNAT
          /* [ option nat ] */ ;
          ASSERT_SOME ;
          PUSH mutez 1
-         /* [ mutez : @some nat ] */ ;
+         /* [ mutez : nat ] */ ;
          MUL
          /* [ mutez ] */ ;
          NIL operation

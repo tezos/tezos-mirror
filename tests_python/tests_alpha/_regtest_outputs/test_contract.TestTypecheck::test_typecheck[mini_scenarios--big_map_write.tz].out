@@ -5,17 +5,16 @@ Gas remaining: 1039994.022 units remaining
 { storage unit ;
   parameter (big_map nat nat) ;
   code { UNPAIR
-         /* [ @parameter big_map nat nat : @storage unit ] */ ;
-         PUSH (option nat)
-              (Some 1)
-         /* [ option nat : @parameter big_map nat nat : @storage unit ] */ ;
+         /* [ big_map nat nat : unit ] */ ;
+         PUSH (option nat) (Some 1)
+         /* [ option nat : big_map nat nat : unit ] */ ;
          PUSH nat 1
-         /* [ nat : option nat : @parameter big_map nat nat : @storage unit ] */ ;
+         /* [ nat : option nat : big_map nat nat : unit ] */ ;
          UPDATE
-         /* [ @parameter big_map nat nat : @storage unit ] */ ;
+         /* [ big_map nat nat : unit ] */ ;
          DROP
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

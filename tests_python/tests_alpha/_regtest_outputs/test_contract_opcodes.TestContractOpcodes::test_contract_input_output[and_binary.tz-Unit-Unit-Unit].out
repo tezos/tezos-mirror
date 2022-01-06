@@ -86,7 +86,7 @@ trace
   - location: 88 (remaining gas: 1039959.811 units remaining)
     [ Unit  	 ]
   - location: 89 (remaining gas: 1039959.796 units remaining)
-    [ {}  	@noop
+    [ {}  	
       Unit  	 ]
   - location: 91 (remaining gas: 1039959.781 units remaining)
     [ (Pair {} Unit)  	 ]

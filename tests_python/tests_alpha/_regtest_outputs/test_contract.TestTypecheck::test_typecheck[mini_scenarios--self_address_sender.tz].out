@@ -5,15 +5,14 @@ Gas remaining: 1039991.879 units remaining
 { parameter (contract (lambda unit address)) ;
   storage unit ;
   code { CAR
-         /* [ @parameter contract (lambda unit address) ] */ ;
+         /* [ contract (lambda unit address) ] */ ;
          BALANCE
-         /* [ @balance mutez : @parameter contract (lambda unit address) ] */ ;
+         /* [ mutez : contract (lambda unit address) ] */ ;
          LAMBDA
            unit
            address
-           { DROP /* [] */ ; SELF_ADDRESS /* [ @self address ] */ }
-         /* [ lambda unit address : @balance mutez
-            : @parameter contract (lambda unit address) ] */ ;
+           { DROP /* [] */ ; SELF_ADDRESS /* [ address ] */ }
+         /* [ lambda unit address : mutez : contract (lambda unit address) ] */ ;
          TRANSFER_TOKENS
          /* [ operation ] */ ;
          DIP { UNIT /* [ unit ] */ ; NIL operation /* [ list operation : unit ] */ }

@@ -7,59 +7,59 @@ Gas remaining: 1039967.216 units remaining
   code { DROP
          /* [] */ ;
          SELF %A
-         /* [ @self contract nat ] */ ;
+         /* [ contract nat ] */ ;
          PACK @Apacked
-         /* [ @Apacked bytes ] */ ;
+         /* [ bytes ] */ ;
          SELF %default
-         /* [ @self contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))
-            : @Apacked bytes ] */ ;
+         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))
+            : bytes ] */ ;
          PACK @defpacked
-         /* [ @defpacked bytes : @Apacked bytes ] */ ;
+         /* [ bytes : bytes ] */ ;
          DUP
-         /* [ @defpacked bytes : @defpacked bytes : @Apacked bytes ] */ ;
-         DIP { SWAP /* [ @Apacked bytes : @defpacked bytes ] */ }
-         /* [ @defpacked bytes : @Apacked bytes : @defpacked bytes ] */ ;
+         /* [ bytes : bytes : bytes ] */ ;
+         DIP { SWAP /* [ bytes : bytes ] */ }
+         /* [ bytes : bytes : bytes ] */ ;
          ASSERT_CMPNEQ ;
          SELF
-         /* [ @self contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))
-            : @defpacked bytes ] */ ;
+         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))
+            : bytes ] */ ;
          PACK @selfpacked
-         /* [ @selfpacked bytes : @defpacked bytes ] */ ;
+         /* [ bytes : bytes ] */ ;
          ASSERT_CMPEQ ;
          SELF %A
-         /* [ @self contract nat ] */ ;
+         /* [ contract nat ] */ ;
          CAST (contract nat)
-         /* [ @self contract nat ] */ ;
+         /* [ contract nat ] */ ;
          DROP
          /* [] */ ;
          SELF %B
-         /* [ @self contract bool ] */ ;
+         /* [ contract bool ] */ ;
          CAST (contract bool)
-         /* [ @self contract bool ] */ ;
+         /* [ contract bool ] */ ;
          DROP
          /* [] */ ;
          SELF %maybe_C
-         /* [ @self contract (or (unit %Z) (string %C)) ] */ ;
+         /* [ contract (or (unit %Z) (string %C)) ] */ ;
          CAST (contract (or unit string))
-         /* [ @self contract (or unit string) ] */ ;
+         /* [ contract (or unit string) ] */ ;
          DROP
          /* [] */ ;
          SELF %Z
-         /* [ @self contract unit ] */ ;
+         /* [ contract unit ] */ ;
          CAST (contract unit)
-         /* [ @self contract unit ] */ ;
+         /* [ contract unit ] */ ;
          DROP
          /* [] */ ;
          SELF
-         /* [ @self contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
          CAST (contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))))
-         /* [ @self contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
          DROP
          /* [] */ ;
          SELF %default
-         /* [ @self contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
          CAST (contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))))
-         /* [ @self contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
          DROP
          /* [] */ ;
          UNIT

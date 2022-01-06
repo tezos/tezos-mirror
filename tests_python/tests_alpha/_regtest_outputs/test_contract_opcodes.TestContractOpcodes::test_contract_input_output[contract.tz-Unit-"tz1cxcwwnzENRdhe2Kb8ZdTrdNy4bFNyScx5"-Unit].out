@@ -10,13 +10,13 @@ trace
   - location: 7 (remaining gas: 1039340.345 units remaining)
     [ (Pair "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5" Unit)  	 ]
   - location: 7 (remaining gas: 1039340.335 units remaining)
-    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter ]
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	 ]
   - location: 8 (remaining gas: 1039340.085 units remaining)
-    [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")  	@parameter.contract ]
+    [ (Some "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5")  	 ]
   - location: 11 (remaining gas: 1039340.075 units remaining)
-    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter.contract.some ]
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	 ]
   - location: 11 (remaining gas: 1039340.060 units remaining)
-    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	@parameter.contract.some ]
+    [ "tz1cxcwwnzENRdhe2Kb8ZdTrdNy4bFNyScx5"  	 ]
   - location: 17 (remaining gas: 1039340.050 units remaining)
     [  ]
   - location: 18 (remaining gas: 1039340.040 units remaining)

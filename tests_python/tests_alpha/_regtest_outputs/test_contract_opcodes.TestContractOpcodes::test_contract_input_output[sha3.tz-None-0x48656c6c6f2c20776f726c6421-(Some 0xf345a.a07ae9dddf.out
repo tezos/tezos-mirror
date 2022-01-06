@@ -10,7 +10,7 @@ trace
   - location: 8 (remaining gas: 1039993.957 units remaining)
     [ (Pair 0x48656c6c6f2c20776f726c6421 None)  	 ]
   - location: 8 (remaining gas: 1039993.947 units remaining)
-    [ 0x48656c6c6f2c20776f726c6421  	@parameter ]
+    [ 0x48656c6c6f2c20776f726c6421  	 ]
   - location: 9 (remaining gas: 1039992.490 units remaining)
     [ 0xf345a219da005ebe9c1a1eaad97bbf38a10c8473e41d0af7fb617caa0c6aa722  	 ]
   - location: 10 (remaining gas: 1039992.475 units remaining)

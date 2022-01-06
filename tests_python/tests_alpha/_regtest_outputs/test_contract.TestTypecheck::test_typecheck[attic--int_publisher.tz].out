@@ -12,7 +12,7 @@ Gas remaining: 1039967.523 units remaining
             : pair (option @parameter (pair signature int)) (pair @storage key int)
             : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
          CAR
-         /* [ @parameter option (pair signature int)
+         /* [ option (pair signature int)
             : pair (option @parameter (pair signature int)) (pair @storage key int)
             : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
          IF_NONE
@@ -22,7 +22,7 @@ Gas remaining: 1039967.523 units remaining
                 : pair (option @parameter (pair signature int)) (pair @storage key int)
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              AMOUNT
-             /* [ @amount mutez : mutez
+             /* [ mutez : mutez
                 : pair (option @parameter (pair signature int)) (pair @storage key int)
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              CMPLE ;
@@ -30,50 +30,48 @@ Gas remaining: 1039967.523 units remaining
                 { /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ } ;
              CDR
-             /* [ @storage pair key int
+             /* [ pair key int
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              DIP { CDDR }
-             /* [ @storage pair key int : int ] */ }
+             /* [ pair key int : int ] */ }
            { DUP
-             /* [ @parameter.some pair signature int : @parameter.some pair signature int
+             /* [ pair signature int : pair signature int
                 : pair (option @parameter (pair signature int)) (pair @storage key int)
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              DIP { SWAP
                    /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                      : @parameter.some pair signature int
+                      : pair signature int
                       : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ }
-             /* [ @parameter.some pair signature int
+             /* [ pair signature int
                 : pair (option @parameter (pair signature int)) (pair @storage key int)
-                : @parameter.some pair signature int
+                : pair signature int
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              SWAP
              /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                : @parameter.some pair signature int : @parameter.some pair signature int
+                : pair signature int : pair signature int
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              CDAR ;
              DIP { DUP
-                   /* [ @parameter.some pair signature int : @parameter.some pair signature int
-                      : @parameter.some pair signature int
+                   /* [ pair signature int : pair signature int : pair signature int
                       : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
                    CAR
-                   /* [ signature : @parameter.some pair signature int
-                      : @parameter.some pair signature int
+                   /* [ signature : pair signature int : pair signature int
                       : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
                    DIP { CDR
-                         /* [ int : @parameter.some pair signature int
+                         /* [ int : pair signature int
                             : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
                          PACK
-                         /* [ @packed bytes : @parameter.some pair signature int
+                         /* [ bytes : pair signature int
                             : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
                          BLAKE2B
-                         /* [ bytes : @parameter.some pair signature int
+                         /* [ bytes : pair signature int
                             : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ }
-                   /* [ signature : bytes : @parameter.some pair signature int
+                   /* [ signature : bytes : pair signature int
                       : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ }
-             /* [ key : signature : bytes : @parameter.some pair signature int
+             /* [ key : signature : bytes : pair signature int
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              CHECK_SIGNATURE
-             /* [ bool : @parameter.some pair signature int
+             /* [ bool : pair signature int
                 : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
              IF { CDR
                   /* [ int
@@ -93,10 +91,10 @@ Gas remaining: 1039967.523 units remaining
                   /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
                   CDR
-                  /* [ @storage pair key int
+                  /* [ pair key int
                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
                   DIP { CDDR }
-                  /* [ @storage pair key int : int ] */ } } ;
+                  /* [ pair key int : int ] */ } } ;
          DIP { DROP /* [] */ }
          /* [ pair key int ] */ ;
          NIL operation

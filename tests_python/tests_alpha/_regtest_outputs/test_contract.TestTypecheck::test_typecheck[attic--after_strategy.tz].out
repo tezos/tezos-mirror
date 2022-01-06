@@ -8,20 +8,19 @@ Gas remaining: 1039989.643 units remaining
          /* [ pair (nat @parameter) (pair @storage (pair nat bool) timestamp)
             : pair (nat @parameter) (pair @storage (pair nat bool) timestamp) ] */ ;
          CAR
-         /* [ @parameter nat
-            : pair (nat @parameter) (pair @storage (pair nat bool) timestamp) ] */ ;
+         /* [ nat : pair (nat @parameter) (pair @storage (pair nat bool) timestamp) ] */ ;
          DIP { CDDR ;
                DUP
                /* [ timestamp : timestamp ] */ ;
                NOW
-               /* [ @now timestamp : timestamp : timestamp ] */ ;
+               /* [ timestamp : timestamp : timestamp ] */ ;
                CMPGT }
-         /* [ @parameter nat : bool : timestamp ] */ ;
+         /* [ nat : bool : timestamp ] */ ;
          PAIR
-         /* [ pair (nat @parameter) bool : timestamp ] */ ;
+         /* [ pair nat bool : timestamp ] */ ;
          PAIR
-         /* [ pair (pair (nat @parameter) bool) timestamp ] */ ;
+         /* [ pair (pair nat bool) timestamp ] */ ;
          NIL operation
-         /* [ list operation : pair (pair (nat @parameter) bool) timestamp ] */ ;
+         /* [ list operation : pair (pair nat bool) timestamp ] */ ;
          PAIR
-         /* [ pair (list operation) (pair (nat @parameter) bool) timestamp ] */ } }
+         /* [ pair (list operation) (pair nat bool) timestamp ] */ } }

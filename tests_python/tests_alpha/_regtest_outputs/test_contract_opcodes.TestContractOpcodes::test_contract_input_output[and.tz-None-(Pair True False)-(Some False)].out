@@ -10,22 +10,22 @@ trace
   - location: 10 (remaining gas: 1039991.303 units remaining)
     [ (Pair (Pair True False) None)  	 ]
   - location: 10 (remaining gas: 1039991.293 units remaining)
-    [ (Pair True False)  	@param ]
+    [ (Pair True False)  	 ]
   - location: 11 (remaining gas: 1039991.283 units remaining)
     [ True  	
       False  	 ]
   - location: 12 (remaining gas: 1039991.263 units remaining)
-    [ False  	@and ]
+    [ False  	 ]
   - location: 13 (remaining gas: 1039991.248 units remaining)
-    [ (Some False)  	@res ]
+    [ (Some False)  	 ]
   - location: 14 (remaining gas: 1039991.233 units remaining)
-    [ {}  	@noop
-      (Some False)  	@res ]
+    [ {}  	
+      (Some False)  	 ]
   - location: 16 (remaining gas: 1039991.218 units remaining)
     [ (Pair {} (Some False))  	 ]
   - location: 17 (remaining gas: 1039991.208 units remaining)
-    [ {}  	@x
-      (Some False)  	@y ]
+    [ {}  	
+      (Some False)  	 ]
   - location: 18 (remaining gas: 1039991.193 units remaining)
     [ (Pair {} (Some False))  	 ]
 

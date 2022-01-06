@@ -6,7 +6,7 @@ Gas remaining: 1039994.949 units remaining
   storage unit ;
   code { DROP
          /* [] */ ;
-         LAMBDA unit unit { /* [ @arg unit ] */ }
+         LAMBDA unit unit { /* [ unit ] */ }
          /* [ lambda unit unit ] */ ;
          UNIT
          /* [ unit : lambda unit unit ] */ ;

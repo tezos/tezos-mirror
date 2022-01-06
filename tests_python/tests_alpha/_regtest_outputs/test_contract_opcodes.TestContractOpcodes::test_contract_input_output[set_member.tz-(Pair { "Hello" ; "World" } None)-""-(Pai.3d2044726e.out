@@ -17,20 +17,20 @@ trace
       (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 13 (remaining gas: 1039983.263 units remaining)
-    [ ""  	@parameter
+    [ ""  	
       (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 14 (remaining gas: 1039983.248 units remaining)
     [ (Pair "" { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 17 (remaining gas: 1039983.238 units remaining)
-    [ (Pair { "Hello" ; "World" } None)  	@storage
+    [ (Pair { "Hello" ; "World" } None)  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 18 (remaining gas: 1039983.228 units remaining)
     [ { "Hello" ; "World" }  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 14 (remaining gas: 1039983.198 units remaining)
-    [ ""  	@parameter
+    [ ""  	
       { "Hello" ; "World" }  	
       (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 19 (remaining gas: 1039982.978 units remaining)
@@ -42,7 +42,7 @@ trace
   - location: 21 (remaining gas: 1039982.948 units remaining)
     [ (Pair "" { "Hello" ; "World" } None)  	 ]
   - location: 24 (remaining gas: 1039982.938 units remaining)
-    [ (Pair { "Hello" ; "World" } None)  	@storage ]
+    [ (Pair { "Hello" ; "World" } None)  	 ]
   - location: 25 (remaining gas: 1039982.928 units remaining)
     [ { "Hello" ; "World" }  	 ]
   - location: 21 (remaining gas: 1039982.898 units remaining)

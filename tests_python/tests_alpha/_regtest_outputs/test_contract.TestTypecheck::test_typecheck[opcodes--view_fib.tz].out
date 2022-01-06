@@ -5,14 +5,14 @@ Gas remaining: 1039993.990 units remaining
 { parameter (pair nat address) ;
   storage nat ;
   code { CAR
-         /* [ @parameter pair nat address ] */ ;
+         /* [ pair nat address ] */ ;
          UNPAIR
          /* [ nat : address ] */ ;
          VIEW "fib" nat
-         /* [ @contract option nat ] */ ;
+         /* [ option nat ] */ ;
          IF_SOME
            { NIL operation
-             /* [ list operation : @contract.some nat ] */ ;
+             /* [ list operation : nat ] */ ;
              PAIR
-             /* [ pair (list operation) (nat @contract.some) ] */ }
+             /* [ pair (list operation) nat ] */ }
            { FAIL } } }

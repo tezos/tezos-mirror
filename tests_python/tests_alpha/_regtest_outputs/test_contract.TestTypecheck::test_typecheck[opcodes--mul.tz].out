@@ -5,7 +5,7 @@ Gas remaining: 1039959.301 units remaining
 { parameter unit ;
   storage unit ;
   code { CAR
-         /* [ @parameter unit ] */ ;
+         /* [ unit ] */ ;
          DROP
          /* [] */ ;
          PUSH nat 7987

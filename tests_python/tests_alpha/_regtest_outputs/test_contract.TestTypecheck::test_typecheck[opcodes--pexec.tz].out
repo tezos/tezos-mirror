@@ -12,9 +12,9 @@ Gas remaining: 1039992.874 units remaining
          SWAP
          /* [ pair (nat @parameter) (nat @storage) : lambda (pair nat nat) nat ] */ ;
          UNPAIR
-         /* [ @parameter nat : @storage nat : lambda (pair nat nat) nat ] */ ;
+         /* [ nat : nat : lambda (pair nat nat) nat ] */ ;
          DIP { APPLY /* [ lambda nat nat ] */ }
-         /* [ @parameter nat : lambda nat nat ] */ ;
+         /* [ nat : lambda nat nat ] */ ;
          EXEC
          /* [ nat ] */ ;
          NIL operation

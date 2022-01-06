@@ -19,14 +19,14 @@ trace
   - location: 12 (remaining gas: 1039984.299 units remaining)
     [  ]
   - location: 13 (remaining gas: 1039984.284 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self ]
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
   - location: 15 (remaining gas: 1039984.254 units remaining)
     [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
   - location: 16 (remaining gas: 1039984.239 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	
       "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
   - location: 17 (remaining gas: 1039984.229 units remaining)
-    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	@self.address
+    [ "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	
       "KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi"  	 ]
   - location: 20 (remaining gas: 1039984.193 units remaining)
     [ 0  	 ]

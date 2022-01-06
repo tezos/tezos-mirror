@@ -9,16 +9,16 @@ Gas remaining: 1039988.984 units remaining
          LAMBDA
            unit
            address
-           { DROP /* [] */ ; SELF_ADDRESS /* [ @self address ] */ }
+           { DROP /* [] */ ; SELF_ADDRESS /* [ address ] */ }
          /* [ lambda unit address ] */ ;
          UNIT
          /* [ unit : lambda unit address ] */ ;
          EXEC
          /* [ address ] */ ;
          SELF
-         /* [ @self contract unit : address ] */ ;
+         /* [ contract unit : address ] */ ;
          ADDRESS
-         /* [ @self.address address : address ] */ ;
+         /* [ address : address ] */ ;
          ASSERT_CMPEQ ;
          UNIT
          /* [ unit ] */ ;

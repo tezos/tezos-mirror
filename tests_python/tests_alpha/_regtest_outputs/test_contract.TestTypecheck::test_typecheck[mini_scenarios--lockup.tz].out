@@ -5,44 +5,38 @@ Gas remaining: 1039981.235 units remaining
 { parameter unit ;
   storage (pair timestamp (pair mutez address)) ;
   code { CDR
-         /* [ @storage pair timestamp mutez address ] */ ;
+         /* [ pair timestamp mutez address ] */ ;
          DUP
-         /* [ @storage pair timestamp mutez address
-            : @storage pair timestamp mutez address ] */ ;
+         /* [ pair timestamp mutez address : pair timestamp mutez address ] */ ;
          CAR
-         /* [ timestamp : @storage pair timestamp mutez address ] */ ;
+         /* [ timestamp : pair timestamp mutez address ] */ ;
          NOW
-         /* [ @now timestamp : timestamp : @storage pair timestamp mutez address ] */ ;
+         /* [ timestamp : timestamp : pair timestamp mutez address ] */ ;
          CMPLT ;
-         IF { FAIL } { /* [ @storage pair timestamp mutez address ] */ } ;
+         IF { FAIL } { /* [ pair timestamp mutez address ] */ } ;
          DUP
-         /* [ @storage pair timestamp mutez address
-            : @storage pair timestamp mutez address ] */ ;
+         /* [ pair timestamp mutez address : pair timestamp mutez address ] */ ;
          CDR
-         /* [ pair mutez address : @storage pair timestamp mutez address ] */ ;
+         /* [ pair mutez address : pair timestamp mutez address ] */ ;
          DUP
-         /* [ pair mutez address : pair mutez address
-            : @storage pair timestamp mutez address ] */ ;
+         /* [ pair mutez address : pair mutez address : pair timestamp mutez address ] */ ;
          CAR
-         /* [ mutez : pair mutez address : @storage pair timestamp mutez address ] */ ;
-         DIP { CDR /* [ address : @storage pair timestamp mutez address ] */ }
-         /* [ mutez : address : @storage pair timestamp mutez address ] */ ;
-         DIP { CONTRACT
-                 unit
-               /* [ @contract option (contract unit) : @storage pair timestamp mutez address ] */ ;
+         /* [ mutez : pair mutez address : pair timestamp mutez address ] */ ;
+         DIP { CDR /* [ address : pair timestamp mutez address ] */ }
+         /* [ mutez : address : pair timestamp mutez address ] */ ;
+         DIP { CONTRACT unit
+               /* [ option (contract unit) : pair timestamp mutez address ] */ ;
                ASSERT_SOME }
-         /* [ mutez : @contract.some contract unit
-            : @storage pair timestamp mutez address ] */ ;
+         /* [ mutez : contract unit : pair timestamp mutez address ] */ ;
          UNIT
-         /* [ unit : mutez : @contract.some contract unit
-            : @storage pair timestamp mutez address ] */ ;
+         /* [ unit : mutez : contract unit : pair timestamp mutez address ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage pair timestamp mutez address ] */ ;
+         /* [ operation : pair timestamp mutez address ] */ ;
          NIL operation
-         /* [ list operation : operation : @storage pair timestamp mutez address ] */ ;
+         /* [ list operation : operation : pair timestamp mutez address ] */ ;
          SWAP
-         /* [ operation : list operation : @storage pair timestamp mutez address ] */ ;
+         /* [ operation : list operation : pair timestamp mutez address ] */ ;
          CONS
-         /* [ list operation : @storage pair timestamp mutez address ] */ ;
+         /* [ list operation : pair timestamp mutez address ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage timestamp mutez address) ] */ } }
+         /* [ pair (list operation) timestamp mutez address ] */ } }

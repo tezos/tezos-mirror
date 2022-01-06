@@ -5,25 +5,23 @@ Gas remaining: 1039989.249 units remaining
 { parameter unit ;
   storage unit ;
   code { CAR
-         /* [ @parameter string ] */ ;
-         PUSH string
-              "foo"
-              /* [ pair (list operation) (string @parameter) ] */
-         /* [ list operation : @parameter string ] */ ;
+         /* [ string ] */ ;
+         PUSH string "foo" /* [ pair (list operation) string ] */
+         /* [ list operation : string ] */ ;
          PUSH mutez 0
-         /* [ mutez : string : @parameter unit ] */ ;
+         /* [ mutez : string : unit ] */ ;
          NONE key_hash
-         /* [ option key_hash : mutez : string : @parameter unit ] */ ;
+         /* [ option key_hash : mutez : string : unit ] */ ;
          CREATE_CONTRACT
            { parameter string ;
              storage string ;
              code { CAR ; NIL operation ; PAIR } }
-         /* [ operation : address : @parameter unit ] */ ;
+         /* [ operation : address : unit ] */ ;
          DROP
-         /* [ address : @parameter unit ] */ ;
+         /* [ address : unit ] */ ;
          DROP
-         /* [ @parameter unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @parameter unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @parameter) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

@@ -5,9 +5,9 @@ Gas remaining: 1039990.023 units remaining
 { parameter unit ;
   storage (pair nat nat nat unit) ;
   code { CDR
-         /* [ @storage pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit ] */ ;
          PUSH nat 2
-         /* [ nat : @storage pair nat nat nat unit ] */ ;
+         /* [ nat : pair nat nat nat unit ] */ ;
          UPDATE 1
          /* [ pair nat nat nat unit ] */ ;
          PUSH nat 12

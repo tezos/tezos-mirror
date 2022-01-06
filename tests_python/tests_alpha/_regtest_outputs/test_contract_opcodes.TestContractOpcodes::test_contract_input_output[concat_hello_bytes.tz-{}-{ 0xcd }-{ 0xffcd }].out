@@ -10,12 +10,12 @@ trace
   - location: 9 (remaining gas: 1039992.498 units remaining)
     [ (Pair { 0xcd } {})  	 ]
   - location: 9 (remaining gas: 1039992.488 units remaining)
-    [ { 0xcd }  	@parameter ]
+    [ { 0xcd }  	 ]
   - location: 10 (remaining gas: 1039992.488 units remaining)
-    [ 0xcd  	@parameter.elt ]
+    [ 0xcd  	 ]
   - location: 12 (remaining gas: 1039992.478 units remaining)
     [ 0xff  	
-      0xcd  	@parameter.elt ]
+      0xcd  	 ]
   - location: 15 (remaining gas: 1039992.413 units remaining)
     [ 0xffcd  	 ]
   - location: 10 (remaining gas: 1039992.398 units remaining)

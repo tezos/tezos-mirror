@@ -11,17 +11,17 @@ trace
   - location: 12 (remaining gas: 1039986.718 units remaining)
     [ (Pair "foo" { Elt "foo" 0 } None)  	 ]
   - location: 12 (remaining gas: 1039986.708 units remaining)
-    [ "foo"  	@parameter
-      (Pair { Elt "foo" 0 } None)  	@storage ]
+    [ "foo"  	
+      (Pair { Elt "foo" 0 } None)  	 ]
   - location: 13 (remaining gas: 1039986.693 units remaining)
-    [ (Pair { Elt "foo" 0 } None)  	@storage ]
+    [ (Pair { Elt "foo" 0 } None)  	 ]
   - location: 15 (remaining gas: 1039986.683 units remaining)
     [ { Elt "foo" 0 }  	 ]
   - location: 16 (remaining gas: 1039986.673 units remaining)
     [ { Elt "foo" 0 }  	
       { Elt "foo" 0 }  	 ]
   - location: 13 (remaining gas: 1039986.643 units remaining)
-    [ "foo"  	@parameter
+    [ "foo"  	
       { Elt "foo" 0 }  	
       { Elt "foo" 0 }  	 ]
   - location: 17 (remaining gas: 1039985.665 units remaining)

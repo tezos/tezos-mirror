@@ -5,7 +5,7 @@ Gas remaining: 1039996.500 units remaining
 { parameter bls12_381_g2 ;
   storage (option bls12_381_g2) ;
   code { CAR
-         /* [ @parameter bls12_381_g2 ] */ ;
+         /* [ bls12_381_g2 ] */ ;
          SOME
          /* [ option bls12_381_g2 ] */ ;
          NIL operation

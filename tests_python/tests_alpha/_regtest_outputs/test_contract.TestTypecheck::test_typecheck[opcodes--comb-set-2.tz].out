@@ -5,9 +5,9 @@ Gas remaining: 1039989.821 units remaining
 { parameter (pair nat nat nat unit) ;
   storage (option (pair int nat string bytes)) ;
   code { CAR
-         /* [ @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit ] */ ;
          PUSH int 2
-         /* [ int : @parameter pair nat nat nat unit ] */ ;
+         /* [ int : pair nat nat nat unit ] */ ;
          UPDATE 1
          /* [ pair int nat nat unit ] */ ;
          PUSH string "toto"

@@ -5,7 +5,7 @@ Gas remaining: 1039994.233 units remaining
 { parameter key ;
   storage (pair nat nat) ;
   code { CAR
-         /* [ @parameter key ] */ ;
+         /* [ key ] */ ;
          HASH_KEY
          /* [ key_hash ] */ ;
          VOTING_POWER

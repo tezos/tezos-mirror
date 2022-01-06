@@ -12,10 +12,10 @@ trace
   - location: 7 (remaining gas: 1039994.938 units remaining)
     [  ]
   - location: 8 (remaining gas: 1039774.922 units remaining)
-    [ 500000  	@balance ]
+    [ 500000  	 ]
   - location: 9 (remaining gas: 1039774.907 units remaining)
     [ {}  	
-      500000  	@balance ]
+      500000  	 ]
   - location: 11 (remaining gas: 1039774.892 units remaining)
     [ (Pair {} 500000)  	 ]
 

@@ -12,17 +12,17 @@ Gas remaining: 1039931.026 units remaining
           (list %sigs (option signature))) ;
   storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
   code { UNPAIR
-         /* [ @parameter pair (pair :payload
+         /* [ pair (pair :payload
                     (nat %counter)
                     (or :action
                        (pair :transfer (mutez %amount) (contract %dest unit))
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key)))))
                  (list %sigs (option signature))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          SWAP
-         /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : @parameter pair (pair :payload
+         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key)
+            : pair (pair :payload
                     (nat %counter)
                     (or :action
                        (pair :transfer (mutez %amount) (contract %dest unit))
@@ -30,9 +30,9 @@ Gas remaining: 1039931.026 units remaining
                            (pair %change_keys (nat %threshold) (list %keys key)))))
                  (list %sigs (option signature)) ] */ ;
          DUP
-         /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : @parameter pair (pair :payload
+         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key)
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key)
+            : pair (pair :payload
                     (nat %counter)
                     (or :action
                        (pair :transfer (mutez %amount) (contract %dest unit))
@@ -40,23 +40,23 @@ Gas remaining: 1039931.026 units remaining
                            (pair %change_keys (nat %threshold) (list %keys key)))))
                  (list %sigs (option signature)) ] */ ;
          DIP { SWAP
-               /* [ @parameter pair (pair :payload
+               /* [ pair (pair :payload
                           (nat %counter)
                           (or :action
                              (pair :transfer (mutez %amount) (contract %dest unit))
                              (or (option %delegate key_hash)
                                  (pair %change_keys (nat %threshold) (list %keys key)))))
                        (list %sigs (option signature))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : @parameter pair (pair :payload
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key)
+            : pair (pair :payload
                     (nat %counter)
                     (or :action
                        (pair :transfer (mutez %amount) (contract %dest unit))
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key)))))
                  (list %sigs (option signature))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          DIP { UNPAIR
                /* [ pair :payload
                     (nat %counter)
@@ -65,7 +65,7 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                DUP
                /* [ pair :payload
                     (nat %counter)
@@ -80,9 +80,9 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                SELF
-               /* [ @self contract
+               /* [ contract
                     (pair (pair :payload
                              (nat %counter)
                              (or :action
@@ -103,9 +103,9 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                ADDRESS
-               /* [ @self.address address
+               /* [ address
                   : pair :payload
                     (nat %counter)
                     (or :action
@@ -119,9 +119,9 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                CHAIN_ID
-               /* [ chain_id : @self.address address
+               /* [ chain_id : address
                   : pair :payload
                     (nat %counter)
                     (or :action
@@ -135,9 +135,9 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                PAIR
-               /* [ pair chain_id (address @self.address)
+               /* [ pair chain_id address
                   : pair :payload
                     (nat %counter)
                     (or :action
@@ -151,9 +151,9 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                PAIR
-               /* [ pair (pair chain_id (address @self.address))
+               /* [ pair (pair chain_id address)
                        (pair :payload
                           (nat %counter)
                           (or :action
@@ -167,9 +167,9 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                PACK
-               /* [ @packed bytes
+               /* [ bytes
                   : pair :payload
                     (nat %counter)
                     (or :action
@@ -177,325 +177,313 @@ Gas remaining: 1039931.026 units remaining
                        (or (option %delegate key_hash)
                            (pair %change_keys (nat %threshold) (list %keys key))))
                   : list (option signature)
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                DIP { UNPAIR @counter
-                     /* [ @counter nat
+                     /* [ nat
                         : or :action
                           (pair :transfer (mutez %amount) (contract %dest unit))
                           (or (option %delegate key_hash)
                               (pair %change_keys (nat %threshold) (list %keys key)))
                         : list (option signature)
-                        : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                        : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                      DIP { SWAP
                            /* [ list (option signature)
                               : or :action
                                 (pair :transfer (mutez %amount) (contract %dest unit))
                                 (or (option %delegate key_hash)
                                     (pair %change_keys (nat %threshold) (list %keys key)))
-                              : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                     /* [ @counter nat : list (option signature)
+                              : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                     /* [ nat : list (option signature)
                         : or :action
                           (pair :transfer (mutez %amount) (contract %dest unit))
                           (or (option %delegate key_hash)
                               (pair %change_keys (nat %threshold) (list %keys key)))
-                        : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-               /* [ @packed bytes : @counter nat : list (option signature)
+                        : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+               /* [ bytes : nat : list (option signature)
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                SWAP
-               /* [ @counter nat : @packed bytes : list (option signature)
+               /* [ nat : bytes : list (option signature)
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ @storage pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : @counter nat : @packed bytes : list (option signature)
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key) : nat : bytes
+            : list (option signature)
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          UNPAIR @stored_counter
-         /* [ @stored_counter nat : pair (nat %threshold) (list %keys key) : @counter nat
-            : @packed bytes : list (option signature)
+         /* [ nat : pair (nat %threshold) (list %keys key) : nat : bytes
+            : list (option signature)
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          DIP { SWAP
-               /* [ @counter nat : pair (nat %threshold) (list %keys key) : @packed bytes
+               /* [ nat : pair (nat %threshold) (list %keys key) : bytes
                   : list (option signature)
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ @stored_counter nat : @counter nat : pair (nat %threshold) (list %keys key)
-            : @packed bytes : list (option signature)
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+         /* [ nat : nat : pair (nat %threshold) (list %keys key) : bytes
+            : list (option signature)
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          ASSERT_CMPEQ ;
          DIP { SWAP
-               /* [ list (option signature) : @packed bytes
+               /* [ list (option signature) : bytes
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ pair (nat %threshold) (list %keys key) : list (option signature)
-            : @packed bytes
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+         /* [ pair (nat %threshold) (list %keys key) : list (option signature) : bytes
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          UNPAIR @threshold @keys
-         /* [ @threshold nat : @keys list key : list (option signature) : @packed bytes
+         /* [ nat : list key : list (option signature) : bytes
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          DIP { PUSH @valid
                  nat
                  0
-               /* [ @valid nat : @keys list key : list (option signature) : @packed bytes
+               /* [ nat : list key : list (option signature) : bytes
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                SWAP
-               /* [ @keys list key : @valid nat : list (option signature) : @packed bytes
+               /* [ list key : nat : list (option signature) : bytes
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                ITER { DIP { SWAP
-                            /* [ list (option signature) : @valid nat : @packed bytes
+                            /* [ list (option signature) : nat : bytes
                                : or :action
                                  (pair :transfer (mutez %amount) (contract %dest unit))
                                  (or (option %delegate key_hash)
                                      (pair %change_keys (nat %threshold) (list %keys key)))
-                               : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                      /* [ @keys.elt key : list (option signature) : @valid nat : @packed bytes
+                               : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                      /* [ key : list (option signature) : nat : bytes
                          : or :action
                            (pair :transfer (mutez %amount) (contract %dest unit))
                            (or (option %delegate key_hash)
                                (pair %change_keys (nat %threshold) (list %keys key)))
-                         : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                       SWAP
-                      /* [ list (option signature) : @keys.elt key : @valid nat : @packed bytes
+                      /* [ list (option signature) : key : nat : bytes
                          : or :action
                            (pair :transfer (mutez %amount) (contract %dest unit))
                            (or (option %delegate key_hash)
                                (pair %change_keys (nat %threshold) (list %keys key)))
-                         : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                       IF_CONS
                         { IF_SOME
                             { SWAP
-                              /* [ @tl list (option signature) : @hd.some signature : @keys.elt key
-                                 : @valid nat : @packed bytes
+                              /* [ list (option signature) : signature : key : nat : bytes
                                  : or :action
                                    (pair :transfer (mutez %amount) (contract %dest unit))
                                    (or (option %delegate key_hash)
                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                               DIP { SWAP
-                                    /* [ @keys.elt key : @hd.some signature : @valid nat : @packed bytes
+                                    /* [ key : signature : nat : bytes
                                        : or :action
                                          (pair :transfer (mutez %amount) (contract %dest unit))
                                          (or (option %delegate key_hash)
                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                                     DIIP { DUUP
-                                           /* [ bytes : @valid nat : @packed bytes
+                                           /* [ bytes : nat : bytes
                                               : or :action
                                                 (pair :transfer (mutez %amount) (contract %dest unit))
                                                 (or (option %delegate key_hash)
                                                     (pair %change_keys (nat %threshold) (list %keys key)))
-                                              : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                                    /* [ @keys.elt key : @hd.some signature : bytes : @valid nat : @packed bytes
+                                              : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                    /* [ key : signature : bytes : nat : bytes
                                        : or :action
                                          (pair :transfer (mutez %amount) (contract %dest unit))
                                          (or (option %delegate key_hash)
                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                                     { DUUUP
-                                      /* [ bytes : @keys.elt key : @hd.some signature : bytes : @valid nat
-                                         : @packed bytes
+                                      /* [ bytes : key : signature : bytes : nat : bytes
                                          : or :action
                                            (pair :transfer (mutez %amount) (contract %dest unit))
                                            (or (option %delegate key_hash)
                                                (pair %change_keys (nat %threshold) (list %keys key)))
-                                         : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                                       DIP { CHECK_SIGNATURE
-                                            /* [ bool : @valid nat : @packed bytes
+                                            /* [ bool : nat : bytes
                                                : or :action
                                                  (pair :transfer (mutez %amount) (contract %dest unit))
                                                  (or (option %delegate key_hash)
                                                      (pair %change_keys (nat %threshold) (list %keys key)))
-                                               : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                                      /* [ bytes : bool : @valid nat : @packed bytes
+                                               : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                      /* [ bytes : bool : nat : bytes
                                          : or :action
                                            (pair :transfer (mutez %amount) (contract %dest unit))
                                            (or (option %delegate key_hash)
                                                (pair %change_keys (nat %threshold) (list %keys key)))
-                                         : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                                       SWAP
-                                      /* [ bool : bytes : @valid nat : @packed bytes
+                                      /* [ bool : bytes : nat : bytes
                                          : or :action
                                            (pair :transfer (mutez %amount) (contract %dest unit))
                                            (or (option %delegate key_hash)
                                                (pair %change_keys (nat %threshold) (list %keys key)))
-                                         : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                                       IF { DROP
-                                           /* [ @valid nat : @packed bytes
+                                           /* [ nat : bytes
                                               : or :action
                                                 (pair :transfer (mutez %amount) (contract %dest unit))
                                                 (or (option %delegate key_hash)
                                                     (pair %change_keys (nat %threshold) (list %keys key)))
-                                              : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                              : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
                                          { FAILWITH /* [] */ } } ;
                                     PUSH nat
                                          1
-                                    /* [ nat : @valid nat : @packed bytes
+                                    /* [ nat : nat : bytes
                                        : or :action
                                          (pair :transfer (mutez %amount) (contract %dest unit))
                                          (or (option %delegate key_hash)
                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                                     ADD @valid
-                                    /* [ @valid nat : @packed bytes
+                                    /* [ nat : bytes
                                        : or :action
                                          (pair :transfer (mutez %amount) (contract %dest unit))
                                          (or (option %delegate key_hash)
                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-                              /* [ @tl list (option signature) : @valid nat : @packed bytes
+                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                              /* [ list (option signature) : nat : bytes
                                  : or :action
                                    (pair :transfer (mutez %amount) (contract %dest unit))
                                    (or (option %delegate key_hash)
                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
                             { SWAP
-                              /* [ @keys.elt key : @tl list (option signature) : @valid nat : @packed bytes
+                              /* [ key : list (option signature) : nat : bytes
                                  : or :action
                                    (pair :transfer (mutez %amount) (contract %dest unit))
                                    (or (option %delegate key_hash)
                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
                               DROP
-                              /* [ @tl list (option signature) : @valid nat : @packed bytes
+                              /* [ list (option signature) : nat : bytes
                                  : or :action
                                    (pair :transfer (mutez %amount) (contract %dest unit))
                                    (or (option %delegate key_hash)
                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ } }
+                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ } }
                         { FAIL } ;
                       SWAP
-                      /* [ @valid nat : @tl list (option signature) : @packed bytes
+                      /* [ nat : list (option signature) : bytes
                          : or :action
                            (pair :transfer (mutez %amount) (contract %dest unit))
                            (or (option %delegate key_hash)
                                (pair %change_keys (nat %threshold) (list %keys key)))
-                         : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-               /* [ @valid nat : list (option signature) : @packed bytes
+                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+               /* [ nat : list (option signature) : bytes
                   : or :action
                     (pair :transfer (mutez %amount) (contract %dest unit))
                     (or (option %delegate key_hash)
                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ @threshold nat : @valid nat : list (option signature) : @packed bytes
+                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+         /* [ nat : nat : list (option signature) : bytes
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          ASSERT_CMPLE ;
          DROP
-         /* [ @packed bytes
+         /* [ bytes
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          DROP
          /* [ or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : @storage pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
          DIP { UNPAIR
                /* [ nat : pair (nat %threshold) (list %keys key) ] */ ;
                PUSH nat 1
                /* [ nat : nat : pair (nat %threshold) (list %keys key) ] */ ;
                ADD @new_counter
-               /* [ @new_counter nat : pair (nat %threshold) (list %keys key) ] */ ;
+               /* [ nat : pair (nat %threshold) (list %keys key) ] */ ;
                PAIR
-               /* [ pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ }
+               /* [ pair nat (nat %threshold) (list %keys key) ] */ }
          /* [ or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair nat (nat %threshold) (list %keys key) ] */ ;
          NIL operation
          /* [ list operation
             : or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair nat (nat %threshold) (list %keys key) ] */ ;
          SWAP
          /* [ or :action
               (pair :transfer (mutez %amount) (contract %dest unit))
               (or (option %delegate key_hash)
                   (pair %change_keys (nat %threshold) (list %keys key))) : list operation
-            : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+            : pair nat (nat %threshold) (list %keys key) ] */ ;
          IF_LEFT
            { UNPAIR
              /* [ mutez : contract unit : list operation
-                : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+                : pair nat (nat %threshold) (list %keys key) ] */ ;
              UNIT
              /* [ unit : mutez : contract unit : list operation
-                : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+                : pair nat (nat %threshold) (list %keys key) ] */ ;
              TRANSFER_TOKENS
-             /* [ operation : list operation
-                : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+             /* [ operation : list operation : pair nat (nat %threshold) (list %keys key) ] */ ;
              CONS
-             /* [ list operation
-                : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ }
+             /* [ list operation : pair nat (nat %threshold) (list %keys key) ] */ }
            { IF_LEFT
                { SET_DELEGATE
-                 /* [ operation : list operation
-                    : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ ;
+                 /* [ operation : list operation : pair nat (nat %threshold) (list %keys key) ] */ ;
                  CONS
-                 /* [ list operation
-                    : pair (nat @new_counter) (nat %threshold) (list %keys key) ] */ }
+                 /* [ list operation : pair nat (nat %threshold) (list %keys key) ] */ }
                { DIP { SWAP
-                       /* [ pair (nat @new_counter) (nat %threshold) (list %keys key)
-                          : list operation ] */ ;
+                       /* [ pair nat (nat %threshold) (list %keys key) : list operation ] */ ;
                        CAR
-                       /* [ @new_counter nat : list operation ] */ }
-                 /* [ @change_keys pair (nat %threshold) (list %keys key) : @new_counter nat
-                    : list operation ] */ ;
+                       /* [ nat : list operation ] */ }
+                 /* [ pair (nat %threshold) (list %keys key) : nat : list operation ] */ ;
                  SWAP
-                 /* [ @new_counter nat : @change_keys pair (nat %threshold) (list %keys key)
-                    : list operation ] */ ;
+                 /* [ nat : pair (nat %threshold) (list %keys key) : list operation ] */ ;
                  PAIR
-                 /* [ pair (nat @new_counter) (pair @change_keys (nat %threshold) (list %keys key))
-                    : list operation ] */ ;
+                 /* [ pair nat (nat %threshold) (list %keys key) : list operation ] */ ;
                  SWAP
-                 /* [ list operation
-                    : pair (nat @new_counter) (pair @change_keys (nat %threshold) (list %keys key)) ] */ } } ;
+                 /* [ list operation : pair nat (nat %threshold) (list %keys key) ] */ } } ;
          PAIR
-         /* [ pair (list operation) (nat @new_counter) (nat %threshold) (list %keys key) ] */ } }
+         /* [ pair (list operation) nat (nat %threshold) (list %keys key) ] */ } }

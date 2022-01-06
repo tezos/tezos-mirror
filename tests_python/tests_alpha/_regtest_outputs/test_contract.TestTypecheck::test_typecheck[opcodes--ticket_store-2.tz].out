@@ -5,8 +5,8 @@ Gas remaining: 1039996.494 units remaining
 { parameter (option (ticket nat)) ;
   storage (option (ticket nat)) ;
   code { CAR
-         /* [ @parameter option (ticket nat) ] */ ;
+         /* [ option (ticket nat) ] */ ;
          NIL operation
-         /* [ list operation : @parameter option (ticket nat) ] */ ;
+         /* [ list operation : option (ticket nat) ] */ ;
          PAIR
-         /* [ pair (list operation) (option @parameter (ticket nat)) ] */ } }
+         /* [ pair (list operation) (option (ticket nat)) ] */ } }

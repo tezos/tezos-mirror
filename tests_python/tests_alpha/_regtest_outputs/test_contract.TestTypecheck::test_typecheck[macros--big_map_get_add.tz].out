@@ -56,7 +56,7 @@ Gas remaining: 1039968.666 units remaining
          /* [ option int : option int : big_map int int ] */ ;
          IF_SOME
            { SWAP
-             /* [ option int : @some int : big_map int int ] */ ;
+             /* [ option int : int : big_map int int ] */ ;
              IF_SOME { ASSERT_CMPEQ } { FAIL } }
            { ASSERT_NONE } ;
          UNIT

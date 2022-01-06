@@ -10,29 +10,29 @@ trace
   - location: 7 (remaining gas: 1039987.094 units remaining)
     [ (Pair "test" "?")  	 ]
   - location: 7 (remaining gas: 1039987.084 units remaining)
-    [ "test"  	@parameter ]
+    [ "test"  	 ]
   - location: 8 (remaining gas: 1039987.074 units remaining)
     [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	
-      "test"  	@parameter ]
+      "test"  	 ]
   - location: 22 (remaining gas: 1039987.064 units remaining)
-    [ "test"  	@parameter
+    [ "test"  	
       { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	 ]
   - location: 12 (remaining gas: 1039987.054 units remaining)
     [ "_abc"  	
-      "test"  	@arg ]
+      "test"  	 ]
   - location: 15 (remaining gas: 1039987.039 units remaining)
     [ {}  	
       "_abc"  	
-      "test"  	@arg ]
+      "test"  	 ]
   - location: 17 (remaining gas: 1039987.029 units remaining)
     [ "_abc"  	
       {}  	
-      "test"  	@arg ]
+      "test"  	 ]
   - location: 18 (remaining gas: 1039987.014 units remaining)
     [ { "_abc" }  	
-      "test"  	@arg ]
+      "test"  	 ]
   - location: 19 (remaining gas: 1039987.004 units remaining)
-    [ "test"  	@arg
+    [ "test"  	
       { "_abc" }  	 ]
   - location: 20 (remaining gas: 1039986.989 units remaining)
     [ { "test" ; "_abc" }  	 ]

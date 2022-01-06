@@ -7,9 +7,9 @@ Gas remaining: 1039992.147 units remaining
   code { DROP
          /* [] */ ;
          AMOUNT
-         /* [ @amount mutez ] */ ;
+         /* [ mutez ] */ ;
          PUSH mutez 10000000
-         /* [ mutez : @amount mutez ] */ ;
+         /* [ mutez : mutez ] */ ;
          CMPGT ;
          IF { FAIL } { /* [] */ } ;
          UNIT

@@ -9,45 +9,42 @@ Gas remaining: 1039978.198 units remaining
           (option (pair int nat))
           (option (pair nat nat))) ;
   code { CAR
-         /* [ @parameter pair int int ] */ ;
+         /* [ pair int int ] */ ;
          DUP
-         /* [ @parameter pair int int : @parameter pair int int ] */ ;
+         /* [ pair int int : pair int int ] */ ;
          UNPAIR
-         /* [ int : int : @parameter pair int int ] */ ;
+         /* [ int : int : pair int int ] */ ;
          ABS
-         /* [ nat : int : @parameter pair int int ] */ ;
-         DIP { ABS /* [ nat : @parameter pair int int ] */ }
-         /* [ nat : nat : @parameter pair int int ] */ ;
+         /* [ nat : int : pair int int ] */ ;
+         DIP { ABS /* [ nat : pair int int ] */ }
+         /* [ nat : nat : pair int int ] */ ;
          EDIV
-         /* [ option (pair nat nat) : @parameter pair int int ] */ ;
+         /* [ option (pair nat nat) : pair int int ] */ ;
          SWAP
-         /* [ @parameter pair int int : option (pair nat nat) ] */ ;
+         /* [ pair int int : option (pair nat nat) ] */ ;
          DUP
-         /* [ @parameter pair int int : @parameter pair int int : option (pair nat nat) ] */ ;
+         /* [ pair int int : pair int int : option (pair nat nat) ] */ ;
          UNPAIR
-         /* [ int : int : @parameter pair int int : option (pair nat nat) ] */ ;
+         /* [ int : int : pair int int : option (pair nat nat) ] */ ;
          ABS
-         /* [ nat : int : @parameter pair int int : option (pair nat nat) ] */ ;
+         /* [ nat : int : pair int int : option (pair nat nat) ] */ ;
          EDIV
-         /* [ option (pair int nat) : @parameter pair int int : option (pair nat nat) ] */ ;
+         /* [ option (pair int nat) : pair int int : option (pair nat nat) ] */ ;
          SWAP
-         /* [ @parameter pair int int : option (pair int nat) : option (pair nat nat) ] */ ;
+         /* [ pair int int : option (pair int nat) : option (pair nat nat) ] */ ;
          DUP
-         /* [ @parameter pair int int : @parameter pair int int : option (pair int nat)
+         /* [ pair int int : pair int int : option (pair int nat)
             : option (pair nat nat) ] */ ;
          UNPAIR
-         /* [ int : int : @parameter pair int int : option (pair int nat)
-            : option (pair nat nat) ] */ ;
+         /* [ int : int : pair int int : option (pair int nat) : option (pair nat nat) ] */ ;
          DIP { ABS
-               /* [ nat : @parameter pair int int : option (pair int nat)
-                  : option (pair nat nat) ] */ }
-         /* [ int : nat : @parameter pair int int : option (pair int nat)
-            : option (pair nat nat) ] */ ;
+               /* [ nat : pair int int : option (pair int nat) : option (pair nat nat) ] */ }
+         /* [ int : nat : pair int int : option (pair int nat) : option (pair nat nat) ] */ ;
          EDIV
-         /* [ option (pair int nat) : @parameter pair int int : option (pair int nat)
+         /* [ option (pair int nat) : pair int int : option (pair int nat)
             : option (pair nat nat) ] */ ;
          SWAP
-         /* [ @parameter pair int int : option (pair int nat) : option (pair int nat)
+         /* [ pair int int : option (pair int nat) : option (pair int nat)
             : option (pair nat nat) ] */ ;
          UNPAIR
          /* [ int : int : option (pair int nat) : option (pair int nat)

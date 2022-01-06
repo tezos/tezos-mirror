@@ -5,13 +5,13 @@ Gas remaining: 1039993.625 units remaining
 { parameter (pair bool bool) ;
   storage (option bool) ;
   code { CAR
-         /* [ @parameter pair bool bool ] */ ;
+         /* [ pair bool bool ] */ ;
          DUP
-         /* [ @parameter pair bool bool : @parameter pair bool bool ] */ ;
+         /* [ pair bool bool : pair bool bool ] */ ;
          CAR
-         /* [ bool : @parameter pair bool bool ] */ ;
+         /* [ bool : pair bool bool ] */ ;
          SWAP
-         /* [ @parameter pair bool bool : bool ] */ ;
+         /* [ pair bool bool : bool ] */ ;
          CDR
          /* [ bool : bool ] */ ;
          OR

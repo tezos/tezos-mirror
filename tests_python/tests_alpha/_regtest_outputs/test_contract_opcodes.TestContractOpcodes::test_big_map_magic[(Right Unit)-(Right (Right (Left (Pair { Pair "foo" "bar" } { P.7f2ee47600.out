@@ -13,27 +13,27 @@ trace
   - location: 43 (remaining gas: 1039919.139 units remaining)
     [ (Pair (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))) (Right Unit))  	 ]
   - location: 43 (remaining gas: 1039919.129 units remaining)
-    [ (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))))  	@parameter
-      (Right Unit)  	@storage ]
+    [ (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))))  	
+      (Right Unit)  	 ]
   - location: 44 (remaining gas: 1039919.119 units remaining)
-    [ (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))  	@parameter.right
-      (Right Unit)  	@storage ]
+    [ (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))  	
+      (Right Unit)  	 ]
   - location: 60 (remaining gas: 1039919.109 units remaining)
-    [ (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))  	@parameter.right.right
-      (Right Unit)  	@storage ]
+    [ (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))  	
+      (Right Unit)  	 ]
   - location: 65 (remaining gas: 1039919.099 units remaining)
-    [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })  	@parameter.right.right.import
-      (Right Unit)  	@storage ]
+    [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })  	
+      (Right Unit)  	 ]
   - location: 67 (remaining gas: 1039919.084 units remaining)
-    [ (Right Unit)  	@storage ]
+    [ (Right Unit)  	 ]
   - location: 70 (remaining gas: 1039919.074 units remaining)
-    [ Unit  	@storage.right ]
+    [ Unit  	 ]
   - location: 70 (remaining gas: 1039919.059 units remaining)
-    [ Unit  	@storage.right ]
+    [ Unit  	 ]
   - location: 76 (remaining gas: 1039919.049 units remaining)
     [  ]
   - location: 67 (remaining gas: 1039919.019 units remaining)
-    [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })  	@parameter.right.right.import ]
+    [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })  	 ]
   - location: 77 (remaining gas: 1039919.009 units remaining)
     [ { Pair "foo" "bar" }  	
       { Pair "gaz" "baz" }  	 ]
@@ -47,7 +47,7 @@ trace
       {}  	
       { Pair "gaz" "baz" }  	 ]
   - location: 83 (remaining gas: 1039918.949 units remaining)
-    [ (Pair "foo" "bar")  	@elt
+    [ (Pair "foo" "bar")  	
       {}  	
       { Pair "gaz" "baz" }  	 ]
   - location: 85 (remaining gas: 1039918.939 units remaining)
@@ -87,7 +87,7 @@ trace
       {}  	
       { Elt "foo" "bar" }  	 ]
   - location: 96 (remaining gas: 1039917.796 units remaining)
-    [ (Pair "gaz" "baz")  	@elt
+    [ (Pair "gaz" "baz")  	
       {}  	
       { Elt "foo" "bar" }  	 ]
   - location: 98 (remaining gas: 1039917.786 units remaining)

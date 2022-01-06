@@ -15,7 +15,7 @@ Gas remaining: 1039911.852 units remaining
           unit) ;
   code { NIL @operations
            operation
-         /* [ @operations list operation
+         /* [ list operation
             : pair (or @parameter
                     (pair %fund
                        (address %dest)
@@ -38,7 +38,7 @@ Gas remaining: 1039911.852 units remaining
                        bytes
                        (pair (pair %recipients (address %from) (address %dest))
                              (pair %settings (mutez %amount) (timestamp %deadline))))
-                    unit) : @operations list operation ] */ ;
+                    unit) : list operation ] */ ;
          UNPAPAIR @% @% @% ;
          DIP { DUP
                /* [ big_map
@@ -49,8 +49,8 @@ Gas remaining: 1039911.852 units remaining
                     bytes
                     (pair (pair %recipients (address %from) (address %dest))
                           (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                  : @operations list operation ] */ }
-         /* [ @parameter or (pair %fund
+                  : list operation ] */ }
+         /* [ or (pair %fund
                   (address %dest)
                   (pair %settings (bytes %target_hash) (timestamp %deadline)))
                (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash))
@@ -62,10 +62,10 @@ Gas remaining: 1039911.852 units remaining
               bytes
               (pair (pair %recipients (address %from) (address %dest))
                     (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-            : @operations list operation ] */ ;
+            : list operation ] */ ;
          IF_LEFT
            { UNPAIR @% @%
-             /* [ @dest address : @settings pair (bytes %target_hash) (timestamp %deadline)
+             /* [ address : pair (bytes %target_hash) (timestamp %deadline)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
@@ -74,10 +74,9 @@ Gas remaining: 1039911.852 units remaining
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              DUP
-             /* [ @dest address : @dest address
-                : @settings pair (bytes %target_hash) (timestamp %deadline)
+             /* [ address : address : pair (bytes %target_hash) (timestamp %deadline)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
@@ -86,11 +85,11 @@ Gas remaining: 1039911.852 units remaining
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              CONTRACT @dest
                unit
-             /* [ @dest option (contract unit) : @dest address
-                : @settings pair (bytes %target_hash) (timestamp %deadline)
+             /* [ option (contract unit) : address
+                : pair (bytes %target_hash) (timestamp %deadline)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
@@ -99,10 +98,10 @@ Gas remaining: 1039911.852 units remaining
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              ASSERT_SOME ;
              DROP
-             /* [ @dest address : @settings pair (bytes %target_hash) (timestamp %deadline)
+             /* [ address : pair (bytes %target_hash) (timestamp %deadline)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
@@ -111,9 +110,9 @@ Gas remaining: 1039911.852 units remaining
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              SWAP
-             /* [ @settings pair (bytes %target_hash) (timestamp %deadline) : @dest address
+             /* [ pair (bytes %target_hash) (timestamp %deadline) : address
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
@@ -122,9 +121,9 @@ Gas remaining: 1039911.852 units remaining
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              UNPAIR @% @%
-             /* [ @target_hash bytes : @deadline timestamp : @dest address
+             /* [ bytes : timestamp : address
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
@@ -133,9 +132,9 @@ Gas remaining: 1039911.852 units remaining
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              DIP { AMOUNT @amount
-                   /* [ @amount mutez : @deadline timestamp : @dest address
+                   /* [ mutez : timestamp : address
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -144,9 +143,9 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    SENDER
-                   /* [ @sender address : @amount mutez : @deadline timestamp : @dest address
+                   /* [ address : mutez : timestamp : address
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -155,10 +154,9 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    DUP
-                   /* [ @sender address : @sender address : @amount mutez : @deadline timestamp
-                      : @dest address
+                   /* [ address : address : mutez : timestamp : address
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -167,11 +165,10 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    CONTRACT @from
                      unit
-                   /* [ @from option (contract unit) : @sender address : @amount mutez
-                      : @deadline timestamp : @dest address
+                   /* [ option (contract unit) : address : mutez : timestamp : address
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -180,10 +177,10 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    ASSERT_SOME ;
                    DROP
-                   /* [ @sender address : @amount mutez : @deadline timestamp : @dest address
+                   /* [ address : mutez : timestamp : address
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -192,9 +189,9 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    DIP { PAIR
-                         /* [ pair (mutez @amount) (timestamp @deadline) : @dest address
+                         /* [ pair mutez timestamp : address
                             : big_map
                               bytes
                               (pair (pair %recipients (address %from) (address %dest))
@@ -203,9 +200,9 @@ Gas remaining: 1039911.852 units remaining
                               bytes
                               (pair (pair %recipients (address %from) (address %dest))
                                     (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                            : @operations list operation ] */ ;
+                            : list operation ] */ ;
                          SWAP
-                         /* [ @dest address : pair (mutez @amount) (timestamp @deadline)
+                         /* [ address : pair mutez timestamp
                             : big_map
                               bytes
                               (pair (pair %recipients (address %from) (address %dest))
@@ -214,9 +211,8 @@ Gas remaining: 1039911.852 units remaining
                               bytes
                               (pair (pair %recipients (address %from) (address %dest))
                                     (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                            : @operations list operation ] */ }
-                   /* [ @sender address : @dest address
-                      : pair (mutez @amount) (timestamp @deadline)
+                            : list operation ] */ }
+                   /* [ address : address : pair mutez timestamp
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -225,10 +221,9 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    PAIR
-                   /* [ pair (address @sender) (address @dest)
-                      : pair (mutez @amount) (timestamp @deadline)
+                   /* [ pair address address : pair mutez timestamp
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -237,9 +232,9 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    PAIR
-                   /* [ pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline)
+                   /* [ pair (pair address address) mutez timestamp
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -248,10 +243,9 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    SOME @xcat
-                   /* [ @xcat option
-                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                   /* [ option (pair (pair address address) mutez timestamp)
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
@@ -260,87 +254,78 @@ Gas remaining: 1039911.852 units remaining
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    SWAP
                    /* [ big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline)))
-                      : @xcat option
-                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                      : option (pair (pair address address) mutez timestamp)
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ }
-             /* [ @target_hash bytes
+                      : list operation ] */ }
+             /* [ bytes
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline)))
-                : @xcat option
-                  (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                : option (pair (pair address address) mutez timestamp)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              DUP
-             /* [ @target_hash bytes : @target_hash bytes
+             /* [ bytes : bytes
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline)))
-                : @xcat option
-                  (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                : option (pair (pair address address) mutez timestamp)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              DIP { MEM
-                   /* [ bool
-                      : @xcat option
-                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                   /* [ bool : option (pair (pair address address) mutez timestamp)
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    NOT
-                   /* [ bool
-                      : @xcat option
-                        (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+                   /* [ bool : option (pair (pair address address) mutez timestamp)
                       : big_map
                         bytes
                         (pair (pair %recipients (address %from) (address %dest))
                               (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                      : @operations list operation ] */ ;
+                      : list operation ] */ ;
                    ASSERT }
-             /* [ @target_hash bytes
-                : @xcat option
-                  (pair (pair (address @sender) (address @dest)) (mutez @amount) (timestamp @deadline))
+             /* [ bytes : option (pair (pair address address) mutez timestamp)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              UPDATE
              /* [ big_map bytes (pair (pair address address) mutez timestamp) : unit
-                : @operations list operation ] */ ;
+                : list operation ] */ ;
              PAIR @new_storage
-             /* [ @new_storage pair (big_map bytes (pair (pair address address) mutez timestamp)) unit
-                : @operations list operation ] */ ;
+             /* [ pair (big_map bytes (pair (pair address address) mutez timestamp)) unit
+                : list operation ] */ ;
              SWAP
-             /* [ @operations list operation
-                : @new_storage pair (big_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
+             /* [ list operation
+                : pair (big_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
              PAIR
-             /* [ pair (list @operations operation)
-                     (pair @new_storage (big_map bytes (pair (pair address address) mutez timestamp)) unit) ] */ }
+             /* [ pair (list operation)
+                     (big_map bytes (pair (pair address address) mutez timestamp))
+                     unit ] */ }
            { IF_LEFT
                { DUP
-                 /* [ @parameter.claim_refund.preimage_claim bytes
-                    : @parameter.claim_refund.preimage_claim bytes
+                 /* [ bytes : bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
@@ -349,9 +334,9 @@ Gas remaining: 1039911.852 units remaining
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  SIZE
-                 /* [ nat : @parameter.claim_refund.preimage_claim bytes
+                 /* [ nat : bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
@@ -360,10 +345,10 @@ Gas remaining: 1039911.852 units remaining
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  PUSH nat
                       32
-                 /* [ nat : nat : @parameter.claim_refund.preimage_claim bytes
+                 /* [ nat : nat : bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
@@ -372,10 +357,10 @@ Gas remaining: 1039911.852 units remaining
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  ASSERT_CMPGE ;
                  SHA256 @hash
-                 /* [ @hash bytes
+                 /* [ bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
@@ -384,9 +369,9 @@ Gas remaining: 1039911.852 units remaining
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  DUP
-                 /* [ @hash bytes : @hash bytes
+                 /* [ bytes : bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
@@ -395,78 +380,73 @@ Gas remaining: 1039911.852 units remaining
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  DIP { SWAP
                        /* [ big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
-                                  (pair %settings (mutez %amount) (timestamp %deadline))) : @hash bytes
+                                  (pair %settings (mutez %amount) (timestamp %deadline))) : bytes
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ }
-                 /* [ @hash bytes
+                          : list operation ] */ }
+                 /* [ bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
-                            (pair %settings (mutez %amount) (timestamp %deadline))) : @hash bytes
+                            (pair %settings (mutez %amount) (timestamp %deadline))) : bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  DIIP { GET
                         /* [ option
                              (pair (pair %recipients (address %from) (address %dest))
                                    (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                           : @operations list operation ] */ ;
+                           : list operation ] */ ;
                         ASSERT_SOME ;
                         DUP
-                        /* [ @some pair (pair %recipients (address %from) (address %dest))
+                        /* [ pair (pair %recipients (address %from) (address %dest))
                                 (pair %settings (mutez %amount) (timestamp %deadline))
-                           : @some pair (pair %recipients (address %from) (address %dest))
+                           : pair (pair %recipients (address %from) (address %dest))
                                 (pair %settings (mutez %amount) (timestamp %deadline)) : unit
-                           : @operations list operation ] */ ;
+                           : list operation ] */ ;
                         CADR @% ;
                         CONTRACT @dest
                           unit
-                        /* [ @dest option (contract unit)
-                           : @some pair (pair %recipients (address %from) (address %dest))
+                        /* [ option (contract unit)
+                           : pair (pair %recipients (address %from) (address %dest))
                                 (pair %settings (mutez %amount) (timestamp %deadline)) : unit
-                           : @operations list operation ] */ ;
+                           : list operation ] */ ;
                         ASSERT_SOME ;
                         SWAP
-                        /* [ @some pair (pair %recipients (address %from) (address %dest))
-                                (pair %settings (mutez %amount) (timestamp %deadline))
-                           : @dest.some contract unit : unit : @operations list operation ] */ ;
+                        /* [ pair (pair %recipients (address %from) (address %dest))
+                                (pair %settings (mutez %amount) (timestamp %deadline)) : contract unit
+                           : unit : list operation ] */ ;
                         CDR @%
-                        /* [ @settings pair (mutez %amount) (timestamp %deadline)
-                           : @dest.some contract unit : unit : @operations list operation ] */ ;
+                        /* [ pair (mutez %amount) (timestamp %deadline) : contract unit : unit
+                           : list operation ] */ ;
                         UNPAIR @% @%
-                        /* [ @amount mutez : @deadline timestamp : @dest.some contract unit : unit
-                           : @operations list operation ] */ ;
+                        /* [ mutez : timestamp : contract unit : unit : list operation ] */ ;
                         SWAP
-                        /* [ @deadline timestamp : @amount mutez : @dest.some contract unit : unit
-                           : @operations list operation ] */ ;
+                        /* [ timestamp : mutez : contract unit : unit : list operation ] */ ;
                         NOW
-                        /* [ @now timestamp : @deadline timestamp : @amount mutez
-                           : @dest.some contract unit : unit : @operations list operation ] */ ;
+                        /* [ timestamp : timestamp : mutez : contract unit : unit : list operation ] */ ;
                         ASSERT_CMPLT ;
                         UNIT
-                        /* [ unit : @amount mutez : @dest.some contract unit : unit
-                           : @operations list operation ] */ ;
+                        /* [ unit : mutez : contract unit : unit : list operation ] */ ;
                         TRANSFER_TOKENS
-                        /* [ operation : unit : @operations list operation ] */ }
-                 /* [ @hash bytes
+                        /* [ operation : unit : list operation ] */ }
+                 /* [ bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : operation
-                    : unit : @operations list operation ] */ }
+                    : unit : list operation ] */ }
                { DUP
-                 /* [ @parameter.claim_refund.refund_hash bytes
-                    : @parameter.claim_refund.refund_hash bytes
+                 /* [ bytes : bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
@@ -475,7 +455,7 @@ Gas remaining: 1039911.852 units remaining
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                    : @operations list operation ] */ ;
+                    : list operation ] */ ;
                  DIP { GET
                        /* [ option
                             (pair (pair %recipients (address %from) (address %dest))
@@ -484,129 +464,126 @@ Gas remaining: 1039911.852 units remaining
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        ASSERT_SOME ;
                        DUP
-                       /* [ @some pair (pair %recipients (address %from) (address %dest))
+                       /* [ pair (pair %recipients (address %from) (address %dest))
                                (pair %settings (mutez %amount) (timestamp %deadline))
-                          : @some pair (pair %recipients (address %from) (address %dest))
+                          : pair (pair %recipients (address %from) (address %dest))
                                (pair %settings (mutez %amount) (timestamp %deadline))
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        CAAR @% ;
                        CONTRACT @from
                          unit
-                       /* [ @from option (contract unit)
-                          : @some pair (pair %recipients (address %from) (address %dest))
+                       /* [ option (contract unit)
+                          : pair (pair %recipients (address %from) (address %dest))
                                (pair %settings (mutez %amount) (timestamp %deadline))
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        ASSERT_SOME ;
                        SWAP
-                       /* [ @some pair (pair %recipients (address %from) (address %dest))
-                               (pair %settings (mutez %amount) (timestamp %deadline))
-                          : @from.some contract unit
+                       /* [ pair (pair %recipients (address %from) (address %dest))
+                               (pair %settings (mutez %amount) (timestamp %deadline)) : contract unit
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        CDR
-                       /* [ pair (mutez %amount) (timestamp %deadline) : @from.some contract unit
+                       /* [ pair (mutez %amount) (timestamp %deadline) : contract unit
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        UNPAIR @% @%
-                       /* [ @amount mutez : @deadline timestamp : @from.some contract unit
+                       /* [ mutez : timestamp : contract unit
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        SWAP
-                       /* [ @deadline timestamp : @amount mutez : @from.some contract unit
+                       /* [ timestamp : mutez : contract unit
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        NOW
-                       /* [ @now timestamp : @deadline timestamp : @amount mutez
-                          : @from.some contract unit
+                       /* [ timestamp : timestamp : mutez : contract unit
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        ASSERT_CMPGE ;
                        UNIT
-                       /* [ unit : @amount mutez : @from.some contract unit
+                       /* [ unit : mutez : contract unit
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        TRANSFER_TOKENS
                        /* [ operation
                           : big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : unit
-                          : @operations list operation ] */ ;
+                          : list operation ] */ ;
                        SWAP
                        /* [ big_map
                             bytes
                             (pair (pair %recipients (address %from) (address %dest))
                                   (pair %settings (mutez %amount) (timestamp %deadline))) : operation
-                          : unit : @operations list operation ] */ }
-                 /* [ @parameter.claim_refund.refund_hash bytes
+                          : unit : list operation ] */ }
+                 /* [ bytes
                     : big_map
                       bytes
                       (pair (pair %recipients (address %from) (address %dest))
                             (pair %settings (mutez %amount) (timestamp %deadline))) : operation
-                    : unit : @operations list operation ] */ } ;
+                    : unit : list operation ] */ } ;
              NONE @none
                (pair (pair address address) (pair mutez timestamp))
-             /* [ @none option (pair (pair address address) mutez timestamp) : bytes
+             /* [ option (pair (pair address address) mutez timestamp) : bytes
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : operation
-                : unit : @operations list operation ] */ ;
+                : unit : list operation ] */ ;
              SWAP
-             /* [ bytes : @none option (pair (pair address address) mutez timestamp)
+             /* [ bytes : option (pair (pair address address) mutez timestamp)
                 : big_map
                   bytes
                   (pair (pair %recipients (address %from) (address %dest))
                         (pair %settings (mutez %amount) (timestamp %deadline))) : operation
-                : unit : @operations list operation ] */ ;
+                : unit : list operation ] */ ;
              UPDATE @cleared_map
-             /* [ @cleared_map big_map bytes (pair (pair address address) mutez timestamp)
-                : operation : unit : @operations list operation ] */ ;
+             /* [ big_map bytes (pair (pair address address) mutez timestamp) : operation
+                : unit : list operation ] */ ;
              SWAP
-             /* [ operation
-                : @cleared_map big_map bytes (pair (pair address address) mutez timestamp)
-                : unit : @operations list operation ] */ ;
+             /* [ operation : big_map bytes (pair (pair address address) mutez timestamp)
+                : unit : list operation ] */ ;
              DIP { PAIR
-                   /* [ pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit
-                      : @operations list operation ] */ ;
+                   /* [ pair (big_map bytes (pair (pair address address) mutez timestamp)) unit
+                      : list operation ] */ ;
                    SWAP
-                   /* [ @operations list operation
-                      : pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit ] */ }
-             /* [ operation : @operations list operation
-                : pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
+                   /* [ list operation
+                      : pair (big_map bytes (pair (pair address address) mutez timestamp)) unit ] */ }
+             /* [ operation : list operation
+                : pair (big_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
              CONS
              /* [ list operation
-                : pair (big_map @cleared_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
+                : pair (big_map bytes (pair (pair address address) mutez timestamp)) unit ] */ ;
              PAIR
              /* [ pair (list operation)
-                     (big_map @cleared_map bytes (pair (pair address address) mutez timestamp))
+                     (big_map bytes (pair (pair address address) mutez timestamp))
                      unit ] */ } } }

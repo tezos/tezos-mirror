@@ -10,41 +10,41 @@ trace
   - location: 12 (remaining gas: 1039980.750 units remaining)
     [ (Pair (Pair 2000000 1000000) None)  	 ]
   - location: 12 (remaining gas: 1039980.740 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	 ]
   - location: 13 (remaining gas: 1039980.730 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter
-      (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	
+      (Pair 2000000 1000000)  	 ]
   - location: 14 (remaining gas: 1039980.720 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter
-      (Pair 2000000 1000000)  	@parameter
-      (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	
+      (Pair 2000000 1000000)  	
+      (Pair 2000000 1000000)  	 ]
   - location: 15 (remaining gas: 1039980.710 units remaining)
     [ 2000000  	
-      (Pair 2000000 1000000)  	@parameter
-      (Pair 2000000 1000000)  	@parameter ]
+      (Pair 2000000 1000000)  	
+      (Pair 2000000 1000000)  	 ]
   - location: 16 (remaining gas: 1039980.695 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter
-      (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	
+      (Pair 2000000 1000000)  	 ]
   - location: 18 (remaining gas: 1039980.685 units remaining)
     [ 1000000  	
-      (Pair 2000000 1000000)  	@parameter ]
+      (Pair 2000000 1000000)  	 ]
   - location: 16 (remaining gas: 1039980.655 units remaining)
     [ 2000000  	
       1000000  	
-      (Pair 2000000 1000000)  	@parameter ]
+      (Pair 2000000 1000000)  	 ]
   - location: 19 (remaining gas: 1039980.635 units remaining)
     [ 3000000  	
-      (Pair 2000000 1000000)  	@parameter ]
+      (Pair 2000000 1000000)  	 ]
   - location: 20 (remaining gas: 1039980.620 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	 ]
   - location: 22 (remaining gas: 1039980.610 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter
-      (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	
+      (Pair 2000000 1000000)  	 ]
   - location: 23 (remaining gas: 1039980.600 units remaining)
     [ 2000000  	
-      (Pair 2000000 1000000)  	@parameter ]
+      (Pair 2000000 1000000)  	 ]
   - location: 24 (remaining gas: 1039980.585 units remaining)
-    [ (Pair 2000000 1000000)  	@parameter ]
+    [ (Pair 2000000 1000000)  	 ]
   - location: 26 (remaining gas: 1039980.575 units remaining)
     [ 1000000  	 ]
   - location: 24 (remaining gas: 1039980.545 units remaining)
@@ -53,12 +53,12 @@ trace
   - location: 27 (remaining gas: 1039980.525 units remaining)
     [ (Some 1000000)  	 ]
   - location: 29 (remaining gas: 1039980.515 units remaining)
-    [ 1000000  	@some ]
+    [ 1000000  	 ]
   - location: 29 (remaining gas: 1039980.500 units remaining)
-    [ 1000000  	@some ]
+    [ 1000000  	 ]
   - location: 20 (remaining gas: 1039980.470 units remaining)
     [ 3000000  	
-      1000000  	@some ]
+      1000000  	 ]
   - location: 35 (remaining gas: 1039980.455 units remaining)
     [ (Pair 3000000 1000000)  	 ]
   - location: 36 (remaining gas: 1039980.440 units remaining)

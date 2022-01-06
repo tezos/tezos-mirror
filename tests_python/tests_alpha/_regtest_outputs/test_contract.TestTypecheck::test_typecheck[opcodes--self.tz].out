@@ -7,10 +7,10 @@ Gas remaining: 1039996.340 units remaining
   code { DROP
          /* [] */ ;
          SELF
-         /* [ @self contract unit ] */ ;
+         /* [ contract unit ] */ ;
          ADDRESS
-         /* [ @self.address address ] */ ;
+         /* [ address ] */ ;
          NIL operation
-         /* [ list operation : @self.address address ] */ ;
+         /* [ list operation : address ] */ ;
          PAIR
-         /* [ pair (list operation) (address @self.address) ] */ } }
+         /* [ pair (list operation) address ] */ } }

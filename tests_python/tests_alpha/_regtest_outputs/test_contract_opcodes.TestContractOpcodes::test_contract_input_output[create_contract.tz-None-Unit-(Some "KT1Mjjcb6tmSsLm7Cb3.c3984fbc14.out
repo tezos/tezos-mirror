@@ -20,11 +20,11 @@ emitted operations
     - location: 9 (remaining gas: 1039984.174 units remaining)
       [ Unit  	 ]
     - location: 10 (remaining gas: 1039984.159 units remaining)
-      [ 50000  	@amount
+      [ 50000  	
         Unit  	 ]
     - location: 11 (remaining gas: 1039984.144 units remaining)
       [ None  	
-        50000  	@amount
+        50000  	
         Unit  	 ]
     - location: 13 (remaining gas: 1039983.538 units remaining)
       [ 0x011d23c1d3d2f8a4ea5e8784b8f7ecf2ad304c0fe600000002d08603000000001c02000000170500036c0501036c050202000000080317053d036d034200000002030b  	

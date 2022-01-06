@@ -5,63 +5,59 @@ Gas remaining: 1039940.196 units remaining
 { storage (pair (big_map string nat) (big_map string nat)) ;
   parameter
     (or (unit %default
-        /* [ list operation : @storage big_map string nat ] */)
+        /* [ list operation : big_map string nat ] */)
         (or (or %mem
                (string %mem_left)
                (string %mem_right)
-            /* [ pair (list operation) (big_map @storage string nat) ] */)
+            /* [ pair (list operation) (big_map string nat) ] */)
             (or (or %add (pair %add_left string nat) (pair %add_right string nat))
                 (or %rem (string %rem_left) (string %rem_right))))
-    /* [ @storage big_map string nat ] */)
-  /* [ @parameter string : @storage big_map string nat ] */ ;
+    /* [ big_map string nat ] */)
+  /* [ string : big_map string nat ] */ ;
   code { UNPAIR
-         /* [ @parameter or (unit %default)
+         /* [ or (unit %default)
                (or (or %mem (string %mem_left) (string %mem_right))
                    (or (or %add (pair %add_left string nat) (pair %add_right string nat))
                        (or %rem (string %rem_left) (string %rem_right))))
-            : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+            : pair (big_map string nat) (big_map string nat) ] */ ;
          IF_LEFT
            { DROP
-             /* [ @storage pair (big_map string nat) (big_map string nat) ] */ ;
+             /* [ pair (big_map string nat) (big_map string nat) ] */ ;
              DUP
-             /* [ @storage pair (big_map string nat) (big_map string nat)
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+             /* [ pair (big_map string nat) (big_map string nat)
+                : pair (big_map string nat) (big_map string nat) ] */ ;
              CAR
-             /* [ big_map string nat
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+             /* [ big_map string nat : pair (big_map string nat) (big_map string nat) ] */ ;
              PUSH mutez
                   0
              /* [ mutez : big_map string nat
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+                : pair (big_map string nat) (big_map string nat) ] */ ;
              NONE key_hash
              /* [ option key_hash : mutez : big_map string nat
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+                : pair (big_map string nat) (big_map string nat) ] */ ;
              CREATE_CONTRACT
                { parameter string ;
                  storage (big_map string nat) ;
                  code { UNPAIR ; DROP ; NIL operation ; PAIR } }
-             /* [ operation : address
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
-             DIP { DROP /* [ @storage pair (big_map string nat) (big_map string nat) ] */ }
-             /* [ operation : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+             /* [ operation : address : pair (big_map string nat) (big_map string nat) ] */ ;
+             DIP { DROP /* [ pair (big_map string nat) (big_map string nat) ] */ }
+             /* [ operation : pair (big_map string nat) (big_map string nat) ] */ ;
              NIL operation
              /* [ list operation : operation
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+                : pair (big_map string nat) (big_map string nat) ] */ ;
              SWAP
              /* [ operation : list operation
-                : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+                : pair (big_map string nat) (big_map string nat) ] */ ;
              CONS
-             /* [ list operation : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+             /* [ list operation : pair (big_map string nat) (big_map string nat) ] */ ;
              PAIR
-             /* [ pair (list operation) (pair @storage (big_map string nat) (big_map string nat)) ] */ }
+             /* [ pair (list operation) (big_map string nat) (big_map string nat) ] */ }
            { IF_LEFT
                { IF_LEFT
                    { DIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
-                     /* [ @parameter.right.mem.mem_left string : big_map string nat
-                        : big_map string nat ] */ ;
+                     /* [ string : big_map string nat : big_map string nat ] */ ;
                      DIP { DUP /* [ big_map string nat : big_map string nat : big_map string nat ] */ }
-                     /* [ @parameter.right.mem.mem_left string : big_map string nat
-                        : big_map string nat : big_map string nat ] */ ;
+                     /* [ string : big_map string nat : big_map string nat : big_map string nat ] */ ;
                      MEM
                      /* [ bool : big_map string nat : big_map string nat ] */ ;
                      ASSERT }
@@ -69,11 +65,9 @@ Gas remaining: 1039940.196 units remaining
                            /* [ big_map string nat : big_map string nat ] */ ;
                            SWAP
                            /* [ big_map string nat : big_map string nat ] */ }
-                     /* [ @parameter.right.mem.mem_right string : big_map string nat
-                        : big_map string nat ] */ ;
+                     /* [ string : big_map string nat : big_map string nat ] */ ;
                      DIP { DUP /* [ big_map string nat : big_map string nat : big_map string nat ] */ }
-                     /* [ @parameter.right.mem.mem_right string : big_map string nat
-                        : big_map string nat : big_map string nat ] */ ;
+                     /* [ string : big_map string nat : big_map string nat : big_map string nat ] */ ;
                      MEM
                      /* [ bool : big_map string nat : big_map string nat ] */ ;
                      ASSERT ;
@@ -82,7 +76,7 @@ Gas remaining: 1039940.196 units remaining
                { IF_LEFT
                    { IF_LEFT
                        { UNPAIR
-                         /* [ string : nat : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+                         /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
                          DIIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
                          /* [ string : nat : big_map string nat : big_map string nat ] */ ;
                          DIP { SOME /* [ option nat : big_map string nat : big_map string nat ] */ }
@@ -90,7 +84,7 @@ Gas remaining: 1039940.196 units remaining
                          UPDATE
                          /* [ big_map string nat : big_map string nat ] */ }
                        { UNPAIR
-                         /* [ string : nat : @storage pair (big_map string nat) (big_map string nat) ] */ ;
+                         /* [ string : nat : pair (big_map string nat) (big_map string nat) ] */ ;
                          DIIP { UNPAIR
                                 /* [ big_map string nat : big_map string nat ] */ ;
                                 SWAP
@@ -104,22 +98,18 @@ Gas remaining: 1039940.196 units remaining
                          /* [ big_map string nat : big_map string nat ] */ } }
                    { IF_LEFT
                        { DIP { UNPAIR /* [ big_map string nat : big_map string nat ] */ }
-                         /* [ @parameter.right.right.rem.rem_left string : big_map string nat
-                            : big_map string nat ] */ ;
+                         /* [ string : big_map string nat : big_map string nat ] */ ;
                          DIP { NONE nat /* [ option nat : big_map string nat : big_map string nat ] */ }
-                         /* [ @parameter.right.right.rem.rem_left string : option nat
-                            : big_map string nat : big_map string nat ] */ ;
+                         /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
                          UPDATE
                          /* [ big_map string nat : big_map string nat ] */ }
                        { DIP { UNPAIR
                                /* [ big_map string nat : big_map string nat ] */ ;
                                SWAP
                                /* [ big_map string nat : big_map string nat ] */ }
-                         /* [ @parameter.right.right.rem.rem_right string : big_map string nat
-                            : big_map string nat ] */ ;
+                         /* [ string : big_map string nat : big_map string nat ] */ ;
                          DIP { NONE nat /* [ option nat : big_map string nat : big_map string nat ] */ }
-                         /* [ @parameter.right.right.rem.rem_right string : option nat
-                            : big_map string nat : big_map string nat ] */ ;
+                         /* [ string : option nat : big_map string nat : big_map string nat ] */ ;
                          UPDATE
                          /* [ big_map string nat : big_map string nat ] */ ;
                          SWAP

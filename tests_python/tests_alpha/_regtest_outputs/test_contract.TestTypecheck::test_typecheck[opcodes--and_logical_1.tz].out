@@ -5,12 +5,12 @@ Gas remaining: 1039996.174 units remaining
 { parameter (pair bool bool) ;
   storage bool ;
   code { CAR
-         /* [ @parameter pair bool bool ] */ ;
+         /* [ pair bool bool ] */ ;
          UNPAIR
          /* [ bool : bool ] */ ;
          AND @and
-         /* [ @and bool ] */ ;
+         /* [ bool ] */ ;
          NIL @noop operation
-         /* [ @noop list operation : @and bool ] */ ;
+         /* [ list operation : bool ] */ ;
          PAIR
-         /* [ pair (list @noop operation) (bool @and) ] */ } }
+         /* [ pair (list operation) bool ] */ } }

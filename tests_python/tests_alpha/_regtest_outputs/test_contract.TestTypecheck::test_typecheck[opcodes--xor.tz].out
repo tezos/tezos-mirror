@@ -5,7 +5,7 @@ Gas remaining: 1039990.984 units remaining
 { parameter (or (pair bool bool) (pair nat nat)) ;
   storage (option (or bool nat)) ;
   code { CAR
-         /* [ @parameter or (pair bool bool) (pair nat nat) ] */ ;
+         /* [ or (pair bool bool) (pair nat nat) ] */ ;
          IF_LEFT
            { UNPAIR /* [ bool : bool ] */ ; XOR /* [ bool ] */ ; LEFT nat /* [ or bool nat ] */ }
            { UNPAIR /* [ nat : nat ] */ ; XOR /* [ nat ] */ ; RIGHT bool /* [ or bool nat ] */ } ;

@@ -13,19 +13,19 @@ trace
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" })  	
       (Pair "1" None { Elt "1" "one" ; Elt "2" "two" })  	 ]
   - location: 13 (remaining gas: 1039986.527 units remaining)
-    [ "1"  	@parameter
+    [ "1"  	
       (Pair "1" None { Elt "1" "one" ; Elt "2" "two" })  	 ]
   - location: 14 (remaining gas: 1039986.512 units remaining)
     [ (Pair "1" None { Elt "1" "one" ; Elt "2" "two" })  	 ]
   - location: 17 (remaining gas: 1039986.502 units remaining)
-    [ (Pair None { Elt "1" "one" ; Elt "2" "two" })  	@storage ]
+    [ (Pair None { Elt "1" "one" ; Elt "2" "two" })  	 ]
   - location: 18 (remaining gas: 1039986.492 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	 ]
   - location: 19 (remaining gas: 1039986.482 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       { Elt "1" "one" ; Elt "2" "two" }  	 ]
   - location: 14 (remaining gas: 1039986.452 units remaining)
-    [ "1"  	@parameter
+    [ "1"  	
       { Elt "1" "one" ; Elt "2" "two" }  	
       { Elt "1" "one" ; Elt "2" "two" }  	 ]
   - location: 20 (remaining gas: 1039986.267 units remaining)

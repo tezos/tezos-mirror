@@ -10,11 +10,11 @@ trace
   - location: 8 (remaining gas: 1039992.898 units remaining)
     [ (Pair { "d" ; "e" ; "f" } "abc")  	 ]
   - location: 8 (remaining gas: 1039992.888 units remaining)
-    [ { "d" ; "e" ; "f" }  	@parameter
-      "abc"  	@storage ]
+    [ { "d" ; "e" ; "f" }  	
+      "abc"  	 ]
   - location: 9 (remaining gas: 1039992.878 units remaining)
-    [ "abc"  	@storage
-      { "d" ; "e" ; "f" }  	@parameter ]
+    [ "abc"  	
+      { "d" ; "e" ; "f" }  	 ]
   - location: 10 (remaining gas: 1039992.863 units remaining)
     [ { "abc" ; "d" ; "e" ; "f" }  	 ]
   - location: 11 (remaining gas: 1039992.723 units remaining)

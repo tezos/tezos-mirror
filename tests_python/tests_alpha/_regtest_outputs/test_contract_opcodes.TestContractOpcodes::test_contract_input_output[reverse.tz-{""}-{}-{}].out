@@ -10,12 +10,12 @@ trace
   - location: 9 (remaining gas: 1039991.349 units remaining)
     [ (Pair {} { "" })  	 ]
   - location: 9 (remaining gas: 1039991.339 units remaining)
-    [ {}  	@parameter ]
+    [ {}  	 ]
   - location: 10 (remaining gas: 1039991.324 units remaining)
     [ {}  	
-      {}  	@parameter ]
+      {}  	 ]
   - location: 12 (remaining gas: 1039991.314 units remaining)
-    [ {}  	@parameter
+    [ {}  	
       {}  	 ]
   - location: 13 (remaining gas: 1039991.314 units remaining)
     [ {}  	 ]

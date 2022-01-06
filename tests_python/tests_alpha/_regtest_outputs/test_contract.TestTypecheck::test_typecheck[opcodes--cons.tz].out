@@ -5,7 +5,7 @@ Gas remaining: 1039996.280 units remaining
 { parameter int ;
   storage (list int) ;
   code { UNPAIR
-         /* [ @parameter int : @storage list int ] */ ;
+         /* [ int : list int ] */ ;
          CONS
          /* [ list int ] */ ;
          NIL operation

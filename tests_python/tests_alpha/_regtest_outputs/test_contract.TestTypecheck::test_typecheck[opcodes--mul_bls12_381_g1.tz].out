@@ -5,7 +5,7 @@ Gas remaining: 1039995.329 units remaining
 { parameter (pair bls12_381_g1 bls12_381_fr) ;
   storage (option bls12_381_g1) ;
   code { CAR
-         /* [ @parameter pair bls12_381_g1 bls12_381_fr ] */ ;
+         /* [ pair bls12_381_g1 bls12_381_fr ] */ ;
          UNPAIR
          /* [ bls12_381_g1 : bls12_381_fr ] */ ;
          MUL

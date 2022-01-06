@@ -10,7 +10,7 @@ trace
   - location: 7 (remaining gas: 1039944.576 units remaining)
     [ (Pair Unit Unit)  	 ]
   - location: 7 (remaining gas: 1039944.566 units remaining)
-    [ Unit  	@parameter ]
+    [ Unit  	 ]
   - location: 8 (remaining gas: 1039944.556 units remaining)
     [  ]
   - location: 9 (remaining gas: 1039944.546 units remaining)

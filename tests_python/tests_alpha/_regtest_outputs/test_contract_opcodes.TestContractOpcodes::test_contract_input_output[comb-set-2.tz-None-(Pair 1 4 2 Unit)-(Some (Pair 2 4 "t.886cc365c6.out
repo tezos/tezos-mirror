@@ -10,10 +10,10 @@ trace
   - location: 16 (remaining gas: 1039985.116 units remaining)
     [ (Pair (Pair 1 4 2 Unit) None)  	 ]
   - location: 16 (remaining gas: 1039985.106 units remaining)
-    [ (Pair 1 4 2 Unit)  	@parameter ]
+    [ (Pair 1 4 2 Unit)  	 ]
   - location: 17 (remaining gas: 1039985.096 units remaining)
     [ 2  	
-      (Pair 1 4 2 Unit)  	@parameter ]
+      (Pair 1 4 2 Unit)  	 ]
   - location: 20 (remaining gas: 1039985.055 units remaining)
     [ (Pair 2 4 2 Unit)  	 ]
   - location: 22 (remaining gas: 1039985.045 units remaining)

@@ -10,7 +10,7 @@ trace
   - location: 8 (remaining gas: 1039991.305 units remaining)
     [ (Pair True None)  	 ]
   - location: 8 (remaining gas: 1039991.295 units remaining)
-    [ True  	@parameter ]
+    [ True  	 ]
   - location: 9 (remaining gas: 1039991.285 units remaining)
     [  ]
   - location: 11 (remaining gas: 1039991.275 units remaining)

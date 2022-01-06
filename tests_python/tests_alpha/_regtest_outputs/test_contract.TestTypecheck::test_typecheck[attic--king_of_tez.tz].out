@@ -9,71 +9,64 @@ Gas remaining: 1039971.047 units remaining
             : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
          CDAR ;
          NOW
-         /* [ @now timestamp : timestamp
+         /* [ timestamp : timestamp
             : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
          CMPGT ;
          IF { CAR
-              /* [ @parameter key_hash ] */ ;
+              /* [ key_hash ] */ ;
               AMOUNT
-              /* [ @amount mutez : @parameter key_hash ] */ ;
+              /* [ mutez : key_hash ] */ ;
               PAIR
-              /* [ pair (mutez @amount) (key_hash @parameter) ] */ ;
+              /* [ pair mutez key_hash ] */ ;
               NOW
-              /* [ @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
-              PUSH int
-                   604800
-              /* [ int : @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+              /* [ timestamp : pair mutez key_hash ] */ ;
+              PUSH int 604800
+              /* [ int : timestamp : pair mutez key_hash ] */ ;
               ADD
-              /* [ timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+              /* [ timestamp : pair mutez key_hash ] */ ;
               PAIR
-              /* [ pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+              /* [ pair timestamp mutez key_hash ] */ ;
               NIL operation
-              /* [ list operation : pair timestamp (mutez @amount) (key_hash @parameter) ] */ }
+              /* [ list operation : pair timestamp mutez key_hash ] */ }
             { DUP
               /* [ pair (key_hash @parameter) (pair @storage timestamp mutez key_hash)
                  : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
               CDDAR ;
               AMOUNT
-              /* [ @amount mutez : mutez
+              /* [ mutez : mutez
                  : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
               CMPLT ;
               IF { FAIL }
                  { CAR
-                   /* [ @parameter key_hash ] */ ;
+                   /* [ key_hash ] */ ;
                    DUP
-                   /* [ @parameter key_hash : @parameter key_hash ] */ ;
+                   /* [ key_hash : key_hash ] */ ;
                    DIP { AMOUNT
-                         /* [ @amount mutez : @parameter key_hash ] */ ;
+                         /* [ mutez : key_hash ] */ ;
                          PAIR
-                         /* [ pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         /* [ pair mutez key_hash ] */ ;
                          NOW
-                         /* [ @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
-                         PUSH int
-                              604800
-                         /* [ int : @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         /* [ timestamp : pair mutez key_hash ] */ ;
+                         PUSH int 604800
+                         /* [ int : timestamp : pair mutez key_hash ] */ ;
                          ADD
-                         /* [ timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         /* [ timestamp : pair mutez key_hash ] */ ;
                          PAIR
-                         /* [ pair timestamp (mutez @amount) (key_hash @parameter) ] */ }
-                   /* [ @parameter key_hash
-                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                         /* [ pair timestamp mutez key_hash ] */ }
+                   /* [ key_hash : pair timestamp mutez key_hash ] */ ;
                    IMPLICIT_ACCOUNT
-                   /* [ contract unit : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   /* [ contract unit : pair timestamp mutez key_hash ] */ ;
                    AMOUNT
-                   /* [ @amount mutez : contract unit
-                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   /* [ mutez : contract unit : pair timestamp mutez key_hash ] */ ;
                    UNIT
-                   /* [ unit : @amount mutez : contract unit
-                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   /* [ unit : mutez : contract unit : pair timestamp mutez key_hash ] */ ;
                    TRANSFER_TOKENS
-                   /* [ operation : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   /* [ operation : pair timestamp mutez key_hash ] */ ;
                    NIL operation
-                   /* [ list operation : operation
-                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   /* [ list operation : operation : pair timestamp mutez key_hash ] */ ;
                    SWAP
-                   /* [ operation : list operation
-                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   /* [ operation : list operation : pair timestamp mutez key_hash ] */ ;
                    CONS
-                   /* [ list operation : pair timestamp (mutez @amount) (key_hash @parameter) ] */ } } ;
+                   /* [ list operation : pair timestamp mutez key_hash ] */ } } ;
          PAIR
-         /* [ pair (list operation) timestamp (mutez @amount) (key_hash @parameter) ] */ } }
+         /* [ pair (list operation) timestamp mutez key_hash ] */ } }

@@ -5,14 +5,14 @@ Gas remaining: 1039992.950 units remaining
 { parameter unit ;
   storage mutez ;
   code { CDR
-         /* [ @storage mutez ] */ ;
+         /* [ mutez ] */ ;
          DUP
-         /* [ @storage mutez : @storage mutez ] */ ;
+         /* [ mutez : mutez ] */ ;
          AMOUNT
-         /* [ @amount mutez : @storage mutez : @storage mutez ] */ ;
+         /* [ mutez : mutez : mutez ] */ ;
          CMPLT ;
          IF { FAIL }
             { NIL operation
-              /* [ list operation : @storage mutez ] */ ;
+              /* [ list operation : mutez ] */ ;
               PAIR
-              /* [ pair (list operation) (mutez @storage) ] */ } } }
+              /* [ pair (list operation) mutez ] */ } } }

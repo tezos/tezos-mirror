@@ -10,7 +10,7 @@ trace
   - location: 8 (remaining gas: 1039992.411 units remaining)
     [ (Pair (Some "hello") "?")  	 ]
   - location: 8 (remaining gas: 1039992.401 units remaining)
-    [ (Some "hello")  	@parameter ]
+    [ (Some "hello")  	 ]
   - location: 10 (remaining gas: 1039992.391 units remaining)
     [ "hello"  	 ]
   - location: 10 (remaining gas: 1039992.376 units remaining)

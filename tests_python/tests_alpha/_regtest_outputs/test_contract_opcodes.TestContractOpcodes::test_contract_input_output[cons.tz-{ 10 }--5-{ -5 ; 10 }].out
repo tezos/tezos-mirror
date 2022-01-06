@@ -10,8 +10,8 @@ trace
   - location: 8 (remaining gas: 1039994.145 units remaining)
     [ (Pair -5 { 10 })  	 ]
   - location: 8 (remaining gas: 1039994.135 units remaining)
-    [ -5  	@parameter
-      { 10 }  	@storage ]
+    [ -5  	
+      { 10 }  	 ]
   - location: 9 (remaining gas: 1039994.120 units remaining)
     [ { -5 ; 10 }  	 ]
   - location: 10 (remaining gas: 1039994.105 units remaining)

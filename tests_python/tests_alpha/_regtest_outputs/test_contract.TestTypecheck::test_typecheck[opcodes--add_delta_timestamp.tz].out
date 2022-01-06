@@ -5,11 +5,11 @@ Gas remaining: 1039993.598 units remaining
 { parameter (pair int timestamp) ;
   storage (option timestamp) ;
   code { CAR
-         /* [ @parameter pair int timestamp ] */ ;
+         /* [ pair int timestamp ] */ ;
          DUP
-         /* [ @parameter pair int timestamp : @parameter pair int timestamp ] */ ;
+         /* [ pair int timestamp : pair int timestamp ] */ ;
          CAR
-         /* [ int : @parameter pair int timestamp ] */ ;
+         /* [ int : pair int timestamp ] */ ;
          DIP { CDR /* [ timestamp ] */ }
          /* [ int : timestamp ] */ ;
          ADD

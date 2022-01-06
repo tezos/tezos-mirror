@@ -5,32 +5,29 @@ Gas remaining: 1039986.383 units remaining
 { parameter string ;
   storage (map address (option string)) ;
   code { UNPAIR @message @guestbook
-         /* [ @message string : @guestbook map address (option string) ] */ ;
+         /* [ string : map address (option string) ] */ ;
          SWAP
-         /* [ @guestbook map address (option string) : @message string ] */ ;
+         /* [ map address (option string) : string ] */ ;
          DUP
-         /* [ @guestbook map address (option string)
-            : @guestbook map address (option string) : @message string ] */ ;
+         /* [ map address (option string) : map address (option string) : string ] */ ;
          SENDER
-         /* [ @sender address : @guestbook map address (option string)
-            : @guestbook map address (option string) : @message string ] */ ;
+         /* [ address : map address (option string) : map address (option string)
+            : string ] */ ;
          GET @previous_message
-         /* [ @previous_message option (option string)
-            : @guestbook map address (option string) : @message string ] */ ;
+         /* [ option (option string) : map address (option string) : string ] */ ;
          ASSERT_SOME ;
          ASSERT_NONE ;
          SWAP
-         /* [ @message string : @guestbook map address (option string) ] */ ;
+         /* [ string : map address (option string) ] */ ;
          SOME
-         /* [ option string : @guestbook map address (option string) ] */ ;
+         /* [ option string : map address (option string) ] */ ;
          SOME
-         /* [ option (option string) : @guestbook map address (option string) ] */ ;
+         /* [ option (option string) : map address (option string) ] */ ;
          SENDER
-         /* [ @sender address : option (option string)
-            : @guestbook map address (option string) ] */ ;
+         /* [ address : option (option string) : map address (option string) ] */ ;
          UPDATE
-         /* [ @guestbook map address (option string) ] */ ;
+         /* [ map address (option string) ] */ ;
          NIL operation
-         /* [ list operation : @guestbook map address (option string) ] */ ;
+         /* [ list operation : map address (option string) ] */ ;
          PAIR
-         /* [ pair (list operation) (map @guestbook address (option string)) ] */ } }
+         /* [ pair (list operation) (map address (option string)) ] */ } }

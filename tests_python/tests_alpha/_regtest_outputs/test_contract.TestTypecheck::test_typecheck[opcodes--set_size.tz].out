@@ -5,7 +5,7 @@ Gas remaining: 1039996.720 units remaining
 { parameter (set int) ;
   storage nat ;
   code { CAR
-         /* [ @parameter set int ] */ ;
+         /* [ set int ] */ ;
          SIZE
          /* [ nat ] */ ;
          NIL operation

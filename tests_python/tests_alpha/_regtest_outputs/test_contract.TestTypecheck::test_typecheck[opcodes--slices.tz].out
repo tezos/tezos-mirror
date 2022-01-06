@@ -23,19 +23,16 @@ Gas remaining: 1039935.257 units remaining
          /* [ option nat : bytes
             : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          IF_SOME
-           { /* [ @some nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ }
+           { /* [ nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ }
            { FAIL } ;
          PUSH nat
               128
-         /* [ nat : @some nat : bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          SLICE @payload
-         /* [ @payload option bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ option bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          ASSERT_SOME ;
          DUP
-         /* [ @payload.some bytes : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DIP { DIP { DUP
                      /* [ pair (pair @parameter bytes signature) (key @storage)
                         : pair (pair @parameter bytes signature) (key @storage) ] */ ;
@@ -47,20 +44,15 @@ Gas remaining: 1039935.257 units remaining
                           0
                      /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      SLICE
-                     /* [ @slice option bytes
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ option bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      ASSERT_SOME }
-               /* [ @payload.some bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                SHA256
-               /* [ bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                ASSERT_CMPEQ }
-         /* [ @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DUP
-         /* [ @payload.some bytes : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DIP { DIP { DUP
                      /* [ pair (pair @parameter bytes signature) (key @storage)
                         : pair (pair @parameter bytes signature) (key @storage) ] */ ;
@@ -72,20 +64,15 @@ Gas remaining: 1039935.257 units remaining
                           32
                      /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      SLICE
-                     /* [ @slice option bytes
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ option bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      ASSERT_SOME }
-               /* [ @payload.some bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                BLAKE2B
-               /* [ bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                ASSERT_CMPEQ }
-         /* [ @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DUP
-         /* [ @payload.some bytes : @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DIP { DIP { DUP
                      /* [ pair (pair @parameter bytes signature) (key @storage)
                         : pair (pair @parameter bytes signature) (key @storage) ] */ ;
@@ -97,60 +84,54 @@ Gas remaining: 1039935.257 units remaining
                           64
                      /* [ nat : nat : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      SLICE
-                     /* [ @slice option bytes
-                        : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+                     /* [ option bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      ASSERT_SOME }
-               /* [ @payload.some bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                SHA512
-               /* [ bytes : @slice.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ bytes : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                ASSERT_CMPEQ }
-         /* [ @payload.some bytes
-            : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+         /* [ bytes : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DIP { DUP
                /* [ pair (pair @parameter bytes signature) (key @storage)
                   : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                CDR
-               /* [ @storage key : pair (pair @parameter bytes signature) (key @storage) ] */ ;
+               /* [ key : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                DIP { DUP
                      /* [ pair (pair @parameter bytes signature) (key @storage)
                         : pair (pair @parameter bytes signature) (key @storage) ] */ ;
                      CADR }
-               /* [ @storage key : signature
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ }
-         /* [ @payload.some bytes : @storage key : signature
+               /* [ key : signature : pair (pair @parameter bytes signature) (key @storage) ] */ }
+         /* [ bytes : key : signature
             : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          SWAP
-         /* [ @storage key : @payload.some bytes : signature
+         /* [ key : bytes : signature
             : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          DIP { SWAP
-               /* [ signature : @payload.some bytes
-                  : pair (pair @parameter bytes signature) (key @storage) ] */ }
-         /* [ @storage key : signature : @payload.some bytes
+               /* [ signature : bytes : pair (pair @parameter bytes signature) (key @storage) ] */ }
+         /* [ key : signature : bytes
             : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          CHECK_SIGNATURE
          /* [ bool : pair (pair @parameter bytes signature) (key @storage) ] */ ;
          ASSERT ;
          CDR
-         /* [ @storage key ] */ ;
+         /* [ key ] */ ;
          DUP
-         /* [ @storage key : @storage key ] */ ;
+         /* [ key : key ] */ ;
          HASH_KEY
-         /* [ key_hash : @storage key ] */ ;
+         /* [ key_hash : key ] */ ;
          IMPLICIT_ACCOUNT
-         /* [ contract unit : @storage key ] */ ;
+         /* [ contract unit : key ] */ ;
          BALANCE
-         /* [ @balance mutez : contract unit : @storage key ] */ ;
+         /* [ mutez : contract unit : key ] */ ;
          UNIT
-         /* [ unit : @balance mutez : contract unit : @storage key ] */ ;
+         /* [ unit : mutez : contract unit : key ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage key ] */ ;
+         /* [ operation : key ] */ ;
          NIL operation
-         /* [ list operation : operation : @storage key ] */ ;
+         /* [ list operation : operation : key ] */ ;
          SWAP
-         /* [ operation : list operation : @storage key ] */ ;
+         /* [ operation : list operation : key ] */ ;
          CONS
-         /* [ list operation : @storage key ] */ ;
+         /* [ list operation : key ] */ ;
          PAIR
-         /* [ pair (list operation) (key @storage) ] */ } }
+         /* [ pair (list operation) key ] */ } }

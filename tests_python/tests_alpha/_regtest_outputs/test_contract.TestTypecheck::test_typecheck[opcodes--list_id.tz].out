@@ -5,8 +5,8 @@ Gas remaining: 1039996.880 units remaining
 { parameter (list string) ;
   storage (list string) ;
   code { CAR
-         /* [ @parameter list string ] */ ;
+         /* [ list string ] */ ;
          NIL operation
-         /* [ list operation : @parameter list string ] */ ;
+         /* [ list operation : list string ] */ ;
          PAIR
-         /* [ pair (list operation) (list @parameter string) ] */ } }
+         /* [ pair (list operation) (list string) ] */ } }

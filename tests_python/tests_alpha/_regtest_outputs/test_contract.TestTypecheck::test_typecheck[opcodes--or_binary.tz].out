@@ -5,7 +5,7 @@ Gas remaining: 1039995.329 units remaining
 { parameter (pair nat nat) ;
   storage (option nat) ;
   code { CAR
-         /* [ @parameter pair nat nat ] */ ;
+         /* [ pair nat nat ] */ ;
          UNPAIR
          /* [ nat : nat ] */ ;
          OR

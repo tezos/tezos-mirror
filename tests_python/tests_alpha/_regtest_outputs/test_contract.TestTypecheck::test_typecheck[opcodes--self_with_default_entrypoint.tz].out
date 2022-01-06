@@ -7,21 +7,21 @@ Gas remaining: 1039988.615 units remaining
   code { DROP
          /* [] */ ;
          SELF
-         /* [ @self contract unit ] */ ;
+         /* [ contract unit ] */ ;
          DROP
          /* [] */ ;
          SELF %A
-         /* [ @self contract nat ] */ ;
+         /* [ contract nat ] */ ;
          DROP
          /* [] */ ;
          SELF %default
-         /* [ @self contract unit ] */ ;
+         /* [ contract unit ] */ ;
          PACK
-         /* [ @self.packed bytes ] */ ;
+         /* [ bytes ] */ ;
          SELF
-         /* [ @self contract unit : @self.packed bytes ] */ ;
+         /* [ contract unit : bytes ] */ ;
          PACK
-         /* [ @self.packed bytes : @self.packed bytes ] */ ;
+         /* [ bytes : bytes ] */ ;
          ASSERT_CMPEQ ;
          UNIT
          /* [ unit ] */ ;

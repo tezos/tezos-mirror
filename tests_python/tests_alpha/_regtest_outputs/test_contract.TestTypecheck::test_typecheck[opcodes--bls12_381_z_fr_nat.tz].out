@@ -5,9 +5,9 @@ Gas remaining: 1039996.340 units remaining
 { parameter nat ;
   storage bls12_381_fr ;
   code { UNPAIR
-         /* [ @parameter nat : @storage bls12_381_fr ] */ ;
+         /* [ nat : bls12_381_fr ] */ ;
          SWAP
-         /* [ @storage bls12_381_fr : @parameter nat ] */ ;
+         /* [ bls12_381_fr : nat ] */ ;
          MUL
          /* [ bls12_381_fr ] */ ;
          NIL operation

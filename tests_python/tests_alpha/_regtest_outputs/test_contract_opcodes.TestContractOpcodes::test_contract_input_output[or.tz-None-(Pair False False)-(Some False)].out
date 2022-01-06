@@ -10,15 +10,15 @@ trace
   - location: 10 (remaining gas: 1039990.715 units remaining)
     [ (Pair (Pair False False) None)  	 ]
   - location: 10 (remaining gas: 1039990.705 units remaining)
-    [ (Pair False False)  	@parameter ]
+    [ (Pair False False)  	 ]
   - location: 11 (remaining gas: 1039990.695 units remaining)
-    [ (Pair False False)  	@parameter
-      (Pair False False)  	@parameter ]
+    [ (Pair False False)  	
+      (Pair False False)  	 ]
   - location: 12 (remaining gas: 1039990.685 units remaining)
     [ False  	
-      (Pair False False)  	@parameter ]
+      (Pair False False)  	 ]
   - location: 13 (remaining gas: 1039990.675 units remaining)
-    [ (Pair False False)  	@parameter
+    [ (Pair False False)  	
       False  	 ]
   - location: 14 (remaining gas: 1039990.665 units remaining)
     [ False  	

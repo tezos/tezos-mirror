@@ -10,17 +10,17 @@ trace
   - location: 12 (remaining gas: 1039988.504 units remaining)
     [ (Pair 1 {} None)  	 ]
   - location: 12 (remaining gas: 1039988.494 units remaining)
-    [ 1  	@parameter
-      (Pair {} None)  	@storage ]
+    [ 1  	
+      (Pair {} None)  	 ]
   - location: 13 (remaining gas: 1039988.479 units remaining)
-    [ (Pair {} None)  	@storage ]
+    [ (Pair {} None)  	 ]
   - location: 15 (remaining gas: 1039988.469 units remaining)
     [ {}  	 ]
   - location: 16 (remaining gas: 1039988.459 units remaining)
     [ {}  	
       {}  	 ]
   - location: 13 (remaining gas: 1039988.429 units remaining)
-    [ 1  	@parameter
+    [ 1  	
       {}  	
       {}  	 ]
   - location: 17 (remaining gas: 1039988.314 units remaining)

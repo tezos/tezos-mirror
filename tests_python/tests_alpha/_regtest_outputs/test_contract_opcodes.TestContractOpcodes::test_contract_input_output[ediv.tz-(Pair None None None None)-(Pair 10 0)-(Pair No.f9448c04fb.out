@@ -10,90 +10,90 @@ trace
   - location: 25 (remaining gas: 1039969.963 units remaining)
     [ (Pair (Pair 10 0) None None None None)  	 ]
   - location: 25 (remaining gas: 1039969.953 units remaining)
-    [ (Pair 10 0)  	@parameter ]
+    [ (Pair 10 0)  	 ]
   - location: 26 (remaining gas: 1039969.943 units remaining)
-    [ (Pair 10 0)  	@parameter
-      (Pair 10 0)  	@parameter ]
+    [ (Pair 10 0)  	
+      (Pair 10 0)  	 ]
   - location: 27 (remaining gas: 1039969.933 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter ]
+      (Pair 10 0)  	 ]
   - location: 28 (remaining gas: 1039969.908 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter ]
+      (Pair 10 0)  	 ]
   - location: 29 (remaining gas: 1039969.893 units remaining)
     [ 0  	
-      (Pair 10 0)  	@parameter ]
+      (Pair 10 0)  	 ]
   - location: 31 (remaining gas: 1039969.868 units remaining)
     [ 0  	
-      (Pair 10 0)  	@parameter ]
+      (Pair 10 0)  	 ]
   - location: 29 (remaining gas: 1039969.838 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter ]
+      (Pair 10 0)  	 ]
   - location: 32 (remaining gas: 1039969.698 units remaining)
     [ None  	
-      (Pair 10 0)  	@parameter ]
+      (Pair 10 0)  	 ]
   - location: 33 (remaining gas: 1039969.688 units remaining)
-    [ (Pair 10 0)  	@parameter
+    [ (Pair 10 0)  	
       None  	 ]
   - location: 34 (remaining gas: 1039969.678 units remaining)
-    [ (Pair 10 0)  	@parameter
-      (Pair 10 0)  	@parameter
+    [ (Pair 10 0)  	
+      (Pair 10 0)  	
       None  	 ]
   - location: 35 (remaining gas: 1039969.668 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	 ]
   - location: 36 (remaining gas: 1039969.643 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	 ]
   - location: 37 (remaining gas: 1039969.503 units remaining)
     [ None  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	 ]
   - location: 38 (remaining gas: 1039969.493 units remaining)
-    [ (Pair 10 0)  	@parameter
+    [ (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 39 (remaining gas: 1039969.483 units remaining)
-    [ (Pair 10 0)  	@parameter
-      (Pair 10 0)  	@parameter
+    [ (Pair 10 0)  	
+      (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 40 (remaining gas: 1039969.473 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 41 (remaining gas: 1039969.458 units remaining)
     [ 0  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 43 (remaining gas: 1039969.433 units remaining)
     [ 0  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 41 (remaining gas: 1039969.403 units remaining)
     [ 10  	
       0  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 44 (remaining gas: 1039969.263 units remaining)
     [ None  	
-      (Pair 10 0)  	@parameter
+      (Pair 10 0)  	
       None  	
       None  	 ]
   - location: 45 (remaining gas: 1039969.253 units remaining)
-    [ (Pair 10 0)  	@parameter
+    [ (Pair 10 0)  	
       None  	
       None  	
       None  	 ]

@@ -10,9 +10,9 @@ trace
   - location: 7 (remaining gas: 1039994.221 units remaining)
     [ (Pair "abcdefg" 0x00)  	 ]
   - location: 7 (remaining gas: 1039994.211 units remaining)
-    [ "abcdefg"  	@parameter ]
+    [ "abcdefg"  	 ]
   - location: 8 (remaining gas: 1039993.654 units remaining)
-    [ 0x05010000000761626364656667  	@parameter.packed ]
+    [ 0x05010000000761626364656667  	 ]
   - location: 9 (remaining gas: 1039993.210 units remaining)
     [ 0x46fdbcb4ea4eadad5615cdaa17d67f783e01e21149ce2b27de497600b4cd8f4e  	 ]
   - location: 10 (remaining gas: 1039993.195 units remaining)

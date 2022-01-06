@@ -5,11 +5,11 @@ Gas remaining: 1039993.059 units remaining
 { parameter (pair nat address) ;
   storage bool ;
   code { CAR
-         /* [ @parameter pair nat address ] */ ;
+         /* [ pair nat address ] */ ;
          UNPAIR
          /* [ nat : address ] */ ;
          VIEW "not_exist" bool
-         /* [ @contract option bool ] */ ;
+         /* [ option bool ] */ ;
          IF_SOME
            { DROP /* [] */ ; PUSH bool True /* [ bool ] */ }
            { PUSH bool False /* [ bool ] */ } ;

@@ -5,14 +5,14 @@ Gas remaining: 1039994.981 units remaining
 { parameter nat ;
   storage (pair nat bool) ;
   code { CAR
-         /* [ @parameter nat ] */ ;
+         /* [ nat ] */ ;
          PUSH bool True
-         /* [ bool : @parameter nat ] */ ;
+         /* [ bool : nat ] */ ;
          SWAP
-         /* [ @parameter nat : bool ] */ ;
+         /* [ nat : bool ] */ ;
          PAIR
-         /* [ pair (nat @parameter) bool ] */ ;
+         /* [ pair nat bool ] */ ;
          NIL operation
-         /* [ list operation : pair (nat @parameter) bool ] */ ;
+         /* [ list operation : pair nat bool ] */ ;
          PAIR
-         /* [ pair (list operation) (nat @parameter) bool ] */ } }
+         /* [ pair (list operation) nat bool ] */ } }

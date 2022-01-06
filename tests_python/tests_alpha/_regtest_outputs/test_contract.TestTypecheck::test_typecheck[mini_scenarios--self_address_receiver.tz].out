@@ -5,15 +5,15 @@ Gas remaining: 1039991.719 units remaining
 { parameter (lambda unit address) ;
   storage unit ;
   code { UNPAIR
-         /* [ @parameter lambda unit address : @storage unit ] */ ;
+         /* [ lambda unit address : unit ] */ ;
          UNIT
-         /* [ unit : @parameter lambda unit address : @storage unit ] */ ;
+         /* [ unit : lambda unit address : unit ] */ ;
          EXEC
-         /* [ address : @storage unit ] */ ;
+         /* [ address : unit ] */ ;
          SELF_ADDRESS
-         /* [ @self address : address : @storage unit ] */ ;
+         /* [ address : address : unit ] */ ;
          ASSERT_CMPEQ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

@@ -13,15 +13,15 @@ trace
   - location: 15 (remaining gas: 1039984.265 units remaining)
     [ (Pair { Elt "3" None } { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
   - location: 15 (remaining gas: 1039984.255 units remaining)
-    [ { Elt "3" None }  	@parameter
-      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	@storage ]
+    [ { Elt "3" None }  	
+      (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
   - location: 16 (remaining gas: 1039984.240 units remaining)
-    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	@storage ]
+    [ (Pair { Elt "1" "one" ; Elt "2" "two" } Unit)  	 ]
   - location: 18 (remaining gas: 1039984.230 units remaining)
     [ { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
   - location: 16 (remaining gas: 1039984.200 units remaining)
-    [ { Elt "3" None }  	@parameter
+    [ { Elt "3" None }  	
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
   - location: 19 (remaining gas: 1039984.200 units remaining)
@@ -29,8 +29,8 @@ trace
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
   - location: 21 (remaining gas: 1039984.190 units remaining)
-    [ "3"  	@key
-      None  	@elt
+    [ "3"  	
+      None  	
       { Elt "1" "one" ; Elt "2" "two" }  	
       Unit  	 ]
   - location: 22 (remaining gas: 1039983.255 units remaining)

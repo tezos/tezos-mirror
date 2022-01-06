@@ -10,15 +10,15 @@ trace
   - location: 12 (remaining gas: 1039963.179 units remaining)
     [ (Pair (Pair { "B" } { "B" }) None)  	 ]
   - location: 12 (remaining gas: 1039963.169 units remaining)
-    [ (Pair { "B" } { "B" })  	@parameter ]
+    [ (Pair { "B" } { "B" })  	 ]
   - location: 13 (remaining gas: 1039963.159 units remaining)
-    [ (Pair { "B" } { "B" })  	@parameter
-      (Pair { "B" } { "B" })  	@parameter ]
+    [ (Pair { "B" } { "B" })  	
+      (Pair { "B" } { "B" })  	 ]
   - location: 14 (remaining gas: 1039963.149 units remaining)
     [ { "B" }  	
-      (Pair { "B" } { "B" })  	@parameter ]
+      (Pair { "B" } { "B" })  	 ]
   - location: 15 (remaining gas: 1039963.134 units remaining)
-    [ (Pair { "B" } { "B" })  	@parameter ]
+    [ (Pair { "B" } { "B" })  	 ]
   - location: 17 (remaining gas: 1039963.124 units remaining)
     [ { "B" }  	 ]
   - location: 15 (remaining gas: 1039963.094 units remaining)
@@ -33,7 +33,7 @@ trace
       {}  	
       { "B" }  	 ]
   - location: 21 (remaining gas: 1039962.864 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       {}  	
       { "B" }  	 ]
   - location: 23 (remaining gas: 1039962.849 units remaining)
@@ -44,7 +44,7 @@ trace
       (Pair "B" {})  	
       { "B" }  	 ]
   - location: 25 (remaining gas: 1039962.829 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       (Pair "B" {})  	
       { "B" }  	 ]
   - location: 26 (remaining gas: 1039962.814 units remaining)
@@ -54,16 +54,16 @@ trace
     [ {}  	
       { "B" }  	 ]
   - location: 26 (remaining gas: 1039962.774 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       {}  	
       { "B" }  	 ]
   - location: 29 (remaining gas: 1039962.764 units remaining)
     [ True  	
-      "B"  	@elt
+      "B"  	
       {}  	
       { "B" }  	 ]
   - location: 32 (remaining gas: 1039962.754 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       True  	
       {}  	
       { "B" }  	 ]
@@ -88,7 +88,7 @@ trace
     [ { "B" }  	
       (Pair { "B" } True)  	 ]
   - location: 40 (remaining gas: 1039962.494 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       (Pair { "B" } True)  	 ]
   - location: 42 (remaining gas: 1039962.479 units remaining)
     [ (Pair "B" { "B" } True)  	 ]
@@ -100,7 +100,7 @@ trace
       (Pair "B" { "B" } True)  	
       (Pair "B" { "B" } True)  	 ]
   - location: 45 (remaining gas: 1039962.449 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       (Pair "B" { "B" } True)  	
       (Pair "B" { "B" } True)  	 ]
   - location: 46 (remaining gas: 1039962.434 units remaining)
@@ -126,7 +126,7 @@ trace
       { "B" }  	
       True  	 ]
   - location: 46 (remaining gas: 1039962.309 units remaining)
-    [ "B"  	@elt
+    [ "B"  	
       { "B" }  	
       { "B" }  	
       True  	 ]

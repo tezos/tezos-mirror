@@ -5,45 +5,39 @@ Gas remaining: 1039981.752 units remaining
 { parameter unit ;
   storage (pair address address) ;
   code { CDR
-         /* [ @storage pair address address ] */ ;
+         /* [ pair address address ] */ ;
          DUP
-         /* [ @storage pair address address : @storage pair address address ] */ ;
+         /* [ pair address address : pair address address ] */ ;
          CAR
-         /* [ address : @storage pair address address ] */ ;
-         CONTRACT
-           unit
-         /* [ @contract option (contract unit) : @storage pair address address ] */ ;
+         /* [ address : pair address address ] */ ;
+         CONTRACT unit
+         /* [ option (contract unit) : pair address address ] */ ;
          ASSERT_SOME ;
-         PUSH mutez
-              5000000
-         /* [ mutez : @contract.some contract unit : @storage pair address address ] */ ;
+         PUSH mutez 5000000
+         /* [ mutez : contract unit : pair address address ] */ ;
          UNIT
-         /* [ unit : mutez : @contract.some contract unit
-            : @storage pair address address ] */ ;
+         /* [ unit : mutez : contract unit : pair address address ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage pair address address ] */ ;
+         /* [ operation : pair address address ] */ ;
          DIP { DUP
-               /* [ @storage pair address address : @storage pair address address ] */ ;
+               /* [ pair address address : pair address address ] */ ;
                CDR
-               /* [ address : @storage pair address address ] */ ;
-               CONTRACT
-                 unit
-               /* [ @contract option (contract unit) : @storage pair address address ] */ ;
+               /* [ address : pair address address ] */ ;
+               CONTRACT unit
+               /* [ option (contract unit) : pair address address ] */ ;
                ASSERT_SOME ;
-               PUSH mutez
-                    5000000
-               /* [ mutez : @contract.some contract unit : @storage pair address address ] */ ;
+               PUSH mutez 5000000
+               /* [ mutez : contract unit : pair address address ] */ ;
                UNIT
-               /* [ unit : mutez : @contract.some contract unit
-                  : @storage pair address address ] */ ;
+               /* [ unit : mutez : contract unit : pair address address ] */ ;
                TRANSFER_TOKENS
-               /* [ operation : @storage pair address address ] */ }
-         /* [ operation : operation : @storage pair address address ] */ ;
-         DIIP { NIL operation /* [ list operation : @storage pair address address ] */ }
-         /* [ operation : operation : list operation : @storage pair address address ] */ ;
-         DIP { CONS /* [ list operation : @storage pair address address ] */ }
-         /* [ operation : list operation : @storage pair address address ] */ ;
+               /* [ operation : pair address address ] */ }
+         /* [ operation : operation : pair address address ] */ ;
+         DIIP { NIL operation /* [ list operation : pair address address ] */ }
+         /* [ operation : operation : list operation : pair address address ] */ ;
+         DIP { CONS /* [ list operation : pair address address ] */ }
+         /* [ operation : list operation : pair address address ] */ ;
          CONS
-         /* [ list operation : @storage pair address address ] */ ;
+         /* [ list operation : pair address address ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage address address) ] */ } }
+         /* [ pair (list operation) address address ] */ } }

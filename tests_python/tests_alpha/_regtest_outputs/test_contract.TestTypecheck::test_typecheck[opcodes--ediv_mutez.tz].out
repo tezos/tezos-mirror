@@ -5,7 +5,7 @@ Gas remaining: 1039987.261 units remaining
 { parameter (pair mutez (or mutez nat)) ;
   storage (or (option (pair nat mutez)) (option (pair mutez mutez))) ;
   code { CAR
-         /* [ @parameter pair mutez (or mutez nat) ] */ ;
+         /* [ pair mutez (or mutez nat) ] */ ;
          UNPAIR
          /* [ mutez : or mutez nat ] */ ;
          SWAP

@@ -5,7 +5,7 @@ Gas remaining: 1039996.037 units remaining
 { parameter key ;
   storage (option key_hash) ;
   code { CAR
-         /* [ @parameter key ] */ ;
+         /* [ key ] */ ;
          HASH_KEY
          /* [ key_hash ] */ ;
          SOME

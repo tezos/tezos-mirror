@@ -5,8 +5,8 @@ Gas remaining: 1039995.219 units remaining
 { parameter (option string) ;
   storage string ;
   code { CAR
-         /* [ @parameter option string ] */ ;
-         IF_SOME { /* [ @parameter.some string ] */ } { PUSH string "" /* [ string ] */ } ;
+         /* [ option string ] */ ;
+         IF_SOME { /* [ string ] */ } { PUSH string "" /* [ string ] */ } ;
          NIL operation
          /* [ list operation : string ] */ ;
          PAIR

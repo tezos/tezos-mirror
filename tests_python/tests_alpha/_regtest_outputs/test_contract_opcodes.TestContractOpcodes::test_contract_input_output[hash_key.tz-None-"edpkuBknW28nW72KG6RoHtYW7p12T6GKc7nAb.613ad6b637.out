@@ -10,7 +10,7 @@ trace
   - location: 8 (remaining gas: 1039668.957 units remaining)
     [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" None)  	 ]
   - location: 8 (remaining gas: 1039668.947 units remaining)
-    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"  	@parameter ]
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"  	 ]
   - location: 9 (remaining gas: 1039668.292 units remaining)
     [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"  	 ]
   - location: 10 (remaining gas: 1039668.277 units remaining)
