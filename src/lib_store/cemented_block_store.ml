@@ -129,8 +129,10 @@ let load_table cemented_blocks_dir =
       Lwt_unix.opendir cemented_blocks_dir_path >>= fun dir_handle ->
       let rec loop acc =
         Lwt.catch
-          (fun () ->
-            Lwt_unix.readdir dir_handle >>= fun filename ->
+          (fun () -> Lwt_unix.readdir dir_handle >>= Lwt.return_some)
+          (function End_of_file -> Lwt.return_none | exn -> raise exn)
+        >>= function
+        | Some filename -> (
             let levels = String.split_on_char '_' filename in
             match levels with
             | [start_level; end_level] -> (
@@ -147,7 +149,7 @@ let load_table cemented_blocks_dir =
                     loop ({start_level; end_level; file} :: acc)
                 | _ -> loop acc)
             | _ -> loop acc)
-          (function End_of_file -> Lwt.return acc | exn -> raise exn)
+        | None -> Lwt.return acc
       in
       Lwt.finalize (fun () -> loop []) (fun () -> Lwt_unix.closedir dir_handle)
       >>= function
