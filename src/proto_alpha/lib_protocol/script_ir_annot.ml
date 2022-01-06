@@ -320,11 +320,10 @@ let parse_var_annot : Script.location -> string list -> unit tzresult =
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc vars >|? fun (_a : var_annot option) -> ()
 
-let split_if_special ~loc f =
+let ignore_special f =
   match f with
-  | Some (Field_annot fa) when Non_empty_string.(fa = at) ->
-      error (Unexpected_annotation loc)
-  | _ -> ok ()
+  | Some (Field_annot fa) when Non_empty_string.(fa = at) -> ok None
+  | _ -> ok f
 
 let parse_constr_annot :
     Script.location ->
@@ -336,8 +335,8 @@ let parse_constr_annot :
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
   get_one_annot loc types >>? fun t ->
   get_two_annot loc fields >>? fun (f1, f2) ->
-  split_if_special ~loc f1 >>? fun () ->
-  split_if_special ~loc f2 >|? fun () -> (t, f1, f2)
+  ignore_special f1 >>? fun f1 ->
+  ignore_special f2 >|? fun f2 -> (t, f1, f2)
 
 let parse_two_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
