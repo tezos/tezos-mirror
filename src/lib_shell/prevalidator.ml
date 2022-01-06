@@ -757,6 +757,30 @@ module Make
     | Ok (filter_state, state, advertised_mempool, _) ->
         Lwt.return (filter_state, state, advertised_mempool)
 
+  let update_advertised_mempool_fields w pv_shell delta_mempool =
+    if Mempool.is_empty delta_mempool then Lwt.return_unit
+    else
+      (* We only advertise newly classified operations. *)
+      let mempool_to_advertise =
+        Mempool.
+          {delta_mempool with known_valid = List.rev delta_mempool.known_valid}
+      in
+      advertise w pv_shell mempool_to_advertise ;
+      let our_mempool =
+        {
+          (* Using List.rev_map is ok since the size of pv.shell.classification.applied
+             cannot be too big. *)
+          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
+             This field does not only contain valid operation *)
+          Mempool.known_valid =
+            List.rev_map fst pv_shell.classification.applied_rev
+            @ (Operation_hash.Map.to_seq pv_shell.classification.prechecked
+              |> Seq.map fst |> List.of_seq);
+          pending = Pending_ops.hashes pv_shell.pending;
+        }
+      in
+      set_mempool pv_shell our_mempool >>= fun _res -> Lwt.pause ()
+
   let handle_unprocessed w pv =
     let notifier = mk_notifier pv.operation_stream in
     match pv.validation_state with
@@ -784,32 +808,10 @@ module Make
             pv.filter_config
             pv.filter_state
             state
-          >>= fun (filter_state, state, advertised_mempool) ->
-          let remaining_pendings = Pending_ops.hashes pv.shell.pending in
+          >>= fun (filter_state, validation_state, delta_mempool) ->
           pv.filter_state <- filter_state ;
-          pv.validation_state <- Ok state ;
-          (* We advertise only newly classified operations. *)
-          let mempool_to_advertise =
-            {
-              advertised_mempool with
-              known_valid = List.rev advertised_mempool.known_valid;
-            }
-          in
-          advertise w pv.shell mempool_to_advertise ;
-          let our_mempool =
-            {
-              (* Using List.rev_map is ok since the size of pv.shell.classification.applied
-                 cannot be too big. *)
-              (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
-                 This field does not only contain valid operation *)
-              Mempool.known_valid =
-                List.rev_map fst pv.shell.classification.applied_rev
-                @ (Operation_hash.Map.to_seq pv.shell.classification.prechecked
-                  |> Seq.map fst |> List.of_seq);
-              pending = remaining_pendings;
-            }
-          in
-          set_mempool pv.shell our_mempool >>= fun _res -> Lwt.pause ()
+          pv.validation_state <- Ok validation_state ;
+          update_advertised_mempool_fields w pv.shell delta_mempool
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
