@@ -522,6 +522,7 @@ module Revamped = struct
        different destination." ;
     let* (`OpHash oph2) =
       Operation.inject_transfer
+        ~force:true
         ~wait_for_injection:node1
         ~source:Constant.bootstrap1
         ~dest:Constant.bootstrap3
@@ -819,12 +820,14 @@ module Revamped = struct
     log_step
       4
       "Inject a transfer with a correct counter but different destination." ;
+    (* with force to avoid failure *)
     let* (`OpHash oph3) =
       Operation.inject_transfer
         ~wait_for_injection:node
         ~source:Constant.bootstrap1
         ~dest:Constant.bootstrap3
         ~counter:(counter + 1)
+        ~force:true
         client
     in
 
@@ -1004,8 +1007,10 @@ module Revamped = struct
       "Inject a transfer with the same source but different destination. This \
        operation should be classified as branch_delayed with the 1M \
        restriction." ;
+    (* with force to avoid failure *)
     let* (`OpHash oph3) =
       Operation.inject_transfer
+        ~force:true
         ~wait_for_injection:node
         ~source:Constant.bootstrap1
         ~dest:Constant.bootstrap3
@@ -2843,7 +2848,7 @@ let get_refused_operation_hash_list_v1 mempool =
 let test_pending_operation_version =
   Protocol.register_test
     ~__FILE__
-    ~title:""
+    ~title:"pending operation version"
     ~tags:["mempool"; "pending_operations"; "version"]
   @@ fun protocol ->
   let open Lwt in
