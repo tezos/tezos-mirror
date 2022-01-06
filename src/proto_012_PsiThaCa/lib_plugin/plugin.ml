@@ -664,6 +664,15 @@ module Mempool = struct
            Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
+    let prefilter_manager_op source op =
+      Lwt.return
+      @@
+      match pre_filter_manager config filter_state source bytes op with
+      | `Passed_prefilter -> `Passed_prefilter `Low
+      | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
+        err ->
+          err
+    in
     match contents with
     | Single (Failing_noop _) ->
         Lwt.return (`Refused [Environment.wrap_tzerror Wrong_operation])
@@ -675,7 +684,7 @@ module Mempool = struct
           ?validation_state_before
           consensus_content
         >>= fun keep ->
-        if keep then Lwt.return `Passed_prefilter
+        if keep then Lwt.return @@ `Passed_prefilter `High
         else
           Lwt.return
             (`Branch_refused
@@ -687,11 +696,11 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        Lwt.return @@ `Passed_prefilter
+        Lwt.return @@ `Passed_prefilter `Low
     | Single (Manager_operation {source; _}) as op ->
-        Lwt.return @@ pre_filter_manager config filter_state source bytes op
+        prefilter_manager_op source op
     | Cons (Manager_operation {source; _}, _) as op ->
-        Lwt.return @@ pre_filter_manager config filter_state source bytes op
+        prefilter_manager_op source op
 
   let precheck_manager :
       type t.
