@@ -317,7 +317,8 @@ module Mempool = struct
       (function Fees_too_low -> Some () | _ -> None)
       (fun () -> Fees_too_low)
 
-  type Environment.Error_monad.error += Manager_restriction
+  type Environment.Error_monad.error +=
+    | Manager_restriction of {oph : Operation_hash.t; fee : Tez.t}
 
   let () =
     Environment.Error_monad.register_error_kind
@@ -325,13 +326,22 @@ module Mempool = struct
       ~id:"plugin_filter.manager_restriction"
       ~title:"Only one manager operation per manager per block allowed"
       ~description:"Only one manager operation per manager per block allowed"
-      ~pp:(fun ppf () ->
+      ~pp:(fun ppf (oph, fee) ->
         Format.fprintf
           ppf
-          "Only one manager operation per manager per block allowed")
-      Data_encoding.unit
-      (function Manager_restriction -> Some () | _ -> None)
-      (fun () -> Manager_restriction)
+          "Only one manager operation per manager per block allowed (found %a \
+           with %atez fee. You may want to use --replace to provide adequate \
+           fee and replace it)."
+          Operation_hash.pp
+          oph
+          Tez.pp
+          fee)
+      Data_encoding.(
+        obj2
+          (req "operation_hash" Operation_hash.encoding)
+          (req "operation_fee" Tez.encoding))
+      (function Manager_restriction {oph; fee} -> Some (oph, fee) | _ -> None)
+      (fun (oph, fee) -> Manager_restriction {oph; fee})
 
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2238
      Write unit tests for the feature 'replace-by-fee' and for other changes
@@ -366,7 +376,12 @@ module Mempool = struct
         if better_fees_and_ratio config old_gas old_fee gas_limit fee then
           `Replace old_hash
         else
-          `Fail (`Branch_delayed [Environment.wrap_tzerror Manager_restriction])
+          `Fail
+            (`Branch_delayed
+              [
+                Environment.wrap_tzerror
+                  (Manager_restriction {oph = old_hash; fee = old_fee});
+              ])
 
   let pre_filter_manager :
       type t.
