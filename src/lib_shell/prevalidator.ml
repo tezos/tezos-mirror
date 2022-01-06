@@ -933,7 +933,7 @@ module Make
               pv.shell.pending <- Pending_ops.add oph op prio pv.shell.pending ;
               return_unit)
 
-    let on_inject (pv : state) ~force op =
+    let on_inject w (pv : state) ~force op =
       let oph = Operation.hash op in
       (* Currently, an injection is always done with priority = `High, because:
          - We want to process and propagate the injected operations fast,
@@ -962,20 +962,61 @@ module Make
           op.Operation.shell.branch
       else
         pv.validation_state >>?= fun validation_state ->
-        Prevalidation_t.parse op >>?= fun parsed_op ->
-        Prevalidation_t.apply_operation validation_state parsed_op >>= function
-        | Applied (_, _result) ->
+        let notifier = mk_notifier pv.operation_stream in
+        classify_operation
+          pv.shell
+          ~filter_config:pv.filter_config
+          ~filter_state:pv.filter_state
+          ~validation_state
+          Mempool.empty
+          op
+          oph
+        >>= fun (filter_state, validation_state, delta_mempool, to_handle) ->
+        let op_status =
+          (* to_handle contains the given operation and its classification, and
+             all operations whose classes are changed/impacted by this
+             classification (eg. in case of operation replacement). Here, we
+             retrieve the classification of our operation. *)
+          List.find_opt
+            (function
+              | (`Parsed ({hash; _} : Filter.Proto.operation_data operation), _)
+              | (`Unparsed (hash, _), _) ->
+                  Operation_hash.equal hash oph)
+            to_handle
+        in
+        match op_status with
+        | Some (_h, (`Applied | `Prechecked)) ->
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2294
+               In case of `Passed_precheck_with_replace, we may want to only do
+               the injection/replacement if a flag `replace` is set to true
+               in the injection query. *)
             Distributed_db.inject_operation pv.shell.parameters.chain_db oph op
             >>= fun (_ : bool) ->
-            pv.shell.pending <- Pending_ops.add oph op prio pv.shell.pending ;
-            return_unit
-        | res ->
+            (* Call handle & update_advertised_mempool only if op is accepted *)
+            List.iter (handle_classification ~notifier pv.shell) to_handle ;
+            pv.filter_state <- filter_state ;
+            pv.validation_state <- Ok validation_state ;
+            (* Note that in this case, we may advertise an operation and bypass
+               the prioritirization strategy. *)
+            update_advertised_mempool_fields w pv.shell delta_mempool >>= return
+        | Some
+            ( _h,
+              (`Branch_delayed e | `Branch_refused e | `Refused e | `Outdated e)
+            ) ->
+            Lwt.return
+            @@ error_with
+                 "Error while applying operation %a:@ %a"
+                 Operation_hash.pp
+                 oph
+                 pp_print_trace
+                 e
+        | None ->
+            (* This case should not happen *)
             failwith
-              "Error while applying operation %a:@ %a"
+              "Unexpected error while injecting operation %a. Operation not \
+               found after classifying it."
               Operation_hash.pp
               oph
-              Prevalidation_t.pp_result
-              res
 
     let on_notify w (shell : types_state_shell) peer mempool =
       let may_fetch_operation = may_fetch_operation w shell (Some peer) in
@@ -1431,7 +1472,7 @@ module Make
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject {op; force} -> Requests.on_inject pv ~force op
+      | Request.Inject {op; force} -> Requests.on_inject w pv ~force op
       | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
       | Request.Advertise ->
           Requests.on_advertise pv.shell ;
