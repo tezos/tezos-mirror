@@ -65,6 +65,10 @@ let pp_entry ppf (entry : value_metadata) =
     Hex.pp
     (Hex.of_bytes entry.cache_nonce)
 
+let equal_value_metadata m1 m2 =
+  m1.size = m2.size && m1.birth = m2.birth
+  && Bytes.equal m1.cache_nonce m2.cache_nonce
+
 module Int64Map = Map.Make (Int64)
 
 type 'a cache = {
@@ -370,6 +374,9 @@ let subcache_domain_encoding : subcache_domain Data_encoding.t =
 let domain_encoding : domain Data_encoding.t =
   Data_encoding.(list subcache_domain_encoding)
 
+let equal_subdomain s1 s2 =
+  s1.counter = s2.counter && KeyMap.equal equal_value_metadata s1.keys s2.keys
+
 let empty_domain = List.is_empty
 
 let sync t ~cache_nonce =
@@ -472,3 +479,7 @@ let key_rank ctxt key =
   in
   if not @@ KeyMap.mem key cache.map then None
   else Int64Map.bindings cache.lru |> List.map snd |> length_until key 0
+
+module Internal_for_tests = struct
+  let equal_domain d1 d2 = List.equal equal_subdomain d1 d2
+end

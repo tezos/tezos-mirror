@@ -121,14 +121,22 @@ module Context : sig
   type cache_value = ..
 
   (** See {!Context.CACHE} in [sigs/v3/context.mli] for documentation. *)
-  module Cache :
-    CACHE
-      with type t := t
-       and type size = int
-       and type index = int
-       and type identifier = string
-       and type key = cache_key
-       and type value = cache_value
+  module Cache : sig
+    include
+      CACHE
+        with type t := t
+         and type size = int
+         and type index = int
+         and type identifier = string
+         and type key = cache_key
+         and type value = cache_value
+
+    module Internal_for_tests : sig
+      (** [same_cache_domains ctxt ctxt'] returns [true] iff the caches
+          of the two contexts share the same domain. *)
+      val same_cache_domains : t -> t -> (bool, 'a) result Lwt.t
+    end
+  end
 
   (** A cache is a block-dependent value: to know whether a cache can
      be reused or recycled in a given block, we need the block that
