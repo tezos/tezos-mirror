@@ -435,3 +435,27 @@ module Make (X : PARAMETERS) = struct
                 "failed to set up memory consumption measurement: %s"
                 (Printexc.to_string exn)))
 end
+
+let n_events_rev n filter =
+  if n <= 0 then invalid_arg "Base.n_events_rev: n must be > 0." ;
+  let acc = ref [] in
+  let size = ref 0 in
+  let accumulation_threshold value =
+    acc := value :: !acc ;
+    incr size ;
+    if !size >= n then Some !acc else None
+  in
+  let accumulating_filter json =
+    Option.bind (filter json) accumulation_threshold
+  in
+  accumulating_filter
+
+let n_events n filter =
+  let accumulating_filter = n_events_rev n filter in
+  let inverting_filter json = Option.map List.rev @@ accumulating_filter json in
+  inverting_filter
+
+let nth_event n filter =
+  let accumulating_filter = n_events_rev n filter in
+  let nth_filter json = Option.map List.hd @@ accumulating_filter json in
+  nth_filter

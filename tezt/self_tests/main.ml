@@ -27,4 +27,5 @@
 
 let () =
   Test_check.register () ;
+  Test_daemon.register () ;
   Test.run ()

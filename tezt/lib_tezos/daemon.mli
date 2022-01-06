@@ -244,3 +244,37 @@ module Make : functor (X : PARAMETERS) -> sig
   *)
   val memory_consumption : t -> observe_memory_consumption Lwt.t
 end
+
+(** {2 Filter combinators } *)
+
+(** Transform an event filter into one that waits for several events.
+
+    Usage: [n_events n filter]
+
+    [n] represents the number of events that the resulting filter must
+    wait for.
+
+    [filter] is the initial filter that must be transformed. It is
+    expressed as a function that takes a serialized input (for example
+    a [JSON.t]) and returns some deserialized output (an event) if no
+    error occured during the decoding and input matched some acceptance
+    criteria.
+
+    The function evaluates into a new filter, i.e. a new function that
+    takes a serialized input and returns [None] until [n] calls where
+    the given input passes the initial [filter] are performed.
+
+    On the [nth] successful call, the resulting filter will return some
+    list of the [n] successuful outputs of [filter]. The order of the
+    given inputs is preserved in the list of outputs.
+
+    The behavior of the resulting filter is unspecified after the list
+    has been returned. *)
+val n_events : int -> ('a -> 'b option) -> 'a -> 'b list option
+
+(** Tranform an event filter into one that waits for several events to
+    return the last one.
+
+   Similar to [n_events] but only returns the last successful event
+   instead of the whole list. *)
+val nth_event : int -> ('a -> 'b option) -> 'a -> 'b option
