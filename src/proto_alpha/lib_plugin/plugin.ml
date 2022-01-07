@@ -1245,6 +1245,7 @@ module RPC = struct
       let trace_code_input_encoding = run_code_input_encoding
 
       let trace_encoding =
+        (* TODO: should this encoding be updated? *)
         def "scripted.trace" @@ list
         @@ obj3
              (req "location" Script.location_encoding)
@@ -1252,7 +1253,12 @@ module RPC = struct
              (req
                 "stack"
                 (list
-                   (obj2 (req "item" Script.expr_encoding) (opt "annot" string))))
+                   (conv
+                      (fun e -> (e, None))
+                      (fun (e, _annot) -> e)
+                      (obj2
+                         (req "item" Script.expr_encoding)
+                         (opt "annot" string)))))
 
       let trace_code_output_encoding =
         conv
@@ -1482,7 +1488,7 @@ module RPC = struct
         let rec unparse_stack :
             type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
-            (Script.expr * string option) list tzresult Lwt.t = function
+            Script.expr list tzresult Lwt.t = function
           | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
           | (Item_t (ty, rest_ty), (v, rest)) ->
               Script_ir_translator.unparse_data
@@ -1492,9 +1498,8 @@ module RPC = struct
                 v
               >>=? fun (data, _ctxt) ->
               unparse_stack (rest_ty, rest) >|=? fun rest ->
-              let annot = None in
               let data = Micheline.strip_locations data in
-              (data, annot) :: rest
+              data :: rest
         in
         unparse_stack (stack_ty, stack)
 

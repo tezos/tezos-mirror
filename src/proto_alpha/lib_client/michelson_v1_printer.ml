@@ -61,13 +61,8 @@ let print_execution_trace ppf trace =
         loc
         Gas.pp
         gas
-        (Format.pp_print_list (fun ppf (e, annot) ->
-             Format.fprintf
-               ppf
-               "@[<v 0>%a  \t%s@]"
-               print_expr
-               e
-               (match annot with None -> "" | Some a -> a)))
+        (Format.pp_print_list (fun ppf e ->
+             Format.fprintf ppf "@[<v 0>%a@]" print_expr e))
         stack)
     ppf
     trace
