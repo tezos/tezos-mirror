@@ -40,6 +40,9 @@ val bounded_encoding : ?max_operations:int -> unit -> mempool Data_encoding.t
 (** Empty mempool. *)
 val empty : mempool
 
+(** [is_empty mempool] returns true if and only if [mempool] is empty. *)
+val is_empty : mempool -> bool
+
 (** [cons_valid oph t] prepends [oph] to the [known_valid] field of [t]. *)
 val cons_valid : Operation_hash.t -> mempool -> mempool
 
