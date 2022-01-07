@@ -974,3 +974,9 @@ module Tx_rollup : sig
     Client.t ->
     JSON.t Lwt.t
 end
+
+module Curl : sig
+  (** [get ()] returns [Some curl] where [curl ~url] returns the raw response obtained
+      by curl when requesting [url]. Returns [None] if [curl] cannot be found. *)
+  val get : unit -> (url:string -> string Lwt.t) option Lwt.t
+end

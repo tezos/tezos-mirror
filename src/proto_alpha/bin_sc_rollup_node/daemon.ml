@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,22 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
+(* For the moment, the daemon does nothing. *)
+let daemonize () = Lwt_utils.never_ending ()
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+let install_finalizer rpc_server =
+  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
+  RPC_server.shutdown rpc_server >>= fun () ->
+  Event.shutdown_node exit_status >>= Internal_event_unix.close
 
-  module type S = sig
-    val name : string
-
-    val parse_boot_sector : string -> boot_sector option
-
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
-
-  type t = (module S)
-end
-
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
-
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
-
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
-
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
-
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
-
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+let run ~data_dir (cctxt : Protocol_client_context.full) =
+  let start () =
+    Event.starting_node () >>= fun () ->
+    Configuration.load ~data_dir >>=? fun configuration ->
+    let Configuration.{rpc_addr; rpc_port; _} = configuration in
+    Layer1.start configuration cctxt >>=? fun () ->
+    RPC_server.start configuration >>=? fun rpc_server ->
+    let _ = install_finalizer rpc_server in
+    Event.node_is_ready ~rpc_addr ~rpc_port >>= daemonize
+  in
+  Lwt.catch start fail_with_exn

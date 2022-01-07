@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
+type t = {
+  data_dir : string;
+  sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
+  rpc_addr : string;
+  rpc_port : int;
+}
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+let default_data_dir =
+  Filename.concat (Sys.getenv "HOME") ".tezos-sc-rollup-node"
 
-  module type S = sig
-    val name : string
+let relative_filename data_dir = Filename.concat data_dir "config.json"
 
-    val parse_boot_sector : string -> boot_sector option
+let filename config = relative_filename config.data_dir
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
+let default_rpc_addr = "127.0.0.1"
 
-  type t = (module S)
-end
+let default_rpc_port = 8932
 
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
+let encoding : t Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {data_dir; sc_rollup_address; rpc_addr; rpc_port} ->
+      (data_dir, sc_rollup_address, rpc_addr, rpc_port))
+    (fun (data_dir, sc_rollup_address, rpc_addr, rpc_port) ->
+      {data_dir; sc_rollup_address; rpc_addr; rpc_port})
+    (obj4
+       (dft
+          "data-dir"
+          ~description:"Location of the data dir"
+          string
+          default_data_dir)
+       (req
+          "sc-rollup-address"
+          ~description:"Smart contract rollup address"
+          Protocol.Alpha_context.Sc_rollup.Address.encoding)
+       (dft "rpc-addr" ~description:"RPC address" string default_rpc_addr)
+       (dft "rpc-port" ~description:"RPC port" int16 default_rpc_port))
 
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
+let save config =
+  let json = Data_encoding.Json.construct encoding config in
+  Lwt_utils_unix.create_dir config.data_dir >>= fun () ->
+  Lwt_utils_unix.Json.write_file (filename config) json
 
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
-
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
-
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
-
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+let load ~data_dir =
+  Lwt_utils_unix.Json.read_file (relative_filename data_dir) >>=? fun json ->
+  return (Data_encoding.Json.destruct encoding json)

@@ -30,7 +30,11 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
     $(foreach p, $(active_protocol_versions), tezos-accuser-$(p)) \
     $(foreach p, $(active_protocol_versions), \
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
-		             echo tezos-endorser-$(p); fi))
+		             echo tezos-endorser-$(p); fi)) \
+    $(shell if [ ${PROFILE} = "dev" ]; then echo tezos-sc-rollup-node-alpha; fi)
+    # TODO: <https://gitlab.com/tezos/tezos/-/issues/2305>
+    # Build sc rollup binaries for all the active protocols, not just alpha,
+    # and for every profile.
 
 ifeq ($(filter ${opam_version}.%,${current_opam_version}),)
 $(error Unexpected opam version (found: ${current_opam_version}, expected: ${opam_version}.*))

@@ -1,0 +1,17 @@
+(library
+ (name tezos_sc_rollup_alpha)
+ (instrumentation (backend bisect_ppx))
+ (public_name tezos-sc-rollup-alpha)
+ (libraries tezos-base
+            tezos-rpc
+            tezos-protocol-alpha
+            tezos-protocol-alpha-parameters
+            tezos-protocol-plugin-alpha)
+ (inline_tests)
+ (preprocess (pps ppx_inline_test))
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_plugin_alpha
+                   -open Tezos_protocol_alpha_parameters
+                   -open Tezos_rpc)))

@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,55 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
+module Simple = struct
+  include Internal_event.Simple
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+  let section = ["sc_rollup_node"]
 
-  module type S = sig
-    val name : string
+  let starting_node =
+    declare_0
+      ~section
+      ~name:"starting_sc_rollup_node"
+      ~msg:"Starting the smart contract rollup node"
+      ~level:Notice
+      ()
 
-    val parse_boot_sector : string -> boot_sector option
+  let shutdown_node =
+    declare_1
+      ~section
+      ~name:"stopping_sc_rollup_node"
+      ~msg:"Stopping the smart contract rollup node"
+      ~level:Notice
+      ("exit_status", Data_encoding.int8)
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
+  let node_is_ready =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_is_ready"
+      ~msg:"The smart contract rollup node is listening to {addr}:{port}"
+      ~level:Notice
+      ("addr", Data_encoding.string)
+      ("port", Data_encoding.uint16)
 
-  type t = (module S)
+  let rollup_exists =
+    declare_2
+      ~section
+      ~name:"sc_rollup_node_knows_its_rollup"
+      ~msg:
+        "The smart contract rollup node is interacting with rollup {addr} of \
+         kind {kind}"
+      ~level:Notice
+      ("addr", Protocol.Alpha_context.Sc_rollup.Address.encoding)
+      ("kind", Data_encoding.string)
 end
 
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
+let starting_node = Simple.(emit starting_node)
 
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
+let shutdown_node exit_status = Simple.(emit shutdown_node exit_status)
 
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
+let node_is_ready ~rpc_addr ~rpc_port =
+  Simple.(emit node_is_ready (rpc_addr, rpc_port))
 
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
-
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
-
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+let rollup_exists ~addr ~kind =
+  let kind = Protocol.Sc_rollups.string_of_kind kind in
+  Simple.(emit rollup_exists (addr, kind))

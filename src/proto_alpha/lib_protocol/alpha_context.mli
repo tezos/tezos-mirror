@@ -1919,6 +1919,8 @@ module Sc_rollup : sig
     kind:Kind.t ->
     boot_sector:PVM.boot_sector ->
     (context * t * Z.t) tzresult Lwt.t
+
+  val kind : context -> t -> Kind.t option tzresult Lwt.t
 end
 
 module Kind : sig

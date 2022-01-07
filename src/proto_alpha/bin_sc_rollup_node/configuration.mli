@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
+type t = {
+  data_dir : string;
+  sc_rollup_address : Protocol.Alpha_context.Sc_rollup.t;
+  rpc_addr : string;
+  rpc_port : int;
+}
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+(** [default_data_dir] is the default value for [data_dir]. *)
+val default_data_dir : string
 
-  module type S = sig
-    val name : string
+(** [default_rpc_addr] is the default value for [rpc_addr]. *)
+val default_rpc_addr : string
 
-    val parse_boot_sector : string -> boot_sector option
+(** [default_rpc_port] is the default value for [rpc_port]. *)
+val default_rpc_port : int
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
+(** [filename configuration] returns the [configuration] filename. *)
+val filename : t -> string
 
-  type t = (module S)
-end
+(** [save configuration] overwrites [configuration] file. *)
+val save : t -> unit tzresult Lwt.t
 
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
-
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
-
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
-
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
-
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
-
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
+val load : data_dir:string -> t tzresult Lwt.t

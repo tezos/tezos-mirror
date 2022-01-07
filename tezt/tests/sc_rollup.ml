@@ -29,12 +29,12 @@
    =======
 
 *)
-let test ~__FILE__ ~output_file title =
-  Protocol.register_regression_test
-    ~output_file
-    ~__FILE__
-    ~title
-    ~tags:["sc_rollup"]
+let test ~__FILE__ ?output_file ?(tags = []) title f =
+  let tags = "sc_rollup" :: tags in
+  match output_file with
+  | Some output_file ->
+      Protocol.register_regression_test ~output_file ~__FILE__ ~title ~tags f
+  | None -> Protocol.register_test ~__FILE__ ~title ~tags f
 
 let setup f ~protocol =
   let sc_rollup_enable = [(["sc_rollup_enable"], Some "true")] in
@@ -45,6 +45,17 @@ let setup f ~protocol =
   in
   let bootstrap1_key = Constant.bootstrap1.public_key_hash in
   f node client bootstrap1_key
+
+let sc_rollup_node_rpc sc_node service =
+  let* curl = RPC.Curl.get () in
+  match curl with
+  | None -> return None
+  | Some curl ->
+      let url =
+        Printf.sprintf "%s/%s" (Sc_rollup_node.endpoint sc_node) service
+      in
+      let* response = curl ~url in
+      return (Some response)
 
 (*
 
@@ -79,4 +90,84 @@ let test_origination =
       Regression.capture rollup_address ;
       return ())
 
-let register ~protocols = test_origination ~protocols
+(* Configuration of a rollup node
+   ------------------------------
+
+   A rollup node has a configuration file that must be initialized.
+
+*)
+let with_fresh_rollup f tezos_node tezos_client bootstrap1_key =
+  let* rollup_address =
+    Client.originate_sc_rollup
+      ~burn_cap:Tez.(of_int 9999999)
+      ~src:bootstrap1_key
+      ~kind:"arith"
+      ~boot_sector:""
+      tezos_client
+  in
+  let sc_rollup_node = Sc_rollup_node.create tezos_node in
+  let* configuration_filename =
+    Sc_rollup_node.config_init sc_rollup_node rollup_address
+  in
+  let* () = Client.bake_for tezos_client in
+  f rollup_address sc_rollup_node configuration_filename
+
+let test_rollup_node_configuration =
+  let output_file = "sc_rollup_node_configuration" in
+  test
+    ~__FILE__
+    ~output_file
+    "configuration of a smart contract optimistic rollup node"
+    (fun protocol ->
+      setup ~protocol @@ with_fresh_rollup
+      @@ fun _rollup_address _sc_rollup_node filename ->
+      let read_configuration =
+        let open Ezjsonm in
+        match from_channel (open_in filename) with
+        | `O fields ->
+            (* Remove 'data-dir' as it is non deterministic. *)
+            `O (List.filter (fun (s, _) -> s <> "data-dir") fields) |> to_string
+        | _ ->
+            failwith "The configuration file does not have the expected format."
+      in
+      Regression.capture read_configuration ;
+      return ())
+
+(* Launching a rollup node
+   -----------------------
+
+   A running rollup node can be asked the address of the rollup it is
+   interacting with.
+
+*)
+let test_rollup_node_running =
+  test
+    ~__FILE__
+    ~tags:["run"]
+    "running a smart contract rollup node"
+    (fun protocol ->
+      setup ~protocol @@ with_fresh_rollup
+      @@ fun rollup_address sc_rollup_node _filename ->
+      let* () = Sc_rollup_node.run sc_rollup_node in
+      let* rollup_address_from_rpc =
+        sc_rollup_node_rpc sc_rollup_node "sc_rollup_address"
+      in
+      match rollup_address_from_rpc with
+      | None ->
+          (* No curl, no check. *)
+          failwith "Please install curl"
+      | Some rollup_address_from_rpc ->
+          let rollup_address = "\"" ^ rollup_address ^ "\"" in
+          if String.trim rollup_address_from_rpc <> rollup_address then
+            failwith
+              (Printf.sprintf
+                 "Expecting %s, got %s when we query the sc rollup node RPC \
+                  address"
+                 rollup_address
+                 rollup_address_from_rpc)
+          else return ())
+
+let register ~protocols =
+  test_origination ~protocols ;
+  test_rollup_node_configuration ~protocols ;
+  test_rollup_node_running ~protocols

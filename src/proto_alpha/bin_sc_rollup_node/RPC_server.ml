@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,44 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Here is the list of PVMs available in this protocol. *)
-open Alpha_context.Sc_rollup
+open Tezos_rpc
+open Tezos_rpc_http
+open Tezos_rpc_http_server
 
-module PVM : sig
-  type boot_sector = Alpha_context.Sc_rollup.PVM.boot_sector
+let register_sc_rollup_address configuration dir =
+  RPC_directory.register0
+    dir
+    (Sc_rollup_services.sc_rollup_address ())
+    (fun () () -> return @@ configuration.Configuration.sc_rollup_address)
 
-  module type S = sig
-    val name : string
+let register configuration =
+  RPC_directory.empty |> register_sc_rollup_address configuration
 
-    val parse_boot_sector : string -> boot_sector option
+let start configuration =
+  let Configuration.{rpc_addr; rpc_port; _} = configuration in
+  let rpc_addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string rpc_addr in
+  let dir = register configuration in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.default rpc_addr in
+  Lwt.catch
+    (fun () ->
+      RPC_server.launch
+        ~media_types:Media_type.all_media_types
+        ~host
+        ~acl
+        node
+        dir
+      >>= return)
+    fail_with_exn
 
-    val pp_boot_sector : Format.formatter -> boot_sector -> unit
-  end
-
-  type t = (module S)
-end
-
-(** [of_kind kind] returns the [PVM] of the given [kind]. *)
-val of_kind : Kind.t -> PVM.t
-
-(** [kind_of pvm] returns the [PVM] of the given [kind]. *)
-val kind_of : PVM.t -> Kind.t
-
-(** [from ~name] is [Some (module I)] if an implemented PVM called
-     [name]. This function returns [None] otherwise. *)
-val from : name:string -> PVM.t option
-
-(** [all] returns all implemented PVM. *)
-val all : Kind.t list
-
-(** [all_names] returns all implemented PVM names. *)
-val all_names : string list
-
-(** [kind_of_string name] returns the kind of the PVM of the specified [name]. *)
-val kind_of_string : string -> Kind.t option
-
-(** [string_of_kind kind] returns a human-readable representation of [kind]. *)
-val string_of_kind : Kind.t -> string
-
-(** [pp fmt kind] is a pretty-printer for [kind]. *)
-val pp : Format.formatter -> Kind.t -> unit
+let shutdown = RPC_server.shutdown
