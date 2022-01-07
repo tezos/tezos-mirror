@@ -203,6 +203,10 @@ module Opam : sig
 
   (** Package version constraints.
 
+      - [Same_as_current_package] means that the version number must be the
+        same as the current package version.
+        It becomes [= version] in the generated opam file.
+
       - [Exactly v] means that the version number must be [v].
         It becomes [=] in the generated opam file.
 
@@ -219,6 +223,7 @@ module Opam : sig
       - [Not v] means that the version number cannot be [v].
         It becomes [!=] in the generated opam file. *)
   type version_constraint =
+    | Same_as_current_package
     | Exactly of version
     | At_least of version
     | Less_than of version

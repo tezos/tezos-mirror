@@ -320,6 +320,7 @@ module Opam = struct
   type version = string
 
   type version_constraint =
+    | Same_as_current_package
     | Exactly of version
     | At_least of version
     | Less_than of version
@@ -431,6 +432,7 @@ module Opam = struct
             ()
     in
     let pp_version_constraint fmt = function
+      | Same_as_current_package -> Format.fprintf fmt "= version"
       | Exactly version -> Format.fprintf fmt "= %a" pp_version version
       | At_least version -> Format.fprintf fmt ">= %a" pp_version version
       | Less_than version -> Format.fprintf fmt "< %a" pp_version version
@@ -1251,15 +1253,22 @@ let generate_dune_files () =
    and in which the dependency will be added.
    If it is the same package as the one in which [target] belongs,
    [None] is returned, since a package cannot depend on itself
-   and there is no need to. *)
-let rec as_opam_dependency ~(for_package : string) ~with_test
+   and there is no need to.
+
+   If [fix_version] is [true], require [target]'s version to be
+   exactly the same as [for_package]'s version, but only if [target] is internal. *)
+let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
     (target : Target.target) : Opam.dependency option =
   match target with
   | Internal {opam = None; _} | External {opam = None; _} -> None
   | Internal {opam = Some package; _} ->
       let package = Filename.basename package in
       if package = for_package then None
-      else Some {Opam.package; version = []; with_test; optional = false}
+      else
+        let version =
+          if fix_version then [Opam.Same_as_current_package] else []
+        in
+        Some {Opam.package; version; with_test; optional = false}
   | Vendored {name = package; _} ->
       Some {Opam.package; version = []; with_test; optional = false}
   | External {opam = Some opam; version; _} | Opam_only {name = opam; version}
@@ -1268,7 +1277,7 @@ let rec as_opam_dependency ~(for_package : string) ~with_test
   | Optional target | Select {package = target; _} ->
       Option.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
-        (as_opam_dependency ~for_package ~with_test target)
+        (as_opam_dependency ~fix_version ~for_package ~with_test target)
 
 let generate_opam ?release this_package (internals : Target.internal list) :
     Opam.t =
@@ -1285,11 +1294,18 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     in
     let deps =
       List.filter_map
-        (as_opam_dependency ~for_package:this_package ~with_test)
+        (as_opam_dependency
+           ~fix_version:(release <> None)
+           ~for_package:this_package
+           ~with_test)
         deps
     in
     let get_preprocess_dep (Target.PPS target | PPS_args (target, _)) =
-      as_opam_dependency ~for_package:this_package ~with_test target
+      as_opam_dependency
+        ~fix_version:(release <> None)
+        ~for_package:this_package
+        ~with_test
+        target
     in
     List.filter_map get_preprocess_dep internal.preprocess @ deps
   in
@@ -1330,7 +1346,10 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     List.flatten @@ map internals
     @@ fun internal ->
     List.filter_map
-      (as_opam_dependency ~for_package:this_package ~with_test:false)
+      (as_opam_dependency
+         ~fix_version:false
+         ~for_package:this_package
+         ~with_test:false)
       internal.conflicts
   in
   let synopsis =
