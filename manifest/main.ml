@@ -3367,7 +3367,7 @@ let _tezos_tps_evaluation =
 
    Note that [filename] is relative to the manifest directory,
    i.e. it starts with "../". *)
-let not_generated filename =
+let exclude filename =
   has_prefix ~prefix:"../src/proto_" filename
   || has_prefix ~prefix:"../src/lib_time_measurement/" filename
   ||
@@ -3376,7 +3376,7 @@ let not_generated filename =
   | _ -> false
 
 (* Generate dune and opam files. *)
-let () = generate ~not_generated ()
+let () = generate ~exclude ()
 
 (* Generate active_protocol_versions. *)
 let () =

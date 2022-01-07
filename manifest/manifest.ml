@@ -1265,7 +1265,7 @@ let generate_opam_files () =
     Opam.pp
     opam
 
-let check_for_non_generated_files ?(not_generated = fun _ -> false) () =
+let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
     let dir_contents = Sys.readdir dir in
     let add_item acc filename =
@@ -1282,7 +1282,7 @@ let check_for_non_generated_files ?(not_generated = fun _ -> false) () =
   let diff = String_set.diff all_files !generated_files in
   let error = ref false in
   let ignore_or_fail filename =
-    if not (not_generated filename) then (
+    if not (exclude filename) then (
       Printf.eprintf "Error: %s: exists but was not generated\n%!" filename ;
       error := true)
   in
@@ -1290,15 +1290,15 @@ let check_for_non_generated_files ?(not_generated = fun _ -> false) () =
   if !error then (
     prerr_endline
       "Please modify manifest/main.ml to generate the above file(s)\n\
-       or declare them in the 'ignore_file' function." ;
+       or declare them in the 'exclude' function." ;
     exit 1)
 
-let generate ?not_generated () =
+let generate ?exclude () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
-    check_for_non_generated_files ?not_generated ()
+    check_for_non_generated_files ?exclude ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
