@@ -73,7 +73,7 @@ module type FILTER = sig
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation ->
-      [ `Passed_prefilter of [`High | `Low]
+      [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
       Lwt.t
 
@@ -113,7 +113,7 @@ module No_filter (Proto : Registered_protocol.T) = struct
       Lwt.return `Undecided
 
     let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =
-      Lwt.return @@ `Passed_prefilter `Low
+      Lwt.return @@ `Passed_prefilter (`Low [])
 
     let post_filter _ ~filter_state ~validation_state_before:_
         ~validation_state_after:_ _ =

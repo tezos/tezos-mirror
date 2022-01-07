@@ -97,8 +97,8 @@ module type FILTER = sig
         is called on arrival of an operation and after a flush of
         the prevalidator. This function calls the [pre_filter] in the protocol
         plugin and returns [`Passed_prefilter priority] if no error occurs during
-        checking of the [operation_data], where priority is either `High or `Low
-        depending on the operation. More tests are done using the
+        checking of the [operation_data], where priority is the priority computed by
+        the protocol filter plug-in. More tests are done using the
         [filter_state]. We classify an operation that passes the prefilter as
         [`Passed_prefilter] since we do not know yet if the operation is
         applicable or not. If an error occurs during the checks, this function
@@ -109,7 +109,7 @@ module type FILTER = sig
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation ->
-      [ `Passed_prefilter of [`High | `Low]
+      [ `Passed_prefilter of Prevalidator_pending_operations.priority
       | Prevalidator_classification.error_classification ]
       Lwt.t
 
