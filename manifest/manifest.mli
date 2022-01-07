@@ -830,6 +830,11 @@ val optional : target -> target
     libraries for which a [main_module] was specified. *)
 val open_ : ?m:string -> target -> target
 
+(** Same as [open_], but only open if a condition holds.
+
+    Example: [tezos_base |> open_if protocol_is_recent_enough] *)
+val open_if : ?m:string -> bool -> target -> target
+
 (** Get a name for a given target, to display in errors.
 
     If a target has multiple names, one is chosen arbitrarily.
