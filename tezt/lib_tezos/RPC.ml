@@ -646,6 +646,18 @@ module Tx_rollup = struct
     Client.rpc ?endpoint ?hooks GET path client
 end
 
+module Sc_rollup = struct
+  let path ~chain ~block ~sc_rollup_address =
+    [
+      "chains"; chain; "blocks"; block; "context"; "sc_rollup"; sc_rollup_address;
+    ]
+
+  let get_inbox ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~sc_rollup_address client =
+    let path = path ~chain ~block ~sc_rollup_address @ ["inbox"] in
+    Client.rpc ?endpoint ?hooks GET path client
+end
+
 module Curl = struct
   let curl_path_cache = ref None
 

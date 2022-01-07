@@ -198,8 +198,59 @@ let test_rollup_client_gets_address =
              rollup_address_from_client) ;
       return ())
 
+(* Pushing message in the inbox
+   ----------------------------
+
+   A message can be pushed to a smart-contract rollup inbox through
+   the Tezos node. Then we can observe that the messages are included in the
+   inbox.
+*)
+let test_rollup_inbox =
+  let output_file = "sc_rollup_inbox" in
+  test
+    ~__FILE__
+    ~output_file
+    ~tags:["inbox"]
+    "pushing messages in the inbox"
+    (fun protocol ->
+      setup ~protocol @@ fun node client ->
+      ( with_fresh_rollup @@ fun sc_rollup_address _sc_rollup_node _filename ->
+        let send msg =
+          let* () =
+            Client.send_sc_rollup_message
+              ~src:"bootstrap1"
+              ~dst:sc_rollup_address
+              ~msg
+              client
+          in
+          Client.bake_for client
+        in
+        let n = 10 in
+        let messages =
+          range 1 n |> fun is ->
+          List.map
+            (fun i ->
+              Printf.sprintf "text:[%s]" @@ String.concat ", "
+              @@ List.map (fun _ -> Printf.sprintf "\"CAFEBABE\"") (range 1 i))
+            is
+        in
+        let* () = Lwt_list.iter_s send messages in
+        let* () = Client.bake_for client in
+        let* inbox = RPC.Sc_rollup.get_inbox ~sc_rollup_address client in
+        (List.assoc_opt "inbox_size" (JSON.as_object inbox) |> function
+         | None -> failwith "inbox_size is undefined"
+         | Some inbox_size ->
+             Check.(
+               (JSON.as_int inbox_size = n * (n + 1) / 2)
+                 int
+                 ~error_msg:"expected value %R, got %L")) ;
+        return () )
+        node
+        client)
+
 let register ~protocols =
   test_origination ~protocols ;
   test_rollup_node_configuration ~protocols ;
   test_rollup_node_running ~protocols ;
-  test_rollup_client_gets_address ~protocols
+  test_rollup_client_gets_address ~protocols ;
+  test_rollup_inbox ~protocols

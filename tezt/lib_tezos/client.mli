@@ -828,6 +828,26 @@ val spawn_originate_sc_rollup :
   t ->
   Process.t
 
+(** Run [tezos-client send rollup message <msg> from <src> to <dst>]. *)
+val send_sc_rollup_message :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  msg:string ->
+  src:string ->
+  dst:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [send_sc_rollup_message], but do not wait for the process to exit. *)
+val spawn_send_sc_rollup_message :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  msg:string ->
+  src:string ->
+  dst:string ->
+  t ->
+  Process.t
+
 (** {2 High-Level Functions} *)
 
 (** Create a client with mode [Client] and import all secret keys

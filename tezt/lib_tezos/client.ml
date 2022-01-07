@@ -1118,6 +1118,23 @@ let originate_sc_rollup ?wait ?burn_cap ~src ~kind ~boot_sector client =
   let* output = Process.check_and_read_stdout process in
   parse_rollup_address_in_receipt output
 
+let spawn_send_sc_rollup_message ?(wait = "none") ?burn_cap ~msg ~src ~dst
+    client =
+  spawn_command
+    client
+    (["--wait"; wait]
+    @ ["send"; "sc"; "rollup"; "message"; msg; "from"; src; "to"; dst]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+        burn_cap)
+
+let send_sc_rollup_message ?wait ?burn_cap ~msg ~src ~dst client =
+  let process =
+    spawn_send_sc_rollup_message ?wait ?burn_cap ~msg ~src ~dst client
+  in
+  Process.check process
+
 let init ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type () =
   let client =
     create ?path ?admin_path ?name ?color ?base_dir ?endpoint ?media_type ()

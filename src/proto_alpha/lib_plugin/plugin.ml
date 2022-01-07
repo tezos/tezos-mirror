@@ -2604,6 +2604,10 @@ module RPC = struct
 
     let register_inbox () =
       Registration.register1 ~chunked:true S.inbox (fun ctxt rollup () () ->
+          Stdlib.Format.eprintf
+            "@[Context level at RPC time at %a@]@."
+            Level.pp
+            (Level.current ctxt) ;
           Sc_rollup.inbox ctxt rollup >>=? fun (inbox, _ctxt) -> return inbox)
 
     let register_kind () =

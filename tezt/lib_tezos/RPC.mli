@@ -975,6 +975,18 @@ module Tx_rollup : sig
     JSON.t Lwt.t
 end
 
+module Sc_rollup : sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/state *)
+  val get_inbox :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    sc_rollup_address:string ->
+    Client.t ->
+    JSON.t Lwt.t
+end
+
 module Curl : sig
   (** [get ()] returns [Some curl] where [curl ~url] returns the raw response obtained
       by curl when requesting [url]. Returns [None] if [curl] cannot be found. *)
