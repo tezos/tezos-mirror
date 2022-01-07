@@ -24,30 +24,38 @@ let clic_arg () =
                other))
 
 let fprintf_lwt chan fmt =
+  let open Lwt_syntax in
   Format.kasprintf
-    (fun s -> protect (fun () -> Lwt_io.write chan s >>= fun () -> return_unit))
+    (fun s ->
+      protect (fun () ->
+          let* () = Lwt_io.write chan s in
+          return_ok_unit))
     fmt
 
 let output ?(channel = Lwt_io.stdout) how_option ~for_human ~for_script =
+  let open Lwt_result_syntax in
   match how_option with
   | None -> for_human ()
   | Some (Rows {separator; escape}) ->
       let open Format in
-      List.iter_es
-        (fun row ->
-          fprintf_lwt
-            channel
-            "%a@."
-            (pp_print_list
-               ~pp_sep:(fun fmt () -> pp_print_string fmt separator)
-               (fun fmt cell ->
-                 match escape with
-                 | `OCaml -> fprintf fmt "%S" cell
-                 | `No -> pp_print_string fmt cell))
-            row)
-        (for_script ())
-      >>=? fun () ->
-      protect (fun () -> Lwt_io.flush channel >>= fun () -> return_unit)
+      let* () =
+        List.iter_es
+          (fun row ->
+            fprintf_lwt
+              channel
+              "%a@."
+              (pp_print_list
+                 ~pp_sep:(fun fmt () -> pp_print_string fmt separator)
+                 (fun fmt cell ->
+                   match escape with
+                   | `OCaml -> fprintf fmt "%S" cell
+                   | `No -> pp_print_string fmt cell))
+              row)
+          (for_script ())
+      in
+      protect (fun () ->
+          let*! () = Lwt_io.flush channel in
+          return_unit)
 
 let output_for_human how_option for_human =
   output how_option ~for_human ~for_script:(fun () -> [])
