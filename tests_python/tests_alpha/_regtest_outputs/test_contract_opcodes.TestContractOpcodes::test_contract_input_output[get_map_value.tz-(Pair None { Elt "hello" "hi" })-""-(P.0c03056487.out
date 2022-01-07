@@ -8,34 +8,34 @@ big_map diff
   
 trace
   - location: 12 (remaining gas: 1039987.050 units remaining)
-    [ (Pair "" None { Elt "hello" "hi" })  	 ]
+    [ (Pair "" None { Elt "hello" "hi" }) ]
   - location: 12 (remaining gas: 1039987.040 units remaining)
-    [ (Pair "" None { Elt "hello" "hi" })  	
-      (Pair "" None { Elt "hello" "hi" })  	 ]
+    [ (Pair "" None { Elt "hello" "hi" })
+      (Pair "" None { Elt "hello" "hi" }) ]
   - location: 13 (remaining gas: 1039987.030 units remaining)
-    [ ""  	
-      (Pair "" None { Elt "hello" "hi" })  	 ]
+    [ ""
+      (Pair "" None { Elt "hello" "hi" }) ]
   - location: 14 (remaining gas: 1039987.015 units remaining)
-    [ (Pair "" None { Elt "hello" "hi" })  	 ]
+    [ (Pair "" None { Elt "hello" "hi" }) ]
   - location: 17 (remaining gas: 1039987.005 units remaining)
-    [ (Pair None { Elt "hello" "hi" })  	 ]
+    [ (Pair None { Elt "hello" "hi" }) ]
   - location: 18 (remaining gas: 1039986.995 units remaining)
-    [ { Elt "hello" "hi" }  	 ]
+    [ { Elt "hello" "hi" } ]
   - location: 19 (remaining gas: 1039986.985 units remaining)
-    [ { Elt "hello" "hi" }  	
-      { Elt "hello" "hi" }  	 ]
+    [ { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
   - location: 14 (remaining gas: 1039986.955 units remaining)
-    [ ""  	
-      { Elt "hello" "hi" }  	
-      { Elt "hello" "hi" }  	 ]
+    [ ""
+      { Elt "hello" "hi" }
+      { Elt "hello" "hi" } ]
   - location: 20 (remaining gas: 1039986.805 units remaining)
-    [ None  	
-      { Elt "hello" "hi" }  	 ]
+    [ None
+      { Elt "hello" "hi" } ]
   - location: 21 (remaining gas: 1039986.790 units remaining)
-    [ (Pair None { Elt "hello" "hi" })  	 ]
+    [ (Pair None { Elt "hello" "hi" }) ]
   - location: 22 (remaining gas: 1039986.775 units remaining)
-    [ {}  	
-      (Pair None { Elt "hello" "hi" })  	 ]
+    [ {}
+      (Pair None { Elt "hello" "hi" }) ]
   - location: 24 (remaining gas: 1039986.760 units remaining)
-    [ (Pair {} None { Elt "hello" "hi" })  	 ]
+    [ (Pair {} None { Elt "hello" "hi" }) ]
 

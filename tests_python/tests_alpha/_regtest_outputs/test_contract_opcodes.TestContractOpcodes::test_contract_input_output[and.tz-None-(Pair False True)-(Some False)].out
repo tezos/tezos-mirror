@@ -8,24 +8,24 @@ big_map diff
   
 trace
   - location: 10 (remaining gas: 1039991.303 units remaining)
-    [ (Pair (Pair False True) None)  	 ]
+    [ (Pair (Pair False True) None) ]
   - location: 10 (remaining gas: 1039991.293 units remaining)
-    [ (Pair False True)  	 ]
+    [ (Pair False True) ]
   - location: 11 (remaining gas: 1039991.283 units remaining)
-    [ False  	
-      True  	 ]
+    [ False
+      True ]
   - location: 12 (remaining gas: 1039991.263 units remaining)
-    [ False  	 ]
+    [ False ]
   - location: 13 (remaining gas: 1039991.248 units remaining)
-    [ (Some False)  	 ]
+    [ (Some False) ]
   - location: 14 (remaining gas: 1039991.233 units remaining)
-    [ {}  	
-      (Some False)  	 ]
+    [ {}
+      (Some False) ]
   - location: 16 (remaining gas: 1039991.218 units remaining)
-    [ (Pair {} (Some False))  	 ]
+    [ (Pair {} (Some False)) ]
   - location: 17 (remaining gas: 1039991.208 units remaining)
-    [ {}  	
-      (Some False)  	 ]
+    [ {}
+      (Some False) ]
   - location: 18 (remaining gas: 1039991.193 units remaining)
-    [ (Pair {} (Some False))  	 ]
+    [ (Pair {} (Some False)) ]
 

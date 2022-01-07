@@ -8,56 +8,56 @@ big_map diff
   
 trace
   - location: 12 (remaining gas: 1039963.427 units remaining)
-    [ (Pair (Pair {} {}) None)  	 ]
+    [ (Pair (Pair {} {}) None) ]
   - location: 12 (remaining gas: 1039963.417 units remaining)
-    [ (Pair {} {})  	 ]
+    [ (Pair {} {}) ]
   - location: 13 (remaining gas: 1039963.407 units remaining)
-    [ (Pair {} {})  	
-      (Pair {} {})  	 ]
+    [ (Pair {} {})
+      (Pair {} {}) ]
   - location: 14 (remaining gas: 1039963.397 units remaining)
-    [ {}  	
-      (Pair {} {})  	 ]
+    [ {}
+      (Pair {} {}) ]
   - location: 15 (remaining gas: 1039963.382 units remaining)
-    [ (Pair {} {})  	 ]
+    [ (Pair {} {}) ]
   - location: 17 (remaining gas: 1039963.372 units remaining)
-    [ {}  	 ]
+    [ {} ]
   - location: 15 (remaining gas: 1039963.342 units remaining)
-    [ {}  	
-      {}  	 ]
+    [ {}
+      {} ]
   - location: 18 (remaining gas: 1039963.122 units remaining)
-    [ {}  	
-      {}  	
-      {}  	 ]
+    [ {}
+      {}
+      {} ]
   - location: 20 (remaining gas: 1039963.112 units remaining)
-    [ {}  	
-      {}  	
-      {}  	 ]
+    [ {}
+      {}
+      {} ]
   - location: 21 (remaining gas: 1039963.112 units remaining)
-    [ {}  	
-      {}  	 ]
+    [ {}
+      {} ]
   - location: 34 (remaining gas: 1039963.102 units remaining)
-    [ True  	
-      {}  	
-      {}  	 ]
+    [ True
+      {}
+      {} ]
   - location: 37 (remaining gas: 1039963.092 units remaining)
-    [ {}  	
-      True  	
-      {}  	 ]
+    [ {}
+      True
+      {} ]
   - location: 38 (remaining gas: 1039963.077 units remaining)
-    [ (Pair {} True)  	
-      {}  	 ]
+    [ (Pair {} True)
+      {} ]
   - location: 39 (remaining gas: 1039963.067 units remaining)
-    [ {}  	
-      (Pair {} True)  	 ]
+    [ {}
+      (Pair {} True) ]
   - location: 40 (remaining gas: 1039963.067 units remaining)
-    [ (Pair {} True)  	 ]
+    [ (Pair {} True) ]
   - location: 64 (remaining gas: 1039963.057 units remaining)
-    [ True  	 ]
+    [ True ]
   - location: 65 (remaining gas: 1039963.042 units remaining)
-    [ (Some True)  	 ]
+    [ (Some True) ]
   - location: 66 (remaining gas: 1039963.027 units remaining)
-    [ {}  	
-      (Some True)  	 ]
+    [ {}
+      (Some True) ]
   - location: 68 (remaining gas: 1039963.012 units remaining)
-    [ (Pair {} (Some True))  	 ]
+    [ (Pair {} (Some True)) ]
 

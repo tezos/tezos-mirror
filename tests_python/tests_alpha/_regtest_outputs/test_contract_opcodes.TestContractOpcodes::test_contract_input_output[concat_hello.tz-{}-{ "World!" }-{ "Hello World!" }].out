@@ -8,21 +8,21 @@ big_map diff
   
 trace
   - location: 9 (remaining gas: 1039992.305 units remaining)
-    [ (Pair { "World!" } {})  	 ]
+    [ (Pair { "World!" } {}) ]
   - location: 9 (remaining gas: 1039992.295 units remaining)
-    [ { "World!" }  	 ]
+    [ { "World!" } ]
   - location: 10 (remaining gas: 1039992.295 units remaining)
-    [ "World!"  	 ]
+    [ "World!" ]
   - location: 12 (remaining gas: 1039992.285 units remaining)
-    [ "Hello "  	
-      "World!"  	 ]
+    [ "Hello "
+      "World!" ]
   - location: 15 (remaining gas: 1039992.220 units remaining)
-    [ "Hello World!"  	 ]
+    [ "Hello World!" ]
   - location: 10 (remaining gas: 1039992.205 units remaining)
-    [ { "Hello World!" }  	 ]
+    [ { "Hello World!" } ]
   - location: 16 (remaining gas: 1039992.190 units remaining)
-    [ {}  	
-      { "Hello World!" }  	 ]
+    [ {}
+      { "Hello World!" } ]
   - location: 18 (remaining gas: 1039992.175 units remaining)
-    [ (Pair {} { "Hello World!" })  	 ]
+    [ (Pair {} { "Hello World!" }) ]
 

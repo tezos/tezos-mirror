@@ -8,16 +8,16 @@ big_map diff
   
 trace
   - location: 8 (remaining gas: 1039993.807 units remaining)
-    [ (Pair Unit (Some "NetXdQprcVkpaWU"))  	 ]
+    [ (Pair Unit (Some "NetXdQprcVkpaWU")) ]
   - location: 8 (remaining gas: 1039993.797 units remaining)
     [  ]
   - location: 9 (remaining gas: 1039993.782 units remaining)
-    [ "NetXdQprcVkpaWU"  	 ]
+    [ "NetXdQprcVkpaWU" ]
   - location: 10 (remaining gas: 1039993.767 units remaining)
-    [ (Some "NetXdQprcVkpaWU")  	 ]
+    [ (Some "NetXdQprcVkpaWU") ]
   - location: 11 (remaining gas: 1039993.752 units remaining)
-    [ {}  	
-      (Some "NetXdQprcVkpaWU")  	 ]
+    [ {}
+      (Some "NetXdQprcVkpaWU") ]
   - location: 13 (remaining gas: 1039993.737 units remaining)
-    [ (Pair {} (Some "NetXdQprcVkpaWU"))  	 ]
+    [ (Pair {} (Some "NetXdQprcVkpaWU")) ]
 

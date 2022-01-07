@@ -8,29 +8,29 @@ big_map diff
   
 trace
   - location: 10 (remaining gas: 1039990.553 units remaining)
-    [ (Pair (Pair 100 "1970-01-01T00:01:40Z") None)  	 ]
+    [ (Pair (Pair 100 "1970-01-01T00:01:40Z") None) ]
   - location: 10 (remaining gas: 1039990.543 units remaining)
-    [ (Pair 100 "1970-01-01T00:01:40Z")  	 ]
+    [ (Pair 100 "1970-01-01T00:01:40Z") ]
   - location: 11 (remaining gas: 1039990.533 units remaining)
-    [ (Pair 100 "1970-01-01T00:01:40Z")  	
-      (Pair 100 "1970-01-01T00:01:40Z")  	 ]
+    [ (Pair 100 "1970-01-01T00:01:40Z")
+      (Pair 100 "1970-01-01T00:01:40Z") ]
   - location: 12 (remaining gas: 1039990.523 units remaining)
-    [ 100  	
-      (Pair 100 "1970-01-01T00:01:40Z")  	 ]
+    [ 100
+      (Pair 100 "1970-01-01T00:01:40Z") ]
   - location: 13 (remaining gas: 1039990.508 units remaining)
-    [ (Pair 100 "1970-01-01T00:01:40Z")  	 ]
+    [ (Pair 100 "1970-01-01T00:01:40Z") ]
   - location: 15 (remaining gas: 1039990.498 units remaining)
-    [ "1970-01-01T00:01:40Z"  	 ]
+    [ "1970-01-01T00:01:40Z" ]
   - location: 13 (remaining gas: 1039990.468 units remaining)
-    [ 100  	
-      "1970-01-01T00:01:40Z"  	 ]
+    [ 100
+      "1970-01-01T00:01:40Z" ]
   - location: 16 (remaining gas: 1039990.413 units remaining)
-    [ "1970-01-01T00:03:20Z"  	 ]
+    [ "1970-01-01T00:03:20Z" ]
   - location: 17 (remaining gas: 1039990.398 units remaining)
-    [ (Some "1970-01-01T00:03:20Z")  	 ]
+    [ (Some "1970-01-01T00:03:20Z") ]
   - location: 18 (remaining gas: 1039990.383 units remaining)
-    [ {}  	
-      (Some "1970-01-01T00:03:20Z")  	 ]
+    [ {}
+      (Some "1970-01-01T00:03:20Z") ]
   - location: 20 (remaining gas: 1039990.368 units remaining)
-    [ (Pair {} (Some "1970-01-01T00:03:20Z"))  	 ]
+    [ (Pair {} (Some "1970-01-01T00:03:20Z")) ]
 

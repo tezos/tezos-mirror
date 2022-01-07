@@ -8,14 +8,14 @@ big_map diff
   
 trace
   - location: 9 (remaining gas: 1039993.290 units remaining)
-    [ (Pair { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 } 111)  	 ]
+    [ (Pair { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 } 111) ]
   - location: 9 (remaining gas: 1039993.280 units remaining)
-    [ { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 }  	 ]
+    [ { Elt "a" 1 ; Elt "b" 2 ; Elt "c" 3 } ]
   - location: 10 (remaining gas: 1039993.265 units remaining)
-    [ 3  	 ]
+    [ 3 ]
   - location: 11 (remaining gas: 1039993.250 units remaining)
-    [ {}  	
-      3  	 ]
+    [ {}
+      3 ]
   - location: 13 (remaining gas: 1039993.235 units remaining)
-    [ (Pair {} 3)  	 ]
+    [ (Pair {} 3) ]
 

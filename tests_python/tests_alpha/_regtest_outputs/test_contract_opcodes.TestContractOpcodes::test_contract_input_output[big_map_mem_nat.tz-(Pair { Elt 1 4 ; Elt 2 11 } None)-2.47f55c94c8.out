@@ -10,35 +10,35 @@ big_map diff
   Set map(4)[2] to 11
 trace
   - location: 12 (remaining gas: 1039985.980 units remaining)
-    [ (Pair 2 { Elt 1 4 ; Elt 2 11 } None)  	 ]
+    [ (Pair 2 { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 12 (remaining gas: 1039985.970 units remaining)
-    [ 2  	
-      (Pair { Elt 1 4 ; Elt 2 11 } None)  	 ]
+    [ 2
+      (Pair { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 13 (remaining gas: 1039985.955 units remaining)
-    [ (Pair { Elt 1 4 ; Elt 2 11 } None)  	 ]
+    [ (Pair { Elt 1 4 ; Elt 2 11 } None) ]
   - location: 15 (remaining gas: 1039985.945 units remaining)
-    [ { Elt 1 4 ; Elt 2 11 }  	 ]
+    [ { Elt 1 4 ; Elt 2 11 } ]
   - location: 16 (remaining gas: 1039985.935 units remaining)
-    [ { Elt 1 4 ; Elt 2 11 }  	
-      { Elt 1 4 ; Elt 2 11 }  	 ]
+    [ { Elt 1 4 ; Elt 2 11 }
+      { Elt 1 4 ; Elt 2 11 } ]
   - location: 13 (remaining gas: 1039985.905 units remaining)
-    [ 2  	
-      { Elt 1 4 ; Elt 2 11 }  	
-      { Elt 1 4 ; Elt 2 11 }  	 ]
+    [ 2
+      { Elt 1 4 ; Elt 2 11 }
+      { Elt 1 4 ; Elt 2 11 } ]
   - location: 17 (remaining gas: 1039985.131 units remaining)
-    [ True  	
-      { Elt 1 4 ; Elt 2 11 }  	 ]
+    [ True
+      { Elt 1 4 ; Elt 2 11 } ]
   - location: 18 (remaining gas: 1039985.116 units remaining)
-    [ (Some True)  	
-      { Elt 1 4 ; Elt 2 11 }  	 ]
+    [ (Some True)
+      { Elt 1 4 ; Elt 2 11 } ]
   - location: 19 (remaining gas: 1039985.106 units remaining)
-    [ { Elt 1 4 ; Elt 2 11 }  	
-      (Some True)  	 ]
+    [ { Elt 1 4 ; Elt 2 11 }
+      (Some True) ]
   - location: 20 (remaining gas: 1039985.091 units remaining)
-    [ (Pair { Elt 1 4 ; Elt 2 11 } (Some True))  	 ]
+    [ (Pair { Elt 1 4 ; Elt 2 11 } (Some True)) ]
   - location: 21 (remaining gas: 1039985.076 units remaining)
-    [ {}  	
-      (Pair { Elt 1 4 ; Elt 2 11 } (Some True))  	 ]
+    [ {}
+      (Pair { Elt 1 4 ; Elt 2 11 } (Some True)) ]
   - location: 23 (remaining gas: 1039985.061 units remaining)
-    [ (Pair {} { Elt 1 4 ; Elt 2 11 } (Some True))  	 ]
+    [ (Pair {} { Elt 1 4 ; Elt 2 11 } (Some True)) ]
 

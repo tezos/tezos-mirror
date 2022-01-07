@@ -8,41 +8,41 @@ big_map diff
   
 trace
   - location: 7 (remaining gas: 1039987.094 units remaining)
-    [ (Pair "test" "?")  	 ]
+    [ (Pair "test" "?") ]
   - location: 7 (remaining gas: 1039987.084 units remaining)
-    [ "test"  	 ]
+    [ "test" ]
   - location: 8 (remaining gas: 1039987.074 units remaining)
-    [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	
-      "test"  	 ]
+    [ { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }
+      "test" ]
   - location: 22 (remaining gas: 1039987.064 units remaining)
-    [ "test"  	
-      { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT }  	 ]
+    [ "test"
+      { PUSH string "_abc" ; NIL string ; SWAP ; CONS ; SWAP ; CONS ; CONCAT } ]
   - location: 12 (remaining gas: 1039987.054 units remaining)
-    [ "_abc"  	
-      "test"  	 ]
+    [ "_abc"
+      "test" ]
   - location: 15 (remaining gas: 1039987.039 units remaining)
-    [ {}  	
-      "_abc"  	
-      "test"  	 ]
+    [ {}
+      "_abc"
+      "test" ]
   - location: 17 (remaining gas: 1039987.029 units remaining)
-    [ "_abc"  	
-      {}  	
-      "test"  	 ]
+    [ "_abc"
+      {}
+      "test" ]
   - location: 18 (remaining gas: 1039987.014 units remaining)
-    [ { "_abc" }  	
-      "test"  	 ]
+    [ { "_abc" }
+      "test" ]
   - location: 19 (remaining gas: 1039987.004 units remaining)
-    [ "test"  	
-      { "_abc" }  	 ]
+    [ "test"
+      { "_abc" } ]
   - location: 20 (remaining gas: 1039986.989 units remaining)
-    [ { "test" ; "_abc" }  	 ]
+    [ { "test" ; "_abc" } ]
   - location: 21 (remaining gas: 1039986.869 units remaining)
-    [ "test_abc"  	 ]
+    [ "test_abc" ]
   - location: 23 (remaining gas: 1039986.839 units remaining)
-    [ "test_abc"  	 ]
+    [ "test_abc" ]
   - location: 24 (remaining gas: 1039986.824 units remaining)
-    [ {}  	
-      "test_abc"  	 ]
+    [ {}
+      "test_abc" ]
   - location: 26 (remaining gas: 1039986.809 units remaining)
-    [ (Pair {} "test_abc")  	 ]
+    [ (Pair {} "test_abc") ]
 

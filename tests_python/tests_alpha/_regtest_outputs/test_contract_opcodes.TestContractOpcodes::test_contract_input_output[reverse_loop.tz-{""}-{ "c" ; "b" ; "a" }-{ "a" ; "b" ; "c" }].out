@@ -8,124 +8,124 @@ big_map diff
   
 trace
   - location: 9 (remaining gas: 1039982.192 units remaining)
-    [ (Pair { "c" ; "b" ; "a" } { "" })  	 ]
+    [ (Pair { "c" ; "b" ; "a" } { "" }) ]
   - location: 9 (remaining gas: 1039982.182 units remaining)
-    [ { "c" ; "b" ; "a" }  	 ]
+    [ { "c" ; "b" ; "a" } ]
   - location: 10 (remaining gas: 1039982.167 units remaining)
-    [ {}  	
-      { "c" ; "b" ; "a" }  	 ]
+    [ {}
+      { "c" ; "b" ; "a" } ]
   - location: 12 (remaining gas: 1039982.157 units remaining)
-    [ { "c" ; "b" ; "a" }  	
-      {}  	 ]
+    [ { "c" ; "b" ; "a" }
+      {} ]
   - location: 13 (remaining gas: 1039982.147 units remaining)
-    [ True  	
-      { "c" ; "b" ; "a" }  	
-      {}  	 ]
+    [ True
+      { "c" ; "b" ; "a" }
+      {} ]
   - location: 16 (remaining gas: 1039982.147 units remaining)
-    [ { "c" ; "b" ; "a" }  	
-      {}  	 ]
+    [ { "c" ; "b" ; "a" }
+      {} ]
   - location: 18 (remaining gas: 1039982.137 units remaining)
-    [ "c"  	
-      { "b" ; "a" }  	
-      {}  	 ]
+    [ "c"
+      { "b" ; "a" }
+      {} ]
   - location: 20 (remaining gas: 1039982.127 units remaining)
-    [ { "b" ; "a" }  	
-      "c"  	
-      {}  	 ]
+    [ { "b" ; "a" }
+      "c"
+      {} ]
   - location: 21 (remaining gas: 1039982.112 units remaining)
-    [ "c"  	
-      {}  	 ]
+    [ "c"
+      {} ]
   - location: 23 (remaining gas: 1039982.097 units remaining)
-    [ { "c" }  	 ]
+    [ { "c" } ]
   - location: 21 (remaining gas: 1039982.067 units remaining)
-    [ { "b" ; "a" }  	
-      { "c" }  	 ]
+    [ { "b" ; "a" }
+      { "c" } ]
   - location: 24 (remaining gas: 1039982.057 units remaining)
-    [ True  	
-      { "b" ; "a" }  	
-      { "c" }  	 ]
+    [ True
+      { "b" ; "a" }
+      { "c" } ]
   - location: 18 (remaining gas: 1039982.042 units remaining)
-    [ True  	
-      { "b" ; "a" }  	
-      { "c" }  	 ]
+    [ True
+      { "b" ; "a" }
+      { "c" } ]
   - location: 16 (remaining gas: 1039982.027 units remaining)
-    [ { "b" ; "a" }  	
-      { "c" }  	 ]
+    [ { "b" ; "a" }
+      { "c" } ]
   - location: 18 (remaining gas: 1039982.017 units remaining)
-    [ "b"  	
-      { "a" }  	
-      { "c" }  	 ]
+    [ "b"
+      { "a" }
+      { "c" } ]
   - location: 20 (remaining gas: 1039982.007 units remaining)
-    [ { "a" }  	
-      "b"  	
-      { "c" }  	 ]
+    [ { "a" }
+      "b"
+      { "c" } ]
   - location: 21 (remaining gas: 1039981.992 units remaining)
-    [ "b"  	
-      { "c" }  	 ]
+    [ "b"
+      { "c" } ]
   - location: 23 (remaining gas: 1039981.977 units remaining)
-    [ { "b" ; "c" }  	 ]
+    [ { "b" ; "c" } ]
   - location: 21 (remaining gas: 1039981.947 units remaining)
-    [ { "a" }  	
-      { "b" ; "c" }  	 ]
+    [ { "a" }
+      { "b" ; "c" } ]
   - location: 24 (remaining gas: 1039981.937 units remaining)
-    [ True  	
-      { "a" }  	
-      { "b" ; "c" }  	 ]
+    [ True
+      { "a" }
+      { "b" ; "c" } ]
   - location: 18 (remaining gas: 1039981.922 units remaining)
-    [ True  	
-      { "a" }  	
-      { "b" ; "c" }  	 ]
+    [ True
+      { "a" }
+      { "b" ; "c" } ]
   - location: 16 (remaining gas: 1039981.907 units remaining)
-    [ { "a" }  	
-      { "b" ; "c" }  	 ]
+    [ { "a" }
+      { "b" ; "c" } ]
   - location: 18 (remaining gas: 1039981.897 units remaining)
-    [ "a"  	
-      {}  	
-      { "b" ; "c" }  	 ]
+    [ "a"
+      {}
+      { "b" ; "c" } ]
   - location: 20 (remaining gas: 1039981.887 units remaining)
-    [ {}  	
-      "a"  	
-      { "b" ; "c" }  	 ]
+    [ {}
+      "a"
+      { "b" ; "c" } ]
   - location: 21 (remaining gas: 1039981.872 units remaining)
-    [ "a"  	
-      { "b" ; "c" }  	 ]
+    [ "a"
+      { "b" ; "c" } ]
   - location: 23 (remaining gas: 1039981.857 units remaining)
-    [ { "a" ; "b" ; "c" }  	 ]
+    [ { "a" ; "b" ; "c" } ]
   - location: 21 (remaining gas: 1039981.827 units remaining)
-    [ {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ {}
+      { "a" ; "b" ; "c" } ]
   - location: 24 (remaining gas: 1039981.817 units remaining)
-    [ True  	
-      {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ True
+      {}
+      { "a" ; "b" ; "c" } ]
   - location: 18 (remaining gas: 1039981.802 units remaining)
-    [ True  	
-      {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ True
+      {}
+      { "a" ; "b" ; "c" } ]
   - location: 16 (remaining gas: 1039981.787 units remaining)
-    [ {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ {}
+      { "a" ; "b" ; "c" } ]
   - location: 18 (remaining gas: 1039981.777 units remaining)
-    [ { "a" ; "b" ; "c" }  	 ]
+    [ { "a" ; "b" ; "c" } ]
   - location: 28 (remaining gas: 1039981.762 units remaining)
-    [ {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ {}
+      { "a" ; "b" ; "c" } ]
   - location: 30 (remaining gas: 1039981.752 units remaining)
-    [ False  	
-      {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ False
+      {}
+      { "a" ; "b" ; "c" } ]
   - location: 18 (remaining gas: 1039981.737 units remaining)
-    [ False  	
-      {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ False
+      {}
+      { "a" ; "b" ; "c" } ]
   - location: 16 (remaining gas: 1039981.722 units remaining)
-    [ {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ {}
+      { "a" ; "b" ; "c" } ]
   - location: 33 (remaining gas: 1039981.712 units remaining)
-    [ { "a" ; "b" ; "c" }  	 ]
+    [ { "a" ; "b" ; "c" } ]
   - location: 34 (remaining gas: 1039981.697 units remaining)
-    [ {}  	
-      { "a" ; "b" ; "c" }  	 ]
+    [ {}
+      { "a" ; "b" ; "c" } ]
   - location: 36 (remaining gas: 1039981.682 units remaining)
-    [ (Pair {} { "a" ; "b" ; "c" })  	 ]
+    [ (Pair {} { "a" ; "b" ; "c" }) ]
 

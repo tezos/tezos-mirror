@@ -8,29 +8,29 @@ big_map diff
   
 trace
   - location: 16 (remaining gas: 1039985.116 units remaining)
-    [ (Pair (Pair 1 4 2 Unit) None)  	 ]
+    [ (Pair (Pair 1 4 2 Unit) None) ]
   - location: 16 (remaining gas: 1039985.106 units remaining)
-    [ (Pair 1 4 2 Unit)  	 ]
+    [ (Pair 1 4 2 Unit) ]
   - location: 17 (remaining gas: 1039985.096 units remaining)
-    [ 2  	
-      (Pair 1 4 2 Unit)  	 ]
+    [ 2
+      (Pair 1 4 2 Unit) ]
   - location: 20 (remaining gas: 1039985.055 units remaining)
-    [ (Pair 2 4 2 Unit)  	 ]
+    [ (Pair 2 4 2 Unit) ]
   - location: 22 (remaining gas: 1039985.045 units remaining)
-    [ "toto"  	
-      (Pair 2 4 2 Unit)  	 ]
+    [ "toto"
+      (Pair 2 4 2 Unit) ]
   - location: 25 (remaining gas: 1039984.999 units remaining)
-    [ (Pair 2 4 "toto" Unit)  	 ]
+    [ (Pair 2 4 "toto" Unit) ]
   - location: 27 (remaining gas: 1039984.989 units remaining)
-    [ 0x01  	
-      (Pair 2 4 "toto" Unit)  	 ]
+    [ 0x01
+      (Pair 2 4 "toto" Unit) ]
   - location: 30 (remaining gas: 1039984.942 units remaining)
-    [ (Pair 2 4 "toto" 0x01)  	 ]
+    [ (Pair 2 4 "toto" 0x01) ]
   - location: 32 (remaining gas: 1039984.927 units remaining)
-    [ (Some (Pair 2 4 "toto" 0x01))  	 ]
+    [ (Some (Pair 2 4 "toto" 0x01)) ]
   - location: 33 (remaining gas: 1039984.912 units remaining)
-    [ {}  	
-      (Some (Pair 2 4 "toto" 0x01))  	 ]
+    [ {}
+      (Some (Pair 2 4 "toto" 0x01)) ]
   - location: 35 (remaining gas: 1039984.897 units remaining)
-    [ (Pair {} (Some (Pair 2 4 "toto" 0x01)))  	 ]
+    [ (Pair {} (Some (Pair 2 4 "toto" 0x01))) ]
 
