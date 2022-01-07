@@ -58,13 +58,14 @@ module type FILTER = sig
       validation_state:Proto.validation_state ->
       Operation_hash.t ->
       Proto.operation ->
-      [ `Passed_precheck of state
-      | `Passed_precheck_with_replace of Operation_hash.t * state
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace
-      | `Undecided ]
+      [ `Passed_precheck of
+        state
+        * [ `No_replace
+          | `Replace of
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ]
+      | `Undecided
+      | Prevalidator_classification.error_classification ]
       Lwt.t
 
     val pre_filter :
@@ -73,10 +74,7 @@ module type FILTER = sig
       ?validation_state_before:Proto.validation_state ->
       Proto.operation ->
       [ `Passed_prefilter of [`High | `Low]
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace ]
+      | Prevalidator_classification.error_classification ]
       Lwt.t
 
     val post_filter :
