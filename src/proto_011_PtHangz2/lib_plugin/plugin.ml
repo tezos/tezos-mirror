@@ -258,7 +258,7 @@ module Mempool = struct
     in
     let prefilter_manager_op op =
       match pre_filter_manager config op bytes with
-      | `Passed_prefilter -> `Passed_prefilter `Low
+      | `Passed_prefilter -> `Passed_prefilter (`Low [])
       | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
         err ->
           err
@@ -302,7 +302,7 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        `Passed_prefilter `Low
+        `Passed_prefilter (`Low [])
     | Single (Manager_operation _) as op -> prefilter_manager_op op
     | Cons (Manager_operation _, _) as op -> prefilter_manager_op op)
     |> fun res -> Lwt.return res
