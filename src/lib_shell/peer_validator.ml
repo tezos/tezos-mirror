@@ -134,6 +134,30 @@ let bootstrap_new_branch w head unknown_prefix =
     (New_branch_validated {peer = pv.peer_id; hash = Block_header.hash head})
   >>= fun () -> return_unit
 
+let only_if_fitness_increases w distant_header hash cont =
+  let pv = Worker.state w in
+  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
+  Store.Block.is_known_valid chain_store hash >>= fun known_valid ->
+  if known_valid then (
+    pv.last_validated_head <- distant_header ;
+    return_unit)
+  else
+    Store.Chain.current_head chain_store >>= fun current_head ->
+    if
+      Fitness.compare
+        distant_header.Block_header.shell.fitness
+        (Store.Block.fitness current_head)
+      <= 0
+    then (
+      Worker.log_event w (Ignoring_head {peer = pv.peer_id; hash}) >>= fun () ->
+      (* Don't download a branch that cannot beat the current head. *)
+      let meta =
+        Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
+      in
+      Peer_metadata.incr meta Old_heads ;
+      return_unit)
+    else cont ()
+
 let validate_new_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
   let block_received = {Event.peer = pv.peer_id; hash} in
@@ -149,6 +173,9 @@ let validate_new_head w hash (header : Block_header.t) =
             header.shell.operations_hash))
     (0 -- (header.shell.validation_passes - 1))
   >>=? fun operations ->
+  (* We redo a check for the fitness here because while waiting for the
+     operations, a new head better than this block might be validated. *)
+  only_if_fitness_increases w header hash @@ fun () ->
   Worker.log_event w (Requesting_new_head_validation block_received)
   >>= fun () ->
   Block_validator.validate
@@ -180,31 +207,6 @@ let validate_new_head w hash (header : Block_header.t) =
       in
       Peer_metadata.incr meta Valid_blocks ;
       return_unit
-
-let only_if_fitness_increases w distant_header cont =
-  let pv = Worker.state w in
-  let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
-  let hash = Block_header.hash distant_header in
-  Store.Block.is_known_valid chain_store hash >>= fun known_valid ->
-  if known_valid then (
-    pv.last_validated_head <- distant_header ;
-    return_unit)
-  else
-    Store.Chain.current_head chain_store >>= fun current_head ->
-    if
-      Fitness.compare
-        distant_header.Block_header.shell.fitness
-        (Store.Block.fitness current_head)
-      <= 0
-    then (
-      Worker.log_event w (Ignoring_head {peer = pv.peer_id; hash}) >>= fun () ->
-      (* Don't download a branch that cannot beat the current head. *)
-      let meta =
-        Distributed_db.get_peer_metadata pv.parameters.chain_db pv.peer_id
-      in
-      Peer_metadata.incr meta Old_heads ;
-      return_unit)
-    else cont ()
 
 let assert_acceptable_head w hash (header : Block_header.t) =
   let pv = Worker.state w in
@@ -248,7 +250,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
       () ;
     return_unit)
   else
-    only_if_fitness_increases w header @@ fun () ->
+    only_if_fitness_increases w header hash @@ fun () ->
     assert_acceptable_head w hash header >>=? fun () ->
     validate_new_head w hash header
 
@@ -256,9 +258,8 @@ let may_validate_new_branch w distant_hash locator =
   (* Make sure this is still ok w.r.t @phink fix *)
   let pv = Worker.state w in
   let (distant_header, _) = (locator : Block_locator.t :> Block_header.t * _) in
-  only_if_fitness_increases w distant_header @@ fun () ->
-  assert_acceptable_head w (Block_header.hash distant_header) distant_header
-  >>=? fun () ->
+  only_if_fitness_increases w distant_header distant_hash @@ fun () ->
+  assert_acceptable_head w distant_hash distant_header >>=? fun () ->
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   (* TODO: should we consider level as well ? Rolling could have
      difficulties boostrapping. *)
