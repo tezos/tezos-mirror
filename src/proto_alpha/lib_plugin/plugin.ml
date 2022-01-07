@@ -1245,20 +1245,11 @@ module RPC = struct
       let trace_code_input_encoding = run_code_input_encoding
 
       let trace_encoding =
-        (* TODO: should this encoding be updated? *)
         def "scripted.trace" @@ list
         @@ obj3
              (req "location" Script.location_encoding)
              (req "gas" Gas.encoding)
-             (req
-                "stack"
-                (list
-                   (conv
-                      (fun e -> (e, None))
-                      (fun (e, _annot) -> e)
-                      (obj2
-                         (req "item" Script.expr_encoding)
-                         (opt "annot" string)))))
+             (req "stack" (list Script.expr_encoding))
 
       let trace_code_output_encoding =
         conv
