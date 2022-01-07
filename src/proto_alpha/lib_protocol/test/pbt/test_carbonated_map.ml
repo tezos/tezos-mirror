@@ -395,9 +395,9 @@ let test_size_add_one =
   | None -> Ok (size' = size + 1)
   | Some _ -> Ok (size' = size)
 
-(** Test that mapping over a map yields is equivalent to mapping over the list
-    of key-value pairs and reconstructing the map. That is, the following
-    diagram commutes:
+(** Test that mapping over a map is equivalent to mapping over the list of
+    key-value pairs and reconstructing the map. That is, the following diagram
+    commutes:
 
     [map] ----to_list---> [list]
       |                     |
@@ -413,6 +413,45 @@ let test_map =
   let* (map', ctxt) = CM.map ctxt (fun ctxt _ x -> Ok (x + 1, ctxt)) map in
   let kvs' = List.map (fun (k, v) -> (k, v + 1)) kvs in
   assert_map_contains ctxt map' kvs'
+
+(** Test that folding over an empty map does not invoke the accumulator
+    function. *)
+let test_fold_empty =
+  unit_test "Fold empty" @@ fun () ->
+  let ctxt = unsafe_new_context () in
+  let* (x, _) = CM.fold ctxt (fun _ctxt _acc _k _v -> dummy_fail) 0 CM.empty in
+  Ok (x = 0)
+
+(** Test that folding over a map is equivalent to folding over the corresponding
+    list of key-value pairs. That is, the following diagram commutes:
+
+    [map] -- to_list --> [list]
+      |                    |
+    [fold f z]      [List.fold_left f z]
+      |                    |
+     res <----- id -----> res
+*)
+let test_fold =
+  int_map_test "Test that fold commutes with folding over a list" @@ fun map ->
+  let ctxt = unsafe_new_context () in
+  let* (kvs, ctxt) = CM.to_list ctxt map in
+  let sum = List.fold_left (fun sum (k, v) -> k + v + sum) 0 kvs in
+  let* (sum', _) =
+    CM.fold ctxt (fun ctxt sum k v -> Ok (k + v + sum, ctxt)) 0 map
+  in
+  Ok (sum = sum')
+
+(** Test that all key-value pairs can be collected by a fold. And that the
+    order is the same as for [to_list]. *)
+let test_fold_to_list =
+  int_map_test "Test that fold collecting the elements agrees with to-list"
+  @@ fun map ->
+  let ctxt = unsafe_new_context () in
+  let* (kvs, ctxt) = CM.to_list ctxt map in
+  let* (kvs', _) =
+    CM.fold ctxt (fun ctxt kvs k v -> Ok ((k, v) :: kvs, ctxt)) [] map
+  in
+  Ok (kvs = List.rev kvs')
 
 (** Test that mapping with a failing function fails iff the list is non-empty. *)
 let test_map_fail =
@@ -461,6 +500,9 @@ let tests =
     test_update_merge;
     test_update_delete;
     test_map;
+    test_fold_empty;
+    test_fold;
+    test_fold_to_list;
     test_map_fail;
   ]
 
