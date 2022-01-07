@@ -339,6 +339,8 @@ module Opam = struct
 
   type build_instruction = {command : command_item list; with_test : bool}
 
+  type url = {url : string; sha256 : string; sha512 : string}
+
   type t = {
     maintainer : string;
     authors : string list;
@@ -350,6 +352,7 @@ module Opam = struct
     conflicts : dependency list;
     build : build_instruction list;
     synopsis : string;
+    url : url option;
   }
 
   let pp fmt
@@ -364,6 +367,7 @@ module Opam = struct
         conflicts;
         build;
         synopsis;
+        url;
       } =
     let (depopts, depends) = List.partition (fun dep -> dep.optional) depends in
     let pp_line x =
@@ -470,6 +474,15 @@ module Opam = struct
         command
         (if with_test then " {with-test}" else "")
     in
+    let pp_url {url; sha256; sha512} =
+      pp_line "url {" ;
+      pp_line "  src: \"%s\"" url ;
+      pp_line "  checksum: [" ;
+      pp_line "    \"sha256=%s\"" sha256 ;
+      pp_line "    \"sha512=%s\"" sha512 ;
+      pp_line "  ]" ;
+      pp_line "}"
+    in
     pp_line "opam-version: \"2.0\"" ;
     pp_line "maintainer: %a" pp_string maintainer ;
     pp_line "%a" (pp_list ~prefix:"authors: " pp_string) authors ;
@@ -487,7 +500,7 @@ module Opam = struct
         conflicts ;
     pp_line "%a" (pp_list ~prefix:"build: " pp_build_instruction) build ;
     pp_line "synopsis: %a" pp_string synopsis ;
-    ()
+    Option.iter pp_url url
 end
 
 (*****************************************************************************)
@@ -1335,6 +1348,7 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
         };
       ];
     synopsis;
+    url = None;
   }
 
 let generate_opam_files () =
