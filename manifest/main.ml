@@ -2195,9 +2195,14 @@ let _tezos_store_tests =
     ~dune:
       Dune.
         [
+          alias_rule "buildtest" ~deps:["test.exe"];
           alias_rule
             "runtest_store"
             ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~alias_deps:["runtest_store"];
         ]
 
 let tezos_requester =
