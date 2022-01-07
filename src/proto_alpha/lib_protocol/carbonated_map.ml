@@ -63,6 +63,13 @@ module type S = sig
     (context -> key -> 'a -> ('b * context) tzresult) ->
     'a t ->
     ('b t * context) tzresult
+
+  val fold :
+    context ->
+    (context -> 'state -> key -> 'value -> ('state * context) tzresult) ->
+    'state ->
+    'value t ->
+    ('state * context) tzresult
 end
 
 module type COMPARABLE = sig
@@ -116,7 +123,7 @@ module Make (C : COMPARABLE) = struct
     | (None, None) -> ok ({map; size}, ctxt)
 
   let to_list ctxt {map; size} =
-    Gas.consume ctxt (Carbonated_map_costs.to_list_cost ~size) >|? fun ctxt ->
+    Gas.consume ctxt (Carbonated_map_costs.fold_cost ~size) >|? fun ctxt ->
     (M.bindings map, ctxt)
 
   let add ctxt ~merge_overlap key value {map; size} =
@@ -145,22 +152,33 @@ module Make (C : COMPARABLE) = struct
     (* To be on the safe side, pay an upfront gas cost for traversing the
        map. Each step of the fold is accounted for separately.
     *)
-    Gas.consume ctxt (Carbonated_map_costs.to_list_cost ~size) >>? fun ctxt ->
+    Gas.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
     M.fold_e
       (fun key value (map, ctxt) -> add ctxt ~merge_overlap key value map)
       map
       (map1, ctxt)
 
+  let fold ctxt f empty {map; size} =
+    Gas.consume ctxt (Carbonated_map_costs.fold_cost ~size) >>? fun ctxt ->
+    M.fold_e
+      (fun key value (acc, ctxt) ->
+        (* Invoking [f] must also account for gas. *)
+        f ctxt acc key value)
+      map
+      (empty, ctxt)
+
   let map ctxt f {map; size} =
     (* We cannot use the standard map function because [f] also meters the gas
        cost at each invocation. *)
-    let accum key value (map, ctxt) =
-      (* Invoking [f] must also account for gas. *)
-      f ctxt key value >>? fun (value, ctxt) ->
-      (* Consume gas for adding the element. *)
-      Gas.consume ctxt (update_cost ~key ~size) >|? fun ctxt ->
-      (M.add key value map, ctxt)
-    in
-    Gas.consume ctxt (Carbonated_map_costs.to_list_cost ~size) >>? fun ctxt ->
-    M.fold_e accum map (M.empty, ctxt) >|? fun (map, ctxt) -> ({map; size}, ctxt)
+    fold
+      ctxt
+      (fun ctxt map key value ->
+        (* Invoking [f] must also account for gas. *)
+        f ctxt key value >>? fun (value, ctxt) ->
+        (* Consume gas for adding the element. *)
+        Gas.consume ctxt (update_cost ~key ~size) >|? fun ctxt ->
+        (M.add key value map, ctxt))
+      M.empty
+      {map; size}
+    >|? fun (map, ctxt) -> ({map; size}, ctxt)
 end

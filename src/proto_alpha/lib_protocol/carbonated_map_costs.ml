@@ -64,9 +64,9 @@ let update_cost ~compare_key_cost ~size =
 
 (** TODO: https://gitlab.com/tezos/tezos/-/issues/2062
     Plugin benchmarked gas.
-    Collect benchmark from [Carbonated_map_benchmarks.To_list_benchmark].
+    Collect benchmark from [Carbonated_map_benchmarks.Fold_benchmark].
 
     The cost of producing a list of elements is linear in the size of the map
     and does not depend on the size of the elements nor keys.
 *)
-let to_list_cost ~size = Gas.(S.safe_int 100 *@ S.safe_int size)
+let fold_cost ~size = Gas.(S.safe_int 100 *@ S.safe_int size)

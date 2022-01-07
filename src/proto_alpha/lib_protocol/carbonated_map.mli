@@ -113,6 +113,21 @@ module type S = sig
     ('b * Alpha_context.context) tzresult) ->
     'a t ->
     ('b t * Alpha_context.context) tzresult
+
+  (** [fold ctxt f z m] folds over the key-value pairs of the given map [m],
+      accumulating values using [f], with [z] as the initial state. The function
+      [f] must account for its own gas cost. The complexity is linear in the
+      size of the map [m]. *)
+  val fold :
+    Alpha_context.context ->
+    (Alpha_context.context ->
+    'state ->
+    key ->
+    'value ->
+    ('state * Alpha_context.context) tzresult) ->
+    'state ->
+    'value t ->
+    ('state * Alpha_context.context) tzresult
 end
 
 (** A module type for comparable values that also includes a cost function
