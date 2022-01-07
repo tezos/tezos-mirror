@@ -512,7 +512,8 @@ let check_error ?exit_code ?msg process =
   | _ -> raise (Failed error)
 
 let program_path program =
-  try
-    let* path = run_and_read_stdout "sh" ["-c"; "command -v " ^ program] in
-    return (Some (String.trim path))
-  with Failed _ -> return None
+  Lwt.catch
+    (fun () ->
+      let* path = run_and_read_stdout "sh" ["-c"; "command -v " ^ program] in
+      return (Some (String.trim path)))
+    (fun _ -> return None)
