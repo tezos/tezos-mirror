@@ -81,8 +81,7 @@ type 'protocol_data t = {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev :
-    (Operation_hash.t * 'protocol_data Prevalidation.operation) list;
+  mutable applied_rev : 'protocol_data Prevalidation.operation list;
   mutable prechecked :
     'protocol_data Prevalidation.operation Operation_hash.Map.t;
   mutable unparsable : Operation_hash.Set.t;
@@ -143,7 +142,8 @@ let flush (classes : 'protocol_data t) ~handle_branch_refused =
   let remove_list_from_in_mempool list =
     classes.in_mempool <-
       List.fold_left
-        (fun mempool (oph, _) -> Operation_hash.Map.remove oph mempool)
+        (fun mempool op ->
+          Operation_hash.Map.remove op.Prevalidation.hash mempool)
         classes.in_mempool
         list
   in
@@ -199,12 +199,12 @@ let remove oph classes =
        | `Applied ->
            classes.applied_rev <-
              List.filter
-               (fun (op, _) -> Operation_hash.(op <> oph))
+               (fun op -> Operation_hash.(op.Prevalidation.hash <> oph))
                classes.applied_rev) ;
       Some (op, classification)
 
 let handle_applied oph op classes =
-  classes.applied_rev <- (oph, op) :: classes.applied_rev ;
+  classes.applied_rev <- op :: classes.applied_rev ;
   classes.in_mempool <-
     Operation_hash.Map.add oph (op, `Applied) classes.in_mempool
 
@@ -285,7 +285,10 @@ let to_map ~applied ~prechecked ~branch_delayed ~branch_refused ~refused
   Map.union
     (fun _oph op _ -> Some op)
     (if prechecked then classes.prechecked else Map.empty)
-  @@ (if applied then Map.of_seq @@ List.to_seq classes.applied_rev
+  @@ (if applied then
+      List.to_seq classes.applied_rev
+      |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+      |> Map.of_seq
      else Map.empty)
      +> (if branch_delayed then classes.branch_delayed.map else Map.empty)
      +> (if branch_refused then classes.branch_refused.map else Map.empty)
@@ -459,7 +462,7 @@ module Internal_for_tests = struct
       } =
     let applied_pp ppf applied =
       applied
-      |> List.map (fun (key, _value) -> key)
+      |> List.map (fun op -> op.Prevalidation.hash)
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
     let in_mempool_pp ppf in_mempool =
