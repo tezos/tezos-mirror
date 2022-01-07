@@ -3040,7 +3040,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             However, DROP is equivalent to DROP 1 so hinting at an arity of 1 makes sense. *)
       fail (Invalid_arity (loc, I_DROP, 1, List.length l))
   | (Prim (loc, I_DUP, [], annot), Item_t (v, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       record_trace_eval
         (fun () ->
           let t = serialize_ty_for_error v in
@@ -3050,7 +3050,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let dup = {apply = (fun kinfo k -> IDup (kinfo, k))} in
       typed ctxt loc dup (Item_t (v, Item_t (v, rest)))
   | (Prim (loc, I_DUP, [n], v_annot), stack_ty) ->
-      parse_var_annot loc v_annot >>?= fun () ->
+      check_var_annot loc v_annot >>?= fun () ->
       let rec make_proof_argument :
           type a s.
           int -> (a, s) stack_ty -> (a * s) dup_n_proof_argument tzresult =
@@ -3143,7 +3143,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack_ty = Item_t (w, Item_t (v, rest)) in
       typed ctxt loc swap stack_ty
   | (Prim (loc, I_PUSH, [t; d], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
       parse_data
@@ -3244,7 +3244,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let cons_pair = {apply = (fun kinfo k -> ICons_pair (kinfo, k))} in
       typed ctxt loc cons_pair stack_ty
   | (Prim (loc, I_PAIR, [n], annot), stack_ty) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let rec make_proof_argument :
           type a s.
           int -> (a, s) stack_ty -> (a * s) comb_proof_argument tzresult =
@@ -3298,7 +3298,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let uncomb = {apply = (fun kinfo k -> IUncomb (kinfo, n, witness, k))} in
       typed ctxt loc uncomb after_ty
   | (Prim (loc, I_GET, [n], annot), Item_t (comb_ty, rest_ty)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let rec make_proof_argument :
           type b. int -> b ty -> b comb_get_proof_argument tzresult =
        fun n ty ->
@@ -3327,7 +3327,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc comb_get after_stack_ty
   | ( Prim (loc, I_UPDATE, [n], annot),
       Item_t (value_ty, Item_t (comb_ty, rest_ty)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let rec make_proof_argument :
           type value before.
           int ->
@@ -3448,7 +3448,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_CONS, [], annot),
       Item_t (tv, Item_t (List_t (t, ty_name), rest)) ) ->
       check_item_ty ctxt tv t loc I_CONS 1 2 >>?= fun (Eq, t, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let cons_list = {apply = (fun kinfo k -> ICons_list (kinfo, k))} in
       (typed ctxt loc cons_list (Item_t (List_t (t, ty_name), rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3617,12 +3617,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (v, Item_t (Bool_t _, Item_t (Set_t (elt, tname), rest))) ) ->
       check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
       >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_update (kinfo, k))} in
       (typed ctxt loc instr (Item_t (Set_t (elt, tname), rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
   | (Prim (loc, I_SIZE, [], annot), Item_t (Set_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_size (kinfo, k))} in
       typed ctxt loc instr (Item_t (nat_t ~annot:None, rest))
   (* maps *)
@@ -3729,7 +3729,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     ->
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_MEM 1 2 >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_mem (kinfo, k))} in
       (typed ctxt loc instr (Item_t (bool_t ~annot:None, rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3737,7 +3737,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (vk, Item_t (Map_t (ck, elt, _), rest)) ) ->
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_get (kinfo, k))} in
       option_t loc elt ~annot:None
       >>?= fun ty : ((a, s) judgement * context) tzresult Lwt.t ->
@@ -3749,7 +3749,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_update (kinfo, k))} in
       (typed ctxt loc instr (Item_t (Map_t (ck, v, map_name), rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3761,14 +3761,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_get_and_update (kinfo, k))} in
       let stack =
         Item_t (Option_t (vv, vname), Item_t (Map_t (ck, v, map_name), rest))
       in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | (Prim (loc, I_SIZE, [], annot), Item_t (Map_t (_, _, _), rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_size (kinfo, k))} in
       typed ctxt loc instr (Item_t (nat_t ~annot:None, rest))
   (* big_map *)
@@ -3788,7 +3788,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (set_key, Item_t (Big_map_t (map_key, _, _), rest)) ) ->
       let k = ty_of_comparable_ty map_key in
       check_item_ty ctxt set_key k loc I_MEM 1 2 >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_mem (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3796,7 +3796,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (vk, Item_t (Big_map_t (ck, elt, _), rest)) ) ->
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_get (kinfo, k))} in
       option_t loc elt ~annot:None >>?= fun ty ->
       let stack = Item_t (ty, rest) in
@@ -3811,7 +3811,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_item_ty ctxt set_key k loc I_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt set_value map_value loc I_UPDATE 2 3
       >>?= fun (Eq, map_value, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_update (kinfo, k))} in
       let stack = Item_t (Big_map_t (map_key, map_value, map_name), rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -3824,7 +3824,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let k = ty_of_comparable_ty ck in
       check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
       check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IBig_map_get_and_update (kinfo, k))}
       in
@@ -3835,7 +3835,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* Sapling *)
   | (Prim (loc, I_SAPLING_EMPTY_STATE, [memo_size], annot), rest) ->
       parse_memo_size memo_size >>?= fun memo_size ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> ISapling_empty_state (kinfo, memo_size, k))}
       in
@@ -3959,7 +3959,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
       (Item_t (Union_t ((tl, _l_field), (tr, _), _), rest) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -4013,7 +4013,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ret
       >>?= fun (Ex_ty ret, ctxt) ->
       check_kind [Seq_kind] code >>?= fun () ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       parse_returning
         (Tc_context.add_lambda tc_context)
         ?type_logger
@@ -4031,7 +4031,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_EXEC, [], annot),
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest)) ) ->
       check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IExec (kinfo, k))} in
       let stack = Item_t (ret, rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -4048,7 +4048,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_packable ~legacy:false loc capture_ty >>?= fun () ->
       check_item_ty ctxt capture capture_ty loc I_APPLY 1 2
       >>?= fun (Eq, capture_ty, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IApply (kinfo, capture_ty, k))} in
       lambda_t loc arg_ty ret ~annot:lam_annot
       (* This cannot fail because the type [lambda 'arg 'ret] is always smaller than
@@ -4146,21 +4146,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IAdd_timestamp_to_seconds (kinfo, k))}
       in
       typed ctxt loc instr (Item_t (Timestamp_t tname, rest))
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Int_t _, Item_t (Timestamp_t tname, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IAdd_seconds_to_timestamp (kinfo, k))}
       in
       typed ctxt loc instr (Item_t (Timestamp_t tname, rest))
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t tname, Item_t (Int_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> ISub_timestamp_seconds (kinfo, k))}
       in
@@ -4170,7 +4170,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t
         ( Timestamp_t {annot = tn1; size = _},
           Item_t (Timestamp_t {annot = tn2; size = _}, rest) ) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_annot ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IDiff_timestamps (kinfo, k))} in
@@ -4179,31 +4179,31 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* string operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (String_t tn1, Item_t (String_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IConcat_string_pair (kinfo, k))} in
       typed ctxt loc instr (Item_t (String_t tname, rest))
   | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (String_t tname, _), rest))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IConcat_string (kinfo, k))} in
       typed ctxt loc instr (Item_t (String_t tname, rest))
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (String_t tname, rest))) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISlice_string (kinfo, k))} in
       let stack = Item_t (option_string'_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SIZE, [], annot), Item_t (String_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IString_size (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, rest) in
       typed ctxt loc instr stack
   (* bytes operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
       Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes_pair (kinfo, k))} in
@@ -4211,25 +4211,25 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (Bytes_t tname, _), rest))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes (kinfo, k))} in
       let stack = Item_t (Bytes_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (Bytes_t tname, rest))) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISlice_bytes (kinfo, k))} in
       let stack = Item_t (option_bytes'_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SIZE, [], annot), Item_t (Bytes_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBytes_size (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, rest) in
       typed ctxt loc instr stack
   (* currency operations *)
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_tez (kinfo, k))} in
@@ -4238,7 +4238,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
       if legacy then
-        parse_var_annot loc annot >>?= fun () ->
+        check_var_annot loc annot >>?= fun () ->
         merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
         >>?= fun tname ->
         let instr = {apply = (fun kinfo k -> ISub_tez_legacy (kinfo, k))} in
@@ -4247,7 +4247,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       else fail (Deprecated_instruction I_SUB)
   | ( Prim (loc, I_SUB_MUTEZ, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_tez (kinfo, k))} in
@@ -4256,21 +4256,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Mutez_t tname, Item_t (Nat_t _, rest)) ) ->
       (* no type name check *)
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_teznat (kinfo, k))} in
       let stack = Item_t (Mutez_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t _, Item_t (Mutez_t tname, rest)) ) ->
       (* no type name check *)
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_nattez (kinfo, k))} in
       let stack = Item_t (Mutez_t tname, rest) in
       typed ctxt loc instr stack
   (* boolean operations *)
   | (Prim (loc, I_OR, [], annot), Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IOr (kinfo, k))} in
@@ -4278,7 +4278,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_AND, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAnd (kinfo, k))} in
@@ -4286,46 +4286,46 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_XOR, [], annot),
       Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IXor (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NOT, [], annot), Item_t (Bool_t tname, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INot (kinfo, k))} in
       let stack = Item_t (Bool_t tname, rest) in
       typed ctxt loc instr stack
   (* integer operations *)
   | (Prim (loc, I_ABS, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAbs_int (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_ISNAT, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IIs_nat (kinfo, k))} in
       let stack = Item_t (option_nat_t, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_INT, [], annot), Item_t (Nat_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IInt_nat (kinfo, k))} in
       let stack = Item_t (int_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEG, [], annot), Item_t (Int_t tname, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEG, [], annot), Item_t (Nat_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg (kinfo, k))} in
       let stack = Item_t (int_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_ADD, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
@@ -4333,19 +4333,19 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_ADD, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_ADD, [], annot), Item_t (Nat_t _, Item_t (Int_t tname, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_ADD, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_nat (kinfo, k))} in
@@ -4353,7 +4353,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_SUB, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
@@ -4361,19 +4361,19 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_SUB, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t _, Item_t (Int_t tname, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun _tname ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
@@ -4381,7 +4381,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_MUL, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
@@ -4389,19 +4389,19 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_MUL, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_MUL, [], annot), Item_t (Nat_t _, Item_t (Int_t tname, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_MUL, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
@@ -4409,13 +4409,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tname, Item_t (Nat_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEdiv_teznat (kinfo, k))} in
       let stack = Item_t (option_pair_mutez'_mutez'_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_EDIV, [], annot),
       Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_tez (kinfo, k))} in
@@ -4423,7 +4423,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_EDIV, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
@@ -4431,19 +4431,19 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_EDIV, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEdiv_int (kinfo, k))} in
       let stack = Item_t (option_pair_int'_nat_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_EDIV, [], annot), Item_t (Nat_t tname, Item_t (Int_t _, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
       let stack = Item_t (option_pair_int_nat'_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_EDIV, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
@@ -4451,7 +4451,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_LSL, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ILsl_nat (kinfo, k))} in
@@ -4459,7 +4459,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_LSR, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> ILsr_nat (kinfo, k))} in
@@ -4467,7 +4467,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_OR, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IOr_nat (kinfo, k))} in
@@ -4475,7 +4475,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_AND, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAnd_nat (kinfo, k))} in
@@ -4483,31 +4483,31 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, I_AND, [], annot), Item_t (Int_t _, Item_t (Nat_t tname, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAnd_int_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_XOR, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
     ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IXor_nat (kinfo, k))} in
       let stack = Item_t (Nat_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NOT, [], annot), Item_t (Int_t tname, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INot_int (kinfo, k))} in
       let stack = Item_t (Int_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NOT, [], annot), Item_t (Nat_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INot_int (kinfo, k))} in
       let stack = Item_t (int_t ~annot:None, rest) in
       typed ctxt loc instr stack
   (* comparison *)
   | (Prim (loc, I_COMPARE, [], annot), Item_t (t1, Item_t (t2, rest))) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       check_item_ty ctxt t1 t2 loc I_COMPARE 1 2 >>?= fun (Eq, t, ctxt) ->
       comparable_ty_of_ty ctxt loc t >>?= fun (key, ctxt) ->
       let instr = {apply = (fun kinfo k -> ICompare (kinfo, key, k))} in
@@ -4515,38 +4515,38 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   (* comparators *)
   | (Prim (loc, I_EQ, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEq (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEQ, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeq (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_LT, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ILt (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_GT, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IGt (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_LE, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ILe (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_GE, [], annot), Item_t (Int_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IGe (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   (* annotations *)
   | (Prim (loc, I_CAST, [cast_t], annot), Item_t (t, stack)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       >>?= fun (Ex_ty cast_t, ctxt) ->
       ty_eq ~legacy ctxt loc cast_t t >>?= fun (Eq, ctxt) ->
@@ -4554,7 +4554,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (cast_t, stack) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | (Prim (loc, I_RENAME, [], annot), Item_t (t, stack)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       (* can erase annot *)
       let instr = {apply = (fun _ k -> k)} in
       let stack = Item_t (t, stack) in
@@ -4566,7 +4566,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         (* allow to pack contracts for hash/signature checks *) loc
         t
       >>?= fun () ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IPack (kinfo, t, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
@@ -4580,7 +4580,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* protocol *)
   | (Prim (loc, I_ADDRESS, [], annot), Item_t (Contract_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAddress (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, rest) in
       typed ctxt loc instr stack
@@ -4604,7 +4604,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       parse_view_output_ty ctxt ~stack_depth:0 ~legacy output_ty
       >>?= fun (Ex_ty output_ty, ctxt) ->
       option_t output_ty_loc output_ty ~annot:None >>?= fun res_ty ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {
           apply =
@@ -4618,21 +4618,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t (p, Item_t (Mutez_t _, Item_t (Contract_t (cp, _), rest))) ) ->
       Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
       check_item_ty ctxt p cp loc prim 1 4 >>?= fun (Eq, _, ctxt) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ITransfer_tokens (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, (I_SET_DELEGATE as prim), [], annot),
       Item_t (Option_t (Key_hash_t _, _), rest) ) ->
       Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_delegate (kinfo, k))} in
       let stack = Item_t (operation_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (_, I_CREATE_ACCOUNT, _, _), _) ->
       fail (Deprecated_instruction I_CREATE_ACCOUNT)
   | (Prim (loc, I_IMPLICIT_ACCOUNT, [], annot), Item_t (Key_hash_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IImplicit_account (kinfo, k))} in
       let stack = Item_t (contract_unit_t, rest) in
       typed ctxt loc instr stack
@@ -4722,49 +4722,49 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       typed ctxt loc instr stack
   | (Prim (loc, I_NOW, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INow (kinfo, k))} in
       let stack = Item_t (timestamp_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_AMOUNT, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAmount (kinfo, k))} in
       let stack = Item_t (mutez_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_CHAIN_ID, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IChainId (kinfo, k))} in
       let stack = Item_t (chain_id_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_BALANCE, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBalance (kinfo, k))} in
       let stack = Item_t (mutez_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_LEVEL, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ILevel (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_VOTING_POWER, [], annot), Item_t (Key_hash_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IVoting_power (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_TOTAL_VOTING_POWER, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ITotal_voting_power (kinfo, k))} in
       let stack = Item_t (nat_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (_, I_STEPS_TO_QUOTA, _, _), _) ->
       fail (Deprecated_instruction I_STEPS_TO_QUOTA)
   | (Prim (loc, I_SOURCE, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISource (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SENDER, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISender (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack) in
       typed ctxt loc instr stack
@@ -4804,50 +4804,50 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               let stack = Item_t (res_ty, stack) in
               typed_no_lwt ctxt loc instr stack )
   | (Prim (loc, I_SELF_ADDRESS, [], annot), stack) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISelf_address (kinfo, k))} in
       let stack = Item_t (address_t ~annot:None, stack) in
       typed ctxt loc instr stack
   (* cryptography *)
   | (Prim (loc, I_HASH_KEY, [], annot), Item_t (Key_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IHash_key (kinfo, k))} in
       let stack = Item_t (key_hash_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_CHECK_SIGNATURE, [], annot),
       Item_t (Key_t _, Item_t (Signature_t _, Item_t (Bytes_t _, rest))) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ICheck_signature (kinfo, k))} in
       let stack = Item_t (bool_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_BLAKE2B, [], annot), Item_t (Bytes_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBlake2b (kinfo, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SHA256, [], annot), Item_t (Bytes_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISha256 (kinfo, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SHA512, [], annot), Item_t (Bytes_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISha512 (kinfo, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_KECCAK, [], annot), Item_t (Bytes_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IKeccak (kinfo, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SHA3, [], annot), Item_t (Bytes_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISha3 (kinfo, k))} in
       let stack = Item_t (bytes_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_g1_t tn1, Item_t (Bls12_381_g1_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g1 (kinfo, k))} in
@@ -4855,7 +4855,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_g2_t tn1, Item_t (Bls12_381_g2_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g2 (kinfo, k))} in
@@ -4863,7 +4863,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
       Item_t (Bls12_381_fr_t tn1, Item_t (Bls12_381_fr_t tn2, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       merge_type_metadata ~legacy ~error_details:Informative tn1 tn2
       >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_fr (kinfo, k))} in
@@ -4871,63 +4871,63 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Bls12_381_g1_t tname, Item_t (Bls12_381_fr_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_g1 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g1_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Bls12_381_g2_t tname, Item_t (Bls12_381_fr_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_g2 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g2_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Bls12_381_fr_t tname, Item_t (Bls12_381_fr_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_fr (kinfo, k))} in
       let stack = Item_t (Bls12_381_fr_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t {annot = tname; _}, Item_t (Bls12_381_fr_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_fr_z (kinfo, k))} in
       let stack = Item_t (bls12_381_fr_t ~annot:tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Int_t {annot = tname; _}, Item_t (Bls12_381_fr_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_fr_z (kinfo, k))} in
       let stack = Item_t (bls12_381_fr_t ~annot:tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Bls12_381_fr_t tname, Item_t (Int_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_z_fr (kinfo, k))} in
       let stack = Item_t (Bls12_381_fr_t tname, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Bls12_381_fr_t tname, Item_t (Nat_t _, rest)) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_z_fr (kinfo, k))} in
       let stack = Item_t (Bls12_381_fr_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_INT, [], annot), Item_t (Bls12_381_fr_t _, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IInt_bls12_381_fr (kinfo, k))} in
       let stack = Item_t (int_t ~annot:None, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g1_t tname, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg_bls12_381_g1 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g1_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g2_t tname, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg_bls12_381_g2 (kinfo, k))} in
       let stack = Item_t (Bls12_381_g2_t tname, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_fr_t tname, rest)) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg_bls12_381_fr (kinfo, k))} in
       let stack = Item_t (Bls12_381_fr_t tname, rest) in
       typed ctxt loc instr stack
@@ -4936,7 +4936,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( List_t
             (Pair_t ((Bls12_381_g1_t _, _, _), (Bls12_381_g2_t _, _, _), _), _),
           rest ) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IPairing_check_bls12_381 (kinfo, k))}
       in
@@ -4944,7 +4944,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* Tickets *)
   | (Prim (loc, I_TICKET, [], annot), Item_t (t, Item_t (Nat_t _, rest))) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       comparable_ty_of_ty ctxt loc t >>?= fun (ty, ctxt) ->
       ticket_t loc ty ~annot:None >>?= fun res_ty ->
       let instr = {apply = (fun kinfo k -> ITicket (kinfo, k))} in
@@ -4952,7 +4952,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_READ_TICKET, [], annot),
       (Item_t (Ticket_t (t, _), _) as full_stack) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let () = check_dupable_comparable_ty t in
       opened_ticket_type loc t >>?= fun opened_ticket_ty ->
       let result = ty_of_comparable_ty opened_ticket_ty in
@@ -4964,7 +4964,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         ( (Ticket_t (t, _) as ticket_t),
           Item_t (Pair_t ((Nat_t _, fa_a, a_a), (Nat_t _, fa_b, a_b), _), rest)
         ) ) ->
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       let () = check_dupable_comparable_ty t in
       pair_t loc (ticket_t, fa_a, a_a) (ticket_t, fa_b, a_b) ~annot:None
       >>?= fun pair_tickets_ty ->
@@ -4976,7 +4976,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t
         ( Pair_t (((Ticket_t _ as ty_a), _, _), ((Ticket_t _ as ty_b), _, _), _),
           rest ) ) -> (
-      parse_var_annot loc annot >>?= fun () ->
+      check_var_annot loc annot >>?= fun () ->
       Gas_monad.run ctxt
       @@ merge_types ~legacy ~error_details:Informative loc ty_a ty_b
       >>?= fun (eq_ty, ctxt) ->

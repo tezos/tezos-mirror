@@ -131,8 +131,8 @@ val check_correct_field :
 
 (** Instruction annotations parsing *)
 
-(** Parse a variable annotation. *)
-val parse_var_annot : Script.location -> string list -> unit tzresult
+(** Check a variable annotation. *)
+val check_var_annot : Script.location -> string list -> unit tzresult
 
 val is_allowed_char : char -> bool
 
