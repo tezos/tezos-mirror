@@ -530,6 +530,32 @@ operators to compare the length of a list to a constant directly. The same
 example can be written ``Compare.List_length_with.(xs > k)``.
 
 
+.. _linting-folding-over-a-promise:
+
+Folding over a promise or a result
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects difficult-to-read patterns of code wherein you traverse a
+list, with an Lwt promise or a result as accumulator.
+
+When folding over a list (using ``List.fold_left`` or ``List.fold_right``), the
+accumulator can be of any type. In particular, it can be an Lwt promise or a
+result, and the folding can perform some additional control-flow.
+
+This is valid code accepted by the compiler. But it often produces code which is
+difficult to read. For example, when folding over a promise, a small change can
+affect whether the traversal sequential (one element at a time) or concurrent
+(all elements treated at the same time).
+
+To make the code more readable, you should use the functions provided in the
+Octez support libraries. Specifically, the ``List`` module in Octez includes
+Lwt-, Result-, and Lwt-Result-specific variants of all the traversal functions
+(``map``, ``iter``, ``for_all``, ``exists``, etc.)
+
+Check the
+`online documentation for a full list of the content of the ``List`` module <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/TzPervasives/List/index.html>`_.
+
+
 Coding conventions
 ------------------
 

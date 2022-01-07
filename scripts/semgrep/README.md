@@ -29,7 +29,7 @@ changes in `semgrep`, the CI uses a fixed version of the tool. If you need to
 run the same version locally you need to install `docker` and then run
 
 ```
-docker run --rm -v "${PWD}:/src" returntocorp/semgrep-agent:sha-932a84b --metrics=off --error -l ocaml -c scripts/semgrep/ --exclude "src/proto_[0-9]*/lib_protocol/*.ml*" src/
+docker run --rm -v "${PWD}:/src" returntocorp/semgrep-agent:sha-c6cd7cf --metrics=off --error -l ocaml -c scripts/semgrep/ --exclude "src/proto_[0-9]*/lib_protocol/*.ml*" src/
 ```
 
 This command has the exact same output as the CI, no matter what updates have
