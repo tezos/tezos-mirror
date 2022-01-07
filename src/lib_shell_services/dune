@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_shell_services)
  (public_name tezos-shell-services)
@@ -5,7 +8,7 @@
  (libraries
   tezos-base
   tezos-workers
-  tezos-stdlib-unix ;; for Tezos_stdlib_unix.Internal_event_unix
+  tezos-stdlib-unix
   tezos-p2p-services
   tezos-version)
  (flags

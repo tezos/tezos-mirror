@@ -1,6 +1,5 @@
-; See src/bin_node/dune to understand in detail how this file abuses
-; the alternative dependency mechanism of dune to implement optional
-; dependencies.
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (env (static (flags (:standard -ccopt -static))))
 
@@ -72,11 +71,6 @@
   (select void_for_linking-tezos-client-alpha-commands-registration from
    (tezos-client-alpha-commands-registration -> void_for_linking-tezos-client-alpha-commands-registration.empty)
    (-> void_for_linking-tezos-client-alpha-commands-registration.empty))
-
-            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-            ; If you modify this file around here, modify src/bin_proxy_server/dune too! ;
-            ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
   (select void_for_linking-tezos-baking-011-PtHangz2-commands-registration from
    (tezos-baking-011-PtHangz2-commands.registration -> void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty)
    (-> void_for_linking-tezos-baking-011-PtHangz2-commands-registration.empty))

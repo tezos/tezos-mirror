@@ -19,6 +19,7 @@ __pycache__
 
 /test_results
 
+/manifest/manifest
 /tezos-node
 /tezos-validator
 /tezos-protocol-compiler

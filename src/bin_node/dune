@@ -1,11 +1,5 @@
-; This file abuses the alternative dependency mechanism of dune to
-; implement optional dependencies.
-; The semantic of `(select a from (b -> c) (-> d))` is: if libraries
-; `b` are present, `cp c a` and link `b` else `cp d a`. Here, we don't
-; care about the cp part as we are not using the file obtained at
-; all. So, we give them names only meant to not clash with anything
-; and copy always the same (generated itself) empty file
-; "void_for_linking".
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (env (static (flags (:standard -ccopt -static))))
 

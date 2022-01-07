@@ -1,7 +1,5 @@
-;; We use virtual libraries, and want to compile the same test with
-;; unix and js. In order to do this, we copy tests from the unix
-;; directory and change the library providing the implementation of
-;; the virtual lib (tezos-hacl-glue-js)
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
 
 (executables
  (names test_hacl test_prop_signature_pk)

@@ -1,3 +1,6 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
 (library
  (name tezos_shell_services_test_helpers)
  (public_name tezos-shell-services-test-helpers)

@@ -8,6 +8,7 @@ sanity_ci:
   before_script:
     - . ./scripts/version.sh
   script:
+    - make -C manifest check
     - src/tooling/lint.sh --check-gitlab-ci-yml
 
 docker-hadolint:
