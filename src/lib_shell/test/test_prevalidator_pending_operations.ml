@@ -32,6 +32,7 @@
 
 open Lib_test.Qcheck_helpers
 module Pending_ops = Prevalidator_pending_operations
+module CompareListQ = Compare.List (Q)
 
 let pending_of_list =
   List.fold_left
@@ -50,15 +51,24 @@ let test_iterators_ordering ~name ~iterator return_value =
     (Gen.small_list (Generators.operation_with_hash_and_priority_gen ()))
   @@ fun ops ->
   let previous_priority = ref `High in
+  let previous_prio_ok ~priority ~previous_priority =
+    match (previous_priority, priority) with
+    | (`High, `High) -> true
+    | ((`High | `Medium), `Medium) -> true
+    | ((`High | `Medium), `Low _) -> true
+    | (`Low q_prev, `Low q_new) -> CompareListQ.(q_new <= q_prev)
+    | (_, _) -> false
+  in
   iterator
     (fun priority _hash _op () ->
       (* Here, we check the priority ordering in the iterators of
          prevalidator_pending_operations module : if the current considered
          priority is `High, it should be true that the previously seen is also
          `High. *)
-      (match priority with
-      | `High -> ignore (qcheck_eq !previous_priority `High)
-      | `Low -> ()) ;
+      if not @@ previous_prio_ok ~priority ~previous_priority:!previous_priority
+      then
+        QCheck.Test.fail_reportf
+          "Pending operations are not ordered by priority" ;
       previous_priority := priority ;
       return_value)
     (pending_of_list ops)
