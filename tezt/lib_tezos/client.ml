@@ -890,15 +890,15 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     client
   |> Process.check
 
-let spawn_run_script ?hooks ~src ~storage ~input client =
+let spawn_run_script ?hooks ~prg ~storage ~input client =
   spawn_command
     ?hooks
     client
-    ["run"; "script"; src; "on"; "storage"; storage; "and"; "input"; input]
+    ["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
 
-let run_script ?hooks ~src ~storage ~input client =
+let run_script ?hooks ~prg ~storage ~input client =
   let* client_output =
-    spawn_run_script ?hooks ~src ~storage ~input client
+    spawn_run_script ?hooks ~prg ~storage ~input client
     |> Process.check_and_read_stdout
   in
   match client_output =~* rex "storage\n(.*)" with

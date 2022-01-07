@@ -660,7 +660,7 @@ val spawn_stresstest :
     Fails if the new storage cannot be extracted from the output. *)
 val run_script :
   ?hooks:Process.hooks ->
-  src:string ->
+  prg:string ->
   storage:string ->
   input:string ->
   t ->
@@ -669,7 +669,7 @@ val run_script :
 (** Same as [run_script] but do not wait for the process to exit. *)
 val spawn_run_script :
   ?hooks:Process.hooks ->
-  src:string ->
+  prg:string ->
   storage:string ->
   input:string ->
   t ->

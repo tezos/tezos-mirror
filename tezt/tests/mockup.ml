@@ -127,7 +127,7 @@ let test_calling_contract_with_global_constant_success ~protocols =
   let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
   let storage = "0" in
   let input = "Unit" in
-  let* result = Client.run_script ~src:script ~storage ~input client in
+  let* result = Client.run_script ~prg:script ~storage ~input client in
   let result = String.trim result in
   Log.info "Contract with constant output storage %s" result ;
   if result = value then return ()
@@ -144,7 +144,7 @@ let test_calling_contract_with_global_constant_failure ~protocols =
   let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
   let storage = "0" in
   let input = "Unit" in
-  let process = Client.spawn_run_script ~src:script ~storage ~input client in
+  let process = Client.spawn_run_script ~prg:script ~storage ~input client in
   Process.check_error
     ~exit_code:1
     ~msg:(rex "No registered global was found")
