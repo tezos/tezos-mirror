@@ -990,7 +990,10 @@ let rec create_parent path =
 
 (* Write a file relatively to the root directory of the repository. *)
 let write filename f =
-  let filename = Filename.parent_dir_name // filename in
+  let filename =
+    if Filename.is_relative filename then Filename.parent_dir_name // filename
+    else filename
+  in
   if String_set.mem filename !generated_files then
     failwith
       (filename ^ " is generated twice; did you declare the same library twice?") ;
@@ -1418,11 +1421,11 @@ let generate_opam_files () =
     Opam.pp
     opam
 
-let generate_opam_files_for_release release =
+let generate_opam_files_for_release packages_dir release =
   Target.iter_internal_by_opam @@ fun package internal_pkgs ->
   let package_name = Filename.basename package in
   let opam_filename =
-    "packages" // package_name
+    packages_dir // package_name
     // (package_name ^ "." ^ release.version)
     // "opam"
   in
@@ -1528,7 +1531,8 @@ let check_js_of_ocaml () =
 
 let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
 
-let release =
+let (packages_dir, release) =
+  let packages_dir = ref "packages" in
   let url = ref "" in
   let sha256 = ref "" in
   let sha512 = ref "" in
@@ -1537,6 +1541,10 @@ let release =
   let spec =
     Arg.align
       [
+        ( "--packages-dir",
+          Arg.Set_string packages_dir,
+          "<PATH> Path of the 'packages' directory where to write opam files \
+           for release (default: 'packages')" );
         ("--url", Arg.Set_string url, "<URL> Set url for release");
         ("--sha256", Arg.Set_string sha256, "<HASH> Set sha256 for release");
         ("--sha512", Arg.Set_string sha512, "<HASH> Set sha512 for release");
@@ -1546,15 +1554,18 @@ let release =
       ]
   in
   Arg.parse spec anon_fun usage_msg ;
-  match (!url, !sha256, !sha512, !version) with
-  | ("", "", "", "") -> None
-  | ("", _, _, _) | (_, "", _, _) | (_, _, "", _) | (_, _, _, "") ->
-      prerr_endline
-        "Error: either all of --url, --sha256, --sha512 and --release must be \
-         specified, or none of them." ;
-      exit 1
-  | (url, sha256, sha512, version) ->
-      Some {version; url = {url; sha256; sha512}}
+  let release =
+    match (!url, !sha256, !sha512, !version) with
+    | ("", "", "", "") -> None
+    | ("", _, _, _) | (_, "", _, _) | (_, _, "", _) | (_, _, _, "") ->
+        prerr_endline
+          "Error: either all of --url, --sha256, --sha512 and --release must \
+           be specified, or none of them." ;
+        exit 1
+    | (url, sha256, sha512, version) ->
+        Some {version; url = {url; sha256; sha512}}
+  in
+  (!packages_dir, release)
 
 let generate ?exclude () =
   Printexc.record_backtrace true ;
@@ -1563,7 +1574,7 @@ let generate ?exclude () =
     generate_opam_files () ;
     check_for_non_generated_files ?exclude () ;
     check_js_of_ocaml () ;
-    Option.iter generate_opam_files_for_release release
+    Option.iter (generate_opam_files_for_release packages_dir) release
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
