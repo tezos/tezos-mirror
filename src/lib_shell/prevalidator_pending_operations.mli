@@ -27,12 +27,12 @@
 (** The priority of a pending operation.
 
     A priority is attached to each pending operation. *)
-type priority = [`High | `Low]
+type priority = [`High | `Medium | `Low of Q.t list]
 
 (**
    This type is used for data representing pending operations of the
    prevalidator. Any iterator on this structure will process operations with
-   [`High] priority first. *)
+   [`High] priority first, followed by [`Medium] and finally [`Low] priority. *)
 type 'protocol_data t
 
 (** The empty structure of pending operations. *)

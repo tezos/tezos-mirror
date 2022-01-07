@@ -482,8 +482,8 @@ module Make
     Lwt_watcher.notify operation_stream (classification, op)
 
   let pre_filter shell ~filter_config ~filter_state ~validation_state ~notifier
-      (parsed_op : protocol_operation operation) : [`High | `Low | `Drop] Lwt.t
-      =
+      (parsed_op : protocol_operation operation) :
+      [Pending_ops.priority | `Drop] Lwt.t =
     let validation_state_before =
       Option.map
         Prevalidation_t.validation_state
@@ -499,7 +499,7 @@ module Make
       ->
         handle_classification ~notifier shell (parsed_op, errs) ;
         `Drop
-    | `Passed_prefilter priority -> (priority :> [`High | `Low | `Drop])
+    | `Passed_prefilter priority -> (priority :> [Pending_ops.priority | `Drop])
 
   let post_filter ~filter_config ~filter_state ~validation_state_before
       ~validation_state_after op receipt =
@@ -841,7 +841,7 @@ module Make
               parsed_op
             >>= function
             | `Drop -> return_unit
-            | (`High | `Low) as prio ->
+            | (`High | `Medium | `Low _) as prio ->
                 if
                   not
                     (Block_hash.Set.mem
@@ -861,7 +861,7 @@ module Make
 
     let on_inject w (pv : state) ~force op =
       let oph = Operation.hash op in
-      (* Currently, an injection is always done with priority = `High, because:
+      (* Currently, an injection is always done with the highest priority, because:
          - We want to process and propagate the injected operations fast,
          - We don't want to call prefilter to get the priority.
          But, this may change in the future
@@ -1030,7 +1030,7 @@ module Make
             op
           >|= function
           | `Drop -> (pending, nb_pending)
-          | (`High | `Low) as prio ->
+          | (`High | `Medium | `Low _) as prio ->
               (* Here, an operation injected in this node with `High priority will
                  now get its approriate priority. *)
               (Pending_ops.add op prio pending, nb_pending + 1))
