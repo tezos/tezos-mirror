@@ -966,6 +966,8 @@ module Target = struct
     Select {package; source_if_present; source_if_absent; target}
 end
 
+type release = {version : string; url : Opam.url}
+
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
@@ -978,6 +980,12 @@ let has_prefix ~prefix string =
    there are other files that we should have generated. *)
 let generated_files = ref String_set.empty
 
+let rec create_parent path =
+  let parent = Filename.dirname path in
+  if String.length parent < String.length path then (
+    create_parent parent ;
+    if not (Sys.file_exists parent) then Sys.mkdir parent 0o755)
+
 (* Write a file relatively to the root directory of the repository. *)
 let write filename f =
   let filename = Filename.parent_dir_name // filename in
@@ -985,6 +993,7 @@ let write filename f =
     failwith
       (filename ^ " is generated twice; did you declare the same library twice?") ;
   generated_files := String_set.add filename !generated_files ;
+  create_parent filename ;
   let outch = open_out filename in
   match f (Format.formatter_of_out_channel outch) with
   | exception exn ->
@@ -1261,7 +1270,8 @@ let rec as_opam_dependency ~(for_package : string) ~with_test
         (fun (dep : Opam.dependency) -> {dep with optional = true})
         (as_opam_dependency ~for_package ~with_test target)
 
-let generate_opam this_package (internals : Target.internal list) : Opam.t =
+let generate_opam ?release this_package (internals : Target.internal list) :
+    Opam.t =
   let map l f = List.map f l in
   let depends =
     List.flatten @@ map internals
@@ -1348,7 +1358,7 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
         };
       ];
     synopsis;
-    url = None;
+    url = Option.map (fun {url; _} -> url) release;
   }
 
 let generate_opam_files () =
@@ -1361,14 +1371,27 @@ let generate_opam_files () =
      same directory as the dune file, with the package as filename (suffixed with .opam),
      but one can specify a custom .opam path too. *)
   Target.iter_internal_by_opam @@ fun opam_filename internals ->
-  let opam = generate_opam (Filename.basename opam_filename) internals in
-  write (opam_filename ^ ".opam") @@ fun fmt ->
+  let package_name = Filename.basename opam_filename in
+  let opam_filename = opam_filename ^ ".opam" in
+  let opam = generate_opam package_name internals in
+  write opam_filename @@ fun fmt ->
   Format.fprintf
     fmt
     "# This file was automatically generated, do not edit.@.# Edit file \
      manifest/main.ml instead.@.%a"
     Opam.pp
     opam
+
+let generate_opam_files_for_release release =
+  Target.iter_internal_by_opam @@ fun opam_filename internal_pkgs ->
+  let package_name = Filename.basename opam_filename in
+  let opam_filename =
+    "packages" // package_name
+    // (package_name ^ "." ^ release.version)
+    // "opam"
+  in
+  let opam = generate_opam ~release package_name internal_pkgs in
+  write opam_filename @@ fun fmt -> Opam.pp fmt opam
 
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
@@ -1467,13 +1490,44 @@ let check_js_of_ocaml () =
       !missing_from_target) ;
   if not !jsoo_ok then exit 1
 
+let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
+
+let release =
+  let url = ref "" in
+  let sha256 = ref "" in
+  let sha512 = ref "" in
+  let version = ref "" in
+  let anon_fun _args = () in
+  let spec =
+    Arg.align
+      [
+        ("--url", Arg.Set_string url, "<URL> Set url for release");
+        ("--sha256", Arg.Set_string sha256, "<HASH> Set sha256 for release");
+        ("--sha512", Arg.Set_string sha512, "<HASH> Set sha512 for release");
+        ( "--release",
+          Arg.Set_string version,
+          "<VERSION> Generate opam files for release instead, for VERSION" );
+      ]
+  in
+  Arg.parse spec anon_fun usage_msg ;
+  match (!url, !sha256, !sha512, !version) with
+  | ("", "", "", "") -> None
+  | ("", _, _, _) | (_, "", _, _) | (_, _, "", _) | (_, _, _, "") ->
+      prerr_endline
+        "Error: either all of --url, --sha256, --sha512 and --release must be \
+         specified, or none of them." ;
+      exit 1
+  | (url, sha256, sha512, version) ->
+      Some {version; url = {url; sha256; sha512}}
+
 let generate ?exclude () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
     check_for_non_generated_files ?exclude () ;
-    check_js_of_ocaml ()
+    check_js_of_ocaml () ;
+    Option.iter generate_opam_files_for_release release
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
