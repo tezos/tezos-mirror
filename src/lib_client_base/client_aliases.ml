@@ -25,7 +25,6 @@
 
 (* Tezos Command line interface - Local Storage for Configuration *)
 
-open Lwt.Infix
 open Clic
 
 module type Entity = sig
@@ -132,68 +131,81 @@ module Alias (Entity : Entity) = struct
     wallet#write Entity.name entries wallet_encoding
 
   let autocomplete wallet =
-    load wallet >>= function
-    | Error _ -> return_nil
-    | Ok list -> return (List.map fst list)
+    let open Lwt_syntax in
+    let* r = load wallet in
+    match r with
+    | Error _ -> return_ok_nil
+    | Ok list -> return_ok (List.map fst list)
 
   let find_opt (wallet : #wallet) name =
-    load wallet >|=? fun list -> List.assoc ~equal:String.equal name list
+    let open Lwt_tzresult_syntax in
+    let+ list = load wallet in
+    List.assoc ~equal:String.equal name list
 
   let find (wallet : #wallet) name =
-    load wallet >>=? fun list ->
+    let open Lwt_tzresult_syntax in
+    let* list = load wallet in
     match List.assoc ~equal:String.equal name list with
     | Some v -> return v
     | None -> failwith "no %s alias named %s" Entity.name name
 
   let rev_find (wallet : #wallet) v =
-    load wallet >|=? fun list ->
+    let open Lwt_tzresult_syntax in
+    let+ list = load wallet in
     Option.map fst @@ List.find (fun (_, v') -> Entity.(v = v')) list
 
   let rev_find_all (wallet : #wallet) v =
-    load wallet >>=? fun list ->
+    let open Lwt_tzresult_syntax in
+    let* list = load wallet in
     return
       (List.filter_map
          (fun (n, v') -> if Entity.(v = v') then Some n else None)
          list)
 
   let mem (wallet : #wallet) name =
-    load wallet >|=? fun list -> List.mem_assoc ~equal:String.equal name list
+    let open Lwt_tzresult_syntax in
+    let+ list = load wallet in
+    List.mem_assoc ~equal:String.equal name list
 
   let add ~force (wallet : #wallet) name value =
+    let open Lwt_tzresult_syntax in
     let keep = ref false in
-    load wallet >>=? fun list ->
-    (if force then return_unit
-    else
-      List.iter_es
-        (fun (n, v) ->
-          if Compare.String.(n = name) && Entity.(v = value) then (
-            keep := true ;
-            return_unit)
-          else if Compare.String.(n = name) && Entity.(v <> value) then
-            failwith
-              "another %s is already aliased as %s, use --force to update"
-              Entity.name
-              n
-          else if Compare.String.(n <> name) && Entity.(v = value) then
-            failwith
-              "this %s is already aliased as %s, use --force to insert \
-               duplicate"
-              Entity.name
-              n
-          else return_unit)
-        list)
-    >>=? fun () ->
+    let* list = load wallet in
+    let* () =
+      if force then return_unit
+      else
+        List.iter_es
+          (fun (n, v) ->
+            if Compare.String.(n = name) && Entity.(v = value) then (
+              keep := true ;
+              return_unit)
+            else if Compare.String.(n = name) && Entity.(v <> value) then
+              failwith
+                "another %s is already aliased as %s, use --force to update"
+                Entity.name
+                n
+            else if Compare.String.(n <> name) && Entity.(v = value) then
+              failwith
+                "this %s is already aliased as %s, use --force to insert \
+                 duplicate"
+                Entity.name
+                n
+            else return_unit)
+          list
+    in
     let list = List.filter (fun (n, _) -> not (String.equal n name)) list in
     let list = (name, value) :: list in
     if !keep then return_unit else wallet#write Entity.name list wallet_encoding
 
   let del (wallet : #wallet) name =
-    load wallet >>=? fun list ->
+    let open Lwt_tzresult_syntax in
+    let* list = load wallet in
     let list = List.filter (fun (n, _) -> not (String.equal n name)) list in
     wallet#write Entity.name list wallet_encoding
 
   let update (wallet : #wallet) name value =
-    load wallet >>=? fun list ->
+    let open Lwt_tzresult_syntax in
+    let* list = load wallet in
     let list =
       List.map
         (fun (n, v) -> (n, if String.equal n name then value else v))
@@ -204,17 +216,22 @@ module Alias (Entity : Entity) = struct
   include Entity
 
   let alias_parameter () =
+    let open Lwt_tzresult_syntax in
     parameter ~autocomplete (fun cctxt s ->
-        find cctxt s >>=? fun v -> return (s, v))
+        let* v = find cctxt s in
+        return (s, v))
 
   let alias_param ?(name = "name")
       ?(desc = "existing " ^ Entity.name ^ " alias") next =
     param ~name ~desc (alias_parameter ()) next
 
   let aliases_parameter () =
+    let open Lwt_tzresult_syntax in
     parameter ~autocomplete (fun cctxt s ->
         String.split ',' s
-        |> List.map_es (fun s -> find cctxt s >>=? fun pkh -> return (s, pkh)))
+        |> List.map_es (fun s ->
+               let* pkh = find cctxt s in
+               return (s, pkh)))
 
   let aliases_param ?(name = "name")
       ?(desc = "existing " ^ Entity.name ^ " aliases") next =
@@ -223,41 +240,53 @@ module Alias (Entity : Entity) = struct
   type fresh_param = Fresh of string
 
   let of_fresh (wallet : #wallet) force (Fresh s) =
-    load wallet >>=? fun list ->
-    (if force then return_unit
-    else
-      List.iter_es
-        (fun (n, v) ->
-          if String.equal n s then
-            Entity.to_source v >>=? fun value ->
-            failwith
-              "@[<v 2>The %s alias %s already exists.@,\
-               The current value is %s.@,\
-               Use --force to update@]"
-              Entity.name
-              n
-              value
-          else return_unit)
-        list)
-    >>=? fun () -> return s
+    let open Lwt_tzresult_syntax in
+    let* list = load wallet in
+    let* () =
+      if force then return_unit
+      else
+        List.iter_es
+          (fun (n, v) ->
+            if String.equal n s then
+              let* value = Entity.to_source v in
+              failwith
+                "@[<v 2>The %s alias %s already exists.@,\
+                 The current value is %s.@,\
+                 Use --force to update@]"
+                Entity.name
+                n
+                value
+            else return_unit)
+          list
+    in
+    return s
 
   let fresh_alias_param ?(name = "new")
       ?(desc = "new " ^ Entity.name ^ " alias") next =
     param ~name ~desc (parameter (fun (_ : < .. >) s -> return @@ Fresh s)) next
 
   let parse_source_string cctxt s =
+    let open Lwt_tzresult_syntax in
     match String.split ~limit:1 ':' s with
     | ["alias"; alias] -> find cctxt alias
     | ["text"; text] -> of_source text
-    | ["file"; path] -> cctxt#read_file path >>=? of_source
+    | ["file"; path] ->
+        let* s = cctxt#read_file path in
+        of_source s
     | _ -> (
-        find cctxt s >>= function
+        let*! r = find cctxt s in
+        match r with
         | Ok v -> return v
         | Error a_errs -> (
-            cctxt#read_file s >>=? of_source >>= function
+            let*! r =
+              let* s = cctxt#read_file s in
+              of_source s
+            in
+            match r with
             | Ok v -> return v
             | Error r_errs -> (
-                of_source s >>= function
+                let*! r = of_source s in
+                match r with
                 | Ok v -> return v
                 | Error s_errs ->
                     let all_errs = List.flatten [a_errs; r_errs; s_errs] in
@@ -308,7 +337,7 @@ module Alias (Entity : Entity) = struct
       ()
 
   let name (wallet : #wallet) d =
-    rev_find wallet d >>=? function
-    | None -> Entity.to_source d
-    | Some name -> return name
+    let open Lwt_result_syntax in
+    let* o = rev_find wallet d in
+    match o with None -> Entity.to_source d | Some name -> return name
 end
