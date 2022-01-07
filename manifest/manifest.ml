@@ -1281,6 +1281,7 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
 
 let generate_opam ?release this_package (internals : Target.internal list) :
     Opam.t =
+  let for_package = Filename.basename this_package in
   let map l f = List.map f l in
   let depends =
     List.flatten @@ map internals
@@ -1296,14 +1297,14 @@ let generate_opam ?release this_package (internals : Target.internal list) :
       List.filter_map
         (as_opam_dependency
            ~fix_version:(release <> None)
-           ~for_package:this_package
+           ~for_package
            ~with_test)
         deps
     in
     let get_preprocess_dep (Target.PPS target | PPS_args (target, _)) =
       as_opam_dependency
         ~fix_version:(release <> None)
-        ~for_package:this_package
+        ~for_package
         ~with_test
         target
     in
@@ -1346,15 +1347,43 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     List.flatten @@ map internals
     @@ fun internal ->
     List.filter_map
-      (as_opam_dependency
-         ~fix_version:false
-         ~for_package:this_package
-         ~with_test:false)
+      (as_opam_dependency ~fix_version:false ~for_package ~with_test:false)
       internal.conflicts
   in
   let synopsis =
     String.concat " " @@ List.flatten @@ map internals
     @@ fun internal -> Option.to_list internal.synopsis
+  in
+  let build =
+    let build : Opam.build_instruction =
+      {
+        command = [S "dune"; S "build"; S "-p"; A "name"; S "-j"; A "jobs"];
+        with_test = false;
+      }
+    in
+    let runtest : Opam.build_instruction =
+      {
+        command = [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
+        with_test = true;
+      }
+    in
+    match release with
+    | None -> [build; runtest]
+    | Some _ ->
+        [
+          {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = false};
+          build;
+          {
+            Opam.command =
+              [
+                S "mv";
+                S (Filename.dirname this_package ^ "/%{name}%.install");
+                S "./";
+              ];
+            with_test = false;
+          };
+          runtest;
+        ]
   in
   {
     maintainer = "contact@tezos.com";
@@ -1365,17 +1394,7 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     license = "MIT";
     depends;
     conflicts;
-    build =
-      [
-        {
-          command = [S "dune"; S "build"; S "-p"; A "name"; S "-j"; A "jobs"];
-          with_test = false;
-        };
-        {
-          command = [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
-          with_test = true;
-        };
-      ];
+    build;
     synopsis;
     url = Option.map (fun {url; _} -> url) release;
   }
@@ -1389,11 +1408,9 @@ let generate_opam_files () =
      So each [Target.t] comes with an [opam] path, which defaults to being in the
      same directory as the dune file, with the package as filename (suffixed with .opam),
      but one can specify a custom .opam path too. *)
-  Target.iter_internal_by_opam @@ fun opam_filename internals ->
-  let package_name = Filename.basename opam_filename in
-  let opam_filename = opam_filename ^ ".opam" in
-  let opam = generate_opam package_name internals in
-  write opam_filename @@ fun fmt ->
+  Target.iter_internal_by_opam @@ fun package internals ->
+  let opam = generate_opam package internals in
+  write (package ^ ".opam") @@ fun fmt ->
   Format.fprintf
     fmt
     "# This file was automatically generated, do not edit.@.# Edit file \
@@ -1402,14 +1419,14 @@ let generate_opam_files () =
     opam
 
 let generate_opam_files_for_release release =
-  Target.iter_internal_by_opam @@ fun opam_filename internal_pkgs ->
-  let package_name = Filename.basename opam_filename in
+  Target.iter_internal_by_opam @@ fun package internal_pkgs ->
+  let package_name = Filename.basename package in
   let opam_filename =
     "packages" // package_name
     // (package_name ^ "." ^ release.version)
     // "opam"
   in
-  let opam = generate_opam ~release package_name internal_pkgs in
+  let opam = generate_opam ~release package internal_pkgs in
   write opam_filename @@ fun fmt -> Opam.pp fmt opam
 
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
