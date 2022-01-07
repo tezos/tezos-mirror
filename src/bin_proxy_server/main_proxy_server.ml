@@ -73,7 +73,8 @@ let sym_block_caching_time : int option Term.t =
   Arg.(value & opt (some int) None & info ["sym-block-caching-time"] ~docv ~doc)
 
 let load_config_from_file (config_file : string) =
-  Lwt_utils_unix.Json.read_file config_file >>=? fun json ->
+  let open Lwt_result_syntax in
+  let* json = Lwt_utils_unix.Json.read_file config_file in
   let open Proxy_server_config in
   match destruct_config json with
   | CannotDeserialize ->
@@ -106,19 +107,20 @@ let get_runtime config_from_file config_args =
 let main_promise (config_file : string option)
     (config_args : Proxy_server_config.t) (log_requests : bool) :
     int tzresult Lwt.t =
-  (match config_file with
-  | None -> return_none
-  | Some config_file -> load_config_from_file config_file >>=? return_some)
-  >>=? fun (config_from_file : Proxy_server_config.t option) ->
+  let open Lwt_result_syntax in
+  let* (config_from_file : Proxy_server_config.t option) =
+    Option.map_es load_config_from_file config_file
+  in
   let open Proxy_server_config in
-  get_runtime config_from_file config_args
-  >>=? fun {
-             endpoint;
-             rpc_server_address;
-             rpc_server_port;
-             rpc_server_tls;
-             sym_block_caching_time;
-           } ->
+  let* {
+         endpoint;
+         rpc_server_address;
+         rpc_server_port;
+         rpc_server_tls;
+         sym_block_caching_time;
+       } =
+    get_runtime config_from_file config_args
+  in
   let open Tezos_rpc_http in
   let open Tezos_rpc_http_client_unix in
   let logger =
@@ -131,20 +133,24 @@ let main_promise (config_file : string option)
   let printer =
     let logger channel msg : unit Lwt.t =
       if channel = "stderr" then
-        Lwt_io.eprintf "%s" msg >>= fun () -> Lwt_io.(flush stderr)
-      else Lwt_io.printf "%s" msg >>= fun () -> Lwt_io.(flush stdout)
+        let*! () = Lwt_io.eprintf "%s" msg in
+        Lwt_io.(flush stderr)
+      else
+        let*! () = Lwt_io.printf "%s" msg in
+        Lwt_io.(flush stdout)
     in
     new Tezos_client_base.Client_context.simple_printer logger
   in
   let http_ctxt =
     new RPC_client_unix.http_ctxt rpc_config Media_type.all_media_types
   in
-  Tezos_proxy.Registration.get_registered_proxy
-    printer
-    http_ctxt
-    `Mode_proxy
-    None
-  >>=? fun proxy_env ->
+  let* proxy_env =
+    Tezos_proxy.Registration.get_registered_proxy
+      printer
+      http_ctxt
+      `Mode_proxy
+      None
+  in
   let dir =
     Tezos_proxy.Proxy_services.build_directory
       printer
@@ -172,15 +178,20 @@ let main (config_file : string option) (log_requests : bool)
       ~sym_block_caching_time
   in
   Lwt_main.run
-    (Lwt_exit.wrap_and_error
-     @@ main_promise config_file config_args log_requests
-     >>= function
-     | Ok (Ok _) -> Lwt_exit.exit_and_wait 0 >|= fun _ -> `Ok ()
-     | Ok (Error err) ->
-         Lwt_exit.exit_and_wait 2 >|= fun _ ->
-         `Error (false, Format.asprintf "%a" pp_print_trace err)
-     | Error exit_status ->
-         Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
+    (let open Lwt_syntax in
+    let* r =
+      Lwt_exit.wrap_and_error
+      @@ main_promise config_file config_args log_requests
+    in
+    match r with
+    | Ok (Ok _) ->
+        let+ _ = Lwt_exit.exit_and_wait 0 in
+        `Ok ()
+    | Ok (Error err) ->
+        let+ _ = Lwt_exit.exit_and_wait 2 in
+        `Error (false, Format.asprintf "%a" pp_print_trace err)
+    | Error exit_status ->
+        Lwt.return (`Error (false, Format.asprintf "Exited %d" exit_status)))
 
 let term : unit Term.t =
   Term.(
