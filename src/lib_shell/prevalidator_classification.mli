@@ -77,6 +77,9 @@ type t = private {
     *)
 val create : parameters -> t
 
+(** [is_empty t] returns [true] iff [t] doesn't contain any operation. *)
+val is_empty : t -> bool
+
 (** [is_in_mempool oph classes] indicates whether [oph] is present
     in field [in_mempool] of [classes]. *)
 val is_in_mempool : Operation_hash.t -> t -> bool
