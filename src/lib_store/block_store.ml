@@ -347,6 +347,7 @@ let cement_blocks ?(check_consistency = true) ~write_metadata block_store blocks
     =
   (* No need to lock *)
   let open Lwt_tzresult_syntax in
+  let*! () = Store_events.(emit start_cementing_blocks) () in
   let {cemented_store; _} = block_store in
   let are_blocks_consistent = check_blocks_consistency blocks in
   let* () = fail_unless are_blocks_consistent Invalid_blocks_to_cement in
@@ -800,6 +801,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
     ~new_store ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
     ~cementing_highwatermark =
   let open Lwt_tzresult_syntax in
+  let*! () = Store_events.(emit start_updating_floating_stores) () in
   let* lafl_block =
     read_predecessor_block_by_level block_store ~head:new_head new_head_lafl
   in
@@ -816,6 +818,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
           add one (sub final_level lowest_bound_to_preserve_in_floating)
           |> to_int))
   in
+  let*! () = Store_events.(emit start_retreiving_predecessors) () in
   let*! lafl_predecessors =
     try_retrieve_n_predecessors
       (* Reverse the stores so that the oldest RO is first in the lookup. *)
@@ -851,6 +854,7 @@ let update_floating_stores block_store ~history_mode ~ro_store ~rw_store
      HYPOTHESIS: all blocks at a given level have the same lafl. *)
   let visited = ref (Block_hash.Set.singleton (Block_repr.hash lafl_block)) in
   let blocks_lafl = ref BlocksLAFL.empty in
+  let*! () = Store_events.(emit start_retreiving_cycles) () in
   let* () =
     List.iter_es
       (fun store ->
@@ -1082,6 +1086,7 @@ let create_merging_thread block_store ~history_mode ~old_ro_store ~old_rw_store
     ~new_head ~new_head_lafl ~lowest_bound_to_preserve_in_floating
     ~cementing_highwatermark =
   let open Lwt_tzresult_syntax in
+  let*! () = Store_events.(emit start_merging_thread) () in
   let*! new_ro_store =
     Floating_block_store.init block_store.chain_dir ~readonly:false RO_TMP
   in
