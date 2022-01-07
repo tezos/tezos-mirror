@@ -755,7 +755,9 @@ module Make
           (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2065
              This field does not only contain valid operation *)
           Mempool.known_valid =
-            List.rev_map fst pv_shell.classification.applied_rev
+            List.rev_map
+              (fun op -> op.Prevalidation.hash)
+              pv_shell.classification.applied_rev
             @ (Operation_hash.Map.to_seq pv_shell.classification.prechecked
               |> Seq.map fst |> List.of_seq);
           pending = Pending_ops.hashes pv_shell.pending;
@@ -1221,7 +1223,7 @@ module Make
              in
              let applied =
                List.rev_map
-                 (fun (oph, op) -> (oph, op.Prevalidation.protocol))
+                 (fun op -> (op.Prevalidation.hash, op.Prevalidation.protocol))
                  pv.shell.classification.applied_rev
              in
              let filter f map =
@@ -1300,16 +1302,15 @@ module Make
                Lwt_watcher.create_stream pv.operation_stream
              in
              (* Convert ops *)
-             let map_op error (_hash, Prevalidation.{protocol = op; hash; _}) =
-               (hash, op, error)
-             in
-             let fold_op hash (op, error) acc =
-               map_op error (hash, op) :: acc
+             let fold_op hash (Prevalidation.{protocol; _}, error) acc =
+               (hash, protocol, error) :: acc
              in
              (* First call : retrieve the current set of op from the mempool *)
              let applied =
                if params#applied then
-                 List.map (map_op []) pv.shell.classification.applied_rev
+                 List.map
+                   (fun op -> (op.Prevalidation.hash, op.protocol, []))
+                   pv.shell.classification.applied_rev
                else []
              in
              (* FIXME https://gitlab.com/tezos/tezos/-/issues/2250
@@ -1318,8 +1319,11 @@ module Make
                 handled the same way for the user point of view. *)
              let prechecked =
                if params#applied then
-                 Operation_hash.Map.bindings pv.shell.classification.prechecked
-                 |> List.map (map_op [])
+                 Operation_hash.Map.fold
+                   (fun hash op acc ->
+                     (hash, op.Prevalidation.protocol, []) :: acc)
+                   pv.shell.classification.prechecked
+                   []
                else []
              in
              let refused =

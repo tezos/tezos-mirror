@@ -71,8 +71,7 @@ type 'protocol_data t = private {
   outdated : 'protocol_data bounded_map;
   branch_refused : 'protocol_data bounded_map;
   branch_delayed : 'protocol_data bounded_map;
-  mutable applied_rev :
-    (Operation_hash.t * 'protocol_data Prevalidation.operation) list;
+  mutable applied_rev : 'protocol_data Prevalidation.operation list;
   mutable prechecked :
     'protocol_data Prevalidation.operation Operation_hash.Map.t;
   mutable unparsable : Operation_hash.Set.t;
