@@ -32,6 +32,8 @@ val list :
   'a ->
   ?active:bool ->
   ?inactive:bool ->
+  ?with_minimal_stake:bool ->
+  ?without_minimal_stake:bool ->
   unit ->
   Signature.Public_key_hash.t list shell_tzresult Lwt.t
 

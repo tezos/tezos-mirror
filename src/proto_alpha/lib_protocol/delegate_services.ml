@@ -165,18 +165,31 @@ module S = struct
 
   open Data_encoding
 
-  type list_query = {active : bool; inactive : bool}
+  type list_query = {
+    active : bool;
+    inactive : bool;
+    with_minimal_stake : bool;
+    without_minimal_stake : bool;
+  }
 
   let list_query : list_query RPC_query.t =
     let open RPC_query in
-    query (fun active inactive -> {active; inactive})
+    query (fun active inactive with_minimal_stake without_minimal_stake ->
+        {active; inactive; with_minimal_stake; without_minimal_stake})
     |+ flag "active" (fun t -> t.active)
     |+ flag "inactive" (fun t -> t.inactive)
+    |+ flag "with_minimal_stake" (fun t -> t.with_minimal_stake)
+    |+ flag "without_minimal_stake" (fun t -> t.without_minimal_stake)
     |> seal
 
   let list_delegate =
     RPC_service.get_service
-      ~description:"Lists all registered delegates."
+      ~description:
+        "Lists all registered delegates. The arguments `active`, `inactive`, \
+         `with_minimal_stake`, and `without_minimal_stake` allow to enumerate \
+         only the delegates that are active, inactive, have at least a minimal \
+         stake to participate in consensus and in governance, or do not have \
+         such a minimal stake, respectively."
       ~query:list_query
       ~output:(list Signature.Public_key_hash.encoding)
       raw_path
@@ -312,14 +325,35 @@ let register () =
   let open Services_registration in
   register0 ~chunked:true S.list_delegate (fun ctxt q () ->
       Delegate.list ctxt >>= fun delegates ->
-      match q with
-      | {active = true; inactive = false} ->
+      (match q with
+      | {active = true; inactive = false; _} ->
           List.filter_es
             (fun pkh -> Delegate.deactivated ctxt pkh >|=? not)
             delegates
-      | {active = false; inactive = true} ->
+      | {active = false; inactive = true; _} ->
           List.filter_es (fun pkh -> Delegate.deactivated ctxt pkh) delegates
-      | _ -> return delegates) ;
+      | {active = false; inactive = false; _}
+      (* This case is counter-intuitive, but it represents the default behavior, when no arguments are given *)
+      | {active = true; inactive = true; _} ->
+          return delegates)
+      >>=? fun delegates ->
+      let tokens_per_roll = Constants.tokens_per_roll ctxt in
+      match q with
+      | {with_minimal_stake = true; without_minimal_stake = false; _} ->
+          List.filter_es
+            (fun pkh ->
+              Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
+              Tez.(staking_balance >= tokens_per_roll))
+            delegates
+      | {with_minimal_stake = false; without_minimal_stake = true; _} ->
+          List.filter_es
+            (fun pkh ->
+              Delegate.staking_balance ctxt pkh >|=? fun staking_balance ->
+              Tez.(staking_balance < tokens_per_roll))
+            delegates
+      | {with_minimal_stake = true; without_minimal_stake = true; _}
+      | {with_minimal_stake = false; without_minimal_stake = false; _} ->
+          return delegates) ;
   register1 ~chunked:false S.info (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.full_balance ctxt pkh >>=? fun full_balance ->
@@ -379,8 +413,14 @@ let register () =
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Delegate.delegate_participation_info ctxt pkh)
 
-let list ctxt block ?(active = true) ?(inactive = false) () =
-  RPC_context.make_call0 S.list_delegate ctxt block {active; inactive} ()
+let list ctxt block ?(active = true) ?(inactive = false)
+    ?(with_minimal_stake = true) ?(without_minimal_stake = false) () =
+  RPC_context.make_call0
+    S.list_delegate
+    ctxt
+    block
+    {active; inactive; with_minimal_stake; without_minimal_stake}
+    ()
 
 let info ctxt block pkh = RPC_context.make_call1 S.info ctxt block pkh () ()
 
