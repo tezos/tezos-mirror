@@ -1265,7 +1265,7 @@ let generate_opam_files () =
     Opam.pp
     opam
 
-let check_for_non_generated_files () =
+let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
     let dir_contents = Sys.readdir dir in
     let add_item acc filename =
@@ -1280,26 +1280,25 @@ let check_for_non_generated_files () =
   in
   let all_files = find_opam_and_dune_files String_set.empty "../src" in
   let diff = String_set.diff all_files !generated_files in
-  let warn filename =
-    (* For now we don't generate:
-       - protocol files (that's a TODO);
-       - lib_time_measurement (its dune structure is *very* specific);
-       - src/lib_protocol_compiler/test/dune (it does not define any library,
-         executable or test stanza, it only defines aliases). *)
-    if
-      (not (has_prefix ~prefix:"../src/proto_" filename))
-      && (not (has_prefix ~prefix:"../src/lib_time_measurement/" filename))
-      && filename <> "../src/lib_protocol_compiler/test/dune"
-    then Printf.eprintf "Warning: %s: exists but was not generated\n%!" filename
+  let error = ref false in
+  let ignore_or_fail filename =
+    if not (exclude filename) then (
+      Printf.eprintf "Error: %s: exists but was not generated\n%!" filename ;
+      error := true)
   in
-  String_set.iter warn diff
+  String_set.iter ignore_or_fail diff ;
+  if !error then (
+    prerr_endline
+      "Please modify manifest/main.ml to generate the above file(s)\n\
+       or declare them in the 'exclude' function." ;
+    exit 1)
 
-let generate () =
+let generate ?exclude () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
-    check_for_non_generated_files ()
+    check_for_non_generated_files ?exclude ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;
