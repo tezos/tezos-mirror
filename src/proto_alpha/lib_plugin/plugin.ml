@@ -68,6 +68,12 @@ let () =
     (fun () -> Cannot_retrieve_predecessor_level)
 
 module Mempool = struct
+  type error_classification =
+    [ `Branch_delayed of tztrace
+    | `Branch_refused of tztrace
+    | `Refused of tztrace
+    | `Outdated of tztrace ]
+
   type nanotez = Q.t
 
   let nanotez_enc : nanotez Data_encoding.t =
@@ -323,7 +329,7 @@ module Mempool = struct
   let () =
     Environment.Error_monad.register_error_kind
       `Temporary
-      ~id:"plugin_filter.manager_restriction"
+      ~id:"prefilter.manager_restriction"
       ~title:"Only one manager operation per manager per block allowed"
       ~description:"Only one manager operation per manager per block allowed"
       ~pp:(fun ppf (oph, fee) ->
@@ -343,6 +349,35 @@ module Mempool = struct
       (function Manager_restriction {oph; fee} -> Some (oph, fee) | _ -> None)
       (fun (oph, fee) -> Manager_restriction {oph; fee})
 
+  type Environment.Error_monad.error +=
+    | Manager_operation_replaced of {
+        old_hash : Operation_hash.t;
+        new_hash : Operation_hash.t;
+      }
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"plugin.manager_operation_replaced"
+      ~title:"Manager operation replaced"
+      ~description:"The manager operation has been replaced"
+      ~pp:(fun ppf (old_hash, new_hash) ->
+        Format.fprintf
+          ppf
+          "The manager operation %a has been replaced with %a"
+          Operation_hash.pp
+          old_hash
+          Operation_hash.pp
+          new_hash)
+      (Data_encoding.obj2
+         (Data_encoding.req "old_hash" Operation_hash.encoding)
+         (Data_encoding.req "new_hash" Operation_hash.encoding))
+      (function
+        | Manager_operation_replaced {old_hash; new_hash} ->
+            Some (old_hash, new_hash)
+        | _ -> None)
+      (fun (old_hash, new_hash) ->
+        Manager_operation_replaced {old_hash; new_hash})
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2238
      Write unit tests for the feature 'replace-by-fee' and for other changes
      introduced by other MRs in the plugin. *)
@@ -728,12 +763,9 @@ module Mempool = struct
       fee:Tez.t ->
       gas_limit:manager_gas_witness Gas.Arith.t ->
       public_key_hash ->
-      [> `Prechecked_manager
-      | `Prechecked_manager_with_replace of Operation_hash.t
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace ]
+      [> `Prechecked_manager of
+         [`No_replace | `Replace of Operation_hash.t * error_classification]
+      | error_classification ]
       Lwt.t =
    fun config
        filter_state
@@ -764,10 +796,16 @@ module Mempool = struct
     with
     | `Fail err -> Lwt.return err
     | `Fresh ->
-        precheck_manager_and_check_signature ~on_success:`Prechecked_manager
-    | `Replace old_oph ->
         precheck_manager_and_check_signature
-          ~on_success:(`Prechecked_manager_with_replace old_oph)
+          ~on_success:(`Prechecked_manager `No_replace)
+    | `Replace old_oph ->
+        let err =
+          Environment.wrap_tzerror
+          @@ Manager_operation_replaced {old_hash = old_oph; new_hash = oph}
+        in
+        precheck_manager_and_check_signature
+          ~on_success:
+            (`Prechecked_manager (`Replace (old_oph, `Outdated [err])))
 
   let add_manager_restriction filter_state oph info source =
     {
@@ -789,12 +827,10 @@ module Mempool = struct
       validation_state:validation_state ->
       Operation_hash.t ->
       Main.operation ->
-      [ `Passed_precheck of state
-      | `Passed_precheck_with_replace of Operation_hash.t * state
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace
+      [ `Passed_precheck of
+        state
+        * [`No_replace | `Replace of Operation_hash.t * error_classification]
+      | error_classification
       | `Undecided ]
       Lwt.t =
    fun config
@@ -817,12 +853,11 @@ module Mempool = struct
             ~fee
             ~gas_limit
           >|= function
-          | `Prechecked_manager ->
-              `Passed_precheck
-                (add_manager_restriction filter_state oph info source)
-          | `Prechecked_manager_with_replace old_oph ->
-              `Passed_precheck_with_replace
-                (old_oph, add_manager_restriction filter_state oph info source)
+          | `Prechecked_manager replacement ->
+              let filter_state =
+                add_manager_restriction config filter_state oph info source
+              in
+              `Passed_precheck (filter_state, replacement)
           | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _)
             as errs ->
               errs)

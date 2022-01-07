@@ -75,7 +75,7 @@
    classify an operation as [Refused], [Branch_refused],
    [Branch_delayed], [Outdated] or [Applied].
 
-     - An operation is [Refused] if the protocol rejects this 
+     - An operation is [Refused] if the protocol rejects this
    operation with an error classified as [Permanent].
 
      - An operation is [Outdated] if the operation is too old to be
@@ -223,36 +223,6 @@ let default_limits =
 
 (* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
-
-type error +=
-  | Manager_operation_replaced of {
-      old_hash : Operation_hash.t;
-      new_hash : Operation_hash.t;
-    }
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"prevalidator.manager_operation_replaced"
-    ~title:"Manager operation replaced"
-    ~description:"The manager operation has been replaced"
-    ~pp:(fun ppf (old_hash, new_hash) ->
-      Format.fprintf
-        ppf
-        "The manager operation %a has been replaced with %a"
-        Operation_hash.pp
-        old_hash
-        Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj2
-       (Data_encoding.req "old_hash" Operation_hash.encoding)
-       (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function
-      | Manager_operation_replaced {old_hash; new_hash} ->
-          Some (old_hash, new_hash)
-      | _ -> None)
-    (fun (old_hash, new_hash) ->
-      Manager_operation_replaced {old_hash; new_hash})
 
 module Name = struct
   type t = Chain_id.t * Protocol_hash.t
@@ -553,21 +523,21 @@ module Make
     | `None -> `None
 
   (* This function retrieves an old/replaced operation and reclassifies it as
-     [`Outdated]. Note that we don't need to re-flush the mempool, as this
-     function is only called in precheck mode.
+     [replacement_classification]. Note that we don't need to re-flush the
+     mempool, as this function is only called in precheck mode.
 
      The operation is expected to be (a) parsable and (b) in the "prechecked"
      class. So, we softly handle the situations where the operation is
      unparsable or not found in any class in case this invariant is broken
      for some reason.
   *)
-  let reclassify_replaced_manager_op old_hash new_hash shell =
+  let reclassify_replaced_manager_op old_hash shell
+      (replacement_classification : [< Classification.error_classification]) =
     shell.advertisement <-
       remove_from_advertisement old_hash shell.advertisement ;
     match Classification.remove old_hash shell.classification with
     | Some (op, _class) ->
-        let err = Manager_operation_replaced {old_hash; new_hash} in
-        [(op, `Outdated [err])]
+        [(op, (replacement_classification :> Classification.classification))]
     | None ->
         (* This case should not happen. *)
         Distributed_db.Operation.clear_or_cancel
@@ -587,14 +557,10 @@ module Make
         op.hash
         op.protocol
       >|= function
-      | `Passed_precheck filter_state ->
+      | `Passed_precheck (filter_state, replacement) ->
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
-          `Passed_precheck filter_state
-      | `Passed_precheck_with_replace (old_oph, filter_state) ->
-          (* Same as `Passed_precheck, but the operation whose hash is returned
-             should be reclassified to Outdated *)
-          `Passed_precheck_with_replace (old_oph, filter_state)
+          `Passed_precheck (filter_state, replacement)
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -639,12 +605,18 @@ module Make
      | `Fail errs ->
          (* Precheck rejected the operation *)
          Lwt.return_error errs
-     | `Passed_precheck filter_state ->
+     | `Passed_precheck (filter_state, replacement) ->
          (* Precheck succeeded *)
-         Lwt.return_ok ((filter_state, validation_state), [], `Prechecked)
-     | `Passed_precheck_with_replace (old_oph, filter_state) ->
-         (* Precheck succeeded, but an old operation is replaced *)
-         let to_handle = reclassify_replaced_manager_op old_oph op.hash shell in
+         let to_handle =
+           match replacement with
+           | `No_replace -> []
+           | `Replace (old_oph, replacement_classification) ->
+               (* Precheck succeeded, but an old operation is replaced *)
+               reclassify_replaced_manager_op
+                 old_oph
+                 shell
+                 replacement_classification
+         in
          Lwt.return_ok ((filter_state, validation_state), to_handle, `Prechecked)
      | `Undecided -> (
          (* Precheck was not able to classify *)

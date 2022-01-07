@@ -23,13 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type classification =
-  [ `Applied
-  | `Prechecked
-  | `Branch_delayed of tztrace
+(** Classifications which correspond to errors *)
+type error_classification =
+  [ `Branch_delayed of tztrace
   | `Branch_refused of tztrace
   | `Refused of tztrace
   | `Outdated of tztrace ]
+
+(** Classification of an operation in the mempool *)
+type classification = [`Applied | `Prechecked | error_classification]
 
 type 'protocol_data bounded_map
 
@@ -205,8 +207,8 @@ type 'block chain_tools = {
     This function guarantees that the branch of all returned operations
     is in [live_blocks] ([live_blocks] acts as a filter).
 
-    Operation which where included in [from_branch] and which are NOT in 
-    [to_branch] need to be parsed again using the [parse] argument. If the 
+    Operation which where included in [from_branch] and which are NOT in
+    [to_branch] need to be parsed again using the [parse] argument. If the
     parsing fails those operations are just dropped. This may happen if those
     operations comes from another protocol.
 
@@ -269,7 +271,7 @@ module Internal_for_tests : sig
       of {!t}. *)
   val flush : 'protocol_data t -> handle_branch_refused:bool -> unit
 
-  (** [handle_live_operations chain_db from_branch to_branch is_branch_alive parse 
+  (** [handle_live_operations chain_db from_branch to_branch is_branch_alive parse
       old_mempool] returns the operations from:
 
       1. [old_mempool],

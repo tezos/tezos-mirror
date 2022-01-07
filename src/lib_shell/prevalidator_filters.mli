@@ -67,11 +67,12 @@ module type FILTER = sig
         [Proto.precheck_manager] and [Proto.check_signature]. This
         function hereby has a similar return type.
 
-        Returns [`Passed_precheck] if the operation was successfully
+        Returns [`Passed_precheck `No_replace] if the operation was successfully
         prechecked. In case the operation is successfully prechecked
         but replaces an already prechecked operation [old_oph], the
-        result [`Passed_precheck_with_replace old_oph] is returned.
-        If the function returns [`Undecided] it means that
+        result [`Passed_precheck (`Replace (old_oph, clasification))] is
+        returned, where [classification] is the new classifiation of the
+        replaced operation. If the function returns [`Undecided] it means that
         [apply_operation] should be called.
 
         This function takes a [state] as parameter and returns it updated if the
@@ -82,13 +83,14 @@ module type FILTER = sig
       validation_state:Proto.validation_state ->
       Operation_hash.t ->
       Proto.operation ->
-      [ `Passed_precheck of state
-      | `Passed_precheck_with_replace of Operation_hash.t * state
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace
-      | `Undecided ]
+      [ `Passed_precheck of
+        state
+        * [ `No_replace
+          | `Replace of
+            Operation_hash.t * Prevalidator_classification.error_classification
+          ]
+      | `Undecided
+      | Prevalidator_classification.error_classification ]
       Lwt.t
 
     (** [pre_filter config ~filter_state ?validation_state_before operation_data]
@@ -108,10 +110,7 @@ module type FILTER = sig
       ?validation_state_before:Proto.validation_state ->
       Proto.operation ->
       [ `Passed_prefilter of [`High | `Low]
-      | `Branch_delayed of tztrace
-      | `Branch_refused of tztrace
-      | `Refused of tztrace
-      | `Outdated of tztrace ]
+      | Prevalidator_classification.error_classification ]
       Lwt.t
 
     (** [post_filter config ~filter_state ~validation_state_before
