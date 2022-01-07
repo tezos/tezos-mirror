@@ -338,7 +338,7 @@ let parse_constr_annot :
   ignore_special f1 >>? fun f1 ->
   ignore_special f2 >|? fun f2 -> (t, f1, f2)
 
-let parse_two_var_annot : Script.location -> string list -> unit tzresult =
+let check_two_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->

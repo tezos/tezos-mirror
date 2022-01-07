@@ -4641,7 +4641,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         (Option_t (Key_hash_t _, _), Item_t (Mutez_t _, Item_t (ginit, rest)))
     ) ->
       Tc_context.check_not_in_view ~legacy loc tc_context prim >>?= fun () ->
-      parse_two_var_annot loc annot >>?= fun () ->
+      check_two_var_annot loc annot >>?= fun () ->
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
       >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
