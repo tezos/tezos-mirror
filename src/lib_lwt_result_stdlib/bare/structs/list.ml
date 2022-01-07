@@ -823,7 +823,7 @@ let rev_map2_s ~when_different_lengths f xs ys =
     | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return_ok []
+  | ([], []) -> return_ok_nil
   | (x :: xs, y :: ys) ->
       let* z = lwt_apply2 f x y in
       aux [z] xs ys
@@ -871,14 +871,14 @@ let iter2_s ~when_different_lengths f xs ys =
   let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> return_ok ()
+    | ([], []) -> return_ok_unit
     | (x :: xs, y :: ys) ->
         let* () = f x y in
         (aux [@ocaml.tailcall]) xs ys
     | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> return_ok ()
+  | ([], []) -> return_ok_unit
   | (x :: xs, y :: ys) ->
       let* () = lwt_apply2 f x y in
       aux xs ys
@@ -1092,17 +1092,17 @@ let for_all2_s ~when_different_lengths f xs ys =
   let rec aux xs ys =
     match (xs, ys) with
     | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-    | ([], []) -> return_ok true
+    | ([], []) -> return_ok_true
     | (x :: xs, y :: ys) ->
         let* b = f x y in
-        if b then (aux [@ocaml.tailcall]) xs ys else return_ok false
+        if b then (aux [@ocaml.tailcall]) xs ys else return_ok_false
   in
   match (xs, ys) with
   | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-  | ([], []) -> return_ok true
+  | ([], []) -> return_ok_true
   | (x :: xs, y :: ys) ->
       let* b = lwt_apply2 f x y in
-      if b then aux xs ys else return_ok false
+      if b then aux xs ys else return_ok_false
 
 let for_all2_es ~when_different_lengths f xs ys =
   let open Lwt_result_syntax in
@@ -1138,17 +1138,17 @@ let exists2_s ~when_different_lengths f xs ys =
   let rec aux xs ys =
     match (xs, ys) with
     | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-    | ([], []) -> return_ok false
+    | ([], []) -> return_ok_false
     | (x :: xs, y :: ys) ->
         let* b = f x y in
-        if b then return_ok true else (aux [@ocaml.tailcall]) xs ys
+        if b then return_ok_true else (aux [@ocaml.tailcall]) xs ys
   in
   match (xs, ys) with
   | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
-  | ([], []) -> return_ok false
+  | ([], []) -> return_ok_false
   | (x :: xs, y :: ys) ->
       let* b = lwt_apply2 f x y in
-      if b then return_ok true else aux xs ys
+      if b then return_ok_true else aux xs ys
 
 let exists2_es ~when_different_lengths f xs ys =
   let open Lwt_result_syntax in

@@ -163,10 +163,10 @@ let create_listening_socket ~backlog ?(addr = Ipaddr.V6.unspecified) port =
           Unix.(ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port))
       in
       Lwt_unix.listen main_socket backlog ;
-      Lwt_tzresult_syntax.return main_socket)
+      return_ok main_socket)
     (function
       | Unix.Unix_error (err, _, _) ->
-          Lwt_tzresult_syntax.fail
+          Error_monad.fail
           @@ Failed_to_open_listening_socket
                {reason = err; address = addr; port}
       | exn -> Lwt.fail exn)

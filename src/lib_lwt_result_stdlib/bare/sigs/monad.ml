@@ -142,6 +142,25 @@ module type S = sig
         [return_error] is an alias for [Lwt.return_error]. *)
     val return_error : 'e -> (_, 'e) result Lwt.t
 
+    (** The following [return_ok_*] functions are intended to be used within the
+        scope of [Lwt_syntax] when returning results compatible with
+        [Lwt_result_syntax]. *)
+
+    (** [return_ok_unit] is an Lwt promise that is already resolved to [Ok ()]. *)
+    val return_ok_unit : (unit, 'e) result Lwt.t
+
+    (** [return_ok_true] is an Lwt promise that is already resolved to [Ok true]. *)
+    val return_ok_true : (bool, 'e) result Lwt.t
+
+    (** [return_ok_false] is an Lwt promise that is already resolved to [Ok false]. *)
+    val return_ok_false : (bool, 'e) result Lwt.t
+
+    (** [return_ok_none] is an Lwt promise that is already resolved to [Ok None]. *)
+    val return_ok_none : ('a option, 'e) result Lwt.t
+
+    (** [return_ok_nil] is an Lwt promise that is already resolved to [Ok []]. *)
+    val return_ok_nil : ('a list, 'e) result Lwt.t
+
     (** [let*] is a binding operator alias for {!Lwt.bind} and {!Lwt.( >>= )}. *)
     val ( let* ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
 

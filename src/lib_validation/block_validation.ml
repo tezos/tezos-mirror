@@ -1007,9 +1007,9 @@ module Make (Proto : Registered_protocol.T) = struct
     in
     match r with
     | Error err ->
-        Lwt_tzresult_syntax.fail
+        Error_monad.fail
           (invalid_block block_hash (Economic_protocol_error err))
-    | Ok () -> Lwt_tzresult_syntax.return_unit
+    | Ok () -> return_ok_unit
 end
 
 let assert_no_duplicate_operations block_hash live_operations operations =
@@ -1124,7 +1124,7 @@ let apply ?cached_result c ~cache block_header operations =
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      Lwt_tzresult_syntax.fail
+      Error_monad.fail
         (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res
 
@@ -1223,6 +1223,6 @@ let preapply ~chain_id ~user_activated_upgrades
   in
   match r with
   | Error (Exn (Unix.Unix_error (errno, fn, msg)) :: _) ->
-      Lwt_tzresult_syntax.fail
+      Error_monad.fail
         (System_error {errno = Unix.error_message errno; fn; msg})
   | (Ok _ | Error _) as res -> Lwt.return res

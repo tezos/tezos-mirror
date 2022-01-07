@@ -26,6 +26,16 @@
 module Lwt_syntax = struct
   include Lwt
   include Lwt.Syntax
+
+  let return_ok_unit = Lwt.return (Ok ())
+
+  let return_ok_true = Lwt.return (Ok true)
+
+  let return_ok_false = Lwt.return (Ok false)
+
+  let return_ok_none = Lwt.return (Ok None)
+
+  let return_ok_nil = Lwt.return (Ok [])
 end
 
 module Result_syntax = struct
@@ -79,17 +89,17 @@ module Lwt_result_syntax = struct
 
   let (fail[@ocaml.iniline "always"]) = fun x -> Lwt.return (Error x)
 
-  let return_unit = Lwt.return (Ok ())
+  let return_unit = Lwt_syntax.return_ok_unit
 
-  let return_none = Lwt.return (Ok None)
+  let return_none = Lwt_syntax.return_ok_none
 
   let return_some x = Lwt.return (Ok (Some x))
 
-  let return_true = Lwt.return (Ok true)
+  let return_true = Lwt_syntax.return_ok_true
 
-  let return_false = Lwt.return (Ok false)
+  let return_false = Lwt_syntax.return_ok_false
 
-  let return_nil = Lwt.return (Ok [])
+  let return_nil = Lwt_syntax.return_ok_nil
 
   let ( let* ) = Lwt_result.bind
 

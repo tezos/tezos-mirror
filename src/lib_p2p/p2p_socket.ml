@@ -739,13 +739,12 @@ let catch_closed_pipe f =
   let open Lwt_syntax in
   let* r =
     Lwt.catch f (function
-        | Lwt_pipe.Closed ->
-            Lwt_tzresult_syntax.fail P2p_errors.Connection_closed
+        | Lwt_pipe.Closed -> Error_monad.fail P2p_errors.Connection_closed
         | exn -> fail_with_exn exn)
   in
   match r with
   | Error (Exn Lwt_pipe.Closed :: _) ->
-      Lwt_tzresult_syntax.fail P2p_errors.Connection_closed
+      Error_monad.fail P2p_errors.Connection_closed
   | (Error _ | Ok _) as v -> Lwt.return v
 
 let write {writer; conn; _} msg =
