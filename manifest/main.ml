@@ -3359,8 +3359,24 @@ let _tezos_tps_evaluation =
     ~release:false
     ~opens:["Tezos_base__TzPervasives"; "Tezt"; "Tezt_tezos"; "Tezt.Base"]
 
+(* For now we don't generate:
+   - protocol files (that's a TODO);
+   - lib_time_measurement (its dune structure is *very* specific);
+   - src/lib_protocol_compiler/test/dune (it does not define any library,
+     executable or test stanza, it only defines aliases).
+
+   Note that [filename] is relative to the manifest directory,
+   i.e. it starts with "../". *)
+let not_generated filename =
+  has_prefix ~prefix:"../src/proto_" filename
+  || has_prefix ~prefix:"../src/lib_time_measurement/" filename
+  ||
+  match filename with
+  | "../src/lib_protocol_compiler/test/dune" -> true
+  | _ -> false
+
 (* Generate dune and opam files. *)
-let () = generate ()
+let () = generate ~not_generated ()
 
 (* Generate active_protocol_versions. *)
 let () =
