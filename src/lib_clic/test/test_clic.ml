@@ -70,16 +70,19 @@ let efgh_param ~name =
 (* instrumentation *)
 
 let dispatch cmds argv () =
+  let open Lwt_result_syntax in
   let res = ref "nomatch" in
   let cmd_return v =
     res := v ;
     return ()
   in
   let cmds = List.map (fun cmd -> cmd cmd_return) cmds in
-  Clic.dispatch cmds () argv >>=? fun () -> return !res
+  let* () = Clic.dispatch cmds () argv in
+  return !res
 
 let expect_result line pr exp got =
-  protect got >>= fun got ->
+  let open Lwt_syntax in
+  let* got = protect got in
   if
     match (got, exp) with
     | (Ok got, Ok exp) -> got = exp
@@ -109,6 +112,7 @@ let expect_result line pr exp got =
 (** Test the dispatch of basic commands with no parameters and with [prefix]
     parameters. *)
 let test_dispatch_basic () =
+  let open Lwt_syntax in
   let empty return =
     Clic.command ~desc:"empty" Clic.no_options Clic.stop (fun () () ->
         return "empty")
@@ -122,25 +126,30 @@ let test_dispatch_basic () =
       (fun () () -> return name)
   in
   let expect line = expect_result line Format.pp_print_string in
-  expect __LINE__ (Ok "empty") (dispatch [empty] []) >>= fun () ->
-  expect __LINE__ (Error "Extra_arguments") (dispatch [empty] ["one"])
-  >>= fun () ->
+  let* () = expect __LINE__ (Ok "empty") (dispatch [empty] []) in
+  let* () =
+    expect __LINE__ (Error "Extra_arguments") (dispatch [empty] ["one"])
+  in
   let cmds = [empty; prefixes ["one"]; prefixes ["one"; "two"]] in
-  expect __LINE__ (Ok "empty") (dispatch cmds []) >>= fun () ->
-  expect __LINE__ (Ok "one") (dispatch cmds ["one"]) >>= fun () ->
-  expect __LINE__ (Ok "one-two") (dispatch cmds ["one"; "two"]) >>= fun () ->
-  expect __LINE__ (Error "Command_not_found") (dispatch cmds ["saucisse"])
-  >>= fun () ->
-  expect
-    __LINE__
-    (Error "Command_not_found")
-    (dispatch cmds ["one"; "saucisse"])
-  >>= fun () ->
-  expect
-    __LINE__
-    (Error "Extra_arguments")
-    (dispatch cmds ["one"; "two"; "three"])
-  >>= fun () -> Lwt.return_unit
+  let* () = expect __LINE__ (Ok "empty") (dispatch cmds []) in
+  let* () = expect __LINE__ (Ok "one") (dispatch cmds ["one"]) in
+  let* () = expect __LINE__ (Ok "one-two") (dispatch cmds ["one"; "two"]) in
+  let* () =
+    expect __LINE__ (Error "Command_not_found") (dispatch cmds ["saucisse"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Error "Command_not_found")
+      (dispatch cmds ["one"; "saucisse"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Error "Extra_arguments")
+      (dispatch cmds ["one"; "two"; "three"])
+  in
+  Lwt.return_unit
 
 (** Test the dispatch of commands with non-terminal sequence parameters. *)
 let test_dispatch_advanced () =
@@ -193,54 +202,71 @@ let test_dispatch_advanced () =
         return ("F" ^ String.concat "" (List.map string_of_abcd l)))
   in
   let expect line = expect_result line Format.pp_print_string in
-  expect __LINE__ (Error "Unterminated_command") (dispatch [en] ["saucisse"])
-  >>= fun () ->
-  expect __LINE__ (Ok "E") (dispatch [en] ["the"; "end"]) >>= fun () ->
-  expect __LINE__ (Ok "EB") (dispatch [en] ["b"; "the"; "end"]) >>= fun () ->
-  expect __LINE__ (Ok "EDB") (dispatch [en] ["d"; "b"; "the"; "end"])
-  >>= fun () ->
-  expect __LINE__ (Ok "EB") (dispatch [en; enp] ["b"; "the"; "end"])
-  >>= fun () ->
-  expect __LINE__ (Ok "EBE") (dispatch [en; enp] ["b"; "the"; "end"; "of"; "e"])
-  >>= fun () ->
-  expect __LINE__ (Ok "EBE") (dispatch [enp] ["b"; "the"; "end"; "of"; "e"])
-  >>= fun () ->
-  expect
-    __LINE__
-    (Error "wrong argument")
-    (dispatch [en] ["d"; "x"; "the"; "end"])
-  >>= fun () ->
-  expect __LINE__ (Ok "F") (dispatch [fr] ["la"; "fin"]) >>= fun () ->
-  expect __LINE__ (Ok "FA") (dispatch [fr] ["a"; "la"; "fin"]) >>= fun () ->
-  expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
-  >>= fun () ->
-  expect
-    __LINE__
-    (Ok "EA")
-    (dispatch [prefixed_en; prefixed_fr] ["en"; "a"; "the"; "end"])
-  >>= fun () ->
-  expect
-    __LINE__
-    (Ok "FA")
-    (dispatch [prefixed_en; prefixed_fr] ["fr"; "a"; "la"; "fin"])
-  >>= fun () ->
-  expect
-    __LINE__
-    (Error "Unterminated_command")
-    (dispatch [prefixed_en; prefixed_fr] ["fr"; "a"; "the"; "end"])
-  >>= fun () ->
+  let open Lwt_syntax in
+  let* () =
+    expect __LINE__ (Error "Unterminated_command") (dispatch [en] ["saucisse"])
+  in
+  let* () = expect __LINE__ (Ok "E") (dispatch [en] ["the"; "end"]) in
+  let* () = expect __LINE__ (Ok "EB") (dispatch [en] ["b"; "the"; "end"]) in
+  let* () =
+    expect __LINE__ (Ok "EDB") (dispatch [en] ["d"; "b"; "the"; "end"])
+  in
+  let* () =
+    expect __LINE__ (Ok "EB") (dispatch [en; enp] ["b"; "the"; "end"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "EBE")
+      (dispatch [en; enp] ["b"; "the"; "end"; "of"; "e"])
+  in
+  let* () =
+    expect __LINE__ (Ok "EBE") (dispatch [enp] ["b"; "the"; "end"; "of"; "e"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Error "wrong argument")
+      (dispatch [en] ["d"; "x"; "the"; "end"])
+  in
+  let* () = expect __LINE__ (Ok "F") (dispatch [fr] ["la"; "fin"]) in
+  let* () = expect __LINE__ (Ok "FA") (dispatch [fr] ["a"; "la"; "fin"]) in
+  let* () =
+    expect __LINE__ (Ok "FCB") (dispatch [fr] ["c"; "b"; "la"; "fin"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "EA")
+      (dispatch [prefixed_en; prefixed_fr] ["en"; "a"; "the"; "end"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Ok "FA")
+      (dispatch [prefixed_en; prefixed_fr] ["fr"; "a"; "la"; "fin"])
+  in
+  let* () =
+    expect
+      __LINE__
+      (Error "Unterminated_command")
+      (dispatch [prefixed_en; prefixed_fr] ["fr"; "a"; "the"; "end"])
+  in
   (* the following two should  all fail with a command clash error *)
   let expected_error =
     Error
       "Command cannot have different non_terminal_seq_level at the same \
        position"
   in
-  expect __LINE__ expected_error (dispatch [en; fr] ["b"; "the"; "end"])
-  >>= fun () ->
-  expect __LINE__ expected_error (dispatch [fr; en] ["b"; "the"; "end"])
-  >>= fun () ->
-  expect __LINE__ expected_error (dispatch [en; fr] ["a"; "la"; "fin"])
-  >>= fun () ->
+  let* () =
+    expect __LINE__ expected_error (dispatch [en; fr] ["b"; "the"; "end"])
+  in
+  let* () =
+    expect __LINE__ expected_error (dispatch [fr; en] ["b"; "the"; "end"])
+  in
+  let* () =
+    expect __LINE__ expected_error (dispatch [en; fr] ["a"; "la"; "fin"])
+  in
   expect __LINE__ expected_error (dispatch [fr; en] ["a"; "la"; "fin"])
 
 let string_param ~autocomplete next =
@@ -260,6 +286,7 @@ let int_param ~autocomplete next =
       next)
 
 let test_autocompletion_case ~commands ~args ~expected () =
+  let open Lwt_tzresult_syntax in
   let script = "script" in
   let (prev_arg, cur_arg) =
     match List.rev args with
@@ -269,15 +296,16 @@ let test_autocompletion_case ~commands ~args ~expected () =
   in
   let global_options = Clic.no_options in
   let ctxt = () in
-  Clic.autocompletion
-    ~script
-    ~cur_arg
-    ~prev_arg
-    ~args
-    ~global_options
-    commands
-    ctxt
-  >>=? fun next ->
+  let* next =
+    Clic.autocompletion
+      ~script
+      ~cur_arg
+      ~prev_arg
+      ~args
+      ~global_options
+      commands
+      ctxt
+  in
   return
   @@ Alcotest.(
        check
@@ -543,8 +571,10 @@ let test_parameters_autocompletion =
   param_cases @ prefix_cases @ seq_cases @ non_terminal_seq_cases
 
 let wrap (n, f) =
+  let open Lwt_syntax in
   Alcotest_lwt.test_case n `Quick (fun _ () ->
-      f () >>= function
+      let* r = f () in
+      match r with
       | Ok () -> Lwt.return_unit
       | Error err -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace err)
 
