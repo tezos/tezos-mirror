@@ -135,3 +135,24 @@ end
 module Version : sig
   val init : ('a, 'b, 'c) P2p.t -> unit
 end
+
+module Peer_validator : sig
+  type t = {
+    on_no_request : Prometheus.Counter.t;
+    new_head_completed : Prometheus.Counter.t;
+    new_branch_completed : Prometheus.Counter.t;
+    invalid_locator : Prometheus.Counter.t;
+    invalid_block : Prometheus.Counter.t;
+    system_error : Prometheus.Counter.t;
+    unavailable_protocol : Prometheus.Counter.t;
+    unknown_ancestor : Prometheus.Counter.t;
+    too_short_locator : Prometheus.Counter.t;
+    operations_fetching_canceled_new_branch : Prometheus.Counter.t;
+    operations_fetching_canceled_new_known_valid_head : Prometheus.Counter.t;
+    operations_fetching_canceled_new_unknown_head : Prometheus.Counter.t;
+    unknown_error : Prometheus.Counter.t;
+    connections : Prometheus.Counter.t;
+  }
+
+  val init : string trace -> t
+end

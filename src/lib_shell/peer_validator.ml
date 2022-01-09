@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
+(* Copyright (c) 2018-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -98,6 +98,8 @@ module Worker = Worker.Make (Name) (Event) (Request) (Types) (Logger)
 open Types
 
 type t = Worker.dropbox Worker.t
+
+let metrics = Shell_metrics.Peer_validator.init Name.base
 
 let bootstrap_new_branch w unknown_prefix =
   let open Lwt_result_syntax in
@@ -343,6 +345,7 @@ let may_validate_new_branch w locator =
 let on_no_request w =
   let open Lwt_syntax in
   let pv = Worker.state w in
+  Prometheus.Counter.inc_one metrics.on_no_request ;
   let timespan =
     Ptime.Span.to_float_s pv.parameters.limits.new_head_request_timeout
   in
@@ -370,15 +373,19 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
       in
       may_validate_new_branch w locator
 
-let on_completion w r _ st =
+let on_completion (type a) w (r : a Request.t) _ st =
+  (match r with
+  | Request.New_head _ -> Prometheus.Counter.inc_one metrics.new_head_completed
+  | Request.New_branch _ ->
+      Prometheus.Counter.inc_one metrics.new_branch_completed) ;
   Worker.log_event w (Event.Request (Request.view r, st, None))
 
 let on_error w r st err =
   let open Lwt_syntax in
   let pv = Worker.state w in
   match err with
-  | ( Validation_errors.Invalid_locator _
-    | Block_validator_errors.Invalid_block _ )
+  | (( Validation_errors.Invalid_locator _
+     | Block_validator_errors.Invalid_block _ ) as e)
     :: _ ->
       let* () = Distributed_db.greylist pv.parameters.chain_db pv.peer_id in
       let* () =
@@ -387,13 +394,21 @@ let on_error w r st err =
           (Terminating_worker
              {peer = pv.peer_id; reason = "invalid data received: kickban"})
       in
+      (match e with
+      | Validation_errors.Invalid_locator _ ->
+          Prometheus.Counter.inc_one metrics.invalid_locator
+      | Block_validator_errors.Invalid_block _ ->
+          Prometheus.Counter.inc_one metrics.invalid_block
+      | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
       Worker.trigger_shutdown w ;
       let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
       Lwt.return_error err
   | Block_validator_errors.System_error _ :: _ ->
+      Prometheus.Counter.inc_one metrics.system_error ;
       let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
       return_ok_unit
   | Block_validator_errors.Unavailable_protocol {protocol; _} :: _ -> (
+      Prometheus.Counter.inc_one metrics.unavailable_protocol ;
       let* fetched_and_compiled =
         Block_validator.fetch_and_compile_protocol
           pv.parameters.block_validator
@@ -425,8 +440,15 @@ let on_error w r st err =
           in
           let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
           Lwt.return_error err)
-  | (Validation_errors.Unknown_ancestor | Validation_errors.Too_short_locator _)
+  | ((Validation_errors.Unknown_ancestor | Validation_errors.Too_short_locator _)
+    as e)
     :: _ ->
+      (match e with
+      | Validation_errors.Unknown_ancestor ->
+          Prometheus.Counter.inc_one metrics.unknown_ancestor
+      | Validation_errors.Too_short_locator _ ->
+          Prometheus.Counter.inc_one metrics.too_short_locator
+      | _ -> (* Cannot happen but OCaml type checker disagrees. *) ()) ;
       let* () =
         Worker.log_event
           w
@@ -450,9 +472,21 @@ let on_error w r st err =
       | New_head hash -> (
           let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
           let* b = Store.Block.is_known_valid chain_store hash in
-          match b with true -> return_ok_unit | false -> Lwt.return_error err)
-      | _ -> Lwt.return_error err)
+          match b with
+          | true ->
+              Prometheus.Counter.inc_one
+                metrics.operations_fetching_canceled_new_known_valid_head ;
+              return_ok_unit
+          | false ->
+              Prometheus.Counter.inc_one
+                metrics.operations_fetching_canceled_new_unknown_head ;
+              Lwt.return_error err)
+      | _ ->
+          Prometheus.Counter.inc_one
+            metrics.operations_fetching_canceled_new_branch ;
+          Lwt.return_error err)
   | _ ->
+      Prometheus.Counter.inc_one metrics.unknown_error ;
       let* () = Worker.log_event w (Event.Request (r, st, Some err)) in
       Lwt.return_error err
 
@@ -480,6 +514,7 @@ let on_launch _ name parameters =
     pv.last_validated_head <- Store.Block.header block ;
     parameters.notify_new_block block
   in
+  Prometheus.Counter.inc_one metrics.connections ;
   return_ok pv
 
 let table =
