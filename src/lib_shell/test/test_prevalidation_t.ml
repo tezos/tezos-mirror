@@ -142,9 +142,9 @@ let prevalidation_operations_gen (type a)
   (* We need to specify the protocol bytes generator to always generate the
      empty string, otherwise the call to [P.parse] will fail with the
      bytes being too long (hereby looking like an attack). *)
-  let string_gen : string QCheck2.Gen.t = QCheck2.Gen.return "" in
+  let proto_gen : string QCheck2.Gen.t = QCheck2.Gen.return "" in
   let+ (ops : Operation.t Operation_hash.Map.t) =
-    Generators.raw_op_map_gen_n ~string_gen ?block_hash_t:None n
+    Generators.raw_op_map_gen_n ~proto_gen ?block_hash_t:None n
   in
   List.map mk_operation (Operation_hash.Map.bindings ops)
 
