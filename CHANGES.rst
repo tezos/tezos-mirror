@@ -23,6 +23,10 @@ be documented here either.
 Node
 ----
 
+- The RPC GET `/chains/main/mempool/pending_operations` does not
+  output unparsable operations anymore. Previously, they were in the
+  ``Refused`` field with a parsing error.
+
 Client
 ------
 
