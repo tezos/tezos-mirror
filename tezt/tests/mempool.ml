@@ -880,6 +880,85 @@ module Revamped = struct
              oph3)) ;
     unit
 
+  (** This test checks that if we inject an operation from the same source,
+      and with the same counter, injection will fail if ~force is false
+      because the operation will not be applied/prechecked. *)
+  let one_operation_per_manager_per_block_inject_not_applied =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Manager_restriction_inject_1M"
+      ~tags:["mempool"; "manager_restriction"; "inject"]
+    @@ fun protocol ->
+    log_step 1 "Initialize a node and a client." ;
+    let* (node, client) =
+      Client.init_with_protocol
+        ~nodes_args:[Synchronisation_threshold 0]
+        ~protocol
+        `Client
+        ()
+    in
+    let* counter =
+      RPC.Contracts.get_counter
+        ~contract_id:Constant.bootstrap1.public_key_hash
+        client
+    in
+    let counter = JSON.as_int counter in
+
+    log_step 2 "Inject a transfer with a correct counter." ;
+    let* (`OpHash oph1) =
+      Operation.inject_transfer
+        ~wait_for_injection:node
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        ~counter:(counter + 1)
+        client
+    in
+    log_step
+      3
+      "Attempt to inject a transfer with a correct counter but different \
+       destination (~force: %b)."
+      false ;
+
+    let* op2 =
+      Operation.mk_transfer
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap3
+        ~counter:(counter + 1)
+        client
+    in
+    let* branch = Operation.get_injection_branch client in
+    let* (`Hex op_str_hex as op_hex) =
+      Operation.forge_operation ~protocol ~branch ~batch:[op2] client
+    in
+    let (`Hex signature) =
+      Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_hex
+    in
+    let signed_op = op_str_hex ^ signature in
+    let p = RPC.spawn_inject_operation ~data:(`String signed_op) client in
+
+    log_step 4 "Check that injection failed as expected." ;
+    let injection_error_rex =
+      rex
+        ~opts:[`Dotall]
+        "Fatal error:\n  Command failed: Error while applying operation.*:"
+    in
+    let* () = Process.check_error ~msg:injection_error_rex p in
+
+    log_step
+      5
+      "Check that the mempool contains %s as applied and no op as \
+       branch_delayed."
+      oph1 ;
+    let* mempool = RPC.get_mempool client in
+    let expected_mempool =
+      {Mempool.empty with applied = [oph1]; branch_delayed = []}
+    in
+    Check.(
+      (expected_mempool = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+    unit
+
   (** This test checks that an operation applied is not reclassified and stays
       applied after the ban of a branch_delayed operation. *)
   let one_operation_per_manager_per_block_ban =
@@ -3713,6 +3792,7 @@ let register ~protocols =
   Revamped.one_operation_per_manager_per_block_flush ~protocols ;
   Revamped.one_operation_per_manager_per_block_ban ~protocols ;
   Revamped.one_operation_per_manager_per_block_flush_on_ban ~protocols ;
+  Revamped.one_operation_per_manager_per_block_inject_not_applied ~protocols ;
   Revamped.max_refused_operations_branch_delayed ~protocols ;
   Revamped.max_refused_operations_branch_refused ~protocols ;
   Revamped.max_refused_operations_refused ~protocols ;
