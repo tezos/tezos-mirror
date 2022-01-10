@@ -340,10 +340,11 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
           let block_location =
             Baking_files.resolve_location ~chain_id `Highwatermarks
           in
+          let delegate = delegate.public_key_hash in
           Baking_highwatermarks.may_sign_preendorsement
             cctxt
             block_location
-            ~delegate:delegate.public_key_hash
+            ~delegate
             ~level
             ~round
           >>=? function
@@ -351,7 +352,7 @@ let inject_preendorsements ~state_recorder state ~preendorsements ~updated_state
               Baking_highwatermarks.record_preendorsement
                 cctxt
                 block_location
-                ~delegate:delegate.public_key_hash
+                ~delegate
                 ~level
                 ~round
               >>=? fun () -> return_true
