@@ -38,3 +38,14 @@ Michelson
   However, ``CREATE_CONTRACT``, ``SET_DELEGATE`` and ``TRANSFER_TOKENS`` remain
   available in lambdas defined inside a view.
   (MR :gl:`!3737`)
+
+- Stack variable annotations are ignored and not propagated. All contracts that
+  used to typecheck correctly before will still typecheck correctly afterwards.
+  Though more contracts are accepted as branches with different stack variable
+  annotations won't be rejected any more.
+  The special annotation ``%@`` of ``PAIR`` has no effect.
+  RPCs ``typecheck_code``, ``trace_code``, as well as typechecking errors
+  reporting stack types, won't report stack annotations any more.
+  In their output encodings, the objects containing the fields ``item`` and
+  ``annot`` are replaced with the contents of the field ``item``.
+  (MR :gl:`!4139`)
