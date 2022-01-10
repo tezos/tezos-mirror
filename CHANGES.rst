@@ -93,6 +93,8 @@ Node
   fields can be used to override the values normally returned by the
   ``NOW`` and ``LEVEL`` instructions.
 
+-  Reduced the memory consumption of the snapshot import.
+
 Client
 ------
 
