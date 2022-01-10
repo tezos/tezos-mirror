@@ -73,13 +73,15 @@ module Slot : sig
 
   val zero : t
 
-  val succ : t -> t
+  val succ : t -> t tzresult
 
   val of_int_do_not_use_except_for_parameters : int -> t
 
   val encoding : t Data_encoding.encoding
 
-  val slot_range : min:int -> count:int -> t list tzresult
+  type slot_range = private t list
+
+  val slot_range : min:int -> count:int -> slot_range tzresult
 
   module Map : Map.S with type key = t
 

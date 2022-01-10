@@ -98,9 +98,9 @@ let to_int i32 =
 let to_int32 t = t [@@inline]
 
 let to_slot round ~committee_size =
-  to_int round >|? fun r ->
+  to_int round >>? fun r ->
   let slot = r mod committee_size in
-  Slot_repr.of_int_exn slot
+  Slot_repr.of_int slot
 
 let encoding =
   Data_encoding.conv_with_guard

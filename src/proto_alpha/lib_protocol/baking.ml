@@ -85,7 +85,7 @@ let endorsing_rights (ctxt : t) level =
       Stake_distribution.slot_owner ctxt level slot >>=? fun (ctxt, (_, pkh)) ->
       return (ctxt, (slot, pkh) :: acc))
     (ctxt, [])
-    slots
+    (slots :> Slot.t list)
   >>=? fun (ctxt, right_owners) ->
   let rights =
     List.fold_left
@@ -126,5 +126,5 @@ let endorsing_rights_by_first_slot ctxt level =
       in
       (ctxt, (delegates_map, slots_map)))
     (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
-    slots
+    (slots :> Slot.t list)
   >>=? fun (ctxt, (_, slots_map)) -> return (ctxt, slots_map)

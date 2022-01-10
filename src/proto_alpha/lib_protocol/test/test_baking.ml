@@ -345,10 +345,16 @@ let test_committee_sampling () =
             (acc.Account.pkh, acc.Account.pk, tez))
         accounts
     in
+    let consensus_committee_size = max_round in
+    assert (
+      (* Enforce that we are not mistakenly testing a value for committee_size
+         that violates invariants of module Slot_repr. *)
+      Result.is_ok
+        (Slot_repr.of_int consensus_committee_size)) ;
     let constants =
       {
         Default_parameters.constants_test with
-        consensus_committee_size = max_round;
+        consensus_committee_size;
         consensus_threshold = 0;
       }
     in
@@ -370,50 +376,51 @@ let test_committee_sampling () =
         Stdlib.Hashtbl.replace stats pkh (bounds, n + 1))
       bakers ;
     let one_failed = ref false in
+
     Format.eprintf
-      "Testing with baker distribution [%a], committee size %d.@\n"
+      "@[<hov>Testing with baker distribution [%a],@ committee size %d.@]@."
       (Format.pp_print_list
-         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",")
+         ~pp_sep:(fun ppf () -> Format.fprintf ppf ",@ ")
          (fun ppf (tez, _) -> Format.fprintf ppf "%Ld" tez))
       distribution
       max_round ;
-    Stdlib.Hashtbl.iter
-      (fun pkh ((min_p, max_p), n) ->
-        let failed = not (n >= min_p && n <= max_p) in
-        Format.eprintf
-          "  - %s%a %d%s@."
-          (if failed then "\027[1m" else "")
-          Signature.Public_key_hash.pp
-          pkh
-          n
-          (if failed then
-           Format.asprintf " [FAIL]\027[0m should be \\in [%d,%d]" min_p max_p
-          else "") ;
-        if failed then one_failed := true)
+
+    Format.eprintf
+      "@[<v 2>@,%a@]@."
+      (fun ppf stats ->
+        Stdlib.Hashtbl.iter
+          (fun pkh ((min_p, max_p), n) ->
+            let failed = not (n >= min_p && n <= max_p) in
+            Format.fprintf
+              ppf
+              "@[<h>- %a %d%a@]@,"
+              Signature.Public_key_hash.pp
+              pkh
+              n
+              (fun ppf failed ->
+                if failed then
+                  Format.fprintf ppf " [FAIL] should be in [%d, %d]" min_p max_p
+                else Format.fprintf ppf "")
+              failed ;
+            one_failed := failed || !one_failed)
+          stats)
       stats ;
+
     if !one_failed then
       Stdlib.failwith
         "The proportion of bakers marked as [FAILED] in the log output appear \
          in the wrong proportion in the committee."
-    else Format.eprintf "Test succesful.@\n"
+    else Format.eprintf "Test succesful.@."
   in
   (* The tests below are not deterministic, but the probability that
      they fail is infinitesimal. *)
-  test_distribution
-    100_000
-    [
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-      (8_000_000_000L, (9_400, 10_600));
-    ]
-  >>=? fun () ->
+  let accounts =
+    let expected_lower_bound = 6_100 and expected_upper_bound = 6_900 in
+    let balance = 8_000_000_000L in
+    let account = (balance, (expected_lower_bound, expected_upper_bound)) in
+    Array.(make 10 account |> to_list)
+  in
+  test_distribution 65535 accounts >>=? fun () ->
   test_distribution
     10_000
     [

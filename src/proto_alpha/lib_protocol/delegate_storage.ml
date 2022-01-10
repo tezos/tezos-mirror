@@ -634,9 +634,8 @@ let slot_owner c level slot = Random.owner c level (Slot_repr.to_int slot)
 let baking_rights_owner c (level : Level_repr.t) ~round =
   Round_repr.to_int round >>?= fun round ->
   let consensus_committee_size = Constants_storage.consensus_committee_size c in
-  let pos = round mod consensus_committee_size in
-  slot_owner c level pos >>=? fun (ctxt, pk) ->
-  return (ctxt, Slot_repr.of_int_do_not_use_except_for_parameters pos, pk)
+  Slot_repr.of_int (round mod consensus_committee_size) >>?= fun slot ->
+  slot_owner c level slot >>=? fun (ctxt, pk) -> return (ctxt, slot, pk)
 
 let already_slashed_for_double_endorsing ctxt delegate (level : Level_repr.t) =
   Storage.Slashed_deposits.find (ctxt, level.cycle) (level.level, delegate)

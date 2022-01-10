@@ -48,29 +48,26 @@ let pp = Format.pp_print_int
 
 let zero = 0
 
-let succ = succ
-
 let to_int x = x
 
+(* We assume 2^16 slots is big enough.
+
+   We could increase that, but we would need to make sure there is no big
+   performance penalty first. *)
 let max_value = (1 lsl 16) - 1
 
 let of_int_do_not_use_except_for_parameters i = i
 
-let of_int_exn i =
-  if Compare.Int.(i < 0 || i > max_value) then
-    invalid_arg
-      (Format.sprintf
-         "valid slot values are in the interval [0, %d] (%d given)"
-         max_value
-         i)
-  else i
+let of_int i =
+  if Compare.Int.(i < 0 || i > max_value) then error (Invalid_slot i) else ok i
+
+let succ slot = of_int (slot + 1)
 
 module Map = Map.Make (Compare.Int)
 module Set = Set.Make (Compare.Int)
 
 module List = struct
   (* Expected invariant: list of increasing values *)
-  (* TODO find a way to properly enforce this invariant *)
   type nonrec t = t list
 
   module Compressed = struct
