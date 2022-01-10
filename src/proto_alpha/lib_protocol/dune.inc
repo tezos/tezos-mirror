@@ -39,8 +39,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
-   sc_rollup_inbox.mli sc_rollup_inbox.ml
-   sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -55,6 +53,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
+   sc_rollup_repr.mli sc_rollup_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
@@ -177,8 +177,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
-   sc_rollup_inbox.mli sc_rollup_inbox.ml
-   sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -193,6 +191,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
+   sc_rollup_repr.mli sc_rollup_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
@@ -315,8 +315,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
-   sc_rollup_inbox.mli sc_rollup_inbox.ml
-   sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -331,6 +329,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
+   sc_rollup_repr.mli sc_rollup_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
@@ -475,8 +475,6 @@ include Tezos_raw_protocol_alpha.Main
    Blinded_public_key_hash
    Block_payload_hash
    Origination_nonce
-   Sc_rollup_inbox
-   Sc_rollup_repr
    Slot_repr
    Tez_repr
    Period_repr
@@ -491,6 +489,8 @@ include Tezos_raw_protocol_alpha.Main
    Fitness_repr
    Cycle_repr
    Level_repr
+   Sc_rollup_inbox
+   Sc_rollup_repr
    Seed_repr
    Sampler
    Voting_period_repr
@@ -654,8 +654,6 @@ include Tezos_raw_protocol_alpha.Main
    blinded_public_key_hash.mli blinded_public_key_hash.ml
    block_payload_hash.mli block_payload_hash.ml
    origination_nonce.mli origination_nonce.ml
-   sc_rollup_inbox.mli sc_rollup_inbox.ml
-   sc_rollup_repr.mli sc_rollup_repr.ml
    slot_repr.mli slot_repr.ml
    tez_repr.mli tez_repr.ml
    period_repr.mli period_repr.ml
@@ -670,6 +668,8 @@ include Tezos_raw_protocol_alpha.Main
    fitness_repr.mli fitness_repr.ml
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
+   sc_rollup_inbox.mli sc_rollup_inbox.ml
+   sc_rollup_repr.mli sc_rollup_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
