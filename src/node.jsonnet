@@ -274,6 +274,7 @@ local prometheus = grafana.prometheus;
   gcOperations:
     local minor = 'Minor collections';
     local major = 'Major collections';
+    local forced = 'Forced major collections';
     local compact = 'Heap compactions';
     graphPanel.new(
       title='GC maintenance operations',
@@ -283,21 +284,27 @@ local prometheus = grafana.prometheus;
       aliasColors={
         [minor]: 'light-green',
         [major]: 'light-yellow',
-        [compact]: 'light-blue',
+        [forced]: 'light-blue',
+        [compact]: 'light-red',
       },
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_minor_collections',
+        'tezos_metrics_stats_gc_minor_collections',
         legendFormat=minor,
       )
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_major_collections',
+        'tezos_metrics_stats_gc_major_collections',
         legendFormat=major,
       )
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_major_compactions',
+        'tezos_metrics_stats_gc_forced_major_collections',
+        legendFormat=forced,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_stats_gc_compactions',
         legendFormat=compact,
       )
     ),
@@ -305,6 +312,7 @@ local prometheus = grafana.prometheus;
   gcMajorHeap:
     local major = 'Major heap';
     local top = 'Top major heap';
+    local live = 'Live words';
     graphPanel.new(
       title='GC minor and major word sizes',
       datasource='Prometheus',
@@ -312,17 +320,23 @@ local prometheus = grafana.prometheus;
       format='bytes',
       aliasColors={
         [major]: 'light-green',
-        [top]: 'light-blue',
+        [top]: 'light-red',
+        [live]: 'light-blue',
       },
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_heap_words',
+        'tezos_metrics_stats_gc_heap_words',
         legendFormat=major,
       )
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_top_heap_words',
+        'tezos_metrics_stats_gc_top_heap_words',
         legendFormat=top,
+      )
+     ).addTarget(
+      prometheus.target(
+        'tezos_metrics_stats_gc_live_words',
+        legendFormat=live,
       )
     ),
 
