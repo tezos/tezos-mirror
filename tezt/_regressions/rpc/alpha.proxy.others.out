@@ -38,7 +38,8 @@ protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGen
   "tx_rollup_max_unfinalized_levels": 2100,
   "tx_rollup_max_messages_per_inbox": 1010,
   "tx_rollup_max_finalized_levels": 60100, "sc_rollup_enable": false,
-  "sc_rollup_origination_size": 6314 }
+  "sc_rollup_origination_size": 6314,
+  "sc_rollup_challenge_window_in_blocks": 20160 }
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/helpers/baking_rights
 protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im

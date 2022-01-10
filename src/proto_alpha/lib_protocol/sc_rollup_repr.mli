@@ -35,7 +35,7 @@
    essential semantics for the rollup operations to be validated by
    the layer 1 in case of dispute about a commitment ;
 
-   - a database which maintains the finalized operations of the rollup
+   - a database which maintains the cemented operations of the rollup
    as well as the potentially-disputed operations.
 
 *)
@@ -111,14 +111,22 @@ module Commitment : sig
   }
 
   val encoding : t Data_encoding.t
+
+  val hash : t -> Commitment_hash.t
 end
 
 (** A smart contract rollup is identified by its address. *)
 type t = Address.t
 
+(** A [Staker] is an implicit account, identified by its public key hash. *)
+module Staker :
+  S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
 val encoding : t Data_encoding.t
 
 val rpc_arg : t RPC_arg.t
+
+val pp : Format.formatter -> t -> unit
 
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t

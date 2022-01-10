@@ -68,6 +68,7 @@ let () =
       Unit_test.spec "receipt encodings" Test_receipt.tests;
       Unit_test.spec "saturation arithmetic" Test_saturation.tests;
       Unit_test.spec "gas monad" Test_gas_monad.tests;
+      Unit_test.spec "Sc_rollup_storage.ml" Test_sc_rollup_storage.tests;
       Unit_test.spec "tx rollup l2" Test_tx_rollup_l2.tests;
       Unit_test.spec "tx rollup l2 apply" Test_tx_rollup_l2_apply.tests;
     ]

@@ -802,6 +802,7 @@ module Constants : sig
     tx_rollup_max_finalized_levels : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
+    sc_rollup_challenge_window_in_blocks : int;
   }
 
   module Generated : sig
@@ -1008,6 +1009,10 @@ module Global_constants_storage : sig
     val expr_to_address_in_context :
       t -> Script.expr -> (t * Script_expr_hash.t) tzresult
   end
+end
+
+module Internal_for_tests : sig
+  val to_raw : context -> Raw_context.t
 end
 
 module Cache : sig
@@ -1799,6 +1804,31 @@ module Sc_rollup : sig
     val encoding : t Data_encoding.t
   end
 
+  module Staker :
+    S.SIGNATURE_PUBLIC_KEY_HASH with type t = Signature.Public_key_hash.t
+
+  module Commitment_hash : S.HASH
+
+  module State_hash : S.HASH
+
+  module Number_of_messages : Bounded.Int32.S
+
+  module Number_of_ticks : Bounded.Int32.S
+
+  module Commitment : sig
+    type t = {
+      compressed_state : State_hash.t;
+      inbox_level : Raw_level_repr.t;
+      predecessor : Commitment_hash.t;
+      number_of_messages : Number_of_messages.t;
+      number_of_ticks : Number_of_ticks.t;
+    }
+
+    val encoding : t Data_encoding.t
+
+    val hash : t -> Commitment_hash.t
+  end
+
   val originate :
     context ->
     kind:Kind.t ->
@@ -1821,6 +1851,35 @@ module Sc_rollup : sig
     context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
 
   val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
+
+  val deposit_stake : context -> t -> Staker.t -> context tzresult Lwt.t
+
+  val withdraw_stake : context -> t -> Staker.t -> context tzresult Lwt.t
+
+  val refine_stake :
+    context ->
+    t ->
+    Raw_level.t ->
+    Staker.t ->
+    Commitment.t ->
+    (Commitment_hash.t * context) tzresult Lwt.t
+
+  val cement_commitment :
+    context -> t -> Raw_level.t -> Commitment_hash.t -> context tzresult Lwt.t
+
+  type conflict_point = Commitment_hash.t * Commitment_hash.t
+
+  val get_conflict_point :
+    context ->
+    t ->
+    Staker.t ->
+    Staker.t ->
+    (conflict_point * context) tzresult Lwt.t
+
+  val get_commitment :
+    context -> t -> Commitment_hash.t -> (Commitment.t * context) tzresult Lwt.t
+
+  val remove_staker : context -> t -> Staker.t -> context tzresult Lwt.t
 end
 
 module Block_payload : sig

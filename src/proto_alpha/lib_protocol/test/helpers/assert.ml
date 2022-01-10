@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -113,6 +114,13 @@ let equal_bool ~loc (a : bool) (b : bool) =
 
 let not_equal_bool ~loc (a : bool) (b : bool) =
   not_equal ~loc Bool.equal "Booleans are equal" Format.pp_print_bool a b
+
+(* string *)
+let equal_string ~loc (a : string) (b : string) =
+  equal ~loc String.equal "Strings aren't equal" Format.pp_print_string a b
+
+let not_equal_string ~loc (a : string) (b : string) =
+  not_equal ~loc String.equal "Strings are equal" Format.pp_print_string a b
 
 (* tez *)
 let equal_tez ~loc (a : Alpha_context.Tez.t) (b : Alpha_context.Tez.t) =

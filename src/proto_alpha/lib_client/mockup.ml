@@ -84,6 +84,7 @@ module Protocol_constants_overrides = struct
     tx_rollup_max_finalized_levels : int option;
     sc_rollup_enable : bool option;
     sc_rollup_origination_size : int option;
+    sc_rollup_challenge_window_in_blocks : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
     chain_id : Chain_id.t option;
     timestamp : Time.Protocol.t option;
@@ -143,8 +144,9 @@ module Protocol_constants_overrides = struct
                       c.tx_rollup_withdraw_period,
                       c.tx_rollup_max_messages_per_inbox,
                       c.tx_rollup_max_finalized_levels ),
-                    (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) )
-          ) ))
+                    ( c.sc_rollup_enable,
+                      c.sc_rollup_origination_size,
+                      c.sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ))
       (fun ( ( preserved_cycles,
                blocks_per_cycle,
                blocks_per_commitment,
@@ -193,8 +195,9 @@ module Protocol_constants_overrides = struct
                          tx_rollup_withdraw_period,
                          tx_rollup_max_messages_per_inbox,
                          tx_rollup_max_finalized_levels ),
-                       (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) )
-           ) ->
+                       ( sc_rollup_enable,
+                         sc_rollup_origination_size,
+                         sc_rollup_challenge_window_in_blocks ) ) ) ) ) ) ) ->
         {
           preserved_cycles;
           blocks_per_cycle;
@@ -243,6 +246,7 @@ module Protocol_constants_overrides = struct
           tx_rollup_max_finalized_levels;
           sc_rollup_enable;
           sc_rollup_origination_size;
+          sc_rollup_challenge_window_in_blocks;
           chain_id;
           timestamp;
           initial_seed;
@@ -311,9 +315,10 @@ module Protocol_constants_overrides = struct
                            (opt "tx_rollup_withdraw_period" int31)
                            (opt "tx_rollup_max_messages_per_inbox" int31)
                            (opt "tx_rollup_max_finalized_levels" int31))
-                        (obj2
+                        (obj3
                            (opt "sc_rollup_enable" bool)
-                           (opt "sc_rollup_origination_size" int31))))))))
+                           (opt "sc_rollup_origination_size" int31)
+                           (opt "sc_rollup_challenge_window_in_blocks" int31))))))))
 
   let default_value (cctxt : Tezos_client_base.Client_context.full) :
       t tzresult Lwt.t =
@@ -393,6 +398,8 @@ module Protocol_constants_overrides = struct
           Some parametric.tx_rollup_max_finalized_levels;
         sc_rollup_enable = Some parametric.sc_rollup_enable;
         sc_rollup_origination_size = Some parametric.sc_rollup_origination_size;
+        sc_rollup_challenge_window_in_blocks =
+          Some parametric.sc_rollup_challenge_window_in_blocks;
         (* Bastard additional parameters. *)
         chain_id = to_chain_id_opt cpctxt#chain;
         timestamp = Some header.timestamp;
@@ -450,6 +457,7 @@ module Protocol_constants_overrides = struct
       tx_rollup_max_finalized_levels = None;
       sc_rollup_enable = None;
       sc_rollup_origination_size = None;
+      sc_rollup_challenge_window_in_blocks = None;
       chain_id = None;
       timestamp = None;
       initial_seed = None;
@@ -675,6 +683,12 @@ module Protocol_constants_overrides = struct
             override_value = o.sc_rollup_origination_size;
             pp = pp_print_int;
           };
+        O
+          {
+            name = "sc_rollup_challenge_window_in_blocks";
+            override_value = o.sc_rollup_challenge_window_in_blocks;
+            pp = pp_print_int;
+          };
         O {name = "chain_id"; override_value = o.chain_id; pp = Chain_id.pp};
         O
           {
@@ -886,6 +900,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.sc_rollup_origination_size
              o.sc_rollup_origination_size;
+         sc_rollup_challenge_window_in_blocks =
+           Option.value
+             ~default:c.sc_rollup_challenge_window_in_blocks
+             o.sc_rollup_challenge_window_in_blocks;
        }
         : Constants.parametric)
 end

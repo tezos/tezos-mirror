@@ -23,6 +23,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Smart Contract Optimistic Rollups
+   Invocation:   dune exec tezt/tests/main.exe -- --file sc_rollup.ml
+*)
+
 (*
 
    Helpers

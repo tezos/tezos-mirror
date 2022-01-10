@@ -1520,6 +1520,17 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_repr.PVM.boot_sector_encoding
       end)
 
+  module Initial_level =
+    Indexed_context.Make_map
+      (struct
+        let name = ["initial_level"]
+      end)
+      (struct
+        type t = Raw_level_repr.t
+
+        let encoding = Raw_level_repr.encoding
+      end)
+
   module Inbox =
     Indexed_context.Make_carbonated_map
       (struct
@@ -1531,10 +1542,10 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_inbox.encoding
       end)
 
-  module Last_final_commitment =
+  module Last_cemented_commitment =
     Indexed_context.Make_carbonated_map
       (struct
-        let name = ["last_final_commitment"]
+        let name = ["last_cemented_commitment"]
       end)
       (struct
         type t = Sc_rollup_repr.Commitment_hash.t
@@ -1555,10 +1566,10 @@ module Sc_rollup = struct
         let encoding = Sc_rollup_repr.Commitment_hash.encoding
       end)
 
-  module Stakers_size =
+  module Staker_count =
     Indexed_context.Make_carbonated_map
       (struct
-        let name = ["stakers_size"]
+        let name = ["staker_count"]
       end)
       (struct
         type t = int32
@@ -1590,5 +1601,18 @@ module Sc_rollup = struct
            type t = int32
 
            let encoding = Data_encoding.int32
+         end)
+
+  module Commitment_added =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_added"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = Raw_level_repr.t
+
+           let encoding = Raw_level_repr.encoding
          end)
 end
