@@ -314,8 +314,9 @@ let init ?args () =
            at all." );
         ( "--job-count",
           Arg.Int set_job_count,
-          "<COUNT> Set the number of target jobs for --suggest-jobs (default \
-           is 3)." );
+          "<COUNT> Run COUNT tests in parallel, in separate processes.\n\
+           With --suggest-jobs, set the number of target jobs for \
+           --suggest-jobs instead (default is 3)." );
         ("-j", Arg.Int set_job_count, "<COUNT> Same as --job-count.");
         ( "--suggest-jobs",
           Arg.Unit (fun () -> options.suggest_jobs <- true),

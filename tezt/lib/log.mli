@@ -143,13 +143,21 @@ type test_result = Successful | Failed of string | Aborted
 
 (** Log the result of a test.
 
-    [progress_state] is the current progress state for this test.
+    [test_index] is the index of the test, starting from 1.
+    [test_count] is the total number of tests.
+    [failure_count] is the total number of failures so far.
 
     [iteration] is the index of the iteration count to display in [--loop] mode.
 
     The [string] argument is the name of the test. *)
 val test_result :
-  progress_state:Progress.t -> iteration:int -> test_result -> string -> unit
+  test_index:int ->
+  test_count:int ->
+  failure_count:int ->
+  iteration:int ->
+  test_result ->
+  string ->
+  unit
 
 (** Log a command which will be run.
 

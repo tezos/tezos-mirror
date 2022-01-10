@@ -756,6 +756,238 @@ let register ~__FILE__ ~title ~tags body =
     in
     registered := String_map.add title test !registered
 
+module Scheduler : sig
+  type request = Run_test of {test_title : string}
+
+  type response = Test_result of Log.test_result
+
+  (* Run a scheduler that manages several workers.
+
+     This starts [worker_count] workers.
+     As soon as a worker is available, it calls [on_worker_available].
+     [on_worker_available] shall return [None] if there is nothing else to do,
+     in which case the worker is killed, or [Some (request, on_response)],
+     in which case the worker executes [request].
+     The result of this request, [response], is then given to [on_response]. *)
+  val run :
+    on_worker_available:(unit -> (request * (response -> unit)) option) ->
+    worker_count:int ->
+    unit
+end = struct
+  type request = Run_test of {test_title : string}
+
+  type response = Test_result of Log.test_result
+
+  type status = Idle | Working of (response -> unit) | Dead
+
+  type worker = {
+    pid : int;
+    mutable status : status;
+    pipe_to_worker : out_channel;
+    pipe_from_worker : in_channel;
+  }
+
+  let send_request channel request =
+    Marshal.to_channel channel (request : request) [] ;
+    flush channel
+
+  let read_request channel =
+    try Some (Marshal.from_channel channel : request) with End_of_file -> None
+
+  let send_response channel response =
+    Marshal.to_channel channel (response : response) [] ;
+    flush channel
+
+  let read_response channel =
+    try Some (Marshal.from_channel channel : response)
+    with End_of_file -> None
+
+  let internal_worker_error x =
+    Printf.ksprintf
+      (fun s ->
+        Log.error "internal error in worker: %s" s ;
+        exit 1)
+      x
+
+  let internal_scheduler_error x =
+    Printf.ksprintf
+      (fun s ->
+        Log.error "internal error in scheduler: %s" s ;
+        exit 1)
+      x
+
+  let perform_request (Run_test {test_title}) =
+    match String_map.find_opt test_title !registered with
+    | None ->
+        internal_worker_error
+          "scheduler requested to run test %S, but worker doesn't know about \
+           this test"
+          test_title
+    | Some test ->
+        let test_result = really_run test in
+        Test_result test_result
+
+  let rec worker_listen_loop pipe_from_scheduler pipe_to_scheduler =
+    let request = read_request pipe_from_scheduler in
+    match request with
+    | None ->
+        (* End of file: no more request will come. *)
+        exit 0
+    | Some request ->
+        let response = perform_request request in
+        send_response pipe_to_scheduler response ;
+        worker_listen_loop pipe_from_scheduler pipe_to_scheduler
+
+  let worker_listen pipe_from_scheduler pipe_to_scheduler =
+    try worker_listen_loop pipe_from_scheduler pipe_to_scheduler
+    with exn ->
+      (* Note: if a test fails, its exception is caught and handled by [really_run].
+         So here we have an error of Tezt itself. *)
+      internal_worker_error "%s" (Printexc.to_string exn)
+
+  let spawn_worker () =
+    let (pipe_to_worker_exit, pipe_to_worker_entrance) = Unix.pipe () in
+    let (pipe_from_worker_exit, pipe_from_worker_entrance) = Unix.pipe () in
+    let pid = Lwt_unix.fork () in
+    if pid = 0 then (
+      (* This is now a worker process. *)
+      Unix.close pipe_to_worker_entrance ;
+      Unix.close pipe_from_worker_exit ;
+      worker_listen
+        (Unix.in_channel_of_descr pipe_to_worker_exit)
+        (Unix.out_channel_of_descr pipe_from_worker_entrance))
+    else (
+      (* This is the scheduler process. *)
+      Unix.close pipe_to_worker_exit ;
+      Unix.close pipe_from_worker_entrance ;
+      {
+        pid;
+        status = Idle;
+        pipe_to_worker = Unix.out_channel_of_descr pipe_to_worker_entrance;
+        pipe_from_worker = Unix.in_channel_of_descr pipe_from_worker_exit;
+      })
+
+  let kill_worker worker =
+    match worker.status with
+    | Dead -> ()
+    | Idle | Working _ ->
+        worker.status <- Dead ;
+        close_out worker.pipe_to_worker ;
+        close_in worker.pipe_from_worker ;
+        Unix.kill worker.pid Sys.sigterm ;
+        let (_ : int * Unix.process_status) = Unix.waitpid [] worker.pid in
+        ()
+
+  let rec run_single_process ~on_worker_available =
+    match on_worker_available () with
+    | None -> ()
+    | Some (request, on_response) ->
+        let response = perform_request request in
+        on_response response ;
+        run_single_process ~on_worker_available
+
+  let run_multi_process ~on_worker_available ~worker_count =
+    (* Start workers. *)
+    let workers = List.init worker_count (fun _ -> spawn_worker ()) in
+    (* Handle Ctrl+C in the scheduler process.
+       Note: Ctrl+C is also received by workers automatically. *)
+    let received_sigint = ref false in
+    Sys.(set_signal sigint)
+      (Signal_handle
+         (fun _ ->
+           received_sigint := true ;
+           (* If the user presses Ctrl+C again, let the program die immediately. *)
+           Sys.(set_signal sigint) Signal_default)) ;
+    (* Give work to workers until there is no work to give. *)
+    let trigger_worker_available worker =
+      if !received_sigint then kill_worker worker
+      else
+        match on_worker_available () with
+        | None -> kill_worker worker
+        | Some (request, on_response) ->
+            worker.status <- Working on_response ;
+            send_request worker.pipe_to_worker request
+    in
+    let rec loop () =
+      (* Calling [trigger_worker_available] not only gives work to idle workers,
+         it also kills them if we don't need them any more.
+         It also ensures that [file_descriptors_to_read] will only be empty if there
+         are no working workers. *)
+      List.iter
+        (fun worker ->
+          match worker.status with
+          | Dead | Working _ -> ()
+          | Idle -> trigger_worker_available worker)
+        workers ;
+      let file_descriptors_to_read =
+        List.filter_map
+          (fun worker ->
+            match worker.status with
+            | Idle | Dead -> None
+            | Working _ ->
+                Some (Unix.descr_of_in_channel worker.pipe_from_worker))
+          workers
+      in
+      match file_descriptors_to_read with
+      | [] ->
+          (* We maintain the invariant that if there is work to do, at least one
+             worker is [Working] at this particular point.
+             This is enforced by the [List.iter] of [trigger_worker_available] above.
+             So if there is no working worker, we can stop the loop. *)
+          ()
+      | _ :: _ ->
+          let (ready, _, _) =
+            (* In case of SIGINT, this returns EINTR. *)
+            try Unix.select file_descriptors_to_read [] [] (-1.)
+            with Unix.Unix_error (EINTR, _, _) -> ([], [], [])
+          in
+          let read_response file_descriptor =
+            match
+              List.find_opt
+                (fun worker ->
+                  match worker.status with
+                  | Idle | Dead -> false
+                  | Working _ ->
+                      Unix.descr_of_in_channel worker.pipe_from_worker
+                      = file_descriptor)
+                workers
+            with
+            | None ->
+                internal_scheduler_error
+                  "received a response from an unknown worker"
+            | Some worker -> (
+                match worker.status with
+                | Idle | Dead ->
+                    (* Please do not consider this error message to be political. *)
+                    internal_scheduler_error
+                      "worker is idle or dead while it should be working"
+                | Working on_response -> (
+                    (* Note: [read_response] is blocking.
+                       We assume that if a worker starts writing something,
+                       it will finish writing almost immediately. *)
+                    let response = read_response worker.pipe_from_worker in
+                    match response with
+                    | None -> internal_scheduler_error "no response from worker"
+                    | Some response ->
+                        on_response response ;
+                        worker.status <- Idle))
+          in
+          List.iter read_response ready ;
+          loop ()
+    in
+    loop ()
+
+  let run ~on_worker_available ~worker_count =
+    if worker_count = 1 then run_single_process ~on_worker_available
+    else
+      try run_multi_process ~on_worker_available ~worker_count
+      with exn -> internal_scheduler_error "%s" (Printexc.to_string exn)
+end
+
+(* [iteration] is between 1 and the value of [--loop-count].
+   [index] is between 1 and [test_count]. *)
+type test_instance = {iteration : int; index : int}
+
 let run () =
   (* Check command-line options. *)
   check_existence "--file" known_files Cli.options.files_to_run ;
@@ -795,55 +1027,80 @@ let run () =
       prerr_endline
         "Cannot use both --list and --suggest-jobs at the same time."
   | (None, false) ->
-      let exception Stop in
-      let a_test_failed = ref false in
-      let rec run iteration =
-        match Cli.options.loop_mode with
-        | Count n when n < iteration -> ()
-        | _ ->
-            let progress_state =
-              Progress.create ~total:(String_map.cardinal !registered)
-            in
-            let run_and_measure_time (test : test) =
-              let start = Unix.gettimeofday () in
-              let test_result = really_run test in
-              let time = Unix.gettimeofday () -. start in
-              (* Display test result. *)
-              let has_failed =
-                match test_result with
-                | Successful -> false
-                | Failed _ | Aborted -> true
-              in
-              Progress.update ~has_failed progress_state ;
-              Log.test_result ~progress_state ~iteration test_result test.title ;
-              let success =
-                match test_result with
-                | Successful -> true
-                | Failed _ ->
-                    Log.report
-                      "Try again with: %s --verbose --test %s"
-                      Sys.argv.(0)
-                      (Log.quote_shell test.title) ;
-                    false
-                | Aborted -> exit 2
-              in
-              (* Store test result for reports. *)
-              if success then
-                test.session_successful_runs <-
-                  Summed_durations.(
-                    test.session_successful_runs + single_seconds time)
-              else (
-                test.session_failed_runs <-
-                  Summed_durations.(
-                    test.session_failed_runs + single_seconds time) ;
-                a_test_failed := true ;
-                if not Cli.options.keep_going then raise Stop)
-            in
-            iter_registered run_and_measure_time ;
-            run (iteration + 1)
+      let test_count = String_map.cardinal !registered in
+      let failure_count = ref 0 in
+      let test_queue = Queue.create () in
+      let refills = ref 0 in
+      let refill_queue () =
+        incr refills ;
+        let index = ref 0 in
+        iter_registered @@ fun test ->
+        incr index ;
+        let test_instance = {iteration = !refills; index = !index} in
+        Queue.add (test, test_instance) test_queue
       in
-      (try run 1 with Stop -> ()) ;
+      refill_queue () ;
+      (* [stop] is used to stop dequeuing tests.
+         When [stop] is [true] we no longer start new tests but we wait for
+         running ones to finish. *)
+      let stop = ref false in
+      (* [aborted] is used to exit with the right error code in case of Ctrl+C.
+         It implies [stop]. *)
+      let aborted = ref false in
+      let next_test () =
+        if !stop then None
+        else
+          match Queue.take_opt test_queue with
+          | None -> (
+              match Cli.options.loop_mode with
+              | Count n when !refills >= n -> None
+              | Count _ | Infinite ->
+                  refill_queue () ;
+                  Queue.take_opt test_queue)
+          | Some _ as x -> x
+      in
+      let a_test_failed = ref false in
+      let on_worker_available () =
+        match next_test () with
+        | None -> None
+        | Some (test, test_instance) ->
+            let start = Unix.gettimeofday () in
+            let on_response (Scheduler.Test_result test_result) =
+              let time = Unix.gettimeofday () -. start in
+              (match test_result with
+              | Failed _ -> incr failure_count
+              | Successful | Aborted -> ()) ;
+              Log.test_result
+                ~test_index:test_instance.index
+                ~test_count
+                ~failure_count:!failure_count
+                ~iteration:test_instance.iteration
+                test_result
+                test.title ;
+              match test_result with
+              | Successful ->
+                  test.session_successful_runs <-
+                    Summed_durations.(
+                      test.session_successful_runs + single_seconds time)
+              | Failed _ ->
+                  Log.report
+                    "Try again with: %s --verbose --test %s"
+                    Sys.argv.(0)
+                    (Log.quote_shell test.title) ;
+                  test.session_failed_runs <-
+                    Summed_durations.(
+                      test.session_failed_runs + single_seconds time) ;
+                  a_test_failed := true ;
+                  if not Cli.options.keep_going then stop := true
+              | Aborted ->
+                  stop := true ;
+                  aborted := true
+            in
+            Some (Scheduler.Run_test {test_title = test.title}, on_response)
+      in
+      Scheduler.run ~on_worker_available ~worker_count:Cli.options.job_count ;
+      (* Output reports. *)
       Option.iter output_junit Cli.options.junit ;
       Option.iter Record.(output_file (current ())) Cli.options.record ;
       if Cli.options.time then display_time_summary () ;
-      if !a_test_failed then exit 1
+      if !aborted then exit 2 else if !a_test_failed then exit 1
