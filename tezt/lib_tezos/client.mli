@@ -662,6 +662,8 @@ val run_script :
   ?hooks:Process.hooks ->
   ?balance:Tez.t ->
   ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
   prg:string ->
   storage:string ->
   input:string ->
@@ -673,6 +675,8 @@ val spawn_run_script :
   ?hooks:Process.hooks ->
   ?balance:Tez.t ->
   ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
   prg:string ->
   storage:string ->
   input:string ->
