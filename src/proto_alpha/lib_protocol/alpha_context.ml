@@ -52,7 +52,9 @@ end
 module Slot = struct
   include Slot_repr
 
-  let slot_range = List.slot_range
+  type slot_range = List.t
+
+  let slot_range ~min ~count = List.slot_range ~min ~count
 end
 
 module Sc_rollup = struct

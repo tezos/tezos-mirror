@@ -2001,7 +2001,16 @@ let get_endorsement_has_bytes ~protocol client =
     | [content] -> content
     | _ -> Test.fail "Contents should countain only one element"
   in
-  let slot = JSON.get "slot" contents |> JSON.as_int in
+  let slot =
+    let slot_elt = JSON.get "slot" contents |> JSON.as_int in
+    match Data_encoding.Json.from_string (sf {|%d|} slot_elt) with
+    | Ok e ->
+        Data_encoding.Json.destruct
+          Tezos_protocol_alpha.Protocol.Slot_repr.encoding
+          e
+    | Error _ -> Test.fail "foo"
+  in
+
   let get_signature op =
     let signature = JSON.get "signature" op |> JSON.as_string in
     match Data_encoding.Json.from_string (sf {|"%s"|} signature) with
@@ -2093,7 +2102,9 @@ let get_endorsement_has_bytes ~protocol client =
                                      signature = Some signature;
                                    };
                                };
-                             slot;
+                             slot =
+                               Tezos_protocol_alpha.Protocol.Slot_repr.to_int
+                                 slot;
                            });
                     signature = None;
                   };

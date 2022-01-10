@@ -231,7 +231,9 @@ val baking_rights_owner :
   Raw_context.t ->
   Level_repr.t ->
   round:Round_repr.round ->
-  (Raw_context.t * int * (Signature.public_key * Signature.public_key_hash))
+  (Raw_context.t
+  * Slot_repr.t
+  * (Signature.public_key * Signature.public_key_hash))
   tzresult
   Lwt.t
 

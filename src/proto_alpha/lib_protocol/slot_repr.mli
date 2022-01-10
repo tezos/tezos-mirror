@@ -23,29 +23,56 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/2057
-   remake abstract (required index for storage) *)
-type t = int
+(** Slot index representation *)
+
+(** {1 Abstract type} *)
+
+(** A slot index is in essence a bounded whole number. That is, it is not
+   allowed to overflow [max_value], nor does it wrap when calling [succ
+   max_value]. In this case it returns an [Invalid_slot] error.*)
+type t
 
 val encoding : t Data_encoding.t
 
-val pp : Format.formatter -> t -> unit
+(** {1 Constructors }*)
 
 val zero : t
 
-val succ : t -> t
-
+(** Upper bound on the value a slot index can take *)
 val max_value : t
 
+(** [of_int i] creates a slot index from integer [i]. 
+
+    @return [Error (Invalid_slot i)] if [i < 0 || i > max_value], and 
+            [Ok slot] otherwise
+ *)
+val of_int : int -> t tzresult
+
+(** [of_int_do_not_use_except_for_parameters i] is an unchecked construction
+   function. 
+
+   It may be used in cases where one knows [0 <= i <= max_value], e.g., when
+   creating protocol parameters. 
+   
+   When in doubt, use [of_int] or [of_int_exn].
+ *)
 val of_int_do_not_use_except_for_parameters : int -> t
 
-(** [of_int i] creates a slot index from integer [i]
+(** {1 Operator and pretty-printer} *)
 
-    @raise Invalid_argument if [i < 0 || i > max_value]
-*)
-val of_int_exn : int -> t
+(** [succ n] either returns an [Invalid_slot] error if [n] is [max_value] or [ok
+    value] otherwise. *)
+val succ : t -> t tzresult
 
+(** {1 Conversion/Printing} *)
+
+(** [to_int slot] returns the integral representation of a slot index. This
+    value is always a whole number. *)
 val to_int : t -> int
+
+val pp : Format.formatter -> t -> unit
+
+(** {1 Submodules} *)
 
 module Map : Map.S with type key = t
 
@@ -54,10 +81,11 @@ module Set : Set.S with type elt = t
 include Compare.S with type t := t
 
 module List : sig
-  (* Expected invariant: list of increasing values *)
-  type nonrec t = t list
+  (** A list of slot is an ordered list of increasing slot values *)
+  type nonrec t = private t list
 
   val encoding : t Data_encoding.t
 
+  (** {3 Constructors} *)
   val slot_range : min:int -> count:int -> t tzresult
 end
