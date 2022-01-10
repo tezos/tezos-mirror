@@ -55,16 +55,29 @@ local prometheus = grafana.prometheus;
       )
     ),
 
-  checkpointLevel:
+  savepointLevel:
     singlestat.new(
-      title='Current checkpoint level',
+      title='Current save pointlevel',
       datasource='Prometheus',
       format='none',
       valueName='max',
     ).addTarget(
       prometheus.target(
-        'tezos_metrics_chain_checkpoint_level',
-        legendFormat='current checkpoint level',
+        'tezos_metrics_chain_checkpoint_savepoint',
+        legendFormat='current savepoint',
+      )
+    ),
+
+  cabooseLevel:
+    singlestat.new(
+      title='Current caboose level',
+      datasource='Prometheus',
+      format='none',
+      valueName='max',
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_checkpoint_caboose',
+        legendFormat='current caboose',
       )
     ),
 
