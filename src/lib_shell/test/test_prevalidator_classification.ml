@@ -33,6 +33,8 @@
 open Lib_test.Qcheck2_helpers
 module Classification = Prevalidator_classification
 
+let is_in_mempool oph t = Classification.is_in_mempool oph t <> None
+
 module Operation_map = struct
   let pp_with_trace ppf map =
     Format.fprintf
@@ -320,9 +322,9 @@ let test_is_in_mempool_remove =
     Generators.(Gen.pair (t_with_operation_gen ()) unrefused_classification_gen)
   @@ fun ((t, (oph, op)), unrefused_classification) ->
   Classification.add unrefused_classification oph op t ;
-  qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
+  qcheck_eq_true ~actual:(is_in_mempool oph t) ;
   drop oph t ;
-  qcheck_eq_false ~actual:(Classification.is_in_mempool oph t) ;
+  qcheck_eq_false ~actual:(is_in_mempool oph t) ;
   true
 
 let test_is_applied =
@@ -332,12 +334,12 @@ let test_is_applied =
     Generators.(Gen.pair (t_gen ()) (operation_with_hash_gen ()))
   @@ fun (t, (oph, op)) ->
   Classification.add `Applied oph op t ;
-  qcheck_eq_true ~actual:(Classification.is_in_mempool oph t) ;
+  qcheck_eq_true ~actual:(is_in_mempool oph t) ;
   match Classification.remove oph t with
   | None -> false
   | Some (_op, classification) ->
       qcheck_eq_true ~actual:(classification = `Applied) ;
-      qcheck_eq_false ~actual:(Classification.is_in_mempool oph t) ;
+      qcheck_eq_false ~actual:(is_in_mempool oph t) ;
       true
 
 let test_invariants =
@@ -721,7 +723,7 @@ module To_map = struct
     let flushed = to_map_all t in
     qcheck_eq' ~pp:map_pp ~eq:map_eq ~expected:initial ~actual:flushed ()
 
-  (** Tests the relationship between [Classification.is_in_mempool]
+  (** Tests the relationship between [is_in_mempool]
       and [Classification.to_map] *)
   let test_is_in_mempool =
     let open QCheck2 in
@@ -729,7 +731,7 @@ module To_map = struct
       ~name:"[is_in_mempool] can be emulated by [to_map]"
       (Generators.t_with_operation_gen ())
     @@ fun (t, (oph, _)) ->
-    let is_in_mempool = Classification.is_in_mempool oph t in
+    let is_in_mempool = is_in_mempool oph t in
     let map =
       to_map_all t |> Operation_hash.Map.filter (fun oph' _ -> oph' = oph)
     in
