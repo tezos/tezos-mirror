@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1703,14 +1704,6 @@ module Sc_rollup = struct
          end))
          (Make_index (Sc_rollup_repr.Index))
 
-  (**
-
-     Each smart contract rollup is associated to:
-
-     - a PVM kind (provided at creation time, read-only) ;
-     - a boot sector (provided at creation time, read-only).
-     - a merkelized inbox, of which only the root hash is stored
-  *)
   module PVM_kind =
     Indexed_context.Make_map
       (struct
@@ -1743,4 +1736,65 @@ module Sc_rollup = struct
 
         let encoding = Sc_rollup_inbox.encoding
       end)
+
+  module Last_final_commitment =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["last_final_commitment"]
+      end)
+      (struct
+        type t = Sc_rollup_repr.Commitment_hash.t
+
+        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+      end)
+
+  module Stakers =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["stakers"]
+         end))
+         (Public_key_hash_index)
+      (struct
+        type t = Sc_rollup_repr.Commitment_hash.t
+
+        let encoding = Sc_rollup_repr.Commitment_hash.encoding
+      end)
+
+  module Stakers_size =
+    Indexed_context.Make_carbonated_map
+      (struct
+        let name = ["stakers_size"]
+      end)
+      (struct
+        type t = int32
+
+        let encoding = Data_encoding.int32
+      end)
+
+  module Commitments =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitments"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = Sc_rollup_repr.Commitment.t
+
+           let encoding = Sc_rollup_repr.Commitment.encoding
+         end)
+
+  module Commitment_stake_count =
+    Make_indexed_carbonated_data_storage
+      (Make_subcontext (Registered) (Indexed_context.Raw_context)
+         (struct
+           let name = ["commitment_stake_count"]
+         end))
+         (Make_index (Sc_rollup_repr.Commitment_hash_index))
+         (struct
+           type t = int32
+
+           let encoding = Data_encoding.int32
+         end)
 end
