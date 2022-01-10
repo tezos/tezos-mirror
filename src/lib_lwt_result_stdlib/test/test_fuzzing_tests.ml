@@ -1237,6 +1237,44 @@ end) : Test = struct
   let tests = [find; find_e; find_s; find_es]
 end
 
+module TestPartitions (M : sig
+  include BASE
+
+  include Traits.MAP_VANILLA with type 'a t := 'a t
+
+  include Traits.PARTITION_EXTRAS with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let partition_either =
+    Test.make
+      ~name:(Format.asprintf "%s.partition, %s.partition_either" M.name M.name)
+      (triple Test_fuzzing_helpers.Fn.pred one many)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (M.partition cond (M.of_list input))
+          (M.partition_either
+             (M.map
+                (fun x -> if cond x then Either.Left x else Either.Right x)
+                (M.of_list input))))
+
+  let partition_result =
+    Test.make
+      ~name:(Format.asprintf "%s.partition, %s.partition_result" M.name M.name)
+      (triple Test_fuzzing_helpers.Fn.pred one many)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (M.partition cond (M.of_list input))
+          (M.partition_result
+             (M.map
+                (fun x -> if cond x then Ok x else Error x)
+                (M.of_list input))))
+
+  let tests = [partition_either; partition_result]
+end
+
 module TestPartitionStdlibList (M : sig
   include BASE
 
@@ -1322,6 +1360,70 @@ end) : Test = struct
       partition_p;
       partition_ep;
     ]
+end
+
+module TestFilters (M : sig
+  include BASE
+
+  include Traits.MAP_VANILLA with type 'a t := 'a t
+
+  include Traits.FILTER_EXTRAS with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let filter_left =
+    Test.make
+      ~name:(Format.asprintf "%s.filter, %s.filter_left" M.name M.name)
+      (triple Test_fuzzing_helpers.Fn.pred one many)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (M.filter cond (M.of_list input))
+          (M.filter_left
+             (M.map
+                (fun x -> if cond x then Either.Left x else Either.Right x)
+                (M.of_list input))))
+
+  let filter_right =
+    Test.make
+      ~name:(Format.asprintf "%s.filter, %s.filter_right" M.name M.name)
+      (triple Test_fuzzing_helpers.Fn.pred one many)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (M.filter cond (M.of_list input))
+          (M.filter_right
+             (M.map
+                (fun x -> if cond x then Either.Right x else Either.Left x)
+                (M.of_list input))))
+
+  let filter_ok =
+    Test.make
+      ~name:(Format.asprintf "%s.filter, %s.filter_ok" M.name M.name)
+      (triple Test_fuzzing_helpers.Fn.pred one many)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (M.filter cond (M.of_list input))
+          (M.filter_ok
+             (M.map
+                (fun x -> if cond x then Ok x else Error x)
+                (M.of_list input))))
+
+  let filter_error =
+    Test.make
+      ~name:(Format.asprintf "%s.filter, %s.filter_error" M.name M.name)
+      (triple Test_fuzzing_helpers.Fn.pred one many)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (M.filter cond (M.of_list input))
+          (M.filter_error
+             (M.map
+                (fun x -> if cond x then Error x else Ok x)
+                (M.of_list input))))
+
+  let tests = [filter_left; filter_right; filter_ok; filter_error]
 end
 
 module TestDoubleTraversorsStdlibList (M : sig

@@ -55,6 +55,8 @@ let () =
       (* Test internal consistency *)
       ("TestIterFold", (module TestIterFold : F));
       ("TestRevMapRevMap", (module TestRevMapRevMap : F));
+      ("Filters", (module TestFilters : F));
+      ("Partitions", (module TestPartitions : F));
       (* Test consistency with Stdlib *)
       ("ExistForall", (module TestExistForallAgainstStdlibList : F));
       ("Filter", (module TestFilterAgainstStdlibList : F));

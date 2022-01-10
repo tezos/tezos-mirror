@@ -307,6 +307,18 @@ module type FILTER_VANILLA = sig
   val filter : ('a -> bool) -> 'a t -> 'a t
 end
 
+module type FILTER_EXTRAS = sig
+  include FILTER_VANILLA
+
+  val filter_left : ('a, 'b) Either.t t -> 'a t
+
+  val filter_right : ('b, 'a) Either.t t -> 'a t
+
+  val filter_ok : ('a, 'b) result t -> 'a t
+
+  val filter_error : ('b, 'a) result t -> 'a t
+end
+
 module type FILTER_SEQUENTIAL = sig
   include FILTER_VANILLA
 
@@ -413,6 +425,14 @@ module type PARTITION_VANILLA = sig
   type 'a t
 
   val partition : ('a -> bool) -> 'a t -> 'a t * 'a t
+end
+
+module type PARTITION_EXTRAS = sig
+  include PARTITION_VANILLA
+
+  val partition_either : ('a, 'b) Either.t t -> 'a t * 'b t
+
+  val partition_result : ('a, 'b) result t -> 'a t * 'b t
 end
 
 module type PARTITION_SEQUENTIAL = sig
