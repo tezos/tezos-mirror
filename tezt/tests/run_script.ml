@@ -28,72 +28,66 @@
    Component:    Client
    Invocation:   dune exec tezt/tests/main.exe -- --file run_script.ml
    Subject:      Check that run script command to tezos-client behaves correctly
-*)
+ *)
 
-(* This script checks it's own address or balance against the expected value
-   given as parameter. The parameter tells what should be tested and what
-   the expected value is. If the actual state matches the expected one,
-   the contract succeeds, otherwise it fails with a pair consisting of the
-   expected and the actual values. *)
-let prg =
+(* This script checks result of some arbitrary instruction against the
+   expected value. Return type and name of the instruction should be
+   given by arguments [ty] and [instr] respectively.  The expected
+   value should be passed to the contract as parameter. If the actual
+   state matches the expected one, the contract succeeds, otherwise it
+   fails with a pair consisting of the expected and the actual
+   values. *)
+let prg_template : ('a -> 'b -> 'c -> 'd, unit, string) format =
   {|
-parameter (or (mutez %check_balance) (address %check_self_address)) ;
+parameter %s ; /* type */
 storage unit ;
 code {
        UNPAIR ;
-       IF_LEFT {
-                 DUP ;
-                 BALANCE ;
-                 IFCMPEQ { DROP }
-                         {
-                           PUSH string "expected" ;
-                           PAIR ;
-                           BALANCE ;
-                           PUSH string "actual" ;
-                           PAIR ;
-                           PAIR ;
-                           PUSH string "Unexpected BALANCE";
-                           PAIR ;
-                           FAILWITH ;
-                         } ;
-               }
+       DUP ;
+       %s ; /* instr */
+       IFCMPEQ { DROP }
                {
-                 DUP ;
-                 SELF_ADDRESS ;
-                 IFCMPEQ { DROP }
-                         {
-                           PUSH string "expected" ;
-                           PAIR ;
-                           SELF_ADDRESS;
-                           PUSH string "actual" ;
-                           PAIR ;
-                           PAIR ;
-                           PUSH string "Unexpected SELF_ADDRESS";
-                           PAIR ;
-                           FAILWITH ;
-                         } ;
-               };
+                 PUSH string "expected" ;
+                 PAIR ;
+                 %s; /* instr */
+                 PUSH string "actual" ;
+                 PAIR ;
+                 PAIR ;
+                 FAILWITH ;
+               } ;
        NIL operation ;
        PAIR ;
      }
 |}
 
-let register ~protocol () =
-  Test.register ~__FILE__ ~title:"Run script" ~tags:["client"; "michelson"]
-  @@ fun () ->
+let prg ty instr = Format.sprintf prg_template ty instr instr
+
+let check_balance = prg "mutez" "BALANCE"
+
+let check_self_address = prg "address" "SELF_ADDRESS"
+
+let check_sender = prg "address" "SENDER"
+
+let check_source = prg "address" "SOURCE"
+
+let test_balance_and_self_address ~protocol () =
   let* client = Client.init_mockup ~protocol () in
   (* With no parameters, the default BALANCE is 4 000 000 ꜩ. *)
   let* _storage =
-    Client.run_script ~prg ~storage:"Unit" ~input:"Left 4000000000000" client
+    Client.run_script
+      ~prg:check_balance
+      ~storage:"Unit"
+      ~input:"4000000000000"
+      client
   in
 
   (* When --balance is given, BALANCE should match the expected value. *)
   let* _storage =
     Client.run_script
       ~balance:(Tez.of_int 1)
-      ~prg
+      ~prg:check_balance
       ~storage:"Unit"
-      ~input:"Left 1000000"
+      ~input:"1000000"
       client
   in
 
@@ -103,7 +97,7 @@ let register ~protocol () =
       ~alias:"test_contract"
       ~amount:(Tez.of_int 100)
       ~src:"bootstrap1"
-      ~prg
+      ~prg:check_self_address
       client
   in
 
@@ -111,9 +105,9 @@ let register ~protocol () =
   let* _storage =
     Client.run_script
       ~self_address
-      ~prg
+      ~prg:check_self_address
       ~storage:"Unit"
-      ~input:(Format.sprintf "Right %S" self_address)
+      ~input:(Format.sprintf "%S" self_address)
       client
   in
   (* When --self-address is given, BALANCE should be equal to that of the
@@ -121,9 +115,9 @@ let register ~protocol () =
   let* _storage =
     Client.run_script
       ~self_address
-      ~prg
+      ~prg:check_balance
       ~storage:"Unit"
-      ~input:"Left 100000000"
+      ~input:"100000000"
       client
   in
 
@@ -133,26 +127,98 @@ let register ~protocol () =
     Client.run_script
       ~balance:(Tez.of_int 1)
       ~self_address
-      ~prg
+      ~prg:check_self_address
       ~storage:"Unit"
-      ~input:(Format.sprintf "Right %S" self_address)
+      ~input:(Format.sprintf "%S" self_address)
       client
   in
   let* _storage =
     Client.run_script
       ~balance:(Tez.of_int 1)
       ~self_address
-      ~prg
+      ~prg:check_balance
       ~storage:"Unit"
-      ~input:"Left 1000000"
+      ~input:"1000000"
       client
   in
   unit
 
+let test_source_and_sender ~protocol () =
+  let* client = Client.init_mockup ~protocol () in
+  let* bootstrap1 = Client.show_address ~alias:"bootstrap1" client in
+  let* bootstrap2 = Client.show_address ~alias:"bootstrap2" client in
+
+  (* When --payer is absent, --source sets *both* SENDER and SOURCE. *)
+  let* _storage =
+    Client.run_script
+      ~source:"bootstrap1"
+      ~prg:check_source
+      ~storage:"Unit"
+      ~input:(Format.sprintf "%S" bootstrap1.public_key_hash)
+      client
+  in
+  let* _storage =
+    Client.run_script
+      ~source:"bootstrap1"
+      ~prg:check_sender
+      ~storage:"Unit"
+      ~input:(Format.sprintf "%S" bootstrap1.public_key_hash)
+      client
+  in
+
+  (* When --source is absent, --payer sets *both* SENDER and SOURCE. *)
+  let* _storage =
+    Client.run_script
+      ~payer:"bootstrap1"
+      ~prg:check_source
+      ~storage:"Unit"
+      ~input:(Format.sprintf "%S" bootstrap1.public_key_hash)
+      client
+  in
+  let* _storage =
+    Client.run_script
+      ~payer:"bootstrap1"
+      ~prg:check_sender
+      ~storage:"Unit"
+      ~input:(Format.sprintf "%S" bootstrap1.public_key_hash)
+      client
+  in
+
+  (* When both --source and --payer are given, their values may differ. *)
+  let* _storage =
+    Client.run_script
+      ~payer:"bootstrap1"
+      ~source:"bootstrap2"
+      ~prg:check_source
+      ~storage:"Unit"
+      ~input:(Format.sprintf "%S" bootstrap1.public_key_hash)
+      client
+  in
+  let* _storage =
+    Client.run_script
+      ~payer:"bootstrap1"
+      ~source:"bootstrap2"
+      ~prg:check_sender
+      ~storage:"Unit"
+      ~input:(Format.sprintf "%S" bootstrap2.public_key_hash)
+      client
+  in
+  unit
+
+let make_for ~protocol () =
+  List.iter
+    (fun (title, f) ->
+      Test.register ~__FILE__ ~title ~tags:["client"; "michelson"] f)
+    [
+      ( "Run script with balance and self address",
+        test_balance_and_self_address ~protocol );
+      ("Run script with source and sender", test_source_and_sender ~protocol);
+    ]
+
 let register ~protocols =
   List.iter
     (function
-      | Protocol.Alpha as protocol -> register ~protocol ()
+      | Protocol.Alpha as protocol -> make_for ~protocol ()
       | Protocol.Hangzhou | Protocol.Ithaca -> ())
     (* Won't work prior to protocol J. *)
     protocols
