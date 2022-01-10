@@ -32,6 +32,14 @@ let add_if_not_present classification op t =
 (** A generator for the protocol bytes of an operation. *)
 let operation_proto_gen = QCheck2.Gen.small_string ?gen:None
 
+(** A generator for the protocol bytes of an operation, when the protocol
+    being used has [type operation_data = unit]. *)
+let operation_mock_proto_gen =
+  let open QCheck2.Gen in
+  (* 9/10 generates the right size (empty), 1/10 generates too long. *)
+  let* len_gen = frequencya [|(9, return 0); (1, 0 -- 31)|] in
+  string_size ?gen:None len_gen
+
 let block_hash_gen : Block_hash.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let string_gen = QCheck2.Gen.small_string ?gen:None in
