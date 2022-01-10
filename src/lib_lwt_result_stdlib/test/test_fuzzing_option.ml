@@ -144,7 +144,65 @@ module TestFilter = struct
            in
            List.hd xs))
 
-  let tests = [filter; filter_e; filter_s; filter_es]
+  let filter_left =
+    Test.make
+      ~name:(Format.asprintf "Option.{filter,filter_left}")
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (Option.filter cond input)
+          (Option.filter_left
+             (Option.map
+                (fun x -> if cond x then Either.Left x else Either.Right x)
+                input)))
+
+  let filter_right =
+    Test.make
+      ~name:(Format.asprintf "Option.{filter,Option.filter_right}")
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (Option.filter cond input)
+          (Option.filter_right
+             (Option.map
+                (fun x -> if cond x then Either.Right x else Either.Left x)
+                input)))
+
+  let filter_ok =
+    Test.make
+      ~name:(Format.asprintf "Option.{filter,filter_ok}")
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (Option.filter cond input)
+          (Option.filter_ok
+             (Option.map (fun x -> if cond x then Ok x else Error x) input)))
+
+  let filter_error =
+    Test.make
+      ~name:(Format.asprintf "Option.{filter,Option.filter_error}")
+      (triple Test_fuzzing_helpers.Fn.pred one maybe)
+      (fun (pred, const, input) ->
+        let cond = CondOf.fn pred const in
+        eq
+          (Option.filter cond input)
+          (Option.filter_error
+             (Option.map (fun x -> if cond x then Error x else Ok x) input)))
+
+  let tests =
+    [
+      filter;
+      filter_e;
+      filter_s;
+      filter_es;
+      filter_left;
+      filter_right;
+      filter_ok;
+      filter_error;
+    ]
 end
 
 (* First-3: testing equivalence of filter_map* *)

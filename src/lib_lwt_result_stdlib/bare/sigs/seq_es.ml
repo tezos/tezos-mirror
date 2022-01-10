@@ -77,11 +77,14 @@ module type S = sig
 
   val fold_left : ('a -> 'b -> 'a) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
 
-  (** See {!Seq_e.fold_left_e} for a warning about traversal and interruption
-      errors being indistinguishable. This applies to all [_e] and [_es]
-      functions of this module. *)
   val fold_left_e :
     ('a -> 'b -> ('a, 'e) result) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
+
+  val fold_left_e_discriminated :
+    ('a -> 'b -> ('a, 'f) result) ->
+    'a ->
+    ('b, 'e) t ->
+    ('a, ('e, 'f) Either.t) result Lwt.t
 
   val fold_left_s :
     ('a -> 'b -> 'a Lwt.t) -> 'a -> ('b, 'e) t -> ('a, 'e) result Lwt.t
@@ -92,15 +95,31 @@ module type S = sig
     ('b, 'e) t ->
     ('a, 'e) result Lwt.t
 
+  val fold_left_es_discriminated :
+    ('a -> 'b -> ('a, 'f) result Lwt.t) ->
+    'a ->
+    ('b, 'e) t ->
+    ('a, ('e, 'f) Either.t) result Lwt.t
+
   val iter : ('a -> unit) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
 
   val iter_e :
     ('a -> (unit, 'e) result) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
 
+  val iter_e_discriminated :
+    ('a -> (unit, 'f) result) ->
+    ('a, 'e) t ->
+    (unit, ('e, 'f) Either.t) result Lwt.t
+
   val iter_s : ('a -> unit Lwt.t) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
 
   val iter_es :
     ('a -> (unit, 'e) result Lwt.t) -> ('a, 'e) t -> (unit, 'e) result Lwt.t
+
+  val iter_es_discriminated :
+    ('a -> (unit, 'f) result Lwt.t) ->
+    ('a, 'e) t ->
+    (unit, ('e, 'f) Either.t) result Lwt.t
 
   val map : ('a -> 'b) -> ('a, 'e) t -> ('b, 'e) t
 

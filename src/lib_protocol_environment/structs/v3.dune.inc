@@ -1,6 +1,7 @@
 (rule
  (targets v3.ml)
  (deps
+   v3/lwtreslib_list_combine.ml
    v1/bls12_381.ml
    v1/error_monad_preallocated_values.ml
    v1/hex.ml

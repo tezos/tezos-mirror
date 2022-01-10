@@ -372,11 +372,11 @@ module Combine = struct
           @@ init ~when_negative_length:() 101 (fun i -> (i, 100 - i)),
           None )) ;
     assert (combine_with_leftovers [0] [1] = ([(0, 1)], None)) ;
-    assert (combine_with_leftovers [] [0] = ([], Some (`Right [0]))) ;
-    assert (combine_with_leftovers [0] [] = ([], Some (`Left [0]))) ;
+    assert (combine_with_leftovers [] [0] = ([], Some (Either.Right [0]))) ;
+    assert (combine_with_leftovers [0] [] = ([], Some (Either.Left [0]))) ;
     assert (
       combine_with_leftovers (up 100) (up 99)
-      = (map (fun i -> (i, i)) (up 99), Some (`Left [100]))) ;
+      = (map (fun i -> (i, i)) (up 99), Some (Either.Left [100]))) ;
     ()
 
   let tests =

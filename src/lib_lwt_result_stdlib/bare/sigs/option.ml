@@ -179,6 +179,12 @@ module type S = sig
   (** [filter_error o] is [Some x] iff [o] is [Some (Error x)]. *)
   val filter_error : ('a, 'e) result option -> 'e option
 
+  (** [filter_left o] is [Some x] iff [o] is [Some (Either.Left x)]. *)
+  val filter_left : ('a, 'b) Either.t option -> 'a option
+
+  (** [filter_right o] is [Some x] iff [o] is [Some (Either.Right x)]. *)
+  val filter_right : ('a, 'b) Either.t option -> 'b option
+
   val iter : ('a -> unit) -> 'a option -> unit
 
   val iter_s : ('a -> unit Lwt.t) -> 'a option -> unit Lwt.t
