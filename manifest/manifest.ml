@@ -173,10 +173,11 @@ module Dune = struct
   let opt o f = match o with None -> E | Some x -> f x
 
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
-      ?instrumentation ?(libraries = []) ?flags ?(inline_tests = false)
-      ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
-      ?(virtual_modules = Stdlib.List.[]) ?implements ?(wrapped = true) ?modules
-      ?modes ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
+      ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
+      ?(inline_tests = false) ?(preprocess = Stdlib.List.[])
+      ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
+      ?implements ?(wrapped = true) ?modules ?modes ?foreign_stubs
+      ?c_library_flags ?(private_modules = Stdlib.List.[])
       ?(deps = Stdlib.List.[]) ?js_of_ocaml (names : string list) =
     [
       V
@@ -198,7 +199,13 @@ module Dune = struct
           | _ :: _ -> S "public_names" :: of_atom_list public_names);
           opt package (fun x -> [S "package"; S x]);
           opt implements (fun x -> [S "implements"; S x]);
-          opt instrumentation (fun x -> [S "instrumentation"; x]);
+          (match instrumentation with
+          | [] -> E
+          | _ ->
+              G
+                (of_list
+                @@ List.map (fun x -> [S "instrumentation"; x]) instrumentation
+                ));
           ( opt modes @@ fun x ->
             S "modes"
             :: of_list (List.map (function mode -> S (string_of_mode mode)) x)
@@ -660,6 +667,7 @@ module Target = struct
 
   type internal = {
     bisect_ppx : bool;
+    time_measurement_ppx : bool;
     c_library_flags : string list option;
     conflicts : t list;
     dep_files : string list;
@@ -821,6 +829,7 @@ module Target = struct
     ?static:bool ->
     ?static_cclibs:string list ->
     ?synopsis:string ->
+    ?time_measurement_ppx:bool ->
     ?virtual_modules:string list ->
     ?wrapped:bool ->
     path:string ->
@@ -834,8 +843,8 @@ module Target = struct
       ?(node_wrapper_flags = []) ?(nopervasives = false) ?ocaml ?opam
       ?(opaque = false) ?(opens = []) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?static_cclibs ?synopsis ?(virtual_modules = [])
-      ?(wrapped = true) ~path names =
+      ?release ?static ?static_cclibs ?synopsis ?(time_measurement_ppx = false)
+      ?(virtual_modules = []) ?(wrapped = true) ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -989,6 +998,7 @@ module Target = struct
     register_internal
       {
         bisect_ppx;
+        time_measurement_ppx;
         c_library_flags;
         conflicts;
         dep_files;
@@ -1342,7 +1352,15 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     | _ -> None
   in
   let instrumentation =
-    if internal.bisect_ppx then Some (Dune.backend "bisect_ppx") else None
+    let bisect_ppx =
+      if internal.bisect_ppx then Some (Dune.backend "bisect_ppx") else None
+    in
+    let time_measurement_ppx =
+      if internal.time_measurement_ppx then
+        Some (Dune.backend "tezos-time-measurement")
+      else None
+    in
+    List.filter_map (fun x -> x) [bisect_ppx; time_measurement_ppx]
   in
   let ((kind : Dune.kind), internal_names, public_names) =
     let get_internal_name {Target.internal_name; _} = internal_name in
@@ -1378,7 +1396,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       internal_names
       ~public_names
       ?package
-      ?instrumentation
+      ~instrumentation
       ~libraries
       ?flags
       ~inline_tests:internal.inline_tests
