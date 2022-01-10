@@ -30,6 +30,9 @@ type alert_config = {
   max_by_test : int;
   gitlab_project_url : Uri.t option;
   timeout : float;
+  (* minimum delay between two alerts for the same category, in seconds *)
+  rate_limit_per_category : float;
+  last_alerts_filename : string;
 }
 
 type config = {
@@ -42,6 +45,9 @@ type config = {
 let default_test_data_path = "/s3data/"
 
 let default default = Option.value ~default
+
+(* the default is one day ( in seconds ) *)
+let default_rate_limit_per_category = 86400.0
 
 let as_alert_config json =
   let slack_webhook_urls = JSON.(json |-> "slack_webhook_urls") in
@@ -65,6 +71,14 @@ let as_alert_config json =
         json |-> "gitlab_project_url" |> as_string_opt
         |> Option.map Uri.of_string);
     timeout = JSON.(json |-> "timeout" |> as_float_opt |> default 20.);
+    rate_limit_per_category =
+      JSON.(
+        json |-> "rate_limit_per_category" |> as_float_opt
+        |> Option.value ~default:default_rate_limit_per_category);
+    last_alerts_filename =
+      JSON.(
+        json |-> "last_alerts_filename" |> as_string_opt
+        |> Option.value ~default:"last_alerts.json");
   }
 
 let read_config_file filename =
@@ -124,6 +138,82 @@ let () =
   if config.grafana = None then
     Log.warn
       "Grafana is not configured: Grafana dashboards will not be updated."
+
+module Alerts : sig
+  type category = string
+
+  val load : alert_config -> unit
+
+  val dump : alert_config -> unit
+
+  val may_send_rate_limit : alert_config -> category option -> bool
+
+  val add : category option -> float -> unit
+end = struct
+  type category = string
+
+  module Map = Map.Make (String)
+
+  (* a map with the last messages used for rate limit
+   * and dumped on disc on_exit *)
+  let last_messages = ref Map.empty
+
+  let default_alert_category = ""
+
+  let may_send_rate_limit alert_cfg category =
+    let now = Unix.gettimeofday () in
+    let c = Option.value ~default:default_alert_category category in
+    match Map.find_opt c !last_messages with
+    | None -> true
+    | Some t -> now >= t +. alert_cfg.rate_limit_per_category
+
+  let add category now =
+    let category = Option.value ~default:default_alert_category category in
+    last_messages := Map.add category now !last_messages
+
+  let encode (c, t) = `O [("category", `String c); ("time", `Float t)]
+
+  let decode json =
+    let category = JSON.(json |-> "category" |> as_string) in
+    let now = Unix.gettimeofday () in
+    let time =
+      JSON.(json |-> "time" |> as_float_opt |> Option.value ~default:now)
+    in
+    (category, time)
+
+  let to_json_array al =
+    JSON.annotate ~origin:"Alert List" (`A (List.map encode al))
+
+  (* we load the alerts and filter out all alerts older than one [rate_limit_per_category] *)
+  let load_alerts config json =
+    let now = Unix.gettimeofday () in
+    JSON.as_list json |> List.map decode
+    |> List.filter (fun (_, alert_time) ->
+           now -. alert_time < config.rate_limit_per_category)
+    |> List.fold_left (fun a (k, v) -> Map.add k v a) Map.empty
+
+  let read_file config =
+    if Sys.file_exists config.last_alerts_filename then
+      JSON.(parse_file config.last_alerts_filename |> load_alerts config)
+    else Map.empty
+
+  let write_file file json =
+    with_open_out file @@ fun oc -> output_string oc (JSON.encode json)
+
+  let load config = last_messages := read_file config
+
+  let dump config =
+    let now = Unix.gettimeofday () in
+    let al =
+      !last_messages
+      |> Map.filter (fun _ t -> now < t +. config.rate_limit_per_category)
+      |> Map.bindings
+    in
+    let ja = to_json_array al in
+    write_file config.last_alerts_filename ja
+end
+
+type category = Alerts.category
 
 type timeout = Seconds of int | Minutes of int | Hours of int | Days of int
 
@@ -233,11 +323,12 @@ module Slack = struct
     unit
 end
 
-let alert_s ~log message =
+let alert_s ?category ~log message =
   if log then Log.error "Alert: %s" message ;
   match config.alerts with
   | None -> ()
   | Some alert_cfg ->
+      let may_send_rate_limit = Alerts.may_send_rate_limit alert_cfg category in
       let may_send =
         !total_alert_count < alert_cfg.max_total
         &&
@@ -245,7 +336,11 @@ let alert_s ~log message =
         | None -> true
         | Some {alert_count; _} -> alert_count < alert_cfg.max_by_test
       in
-      if may_send then
+      if not may_send_rate_limit then
+        Log.debug "Alert not sent because of rate limit." ;
+      if may_send && may_send_rate_limit then
+        let () = Alerts.add category (Unix.gettimeofday ()) in
+        let () = Alerts.dump alert_cfg in
         let slack_webhook_url =
           match !current_test with
           | Some {team = Some team; _} -> (
@@ -307,13 +402,13 @@ let alert_s ~log message =
              slack_webhook_url
              message
 
-let alert x = Printf.ksprintf (alert_s ~log:true) x
+let alert ?category = Printf.ksprintf (alert_s ?category ~log:true)
 
 let alert_exn exn x =
   Printf.ksprintf
     (fun s ->
       Log.error "Alert: %s: %s" s (Printexc.to_string exn) ;
-      alert_s ~log:false s)
+      alert_s ~category:s ~log:false s)
     x
 
 let add_data_point data_point =
@@ -753,13 +848,17 @@ let wrap_body title filename team timeout body argument =
     {title; filename; team; data_points = String_map.empty; alert_count = 0}
   in
   current_test := Some test ;
+  Option.iter Alerts.load config.alerts ;
   Lwt.finalize
     (fun () ->
       Lwt.catch
         (fun () ->
           Lwt.finalize (with_timeout timeout (body argument)) send_data_points)
         (fun exn ->
-          alert_s ~log:false (Printexc.to_string exn) ;
+          alert_s
+            ~category:("exception-" ^ title)
+            ~log:false
+            (Printexc.to_string exn) ;
           raise exn))
     (fun () ->
       current_test := None ;
