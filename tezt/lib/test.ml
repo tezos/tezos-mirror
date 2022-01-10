@@ -139,7 +139,7 @@ type test = {
   mutable result : Log.test_result option;
 }
 
-let really_run ~progress_state ~iteration test =
+let really_run test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
   test.result <- None ;
@@ -263,7 +263,7 @@ let really_run ~progress_state ~iteration test =
   (* Resolve all pending promises so that they won't do anything
      (like raise [Canceled]) during the next test. *)
   let* () = Background.stop () in
-  (* Update progress indicators. *)
+  (* Return test result. *)
   let test_result =
     match test.result with
     | None ->
@@ -273,21 +273,7 @@ let really_run ~progress_state ~iteration test =
         Log.Failed "unknown error"
     | Some result -> result
   in
-  let has_failed =
-    match test_result with Successful -> false | Failed _ | Aborted -> true
-  in
-  Progress.update ~has_failed progress_state ;
-  (* Display test result. *)
-  Log.test_result ~progress_state ~iteration test_result test.title ;
-  match test_result with
-  | Successful -> return true
-  | Failed _ ->
-      Log.report
-        "Try again with: %s --verbose --test %s"
-        Sys.argv.(0)
-        (Log.quote_shell test.title) ;
-      return false
-  | Aborted -> exit 2
+  return test_result
 
 let test_should_be_run ~file ~title ~tags =
   List.for_all (fun tag -> List.mem tag tags) Cli.options.tags_to_run
@@ -820,8 +806,28 @@ let run () =
             in
             let run_and_measure_time (test : test) =
               let start = Unix.gettimeofday () in
-              let success = really_run ~progress_state ~iteration test in
+              let test_result = really_run test in
               let time = Unix.gettimeofday () -. start in
+              (* Display test result. *)
+              let has_failed =
+                match test_result with
+                | Successful -> false
+                | Failed _ | Aborted -> true
+              in
+              Progress.update ~has_failed progress_state ;
+              Log.test_result ~progress_state ~iteration test_result test.title ;
+              let success =
+                match test_result with
+                | Successful -> true
+                | Failed _ ->
+                    Log.report
+                      "Try again with: %s --verbose --test %s"
+                      Sys.argv.(0)
+                      (Log.quote_shell test.title) ;
+                    false
+                | Aborted -> exit 2
+              in
+              (* Store test result for reports. *)
               if success then
                 test.session_successful_runs <-
                   Summed_durations.(
