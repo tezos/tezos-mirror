@@ -12,6 +12,8 @@ depends: [
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "bls12-381" { >= "1.1.0" & < "1.2.0" }
+  "ringo" { = "0.7" }
+  "ringo-lwt" { = "0.7" }
   "tezos-base"
   "tezos-sapling"
   "tezos-protocol-environment-sigs"

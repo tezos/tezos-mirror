@@ -9,6 +9,8 @@
   zarith
   zarith_stubs_js
   bls12-381
+  ringo
+  ringo-lwt
   tezos-base
   tezos-sapling
   tezos-protocol-environment-sigs

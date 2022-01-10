@@ -538,45 +538,48 @@ module Context = struct
 
   (**
 
-     The following reference contains a cache for the cache to avoid
-     reloading the cache from the context when it has been used in the
-     last cache-related operations.
+     The following cache is for the cache to avoid reloading the cache from the
+     context when it has been used in the last cache-related operations.
 
      The cache is indexed by the block hash that has produced it.
 
-     Notice that there is no guarantee that, after the execution of
-     [load_cache b], [cache_cache] contains the cache of the block
-     [b]. Indeed, a concurrent evaluation of [load_cache] may assign
-     [cache_cache] before we reach the [return] instruction. This
-     cannot endanger safety since the assignment to [cache_cache] is
-     atomic and maintains the invariant that the pair [(block_hash,
-     cache)] is consistent.
+     Notice that there is no guarantee that, after a call to [load_cache b], the
+     [cache_cache] holds the cache of the block [b]. Indeed, a subsequent call
+     to [load_cache bb] will take precedence. This is true even if the promise
+     for [b] has not resolved yet. Either way, whatever the pattern of
+     concurrent calls, the cache is safe in that:
+
+     - The cache that is returned by [load_cache b] is always the cache for the
+       block [b].
+     - If an error occurs during the loading of a cache, then the cache-cache
+       simply becomes empty.
 
   *)
-  let cache_cache : (Block_hash.t * cache) option ref = ref None
+  module Cache_cache =
+  Ringo_lwt.Functors.Make_result_presized (Ringo.SingletonMap (struct
+    type t = Block_hash.t
+
+    let equal = Block_hash.equal
+
+    let hash = Block_hash.hash
+  end))
+
+  let cache_cache : (cache, error trace) Cache_cache.t = Cache_cache.create ()
 
   let load_cache block_hash (Context ctxt) mode builder =
-    match mode with
+    (match mode with
     | `Force_load ->
-        cache_cache := None ;
-        load_cache (Context ctxt) `Load builder >>=? fun cache ->
-        cache_cache := Some (block_hash, cache) ;
-        return (Context {ctxt with cache})
+        let p = load_cache (Context ctxt) `Load builder in
+        Cache_cache.replace cache_cache block_hash p ;
+        p
     | (`Load | `Lazy | `Inherited _) as mode ->
-        (match !cache_cache with
-        | Some (block_hash', cached_cache)
-          when Block_hash.equal block_hash block_hash' ->
-            return cached_cache
-        | _ ->
-            cache_cache := None ;
-            load_cache (Context ctxt) mode builder >>=? fun cache ->
-            cache_cache := Some (block_hash, cache) ;
-            return cache)
-        >>=? fun cache -> return (Context {ctxt with cache})
+        Cache_cache.find_or_replace cache_cache block_hash (fun _block_hash ->
+            load_cache (Context ctxt) mode builder))
+    >>=? fun cache -> return (Context {ctxt with cache})
 
   let reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing
       () =
-    cache_cache := None
+    Cache_cache.clear cache_cache
 
   (* misc *)
 
