@@ -109,7 +109,7 @@ let stack_ty_size s =
    fun accu s ->
     match s with
     | Bot_t -> ret_succ accu
-    | Item_t (ty, _) -> ret_succ_adding (accu ++ ty_size ty) h3w
+    | Item_t (ty, _) -> ret_succ_adding (accu ++ ty_size ty) h2w
   in
   stack_ty_traverse s zero {apply}
 
