@@ -20,14 +20,13 @@ Gas remaining: 1039985.509 units remaining
                       /* [ int :k : pair (int :k) (int :e %r) ] */ ;
                       DIP { CDR /* [ int :e ] */ }
                       /* [ int :k : int :e ] */ }
-                /* [ pair (int :k @key) (int :e @elt) : int :k : int :e ] */ ;
+                /* [ pair (int :k) (int :e) : int :k : int :e ] */ ;
                 DUP
-                /* [ pair (int :k @key) (int :e @elt) : pair (int :k @key) (int :e @elt)
-                   : int :k : int :e ] */ ;
+                /* [ pair (int :k) (int :e) : pair (int :k) (int :e) : int :k : int :e ] */ ;
                 DIP { CAR /* [ int :k : int :k : int :e ] */ ; ADD /* [ int :k : int :e ] */ }
-                /* [ pair (int :k @key) (int :e @elt) : int :k : int :e ] */ ;
+                /* [ pair (int :k) (int :e) : int :k : int :e ] */ ;
                 SWAP
-                /* [ int :k : pair (int :k @key) (int :e @elt) : int :e ] */ ;
+                /* [ int :k : pair (int :k) (int :e) : int :e ] */ ;
                 DIP { CDR /* [ int :e : int :e ] */ ; ADD /* [ int :e ] */ }
                 /* [ int :k : int :e ] */ ;
                 PAIR % %r

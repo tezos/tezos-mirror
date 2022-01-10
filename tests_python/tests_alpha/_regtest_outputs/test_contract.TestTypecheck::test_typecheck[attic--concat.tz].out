@@ -5,8 +5,7 @@ Gas remaining: 1039992.618 units remaining
 { parameter string ;
   storage string ;
   code { DUP
-         /* [ pair (string @parameter) (string @storage)
-            : pair (string @parameter) (string @storage) ] */ ;
+         /* [ pair string string : pair string string ] */ ;
          DIP { CDR
                /* [ string ] */ ;
                NIL string
@@ -15,7 +14,7 @@ Gas remaining: 1039992.618 units remaining
                /* [ string : list string ] */ ;
                CONS
                /* [ list string ] */ }
-         /* [ pair (string @parameter) (string @storage) : list string ] */ ;
+         /* [ pair string string : list string ] */ ;
          CAR
          /* [ string : list string ] */ ;
          CONS

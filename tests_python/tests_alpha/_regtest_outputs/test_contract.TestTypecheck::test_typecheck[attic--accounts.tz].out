@@ -7,28 +7,24 @@ Gas remaining: 1039925.145 units remaining
         (pair %Withdraw (key %from) (pair (mutez %withdraw_amount) (signature %sig)))) ;
   storage (map :stored_balance key_hash mutez) ;
   code { DUP
-         /* [ pair (or @parameter
-                    (key_hash %Initialize)
-                    (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                 (map :stored_balance @stored_balance key_hash mutez)
-            : pair (or @parameter
-                    (key_hash %Initialize)
-                    (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                 (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+         /* [ pair (or (key_hash %Initialize)
+                     (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                 (map :stored_balance key_hash mutez)
+            : pair (or (key_hash %Initialize)
+                     (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                 (map :stored_balance key_hash mutez) ] */ ;
          CAR
          /* [ or (key_hash %Initialize)
                (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig))
-            : pair (or @parameter
-                    (key_hash %Initialize)
-                    (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                 (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+            : pair (or (key_hash %Initialize)
+                     (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                 (map :stored_balance key_hash mutez) ] */ ;
          IF_LEFT
            { DUP
              /* [ key_hash : key_hash
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              DIIP { CDR %stored_balance
                     /* [ map :stored_balance key_hash mutez ] */ ;
                     DUP
@@ -73,97 +69,85 @@ Gas remaining: 1039925.145 units remaining
            { DUP
              /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              DUP
              /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
-             DUP
-             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              DUP
              /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
+             DUP
+             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              CAR %from
              /* [ key : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              DIIP { CDAR %withdraw_amount ;
                     PACK
                     /* [ bytes : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                        : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (or @parameter
-                               (key_hash %Initialize)
-                               (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                            (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                       : pair (or (key_hash %Initialize)
+                                (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                            (map :stored_balance key_hash mutez) ] */ ;
                     BLAKE2B @signed_amount
                     /* [ bytes : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                        : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (or @parameter
-                               (key_hash %Initialize)
-                               (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                            (map :stored_balance @stored_balance key_hash mutez) ] */ }
+                       : pair (or (key_hash %Initialize)
+                                (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                            (map :stored_balance key_hash mutez) ] */ }
              /* [ key : pair (key %from) (mutez %withdraw_amount) (signature %sig) : bytes
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              DIP { CDDR %sig }
              /* [ key : signature : bytes
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              CHECK_SIGNATURE
              /* [ bool : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                 : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or @parameter
-                        (key_hash %Initialize)
-                        (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                     (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                : pair (or (key_hash %Initialize)
+                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                     (map :stored_balance key_hash mutez) ] */ ;
              IF { /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
                      : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (or @parameter
-                             (key_hash %Initialize)
-                             (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                          (map :stored_balance @stored_balance key_hash mutez) ] */ }
+                     : pair (or (key_hash %Initialize)
+                              (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                          (map :stored_balance key_hash mutez) ] */ }
                 { PUSH string
                        "Bad signature"
                   /* [ string : pair (key %from) (mutez %withdraw_amount) (signature %sig)
                      : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (or @parameter
-                             (key_hash %Initialize)
-                             (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
-                          (map :stored_balance @stored_balance key_hash mutez) ] */ ;
+                     : pair (or (key_hash %Initialize)
+                              (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                          (map :stored_balance key_hash mutez) ] */ ;
                   FAILWITH
                   /* [] */ } ;
              DIIP { CDR %stored_balance

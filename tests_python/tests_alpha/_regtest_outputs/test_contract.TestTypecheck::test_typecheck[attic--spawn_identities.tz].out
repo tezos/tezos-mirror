@@ -4,11 +4,11 @@ Well typed
 Gas remaining: 1039971.200 units remaining
 { parameter nat ;
   storage (list address) ;
-  code { /* [ pair (string @parameter) (string @storage) ] */
+  code { /* [ pair string string ] */
          DUP
          /* [ list operation : string ] */ ;
          CAR
-         /* [ nat : pair (nat @parameter) (list @storage address) ] */ ;
+         /* [ nat : pair nat (list address) ] */ ;
          DIP { CDR /* [ list address ] */ ; NIL operation /* [ list operation : list address ] */ }
          /* [ pair (list operation) string ] */ ;
          PUSH bool True

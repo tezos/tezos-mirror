@@ -5,25 +5,21 @@ Gas remaining: 1039988.400 units remaining
 { parameter string ;
   storage (pair (set string) (option bool)) ;
   code { DUP
-         /* [ pair (string @parameter) (pair @storage (set string) (option bool))
-            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         /* [ pair string (set string) (option bool)
+            : pair string (set string) (option bool) ] */ ;
          DUP
-         /* [ pair (string @parameter) (pair @storage (set string) (option bool))
-            : pair (string @parameter) (pair @storage (set string) (option bool))
-            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         /* [ pair string (set string) (option bool)
+            : pair string (set string) (option bool)
+            : pair string (set string) (option bool) ] */ ;
          CAR
-         /* [ string
-            : pair (string @parameter) (pair @storage (set string) (option bool))
-            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         /* [ string : pair string (set string) (option bool)
+            : pair string (set string) (option bool) ] */ ;
          DIP { CDAR }
-         /* [ string : set string
-            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         /* [ string : set string : pair string (set string) (option bool) ] */ ;
          MEM
-         /* [ bool
-            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         /* [ bool : pair string (set string) (option bool) ] */ ;
          SOME
-         /* [ option bool
-            : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
+         /* [ option bool : pair string (set string) (option bool) ] */ ;
          DIP { CDAR }
          /* [ option bool : set string ] */ ;
          SWAP

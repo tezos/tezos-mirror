@@ -7,86 +7,64 @@ Gas remaining: 1039876.691 units remaining
     (pair string
           (pair timestamp (pair (pair mutez mutez) (pair address (pair address address))))) ;
   code { DUP
-         /* [ pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address)
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+         /* [ pair unit string timestamp (pair mutez mutez) address address address
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          CDAR ;
          PUSH string
               "open"
          /* [ string : string
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          COMPARE
          /* [ int
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          NEQ
          /* [ bool
-            : pair (unit @parameter)
-                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
          IF { FAIL }
             { DUP
-              /* [ pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address)
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+              /* [ pair unit string timestamp (pair mutez mutez) address address address
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               CDDAR ;
               NOW
               /* [ timestamp : timestamp
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               COMPARE
               /* [ int
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               LT
               /* [ bool
-                 : pair (unit @parameter)
-                      (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                 : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
               IF { PUSH mutez
                         0
                    /* [ mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    DIP { DUP
-                         /* [ pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address)
-                            : pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                         /* [ pair unit string timestamp (pair mutez mutez) address address address
+                            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                          CDDDAAR }
                    /* [ mutez : mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    ADD
                    /* [ mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    DIP { DUP
-                         /* [ pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address)
-                            : pair (unit @parameter)
-                                 (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                         /* [ pair unit string timestamp (pair mutez mutez) address address address
+                            : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                          CDDDADR }
                    /* [ mutez : mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    ADD
                    /* [ mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    BALANCE
                    /* [ mutez : mutez
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    COMPARE
                    /* [ int
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    LT
                    /* [ bool
-                      : pair (unit @parameter)
-                           (pair @storage string timestamp (pair mutez mutez) address address address) ] */ ;
+                      : pair unit string timestamp (pair mutez mutez) address address address ] */ ;
                    IF { CDR
                         /* [ pair string timestamp (pair mutez mutez) address address address ] */ ;
                         NIL operation

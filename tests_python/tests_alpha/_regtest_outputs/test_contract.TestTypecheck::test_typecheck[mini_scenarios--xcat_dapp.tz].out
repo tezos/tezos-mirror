@@ -16,29 +16,25 @@ Gas remaining: 1039911.852 units remaining
   code { NIL @operations
            operation
          /* [ list operation
-            : pair (or @parameter
-                    (pair %fund
-                       (address %dest)
-                       (pair %settings (bytes %target_hash) (timestamp %deadline)))
-                    (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
-                 (pair @storage
-                    (big_map
-                       bytes
-                       (pair (pair %recipients (address %from) (address %dest))
-                             (pair %settings (mutez %amount) (timestamp %deadline))))
-                    unit) ] */ ;
+            : pair (or (pair %fund
+                        (address %dest)
+                        (pair %settings (bytes %target_hash) (timestamp %deadline)))
+                     (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
+                 (big_map
+                    bytes
+                    (pair (pair %recipients (address %from) (address %dest))
+                          (pair %settings (mutez %amount) (timestamp %deadline))))
+                 unit ] */ ;
          SWAP
-         /* [ pair (or @parameter
-                    (pair %fund
-                       (address %dest)
-                       (pair %settings (bytes %target_hash) (timestamp %deadline)))
-                    (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
-                 (pair @storage
-                    (big_map
-                       bytes
-                       (pair (pair %recipients (address %from) (address %dest))
-                             (pair %settings (mutez %amount) (timestamp %deadline))))
-                    unit) : list operation ] */ ;
+         /* [ pair (or (pair %fund
+                        (address %dest)
+                        (pair %settings (bytes %target_hash) (timestamp %deadline)))
+                     (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
+                 (big_map
+                    bytes
+                    (pair (pair %recipients (address %from) (address %dest))
+                          (pair %settings (mutez %amount) (timestamp %deadline))))
+                 unit : list operation ] */ ;
          UNPAPAIR @% @% @% ;
          DIP { DUP
                /* [ big_map

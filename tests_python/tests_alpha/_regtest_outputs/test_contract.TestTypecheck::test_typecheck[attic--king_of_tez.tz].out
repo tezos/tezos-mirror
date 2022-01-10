@@ -5,12 +5,11 @@ Gas remaining: 1039971.047 units remaining
 { parameter key_hash ;
   storage (pair timestamp (pair mutez key_hash)) ;
   code { DUP
-         /* [ pair (key_hash @parameter) (pair @storage timestamp mutez key_hash)
-            : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+         /* [ pair key_hash timestamp mutez key_hash
+            : pair key_hash timestamp mutez key_hash ] */ ;
          CDAR ;
          NOW
-         /* [ timestamp : timestamp
-            : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+         /* [ timestamp : timestamp : pair key_hash timestamp mutez key_hash ] */ ;
          CMPGT ;
          IF { CAR
               /* [ key_hash ] */ ;
@@ -29,12 +28,11 @@ Gas remaining: 1039971.047 units remaining
               NIL operation
               /* [ list operation : pair timestamp mutez key_hash ] */ }
             { DUP
-              /* [ pair (key_hash @parameter) (pair @storage timestamp mutez key_hash)
-                 : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+              /* [ pair key_hash timestamp mutez key_hash
+                 : pair key_hash timestamp mutez key_hash ] */ ;
               CDDAR ;
               AMOUNT
-              /* [ mutez : mutez
-                 : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+              /* [ mutez : mutez : pair key_hash timestamp mutez key_hash ] */ ;
               CMPLT ;
               IF { FAIL }
                  { CAR

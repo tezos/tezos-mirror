@@ -5,14 +5,11 @@ Gas remaining: 1039928.103 units remaining
 { storage (pair bool (pair (map nat (pair bool bool)) (pair key key))) ;
   parameter (or nat (pair signature nat)) ;
   code { DUP
-         /* [ pair (or @parameter nat (pair signature nat))
-                 (pair @storage bool (map nat (pair bool bool)) key key)
-            : pair (or @parameter nat (pair signature nat))
-                 (pair @storage bool (map nat (pair bool bool)) key key) ] */ ;
+         /* [ pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key
+            : pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key ] */ ;
          CAR
          /* [ or nat (pair signature nat)
-            : pair (or @parameter nat (pair signature nat))
-                 (pair @storage bool (map nat (pair bool bool)) key key) ] */ ;
+            : pair (or nat (pair signature nat)) bool (map nat (pair bool bool)) key key ] */ ;
          DIP { CDDR }
          /* [ or nat (pair signature nat) : pair (map nat (pair bool bool)) key key ] */ ;
          IF_LEFT

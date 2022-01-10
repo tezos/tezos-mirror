@@ -5,14 +5,16 @@ Gas remaining: 1039979.486 units remaining
 { parameter (or string (pair string (lambda unit string))) ;
   storage (pair string (map string (lambda unit string))) ;
   code { DUP
-         /* [ pair (or @parameter string (pair string (lambda unit string)))
-                 (pair @storage string (map string (lambda unit string)))
-            : pair (or @parameter string (pair string (lambda unit string)))
-                 (pair @storage string (map string (lambda unit string))) ] */ ;
+         /* [ pair (or string (pair string (lambda unit string)))
+                 string
+                 (map string (lambda unit string))
+            : pair (or string (pair string (lambda unit string)))
+                 string
+                 (map string (lambda unit string)) ] */ ;
          DIP { CDDR }
-         /* [ pair (or @parameter string (pair string (lambda unit string)))
-                 (pair @storage string (map string (lambda unit string)))
-            : map string (lambda unit string) ] */ ;
+         /* [ pair (or string (pair string (lambda unit string)))
+                 string
+                 (map string (lambda unit string)) : map string (lambda unit string) ] */ ;
          CAR
          /* [ or string (pair string (lambda unit string))
             : map string (lambda unit string) ] */ ;

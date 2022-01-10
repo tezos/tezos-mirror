@@ -5,8 +5,7 @@ Gas remaining: 1039975.926 units remaining
 { parameter (pair (lambda int int) (list int)) ;
   storage (list int) ;
   code { DIP { NIL int /* [ list int ] */ }
-         /* [ pair (pair @parameter (lambda int int) (list int)) (list @storage int)
-            : list int ] */ ;
+         /* [ pair (pair (lambda int int) (list int)) (list int) : list int ] */ ;
          CAR
          /* [ pair (lambda int int) (list int) : list int ] */ ;
          DUP

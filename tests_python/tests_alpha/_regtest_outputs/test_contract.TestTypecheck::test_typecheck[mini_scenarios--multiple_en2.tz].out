@@ -5,42 +5,38 @@ Gas remaining: 1039921.322 units remaining
 { parameter unit ;
   storage (option address) ;
   code { SENDER
-         /* [ address : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ address : pair unit (option address) ] */ ;
          SELF
-         /* [ contract unit : address
-            : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ contract unit : address : pair unit (option address) ] */ ;
          ADDRESS
-         /* [ address : address : pair (unit @parameter) (option @storage address) ] */ ;
-         { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+         /* [ address : address : pair unit (option address) ] */ ;
+         { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
            COMPARE
-           /* [ mutez : mutez
-              : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ ;
+           /* [ mutez : mutez : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ ;
            EQ
-           /* [ bool : pair (unit @parameter) (option @storage address) ] */ ;
+           /* [ bool : pair unit (option address) ] */ ;
            IF { CDR
                 /* [ option address ] */ ;
-                { /* [ mutez : mutez
-                     : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+                { /* [ mutez : mutez : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
                   IF_NONE
-                    { { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+                    { { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
                         UNIT
                         /* [ unit ] */ ;
                         FAILWITH
                         /* [] */ } }
-                    { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ }
-                  /* [ bool
-                     : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ } ;
+                    { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ }
+                  /* [ bool : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ } ;
                 DIP { NIL operation
-                          /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage)
-                             : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+                          /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int
+                             : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
                       /* [ list operation ] */ }
                 /* [] */ ;
                 DUP
                 /* [ or (or (nat %add) (nat %sub)) (unit %default)
-                   : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ ;
+                   : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ ;
                 CONTRACT %add unit
                 /* [ or (or (nat %add) (nat %sub)) (unit %default) : int ] */ ;
-                { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+                { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
                   IF_NONE
                     { /* [ address : list operation ] */ }
                     { { UNIT /* [ int ] */ ; FAILWITH /* [] */ } } } ;

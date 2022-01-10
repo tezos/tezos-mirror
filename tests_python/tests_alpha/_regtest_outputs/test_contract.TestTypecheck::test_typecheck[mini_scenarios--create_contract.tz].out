@@ -4,7 +4,7 @@ Well typed
 Gas remaining: 1039968.907 units remaining
 { parameter (option address) ;
   storage unit ;
-  code { /* [ pair (string @parameter) (string @storage) ] */
+  code { /* [ pair string string ] */
          CAR
          /* [ list operation : string ] */ ;
          IF_NONE
