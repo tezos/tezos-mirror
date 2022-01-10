@@ -24,42 +24,59 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ground_values =
-  [
-    `O [];
-    `Bool true;
-    `Bool false;
-    `Float 0.0;
-    `Float 0.1;
-    `Float Float.epsilon;
-    `Float 1.0;
-    `A [];
-    `Null;
-    `String "";
-    `String "0";
-    `String "\"";
-    `String "'";
-    `String ";";
-    `String "0";
-    `String "00";
-  ]
+let string1 =
+  let open Crowbar in
+  with_printer pp_string
+  @@ map
+       [choose [range ~min:48 10; range ~min:65 26; range ~min:97 26]]
+       (fun c -> String.make 1 (Char.chr c))
 
-let values_1 =
-  (* [concat_map] is only available since OCaml.4.10, for tests we dont care
-     about perf so we use [concat]+[map] *)
-  List.concat
-  @@ List.map
-       (fun (a, b) ->
-         [
-           `O [("x", a)];
-           `O [("yy", a); ("x", `Null); ("z", `A []); ("t", b)];
-           `A [a];
-           `A [a; b];
-           `A [a; `Float 0.33; `Float 0.33; b; `Float 0.33];
-         ])
-       (List.map2 (fun x y -> (x, y)) ground_values (List.rev ground_values))
+let string0 =
+  let open Crowbar in
+  with_printer pp_string @@ choose [string1; const ""]
 
-let all_values = ground_values @ values_1
+let rec printer fmt =
+  let open Format in
+  function
+  | `Null -> pp_print_string fmt "null"
+  | `Bool true -> pp_print_string fmt "true"
+  | `Bool false -> pp_print_string fmt "false"
+  | `Float _ -> pp_print_string fmt "<float>"
+  | `String s -> fprintf fmt "%S" s
+  | `A js ->
+      pp_print_string fmt "[" ;
+      pp_print_list
+        ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+        printer
+        fmt
+        js ;
+      pp_print_string fmt "]"
+  | `O kvs ->
+      pp_print_string fmt "{" ;
+      pp_print_list
+        ~pp_sep:(fun fmt () -> pp_print_string fmt ", ")
+        (fun fmt (k, v) ->
+          fprintf fmt "%S" k ;
+          pp_print_string fmt ": " ;
+          printer fmt v)
+        fmt
+        kvs ;
+      pp_print_string fmt "}"
+
+let g : Data_encoding.Json.t Crowbar.gen =
+  let open Crowbar in
+  with_printer printer
+  @@ fix (fun g ->
+         choose
+           [
+             const @@ `Null;
+             const @@ `Bool true;
+             const @@ `Bool false;
+             map [string0] (fun s -> `String s);
+             map [float] (fun f -> `Float f);
+             map [list g] (fun xs -> `A xs);
+             map [list (map [string1; g] (fun k v -> (k, v)))] (fun xs -> `O xs);
+           ])
 
 (* Setting up the actual tests *)
 let test_json (j : Data_encoding.Json.t) =
@@ -74,7 +91,7 @@ let test_json (j : Data_encoding.Json.t) =
   in
   assert (j = jj)
 
-let test_jsons () = List.iter test_json all_values
+let () = Crowbar.add_test ~name:"json_json_roundtrip" [g] test_json
 
 (* The basic binary test would fail. This is because:
    - The binary encoding of JSON values uses the BSON representation
@@ -92,26 +109,30 @@ let test_binary (j : Data_encoding.Json.t) =
     try Data_encoding.Binary.of_string_exn Data_encoding.Json.encoding s
     with _ -> failwith "Cannot destruct"
   in
-  let rec equal a b =
+  let rec assert_equal a b =
     match (a, b) with
-    | (`Null, `Null) -> true
-    | (`Bool a, `Bool b) -> a = b
-    | (`Float a, `Float b) -> a = b
-    | (`String a, `String b) -> a = b
-    | (`O a, `O b) ->
-        List.for_all2 (fun (n, a) (m, b) -> n = m && equal a b) a b
-    | (`A a, `A b) -> List.for_all2 equal a b
-    | (`O a, `A b) | (`A b, `O a) ->
+    | `Null, `Null -> ()
+    | `Bool a, `Bool b -> assert (a = b)
+    | `Float a, `Float b -> assert (a = b)
+    | `String a, `String b -> assert (a = b)
+    | `A a, `A b -> List.iter2 (fun a b -> assert_equal a b) a b
+    | `O a, `O b ->
+        List.iter2
+          (fun (n, a) (m, b) ->
+            assert (n = m) ;
+            assert_equal a b)
+          a
+          b
+    | `A b, `O a | `O a, `A b ->
         let b = List.mapi (fun i x -> (string_of_int i, x)) b in
-        List.for_all2 (fun (n, a) (m, b) -> n = m && equal a b) a b
-    | _ -> false
+        List.iter2
+          (fun (n, a) (m, b) ->
+            assert (n = m) ;
+            assert_equal a b)
+          a
+          b
+    | _ -> assert false
   in
-  assert (equal j jj)
+  assert_equal j jj
 
-let test_binaries () = List.iter test_binary all_values
-
-let tests =
-  [
-    ("json_roundtrip_in_json", `Quick, test_jsons);
-    ("json_roundtrip_in_binary", `Quick, test_binaries);
-  ]
+let () = Crowbar.add_test ~name:"json_binary(bson)_roundtrip" [g] test_binary

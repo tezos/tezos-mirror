@@ -42,5 +42,4 @@ let () =
       ("int31_int32", Int31_int32.tests);
       ("inline_phantom", Reference_check.Inline_phantom.tests);
       ("mu_phantom", Reference_check.Mu_phantom.tests);
-      ("json_encoding", Json_roundtrip_in_binary.tests);
     ]
