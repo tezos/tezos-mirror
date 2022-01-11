@@ -44,8 +44,6 @@ val string_seq_of_jsonm_lexeme_seq :
     is a sequence of [(buff, offset, length)] such that the concatenation of the
     sub-strings thus designated represents the json value in text form.
 
-    @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32.
-
     The intended use is to blit each of the substring onto whatever output the
     consumer decides. In most cases, the Sequence's [buff] is physically equal
     to [buffer]. This is not always true and one cannot rely on that fact. E.g.,
@@ -56,7 +54,9 @@ val string_seq_of_jsonm_lexeme_seq :
 
     Note that once the next element of the sequence is forced, the blit
     instructions become invalid: the content of [buff] may have been rewritten
-    by the side effect of forcing the next element. *)
+    by the side effect of forcing the next element.
+
+    @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32. *)
 val blit_instructions_seq_of_jsonm_lexeme_seq :
   newline:bool ->
   buffer:bytes ->

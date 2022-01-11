@@ -68,9 +68,9 @@
 (** {2 Module structure}
 
     This [Data_encoding] module provides multiple submodules:
-    - [Encoding] contains the necessary types and constructors for making the
+    - {!Encoding} contains the necessary types and constructors for making the
     type descriptors.
-    - [Json], [Bson], and [Binary] contain functions to serialize and
+    - {!Json}, {!Bson}, and {!Binary} contain functions to serialize and
     deserialize values.
 
 *)
@@ -204,6 +204,7 @@ module Encoding : sig
       - encoded as the concatenation of all the element in binary
        prefixed its length in bytes
 
+      @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
       size, a {!check_size} is automatically added for earlier rejection.
 
@@ -215,6 +216,7 @@ module Encoding : sig
       - encoded as the concatenation of all the element in binary
        prefixed its length in bytes
 
+      @param [max_length]
       If [max_length] is passed and the encoding of elements has fixed
       size, a {!check_size} is automatically added for earlier rejection.
 
@@ -234,7 +236,7 @@ module Encoding : sig
     'b encoding ->
     'a encoding
 
-  (** [conv_with_guard] is similar to [conv] but the function that takes in the value
+  (** [conv_with_guard] is similar to {!conv} but the function that takes in the value
       from the outside (untrusted) world has a chance to fail.
 
       Specifically, if the function returns [Error msg] then the decoding is
@@ -828,10 +830,10 @@ module Json : sig
   (** Encodes a JSON schema (BSON encoded for binary). *)
   val schema_encoding : schema Encoding.t
 
-  (** Create a {!Json_encoding.encoding} from an {!encoding}. *)
+  (** Create a {!Json_encoding.encoding} from an {!type:encoding}. *)
   val convert : 'a Encoding.t -> 'a Json_encoding.encoding
 
-  (** Generate a schema from an {!encoding}. *)
+  (** Generate a schema from an {!type:encoding}. *)
   val schema : ?definitions_path:string -> 'a Encoding.t -> schema
 
   (** Construct a JSON object from an encoding. *)
@@ -867,7 +869,7 @@ module Json : sig
 
       Forcing one element of the resulting string sequence forces multiple
       elements of the underlying lexeme sequence. Once enough lexemes have been
-      forced that roughly [chunk_size_hint] characters are needed to reprensent
+      forced that roughly [chunk_size_hint] characters are needed to represent
       them, the representation is returned and the rest of the sequence is held
       lazily.
 
@@ -884,8 +886,6 @@ module Json : sig
       is a sequence of [(buff, offset, length)] such that the concatenation of the
       sub-strings thus designated represents the json value in text form.
 
-      @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32.
-
       The intended use is to blit each of the substring onto whatever output the
       consumer decides. In most cases, the Sequence's [buff] is physically equal
       to [buffer]. This is not always true and one cannot rely on that fact. E.g.,
@@ -896,7 +896,9 @@ module Json : sig
 
       Note that once the next element of the sequence is forced, the blit
       instructions become invalid: the content of [buff] may have been rewritten
-      by the side effect of forcing the next element. *)
+      by the side effect of forcing the next element.
+
+      @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32. *)
   val blit_instructions_seq_of_jsonm_lexeme_seq :
     newline:bool ->
     buffer:bytes ->
@@ -925,7 +927,7 @@ module Json : sig
   (** Unexpected kind of data encountered, with the expectation. *)
   exception Unexpected of string * string
 
-  (** Some {!union} couldn't be destructed, with the reasons for each {!case}. *)
+  (** Some {!val:union} couldn't be destructed, with the reasons for each {!val:case}. *)
   exception No_case_matched of exn list
 
   (** Array of unexpected size encountered, with the expectation. *)
@@ -1016,11 +1018,11 @@ module Binary : sig
         (** A value is encoded with more bytes than is allowed by the encoding.
             E.g., the constraints of a {!check_size} are being broken. *)
     | List_too_long
-        (** A list contains more elements than is specified in its {!max_length}
+        (** A list contains more elements than is specified in its [max_length]
             parameter. *)
     | Array_too_long
         (** An array contains more elements than is specified in its
-            {!max_length} parameter. *)
+            [max_length] parameter. *)
     | Exception_raised_in_user_function of string
         (** A function provided by the user raised an exception. E.g., a
             function in a {!conv} encoding or a {!delayed} encoding raised. *)
