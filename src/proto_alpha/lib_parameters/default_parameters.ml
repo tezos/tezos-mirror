@@ -78,7 +78,7 @@ let default_dal =
 
 let constants_mainnet =
   let consensus_committee_size = 7000 in
-  let block_time = 30 in
+  let block_time = 15 in
   let Constants.Generated.
         {
           consensus_threshold;
@@ -93,18 +93,18 @@ let constants_mainnet =
   in
   {
     Constants.Parametric.preserved_cycles = 5;
-    blocks_per_cycle = 8192l;
-    blocks_per_commitment = 64l;
-    nonce_revelation_threshold = 256l;
-    blocks_per_stake_snapshot = 512l;
+    blocks_per_cycle = 16384l;
+    blocks_per_commitment = 128l;
+    nonce_revelation_threshold = 512l;
+    blocks_per_stake_snapshot = 1024l;
     cycles_per_voting_period = 5l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
-    hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
+    hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 2_600_000);
     proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
     minimal_stake = Tez.(mul_exn one 6_000);
     (* VDF's difficulty must be a multiple of `nonce_revelation_threshold` times
        the block time. At the moment it is equal to 8B = 8000 * 5 * .2M with
-          - 8000 ~= 256 * 30 that is nonce_revelation_threshold * block time
+          - 8000 ~= 512 * 15 that is nonce_revelation_threshold * block time
           - .2M  ~= number of modular squaring per second on benchmark machine
          with 2.8GHz CPU
           - 5: security factor (strictly higher than the ratio between highest CPU
@@ -113,29 +113,29 @@ let constants_mainnet =
     seed_nonce_revelation_tip =
       (match Tez.(one /? 8L) with Ok c -> c | Error _ -> assert false);
     origination_size = 257;
-    baking_reward_fixed_portion (* 10_000_000 mutez *);
-    baking_reward_bonus_per_slot (* 4_286 mutez *);
-    endorsing_reward_per_slot (* 2_857 mutez *);
+    baking_reward_fixed_portion (* 5_000_000 mutez *);
+    baking_reward_bonus_per_slot (* 2_143 mutez *);
+    endorsing_reward_per_slot (* 1_428 mutez *);
     hard_storage_limit_per_operation = Z.of_int 60_000;
     cost_per_byte = Tez.of_mutez_exn 250L;
     quorum_min = 20_00l;
     quorum_max = 70_00l;
     min_proposal_quorum = 5_00l;
     (* liquidity_baking_subsidy is 1/16th of maximum total rewards for a block *)
-    liquidity_baking_subsidy (* 2_500_000 mutez *);
+    liquidity_baking_subsidy (* 1_250_000 mutez *);
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
     liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
     (* The rationale behind the value of this constant is that an
        operation should be considered alive for about one hour:
 
-       minimal_block_delay context *  max_operations_ttl = 3600
+         minimal_block_delay * max_operations_time_to_live = 3600
 
        The unit for this value is a block.
     *)
-    max_operations_time_to_live = 120;
+    max_operations_time_to_live = 240;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
-    delay_increment_per_round = Period.of_seconds_exn 15L;
+    delay_increment_per_round = Period.of_seconds_exn 8L;
     consensus_committee_size;
     consensus_threshold;
     (* 4667 slots *)
