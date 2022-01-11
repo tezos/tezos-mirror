@@ -596,12 +596,11 @@ end
 
 let cache_size_limit = 100
 
-let compute_delegate_slots (cctxt : Protocol_client_context.full) delegates
-    ~level ~chain =
+let compute_delegate_slots (cctxt : Protocol_client_context.full)
+    ?(block = `Head 0) ~level ~chain delegates =
   let own_delegates = DelegateSet.of_list delegates in
   Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
-  (* FIXME? should we not take `Head 0 ? *)
-  Plugin.RPC.Validators.get cctxt (chain, `Head 0) ~levels:[level]
+  Plugin.RPC.Validators.get cctxt (chain, block) ~levels:[level]
   >>=? fun endorsing_rights ->
   let (own_delegate_slots, all_delegate_slots) =
     List.fold_left
