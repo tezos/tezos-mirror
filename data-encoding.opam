@@ -15,7 +15,8 @@ depends: [
   "json-data-encoding-bson" { = "0.9.1" }
   "alcotest" { with-test }
   "crowbar" { >= "0.2" & with-test }
-  "ocamlformat" { = "0.18.0" & dev }
+  "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
+  "odoc" { with-doc }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
