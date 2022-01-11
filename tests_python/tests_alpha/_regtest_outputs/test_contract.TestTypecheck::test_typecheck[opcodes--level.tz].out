@@ -7,8 +7,8 @@ Gas remaining: 1039996.803 units remaining
   code { DROP
          /* [] */ ;
          LEVEL
-         /* [ @level nat ] */ ;
+         /* [ nat ] */ ;
          NIL operation
-         /* [ list operation : @level nat ] */ ;
+         /* [ list operation : nat ] */ ;
          PAIR
-         /* [ pair (list operation) (nat @level) ] */ } }
+         /* [ pair (list operation) nat ] */ } }

@@ -5,8 +5,8 @@ Gas remaining: 1039997.267 units remaining
 { parameter bytes ;
   storage unit ;
   code { CDR
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

@@ -8,86 +8,86 @@ big_map diff
   
 trace
   - location: 15 (remaining gas: 1039986.010 units remaining)
-    [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0)  	 ]
+    [ (Pair (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) 0) ]
   - location: 15 (remaining gas: 1039986 units remaining)
-    [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5)  	@parameter ]
+    [ (Pair (Pair (Pair (Pair 1 2) 3) 4) 5) ]
   - location: 16 (remaining gas: 1039985.990 units remaining)
-    [ (Pair (Pair (Pair 1 2) 3) 4)  	
-      5  	 ]
+    [ (Pair (Pair (Pair 1 2) 3) 4)
+      5 ]
   - location: 17 (remaining gas: 1039985.980 units remaining)
-    [ (Pair (Pair 1 2) 3)  	
-      4  	
-      5  	 ]
+    [ (Pair (Pair 1 2) 3)
+      4
+      5 ]
   - location: 18 (remaining gas: 1039985.970 units remaining)
-    [ (Pair 1 2)  	
-      3  	
-      4  	
-      5  	 ]
+    [ (Pair 1 2)
+      3
+      4
+      5 ]
   - location: 19 (remaining gas: 1039985.960 units remaining)
-    [ 1  	
-      2  	
-      3  	
-      4  	
-      5  	 ]
+    [ 1
+      2
+      3
+      4
+      5 ]
   - location: 20 (remaining gas: 1039985.908 units remaining)
     [  ]
   - location: 23 (remaining gas: 1039985.898 units remaining)
-    [ 6  	 ]
+    [ 6 ]
   - location: 20 (remaining gas: 1039985.873 units remaining)
-    [ 5  	
-      6  	 ]
+    [ 5
+      6 ]
   - location: 20 (remaining gas: 1039985.863 units remaining)
-    [ 4  	
-      5  	
-      6  	 ]
+    [ 4
+      5
+      6 ]
   - location: 20 (remaining gas: 1039985.853 units remaining)
-    [ 3  	
-      4  	
-      5  	
-      6  	 ]
+    [ 3
+      4
+      5
+      6 ]
   - location: 20 (remaining gas: 1039985.843 units remaining)
-    [ 2  	
-      3  	
-      4  	
-      5  	
-      6  	 ]
+    [ 2
+      3
+      4
+      5
+      6 ]
   - location: 20 (remaining gas: 1039985.833 units remaining)
-    [ 1  	
-      2  	
-      3  	
-      4  	
-      5  	
-      6  	 ]
+    [ 1
+      2
+      3
+      4
+      5
+      6 ]
   - location: 20 (remaining gas: 1039985.833 units remaining)
-    [ 1  	
-      2  	
-      3  	
-      4  	
-      5  	
-      6  	 ]
+    [ 1
+      2
+      3
+      4
+      5
+      6 ]
   - location: 26 (remaining gas: 1039985.823 units remaining)
-    [ 2  	
-      3  	
-      4  	
-      5  	
-      6  	 ]
+    [ 2
+      3
+      4
+      5
+      6 ]
   - location: 27 (remaining gas: 1039985.813 units remaining)
-    [ 3  	
-      4  	
-      5  	
-      6  	 ]
+    [ 3
+      4
+      5
+      6 ]
   - location: 28 (remaining gas: 1039985.803 units remaining)
-    [ 4  	
-      5  	
-      6  	 ]
+    [ 4
+      5
+      6 ]
   - location: 29 (remaining gas: 1039985.793 units remaining)
-    [ 5  	
-      6  	 ]
+    [ 5
+      6 ]
   - location: 30 (remaining gas: 1039985.783 units remaining)
-    [ 6  	 ]
+    [ 6 ]
   - location: 31 (remaining gas: 1039985.768 units remaining)
-    [ {}  	
-      6  	 ]
+    [ {}
+      6 ]
   - location: 33 (remaining gas: 1039985.753 units remaining)
-    [ (Pair {} 6)  	 ]
+    [ (Pair {} 6) ]
 

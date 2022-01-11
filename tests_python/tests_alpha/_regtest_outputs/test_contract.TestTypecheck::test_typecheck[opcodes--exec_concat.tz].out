@@ -5,27 +5,27 @@ Gas remaining: 1039991.097 units remaining
 { parameter string ;
   storage string ;
   code { CAR
-         /* [ @parameter string ] */ ;
+         /* [ string ] */ ;
          LAMBDA
            string
            string
            { PUSH string "_abc"
-             /* [ string : @arg string ] */ ;
+             /* [ string : string ] */ ;
              NIL string
-             /* [ list string : string : @arg string ] */ ;
+             /* [ list string : string : string ] */ ;
              SWAP
-             /* [ string : list string : @arg string ] */ ;
+             /* [ string : list string : string ] */ ;
              CONS
-             /* [ list string : @arg string ] */ ;
+             /* [ list string : string ] */ ;
              SWAP
-             /* [ @arg string : list string ] */ ;
+             /* [ string : list string ] */ ;
              CONS
              /* [ list string ] */ ;
              CONCAT
              /* [ string ] */ }
-         /* [ lambda string string : @parameter string ] */ ;
+         /* [ lambda string string : string ] */ ;
          SWAP
-         /* [ @parameter string : lambda string string ] */ ;
+         /* [ string : lambda string string ] */ ;
          EXEC
          /* [ string ] */ ;
          NIL operation

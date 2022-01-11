@@ -5,15 +5,14 @@ Gas remaining: 1039992.390 units remaining
 { parameter address ;
   storage (option (pair (pair mutez mutez) (pair (pair address address) address))) ;
   code { CAR
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          UNIT
-         /* [ unit : @parameter address ] */ ;
+         /* [ unit : address ] */ ;
          VIEW "step_constants"
               (pair (pair mutez mutez) (pair (pair address address) address))
-         /* [ @parameter.contract option (pair (pair mutez mutez) (pair address address) address) ] */ ;
+         /* [ option (pair (pair mutez mutez) (pair address address) address) ] */ ;
          NIL operation
          /* [ list operation
-            : @parameter.contract option (pair (pair mutez mutez) (pair address address) address) ] */ ;
+            : option (pair (pair mutez mutez) (pair address address) address) ] */ ;
          PAIR
-         /* [ pair (list operation)
-                 (option @parameter.contract (pair (pair mutez mutez) (pair address address) address)) ] */ } }
+         /* [ pair (list operation) (option (pair (pair mutez mutez) (pair address address) address)) ] */ } }

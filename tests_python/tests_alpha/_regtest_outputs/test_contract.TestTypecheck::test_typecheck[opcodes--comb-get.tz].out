@@ -5,41 +5,41 @@ Gas remaining: 1039964.212 units remaining
 { parameter (pair nat nat nat unit) ;
   storage unit ;
   code { CAR
-         /* [ @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit ] */ ;
          DUP
-         /* [ @parameter pair nat nat nat unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit : pair nat nat nat unit ] */ ;
          CAR
-         /* [ nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : pair nat nat nat unit ] */ ;
          PUSH nat 1
-         /* [ nat : nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : nat : pair nat nat nat unit ] */ ;
          ASSERT_CMPEQ ;
          DUP
-         /* [ @parameter pair nat nat nat unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit : pair nat nat nat unit ] */ ;
          GET 1
-         /* [ nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : pair nat nat nat unit ] */ ;
          PUSH nat 1
-         /* [ nat : nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : nat : pair nat nat nat unit ] */ ;
          ASSERT_CMPEQ ;
          DUP
-         /* [ @parameter pair nat nat nat unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit : pair nat nat nat unit ] */ ;
          GET 3
-         /* [ nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : pair nat nat nat unit ] */ ;
          PUSH nat 4
-         /* [ nat : nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : nat : pair nat nat nat unit ] */ ;
          ASSERT_CMPEQ ;
          DUP
-         /* [ @parameter pair nat nat nat unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit : pair nat nat nat unit ] */ ;
          GET 5
-         /* [ nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : pair nat nat nat unit ] */ ;
          PUSH nat 2
-         /* [ nat : nat : @parameter pair nat nat nat unit ] */ ;
+         /* [ nat : nat : pair nat nat nat unit ] */ ;
          ASSERT_CMPEQ ;
          DUP
-         /* [ @parameter pair nat nat nat unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ pair nat nat nat unit : pair nat nat nat unit ] */ ;
          GET 6
-         /* [ unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ unit : pair nat nat nat unit ] */ ;
          UNIT
-         /* [ unit : unit : @parameter pair nat nat nat unit ] */ ;
+         /* [ unit : unit : pair nat nat nat unit ] */ ;
          ASSERT_CMPEQ ;
          DROP
          /* [] */ ;

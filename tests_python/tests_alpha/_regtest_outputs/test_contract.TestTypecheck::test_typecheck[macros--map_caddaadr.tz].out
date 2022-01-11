@@ -6,13 +6,13 @@ Gas remaining: 1039964.206 units remaining
   storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
   code { MAP_CDADDAADR @new_storage %value
            { PUSH mutez 1000000
-             /* [ mutez : @value mutez : pair (nat %p) (mutez %value) ] */ ;
+             /* [ mutez : mutez : pair (nat %p) (mutez %value) ] */ ;
              ADD
              /* [ mutez : pair (nat %p) (mutez %value) ] */ } ;
          NIL operation
          /* [ list operation
-            : @new_storage pair unit (pair nat nat (pair (pair (nat %p @p) (mutez %value)) nat) nat) nat ] */ ;
+            : pair unit (pair nat nat (pair (pair nat (mutez %value)) nat) nat) nat ] */ ;
          SWAP
-         /* [ @new_storage pair unit (pair nat nat (pair (pair (nat %p @p) (mutez %value)) nat) nat) nat
+         /* [ pair unit (pair nat nat (pair (pair nat (mutez %value)) nat) nat) nat
             : list operation ] */ ;
          SET_CAR } }

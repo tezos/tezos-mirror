@@ -5,29 +5,25 @@ Gas remaining: 1039968.322 units remaining
 { parameter (pair mutez mutez) ;
   storage (list bool) ;
   code { CAR
-         /* [ @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez : @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez
+            : pair mutez mutez ] */ ;
          DIIIIIP
            { NIL bool /* [ list bool ] */ }
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez : list bool ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez
+            : pair mutez mutez : list bool ] */ ;
          DIIIIP
            { DUP
-             /* [ @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+             /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
              CAR
-             /* [ mutez : @parameter pair mutez mutez : list bool ] */ ;
+             /* [ mutez : pair mutez mutez : list bool ] */ ;
              DIP { CDR /* [ mutez : list bool ] */ }
              /* [ mutez : mutez : list bool ] */ ;
              COMPARE
@@ -36,13 +32,13 @@ Gas remaining: 1039968.322 units remaining
              /* [ bool : list bool ] */ ;
              CONS
              /* [ list bool ] */ }
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : pair mutez mutez
+            : list bool ] */ ;
          DIIIP
            { DUP
-             /* [ @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+             /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
              CAR
-             /* [ mutez : @parameter pair mutez mutez : list bool ] */ ;
+             /* [ mutez : pair mutez mutez : list bool ] */ ;
              DIP { CDR /* [ mutez : list bool ] */ }
              /* [ mutez : mutez : list bool ] */ ;
              COMPARE
@@ -51,12 +47,11 @@ Gas remaining: 1039968.322 units remaining
              /* [ bool : list bool ] */ ;
              CONS
              /* [ list bool ] */ }
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez
-            : @parameter pair mutez mutez : list bool ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : pair mutez mutez : list bool ] */ ;
          DIIP { DUP
-                /* [ @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+                /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
                 CAR
-                /* [ mutez : @parameter pair mutez mutez : list bool ] */ ;
+                /* [ mutez : pair mutez mutez : list bool ] */ ;
                 DIP { CDR /* [ mutez : list bool ] */ }
                 /* [ mutez : mutez : list bool ] */ ;
                 COMPARE
@@ -65,11 +60,11 @@ Gas remaining: 1039968.322 units remaining
                 /* [ bool : list bool ] */ ;
                 CONS
                 /* [ list bool ] */ }
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
          DIP { DUP
-               /* [ @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+               /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
                CAR
-               /* [ mutez : @parameter pair mutez mutez : list bool ] */ ;
+               /* [ mutez : pair mutez mutez : list bool ] */ ;
                DIP { CDR /* [ mutez : list bool ] */ }
                /* [ mutez : mutez : list bool ] */ ;
                COMPARE
@@ -78,11 +73,11 @@ Gas remaining: 1039968.322 units remaining
                /* [ bool : list bool ] */ ;
                CONS
                /* [ list bool ] */ }
-         /* [ @parameter pair mutez mutez : list bool ] */ ;
+         /* [ pair mutez mutez : list bool ] */ ;
          DUP
-         /* [ @parameter pair mutez mutez : @parameter pair mutez mutez : list bool ] */ ;
+         /* [ pair mutez mutez : pair mutez mutez : list bool ] */ ;
          CAR
-         /* [ mutez : @parameter pair mutez mutez : list bool ] */ ;
+         /* [ mutez : pair mutez mutez : list bool ] */ ;
          DIP { CDR /* [ mutez : list bool ] */ }
          /* [ mutez : mutez : list bool ] */ ;
          COMPARE

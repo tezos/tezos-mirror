@@ -8,35 +8,35 @@ big_map diff
   New map(4) of type (big_map string nat)
 trace
   - location: 12 (remaining gas: 1039987.960 units remaining)
-    [ (Pair "bar" {} None)  	 ]
+    [ (Pair "bar" {} None) ]
   - location: 12 (remaining gas: 1039987.950 units remaining)
-    [ "bar"  	@parameter
-      (Pair {} None)  	@storage ]
+    [ "bar"
+      (Pair {} None) ]
   - location: 13 (remaining gas: 1039987.935 units remaining)
-    [ (Pair {} None)  	@storage ]
+    [ (Pair {} None) ]
   - location: 15 (remaining gas: 1039987.925 units remaining)
-    [ {}  	 ]
+    [ {} ]
   - location: 16 (remaining gas: 1039987.915 units remaining)
-    [ {}  	
-      {}  	 ]
+    [ {}
+      {} ]
   - location: 13 (remaining gas: 1039987.885 units remaining)
-    [ "bar"  	@parameter
-      {}  	
-      {}  	 ]
+    [ "bar"
+      {}
+      {} ]
   - location: 17 (remaining gas: 1039986.909 units remaining)
-    [ False  	
-      {}  	 ]
+    [ False
+      {} ]
   - location: 18 (remaining gas: 1039986.894 units remaining)
-    [ (Some False)  	
-      {}  	 ]
+    [ (Some False)
+      {} ]
   - location: 19 (remaining gas: 1039986.884 units remaining)
-    [ {}  	
-      (Some False)  	 ]
+    [ {}
+      (Some False) ]
   - location: 20 (remaining gas: 1039986.869 units remaining)
-    [ (Pair {} (Some False))  	 ]
+    [ (Pair {} (Some False)) ]
   - location: 21 (remaining gas: 1039986.854 units remaining)
-    [ {}  	
-      (Pair {} (Some False))  	 ]
+    [ {}
+      (Pair {} (Some False)) ]
   - location: 23 (remaining gas: 1039986.839 units remaining)
-    [ (Pair {} {} (Some False))  	 ]
+    [ (Pair {} {} (Some False)) ]
 

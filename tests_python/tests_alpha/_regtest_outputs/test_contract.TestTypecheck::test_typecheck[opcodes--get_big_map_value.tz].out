@@ -8,10 +8,10 @@ Gas remaining: 1039990.479 units remaining
          /* [ pair (string @parameter) (pair @storage (big_map string string) (option string))
             : pair (string @parameter) (pair @storage (big_map string string) (option string)) ] */ ;
          CAR
-         /* [ @parameter string
+         /* [ string
             : pair (string @parameter) (pair @storage (big_map string string) (option string)) ] */ ;
          DIP { CDAR ; DUP /* [ big_map string string : big_map string string ] */ }
-         /* [ @parameter string : big_map string string : big_map string string ] */ ;
+         /* [ string : big_map string string : big_map string string ] */ ;
          GET
          /* [ option string : big_map string string ] */ ;
          SWAP

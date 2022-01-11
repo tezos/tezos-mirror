@@ -32,24 +32,13 @@ open Michelson_v1_printer
 
 let print_ty ppf ty = Michelson_v1_printer.print_expr_unwrapped ppf ty
 
-let print_var_annot ppf annot = List.iter (Format.fprintf ppf "@ %s") annot
-
 let print_stack_ty ?(depth = max_int) ppf s =
   let rec loop depth ppf = function
     | [] -> ()
     | _ when depth <= 0 -> Format.fprintf ppf "..."
-    | [(last, annot)] ->
-        Format.fprintf ppf "%a%a" print_ty last print_var_annot annot
-    | (last, annot) :: rest ->
-        Format.fprintf
-          ppf
-          "%a%a@ :@ %a"
-          print_ty
-          last
-          print_var_annot
-          annot
-          (loop (depth - 1))
-          rest
+    | [last] -> print_ty ppf last
+    | last :: rest ->
+        Format.fprintf ppf "%a@ :@ %a" print_ty last (loop (depth - 1)) rest
   in
   match s with
   | [] -> Format.fprintf ppf "[]"
@@ -538,7 +527,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               print_loc
               loc
               (fun ppf -> print_stack_ty ppf)
-              [(exp, [])]
+              [exp]
               (fun ppf -> print_stack_ty ppf)
               got
         | Bad_stack (loc, name, depth, sty) ->

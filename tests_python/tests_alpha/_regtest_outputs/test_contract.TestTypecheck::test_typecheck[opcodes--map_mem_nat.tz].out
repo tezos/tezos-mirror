@@ -5,9 +5,9 @@ Gas remaining: 1039991.954 units remaining
 { parameter nat ;
   storage (pair (map nat nat) (option bool)) ;
   code { UNPAIR
-         /* [ @parameter nat : @storage pair (map nat nat) (option bool) ] */ ;
+         /* [ nat : pair (map nat nat) (option bool) ] */ ;
          DIP { CAR /* [ map nat nat ] */ ; DUP /* [ map nat nat : map nat nat ] */ }
-         /* [ @parameter nat : map nat nat : map nat nat ] */ ;
+         /* [ nat : map nat nat : map nat nat ] */ ;
          MEM
          /* [ bool : map nat nat ] */ ;
          SOME

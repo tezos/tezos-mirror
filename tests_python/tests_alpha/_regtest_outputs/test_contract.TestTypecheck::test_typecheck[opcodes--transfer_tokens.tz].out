@@ -5,13 +5,13 @@ Gas remaining: 1039993.170 units remaining
 { parameter (contract unit) ;
   storage unit ;
   code { CAR
-         /* [ @parameter contract unit ] */ ;
+         /* [ contract unit ] */ ;
          DIP { UNIT /* [ unit ] */ }
-         /* [ @parameter contract unit : unit ] */ ;
+         /* [ contract unit : unit ] */ ;
          PUSH mutez 100000000
-         /* [ mutez : @parameter contract unit : unit ] */ ;
+         /* [ mutez : contract unit : unit ] */ ;
          UNIT
-         /* [ unit : mutez : @parameter contract unit : unit ] */ ;
+         /* [ unit : mutez : contract unit : unit ] */ ;
          TRANSFER_TOKENS
          /* [ operation : unit ] */ ;
          NIL operation

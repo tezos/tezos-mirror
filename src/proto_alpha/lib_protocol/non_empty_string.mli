@@ -37,9 +37,3 @@ val of_string_exn : string -> t
 (** [cat2 a b] concatenates [a] and [b].
     [cat2 a ~sep b] concatenates [a], [sep], and [b]. *)
 val cat2 : t -> ?sep:string -> t -> t
-
-(** [split_on_last c s] finds the last occurrence of [c] in [s] and returns
-    the substring before and the substring after.
-    Returns [None] if [c] is not present in [s] or if one or both substrings
-    would end up being empty. *)
-val split_on_last : char -> t -> (t * t) option

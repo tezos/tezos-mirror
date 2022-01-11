@@ -102,9 +102,7 @@ let test_stack_overflow () =
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo = {iloc = -1; kstack_ty = stack} in
-  let kinfo' =
-    {iloc = -1; kstack_ty = Item_t (bool_t ~annot:None, stack, None)}
-  in
+  let kinfo' = {iloc = -1; kstack_ty = Item_t (bool_t ~annot:None, stack)} in
   let enorme_et_seq n =
     let rec aux n acc =
       if n = 0 then acc
@@ -132,7 +130,7 @@ let test_stack_overflow_in_lwt () =
     Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
   in
   let stack = Bot_t in
-  let item ty s = Item_t (ty, s, None) in
+  let item ty s = Item_t (ty, s) in
   let unit_t = unit_t ~annot:None in
   let unit_k = unit_key ~annot:None in
   let bool_t = bool_t ~annot:None in

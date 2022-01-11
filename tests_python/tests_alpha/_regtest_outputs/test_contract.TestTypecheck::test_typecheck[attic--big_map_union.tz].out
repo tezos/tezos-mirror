@@ -15,7 +15,7 @@ Gas remaining: 1039983.939 units remaining
                 /* [ option int : string : int : big_map string int : unit ] */ ;
                 IF_NONE
                   { PUSH int 0 /* [ int : string : int : big_map string int : unit ] */ }
-                  { /* [ @some int : string : int : big_map string int : unit ] */ } ;
+                  { /* [ int : string : int : big_map string int : unit ] */ } ;
                 SWAP
                 /* [ string : int : int : big_map string int : unit ] */ ;
                 DIP { ADD

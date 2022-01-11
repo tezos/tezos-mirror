@@ -5,9 +5,9 @@ Gas remaining: 1039995.574 units remaining
 { parameter (list string) ;
   storage string ;
   code { UNPAIR
-         /* [ @parameter list string : @storage string ] */ ;
+         /* [ list string : string ] */ ;
          SWAP
-         /* [ @storage string : @parameter list string ] */ ;
+         /* [ string : list string ] */ ;
          CONS
          /* [ list string ] */ ;
          CONCAT

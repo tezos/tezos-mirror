@@ -1111,8 +1111,7 @@ and ('a, 's, 'b, 'f, 'c, 'u) logging_function =
   'c * 'u ->
   unit
 
-and execution_trace =
-  (Script.location * Gas.t * (Script.expr * string option) list) list
+and execution_trace = (Script.location * Gas.t * Script.expr list) list
 
 and logger = {
   log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
@@ -1178,9 +1177,7 @@ and 'ty ty =
   | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
-  | Item_t :
-      'ty ty * ('ty2, 'rest) stack_ty * var_annot option
-      -> ('ty, 'ty2 * 'rest) stack_ty
+  | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
   | Bot_t : (empty_cell, empty_cell) stack_ty
 
 and ('key, 'value) big_map = {
@@ -2093,7 +2090,7 @@ let stack_ty_traverse (type a t) (sty : (a, t) stack_ty) init f =
    fun accu sty ->
     match sty with
     | Bot_t -> f.apply accu sty
-    | Item_t (_, sty', _) -> aux (f.apply accu sty) sty'
+    | Item_t (_, sty') -> aux (f.apply accu sty) sty'
   in
   aux init sty
 
@@ -2213,4 +2210,4 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
   [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty = function
-  | Item_t (ty, _, _) -> ty
+  | Item_t (ty, _) -> ty

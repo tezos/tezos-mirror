@@ -5,7 +5,7 @@ Gas remaining: 1039996.037 units remaining
 { storage (option bytes) ;
   parameter bytes ;
   code { CAR
-         /* [ @parameter bytes ] */ ;
+         /* [ bytes ] */ ;
          SHA3
          /* [ bytes ] */ ;
          SOME

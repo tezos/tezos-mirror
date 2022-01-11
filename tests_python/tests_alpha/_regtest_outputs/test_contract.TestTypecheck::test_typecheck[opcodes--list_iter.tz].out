@@ -5,11 +5,11 @@ Gas remaining: 1039994.793 units remaining
 { parameter (list int) ;
   storage int ;
   code { CAR
-         /* [ @parameter list int ] */ ;
+         /* [ list int ] */ ;
          PUSH int 1
-         /* [ int : @parameter list int ] */ ;
+         /* [ int : list int ] */ ;
          SWAP
-         /* [ @parameter list int : int ] */ ;
+         /* [ list int : int ] */ ;
          ITER { MUL /* [ int ] */ }
          /* [ int ] */ ;
          NIL operation

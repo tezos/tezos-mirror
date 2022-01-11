@@ -5,29 +5,25 @@ Gas remaining: 1039989.740 units remaining
 { parameter unit ;
   storage unit ;
   code { CDR
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          SOURCE
-         /* [ @source address : list operation : @storage unit ] */ ;
-         CONTRACT
-           unit
-         /* [ @source.contract option (contract unit) : list operation : @storage unit ] */ ;
+         /* [ address : list operation : unit ] */ ;
+         CONTRACT unit
+         /* [ option (contract unit) : list operation : unit ] */ ;
          ASSERT_SOME ;
-         PUSH mutez
-              1
-         /* [ mutez : @source.contract.some contract unit : list operation
-            : @storage unit ] */ ;
+         PUSH mutez 1
+         /* [ mutez : contract unit : list operation : unit ] */ ;
          UNIT
-         /* [ unit : mutez : @source.contract.some contract unit : list operation
-            : @storage unit ] */ ;
+         /* [ unit : mutez : contract unit : list operation : unit ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : list operation : @storage unit ] */ ;
+         /* [ operation : list operation : unit ] */ ;
          DUP
-         /* [ operation : operation : list operation : @storage unit ] */ ;
-         DIP { CONS /* [ list operation : @storage unit ] */ }
-         /* [ operation : list operation : @storage unit ] */ ;
+         /* [ operation : operation : list operation : unit ] */ ;
+         DIP { CONS /* [ list operation : unit ] */ }
+         /* [ operation : list operation : unit ] */ ;
          CONS
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

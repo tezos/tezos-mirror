@@ -1207,8 +1207,7 @@ and ('a, 's, 'b, 'f, 'c, 'u) logging_function =
   'c * 'u ->
   unit
 
-and execution_trace =
-  (Script.location * Gas.t * (Script.expr * string option) list) list
+and execution_trace = (Script.location * Gas.t * Script.expr list) list
 
 and logger = {
   log_interp : 'a 's 'b 'f 'c 'u. ('a, 's, 'b, 'f, 'c, 'u) logging_function;
@@ -1285,9 +1284,7 @@ and 'ty ty =
   | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
-  | Item_t :
-      'ty ty * ('ty2, 'rest) stack_ty * var_annot option
-      -> ('ty, 'ty2 * 'rest) stack_ty
+  | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
   | Bot_t : (empty_cell, empty_cell) stack_ty
 
 and ('key, 'value) big_map = {

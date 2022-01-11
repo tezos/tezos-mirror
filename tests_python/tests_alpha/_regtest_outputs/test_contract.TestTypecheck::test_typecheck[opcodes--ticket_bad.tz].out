@@ -5,8 +5,8 @@ Gas remaining: 1039996.963 units remaining
 { parameter unit ;
   storage (ticket nat) ;
   code { CDR
-         /* [ @storage ticket nat ] */ ;
+         /* [ ticket nat ] */ ;
          NIL operation
-         /* [ list operation : @storage ticket nat ] */ ;
+         /* [ list operation : ticket nat ] */ ;
          PAIR
-         /* [ pair (list operation) (ticket @storage nat) ] */ } }
+         /* [ pair (list operation) (ticket nat) ] */ } }

@@ -5,13 +5,13 @@ Gas remaining: 1039989.496 units remaining
 { parameter (or string (option int)) ;
   storage string ;
   code { CAR
-         /* [ @parameter or string (option int) ] */ ;
+         /* [ or string (option int) ] */ ;
          IF_LEFT
-           { /* [ @parameter.left string ] */ }
+           { /* [ string ] */ }
            { IF_NONE
                { FAIL }
                { PUSH int 0
-                 /* [ int : @parameter.right.some int ] */ ;
+                 /* [ int : int ] */ ;
                  CMPGT ;
                  IF { FAIL } { PUSH string "" /* [ string ] */ } } } ;
          NIL operation

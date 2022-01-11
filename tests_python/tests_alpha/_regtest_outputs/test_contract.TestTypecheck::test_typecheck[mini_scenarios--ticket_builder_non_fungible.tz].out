@@ -5,69 +5,56 @@ Gas remaining: 1039970.718 units remaining
 { parameter (or (ticket %burn nat) (contract %mint_destination (ticket nat))) ;
   storage (pair (address %manager) (nat %counter)) ;
   code { AMOUNT
-         /* [ @amount mutez
+         /* [ mutez
             : pair (or @parameter (ticket %burn nat) (contract %mint_destination (ticket nat)))
                  (pair @storage (address %manager) (nat %counter)) ] */ ;
          PUSH mutez
               0
-         /* [ mutez : @amount mutez
+         /* [ mutez : mutez
             : pair (or @parameter (ticket %burn nat) (contract %mint_destination (ticket nat)))
                  (pair @storage (address %manager) (nat %counter)) ] */ ;
          ASSERT_CMPEQ ;
          UNPAIR
            3
-         /* [ or (ticket %burn nat) (contract %mint_destination (ticket nat))
-            : @manager address : @counter nat ] */ ;
+         /* [ or (ticket %burn nat) (contract %mint_destination (ticket nat)) : address
+            : nat ] */ ;
          IF_LEFT
            { READ_TICKET
-             /* [ pair address nat nat : @burn ticket nat : @manager address : @counter nat ] */ ;
+             /* [ pair address nat nat : ticket nat : address : nat ] */ ;
              CAR
-             /* [ address : @burn ticket nat : @manager address : @counter nat ] */ ;
+             /* [ address : ticket nat : address : nat ] */ ;
              SELF_ADDRESS
-             /* [ @self address : address : @burn ticket nat : @manager address
-                : @counter nat ] */ ;
+             /* [ address : address : ticket nat : address : nat ] */ ;
              ASSERT_CMPEQ ;
              DROP
-             /* [ @manager address : @counter nat ] */ ;
+             /* [ address : nat ] */ ;
              NIL operation
-             /* [ list operation : @manager address : @counter nat ] */ }
-           { DUP @manager
-               2
-             /* [ @manager address : @mint_destination contract (ticket nat)
-                : @manager address : @counter nat ] */ ;
+             /* [ list operation : address : nat ] */ }
+           { DUP @manager 2
+             /* [ address : contract (ticket nat) : address : nat ] */ ;
              SENDER
-             /* [ @sender address : @manager address
-                : @mint_destination contract (ticket nat) : @manager address : @counter nat ] */ ;
+             /* [ address : address : contract (ticket nat) : address : nat ] */ ;
              ASSERT_CMPEQ ;
-             PUSH @amount
-               nat
-               1
-             /* [ @amount nat : @mint_destination contract (ticket nat) : @manager address
-                : @counter nat ] */ ;
-             DUP @counter
-               4
-             /* [ @counter nat : @amount nat : @mint_destination contract (ticket nat)
-                : @manager address : @counter nat ] */ ;
+             PUSH @amount nat 1
+             /* [ nat : contract (ticket nat) : address : nat ] */ ;
+             DUP @counter 4
+             /* [ nat : nat : contract (ticket nat) : address : nat ] */ ;
              TICKET
-             /* [ ticket nat : @mint_destination contract (ticket nat) : @manager address
-                : @counter nat ] */ ;
-             PUSH mutez
-                  0
-             /* [ mutez : ticket nat : @mint_destination contract (ticket nat)
-                : @manager address : @counter nat ] */ ;
+             /* [ ticket nat : contract (ticket nat) : address : nat ] */ ;
+             PUSH mutez 0
+             /* [ mutez : ticket nat : contract (ticket nat) : address : nat ] */ ;
              SWAP
-             /* [ ticket nat : mutez : @mint_destination contract (ticket nat)
-                : @manager address : @counter nat ] */ ;
+             /* [ ticket nat : mutez : contract (ticket nat) : address : nat ] */ ;
              TRANSFER_TOKENS
-             /* [ operation : @manager address : @counter nat ] */ ;
+             /* [ operation : address : nat ] */ ;
              NIL operation
-             /* [ list operation : operation : @manager address : @counter nat ] */ ;
+             /* [ list operation : operation : address : nat ] */ ;
              SWAP
-             /* [ operation : list operation : @manager address : @counter nat ] */ ;
+             /* [ operation : list operation : address : nat ] */ ;
              CONS
-             /* [ list operation : @manager address : @counter nat ] */ ;
+             /* [ list operation : address : nat ] */ ;
              DIP 2
-                 { PUSH nat 1 /* [ nat : @counter nat ] */ ; ADD /* [ nat ] */ }
-             /* [ list operation : @manager address : nat ] */ } ;
+                 { PUSH nat 1 /* [ nat : nat ] */ ; ADD /* [ nat ] */ }
+             /* [ list operation : address : nat ] */ } ;
          PAIR 3
          /* [ pair (list operation) address nat ] */ } }

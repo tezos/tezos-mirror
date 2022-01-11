@@ -9,27 +9,27 @@ big_map diff
   Set map(4)["hello"] to 4
 trace
   - location: 13 (remaining gas: 1039989.246 units remaining)
-    [ (Pair "hello" (Some 4) {})  	 ]
+    [ (Pair "hello" (Some 4) {}) ]
   - location: 13 (remaining gas: 1039989.236 units remaining)
-    [ "hello"  	@parameter
-      (Pair (Some 4) {})  	@storage ]
+    [ "hello"
+      (Pair (Some 4) {}) ]
   - location: 14 (remaining gas: 1039989.221 units remaining)
-    [ (Pair (Some 4) {})  	@storage ]
+    [ (Pair (Some 4) {}) ]
   - location: 16 (remaining gas: 1039989.211 units remaining)
-    [ (Some 4)  	
-      {}  	 ]
+    [ (Some 4)
+      {} ]
   - location: 14 (remaining gas: 1039989.181 units remaining)
-    [ "hello"  	@parameter
-      (Some 4)  	
-      {}  	 ]
+    [ "hello"
+      (Some 4)
+      {} ]
   - location: 17 (remaining gas: 1039988.109 units remaining)
-    [ None  	
-      { Elt "hello" 4 }  	 ]
+    [ None
+      { Elt "hello" 4 } ]
   - location: 18 (remaining gas: 1039988.094 units remaining)
-    [ (Pair None { Elt "hello" 4 })  	 ]
+    [ (Pair None { Elt "hello" 4 }) ]
   - location: 19 (remaining gas: 1039988.079 units remaining)
-    [ {}  	
-      (Pair None { Elt "hello" 4 })  	 ]
+    [ {}
+      (Pair None { Elt "hello" 4 }) ]
   - location: 21 (remaining gas: 1039988.064 units remaining)
-    [ (Pair {} None { Elt "hello" 4 })  	 ]
+    [ (Pair {} None { Elt "hello" 4 }) ]
 

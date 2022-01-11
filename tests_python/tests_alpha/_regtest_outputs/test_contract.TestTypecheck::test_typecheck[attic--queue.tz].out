@@ -10,7 +10,7 @@ Gas remaining: 1039952.504 units remaining
             : pair (option @parameter string)
                  (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
          CAR
-         /* [ @parameter option string
+         /* [ option string
             : pair (option @parameter string)
                  (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
          IF_NONE
@@ -77,11 +77,11 @@ Gas remaining: 1039952.504 units remaining
                    /* [ pair nat nat : map nat string ] */ ;
                    DUP
                    /* [ pair nat nat : pair nat nat : map nat string ] */ }
-             /* [ @parameter.some string : pair nat nat : pair nat nat : map nat string ] */ ;
+             /* [ string : pair nat nat : pair nat nat : map nat string ] */ ;
              SWAP
-             /* [ pair nat nat : @parameter.some string : pair nat nat : map nat string ] */ ;
+             /* [ pair nat nat : string : pair nat nat : map nat string ] */ ;
              CAR
-             /* [ nat : @parameter.some string : pair nat nat : map nat string ] */ ;
+             /* [ nat : string : pair nat nat : map nat string ] */ ;
              DIP { SOME
                    /* [ option string : pair nat nat : map nat string ] */ ;
                    SWAP

@@ -1249,10 +1249,7 @@ module RPC = struct
         @@ obj3
              (req "location" Script.location_encoding)
              (req "gas" Gas.encoding)
-             (req
-                "stack"
-                (list
-                   (obj2 (req "item" Script.expr_encoding) (opt "annot" string))))
+             (req "stack" (list Script.expr_encoding))
 
       let trace_code_output_encoding =
         conv
@@ -1482,9 +1479,9 @@ module RPC = struct
         let rec unparse_stack :
             type a s.
             (a, s) Script_typed_ir.stack_ty * (a * s) ->
-            (Script.expr * string option) list tzresult Lwt.t = function
+            Script.expr list tzresult Lwt.t = function
           | (Bot_t, (EmptyCell, EmptyCell)) -> return_nil
-          | (Item_t (ty, rest_ty, annot), (v, rest)) ->
+          | (Item_t (ty, rest_ty), (v, rest)) ->
               Script_ir_translator.unparse_data
                 ctxt
                 Unparsing_mode.unparsing_mode
@@ -1492,14 +1489,8 @@ module RPC = struct
                 v
               >>=? fun (data, _ctxt) ->
               unparse_stack (rest_ty, rest) >|=? fun rest ->
-              let annot =
-                match Script_ir_annot.unparse_var_annot annot with
-                | [] -> None
-                | [a] -> Some a
-                | _ -> assert false
-              in
               let data = Micheline.strip_locations data in
-              (data, annot) :: rest
+              data :: rest
         in
         unparse_stack (stack_ty, stack)
 

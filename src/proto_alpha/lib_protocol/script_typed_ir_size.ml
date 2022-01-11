@@ -109,7 +109,7 @@ let stack_ty_size s =
    fun accu s ->
     match s with
     | Bot_t -> ret_succ accu
-    | Item_t (ty, _, _annot) -> ret_succ_adding (accu ++ ty_size ty) h3w
+    | Item_t (ty, _) -> ret_succ_adding (accu ++ ty_size ty) h2w
   in
   stack_ty_traverse s zero {apply}
 
@@ -670,42 +670,42 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
          to create a type that is embedded in the IR. *)
       | IJoin_tickets (_, _, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ITicket (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IRead_ticket (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ICons_list (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IMap_update (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IMap_get_and_update (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IBig_map_get_and_update (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IApply (_, ty, _) -> ty_size ty
       | ICompare (_, ty, _) -> comparable_ty_size ty
       | IList_iter (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IList_map (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ISet_iter (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IMap_map (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IMap_iter (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _, _) -> ty_size ty)
+          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ILambda (_, lambda, _) -> lambda_extra_size lambda
       | ICreate_contract {lambda; _} -> lambda_extra_size lambda
       | _ -> zero

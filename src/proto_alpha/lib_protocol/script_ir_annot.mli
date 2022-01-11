@@ -41,59 +41,15 @@ end
 
 (** Default annotations *)
 
-val default_now_annot : var_annot option
-
-val default_amount_annot : var_annot option
-
-val default_balance_annot : var_annot option
-
-val default_level_annot : var_annot option
-
-val default_source_annot : var_annot option
-
-val default_sender_annot : var_annot option
-
-val default_self_annot : var_annot option
-
-val default_arg_annot : var_annot option
-
-val lambda_arg_annot : var_annot option
-
 val default_param_annot : var_annot option
 
 val default_storage_annot : var_annot option
 
-val default_sapling_state_annot : var_annot option
-
 val default_sapling_balance_annot : var_annot option
-
-val default_car_annot : field_annot option
-
-val default_cdr_annot : field_annot option
-
-val default_contract_annot : field_annot option
-
-val default_addr_annot : field_annot option
-
-val default_pack_annot : field_annot option
-
-val default_unpack_annot : field_annot option
-
-val default_slice_annot : field_annot option
 
 val default_elt_annot : field_annot option
 
 val default_key_annot : field_annot option
-
-val default_hd_annot : field_annot option
-
-val default_tl_annot : field_annot option
-
-val default_some_annot : field_annot option
-
-val default_left_annot : field_annot option
-
-val default_right_annot : field_annot option
 
 (** Unparse annotations to their string representation *)
 
@@ -109,8 +65,6 @@ val field_to_var_annot : field_annot option -> var_annot option
 
 val type_to_var_annot : type_annot option -> var_annot option
 
-val var_to_field_annot : var_annot option -> field_annot option
-
 (** Converts a field annot option to an entrypoint.
     An error is returned if the field annot is too long or is "default".
     [None] is converted to [Some default].
@@ -125,13 +79,6 @@ val field_annot_opt_eq_entrypoint_lax :
 
 (** Replace an annotation by its default value if it is [None] *)
 val default_annot : default:'a option -> 'a option -> 'a option
-
-(** Generate annotation for field accesses, of the form [var.field1.field2] *)
-val gen_access_annot :
-  var_annot option ->
-  ?default:field_annot option ->
-  field_annot option ->
-  var_annot option
 
 (** Merge type annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
@@ -184,61 +131,28 @@ val check_correct_field :
 
 (** Instruction annotations parsing *)
 
-(** Parse a variable annotation, replaced by a default value if [None]. *)
-val parse_var_annot :
-  Script.location ->
-  ?default:var_annot option ->
-  string list ->
-  var_annot option tzresult
+(** Check a variable annotation. *)
+val check_var_annot : Script.location -> string list -> unit tzresult
 
 val is_allowed_char : char -> bool
 
 val parse_constr_annot :
   Script.location ->
-  ?if_special_first:field_annot option ->
-  ?if_special_second:field_annot option ->
   string list ->
-  (var_annot option
-  * type_annot option
-  * field_annot option
-  * field_annot option)
-  tzresult
+  (type_annot option * field_annot option * field_annot option) tzresult
 
-val parse_two_var_annot :
-  Script.location ->
-  string list ->
-  (var_annot option * var_annot option) tzresult
+val check_two_var_annot : Script.location -> string list -> unit tzresult
 
 val parse_destr_annot :
-  Script.location ->
-  string list ->
-  default_accessor:field_annot option ->
-  field_name:field_annot option ->
-  pair_annot:var_annot option ->
-  value_annot:var_annot option ->
-  (var_annot option * field_annot option) tzresult
+  Script.location -> string list -> field_annot option tzresult
 
 val parse_unpair_annot :
   Script.location ->
   string list ->
-  field_name_car:field_annot option ->
-  field_name_cdr:field_annot option ->
-  pair_annot:var_annot option ->
-  value_annot_car:var_annot option ->
-  value_annot_cdr:var_annot option ->
-  (var_annot option
-  * var_annot option
-  * field_annot option
-  * field_annot option)
-  tzresult
+  (field_annot option * field_annot option) tzresult
 
 val parse_entrypoint_annot :
-  Script.location ->
-  ?default:var_annot option ->
-  string list ->
-  (var_annot option * field_annot option) tzresult
+  Script.location -> string list -> field_annot option tzresult
 
 val parse_var_type_annot :
-  Script.location ->
-  string list ->
-  (var_annot option * type_annot option) tzresult
+  Script.location -> string list -> type_annot option tzresult

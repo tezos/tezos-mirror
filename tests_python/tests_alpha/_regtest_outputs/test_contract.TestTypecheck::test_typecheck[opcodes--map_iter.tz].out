@@ -5,38 +5,30 @@ Gas remaining: 1039985.509 units remaining
 { parameter (map (int :k) (int :e)) ;
   storage (pair (int :k) (int :e)) ;
   code { CAR
-         /* [ @parameter map (int :k) (int :e) ] */ ;
+         /* [ map (int :k) (int :e) ] */ ;
          PUSH @acc_e (int :e) 0
-         /* [ @acc_e int :e : @parameter map (int :k) (int :e) ] */ ;
-         PUSH @acc_k
-           (int :k)
-           0
-         /* [ @acc_k int :k : @acc_e int :e : @parameter map (int :k) (int :e) ] */ ;
+         /* [ int :e : map (int :k) (int :e) ] */ ;
+         PUSH @acc_k (int :k) 0
+         /* [ int :k : int :e : map (int :k) (int :e) ] */ ;
          PAIR % %r
-         /* [ pair (int :k @acc_k) (int :e %r @acc_e)
-            : @parameter map (int :k) (int :e) ] */ ;
+         /* [ pair (int :k) (int :e %r) : map (int :k) (int :e) ] */ ;
          SWAP
-         /* [ @parameter map (int :k) (int :e)
-            : pair (int :k @acc_k) (int :e %r @acc_e) ] */ ;
+         /* [ map (int :k) (int :e) : pair (int :k) (int :e %r) ] */ ;
          ITER { DIP { DUP
-                      /* [ pair (int :k @acc_k) (int :e %r @acc_e)
-                         : pair (int :k @acc_k) (int :e %r @acc_e) ] */ ;
+                      /* [ pair (int :k) (int :e %r) : pair (int :k) (int :e %r) ] */ ;
                       CAR
-                      /* [ @acc_k int :k : pair (int :k @acc_k) (int :e %r @acc_e) ] */ ;
-                      DIP { CDR /* [ @acc_e int :e ] */ }
-                      /* [ @acc_k int :k : @acc_e int :e ] */ }
-                /* [ pair (int :k @key) (int :e @elt) : @acc_k int :k : @acc_e int :e ] */ ;
+                      /* [ int :k : pair (int :k) (int :e %r) ] */ ;
+                      DIP { CDR /* [ int :e ] */ }
+                      /* [ int :k : int :e ] */ }
+                /* [ pair (int :k @key) (int :e @elt) : int :k : int :e ] */ ;
                 DUP
                 /* [ pair (int :k @key) (int :e @elt) : pair (int :k @key) (int :e @elt)
-                   : @acc_k int :k : @acc_e int :e ] */ ;
-                DIP { CAR
-                      /* [ @key int :k : @acc_k int :k : @acc_e int :e ] */ ;
-                      ADD
-                      /* [ int :k : @acc_e int :e ] */ }
-                /* [ pair (int :k @key) (int :e @elt) : int :k : @acc_e int :e ] */ ;
+                   : int :k : int :e ] */ ;
+                DIP { CAR /* [ int :k : int :k : int :e ] */ ; ADD /* [ int :k : int :e ] */ }
+                /* [ pair (int :k @key) (int :e @elt) : int :k : int :e ] */ ;
                 SWAP
-                /* [ int :k : pair (int :k @key) (int :e @elt) : @acc_e int :e ] */ ;
-                DIP { CDR /* [ @elt int :e : @acc_e int :e ] */ ; ADD /* [ int :e ] */ }
+                /* [ int :k : pair (int :k @key) (int :e @elt) : int :e ] */ ;
+                DIP { CDR /* [ int :e : int :e ] */ ; ADD /* [ int :e ] */ }
                 /* [ int :k : int :e ] */ ;
                 PAIR % %r
                 /* [ pair (int :k) (int :e %r) ] */ }

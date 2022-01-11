@@ -1,0 +1,28 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/unpair_field_annotation_mismatch.tz]
+
+Well typed
+Gas remaining: 1039993.045 units remaining
+{ parameter (unit :param_unit) ;
+  storage (unit :u1) ;
+  code { DROP
+         /* [] */ ;
+         UNIT @b
+         /* [ unit ] */ ;
+         UNIT @a
+         /* [ unit : unit ] */ ;
+         PAIR %@ %@
+         /* [ pair unit unit ] */ ;
+         DUP
+         /* [ pair unit unit : pair unit unit ] */ ;
+         UNPAIR %c %d
+         /* [ unit : unit : pair unit unit ] */ ;
+         DROP 2
+         /* [ pair unit unit ] */ ;
+         DROP
+         /* [] */ ;
+         UNIT
+         /* [ unit ] */ ;
+         NIL operation
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }

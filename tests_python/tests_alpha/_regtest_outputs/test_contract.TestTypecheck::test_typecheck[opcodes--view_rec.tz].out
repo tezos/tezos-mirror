@@ -12,22 +12,22 @@ Gas remaining: 1039987.709 units remaining
          DUP
          /* [ address : address ] */ ;
          VIEW "loop" never
-         /* [ @contract option never ] */ ;
+         /* [ option never ] */ ;
          ASSERT_SOME } ;
   code { CDR
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          SELF
-         /* [ @self contract unit : @storage unit ] */ ;
+         /* [ contract unit : unit ] */ ;
          ADDRESS
-         /* [ @self.address address : @storage unit ] */ ;
+         /* [ address : unit ] */ ;
          DUP
-         /* [ @self.address address : @self.address address : @storage unit ] */ ;
+         /* [ address : address : unit ] */ ;
          VIEW "loop" never
-         /* [ @self.address.contract option never : @storage unit ] */ ;
+         /* [ option never : unit ] */ ;
          ASSERT_SOME ;
          DROP
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

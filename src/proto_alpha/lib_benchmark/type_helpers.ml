@@ -68,7 +68,7 @@ let rec michelson_type_list_to_ex_stack_ty
       | Ex_ty ty -> (
           let ex_stack_ty = michelson_type_list_to_ex_stack_ty tl ctxt in
           match ex_stack_ty with
-          | Ex_stack_ty tl -> Ex_stack_ty (Item_t (ty, tl, None))))
+          | Ex_stack_ty tl -> Ex_stack_ty (Item_t (ty, tl))))
 
 let base_type_to_michelson_type (typ : Type.Base.t) =
   let typ = Mikhailsky.map_var (fun _ -> Mikhailsky.unit_ty) typ in

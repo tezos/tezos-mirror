@@ -8,26 +8,26 @@ big_map diff
   
 trace
   - location: 9 (remaining gas: 1039989.971 units remaining)
-    [ (Pair Unit {})  	 ]
+    [ (Pair Unit {}) ]
   - location: 9 (remaining gas: 1039989.961 units remaining)
     [  ]
   - location: 10 (remaining gas: 1039989.741 units remaining)
-    [ {}  	 ]
+    [ {} ]
   - location: 13 (remaining gas: 1039989.731 units remaining)
-    [ "world"  	
-      {}  	 ]
+    [ "world"
+      {} ]
   - location: 16 (remaining gas: 1039989.716 units remaining)
-    [ (Some "world")  	
-      {}  	 ]
+    [ (Some "world")
+      {} ]
   - location: 17 (remaining gas: 1039989.706 units remaining)
-    [ "hello"  	
-      (Some "world")  	
-      {}  	 ]
+    [ "hello"
+      (Some "world")
+      {} ]
   - location: 20 (remaining gas: 1039989.556 units remaining)
-    [ { Elt "hello" "world" }  	 ]
+    [ { Elt "hello" "world" } ]
   - location: 21 (remaining gas: 1039989.541 units remaining)
-    [ {}  	
-      { Elt "hello" "world" }  	 ]
+    [ {}
+      { Elt "hello" "world" } ]
   - location: 23 (remaining gas: 1039989.526 units remaining)
-    [ (Pair {} { Elt "hello" "world" })  	 ]
+    [ (Pair {} { Elt "hello" "world" }) ]
 

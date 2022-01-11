@@ -19,8 +19,8 @@ Gas remaining: 1039988.218 units remaining
          DROP
          /* [ pair (unit @parameter) (unit @storage) ] */ ;
          CDR
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

@@ -5,9 +5,9 @@ Gas remaining: 1039995.574 units remaining
 { parameter (list bytes) ;
   storage bytes ;
   code { UNPAIR
-         /* [ @parameter list bytes : @storage bytes ] */ ;
+         /* [ list bytes : bytes ] */ ;
          SWAP
-         /* [ @storage bytes : @parameter list bytes ] */ ;
+         /* [ bytes : list bytes ] */ ;
          CONS
          /* [ list bytes ] */ ;
          CONCAT

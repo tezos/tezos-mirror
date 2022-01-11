@@ -17,173 +17,173 @@ Gas remaining: 1039903.879 units remaining
          DROP 2
          /* [] */ ;
          UNIT @b
-         /* [ @b unit ] */ ;
+         /* [ unit ] */ ;
          UNIT @a
-         /* [ @a unit : @b unit ] */ ;
+         /* [ unit : unit ] */ ;
          PAIR
-         /* [ pair (unit @a) (unit @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          UNPAIR @c @d
-         /* [ @c unit : @d unit ] */ ;
+         /* [ unit : unit ] */ ;
          DROP 2
          /* [] */ ;
          UNIT @b
-         /* [ @b unit ] */ ;
+         /* [ unit ] */ ;
          UNIT @a
-         /* [ @a unit : @b unit ] */ ;
+         /* [ unit : unit ] */ ;
          PAIR %@ %@
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR %a %b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR % %b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR %a %
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR % %
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR %a
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR %
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR %a %b @a @b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR @a @b %a %b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR @a @% %a %b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR @% @% %a %b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DUP
-         /* [ pair (unit %a @a) (unit %b @b) : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit : pair unit unit ] */ ;
          UNPAIR @% @b %a %b
-         /* [ @a unit : @b unit : pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ unit : unit : pair unit unit ] */ ;
          DROP 2
-         /* [ pair (unit %a @a) (unit %b @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          DROP
          /* [] */ ;
          UNIT @d
-         /* [ @d unit ] */ ;
+         /* [ unit ] */ ;
          UNIT @c
-         /* [ @c unit : @d unit ] */ ;
+         /* [ unit : unit ] */ ;
          PAIR %a %b
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR %a %b
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR % %b
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR %a %
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR % %
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR %a
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR %
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR
-         /* [ @c unit : @d unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR %a %b @a @b
-         /* [ @a unit : @b unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @a @b %a %b
-         /* [ @a unit : @b unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @a @% %a %b
-         /* [ @a unit : @b unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @% @% %a %b
-         /* [ @a unit : @b unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ pair (unit %a @c) (unit %b @d) : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @% @b %a %b
-         /* [ @a unit : @b unit : pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ pair (unit %a @c) (unit %b @d) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DROP
          /* [] */ ;
          UNIT
@@ -237,31 +237,31 @@ Gas remaining: 1039903.879 units remaining
          DUP
          /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR %a %b @a @b
-         /* [ @a unit : @b unit : pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
          /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
          /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @a @b %a %b
-         /* [ @a unit : @b unit : pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
          /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
          /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @a @% %a %b
-         /* [ @a unit : @b unit : pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
          /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
          /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @% @% %a %b
-         /* [ @a unit : @b unit : pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
          /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
          /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @% @b %a %b
-         /* [ @a unit : @b unit : pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
          /* [ pair (unit %a) (unit %b) ] */ ;
          DROP
@@ -271,47 +271,47 @@ Gas remaining: 1039903.879 units remaining
          UNIT
          /* [ unit : unit ] */ ;
          PAIR %a %b @p
-         /* [ @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ @p pair (unit %a) (unit %b) : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @%% @b
-         /* [ @p.a unit : @b unit : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ @p pair (unit %a) (unit %b) : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @a @%%
-         /* [ @a unit : @p.b unit : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ @p pair (unit %a) (unit %b) : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @%% @%%
-         /* [ @p.a unit : @p.b unit : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ @p pair (unit %a) (unit %b) : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @% @%%
-         /* [ @a unit : @p.b unit : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DUP
-         /* [ @p pair (unit %a) (unit %b) : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) : pair (unit %a) (unit %b) ] */ ;
          UNPAIR @%% @%
-         /* [ @p.a unit : @b unit : @p pair (unit %a) (unit %b) ] */ ;
+         /* [ unit : unit : pair (unit %a) (unit %b) ] */ ;
          DROP 2
-         /* [ @p pair (unit %a) (unit %b) ] */ ;
+         /* [ pair (unit %a) (unit %b) ] */ ;
          DROP
          /* [] */ ;
          UNIT @b
-         /* [ @b unit ] */ ;
+         /* [ unit ] */ ;
          UNIT @a
-         /* [ @a unit : @b unit ] */ ;
+         /* [ unit : unit ] */ ;
          PAIR @c
-         /* [ @c pair (unit @a) (unit @b) ] */ ;
+         /* [ pair unit unit ] */ ;
          UNPAIR @b @a
-         /* [ @b unit : @a unit ] */ ;
+         /* [ unit : unit ] */ ;
          DROP 2
          /* [] */ ;
          UNIT

@@ -5,22 +5,21 @@ Gas remaining: 1039921.322 units remaining
 { parameter unit ;
   storage (option address) ;
   code { SENDER
-         /* [ @sender address : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ address : pair (unit @parameter) (option @storage address) ] */ ;
          SELF
-         /* [ @self contract unit : @sender address
+         /* [ contract unit : address
             : pair (unit @parameter) (option @storage address) ] */ ;
          ADDRESS
-         /* [ @self.address address : @sender address
-            : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ address : address : pair (unit @parameter) (option @storage address) ] */ ;
          { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
            COMPARE
-           /* [ mutez : @amount mutez
+           /* [ mutez : mutez
               : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ ;
            EQ
            /* [ bool : pair (unit @parameter) (option @storage address) ] */ ;
            IF { CDR
-                /* [ @storage option address ] */ ;
-                { /* [ mutez : @amount mutez
+                /* [ option address ] */ ;
+                { /* [ mutez : mutez
                      : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
                   IF_NONE
                     { { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
@@ -37,118 +36,89 @@ Gas remaining: 1039921.322 units remaining
                       /* [ list operation ] */ }
                 /* [] */ ;
                 DUP
-                /* [ @parameter or (or (nat %add) (nat %sub)) (unit %default)
+                /* [ or (or (nat %add) (nat %sub)) (unit %default)
                    : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ ;
-                CONTRACT %add
-                  unit
-                /* [ @parameter or (or (nat %add) (nat %sub)) (unit %default) : @storage int ] */ ;
+                CONTRACT %add unit
+                /* [ or (or (nat %add) (nat %sub)) (unit %default) : int ] */ ;
                 { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
                   IF_NONE
-                    { /* [ @storage.some address : list operation ] */ }
+                    { /* [ address : list operation ] */ }
                     { { UNIT /* [ int ] */ ; FAILWITH /* [] */ } } } ;
                 DUP
-                /* [ @storage int : @parameter.left.sub nat ] */ ;
+                /* [ int : nat ] */ ;
                 CONTRACT %fact nat
                 /* [ int ] */ ;
-                { /* [ @parameter.default unit : @storage int ] */
+                { /* [ unit : int ] */
                   IF_NONE { /* [] */ } { { UNIT /* [ list operation : int ] */ ; FAILWITH /* [] */ } }
                   /* [] */ } ;
                 DUP
                 /* [ pair (list operation) int ] */ ;
-                CONTRACT %add
-                  nat
-                /* [ @storage.some.contract option (contract nat) : @storage.some address
-                   : list operation ] */ ;
+                CONTRACT %add nat
+                /* [ option (contract nat) : address : list operation ] */ ;
                 { IF_NONE
-                    { { UNIT /* [ unit : @storage.some address : list operation ] */ ; FAILWITH /* [] */ } }
-                    { /* [ @storage.some.contract.some contract nat : @storage.some address
-                         : list operation ] */ } } ;
-                PUSH mutez
-                     0
-                /* [ mutez : @storage.some.contract.some contract nat : @storage.some address
-                   : list operation ] */ ;
-                PUSH nat
-                     12
-                /* [ nat : mutez : @storage.some.contract.some contract nat
-                   : @storage.some address : list operation ] */ ;
+                    { { UNIT /* [ unit : address : list operation ] */ ; FAILWITH /* [] */ } }
+                    { /* [ contract nat : address : list operation ] */ } } ;
+                PUSH mutez 0
+                /* [ mutez : contract nat : address : list operation ] */ ;
+                PUSH nat 12
+                /* [ nat : mutez : contract nat : address : list operation ] */ ;
                 TRANSFER_TOKENS
-                /* [ operation : @storage.some address : list operation ] */ ;
+                /* [ operation : address : list operation ] */ ;
                 SWAP
-                /* [ @storage.some address : operation : list operation ] */ ;
+                /* [ address : operation : list operation ] */ ;
                 DIP { CONS /* [ list operation ] */ }
-                /* [ @storage.some address : list operation ] */ ;
+                /* [ address : list operation ] */ ;
                 DUP
-                /* [ @storage.some address : @storage.some address : list operation ] */ ;
-                CONTRACT
-                  unit
-                /* [ @storage.some.contract option (contract unit) : @storage.some address
-                   : list operation ] */ ;
+                /* [ address : address : list operation ] */ ;
+                CONTRACT unit
+                /* [ option (contract unit) : address : list operation ] */ ;
                 { IF_NONE
-                    { { UNIT /* [ unit : @storage.some address : list operation ] */ ; FAILWITH /* [] */ } }
-                    { /* [ @storage.some.contract.some contract unit : @storage.some address
-                         : list operation ] */ } } ;
-                PUSH mutez
-                     0
-                /* [ mutez : @storage.some.contract.some contract unit : @storage.some address
-                   : list operation ] */ ;
-                PUSH unit
-                     Unit
-                /* [ unit : mutez : @storage.some.contract.some contract unit
-                   : @storage.some address : list operation ] */ ;
+                    { { UNIT /* [ unit : address : list operation ] */ ; FAILWITH /* [] */ } }
+                    { /* [ contract unit : address : list operation ] */ } } ;
+                PUSH mutez 0
+                /* [ mutez : contract unit : address : list operation ] */ ;
+                PUSH unit Unit
+                /* [ unit : mutez : contract unit : address : list operation ] */ ;
                 TRANSFER_TOKENS
-                /* [ operation : @storage.some address : list operation ] */ ;
+                /* [ operation : address : list operation ] */ ;
                 SWAP
-                /* [ @storage.some address : operation : list operation ] */ ;
+                /* [ address : operation : list operation ] */ ;
                 DIP { CONS /* [ list operation ] */ }
-                /* [ @storage.some address : list operation ] */ ;
+                /* [ address : list operation ] */ ;
                 DUP
-                /* [ @storage.some address : @storage.some address : list operation ] */ ;
-                CONTRACT %sub
-                  nat
-                /* [ @storage.some.contract option (contract nat) : @storage.some address
-                   : list operation ] */ ;
+                /* [ address : address : list operation ] */ ;
+                CONTRACT %sub nat
+                /* [ option (contract nat) : address : list operation ] */ ;
                 { IF_NONE
-                    { { UNIT /* [ unit : @storage.some address : list operation ] */ ; FAILWITH /* [] */ } }
-                    { /* [ @storage.some.contract.some contract nat : @storage.some address
-                         : list operation ] */ } } ;
-                PUSH mutez
-                     0
-                /* [ mutez : @storage.some.contract.some contract nat : @storage.some address
-                   : list operation ] */ ;
-                PUSH nat
-                     3
-                /* [ nat : mutez : @storage.some.contract.some contract nat
-                   : @storage.some address : list operation ] */ ;
+                    { { UNIT /* [ unit : address : list operation ] */ ; FAILWITH /* [] */ } }
+                    { /* [ contract nat : address : list operation ] */ } } ;
+                PUSH mutez 0
+                /* [ mutez : contract nat : address : list operation ] */ ;
+                PUSH nat 3
+                /* [ nat : mutez : contract nat : address : list operation ] */ ;
                 TRANSFER_TOKENS
-                /* [ operation : @storage.some address : list operation ] */ ;
+                /* [ operation : address : list operation ] */ ;
                 SWAP
-                /* [ @storage.some address : operation : list operation ] */ ;
+                /* [ address : operation : list operation ] */ ;
                 DIP { CONS /* [ list operation ] */ }
-                /* [ @storage.some address : list operation ] */ ;
+                /* [ address : list operation ] */ ;
                 DUP
-                /* [ @storage.some address : @storage.some address : list operation ] */ ;
-                CONTRACT %add
-                  nat
-                /* [ @storage.some.contract option (contract nat) : @storage.some address
-                   : list operation ] */ ;
+                /* [ address : address : list operation ] */ ;
+                CONTRACT %add nat
+                /* [ option (contract nat) : address : list operation ] */ ;
                 { IF_NONE
-                    { { UNIT /* [ unit : @storage.some address : list operation ] */ ; FAILWITH /* [] */ } }
-                    { /* [ @storage.some.contract.some contract nat : @storage.some address
-                         : list operation ] */ } } ;
-                PUSH mutez
-                     0
-                /* [ mutez : @storage.some.contract.some contract nat : @storage.some address
-                   : list operation ] */ ;
-                PUSH nat
-                     5
-                /* [ nat : mutez : @storage.some.contract.some contract nat
-                   : @storage.some address : list operation ] */ ;
+                    { { UNIT /* [ unit : address : list operation ] */ ; FAILWITH /* [] */ } }
+                    { /* [ contract nat : address : list operation ] */ } } ;
+                PUSH mutez 0
+                /* [ mutez : contract nat : address : list operation ] */ ;
+                PUSH nat 5
+                /* [ nat : mutez : contract nat : address : list operation ] */ ;
                 TRANSFER_TOKENS
-                /* [ operation : @storage.some address : list operation ] */ ;
+                /* [ operation : address : list operation ] */ ;
                 SWAP
-                /* [ @storage.some address : operation : list operation ] */ ;
+                /* [ address : operation : list operation ] */ ;
                 DIP { CONS /* [ list operation ] */ }
-                /* [ @storage.some address : list operation ] */ ;
+                /* [ address : list operation ] */ ;
                 DROP
                 /* [ list operation ] */ ;
                 DIP { NONE address /* [ option address ] */ }
@@ -156,16 +126,16 @@ Gas remaining: 1039921.322 units remaining
                 PAIR
                 /* [ pair (list operation) (option address) ] */ }
               { CAR
-                /* [ @parameter unit ] */ ;
+                /* [ unit ] */ ;
                 DUP
-                /* [ @parameter unit : @parameter unit ] */ ;
+                /* [ unit : unit ] */ ;
                 DIP { DIP { PUSH int 0
                             /* [ int ] */ ;
                             PUSH mutez 0
                             /* [ mutez : int ] */ ;
                             NONE key_hash
                             /* [ option key_hash : mutez : int ] */ }
-                      /* [ @parameter unit : option key_hash : mutez : int ] */ ;
+                      /* [ unit : option key_hash : mutez : int ] */ ;
                       DROP
                       /* [ option key_hash : mutez : int ] */ ;
                       CREATE_CONTRACT
@@ -181,12 +151,12 @@ Gas remaining: 1039921.322 units remaining
                                  NIL operation ;
                                  PAIR } }
                       /* [ operation : address ] */ }
-                /* [ @parameter unit : operation : address ] */ ;
+                /* [ unit : operation : address ] */ ;
                 DIP { SELF
-                      /* [ @self contract unit : operation : address ] */ ;
+                      /* [ contract unit : operation : address ] */ ;
                       PUSH mutez 0
-                      /* [ mutez : @self contract unit : operation : address ] */ }
-                /* [ @parameter unit : mutez : @self contract unit : operation : address ] */ ;
+                      /* [ mutez : contract unit : operation : address ] */ }
+                /* [ unit : mutez : contract unit : operation : address ] */ ;
                 TRANSFER_TOKENS
                 /* [ operation : operation : address ] */ ;
                 NIL operation

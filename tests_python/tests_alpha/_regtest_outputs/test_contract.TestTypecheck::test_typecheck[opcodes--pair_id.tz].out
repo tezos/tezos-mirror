@@ -5,7 +5,7 @@ Gas remaining: 1039995.649 units remaining
 { parameter (pair bool bool) ;
   storage (option (pair bool bool)) ;
   code { CAR
-         /* [ @parameter pair bool bool ] */ ;
+         /* [ pair bool bool ] */ ;
          SOME
          /* [ option (pair bool bool) ] */ ;
          NIL operation

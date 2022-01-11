@@ -5,8 +5,8 @@ Gas remaining: 1039995.173 units remaining
 { parameter (list bytes) ;
   storage (list bytes) ;
   code { CAR
-         /* [ @parameter list bytes ] */ ;
-         MAP { PUSH bytes 0xff /* [ bytes : @parameter.elt bytes ] */ ; CONCAT /* [ bytes ] */ }
+         /* [ list bytes ] */ ;
+         MAP { PUSH bytes 0xff /* [ bytes : bytes ] */ ; CONCAT /* [ bytes ] */ }
          /* [ list bytes ] */ ;
          NIL operation
          /* [ list operation : list bytes ] */ ;

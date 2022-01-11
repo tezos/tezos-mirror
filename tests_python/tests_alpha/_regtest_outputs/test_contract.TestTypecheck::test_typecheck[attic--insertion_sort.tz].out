@@ -5,51 +5,51 @@ Gas remaining: 1039971.505 units remaining
 { parameter (list int) ;
   storage (list int) ;
   code { CAR
-         /* [ @parameter list int ] */ ;
+         /* [ list int ] */ ;
          NIL int
-         /* [ list int : @parameter list int ] */ ;
+         /* [ list int : list int ] */ ;
          SWAP
-         /* [ @parameter list int : list int ] */ ;
+         /* [ list int : list int ] */ ;
          ITER { SWAP
-                /* [ list int : @parameter.elt int ] */ ;
+                /* [ list int : int ] */ ;
                 DIIP { NIL int /* [ list int ] */ }
-                /* [ list int : @parameter.elt int : list int ] */ ;
+                /* [ list int : int : list int ] */ ;
                 PUSH bool True
-                /* [ bool : list int : @parameter.elt int : list int ] */ ;
+                /* [ bool : list int : int : list int ] */ ;
                 LOOP { IF_CONS
                          { SWAP
-                           /* [ @tl list int : @hd int : @parameter.elt int : list int ] */ ;
+                           /* [ list int : int : int : list int ] */ ;
                            DIP { DUP
-                                 /* [ @hd int : @hd int : @parameter.elt int : list int ] */ ;
-                                 DIIP { DUP /* [ @parameter.elt int : @parameter.elt int : list int ] */ }
-                                 /* [ @hd int : @hd int : @parameter.elt int : @parameter.elt int : list int ] */ ;
+                                 /* [ int : int : int : list int ] */ ;
+                                 DIIP { DUP /* [ int : int : list int ] */ }
+                                 /* [ int : int : int : int : list int ] */ ;
                                  DIP { CMPLT }
-                                 /* [ @hd int : bool : @parameter.elt int : list int ] */ ;
+                                 /* [ int : bool : int : list int ] */ ;
                                  SWAP
-                                 /* [ bool : @hd int : @parameter.elt int : list int ] */ }
-                           /* [ @tl list int : bool : @hd int : @parameter.elt int : list int ] */ ;
+                                 /* [ bool : int : int : list int ] */ }
+                           /* [ list int : bool : int : int : list int ] */ ;
                            SWAP
-                           /* [ bool : @tl list int : @hd int : @parameter.elt int : list int ] */ ;
+                           /* [ bool : list int : int : int : list int ] */ ;
                            IF { DIP { SWAP
-                                      /* [ @parameter.elt int : @hd int : list int ] */ ;
+                                      /* [ int : int : list int ] */ ;
                                       DIP { CONS /* [ list int ] */ }
-                                      /* [ @parameter.elt int : list int ] */ }
-                                /* [ @tl list int : @parameter.elt int : list int ] */ ;
+                                      /* [ int : list int ] */ }
+                                /* [ list int : int : list int ] */ ;
                                 PUSH bool True
-                                /* [ bool : @tl list int : @parameter.elt int : list int ] */ }
+                                /* [ bool : list int : int : list int ] */ }
                               { SWAP
-                                /* [ @hd int : @tl list int : @parameter.elt int : list int ] */ ;
+                                /* [ int : list int : int : list int ] */ ;
                                 CONS
-                                /* [ list int : @parameter.elt int : list int ] */ ;
+                                /* [ list int : int : list int ] */ ;
                                 PUSH bool False
-                                /* [ bool : list int : @parameter.elt int : list int ] */ } }
+                                /* [ bool : list int : int : list int ] */ } }
                          { NIL int
-                           /* [ list int : @parameter.elt int : list int ] */ ;
+                           /* [ list int : int : list int ] */ ;
                            PUSH bool False
-                           /* [ bool : list int : @parameter.elt int : list int ] */ } }
-                /* [ list int : @parameter.elt int : list int ] */ ;
+                           /* [ bool : list int : int : list int ] */ } }
+                /* [ list int : int : list int ] */ ;
                 SWAP
-                /* [ @parameter.elt int : list int : list int ] */ ;
+                /* [ int : list int : list int ] */ ;
                 CONS
                 /* [ list int : list int ] */ ;
                 SWAP

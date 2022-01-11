@@ -5,10 +5,10 @@ Gas remaining: 1039996.317 units remaining
 { parameter bool ;
   storage unit ;
   code { UNPAIR
-         /* [ @parameter bool : @storage unit ] */ ;
+         /* [ bool : unit ] */ ;
          LOOP { FAILWITH /* [] */ }
-         /* [ @storage unit ] */ ;
+         /* [ unit ] */ ;
          NIL operation
-         /* [ list operation : @storage unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list operation) (unit @storage) ] */ } }
+         /* [ pair (list operation) unit ] */ } }

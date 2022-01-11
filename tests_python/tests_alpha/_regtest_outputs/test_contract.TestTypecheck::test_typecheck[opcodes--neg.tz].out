@@ -5,7 +5,7 @@ Gas remaining: 1039995.361 units remaining
 { parameter (or int nat) ;
   storage int ;
   code { CAR
-         /* [ @parameter or int nat ] */ ;
+         /* [ or int nat ] */ ;
          IF_LEFT { NEG /* [ int ] */ } { NEG /* [ int ] */ } ;
          NIL operation
          /* [ list operation : int ] */ ;

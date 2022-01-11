@@ -8,30 +8,30 @@ big_map diff
   
 trace
   - location: 10 (remaining gas: 1039988.942 units remaining)
-    [ (Pair (Pair 1 2) (Some 0xaabbcc))  	 ]
+    [ (Pair (Pair 1 2) (Some 0xaabbcc)) ]
   - location: 10 (remaining gas: 1039988.932 units remaining)
-    [ (Pair 1 2)  	@parameter
-      (Some 0xaabbcc)  	@storage ]
+    [ (Pair 1 2)
+      (Some 0xaabbcc) ]
   - location: 11 (remaining gas: 1039988.922 units remaining)
-    [ (Some 0xaabbcc)  	@storage
-      (Pair 1 2)  	@parameter ]
+    [ (Some 0xaabbcc)
+      (Pair 1 2) ]
   - location: 13 (remaining gas: 1039988.912 units remaining)
-    [ 0xaabbcc  	@storage.some
-      (Pair 1 2)  	@parameter ]
+    [ 0xaabbcc
+      (Pair 1 2) ]
   - location: 19 (remaining gas: 1039988.902 units remaining)
-    [ (Pair 1 2)  	@parameter
-      0xaabbcc  	@storage.some ]
+    [ (Pair 1 2)
+      0xaabbcc ]
   - location: 20 (remaining gas: 1039988.892 units remaining)
-    [ 1  	
-      2  	
-      0xaabbcc  	@storage.some ]
+    [ 1
+      2
+      0xaabbcc ]
   - location: 21 (remaining gas: 1039988.852 units remaining)
-    [ (Some 0xbbcc)  	 ]
+    [ (Some 0xbbcc) ]
   - location: 13 (remaining gas: 1039988.837 units remaining)
-    [ (Some 0xbbcc)  	 ]
+    [ (Some 0xbbcc) ]
   - location: 22 (remaining gas: 1039988.822 units remaining)
-    [ {}  	
-      (Some 0xbbcc)  	 ]
+    [ {}
+      (Some 0xbbcc) ]
   - location: 24 (remaining gas: 1039988.807 units remaining)
-    [ (Pair {} (Some 0xbbcc))  	 ]
+    [ (Pair {} (Some 0xbbcc)) ]
 

@@ -5,11 +5,11 @@ Gas remaining: 1039942.437 units remaining
 { parameter nat ;
   storage nat ;
   code { CAR
-         /* [ @parameter nat ] */ ;
+         /* [ nat ] */ ;
          NIL operation
-         /* [ list operation : @parameter nat ] */ ;
+         /* [ list operation : nat ] */ ;
          PAIR
-         /* [ pair (list operation) (nat @parameter) ] */ } ;
+         /* [ pair (list operation) nat ] */ } ;
   view "add" nat nat { UNPAIR /* [ nat : nat ] */ ; ADD /* [ nat ] */ } ;
   view "id" nat (pair nat nat) { /* [ pair nat nat ] */ } ;
   view "test_failwith" nat (pair nat nat) { FAILWITH /* [] */ } ;
@@ -19,28 +19,23 @@ Gas remaining: 1039942.437 units remaining
        { DROP
          /* [] */ ;
          SOURCE
-         /* [ @source address ] */ ;
+         /* [ address ] */ ;
          SENDER
-         /* [ @sender address : @source address ] */ ;
+         /* [ address : address ] */ ;
          SELF_ADDRESS
-         /* [ @self address : @sender address : @source address ] */ ;
+         /* [ address : address : address ] */ ;
          PAIR
-         /* [ pair (address @self) (address @sender) : @source address ] */ ;
+         /* [ pair address address : address ] */ ;
          PAIR
-         /* [ pair (pair (address @self) (address @sender)) (address @source) ] */ ;
+         /* [ pair (pair address address) address ] */ ;
          BALANCE
-         /* [ @balance mutez
-            : pair (pair (address @self) (address @sender)) (address @source) ] */ ;
+         /* [ mutez : pair (pair address address) address ] */ ;
          AMOUNT
-         /* [ @amount mutez : @balance mutez
-            : pair (pair (address @self) (address @sender)) (address @source) ] */ ;
+         /* [ mutez : mutez : pair (pair address address) address ] */ ;
          PAIR
-         /* [ pair (mutez @amount) (mutez @balance)
-            : pair (pair (address @self) (address @sender)) (address @source) ] */ ;
+         /* [ pair mutez mutez : pair (pair address address) address ] */ ;
          PAIR
-         /* [ pair (pair (mutez @amount) (mutez @balance))
-                 (pair (address @self) (address @sender))
-                 (address @source) ] */ } ;
+         /* [ pair (pair mutez mutez) (pair address address) address ] */ } ;
   view "succ"
        (pair nat address)
        nat
@@ -61,7 +56,7 @@ Gas remaining: 1039942.437 units remaining
          SWAP
          /* [ pair nat address : address ] */ ;
          VIEW "is_twenty" nat
-         /* [ @contract option nat ] */ ;
+         /* [ option nat ] */ ;
          ASSERT_SOME } ;
   view "is_twenty"
        (pair nat address)
@@ -86,7 +81,7 @@ Gas remaining: 1039942.437 units remaining
               SWAP
               /* [ pair nat address : address ] */ ;
               VIEW "succ" nat
-              /* [ @contract option nat ] */ ;
+              /* [ option nat ] */ ;
               ASSERT_SOME } } ;
   view "fib"
        nat
@@ -122,27 +117,27 @@ Gas remaining: 1039942.437 units remaining
                    ABS
                    /* [ nat : nat ] */ ;
                    SELF_ADDRESS
-                   /* [ @self address : nat : nat ] */ ;
+                   /* [ address : nat : nat ] */ ;
                    SWAP
-                   /* [ nat : @self address : nat ] */ ;
+                   /* [ nat : address : nat ] */ ;
                    VIEW "fib" nat
-                   /* [ @self.contract option nat : nat ] */ ;
+                   /* [ option nat : nat ] */ ;
                    IF_SOME
                      { SWAP
-                       /* [ nat : @self.contract.some nat ] */ ;
+                       /* [ nat : nat ] */ ;
                        PUSH nat 2
-                       /* [ nat : nat : @self.contract.some nat ] */ ;
+                       /* [ nat : nat : nat ] */ ;
                        SWAP
-                       /* [ nat : nat : @self.contract.some nat ] */ ;
+                       /* [ nat : nat : nat ] */ ;
                        SUB
-                       /* [ int : @self.contract.some nat ] */ ;
+                       /* [ int : nat ] */ ;
                        ABS
-                       /* [ nat : @self.contract.some nat ] */ ;
+                       /* [ nat : nat ] */ ;
                        SELF_ADDRESS
-                       /* [ @self address : nat : @self.contract.some nat ] */ ;
+                       /* [ address : nat : nat ] */ ;
                        SWAP
-                       /* [ nat : @self address : @self.contract.some nat ] */ ;
+                       /* [ nat : address : nat ] */ ;
                        VIEW "fib" nat
-                       /* [ @self.contract option nat : @self.contract.some nat ] */ ;
+                       /* [ option nat : nat ] */ ;
                        IF_SOME { ADD /* [ nat ] */ } { FAIL } }
                      { FAIL } } } } }

@@ -9,35 +9,35 @@ big_map diff
   Set map(4)["foo"] to 1
 trace
   - location: 12 (remaining gas: 1039986.718 units remaining)
-    [ (Pair "bar" { Elt "foo" 1 } None)  	 ]
+    [ (Pair "bar" { Elt "foo" 1 } None) ]
   - location: 12 (remaining gas: 1039986.708 units remaining)
-    [ "bar"  	@parameter
-      (Pair { Elt "foo" 1 } None)  	@storage ]
+    [ "bar"
+      (Pair { Elt "foo" 1 } None) ]
   - location: 13 (remaining gas: 1039986.693 units remaining)
-    [ (Pair { Elt "foo" 1 } None)  	@storage ]
+    [ (Pair { Elt "foo" 1 } None) ]
   - location: 15 (remaining gas: 1039986.683 units remaining)
-    [ { Elt "foo" 1 }  	 ]
+    [ { Elt "foo" 1 } ]
   - location: 16 (remaining gas: 1039986.673 units remaining)
-    [ { Elt "foo" 1 }  	
-      { Elt "foo" 1 }  	 ]
+    [ { Elt "foo" 1 }
+      { Elt "foo" 1 } ]
   - location: 13 (remaining gas: 1039986.643 units remaining)
-    [ "bar"  	@parameter
-      { Elt "foo" 1 }  	
-      { Elt "foo" 1 }  	 ]
+    [ "bar"
+      { Elt "foo" 1 }
+      { Elt "foo" 1 } ]
   - location: 17 (remaining gas: 1039985.665 units remaining)
-    [ False  	
-      { Elt "foo" 1 }  	 ]
+    [ False
+      { Elt "foo" 1 } ]
   - location: 18 (remaining gas: 1039985.650 units remaining)
-    [ (Some False)  	
-      { Elt "foo" 1 }  	 ]
+    [ (Some False)
+      { Elt "foo" 1 } ]
   - location: 19 (remaining gas: 1039985.640 units remaining)
-    [ { Elt "foo" 1 }  	
-      (Some False)  	 ]
+    [ { Elt "foo" 1 }
+      (Some False) ]
   - location: 20 (remaining gas: 1039985.625 units remaining)
-    [ (Pair { Elt "foo" 1 } (Some False))  	 ]
+    [ (Pair { Elt "foo" 1 } (Some False)) ]
   - location: 21 (remaining gas: 1039985.610 units remaining)
-    [ {}  	
-      (Pair { Elt "foo" 1 } (Some False))  	 ]
+    [ {}
+      (Pair { Elt "foo" 1 } (Some False)) ]
   - location: 23 (remaining gas: 1039985.595 units remaining)
-    [ (Pair {} { Elt "foo" 1 } (Some False))  	 ]
+    [ (Pair {} { Elt "foo" 1 } (Some False)) ]
 

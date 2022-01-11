@@ -8,14 +8,13 @@ Gas remaining: 1039990.103 units remaining
          /* [ pair (bool @parameter) (pair @storage (bool %b) (nat %n))
             : pair (bool @parameter) (pair @storage (bool %b) (nat %n)) ] */ ;
          CAR
-         /* [ @parameter bool
-            : pair (bool @parameter) (pair @storage (bool %b) (nat %n)) ] */ ;
-         DIP { CDR /* [ @storage pair (bool %b) (nat %n) ] */ }
-         /* [ @parameter bool : @storage pair (bool %b) (nat %n) ] */ ;
+         /* [ bool : pair (bool @parameter) (pair @storage (bool %b) (nat %n)) ] */ ;
+         DIP { CDR /* [ pair (bool %b) (nat %n) ] */ }
+         /* [ bool : pair (bool %b) (nat %n) ] */ ;
          SWAP
-         /* [ @storage pair (bool %b) (nat %n) : @parameter bool ] */ ;
+         /* [ pair (bool %b) (nat %n) : bool ] */ ;
          MAP_CAR @new_storage %b { AND /* [ bool ] */ } ;
          NIL operation
-         /* [ list operation : @storage pair (bool %b) (nat %n @storage.n) ] */ ;
+         /* [ list operation : pair (bool %b) nat ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage (bool %b) (nat %n @storage.n)) ] */ } }
+         /* [ pair (list operation) (bool %b) nat ] */ } }

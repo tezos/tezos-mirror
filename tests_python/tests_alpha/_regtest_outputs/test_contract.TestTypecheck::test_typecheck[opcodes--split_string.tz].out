@@ -5,59 +5,58 @@ Gas remaining: 1039970.057 units remaining
 { parameter string ;
   storage (list string) ;
   code { UNPAIR
-         /* [ @parameter string : @storage list string ] */ ;
+         /* [ string : list string ] */ ;
          DIP { NIL string
-               /* [ list string : @storage list string ] */ ;
+               /* [ list string : list string ] */ ;
                SWAP
-               /* [ @storage list string : list string ] */ ;
+               /* [ list string : list string ] */ ;
                ITER { CONS /* [ list string ] */ }
                /* [ list string ] */ }
-         /* [ @parameter string : list string ] */ ;
+         /* [ string : list string ] */ ;
          DUP
-         /* [ @parameter string : @parameter string : list string ] */ ;
+         /* [ string : string : list string ] */ ;
          SIZE
-         /* [ nat : @parameter string : list string ] */ ;
+         /* [ nat : string : list string ] */ ;
          PUSH nat 0
-         /* [ nat : nat : @parameter string : list string ] */ ;
+         /* [ nat : nat : string : list string ] */ ;
          CMPNEQ ;
-         DIP { PUSH @index nat 0 /* [ @index nat : @parameter string : list string ] */ }
-         /* [ bool : @index nat : @parameter string : list string ] */ ;
+         DIP { PUSH @index nat 0 /* [ nat : string : list string ] */ }
+         /* [ bool : nat : string : list string ] */ ;
          LOOP { PAIR
-                /* [ pair (nat @index) (string @parameter) : list string ] */ ;
+                /* [ pair nat string : list string ] */ ;
                 DUP
-                /* [ pair (nat @index) (string @parameter)
-                   : pair (nat @index) (string @parameter) : list string ] */ ;
+                /* [ pair nat string : pair nat string : list string ] */ ;
                 DIP { UNPAIR
-                      /* [ @index nat : @parameter string : list string ] */ ;
-                      DIP { PUSH nat 1 /* [ nat : @parameter string : list string ] */ }
-                      /* [ @index nat : nat : @parameter string : list string ] */ ;
+                      /* [ nat : string : list string ] */ ;
+                      DIP { PUSH nat 1 /* [ nat : string : list string ] */ }
+                      /* [ nat : nat : string : list string ] */ ;
                       SLICE
-                      /* [ @parameter.slice option string : list string ] */ ;
+                      /* [ option string : list string ] */ ;
                       ASSERT_SOME ;
                       CONS @storage
-                      /* [ @storage list string ] */ }
-                /* [ pair (nat @index) (string @parameter) : @storage list string ] */ ;
+                      /* [ list string ] */ }
+                /* [ pair nat string : list string ] */ ;
                 UNPAIR
-                /* [ @index nat : @parameter string : @storage list string ] */ ;
+                /* [ nat : string : list string ] */ ;
                 PUSH nat 1
-                /* [ nat : @index nat : @parameter string : @storage list string ] */ ;
+                /* [ nat : nat : string : list string ] */ ;
                 ADD @index
-                /* [ @index nat : @parameter string : @storage list string ] */ ;
+                /* [ nat : string : list string ] */ ;
                 DUP
-                /* [ @index nat : @index nat : @parameter string : @storage list string ] */ ;
-                DIP { DIP { DUP /* [ @parameter string : @parameter string : @storage list string ] */ }
-                      /* [ @index nat : @parameter string : @parameter string : @storage list string ] */ ;
+                /* [ nat : nat : string : list string ] */ ;
+                DIP { DIP { DUP /* [ string : string : list string ] */ }
+                      /* [ nat : string : string : list string ] */ ;
                       SWAP
-                      /* [ @parameter string : @index nat : @parameter string : @storage list string ] */ ;
+                      /* [ string : nat : string : list string ] */ ;
                       SIZE
-                      /* [ nat : @index nat : @parameter string : @storage list string ] */ ;
+                      /* [ nat : nat : string : list string ] */ ;
                       CMPNEQ }
-                /* [ @index nat : bool : @parameter string : @storage list string ] */ ;
+                /* [ nat : bool : string : list string ] */ ;
                 SWAP
-                /* [ bool : @index nat : @parameter string : @storage list string ] */ }
-         /* [ @index nat : @parameter string : list string ] */ ;
+                /* [ bool : nat : string : list string ] */ }
+         /* [ nat : string : list string ] */ ;
          DROP
-         /* [ @parameter string : list string ] */ ;
+         /* [ string : list string ] */ ;
          DROP
          /* [ list string ] */ ;
          NIL string

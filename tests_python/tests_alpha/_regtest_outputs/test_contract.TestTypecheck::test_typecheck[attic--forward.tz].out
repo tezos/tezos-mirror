@@ -52,7 +52,7 @@ Gas remaining: 1039634.172 units remaining
                     (pair address address)
                     address) ] */ ;
          NOW
-         /* [ @now timestamp : timestamp
+         /* [ timestamp : timestamp
             : pair (or @parameter string nat)
                  (pair @storage
                     (pair nat mutez mutez)
@@ -94,7 +94,7 @@ Gas remaining: 1039634.172 units remaining
                          (pair address address)
                          address) ] */ ;
               CAR
-              /* [ @parameter or string nat
+              /* [ or string nat
                  : pair (or @parameter string nat)
                       (pair @storage
                          (pair nat mutez mutez)
@@ -104,7 +104,7 @@ Gas remaining: 1039634.172 units remaining
                          address) ] */ ;
               IF_LEFT
                 { DUP
-                  /* [ @parameter.left string : @parameter.left string
+                  /* [ string : string
                      : pair (or @parameter string nat)
                           (pair @storage
                              (pair nat mutez mutez)
@@ -114,7 +114,7 @@ Gas remaining: 1039634.172 units remaining
                              address) ] */ ;
                   PUSH string
                        "buyer"
-                  /* [ string : @parameter.left string : @parameter.left string
+                  /* [ string : string : string
                      : pair (or @parameter string nat)
                           (pair @storage
                              (pair nat mutez mutez)
@@ -123,7 +123,7 @@ Gas remaining: 1039634.172 units remaining
                              (pair address address)
                              address) ] */ ;
                   COMPARE
-                  /* [ int : @parameter.left string
+                  /* [ int : string
                      : pair (or @parameter string nat)
                           (pair @storage
                              (pair nat mutez mutez)
@@ -132,7 +132,7 @@ Gas remaining: 1039634.172 units remaining
                              (pair address address)
                              address) ] */ ;
                   EQ
-                  /* [ bool : @parameter.left string
+                  /* [ bool : string
                      : pair (or @parameter string nat)
                           (pair @storage
                              (pair nat mutez mutez)
@@ -165,7 +165,7 @@ Gas remaining: 1039634.172 units remaining
                                   address) ] */ ;
                        CDADAR ;
                        DIP { AMOUNT
-                             /* [ @amount mutez
+                             /* [ mutez
                                 : pair (or @parameter string nat)
                                      (pair @storage
                                         (pair nat mutez mutez)
@@ -173,7 +173,7 @@ Gas remaining: 1039634.172 units remaining
                                         (pair mutez mutez)
                                         (pair address address)
                                         address) ] */ }
-                       /* [ mutez : @amount mutez
+                       /* [ mutez : mutez
                           : pair (or @parameter string nat)
                                (pair @storage
                                   (pair nat mutez mutez)
@@ -267,7 +267,7 @@ Gas remaining: 1039634.172 units remaining
                                address ] */ }
                      { PUSH string
                             "seller"
-                       /* [ string : @parameter.left string
+                       /* [ string : string
                           : pair (or @parameter string nat)
                                (pair @storage
                                   (pair nat mutez mutez)
@@ -310,7 +310,7 @@ Gas remaining: 1039634.172 units remaining
                                        address) ] */ ;
                             CDADDR ;
                             DIP { AMOUNT
-                                  /* [ @amount mutez
+                                  /* [ mutez
                                      : pair (or @parameter string nat)
                                           (pair @storage
                                              (pair nat mutez mutez)
@@ -318,7 +318,7 @@ Gas remaining: 1039634.172 units remaining
                                              (pair mutez mutez)
                                              (pair address address)
                                              address) ] */ }
-                            /* [ mutez : @amount mutez
+                            /* [ mutez : mutez
                                : pair (or @parameter string nat)
                                     (pair @storage
                                        (pair nat mutez mutez)
@@ -422,7 +422,7 @@ Gas remaining: 1039634.172 units remaining
                           { FAIL } } }
                 { FAIL } }
             { BALANCE
-              /* [ @balance mutez
+              /* [ mutez
                  : pair (or @parameter string nat)
                       (pair @storage
                          (pair nat mutez mutez)
@@ -432,7 +432,7 @@ Gas remaining: 1039634.172 units remaining
                          address) ] */ ;
               PUSH mutez
                    0
-              /* [ mutez : @balance mutez
+              /* [ mutez : mutez
                  : pair (or @parameter string nat)
                       (pair @storage
                          (pair nat mutez mutez)
@@ -518,7 +518,7 @@ Gas remaining: 1039634.172 units remaining
                          (pair address address)
                          address) ] */ ;
               BALANCE
-              /* [ @balance mutez : mutez
+              /* [ mutez : mutez
                  : pair (or @parameter string nat)
                       (pair @storage
                          (pair nat mutez mutez)
@@ -545,295 +545,294 @@ Gas remaining: 1039634.172 units remaining
                          (pair address address)
                          address) ] */ ;
               IF { CDR
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    DUP
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    CADAR ;
                    DIP { DUP
-                         /* [ @storage pair (pair nat mutez mutez)
+                         /* [ pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address
-                            : @storage pair (pair nat mutez mutez)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address ] */ ;
                          CDDDAAR }
                    /* [ mutez : address
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    DIP { CONTRACT
                            unit
-                         /* [ @contract option (contract unit)
-                            : @storage pair (pair nat mutez mutez)
+                         /* [ option (contract unit)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address ] */ ;
                          ASSERT_SOME }
-                   /* [ mutez : @contract.some contract unit
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ mutez : contract unit
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    UNIT
-                   /* [ unit : mutez : @contract.some contract unit
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ unit : mutez : contract unit
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    TRANSFER_TOKENS
                    /* [ operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    NIL operation
                    /* [ list operation : operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    SWAP
                    /* [ operation : list operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    CONS
                    /* [ list operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    SWAP
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    DUP
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    CADDR ;
                    DIP { DUP
-                         /* [ @storage pair (pair nat mutez mutez)
+                         /* [ pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address
-                            : @storage pair (pair nat mutez mutez)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address : list operation ] */ ;
                          CDDDADR }
                    /* [ mutez : address
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    DIP { CONTRACT
                            unit
-                         /* [ @contract option (contract unit)
-                            : @storage pair (pair nat mutez mutez)
+                         /* [ option (contract unit)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address : list operation ] */ ;
                          ASSERT_SOME }
-                   /* [ mutez : @contract.some contract unit
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ mutez : contract unit
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    UNIT
-                   /* [ unit : mutez : @contract.some contract unit
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ unit : mutez : contract unit
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    TRANSFER_TOKENS
                    /* [ operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    SWAP
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : operation : list operation ] */ ;
                    DIP { CONS /* [ list operation ] */ }
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    DUP
-                   /* [ @storage pair (pair nat mutez mutez)
+                   /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    CADAR ;
                    DIP { DUP
-                         /* [ @storage pair (pair nat mutez mutez)
+                         /* [ pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address
-                            : @storage pair (pair nat mutez mutez)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address : list operation ] */ ;
                          CADDR }
                    /* [ mutez : mutez
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    ADD
                    /* [ mutez
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    BALANCE
-                   /* [ @balance mutez : mutez
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ mutez : mutez
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    SUB_MUTEZ
                    /* [ option mutez
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    ASSERT_SOME ;
                    DIP { DUP
-                         /* [ @storage pair (pair nat mutez mutez)
+                         /* [ pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address
-                            : @storage pair (pair nat mutez mutez)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address : list operation ] */ ;
                          CDDDDR }
-                   /* [ @some mutez : address
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ mutez : address
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    DIP { CONTRACT
                            unit
-                         /* [ @contract option (contract unit)
-                            : @storage pair (pair nat mutez mutez)
+                         /* [ option (contract unit)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address : list operation ] */ ;
                          ASSERT_SOME }
-                   /* [ @some mutez : @contract.some contract unit
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ mutez : contract unit
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    UNIT
-                   /* [ unit : @some mutez : @contract.some contract unit
-                      : @storage pair (pair nat mutez mutez)
+                   /* [ unit : mutez : contract unit
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    TRANSFER_TOKENS
                    /* [ operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address : list operation ] */ ;
                    DIP { SWAP
                          /* [ list operation
-                            : @storage pair (pair nat mutez mutez)
+                            : pair (pair nat mutez mutez)
                                  (pair nat timestamp timestamp)
                                  (pair mutez mutez)
                                  (pair address address)
                                  address ] */ }
                    /* [ operation : list operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    CONS
                    /* [ list operation
-                      : @storage pair (pair nat mutez mutez)
+                      : pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
                            (pair mutez mutez)
                            (pair address address)
                            address ] */ ;
                    PAIR
                    /* [ pair (list operation)
-                           (pair @storage
-                              (pair nat mutez mutez)
-                              (pair nat timestamp timestamp)
-                              (pair mutez mutez)
-                              (pair address address)
-                              address) ] */ }
+                           (pair nat mutez mutez)
+                           (pair nat timestamp timestamp)
+                           (pair mutez mutez)
+                           (pair address address)
+                           address ] */ }
                  { DUP
                    /* [ pair (or @parameter string nat)
                            (pair @storage
@@ -851,7 +850,7 @@ Gas remaining: 1039634.172 units remaining
                               address) ] */ ;
                    CDDADAR ;
                    NOW
-                   /* [ @now timestamp : timestamp
+                   /* [ timestamp : timestamp
                       : pair (or @parameter string nat)
                            (pair @storage
                               (pair nat mutez mutez)
@@ -914,7 +913,7 @@ Gas remaining: 1039634.172 units remaining
                                    (pair address address)
                                    address) ] */ ;
                         NOW
-                        /* [ @now timestamp : timestamp
+                        /* [ timestamp : timestamp
                            : pair (or @parameter string nat)
                                 (pair @storage
                                    (pair nat mutez mutez)
@@ -956,7 +955,7 @@ Gas remaining: 1039634.172 units remaining
                                         (pair address address)
                                         address) ] */ ;
                              CAR
-                             /* [ @parameter or string nat
+                             /* [ or string nat
                                 : pair (or @parameter string nat)
                                      (pair @storage
                                         (pair nat mutez mutez)
@@ -967,7 +966,7 @@ Gas remaining: 1039634.172 units remaining
                              IF_LEFT
                                { PUSH string
                                       "buyer"
-                                 /* [ string : @parameter.left string
+                                 /* [ string : string
                                     : pair (or @parameter string nat)
                                          (pair @storage
                                             (pair nat mutez mutez)
@@ -1010,7 +1009,7 @@ Gas remaining: 1039634.172 units remaining
                                                  address) ] */ ;
                                       CDADAR ;
                                       DIP { AMOUNT
-                                            /* [ @amount mutez
+                                            /* [ mutez
                                                : pair (or @parameter string nat)
                                                     (pair @storage
                                                        (pair nat mutez mutez)
@@ -1018,7 +1017,7 @@ Gas remaining: 1039634.172 units remaining
                                                        (pair mutez mutez)
                                                        (pair address address)
                                                        address) ] */ }
-                                      /* [ mutez : @amount mutez
+                                      /* [ mutez : mutez
                                          : pair (or @parameter string nat)
                                               (pair @storage
                                                  (pair nat mutez mutez)
@@ -1304,7 +1303,7 @@ Gas remaining: 1039634.172 units remaining
                                         (pair address address)
                                         address) ] */ ;
                              IF { BALANCE
-                                  /* [ @balance mutez
+                                  /* [ mutez
                                      : pair (or @parameter string nat)
                                           (pair @storage
                                              (pair nat mutez mutez)
@@ -1328,7 +1327,7 @@ Gas remaining: 1039634.172 units remaining
                                                    (pair address address)
                                                    address) ] */ ;
                                         CDDDDADR }
-                                  /* [ @balance mutez : address
+                                  /* [ mutez : address
                                      : pair (or @parameter string nat)
                                           (pair @storage
                                              (pair nat mutez mutez)
@@ -1337,75 +1336,74 @@ Gas remaining: 1039634.172 units remaining
                                              (pair address address)
                                              address) ] */ ;
                                   DIIP { CDR
-                                         /* [ @storage pair (pair nat mutez mutez)
+                                         /* [ pair (pair nat mutez mutez)
                                                  (pair nat timestamp timestamp)
                                                  (pair mutez mutez)
                                                  (pair address address)
                                                  address ] */ }
-                                  /* [ @balance mutez : address
-                                     : @storage pair (pair nat mutez mutez)
+                                  /* [ mutez : address
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   DIP { CONTRACT
                                           unit
-                                        /* [ @contract option (contract unit)
-                                           : @storage pair (pair nat mutez mutez)
+                                        /* [ option (contract unit)
+                                           : pair (pair nat mutez mutez)
                                                 (pair nat timestamp timestamp)
                                                 (pair mutez mutez)
                                                 (pair address address)
                                                 address ] */ ;
                                         ASSERT_SOME }
-                                  /* [ @balance mutez : @contract.some contract unit
-                                     : @storage pair (pair nat mutez mutez)
+                                  /* [ mutez : contract unit
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   UNIT
-                                  /* [ unit : @balance mutez : @contract.some contract unit
-                                     : @storage pair (pair nat mutez mutez)
+                                  /* [ unit : mutez : contract unit
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   TRANSFER_TOKENS
                                   /* [ operation
-                                     : @storage pair (pair nat mutez mutez)
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   NIL operation
                                   /* [ list operation : operation
-                                     : @storage pair (pair nat mutez mutez)
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   SWAP
                                   /* [ operation : list operation
-                                     : @storage pair (pair nat mutez mutez)
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   CONS
                                   /* [ list operation
-                                     : @storage pair (pair nat mutez mutez)
+                                     : pair (pair nat mutez mutez)
                                           (pair nat timestamp timestamp)
                                           (pair mutez mutez)
                                           (pair address address)
                                           address ] */ ;
                                   PAIR
                                   /* [ pair (list operation)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ }
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ }
                                 { DUP
                                   /* [ pair (or @parameter string nat)
                                           (pair @storage
@@ -1461,7 +1459,7 @@ Gas remaining: 1039634.172 units remaining
                                              (pair address address)
                                              address) ] */ ;
                                   NOW
-                                  /* [ @now timestamp : timestamp
+                                  /* [ timestamp : timestamp
                                      : pair (or @parameter string nat)
                                           (pair @storage
                                              (pair nat mutez mutez)
@@ -1504,7 +1502,7 @@ Gas remaining: 1039634.172 units remaining
                                                   address) ] */ ;
                                        CDDDDDR ;
                                        SENDER
-                                       /* [ @sender address : address
+                                       /* [ address : address
                                           : pair (or @parameter string nat)
                                                (pair @storage
                                                   (pair nat mutez mutez)
@@ -1554,7 +1552,7 @@ Gas remaining: 1039634.172 units remaining
                                                   (pair address address)
                                                   address) ] */ ;
                                        CAR
-                                       /* [ @parameter or string nat
+                                       /* [ or string nat
                                           : pair (or @parameter string nat)
                                                (pair @storage
                                                   (pair nat mutez mutez)
@@ -1580,7 +1578,7 @@ Gas remaining: 1039634.172 units remaining
                                                             (pair address address)
                                                             address) ] */ ;
                                                  CDAAR }
-                                           /* [ @parameter.right nat : nat
+                                           /* [ nat : nat
                                               : pair (or @parameter string nat)
                                                    (pair @storage
                                                       (pair nat mutez mutez)
@@ -1718,7 +1716,7 @@ Gas remaining: 1039634.172 units remaining
                                                         (pair address address)
                                                         address ] */ }
                                               { BALANCE
-                                                /* [ @balance mutez
+                                                /* [ mutez
                                                    : pair unit
                                                         (pair nat mutez mutez)
                                                         (pair nat timestamp timestamp)
@@ -1739,7 +1737,7 @@ Gas remaining: 1039634.172 units remaining
                                                               (pair address address)
                                                               address ] */ ;
                                                       CDDDDADR }
-                                                /* [ @balance mutez : address
+                                                /* [ mutez : address
                                                    : pair unit
                                                         (pair nat mutez mutez)
                                                         (pair nat timestamp timestamp)
@@ -1752,7 +1750,7 @@ Gas remaining: 1039634.172 units remaining
                                                                (pair mutez mutez)
                                                                (pair address address)
                                                                address ] */ }
-                                                /* [ @balance mutez : address
+                                                /* [ mutez : address
                                                    : pair (pair nat mutez mutez)
                                                         (pair nat timestamp timestamp)
                                                         (pair mutez mutez)
@@ -1760,21 +1758,21 @@ Gas remaining: 1039634.172 units remaining
                                                         address ] */ ;
                                                 DIP { CONTRACT
                                                         unit
-                                                      /* [ @contract option (contract unit)
+                                                      /* [ option (contract unit)
                                                          : pair (pair nat mutez mutez)
                                                               (pair nat timestamp timestamp)
                                                               (pair mutez mutez)
                                                               (pair address address)
                                                               address ] */ ;
                                                       ASSERT_SOME }
-                                                /* [ @balance mutez : @contract.some contract unit
+                                                /* [ mutez : contract unit
                                                    : pair (pair nat mutez mutez)
                                                         (pair nat timestamp timestamp)
                                                         (pair mutez mutez)
                                                         (pair address address)
                                                         address ] */ ;
                                                 UNIT
-                                                /* [ unit : @balance mutez : @contract.some contract unit
+                                                /* [ unit : mutez : contract unit
                                                    : pair (pair nat mutez mutez)
                                                         (pair nat timestamp timestamp)
                                                         (pair mutez mutez)
@@ -1816,7 +1814,7 @@ Gas remaining: 1039634.172 units remaining
                                                (pair address address)
                                                address ] */ }
                                      { BALANCE
-                                       /* [ @balance mutez
+                                       /* [ mutez
                                           : pair (or @parameter string nat)
                                                (pair @storage
                                                   (pair nat mutez mutez)
@@ -1840,7 +1838,7 @@ Gas remaining: 1039634.172 units remaining
                                                         (pair address address)
                                                         address) ] */ ;
                                              CDDDDAAR }
-                                       /* [ @balance mutez : address
+                                       /* [ mutez : address
                                           : pair (or @parameter string nat)
                                                (pair @storage
                                                   (pair nat mutez mutez)
@@ -1849,72 +1847,71 @@ Gas remaining: 1039634.172 units remaining
                                                   (pair address address)
                                                   address) ] */ ;
                                        DIIP { CDR
-                                              /* [ @storage pair (pair nat mutez mutez)
+                                              /* [ pair (pair nat mutez mutez)
                                                       (pair nat timestamp timestamp)
                                                       (pair mutez mutez)
                                                       (pair address address)
                                                       address ] */ }
-                                       /* [ @balance mutez : address
-                                          : @storage pair (pair nat mutez mutez)
+                                       /* [ mutez : address
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        DIP { CONTRACT
                                                unit
-                                             /* [ @contract option (contract unit)
-                                                : @storage pair (pair nat mutez mutez)
+                                             /* [ option (contract unit)
+                                                : pair (pair nat mutez mutez)
                                                      (pair nat timestamp timestamp)
                                                      (pair mutez mutez)
                                                      (pair address address)
                                                      address ] */ ;
                                              ASSERT_SOME }
-                                       /* [ @balance mutez : @contract.some contract unit
-                                          : @storage pair (pair nat mutez mutez)
+                                       /* [ mutez : contract unit
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        UNIT
-                                       /* [ unit : @balance mutez : @contract.some contract unit
-                                          : @storage pair (pair nat mutez mutez)
+                                       /* [ unit : mutez : contract unit
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        TRANSFER_TOKENS
                                        /* [ operation
-                                          : @storage pair (pair nat mutez mutez)
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        NIL operation
                                        /* [ list operation : operation
-                                          : @storage pair (pair nat mutez mutez)
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        SWAP
                                        /* [ operation : list operation
-                                          : @storage pair (pair nat mutez mutez)
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        CONS
                                        /* [ list operation
-                                          : @storage pair (pair nat mutez mutez)
+                                          : pair (pair nat mutez mutez)
                                                (pair nat timestamp timestamp)
                                                (pair mutez mutez)
                                                (pair address address)
                                                address ] */ ;
                                        PAIR
                                        /* [ pair (list operation)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ } } } } } } } }
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ } } } } } } } }

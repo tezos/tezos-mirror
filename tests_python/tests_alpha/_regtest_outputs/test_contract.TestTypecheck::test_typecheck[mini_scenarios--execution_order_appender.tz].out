@@ -5,30 +5,25 @@ Gas remaining: 1039989.364 units remaining
 { parameter unit ;
   storage (pair address string) ;
   code { CDR
-         /* [ @storage pair address string ] */ ;
+         /* [ pair address string ] */ ;
          DUP
-         /* [ @storage pair address string : @storage pair address string ] */ ;
+         /* [ pair address string : pair address string ] */ ;
          UNPAIR
-         /* [ address : string : @storage pair address string ] */ ;
-         CONTRACT
-           string
-         /* [ @contract option (contract string) : string
-            : @storage pair address string ] */ ;
+         /* [ address : string : pair address string ] */ ;
+         CONTRACT string
+         /* [ option (contract string) : string : pair address string ] */ ;
          ASSERT_SOME ;
-         PUSH mutez
-              0
-         /* [ mutez : @contract.some contract string : string
-            : @storage pair address string ] */ ;
+         PUSH mutez 0
+         /* [ mutez : contract string : string : pair address string ] */ ;
          DIG 2
-         /* [ string : mutez : @contract.some contract string
-            : @storage pair address string ] */ ;
+         /* [ string : mutez : contract string : pair address string ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage pair address string ] */ ;
+         /* [ operation : pair address string ] */ ;
          NIL operation
-         /* [ list operation : operation : @storage pair address string ] */ ;
+         /* [ list operation : operation : pair address string ] */ ;
          SWAP
-         /* [ operation : list operation : @storage pair address string ] */ ;
+         /* [ operation : list operation : pair address string ] */ ;
          CONS
-         /* [ list operation : @storage pair address string ] */ ;
+         /* [ list operation : pair address string ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage address string) ] */ } }
+         /* [ pair (list operation) address string ] */ } }

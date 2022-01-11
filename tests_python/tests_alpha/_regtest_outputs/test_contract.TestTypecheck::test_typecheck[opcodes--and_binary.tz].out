@@ -45,6 +45,6 @@ Gas remaining: 1039971.036 units remaining
          UNIT
          /* [ unit ] */ ;
          NIL @noop operation
-         /* [ @noop list operation : unit ] */ ;
+         /* [ list operation : unit ] */ ;
          PAIR
-         /* [ pair (list @noop operation) unit ] */ } }
+         /* [ pair (list operation) unit ] */ } }

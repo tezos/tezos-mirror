@@ -8,13 +8,13 @@ Gas remaining: 1039977.336 units remaining
          /* [ pair (pair @parameter bytes signature) (pair @storage bytes key)
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          UNPAIR
-         /* [ @parameter pair bytes signature : @storage pair bytes key
+         /* [ pair bytes signature : pair bytes key
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          CAR
-         /* [ bytes : @storage pair bytes key
+         /* [ bytes : pair bytes key
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          SHA256
-         /* [ bytes : @storage pair bytes key
+         /* [ bytes : pair bytes key
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          DIP { CAR
                /* [ bytes : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ }
@@ -25,10 +25,10 @@ Gas remaining: 1039977.336 units remaining
          /* [ pair (pair @parameter bytes signature) (pair @storage bytes key)
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          UNPAIR
-         /* [ @parameter pair bytes signature : @storage pair bytes key
+         /* [ pair bytes signature : pair bytes key
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          SWAP
-         /* [ @storage pair bytes key : @parameter pair bytes signature
+         /* [ pair bytes key : pair bytes signature
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          DIP { UNPAIR
                /* [ bytes : signature
@@ -36,7 +36,7 @@ Gas remaining: 1039977.336 units remaining
                SWAP
                /* [ signature : bytes
                   : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ }
-         /* [ @storage pair bytes key : signature : bytes
+         /* [ pair bytes key : signature : bytes
             : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          CDR
          /* [ key : signature : bytes
@@ -45,26 +45,26 @@ Gas remaining: 1039977.336 units remaining
          /* [ bool : pair (pair @parameter bytes signature) (pair @storage bytes key) ] */ ;
          ASSERT ;
          CDR
-         /* [ @storage pair bytes key ] */ ;
+         /* [ pair bytes key ] */ ;
          DUP
-         /* [ @storage pair bytes key : @storage pair bytes key ] */ ;
+         /* [ pair bytes key : pair bytes key ] */ ;
          CDR
-         /* [ key : @storage pair bytes key ] */ ;
+         /* [ key : pair bytes key ] */ ;
          HASH_KEY
-         /* [ key_hash : @storage pair bytes key ] */ ;
+         /* [ key_hash : pair bytes key ] */ ;
          IMPLICIT_ACCOUNT
-         /* [ contract unit : @storage pair bytes key ] */ ;
+         /* [ contract unit : pair bytes key ] */ ;
          BALANCE
-         /* [ @balance mutez : contract unit : @storage pair bytes key ] */ ;
+         /* [ mutez : contract unit : pair bytes key ] */ ;
          UNIT
-         /* [ unit : @balance mutez : contract unit : @storage pair bytes key ] */ ;
+         /* [ unit : mutez : contract unit : pair bytes key ] */ ;
          TRANSFER_TOKENS
-         /* [ operation : @storage pair bytes key ] */ ;
+         /* [ operation : pair bytes key ] */ ;
          NIL operation
-         /* [ list operation : operation : @storage pair bytes key ] */ ;
+         /* [ list operation : operation : pair bytes key ] */ ;
          SWAP
-         /* [ operation : list operation : @storage pair bytes key ] */ ;
+         /* [ operation : list operation : pair bytes key ] */ ;
          CONS
-         /* [ list operation : @storage pair bytes key ] */ ;
+         /* [ list operation : pair bytes key ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage bytes key) ] */ } }
+         /* [ pair (list operation) bytes key ] */ } }

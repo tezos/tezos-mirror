@@ -5,7 +5,7 @@ Gas remaining: 1039994.330 units remaining
 { parameter bool ;
   storage (option bool) ;
   code { CAR
-         /* [ @parameter bool ] */ ;
+         /* [ bool ] */ ;
          IF { PUSH bool True /* [ bool ] */ } { PUSH bool False /* [ bool ] */ } ;
          SOME
          /* [ option bool ] */ ;

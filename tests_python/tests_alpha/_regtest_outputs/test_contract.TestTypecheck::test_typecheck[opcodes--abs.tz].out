@@ -5,13 +5,13 @@ Gas remaining: 1039991.794 units remaining
 { parameter nat ;
   storage unit ;
   code { CAR
-         /* [ @parameter nat ] */ ;
+         /* [ nat ] */ ;
          DUP
-         /* [ @parameter nat : @parameter nat ] */ ;
+         /* [ nat : nat ] */ ;
          NEG
-         /* [ int : @parameter nat ] */ ;
+         /* [ int : nat ] */ ;
          ABS
-         /* [ nat : @parameter nat ] */ ;
+         /* [ nat : nat ] */ ;
          COMPARE
          /* [ int ] */ ;
          ASSERT_EQ ;

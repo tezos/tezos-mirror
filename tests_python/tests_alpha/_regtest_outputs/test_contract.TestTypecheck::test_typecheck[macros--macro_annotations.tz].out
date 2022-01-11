@@ -15,10 +15,10 @@ Gas remaining: 1039992.402 units remaining
          UNIT
          /* [ unit : pair (unit %truc) unit ] */ ;
          DUUP @new_storage
-         /* [ @new_storage pair (unit %truc) unit : unit : pair (unit %truc) unit ] */ ;
+         /* [ pair (unit %truc) unit : unit : pair (unit %truc) unit ] */ ;
          DIP { DROP /* [ pair (unit %truc) unit ] */ ; DROP /* [] */ }
-         /* [ @new_storage pair (unit %truc) unit ] */ ;
+         /* [ pair (unit %truc) unit ] */ ;
          NIL operation
-         /* [ list operation : @new_storage pair (unit %truc) unit ] */ ;
+         /* [ list operation : pair (unit %truc) unit ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @new_storage (unit %truc) unit) ] */ } }
+         /* [ pair (list operation) (unit %truc) unit ] */ } }

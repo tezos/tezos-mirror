@@ -5,9 +5,9 @@ Gas remaining: 1039984.150 units remaining
 { parameter (ticket nat) ;
   storage address ;
   code { CAR
-         /* [ @parameter ticket nat ] */ ;
+         /* [ ticket nat ] */ ;
          READ_TICKET
-         /* [ pair address nat nat : @parameter ticket nat ] */ ;
+         /* [ pair address nat nat : ticket nat ] */ ;
          DIP { DROP /* [] */ }
          /* [ pair address nat nat ] */ ;
          UNPAIR

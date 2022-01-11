@@ -5,59 +5,58 @@ Gas remaining: 1039970.057 units remaining
 { parameter bytes ;
   storage (list bytes) ;
   code { UNPAIR
-         /* [ @parameter bytes : @storage list bytes ] */ ;
+         /* [ bytes : list bytes ] */ ;
          DIP { NIL bytes
-               /* [ list bytes : @storage list bytes ] */ ;
+               /* [ list bytes : list bytes ] */ ;
                SWAP
-               /* [ @storage list bytes : list bytes ] */ ;
+               /* [ list bytes : list bytes ] */ ;
                ITER { CONS /* [ list bytes ] */ }
                /* [ list bytes ] */ }
-         /* [ @parameter bytes : list bytes ] */ ;
+         /* [ bytes : list bytes ] */ ;
          DUP
-         /* [ @parameter bytes : @parameter bytes : list bytes ] */ ;
+         /* [ bytes : bytes : list bytes ] */ ;
          SIZE
-         /* [ nat : @parameter bytes : list bytes ] */ ;
+         /* [ nat : bytes : list bytes ] */ ;
          PUSH nat 0
-         /* [ nat : nat : @parameter bytes : list bytes ] */ ;
+         /* [ nat : nat : bytes : list bytes ] */ ;
          CMPNEQ ;
-         DIP { PUSH @index nat 0 /* [ @index nat : @parameter bytes : list bytes ] */ }
-         /* [ bool : @index nat : @parameter bytes : list bytes ] */ ;
+         DIP { PUSH @index nat 0 /* [ nat : bytes : list bytes ] */ }
+         /* [ bool : nat : bytes : list bytes ] */ ;
          LOOP { PAIR
-                /* [ pair (nat @index) (bytes @parameter) : list bytes ] */ ;
+                /* [ pair nat bytes : list bytes ] */ ;
                 DUP
-                /* [ pair (nat @index) (bytes @parameter) : pair (nat @index) (bytes @parameter)
-                   : list bytes ] */ ;
+                /* [ pair nat bytes : pair nat bytes : list bytes ] */ ;
                 DIP { UNPAIR
-                      /* [ @index nat : @parameter bytes : list bytes ] */ ;
-                      DIP { PUSH nat 1 /* [ nat : @parameter bytes : list bytes ] */ }
-                      /* [ @index nat : nat : @parameter bytes : list bytes ] */ ;
+                      /* [ nat : bytes : list bytes ] */ ;
+                      DIP { PUSH nat 1 /* [ nat : bytes : list bytes ] */ }
+                      /* [ nat : nat : bytes : list bytes ] */ ;
                       SLICE
-                      /* [ @parameter.slice option bytes : list bytes ] */ ;
+                      /* [ option bytes : list bytes ] */ ;
                       ASSERT_SOME ;
                       CONS @storage
-                      /* [ @storage list bytes ] */ }
-                /* [ pair (nat @index) (bytes @parameter) : @storage list bytes ] */ ;
+                      /* [ list bytes ] */ }
+                /* [ pair nat bytes : list bytes ] */ ;
                 UNPAIR
-                /* [ @index nat : @parameter bytes : @storage list bytes ] */ ;
+                /* [ nat : bytes : list bytes ] */ ;
                 PUSH nat 1
-                /* [ nat : @index nat : @parameter bytes : @storage list bytes ] */ ;
+                /* [ nat : nat : bytes : list bytes ] */ ;
                 ADD @index
-                /* [ @index nat : @parameter bytes : @storage list bytes ] */ ;
+                /* [ nat : bytes : list bytes ] */ ;
                 DUP
-                /* [ @index nat : @index nat : @parameter bytes : @storage list bytes ] */ ;
-                DIP { DIP { DUP /* [ @parameter bytes : @parameter bytes : @storage list bytes ] */ }
-                      /* [ @index nat : @parameter bytes : @parameter bytes : @storage list bytes ] */ ;
+                /* [ nat : nat : bytes : list bytes ] */ ;
+                DIP { DIP { DUP /* [ bytes : bytes : list bytes ] */ }
+                      /* [ nat : bytes : bytes : list bytes ] */ ;
                       SWAP
-                      /* [ @parameter bytes : @index nat : @parameter bytes : @storage list bytes ] */ ;
+                      /* [ bytes : nat : bytes : list bytes ] */ ;
                       SIZE
-                      /* [ nat : @index nat : @parameter bytes : @storage list bytes ] */ ;
+                      /* [ nat : nat : bytes : list bytes ] */ ;
                       CMPNEQ }
-                /* [ @index nat : bool : @parameter bytes : @storage list bytes ] */ ;
+                /* [ nat : bool : bytes : list bytes ] */ ;
                 SWAP
-                /* [ bool : @index nat : @parameter bytes : @storage list bytes ] */ }
-         /* [ @index nat : @parameter bytes : list bytes ] */ ;
+                /* [ bool : nat : bytes : list bytes ] */ }
+         /* [ nat : bytes : list bytes ] */ ;
          DROP
-         /* [ @parameter bytes : list bytes ] */ ;
+         /* [ bytes : list bytes ] */ ;
          DROP
          /* [ list bytes ] */ ;
          NIL bytes

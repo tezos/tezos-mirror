@@ -12,11 +12,11 @@ Gas remaining: 1039988.400 units remaining
             : pair (string @parameter) (pair @storage (set string) (option bool))
             : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
          CAR
-         /* [ @parameter string
+         /* [ string
             : pair (string @parameter) (pair @storage (set string) (option bool))
             : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
          DIP { CDAR }
-         /* [ @parameter string : set string
+         /* [ string : set string
             : pair (string @parameter) (pair @storage (set string) (option bool)) ] */ ;
          MEM
          /* [ bool

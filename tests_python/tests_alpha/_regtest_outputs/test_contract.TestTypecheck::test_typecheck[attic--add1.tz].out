@@ -5,9 +5,9 @@ Gas remaining: 1039996.134 units remaining
 { parameter int ;
   storage int ;
   code { CAR
-         /* [ @parameter int ] */ ;
+         /* [ int ] */ ;
          PUSH int 1
-         /* [ int : @parameter int ] */ ;
+         /* [ int : int ] */ ;
          ADD
          /* [ int ] */ ;
          NIL operation

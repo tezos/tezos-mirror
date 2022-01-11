@@ -5,16 +5,16 @@ Gas remaining: 1039992.627 units remaining
 { parameter (pair nat nat) ;
   storage (option bytes) ;
   code { UNPAIR
-         /* [ @parameter pair nat nat : @storage option bytes ] */ ;
+         /* [ pair nat nat : option bytes ] */ ;
          SWAP
-         /* [ @storage option bytes : @parameter pair nat nat ] */ ;
+         /* [ option bytes : pair nat nat ] */ ;
          IF_SOME
            { SWAP
-             /* [ @parameter pair nat nat : @storage.some bytes ] */ ;
+             /* [ pair nat nat : bytes ] */ ;
              UNPAIR
-             /* [ nat : nat : @storage.some bytes ] */ ;
+             /* [ nat : nat : bytes ] */ ;
              SLICE
-             /* [ @storage.some.slice option bytes ] */ }
+             /* [ option bytes ] */ }
            { DROP /* [] */ ; NONE bytes /* [ option bytes ] */ } ;
          NIL operation
          /* [ list operation : option bytes ] */ ;

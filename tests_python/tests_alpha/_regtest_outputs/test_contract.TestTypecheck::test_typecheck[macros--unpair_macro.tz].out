@@ -7,26 +7,26 @@ Gas remaining: 1039976.490 units remaining
   code { DROP
          /* [] */ ;
          UNIT :u4 @a4
-         /* [ @a4 unit :u4 ] */ ;
+         /* [ unit :u4 ] */ ;
          UNIT :u3 @a3
-         /* [ @a3 unit :u3 : @a4 unit :u4 ] */ ;
+         /* [ unit :u3 : unit :u4 ] */ ;
          UNIT :u2 @a2
-         /* [ @a2 unit :u2 : @a3 unit :u3 : @a4 unit :u4 ] */ ;
+         /* [ unit :u2 : unit :u3 : unit :u4 ] */ ;
          UNIT :u1 @a1
-         /* [ @a1 unit :u1 : @a2 unit :u2 : @a3 unit :u3 : @a4 unit :u4 ] */ ;
+         /* [ unit :u1 : unit :u2 : unit :u3 : unit :u4 ] */ ;
          PAIR
-         /* [ pair (unit :u1 @a1) (unit :u2 @a2) : @a3 unit :u3 : @a4 unit :u4 ] */ ;
+         /* [ pair (unit :u1) (unit :u2) : unit :u3 : unit :u4 ] */ ;
          UNPAIR @x1 @x2
-         /* [ @x1 unit :u1 : @x2 unit :u2 : @a3 unit :u3 : @a4 unit :u4 ] */ ;
+         /* [ unit :u1 : unit :u2 : unit :u3 : unit :u4 ] */ ;
          PPAIPAIR @p1 %x1 %x2 %x3 %x4 ;
          UNPPAIPAIR %x1 % %x3 %x4 @uno @due @tre @quattro ;
          PAPAPAIR @p2 %x1 %x2 %x3 %x4 ;
          UNPAPAPAIR @un @deux @trois @quatre ;
          PAPPAIIR @p3 %x1 %x2 %x3 %x4 ;
          UNPAPPAIIR @one @two @three @four ;
-         DIP { DROP /* [ @a3 unit :u3 : @a4 unit :u4 ] */ ; DROP /* [ @a4 unit :u4 ] */ ; DROP /* [] */ }
-         /* [ @x1 unit :u1 ] */ ;
+         DIP { DROP /* [ unit :u3 : unit :u4 ] */ ; DROP /* [ unit :u4 ] */ ; DROP /* [] */ }
+         /* [ unit :u1 ] */ ;
          NIL operation
-         /* [ list operation : @x1 unit :u1 ] */ ;
+         /* [ list operation : unit :u1 ] */ ;
          PAIR
-         /* [ pair (list operation) (unit :u1 @x1) ] */ } }
+         /* [ pair (list operation) (unit :u1) ] */ } }

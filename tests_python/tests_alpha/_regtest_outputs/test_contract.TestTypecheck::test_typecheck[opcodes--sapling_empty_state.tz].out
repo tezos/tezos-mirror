@@ -7,8 +7,8 @@ Gas remaining: 1039996.757 units remaining
   code { DROP
          /* [] */ ;
          SAPLING_EMPTY_STATE 8
-         /* [ @sapling sapling_state 8 ] */ ;
+         /* [ sapling_state 8 ] */ ;
          NIL operation
-         /* [ list operation : @sapling sapling_state 8 ] */ ;
+         /* [ list operation : sapling_state 8 ] */ ;
          PAIR
-         /* [ pair (list operation) (sapling_state @sapling 8) ] */ } }
+         /* [ pair (list operation) (sapling_state 8) ] */ } }

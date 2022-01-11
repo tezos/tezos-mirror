@@ -5,13 +5,13 @@ Gas remaining: 1039990.664 units remaining
 { parameter (list int) ;
   storage (list int) ;
   code { CAR
-         /* [ @parameter list int ] */ ;
+         /* [ list int ] */ ;
          PUSH int 0
-         /* [ int : @parameter list int ] */ ;
+         /* [ int : list int ] */ ;
          SWAP
-         /* [ @parameter list int : int ] */ ;
+         /* [ list int : int ] */ ;
          MAP { DIP { DUP /* [ int : int ] */ }
-               /* [ @parameter.elt int : int : int ] */ ;
+               /* [ int : int : int ] */ ;
                ADD
                /* [ int : int ] */ ;
                DIP { PUSH int 1 /* [ int : int ] */ ; ADD /* [ int ] */ }

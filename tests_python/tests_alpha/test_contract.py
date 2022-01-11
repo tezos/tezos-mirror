@@ -557,11 +557,6 @@ class TestContracts:
             ),
             # error message for attempting to push a value of type never
             ("never_literal.tz", r'type never has no inhabitant.'),
-            # field annotation mismatch with UNPAIR
-            (
-                "unpair_field_annotation_mismatch.tz",
-                r'The field access annotation does not match',
-            ),
             # COMB, UNCOMB, and DUP cannot take 0 as argument
             ("comb0.tz", r"PAIR expects an argument of at least 2"),
             ("comb1.tz", r"PAIR expects an argument of at least 2"),

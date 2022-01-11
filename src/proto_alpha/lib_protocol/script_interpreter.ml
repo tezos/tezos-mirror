@@ -123,9 +123,7 @@ let () =
     @@ obj3
          (req "location" Script.location_encoding)
          (req "gas" Gas.encoding)
-         (req
-            "stack"
-            (list (obj2 (req "item" Script.expr_encoding) (opt "annot" string))))
+         (req "stack" (list Script.expr_encoding))
   in
   (* Reject *)
   register_error_kind
@@ -1065,8 +1063,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                   | Lam
                       ( {
                           kloc;
-                          kaft = Item_t (aft_ty, Bot_t, _);
-                          kbef = Item_t (bef_ty, Bot_t, _);
+                          kaft = Item_t (aft_ty, Bot_t);
+                          kbef = Item_t (bef_ty, Bot_t);
                           kinstr;
                         },
                         _script_view ) -> (
@@ -1100,8 +1098,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                       | Ok (Eq, Eq) -> (
                           let kkinfo = kinfo_of_kinstr k in
                           match kkinfo.kstack_ty with
-                          | Item_t (_, s, a) ->
-                              let kstack_ty = Item_t (output_ty, s, a) in
+                          | Item_t (_, s) ->
+                              let kstack_ty = Item_t (output_ty, s) in
                               let kkinfo = {kkinfo with kstack_ty} in
                               let ks = KCons (ICons_some (kkinfo, k), ks) in
                               (step [@ocaml.tailcall])

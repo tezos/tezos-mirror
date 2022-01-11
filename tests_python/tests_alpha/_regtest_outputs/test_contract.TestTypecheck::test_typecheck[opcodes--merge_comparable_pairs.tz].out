@@ -5,20 +5,16 @@ Gas remaining: 1039990.293 units remaining
 { parameter (set (pair (nat %n) (pair %p (string %s) (int %i)))) ;
   storage nat ;
   code { UNPAIR
-         /* [ @parameter set (pair (nat %n) (pair %p (string %s) (int %i)))
-            : @storage nat ] */ ;
+         /* [ set (pair (nat %n) (pair %p (string %s) (int %i))) : nat ] */ ;
          SWAP
-         /* [ @storage nat
-            : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
-         PUSH nat
-              3
-         /* [ nat : @storage nat
-            : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
+         /* [ nat : set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
+         PUSH nat 3
+         /* [ nat : nat : set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
          COMPARE
-         /* [ int : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
+         /* [ int : set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
          GT
-         /* [ bool : @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
-         IF { /* [ @parameter set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ }
+         /* [ bool : set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ ;
+         IF { /* [ set (pair (nat %n) (pair %p (string %s) (int %i))) ] */ }
             { DROP
               /* [] */ ;
               EMPTY_SET (pair nat (pair string int))

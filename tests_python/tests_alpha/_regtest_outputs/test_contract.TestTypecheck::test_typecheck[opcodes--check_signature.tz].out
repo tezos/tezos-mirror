@@ -12,31 +12,31 @@ Gas remaining: 1039988.024 units remaining
             : pair (key @parameter) (pair @storage signature string)
             : pair (key @parameter) (pair @storage signature string) ] */ ;
          DIP { CDR
-               /* [ @storage pair signature string
+               /* [ pair signature string
                   : pair (key @parameter) (pair @storage signature string) ] */ ;
                DUP
-               /* [ @storage pair signature string : @storage pair signature string
+               /* [ pair signature string : pair signature string
                   : pair (key @parameter) (pair @storage signature string) ] */ ;
                CAR
-               /* [ signature : @storage pair signature string
+               /* [ signature : pair signature string
                   : pair (key @parameter) (pair @storage signature string) ] */ ;
                DIP { CDR
                      /* [ string : pair (key @parameter) (pair @storage signature string) ] */ ;
                      PACK
-                     /* [ @packed bytes : pair (key @parameter) (pair @storage signature string) ] */ }
-               /* [ signature : @packed bytes
+                     /* [ bytes : pair (key @parameter) (pair @storage signature string) ] */ }
+               /* [ signature : bytes
                   : pair (key @parameter) (pair @storage signature string) ] */ }
-         /* [ pair (key @parameter) (pair @storage signature string) : signature
-            : @packed bytes : pair (key @parameter) (pair @storage signature string) ] */ ;
+         /* [ pair (key @parameter) (pair @storage signature string) : signature : bytes
+            : pair (key @parameter) (pair @storage signature string) ] */ ;
          CAR
-         /* [ @parameter key : signature : @packed bytes
+         /* [ key : signature : bytes
             : pair (key @parameter) (pair @storage signature string) ] */ ;
          CHECK_SIGNATURE
          /* [ bool : pair (key @parameter) (pair @storage signature string) ] */ ;
          IF { /* [ pair (key @parameter) (pair @storage signature string) ] */ } { FAIL } ;
          CDR
-         /* [ @storage pair signature string ] */ ;
+         /* [ pair signature string ] */ ;
          NIL operation
-         /* [ list operation : @storage pair signature string ] */ ;
+         /* [ list operation : pair signature string ] */ ;
          PAIR
-         /* [ pair (list operation) (pair @storage signature string) ] */ } }
+         /* [ pair (list operation) signature string ] */ } }

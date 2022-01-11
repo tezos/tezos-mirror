@@ -5,54 +5,54 @@ Gas remaining: 1039972.732 units remaining
 { parameter (list int) ;
   storage (list (list bool)) ;
   code { CAR
-         /* [ @parameter list int ] */ ;
+         /* [ list int ] */ ;
          NIL (list bool)
-         /* [ list (list bool) : @parameter list int ] */ ;
+         /* [ list (list bool) : list int ] */ ;
          DIP { DUP
-               /* [ @parameter list int : @parameter list int ] */ ;
-               MAP { EQ /* [ bool : @parameter list int ] */ }
-               /* [ list bool : @parameter list int ] */ }
-         /* [ list (list bool) : list bool : @parameter list int ] */ ;
+               /* [ list int : list int ] */ ;
+               MAP { EQ /* [ bool : list int ] */ }
+               /* [ list bool : list int ] */ }
+         /* [ list (list bool) : list bool : list int ] */ ;
          SWAP
-         /* [ list bool : list (list bool) : @parameter list int ] */ ;
+         /* [ list bool : list (list bool) : list int ] */ ;
          CONS
-         /* [ list (list bool) : @parameter list int ] */ ;
+         /* [ list (list bool) : list int ] */ ;
          DIP { DUP
-               /* [ @parameter list int : @parameter list int ] */ ;
-               MAP { NEQ /* [ bool : @parameter list int ] */ }
-               /* [ list bool : @parameter list int ] */ }
-         /* [ list (list bool) : list bool : @parameter list int ] */ ;
+               /* [ list int : list int ] */ ;
+               MAP { NEQ /* [ bool : list int ] */ }
+               /* [ list bool : list int ] */ }
+         /* [ list (list bool) : list bool : list int ] */ ;
          SWAP
-         /* [ list bool : list (list bool) : @parameter list int ] */ ;
+         /* [ list bool : list (list bool) : list int ] */ ;
          CONS
-         /* [ list (list bool) : @parameter list int ] */ ;
+         /* [ list (list bool) : list int ] */ ;
          DIP { DUP
-               /* [ @parameter list int : @parameter list int ] */ ;
-               MAP { LE /* [ bool : @parameter list int ] */ }
-               /* [ list bool : @parameter list int ] */ }
-         /* [ list (list bool) : list bool : @parameter list int ] */ ;
+               /* [ list int : list int ] */ ;
+               MAP { LE /* [ bool : list int ] */ }
+               /* [ list bool : list int ] */ }
+         /* [ list (list bool) : list bool : list int ] */ ;
          SWAP
-         /* [ list bool : list (list bool) : @parameter list int ] */ ;
+         /* [ list bool : list (list bool) : list int ] */ ;
          CONS
-         /* [ list (list bool) : @parameter list int ] */ ;
+         /* [ list (list bool) : list int ] */ ;
          DIP { DUP
-               /* [ @parameter list int : @parameter list int ] */ ;
-               MAP { LT /* [ bool : @parameter list int ] */ }
-               /* [ list bool : @parameter list int ] */ }
-         /* [ list (list bool) : list bool : @parameter list int ] */ ;
+               /* [ list int : list int ] */ ;
+               MAP { LT /* [ bool : list int ] */ }
+               /* [ list bool : list int ] */ }
+         /* [ list (list bool) : list bool : list int ] */ ;
          SWAP
-         /* [ list bool : list (list bool) : @parameter list int ] */ ;
+         /* [ list bool : list (list bool) : list int ] */ ;
          CONS
-         /* [ list (list bool) : @parameter list int ] */ ;
+         /* [ list (list bool) : list int ] */ ;
          DIP { DUP
-               /* [ @parameter list int : @parameter list int ] */ ;
-               MAP { GE /* [ bool : @parameter list int ] */ }
-               /* [ list bool : @parameter list int ] */ }
-         /* [ list (list bool) : list bool : @parameter list int ] */ ;
+               /* [ list int : list int ] */ ;
+               MAP { GE /* [ bool : list int ] */ }
+               /* [ list bool : list int ] */ }
+         /* [ list (list bool) : list bool : list int ] */ ;
          SWAP
-         /* [ list bool : list (list bool) : @parameter list int ] */ ;
+         /* [ list bool : list (list bool) : list int ] */ ;
          CONS
-         /* [ list (list bool) : @parameter list int ] */ ;
+         /* [ list (list bool) : list int ] */ ;
          DIP { MAP { GT /* [ bool ] */ } /* [ list bool ] */ }
          /* [ list (list bool) : list bool ] */ ;
          SWAP

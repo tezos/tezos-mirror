@@ -5,13 +5,13 @@ Gas remaining: 1039991.583 units remaining
 { parameter unit ;
   storage int ;
   code { CDR
-         /* [ @storage int ] */ ;
+         /* [ int ] */ ;
          DUP
-         /* [ @storage int : @storage int ] */ ;
+         /* [ int : int ] */ ;
          PUSH int 0
-         /* [ int : @storage int : @storage int ] */ ;
+         /* [ int : int : int ] */ ;
          CMPLT ;
-         IF { PUSH int -1 /* [ int : @storage int ] */ ; ADD /* [ int ] */ } { FAIL } ;
+         IF { PUSH int -1 /* [ int : int ] */ ; ADD /* [ int ] */ } { FAIL } ;
          NIL operation
          /* [ list operation : int ] */ ;
          PAIR

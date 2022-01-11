@@ -5,37 +5,36 @@ Gas remaining: 1039984.961 units remaining
 { parameter address ;
   storage address ;
   code { CAR
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          DUP
-         /* [ @parameter address : @parameter address ] */ ;
+         /* [ address : address ] */ ;
          PUSH nat 0
-         /* [ nat : @parameter address : @parameter address ] */ ;
-         VIEW "id"
-              (pair nat nat)
-         /* [ @parameter.contract option (pair nat nat) : @parameter address ] */ ;
+         /* [ nat : address : address ] */ ;
+         VIEW "id" (pair nat nat)
+         /* [ option (pair nat nat) : address ] */ ;
          ASSERT_SOME ;
          DROP
-         /* [ @parameter address ] */ ;
+         /* [ address ] */ ;
          CONTRACT nat
-         /* [ @parameter.contract option (contract nat) ] */ ;
+         /* [ option (contract nat) ] */ ;
          ASSERT_SOME ;
          PUSH mutez 1500
-         /* [ mutez : @parameter.contract.some contract nat ] */ ;
+         /* [ mutez : contract nat ] */ ;
          PUSH nat 0
-         /* [ nat : mutez : @parameter.contract.some contract nat ] */ ;
+         /* [ nat : mutez : contract nat ] */ ;
          TRANSFER_TOKENS
          /* [ operation ] */ ;
          SELF
-         /* [ @self contract address : operation ] */ ;
+         /* [ contract address : operation ] */ ;
          ADDRESS
-         /* [ @self.address address : operation ] */ ;
+         /* [ address : operation ] */ ;
          SWAP
-         /* [ operation : @self.address address ] */ ;
+         /* [ operation : address ] */ ;
          NIL operation
-         /* [ list operation : operation : @self.address address ] */ ;
+         /* [ list operation : operation : address ] */ ;
          SWAP
-         /* [ operation : list operation : @self.address address ] */ ;
+         /* [ operation : list operation : address ] */ ;
          CONS
-         /* [ list operation : @self.address address ] */ ;
+         /* [ list operation : address ] */ ;
          PAIR
-         /* [ pair (list operation) (address @self.address) ] */ } }
+         /* [ pair (list operation) address ] */ } }

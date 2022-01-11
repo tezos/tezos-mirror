@@ -5,7 +5,7 @@ Gas remaining: 1039996.114 units remaining
 { parameter (ticket nat) ;
   storage (option (ticket nat)) ;
   code { CAR
-         /* [ @parameter ticket nat ] */ ;
+         /* [ ticket nat ] */ ;
          SOME
          /* [ option (ticket nat) ] */ ;
          NIL operation

@@ -14,28 +14,27 @@ Gas remaining: 1039979.486 units remaining
                  (pair @storage string (map string (lambda unit string)))
             : map string (lambda unit string) ] */ ;
          CAR
-         /* [ @parameter or string (pair string (lambda unit string))
+         /* [ or string (pair string (lambda unit string))
             : map string (lambda unit string) ] */ ;
          IF_LEFT
            { DIP { DUP
                    /* [ map string (lambda unit string) : map string (lambda unit string) ] */ }
-             /* [ @parameter.left string : map string (lambda unit string)
+             /* [ string : map string (lambda unit string)
                 : map string (lambda unit string) ] */ ;
              GET
              /* [ option (lambda unit string) : map string (lambda unit string) ] */ ;
              IF_NONE
                { FAIL }
-               { /* [ @some lambda unit string : map string (lambda unit string) ] */ } ;
+               { /* [ lambda unit string : map string (lambda unit string) ] */ } ;
              UNIT
-             /* [ unit : @some lambda unit string : map string (lambda unit string) ] */ ;
+             /* [ unit : lambda unit string : map string (lambda unit string) ] */ ;
              EXEC
              /* [ string : map string (lambda unit string) ] */ }
            { DUP
-             /* [ @parameter.right pair string (lambda unit string)
-                : @parameter.right pair string (lambda unit string)
+             /* [ pair string (lambda unit string) : pair string (lambda unit string)
                 : map string (lambda unit string) ] */ ;
              CAR
-             /* [ string : @parameter.right pair string (lambda unit string)
+             /* [ string : pair string (lambda unit string)
                 : map string (lambda unit string) ] */ ;
              DIP { CDR
                    /* [ lambda unit string : map string (lambda unit string) ] */ ;

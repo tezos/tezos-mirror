@@ -5,57 +5,52 @@ Gas remaining: 1039973.219 units remaining
 { storage nat ;
   parameter nat ;
   code { UNPAIR
-         /* [ @parameter nat : @storage nat ] */ ;
+         /* [ nat : nat ] */ ;
          DIP { SELF
-               /* [ @self contract nat : @storage nat ] */ ;
+               /* [ contract nat : nat ] */ ;
                ADDRESS
-               /* [ @self.address address : @storage nat ] */ ;
+               /* [ address : nat ] */ ;
                SENDER
-               /* [ @sender address : @self.address address : @storage nat ] */ ;
-               IFCMPEQ
-                 { /* [ @storage nat ] */ }
-                 { DROP /* [] */ ; PUSH @storage nat 1 /* [ @storage nat ] */ } }
-         /* [ @parameter nat : @storage nat ] */ ;
+               /* [ address : address : nat ] */ ;
+               IFCMPEQ { /* [ nat ] */ } { DROP /* [] */ ; PUSH @storage nat 1 /* [ nat ] */ } }
+         /* [ nat : nat ] */ ;
          DUP
-         /* [ @parameter nat : @parameter nat : @storage nat ] */ ;
+         /* [ nat : nat : nat ] */ ;
          PUSH nat 1
-         /* [ nat : @parameter nat : @parameter nat : @storage nat ] */ ;
+         /* [ nat : nat : nat : nat ] */ ;
          IFCMPGE
            { DROP
-             /* [ @storage nat ] */ ;
+             /* [ nat ] */ ;
              NIL operation
-             /* [ list operation : @storage nat ] */ ;
+             /* [ list operation : nat ] */ ;
              PAIR
-             /* [ pair (list operation) (nat @storage) ] */ }
+             /* [ pair (list operation) nat ] */ }
            { PUSH nat 1
-             /* [ nat : @parameter nat : @storage nat ] */ ;
+             /* [ nat : nat : nat ] */ ;
              SWAP
-             /* [ @parameter nat : nat : @storage nat ] */ ;
+             /* [ nat : nat : nat ] */ ;
              SUB @parameter
-             /* [ @parameter int : @storage nat ] */ ;
+             /* [ int : nat ] */ ;
              ISNAT
-             /* [ @parameter option nat : @storage nat ] */ ;
+             /* [ option nat : nat ] */ ;
              IF_NONE
                { NIL operation
-                 /* [ list operation : @storage nat ] */ ;
+                 /* [ list operation : nat ] */ ;
                  PAIR
-                 /* [ pair (list operation) (nat @storage) ] */ }
+                 /* [ pair (list operation) nat ] */ }
                { DUP
-                 /* [ @parameter.some nat : @parameter.some nat : @storage nat ] */ ;
+                 /* [ nat : nat : nat ] */ ;
                  DIP { PUSH nat 1
-                       /* [ nat : @parameter.some nat : @storage nat ] */ ;
+                       /* [ nat : nat : nat ] */ ;
                        ADD
-                       /* [ nat : @storage nat ] */ ;
+                       /* [ nat : nat ] */ ;
                        MUL @storage
-                       /* [ @storage nat ] */ }
-                 /* [ @parameter.some nat : @storage nat ] */ ;
+                       /* [ nat ] */ }
+                 /* [ nat : nat ] */ ;
                  SWAP
-                 /* [ @storage nat : @parameter.some nat ] */ ;
-                 DIP { DIP { SELF
-                             /* [ @self contract nat ] */ ;
-                             PUSH mutez 0
-                             /* [ mutez : @self contract nat ] */ }
-                       /* [ @parameter.some nat : mutez : @self contract nat ] */ ;
+                 /* [ nat : nat ] */ ;
+                 DIP { DIP { SELF /* [ contract nat ] */ ; PUSH mutez 0 /* [ mutez : contract nat ] */ }
+                       /* [ nat : mutez : contract nat ] */ ;
                        TRANSFER_TOKENS
                        /* [ operation ] */ ;
                        NIL operation
@@ -64,8 +59,8 @@ Gas remaining: 1039973.219 units remaining
                        /* [ operation : list operation ] */ ;
                        CONS
                        /* [ list operation ] */ }
-                 /* [ @storage nat : list operation ] */ ;
+                 /* [ nat : list operation ] */ ;
                  SWAP
-                 /* [ list operation : @storage nat ] */ ;
+                 /* [ list operation : nat ] */ ;
                  PAIR
-                 /* [ pair (list operation) (nat @storage) ] */ } } } }
+                 /* [ pair (list operation) nat ] */ } } } }

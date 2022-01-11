@@ -7,7 +7,7 @@ Gas remaining: 1039992.790 units remaining
   code { DIP { UNIT /* [ unit ] */ }
          /* [ pair (key_hash @parameter) (unit @storage) : unit ] */ ;
          CAR
-         /* [ @parameter key_hash : unit ] */ ;
+         /* [ key_hash : unit ] */ ;
          IMPLICIT_ACCOUNT
          /* [ contract unit : unit ] */ ;
          PUSH mutez 100000000

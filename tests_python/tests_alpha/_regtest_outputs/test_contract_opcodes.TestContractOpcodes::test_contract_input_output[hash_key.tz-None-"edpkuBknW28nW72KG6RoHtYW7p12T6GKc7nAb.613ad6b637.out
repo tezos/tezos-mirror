@@ -8,16 +8,16 @@ big_map diff
   
 trace
   - location: 8 (remaining gas: 1039668.957 units remaining)
-    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" None)  	 ]
+    [ (Pair "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" None) ]
   - location: 8 (remaining gas: 1039668.947 units remaining)
-    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"  	@parameter ]
+    [ "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav" ]
   - location: 9 (remaining gas: 1039668.292 units remaining)
-    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"  	 ]
+    [ "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx" ]
   - location: 10 (remaining gas: 1039668.277 units remaining)
-    [ (Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")  	 ]
+    [ (Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") ]
   - location: 11 (remaining gas: 1039668.262 units remaining)
-    [ {}  	
-      (Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")  	 ]
+    [ {}
+      (Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx") ]
   - location: 13 (remaining gas: 1039668.247 units remaining)
-    [ (Pair {} (Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"))  	 ]
+    [ (Pair {} (Some "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx")) ]
 

@@ -5,7 +5,7 @@ Gas remaining: 1039992.790 units remaining
 { parameter key_hash ;
   storage unit ;
   code { CAR
-         /* [ @parameter key_hash ] */ ;
+         /* [ key_hash ] */ ;
          IMPLICIT_ACCOUNT
          /* [ contract unit ] */ ;
          DIP { UNIT /* [ unit ] */ }
