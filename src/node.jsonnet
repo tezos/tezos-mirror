@@ -57,7 +57,7 @@ local prometheus = grafana.prometheus;
 
   savepointLevel:
     singlestat.new(
-      title='Current save pointlevel',
+      title='Current savepoint level',
       datasource='Prometheus',
       format='none',
       valueName='max',
@@ -128,6 +128,40 @@ local prometheus = grafana.prometheus;
       )
     ),
 
+  gasConsumedHistory:
+    local blocks = 'Gas consumed';
+    graphPanel.new(
+      title='Gas consumed history',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      aliasColors={
+        [blocks]: 'light-green',
+      },
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_current_gas_consumed',
+        legendFormat=blocks,
+      )
+    ),
+
+  priorityHistory:
+    local blocks = 'Priority';
+    graphPanel.new(
+      title='Priority history',
+      datasource='Prometheus',
+      linewidth=1,
+      format='none',
+      aliasColors={
+        [blocks]: 'light-green',
+      },
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_current_priority',
+        legendFormat=blocks,
+      )
+    ),
+
   blocksPerSecond:
     heatmapPanel.new(
       title='Blocks per second',
@@ -154,6 +188,8 @@ local prometheus = grafana.prometheus;
     local proposals = 'Proposals';
     local seed_nonce_revelation = 'Seed nonce revelation';
     local reveal = 'Reveal';
+    local register_global_constant = 'Register global constant';
+    local set_deposits_limit = 'Set deposits limit';
     graphPanel.new(
       title='Head operations',
       datasource='Prometheus',
@@ -221,6 +257,16 @@ local prometheus = grafana.prometheus;
         'tezos_metrics_chain_head_double_endorsement_evidence',
         legendFormat=double_endorsement_evidence,
       )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_register_global_constant',
+        legendFormat=register_global_constant,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_chain_head_set_deposits_limit',
+        legendFormat=set_deposits_limit,
+      )
     ),
 
   //## GC
@@ -228,6 +274,7 @@ local prometheus = grafana.prometheus;
   gcOperations:
     local minor = 'Minor collections';
     local major = 'Major collections';
+    local forced = 'Forced major collections';
     local compact = 'Heap compactions';
     graphPanel.new(
       title='GC maintenance operations',
@@ -237,21 +284,27 @@ local prometheus = grafana.prometheus;
       aliasColors={
         [minor]: 'light-green',
         [major]: 'light-yellow',
-        [compact]: 'light-blue',
+        [forced]: 'light-blue',
+        [compact]: 'light-red',
       },
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_minor_collections',
+        'tezos_metrics_stats_gc_minor_collections',
         legendFormat=minor,
       )
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_major_collections',
+        'tezos_metrics_stats_gc_major_collections',
         legendFormat=major,
       )
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_major_compactions',
+        'tezos_metrics_stats_gc_forced_major_collections',
+        legendFormat=forced,
+      )
+    ).addTarget(
+      prometheus.target(
+        'tezos_metrics_stats_gc_compactions',
         legendFormat=compact,
       )
     ),
@@ -259,6 +312,7 @@ local prometheus = grafana.prometheus;
   gcMajorHeap:
     local major = 'Major heap';
     local top = 'Top major heap';
+    local live = 'Live words';
     graphPanel.new(
       title='GC minor and major word sizes',
       datasource='Prometheus',
@@ -266,17 +320,23 @@ local prometheus = grafana.prometheus;
       format='bytes',
       aliasColors={
         [major]: 'light-green',
-        [top]: 'light-blue',
+        [top]: 'light-red',
+        [live]: 'light-blue',
       },
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_heap_words',
+        'tezos_metrics_stats_gc_heap_words',
         legendFormat=major,
       )
     ).addTarget(
       prometheus.target(
-        'ocaml_gc_top_heap_words',
+        'tezos_metrics_stats_gc_top_heap_words',
         legendFormat=top,
+      )
+     ).addTarget(
+      prometheus.target(
+        'tezos_metrics_stats_gc_live_words',
+        legendFormat=live,
       )
     ),
 
