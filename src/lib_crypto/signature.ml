@@ -693,6 +693,8 @@ let make_endorsement_cache =
 
         let clear _ = ()
 
+        let filter _ _ = ()
+
         module H = H
       end in
       (module Fake_ring : Ringo.MAP_MAKER)

@@ -197,9 +197,9 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 
 let resto_directory = external_lib "resto-directory" resto_version
 
-let ringo = external_lib "ringo" [Exactly "0.5"]
+let ringo = external_lib "ringo" [Exactly "0.7"]
 
-let ringo_lwt = external_lib "ringo-lwt" [Exactly "0.5"]
+let ringo_lwt = external_lib "ringo-lwt" [Exactly "0.7"]
 
 let secp256k1_internal = external_lib "secp256k1-internal" []
 

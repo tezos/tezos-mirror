@@ -18,7 +18,7 @@ depends: [
   "tezos-validation"
   "tezos-protocol-updater"
   "lwt-watcher" { = "0.1" }
-  "ringo-lwt" { = "0.5" }
+  "ringo-lwt" { = "0.7" }
   "camlzip" { = "1.10" }
   "tar"
   "tar-unix" { = "1.1.0" }

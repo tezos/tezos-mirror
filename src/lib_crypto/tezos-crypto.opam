@@ -17,7 +17,7 @@ depends: [
   "tezos-error-monad"
   "tezos-rpc"
   "tezos-stdlib"
-  "ringo" { = "0.5" }
+  "ringo" { = "0.7" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
   "tezos-hacl-glue-unix" {with-test}
