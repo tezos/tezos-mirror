@@ -27,20 +27,12 @@
     endorser and accuser. Handles event handling in particular. *)
 
 module type PARAMETERS = sig
-  (** Parameters of the [Daemon.Make] functor. *)
-
-  (** Data to store whether a daemon is running or not. *)
   type persistent_state
 
-  (** Data to store when a daemon is running. *)
   type session_state
 
-  (** Basis for the default value for the [?name] argument of [create].
-
-      Examples: ["node"] or ["accuser"]. *)
   val base_default_name : string
 
-  (** Cycle of default values for the [?color] argument of [create]. *)
   val default_colors : Log.Color.t array
 end
 
@@ -79,18 +71,6 @@ module Make (X : PARAMETERS) = struct
              where)
     | _ -> None
 
-  (* When a daemon is running, we store:
-     - its process, so that we can terminate it for instance;
-     - the event loop promise, which reads events and cleans them up when
-       the daemon terminates;
-     - some information about the state of the daemon so that users can query them.
-
-     The event loop promise is particularly important as when we terminate
-     the daemon we must also wait for the event loop to finish cleaning up before
-     we start the daemon again. The event loop is also responsible to set the status
-     of the daemon to [Not_running], which is another reason to wait for it to
-     finish before restarting a daemon. Otherwise we could have a [Not_running]
-     daemon which would be actually running. *)
   type session_status = {
     process : Process.t;
     session_state : X.session_state;

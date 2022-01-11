@@ -63,13 +63,13 @@ val create :
   Node.t ->
   t
 
-(** Get the name of an accuser. *)
+(** Specialised version of [Daemon.Make.name]. *)
 val name : t -> string
 
 (** Get the RPC port of the associated node. *)
 val node_rpc_port : t -> int
 
-(** Send SIGTERM (or SIGKILL) to an accuser and wait for it to terminate. *)
+(** Specialised version of [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
@@ -102,39 +102,13 @@ exception
     connected to is bootstrapped, and then, the accuser is ready. *)
 val wait_for_ready : t -> unit Lwt.t
 
-(** Wait for a custom event to occur.
-
-    Usage: [wait_for accuser name filter]
-
-    If an event named [name] occurs, apply [filter] to its value.
-    If [filter] returns [None], continue waiting.
-    If [filter] returns [Some x], return [x].
-
-    [where] is used as the [where] field of the
-    [Terminated_before_event] exception if the accuser terminates. It
-    should describe the constraint that [filter] applies, such as
-    ["field level exists"].
-
-    It is advised to register such event handlers before starting the accuser,
-    as if they occur before being registered, they will not trigger your handler.
-    For instance, you can define a promise with
-    [let x_event = wait_for accuser "x" (fun x -> Some x)]
-    and bind it later with [let* x = x_event]. *)
+(** Specialised version of [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** Add a callback to be called whenever the accuser emits an event.
-
-    Contrary to [wait_for] functions, this callback is never removed.
-
-    Listening to events with [on_event] will not prevent [wait_for] promises
-    to be fulfilled. You can also have multiple [on_event] handlers, although
-    the order in which they trigger is unspecified. *)
+(** Specialised version of [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
 
-(** Register an event handler that logs all events.
-
-    Use this when you need to debug or reverse engineer incoming events.
-    Usually you do not want to keep that in the final versions of your tests. *)
+(** Specialised version of [Daemon.Make.log_events]. *)
 val log_events : t -> unit
 
 (** {2 High-Level Functions} *)
