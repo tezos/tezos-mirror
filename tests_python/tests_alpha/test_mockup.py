@@ -637,7 +637,7 @@ def _test_create_mockup_init_show_roundtrip(
                 'minimal_block_delay': '1',
                 'delay_increment_per_round': '1',
                 'max_slashing_period': 12,
-                "blocks_per_voting_period": 65,
+                "blocks_per_voting_period": 63,
                 "blocks_per_stake_snapshot": 5,
                 "blocks_per_commitment": 5,
                 "blocks_per_cycle": 9,

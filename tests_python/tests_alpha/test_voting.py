@@ -16,6 +16,7 @@ def client(sandbox):
     """One node, 4 blocks per voting period."""
     proto_params = dict(protocol.PARAMETERS)
     parameters = copy.deepcopy(proto_params)
+    parameters["blocks_per_cycle"] = 4
     parameters["blocks_per_voting_period"] = 4
     parameters['consensus_threshold'] = 0
     sandbox.add_node(0, params=constants.NODE_PARAMS)
