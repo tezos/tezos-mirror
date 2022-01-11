@@ -86,7 +86,7 @@ let read_atom resume size conv state k =
   match
     let remaining_bytes = check_remaining_bytes state size in
     let allowed_bytes = check_allowed_bytes state size in
-    let (res, stream) = Binary_stream.read state.stream size in
+    let res, stream = Binary_stream.read state.stream size in
     ( conv res.buffer res.ofs,
       {
         remaining_bytes;
@@ -174,7 +174,7 @@ module Atom = struct
     uint8 resume state @@ fun (byte, state) ->
     let value = value lor ((byte land 0x7F) lsl bit_in_value) in
     let bit_in_value = bit_in_value + 7 in
-    let (bit_in_value, value) =
+    let bit_in_value, value =
       if bit_in_value < 8 then (bit_in_value, value)
       else (
         Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
@@ -396,10 +396,10 @@ and read_variable_pair :
  fun e1 e2 state k ->
   let size = remaining_bytes state in
   match (Encoding.classify e1, Encoding.classify e2) with
-  | ((`Dynamic | `Fixed _), `Variable) ->
+  | (`Dynamic | `Fixed _), `Variable ->
       read_rec false e1 state @@ fun (left, state) ->
       read_rec true e2 state @@ fun (right, state) -> k ((left, right), state)
-  | (`Variable, `Fixed n) ->
+  | `Variable, `Fixed n ->
       if n > size then Error Not_enough_data
       else
         let state = {state with remaining_bytes = Some (size - n)} in

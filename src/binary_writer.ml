@@ -266,12 +266,12 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       match value with None -> () | Some value -> write_rec e state value)
   | Obj (Dft {encoding = e; _}) -> write_rec e state value
   | Objs {left; right; _} ->
-      let (v1, v2) = value in
+      let v1, v2 = value in
       write_rec left state v1 ;
       write_rec right state v2
   | Tup e -> write_rec e state value
   | Tups {left; right; _} ->
-      let (v1, v2) = value in
+      let v1, v2 = value in
       write_rec left state v1 ;
       write_rec right state v2
   | Conv {encoding = e; proj; _} ->

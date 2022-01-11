@@ -225,8 +225,8 @@ let bin_qualified =
 
 let rec check_sliced_fields_result fl rl =
   match (fl, rl) with
-  | ([], []) -> ()
-  | ({Data_encoding.Binary.Slicer.pretty_printed; _} :: tf, r :: tr) ->
+  | [], [] -> ()
+  | {Data_encoding.Binary.Slicer.pretty_printed; _} :: tf, r :: tr ->
       if pretty_printed = r then check_sliced_fields_result tf tr
       else Alcotest.failf "Unexpected slicintg result %s /= %s" pretty_printed r
   | _ -> Alcotest.failf "Unexpected size of resulted list of fields"

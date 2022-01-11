@@ -196,8 +196,7 @@ and lift_union_in_pair :
  fun b p e1 e2 ->
   let open Encoding in
   match (lift_union e1, lift_union e2) with
-  | (e1, {encoding = Union {tag_size; match_case; cases; tagged_cases; _}; _})
-    ->
+  | e1, {encoding = Union {tag_size; match_case; cases; tagged_cases; _}; _} ->
       let match_case (x, y) =
         match match_case y with
         | Matched (tag, e2, v) ->
@@ -225,8 +224,7 @@ and lift_union_in_pair :
              match_case;
              cases = List.map lift cases;
            }
-  | ({encoding = Union {tag_size; tagged_cases; match_case; cases; _}; _}, e2)
-    ->
+  | {encoding = Union {tag_size; tagged_cases; match_case; cases; _}; _}, e2 ->
       let match_case (x, y) =
         match match_case x with
         | Matched (tag, e1, v) ->
@@ -254,7 +252,7 @@ and lift_union_in_pair :
              match_case;
              cases = List.map lift cases;
            }
-  | (e1, e2) -> b.build p e1 e2
+  | e1, e2 -> b.build p e1 e2
 
 let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   let open Encoding in

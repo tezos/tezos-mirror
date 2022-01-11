@@ -189,7 +189,7 @@ let roundtrip_binary_write pp ding v slack =
         we
   in
   Crowbar.check_eq written size ;
-  let (read, vv) =
+  let read, vv =
     try
       Data_encoding.Binary.read_exn ding (Bytes.unsafe_to_string buffer) 0 size
     with Data_encoding.Binary.Read_error re ->

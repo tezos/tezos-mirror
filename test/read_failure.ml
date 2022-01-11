@@ -103,13 +103,13 @@ let minimal_stream ?(expected = fun _ -> true) expected_read read_encoding bytes
     () =
   let name = "minimal_stream" in
   match streamed_read read_encoding bytes with
-  | (Binary.Success _, _) ->
+  | Binary.Success _, _ ->
       Alcotest.failf "%s failed: expecting exception, got success." name
-  | (Binary.Await _, _) -> Alcotest.failf "%s failed: not enough data" name
-  | (Binary.Error error, count)
+  | Binary.Await _, _ -> Alcotest.failf "%s failed: not enough data" name
+  | Binary.Error error, count
     when expected (Binary.Read_error error) && count = expected_read ->
       ()
-  | (Binary.Error error, count) ->
+  | Binary.Error error, count ->
       Alcotest.failf
         "@[<v 2>%s failed: read error after reading %d. @ %a@]"
         name

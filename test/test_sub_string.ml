@@ -55,7 +55,7 @@ let () =
   let wri = Data_encoding.Binary.write_exn enc ful sta in
   assert (wri = 1) ;
   let buf = Bytes.unsafe_to_string buf in
-  let (red, nib) = Data_encoding.Binary.read_exn enc buf 0 1 in
+  let red, nib = Data_encoding.Binary.read_exn enc buf 0 1 in
   assert (red = 1) ;
   tamper_with buf ;
   assert (String.equal ful nib)

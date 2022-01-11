@@ -92,7 +92,7 @@ let trip_binary pp code_ding decode_ding v =
 let test_binary_compat_legacy_res (fulla_and_v : full_and_v)
     (fullb_and_v : full_and_v) =
   match (fulla_and_v, fullb_and_v) with
-  | (FullAndV (fulla, a), FullAndV (fullb, b)) ->
+  | FullAndV (fulla, a), FullAndV (fullb, b) ->
       let fullr = full_result fulla fullb in
       let module Fullr = (val fullr) in
       let fullleg = full_legacy_result fulla fullb in

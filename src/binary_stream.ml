@@ -64,7 +64,7 @@ let split buffer len =
 let read stream len =
   if len > stream.unread then raise Need_more_data ;
   if len <= stream.current.len then
-    let (res, current) = split stream.current len in
+    let res, current = split stream.current len in
     (res, {stream with current; unread = stream.unread - len})
   else
     let res = {buffer = Bytes.create len; ofs = 0; len} in

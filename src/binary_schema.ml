@@ -346,7 +346,7 @@ module Printer = struct
           tables
 
   let pp ppf {toplevel; fields} =
-    let (_, toplevel) =
+    let _, toplevel =
       Printer_ast.toplevel ({title = ""; description = None}, toplevel)
     in
     Format.fprintf
@@ -506,7 +506,7 @@ module Encoding = struct
             (obj2 (req "size" int31) (req "kind" (constant "Float")))
             (function `Fixed n -> Some (n, ()) | _ -> None)
             (fun (n, _) -> `Fixed n)
-          :: kind_enum_cases ())
+         :: kind_enum_cases ())
 
   let unsigned_integer_encoding =
     string_enum [("Uint30", `Uint30); ("Uint16", `Uint16); ("Uint8", `Uint8)]
