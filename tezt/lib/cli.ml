@@ -332,7 +332,8 @@ let init ?args () =
           Arg.String (fun path -> options.junit <- Some path),
           "<FILE> Store test results in FILE using JUnit XML format. Time \
            information for each test is the sum of all runs of this test for \
-           the current session." );
+           the current session. Test result (success or failure) is the result \
+           for the last run of the test." );
       ]
   in
   let usage =

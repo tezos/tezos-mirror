@@ -142,6 +142,7 @@ type test = {
 let really_run ~progress_state ~iteration test =
   Log.info "Starting test: %s" test.title ;
   List.iter (fun reset -> reset ()) !reset_functions ;
+  test.result <- None ;
   Lwt_main.run
   @@
   (* It may happen that the promise of the function resolves successfully
