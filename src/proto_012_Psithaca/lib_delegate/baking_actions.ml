@@ -265,6 +265,9 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     injection_level
   >>=? fun seed_nonce_opt ->
   let seed_nonce_hash = Option.map fst seed_nonce_opt in
+  let user_activated_upgrades =
+    state.global_state.config.user_activated_upgrades
+  in
   (* Set liquidity_baking_escape_vote for this block *)
   let default = state.global_state.config.liquidity_baking_escape_vote in
   (match state.global_state.config.per_block_vote_file with
@@ -282,6 +285,7 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     ~seed_nonce_hash
     ~payload_round
     ~liquidity_baking_escape_vote
+    ~user_activated_upgrades
     state.global_state.config.fees
     simulation_mode
     simulation_kind

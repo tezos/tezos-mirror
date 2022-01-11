@@ -116,11 +116,26 @@ let retain_live_operations_only ~live_blocks operation_pool =
     operation_pool
 
 let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
-    ~timestamp ~liquidity_baking_escape_vote fees_config ~seed_nonce_hash
-    ~payload_round simulation_mode simulation_kind constants =
+    ~timestamp ~liquidity_baking_escape_vote ~user_activated_upgrades
+    fees_config ~seed_nonce_hash ~payload_round simulation_mode simulation_kind
+    constants =
   let predecessor_block = (pred_info : Baking_state.block_info) in
   let hard_gas_limit_per_block = constants.Constants.hard_gas_limit_per_block in
   let chain = `Hash chain_id in
+  let check_protocol_changed
+      ~(validation_result : Environment_context.validation_result) =
+    Context_ops.get_protocol validation_result.context >>= fun next_protocol ->
+    let next_protocol =
+      match
+        Tezos_base.Block_header.get_forced_protocol_upgrade
+          ~user_activated_upgrades
+          ~level:(Int32.succ predecessor_block.shell.level)
+      with
+      | None -> next_protocol
+      | Some hash -> hash
+    in
+    return Protocol_hash.(Protocol.hash <> next_protocol)
+  in
   let filter_via_node ~operation_pool =
     let filtered_operations =
       Operation_selection.filter_operations_without_simulation
@@ -186,51 +201,53 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
                operations_hash;
                _;
              } ->
-    let _op_pool' =
-      Operation_pool.(add_operations empty (List.concat operations))
-    in
-    protect
-      ~on_error:(fun _ -> return_none)
-      (fun () ->
-        Shell_services.Blocks.metadata_hash
-          cctxt
-          ~block:(`Hash (predecessor_block.hash, 0))
-          ~chain
-          ()
-        >>=? fun pred_block_metadata_hash ->
-        return (Some pred_block_metadata_hash))
-    >>=? fun pred_block_metadata_hash ->
-    protect
-      ~on_error:(fun _ -> return_none)
-      (fun () ->
-        Shell_services.Blocks.Operation_metadata_hashes.root
-          cctxt
-          ~block:(`Hash (predecessor_block.hash, 0))
-          ~chain
-          ()
-        >>=? fun pred_op_metadata_hash -> return (Some pred_op_metadata_hash))
-    >>=? fun pred_op_metadata_hash ->
-    finalize_block_header
-      incremental.header
-      timestamp
-      validation_result
-      operations_hash
-      pred_block_metadata_hash
-      pred_op_metadata_hash
-    >>=? fun shell_header ->
-    let operations = List.map (List.map convert_operation) operations in
-    let payload_hash =
-      let operation_list_hash =
-        Stdlib.List.tl operations |> List.flatten
-        |> List.map Tezos_base.Operation.hash
-        |> Operation_list_hash.compute
+    check_protocol_changed ~validation_result >>=? fun changed ->
+    if changed then
+      (* Fallback to processing via node, which knows both old and new protocol. *)
+      filter_via_node ~operation_pool
+    else
+      protect
+        ~on_error:(fun _ -> return_none)
+        (fun () ->
+          Shell_services.Blocks.metadata_hash
+            cctxt
+            ~block:(`Hash (predecessor_block.hash, 0))
+            ~chain
+            ()
+          >>=? fun pred_block_metadata_hash ->
+          return (Some pred_block_metadata_hash))
+      >>=? fun pred_block_metadata_hash ->
+      protect
+        ~on_error:(fun _ -> return_none)
+        (fun () ->
+          Shell_services.Blocks.Operation_metadata_hashes.root
+            cctxt
+            ~block:(`Hash (predecessor_block.hash, 0))
+            ~chain
+            ()
+          >>=? fun pred_op_metadata_hash -> return (Some pred_op_metadata_hash))
+      >>=? fun pred_op_metadata_hash ->
+      finalize_block_header
+        incremental.header
+        timestamp
+        validation_result
+        operations_hash
+        pred_block_metadata_hash
+        pred_op_metadata_hash
+      >>=? fun shell_header ->
+      let operations = List.map (List.map convert_operation) operations in
+      let payload_hash =
+        let operation_list_hash =
+          Stdlib.List.tl operations |> List.flatten
+          |> List.map Tezos_base.Operation.hash
+          |> Operation_list_hash.compute
+        in
+        Block_payload.hash
+          ~predecessor:shell_header.predecessor
+          payload_round
+          operation_list_hash
       in
-      Block_payload.hash
-        ~predecessor:shell_header.predecessor
-        payload_round
-        operation_list_hash
-    in
-    return (shell_header, operations, payload_hash)
+      return (shell_header, operations, payload_hash)
   in
   let apply_via_node ~ordered_pool ~payload_hash =
     let operations = Operation_pool.ordered_to_list_list ordered_pool in
@@ -294,37 +311,42 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     in
     Baking_simulator.finalize_construction incremental
     >>=? fun (validation_result, _) ->
-    protect
-      ~on_error:(fun _ -> return_none)
-      (fun () ->
-        Shell_services.Blocks.metadata_hash
-          cctxt
-          ~block:(`Hash (predecessor_block.hash, 0))
-          ~chain
-          ()
-        >>=? fun pred_block_metadata_hash ->
-        return (Some pred_block_metadata_hash))
-    >>=? fun pred_block_metadata_hash ->
-    protect
-      ~on_error:(fun _ -> return_none)
-      (fun () ->
-        Shell_services.Blocks.Operation_metadata_hashes.root
-          cctxt
-          ~block:(`Hash (predecessor_block.hash, 0))
-          ~chain
-          ()
-        >>=? fun pred_op_metadata_hash -> return (Some pred_op_metadata_hash))
-    >>=? fun pred_op_metadata_hash ->
-    finalize_block_header
-      incremental.header
-      timestamp
-      validation_result
-      operations_hash
-      pred_block_metadata_hash
-      pred_op_metadata_hash
-    >>=? fun shell_header ->
-    let operations = List.map (List.map convert_operation) operations in
-    return (shell_header, operations, payload_hash)
+    check_protocol_changed ~validation_result >>=? fun changed ->
+    if changed then
+      (* Fallback to processing via node, which knows both old and new protocol. *)
+      apply_via_node ~ordered_pool ~payload_hash
+    else
+      protect
+        ~on_error:(fun _ -> return_none)
+        (fun () ->
+          Shell_services.Blocks.metadata_hash
+            cctxt
+            ~block:(`Hash (predecessor_block.hash, 0))
+            ~chain
+            ()
+          >>=? fun pred_block_metadata_hash ->
+          return (Some pred_block_metadata_hash))
+      >>=? fun pred_block_metadata_hash ->
+      protect
+        ~on_error:(fun _ -> return_none)
+        (fun () ->
+          Shell_services.Blocks.Operation_metadata_hashes.root
+            cctxt
+            ~block:(`Hash (predecessor_block.hash, 0))
+            ~chain
+            ()
+          >>=? fun pred_op_metadata_hash -> return (Some pred_op_metadata_hash))
+      >>=? fun pred_op_metadata_hash ->
+      finalize_block_header
+        incremental.header
+        timestamp
+        validation_result
+        operations_hash
+        pred_block_metadata_hash
+        pred_op_metadata_hash
+      >>=? fun shell_header ->
+      let operations = List.map (List.map convert_operation) operations in
+      return (shell_header, operations, payload_hash)
   in
   let simulation_kind =
     match simulation_kind with
