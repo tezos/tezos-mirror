@@ -95,6 +95,10 @@ let () =
       | Ledger_signing_hash_mismatch (lh, ch) -> Some (lh, ch) | _ -> None)
     (fun (lh, ch) -> Ledger_signing_hash_mismatch (lh, ch))
 
+let pp_round_opt fmt = function
+  | None -> ()
+  | Some x -> Format.fprintf fmt " (round: %ld)" x
+
 (** Wrappers around Ledger APDUs. *)
 module Ledger_commands = struct
   let wrap_ledger_cmd f =
@@ -1072,23 +1076,31 @@ let baking_commands group =
               >>=? fun main_chain_id ->
               Ledger_commands.wrap_ledger_cmd (fun pp ->
                   Ledgerwallet_tezos.get_all_high_watermarks ~pp hidapi)
-              >>=? fun ( `Main_hwm current_mh,
-                         `Test_hwm current_th,
+              >>=? fun ( `Main_hwm (current_mh, current_mhr_opt),
+                         `Test_hwm (current_th, current_thr_opt),
                          `Chain_id current_ci ) ->
               let main_hwm = Option.value main_hwm_opt ~default:current_mh in
               let test_hwm = Option.value test_hwm_opt ~default:current_th in
               cctxt#message
                 "Setting up the ledger:@.* Main chain ID: %a -> %a@.* Main \
-                 chain High Watermark: %ld -> %ld@.* Test chain High \
-                 Watermark: %ld -> %ld"
+                 chain High Watermark: %ld%a -> %ld%a@.* Test chain High \
+                 Watermark: %ld%a -> %ld%a"
                 pp_ledger_chain_id
                 current_ci
                 Chain_id.pp
                 main_chain_id
                 current_mh
+                pp_round_opt
+                current_mhr_opt
                 main_hwm
+                pp_round_opt
+                (Option.map (fun _ -> 0l) current_mhr_opt)
                 current_th
+                pp_round_opt
+                current_thr_opt
                 test_hwm
+                pp_round_opt
+                (Option.map (fun _ -> 0l) current_thr_opt)
               >>= fun () ->
               Ledger_commands.public_key_returning_instruction
                 (`Setup (Chain_id.to_string main_chain_id, main_hwm, test_hwm))
@@ -1159,12 +1171,14 @@ let high_water_mark_commands group watermark_spelling =
               | TezBake when (not no_legacy_apdu) && version.major < 2 ->
                   Ledger_commands.wrap_ledger_cmd (fun pp ->
                       Ledgerwallet_tezos.get_high_watermark ~pp hidapi)
-                  >>=? fun hwm ->
+                  >>=? fun (hwm, hwm_round_opt) ->
                   cctxt#message
-                    "The high water mark for@ %a@ is %ld."
+                    "The high water mark for@ %a@ is %ld%a."
                     Ledger_uri.pp
                     ledger_uri
                     hwm
+                    pp_round_opt
+                    hwm_round_opt
                   >>= fun () -> return_some ()
               | TezBake when no_legacy_apdu && version.major < 2 ->
                   failwith
@@ -1175,16 +1189,21 @@ let high_water_mark_commands group watermark_spelling =
               | TezBake ->
                   Ledger_commands.wrap_ledger_cmd (fun pp ->
                       Ledgerwallet_tezos.get_all_high_watermarks ~pp hidapi)
-                  >>=? fun (`Main_hwm mh, `Test_hwm th, `Chain_id ci) ->
+                  >>=? fun (`Main_hwm (mh, mr), `Test_hwm (th, tr), `Chain_id ci)
+                    ->
                   cctxt#message
-                    "The high water mark values for@ %a@ are@ %ld for the \
-                     main-chain@ (%a)@ and@ %ld for the test-chain."
+                    "The high water mark values for@ %a@ are@ %ld%a for the \
+                     main-chain@ (%a)@ and@ %ld%a for the test-chain."
                     Ledger_uri.pp
                     ledger_uri
                     mh
+                    pp_round_opt
+                    mr
                     pp_ledger_chain_id
                     ci
                     th
+                    pp_round_opt
+                    tr
                   >>= fun () -> return_some ()));
       Clic.command
         ~group
@@ -1213,12 +1232,14 @@ let high_water_mark_commands group watermark_spelling =
                   >>=? fun () ->
                   Ledger_commands.wrap_ledger_cmd (fun pp ->
                       Ledgerwallet_tezos.get_high_watermark ~pp hidapi)
-                  >>=? fun new_hwm ->
+                  >>=? fun (new_hwm, new_hwm_round_opt) ->
                   cctxt#message
-                    "@[<v 0>%a has now high water mark: %ld@]"
+                    "@[<v 0>%a has now high water mark: %ld%a@]"
                     Ledger_uri.pp
                     ledger_uri
                     new_hwm
+                    pp_round_opt
+                    new_hwm_round_opt
                   >>= fun () -> return_some ()));
     ]
 
