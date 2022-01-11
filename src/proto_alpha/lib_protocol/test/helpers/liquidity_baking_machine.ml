@@ -868,6 +868,7 @@ module ConcreteBaseMachine :
       ~baking_reward_fixed_portion:Tez.zero
       ~origination_size:0
       ~blocks_per_cycle:10_000l
+      ~blocks_per_voting_period:10_000l
       ?liquidity_baking_subsidy
     >>= function
     | (blk, holder :: accounts) ->

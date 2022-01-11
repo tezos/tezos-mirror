@@ -451,7 +451,6 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       ~default:constants.blocks_per_voting_period
       blocks_per_voting_period
   in
-  (* ?origination_size *)
   let consensus_threshold =
     Option.value ~default:constants.consensus_threshold consensus_threshold
   in
