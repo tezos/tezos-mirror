@@ -26,11 +26,9 @@ where <test-name> can be:
 * use-docker
 * install-bin-bionic
 * install-bin-focal
-* install-bin-fedora33
 * install-bin-fedora34
 * install-bin-rc-bionic
 * install-bin-rc-focal
-* install-bin-rc-fedora33
 * install-bin-rc-fedora34
 * install-opam-scratch
 * install-opam-bionic
@@ -53,9 +51,6 @@ case "$1" in
   "install-bin-focal" )
     docker run --rm -i $UBUNTU_FOCAL <"$MYDIR"/install-bin-ubuntu.sh
     ;;
-  "install-bin-fedora33" )
-    docker run --rm -i fedora:33 <"$MYDIR"/install-bin-fedora.sh
-    ;;
   "install-bin-fedora34" )
     docker run --rm -i fedora:34 <"$MYDIR"/install-bin-fedora.sh
     ;;
@@ -64,9 +59,6 @@ case "$1" in
     ;;
   "install-bin-rc-focal" )
     docker run --rm -i $UBUNTU_FOCAL <"$MYDIR"/install-bin-rc-ubuntu.sh
-    ;;
-  "install-bin-rc-fedora33" )
-    docker run --rm -i fedora:33 <"$MYDIR"/install-bin-rc-fedora.sh
     ;;
   "install-bin-rc-fedora34" )
     docker run --rm -i fedora:34 <"$MYDIR"/install-bin-rc-fedora.sh

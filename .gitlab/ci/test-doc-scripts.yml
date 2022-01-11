@@ -50,10 +50,6 @@ install_bin_rc_focal:
   script:
     - ./docs/introduction/install-bin-fedora.sh
 
-install_bin_fedora_33:
-  image: fedora:33
-  extends: .install_bin_fedora_template
-
 install_bin_fedora_34:
   image: fedora:34
   extends: .install_bin_fedora_template
@@ -65,10 +61,6 @@ install_bin_fedora_34:
     - .rules_template__development_documentation
   script:
     - ./docs/introduction/install-bin-rc-fedora.sh
-
-install_bin_rc_fedora_33:
-  image: fedora:33
-  extends: .install_bin_rc_fedora_template
 
 install_bin_rc_fedora_34:
   image: fedora:34

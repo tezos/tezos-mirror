@@ -107,7 +107,7 @@ Fedora Copr repository with Tezos packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you're using Fedora, you can install packages with Tezos binaries from a Copr repository.
-Currently it supports Fedora 33 and 34.
+Currently it supports Fedora 34.
 
 In order to add the stable Copr repository to your machine, run:
 
