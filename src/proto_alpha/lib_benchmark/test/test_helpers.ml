@@ -55,8 +55,16 @@ let typecheck_by_tezos =
         ]
       5
     >>=? fun (block, _accounts) ->
+    Context.get_constants (B block) >>=? fun csts ->
+    let minimal_block_delay =
+      Protocol.Alpha_context.Period.to_seconds
+        csts.parametric.minimal_block_delay
+    in
     Incremental.begin_construction
-      ~timestamp:(Tezos_base.Time.Protocol.add block.header.shell.timestamp 30L)
+      ~timestamp:
+        (Tezos_base.Time.Protocol.add
+           block.header.shell.timestamp
+           minimal_block_delay)
       block
     >>=? fun vs ->
     let ctxt = Incremental.alpha_ctxt vs in
