@@ -23,38 +23,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** This module contains constants and utility functions for gas metering
-    functions used for extracting and handling tickets for the global ticket
-    balance table. *)
+type ex_token =
+  | Ex_token : {
+      ticketer : Alpha_context.Contract.t;
+      contents_type : 'a Script_typed_ir.comparable_ty;
+      contents : 'a;
+    }
+      -> ex_token
 
-module Constants : sig
-  val cost_contains_tickets_step : Alpha_context.Gas.cost
-
-  val cost_collect_tickets_step : Alpha_context.Gas.cost
-
-  val cost_token_and_amount_of_ticket : Alpha_context.Gas.cost
-
-  val cost_compare_key_script_expr_hash : Alpha_context.Gas.cost
-end
-
-(** [consume_gas_steps ctxt ~num_steps] consumes gas corresponding to
-    a given [num_steps] and [step_cost]. It's useful for paying for gas
-    upfront where the number of steps can be determined.
-
-    This function is generic and should probably be moved. See issue
-    https://gitlab.com/tezos/tezos/-/issues/1950.
-
-  *)
-val consume_gas_steps :
-  Alpha_context.t ->
-  step_cost:Alpha_context.Gas.cost ->
-  num_steps:int ->
-  Alpha_context.t tzresult
-
-(** [has_tickets_of_ty_cost ty] returns the cost of producing a [has_tickets],
-    used internally in the [Ticket_scanner] module. *)
-val has_tickets_of_ty_cost :
-  'a Script_typed_ir.ty -> Saturation_repr.may_saturate Saturation_repr.t
-
-(** [negate_cost z] returns the cost of negating the given value [z]. *)
-val negate_cost : Z.t -> Alpha_context.Gas.cost
+let token_and_amount_of_ex_ticket
+    (Ticket_scanner.Ex_ticket
+      (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
+  let amount = Alpha_context.Script_int.to_zint amount in
+  (Ex_token {ticketer; contents_type; contents}, amount)

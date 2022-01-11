@@ -1153,7 +1153,7 @@ end
 
 module Big_map : sig
   module Id : sig
-    type t
+    type t = Lazy_storage_kind.Big_map.Id.t
 
     val encoding : t Data_encoding.t
 
@@ -1326,7 +1326,10 @@ module Lazy_storage : sig
     | Remove
     | Update of {init : ('id, 'alloc) init; updates : 'updates}
 
-  type diffs_item
+  type diffs_item = private
+    | Item :
+        ('i, 'a, 'u) Lazy_storage_kind.t * 'i * ('i, 'a, 'u) diff
+        -> diffs_item
 
   val make : ('i, 'a, 'u) Kind.t -> 'i -> ('i, 'a, 'u) diff -> diffs_item
 

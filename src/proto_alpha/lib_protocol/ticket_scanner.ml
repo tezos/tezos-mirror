@@ -506,10 +506,29 @@ module Ticket_collection = struct
                 k
           | None -> (k [@ocaml.tailcall]) ctxt acc)
 
-  let tickets_of_value ctxt ~include_lazy ty x =
-    Ticket_inspection.has_tickets_of_ty ctxt ty >>?= fun (ht, ctxt) ->
+  let tickets_of_value ctxt ~include_lazy ht ty x =
     tickets_of_value ctxt ~include_lazy ht ty x [] (fun ctxt ex_tickets ->
         return (ex_tickets, ctxt))
 end
 
-let tickets_of_value ctxt = Ticket_collection.tickets_of_value ctxt
+type 'a has_tickets = 'a Ticket_inspection.has_tickets * 'a Script_typed_ir.ty
+
+let type_has_tickets ctxt ty =
+  Ticket_inspection.has_tickets_of_ty ctxt ty >|? fun (has_tickets, ctxt) ->
+  ((has_tickets, ty), ctxt)
+
+let tickets_of_value ctxt ~include_lazy (ht, ty) =
+  Ticket_collection.tickets_of_value ctxt ~include_lazy ht ty
+
+let tickets_of_node ctxt ~include_lazy (ht, ty) expr =
+  match ht with
+  | Ticket_inspection.False_ht -> return ([], ctxt)
+  | _ ->
+      Script_ir_translator.parse_data
+        ctxt
+        ~legacy:true
+        ~allow_forged:true
+        ty
+        expr
+      >>=? fun (value, ctxt) ->
+      tickets_of_value ctxt ~include_lazy (ht, ty) value

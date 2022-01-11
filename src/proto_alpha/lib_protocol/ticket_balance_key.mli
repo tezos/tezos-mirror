@@ -24,17 +24,14 @@
 (*****************************************************************************)
 
 (** This module exposes a function for generating a ticket-balance key-hash
-    and an amount, given an owner and a ticket. The key-hash and the amount is
-    used for populating the global ticket-balance table that tracks ownership
-    of different types of tickets.
+    given an owner and a ticket-token. The key-hash is used for populating the
+    global ticket-balance table that tracks ownership of tickets for different tokens.
  *)
 
-(** [ticket_balance_key_and_amount ctxt ~owner ex_ticket] returns the [key_hash]
-    of the given [owner] and [ex_ticket], as well as the amount of the
-    ticket. *)
-val ticket_balance_key_and_amount :
+(** [ticket_balance_key ctxt ~owner ex_token] returns the [key_hash] of the
+    given [owner] and [ex_token]. *)
+val ticket_balance_key :
   Alpha_context.context ->
   owner:Alpha_context.Contract.t ->
-  Ticket_scanner.ex_ticket ->
-  (Alpha_context.Ticket_balance.key_hash * Z.t * Alpha_context.context) tzresult
-  Lwt.t
+  Ticket_token.ex_token ->
+  (Alpha_context.Ticket_balance.key_hash * Alpha_context.context) tzresult Lwt.t

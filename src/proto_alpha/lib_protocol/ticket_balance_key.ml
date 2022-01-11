@@ -32,11 +32,10 @@ open Alpha_context
     - Owner
    to generate at ticket-balance key-hash.
 *)
-let ticket_balance_key_and_amount ctxt ~owner
-    (Ticket_scanner.Ex_ticket
-      (comp_ty, Script_typed_ir.{ticketer; contents; amount})) =
+let ticket_balance_key ctxt ~owner
+    (Ticket_token.Ex_token {ticketer; contents_type; contents}) =
   let loc = Micheline.dummy_location in
-  Script_ir_translator.unparse_comparable_ty ~loc ctxt comp_ty
+  Script_ir_translator.unparse_comparable_ty ~loc ctxt contents_type
   >>?= fun (cont_ty_unstripped, ctxt) ->
   (* We strip the annotations from the content type in order to map
      tickets with the same content type, but with different annotations, to the
@@ -57,7 +56,7 @@ let ticket_balance_key_and_amount ctxt ~owner
     ~loc
     ctxt
     Script_ir_translator.Optimized_legacy
-    comp_ty
+    contents_type
     contents
   >>=? fun (contents, ctxt) ->
   Script_ir_translator.unparse_data
@@ -66,5 +65,4 @@ let ticket_balance_key_and_amount ctxt ~owner
     address_t
     owner_address
   >>=? fun (owner, ctxt) ->
-  Ticket_balance.make_key_hash ctxt ~ticketer ~typ ~contents ~owner
-  >>?= fun (hash, ctxt) -> return (hash, Script_int.to_zint amount, ctxt)
+  Lwt.return (Ticket_balance.make_key_hash ctxt ~ticketer ~typ ~contents ~owner)
