@@ -76,12 +76,14 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
 {}
@@ -100,17 +102,20 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
 }'
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
   "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
   "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
   "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
@@ -122,17 +127,20 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
 }'
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
 { "minimal_fees": "200" }
@@ -140,17 +148,20 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
 ./tezos-client rpc post /chains/main/mempool/filter with '{}'
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get /chains/main/mempool/filter
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=true'
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client rpc get '/chains/main/mempool/filter?include_default=false'
 {}

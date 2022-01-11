@@ -78,13 +78,15 @@ curl -s 'http://localhost:16385/chains/main/mempool/monitor_operations?applied=t
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -105,19 +107,22 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
   "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/filter
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
   "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "50", "minimal_nanotez_per_gas_unit": [ "201", "5" ],
   "minimal_nanotez_per_byte": [ "56", "3" ], "allow_script_failure": false,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -131,19 +136,22 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/filter
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "200", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -153,19 +161,22 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get /chains/main/mempool/filter
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=true'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 { "minimal_fees": "100", "minimal_nanotez_per_gas_unit": [ "100", "1" ],
   "minimal_nanotez_per_byte": [ "1000", "1" ], "allow_script_failure": true,
-  "replace_by_fee_factor": [ "21", "20" ] }
+  "replace_by_fee_factor": [ "21", "20" ],
+  "max_prechecked_manager_operations": 5000 }
 
 ./tezos-client --mode proxy rpc get '/chains/main/mempool/filter?include_default=false'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
