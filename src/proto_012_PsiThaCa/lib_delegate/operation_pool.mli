@@ -161,9 +161,9 @@ module Prioritized : sig
   val of_pool : pool -> t
 
   (** [merge_external_operations pool extern_ops] creates a prioritized pool
-     from a [pool], assumed to contained operations taken from a node and
-     [extern_ops] coming from an external source, which we prioritize. *)
-  val merge_external_operations : pool -> packed_operation list -> t
+     from a [pool] and [extern_ops] coming from an external source, which we
+     prioritize. *)
+  val merge_external_operations : t -> packed_operation list -> t
 
   val filter : (packed_operation -> bool) -> t -> t
 
