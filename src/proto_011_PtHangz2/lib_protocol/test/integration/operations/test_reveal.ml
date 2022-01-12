@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (revelation)
-    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^revelation$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/integration/operations/main.exe -- test "^revelation$"
     Subject:    On the reveal operation.
 *)
 
