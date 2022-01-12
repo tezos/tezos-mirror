@@ -195,7 +195,7 @@ let get_two_annot loc = function
   | [a; b] -> ok (a, b)
   | _ -> error (Unexpected_annotation loc)
 
-let parse_type_annot : Script.location -> string list -> unit tzresult =
+let check_type_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->

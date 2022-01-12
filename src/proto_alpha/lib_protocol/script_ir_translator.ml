@@ -1147,43 +1147,43 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
   else
     match ty with
     | Prim (loc, T_unit, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty unit_key, ctxt)
     | Prim (loc, T_never, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty never_key, ctxt)
     | Prim (loc, T_int, [], annot) ->
-        parse_type_annot loc annot >|? fun () -> (Ex_comparable_ty int_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty int_key, ctxt)
     | Prim (loc, T_nat, [], annot) ->
-        parse_type_annot loc annot >|? fun () -> (Ex_comparable_ty nat_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty nat_key, ctxt)
     | Prim (loc, T_signature, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty signature_key, ctxt)
     | Prim (loc, T_string, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty string_key, ctxt)
     | Prim (loc, T_bytes, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty bytes_key, ctxt)
     | Prim (loc, T_mutez, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty mutez_key, ctxt)
     | Prim (loc, T_bool, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty bool_key, ctxt)
     | Prim (loc, T_key_hash, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty key_hash_key, ctxt)
     | Prim (loc, T_key, [], annot) ->
-        parse_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_key, ctxt)
     | Prim (loc, T_timestamp, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty timestamp_key, ctxt)
     | Prim (loc, T_chain_id, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty chain_id_key, ctxt)
     | Prim (loc, T_address, [], annot) ->
-        parse_type_annot loc annot >|? fun () ->
+        check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty address_key, ctxt)
     | Prim
         ( loc,
@@ -1194,7 +1194,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
           _ ) ->
         error (Invalid_arity (loc, prim, 0, List.length l))
     | Prim (loc, T_pair, left :: right, annot) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         extract_field_annot left >>? fun (left, left_annot) ->
         (match right with
         | [right] -> extract_field_annot right
@@ -1209,7 +1209,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         pair_key loc (left, left_annot) (right, right_annot) >|? fun ty ->
         (Ex_comparable_ty ty, ctxt)
     | Prim (loc, T_or, [left; right], annot) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         extract_field_annot left >>? fun (left, left_annot) ->
         extract_field_annot right >>? fun (right, right_annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt right
@@ -1221,7 +1221,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
     | Prim (loc, ((T_pair | T_or) as prim), l, _) ->
         error (Invalid_arity (loc, prim, 2, List.length l))
     | Prim (loc, T_option, [t], annot) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
         >>? fun (Ex_comparable_ty t, ctxt) ->
         option_key loc t >|? fun ty -> (Ex_comparable_ty ty, ctxt)
@@ -1388,52 +1388,52 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
   else
     match node with
     | Prim (loc, T_unit, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty unit_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty unit_t, ctxt)
     | Prim (loc, T_int, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty int_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty int_t, ctxt)
     | Prim (loc, T_nat, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty nat_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty nat_t, ctxt)
     | Prim (loc, T_string, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty string_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty string_t, ctxt)
     | Prim (loc, T_bytes, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty bytes_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty bytes_t, ctxt)
     | Prim (loc, T_mutez, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty mutez_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty mutez_t, ctxt)
     | Prim (loc, T_bool, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty bool_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty bool_t, ctxt)
     | Prim (loc, T_key, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty key_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty key_t, ctxt)
     | Prim (loc, T_key_hash, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty key_hash_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty key_hash_t, ctxt)
     | Prim (loc, T_chest_key, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty chest_key_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty chest_key_t, ctxt)
     | Prim (loc, T_chest, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty chest_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty chest_t, ctxt)
     | Prim (loc, T_timestamp, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty timestamp_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty timestamp_t, ctxt)
     | Prim (loc, T_address, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty address_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty address_t, ctxt)
     | Prim (loc, T_signature, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty signature_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty signature_t, ctxt)
     | Prim (loc, T_operation, [], annot) ->
         if allow_operation then
-          parse_type_annot loc annot >>? fun () -> ok (Ex_ty operation_t, ctxt)
+          check_type_annot loc annot >>? fun () -> ok (Ex_ty operation_t, ctxt)
         else error (Unexpected_operation loc)
     | Prim (loc, T_chain_id, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty chain_id_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty chain_id_t, ctxt)
     | Prim (loc, T_never, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty never_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty never_t, ctxt)
     | Prim (loc, T_bls12_381_g1, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g1_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g1_t, ctxt)
     | Prim (loc, T_bls12_381_g2, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g2_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g2_t, ctxt)
     | Prim (loc, T_bls12_381_fr, [], annot) ->
-        parse_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_fr_t, ctxt)
+        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_fr_t, ctxt)
     | Prim (loc, T_contract, [utl], annot) ->
         if allow_contract then
           parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
           >>? fun (Ex_ty tl, ctxt) ->
-          parse_type_annot loc annot >>? fun () ->
+          check_type_annot loc annot >>? fun () ->
           contract_t loc tl >|? fun ty -> (Ex_ty ty, ctxt)
         else error (Unexpected_contract loc)
     | Prim (loc, T_pair, utl :: utr, annot) ->
@@ -1464,7 +1464,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_ticket
           utr
         >>? fun (Ex_ty tr, ctxt) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         pair_t loc (tl, left_field) (tr, right_field) >|? fun ty ->
         (Ex_ty ty, ctxt)
     | Prim (loc, T_or, [utl; utr], annot) ->
@@ -1490,7 +1490,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_ticket
           utr
         >>? fun (Ex_ty tr, ctxt) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         union_t loc (tl, left_constr) (tr, right_constr) >|? fun ty ->
         (Ex_ty ty, ctxt)
     | Prim (loc, T_lambda, [uta; utr], annot) ->
@@ -1498,14 +1498,14 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
         >>? fun (Ex_ty ta, ctxt) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
         >>? fun (Ex_ty tr, ctxt) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         lambda_t loc ta tr >|? fun ty -> (Ex_ty ty, ctxt)
     | Prim (loc, T_option, [ut], annot) ->
         (if legacy then
          (* legacy semantics with (broken) field annotations *)
          extract_field_annot ut >>? fun (ut, _some_constr) ->
          parse_composed_type_annot loc annot >>? fun (_none_constr, _) -> ok ut
-        else parse_type_annot loc annot >>? fun () -> ok ut)
+        else check_type_annot loc annot >>? fun () -> ok ut)
         >>? fun ut ->
         parse_ty
           ctxt
@@ -1529,19 +1529,19 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_ticket
           ut
         >>? fun (Ex_ty t, ctxt) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         list_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
     | Prim (loc, T_ticket, [ut], annot) ->
         if allow_ticket then
           parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
           >>? fun (Ex_comparable_ty t, ctxt) ->
-          parse_type_annot loc annot >>? fun () ->
+          check_type_annot loc annot >>? fun () ->
           ticket_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
         else error (Unexpected_ticket loc)
     | Prim (loc, T_set, [ut], annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
         >>? fun (Ex_comparable_ty t, ctxt) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         set_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
     | Prim (loc, T_map, [uta; utr], annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt uta
@@ -1556,10 +1556,10 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_ticket
           utr
         >>? fun (Ex_ty tr, ctxt) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         map_t loc ta tr >|? fun ty -> (Ex_ty ty, ctxt)
     | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
         (Ex_ty (sapling_transaction_t ~memo_size), ctxt)
     (*
@@ -1571,7 +1571,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
     | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
         (parse_big_map_ty [@tailcall]) ctxt ~stack_depth ~legacy loc args annot
     | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
-        parse_type_annot loc annot >>? fun () ->
+        check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
         (Ex_ty (sapling_state_t ~memo_size), ctxt)
     | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
@@ -1640,7 +1640,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_ma
         ~legacy
         value_ty
       >>? fun (Ex_ty value_ty, ctxt) ->
-      parse_type_annot big_map_loc map_annot >>? fun () ->
+      check_type_annot big_map_loc map_annot >>? fun () ->
       big_map_t big_map_loc key_ty value_ty >|? fun big_map_ty ->
       (Ex_ty big_map_ty, ctxt)
   | args -> error @@ Invalid_arity (big_map_loc, T_big_map, 2, List.length args)

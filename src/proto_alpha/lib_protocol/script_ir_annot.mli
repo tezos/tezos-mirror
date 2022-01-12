@@ -66,7 +66,7 @@ val merge_field_annot :
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
 (** Parse a type annotation only. *)
-val parse_type_annot : Script.location -> string list -> unit tzresult
+val check_type_annot : Script.location -> string list -> unit tzresult
 
 (** Parse a field annotation only. *)
 val parse_field_annot :
