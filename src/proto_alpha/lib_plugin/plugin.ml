@@ -3224,8 +3224,9 @@ module RPC = struct
     | (levels, cycles) ->
         (* explicitly fail when requested levels or cycle are in the past...
            or too far in the future...
-           TODO-TB: this old comment (from version Alpha) conflicts with
-           the specification of the RPCs that use this code.
+           TODO: https://gitlab.com/tezos/tezos/-/issues/2335
+                 this old comment (from version Alpha) conflicts with
+                 the specification of the RPCs that use this code.
         *)
         List.sort_uniq
           Level.compare
