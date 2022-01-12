@@ -583,11 +583,6 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
   let* () = wait_for_ready node in
   return node
 
-let restart node arguments =
-  let* () = terminate node in
-  let* () = run node arguments in
-  wait_for_ready node
-
 let send_raw_data node ~data =
   (* Extracted from Lwt_utils_unix. *)
   let write_string ?(pos = 0) ?len descr buf =

@@ -452,16 +452,6 @@ val init :
   argument list ->
   t Lwt.t
 
-(** Restart a node.
-
-    This {!terminate}s a node, then {!run}s it again and waits for it to be ready.
-
-    If you passed arguments such as [Expected_pow] or [Singleprocess]
-    to {!run} they are not automatically passed again.
-    You can pass them to [restart], or you can pass other values if you want
-    to restart with other parameters. *)
-val restart : t -> argument list -> unit Lwt.t
-
 (** [send_raw_data node ~data] writes [~data] using an IP socket on the net
     port of [node]. *)
 val send_raw_data : t -> data:string -> unit Lwt.t
