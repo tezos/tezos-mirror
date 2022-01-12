@@ -285,9 +285,9 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
        contract)
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~contract
-    ~destination ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee ?gas_limit
-    ?storage_limit ?counter ~fee_parameter () :
+    ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
+    ~src_sk ~contract ~destination ?(entrypoint = Entrypoint.default) ?arg
+    ~amount ?fee ?gas_limit ?storage_limit ?counter ~fee_parameter () :
     (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
     Lwt.t =
   build_transaction_operation
@@ -313,6 +313,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?dry_run
     ?verbose_signing
     ?simulation
+    ~force
     ?branch
     ~source
     ~fee:(Limit.of_option fee)
@@ -324,6 +325,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~fee_parameter
     operation
   >>=? fun (oph, op, result) ->
-  Lwt.return (Injection.originated_contracts result) >>=? fun contracts ->
+  Lwt.return (Injection.originated_contracts ~force result)
+  >>=? fun contracts ->
   return_single_manager_result (oph, op, result) >>=? fun res ->
   return (res, contracts)

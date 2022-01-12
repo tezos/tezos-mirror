@@ -640,11 +640,18 @@ let simulate_switch =
       "Simulate the execution of the command, without needing any signatures."
     ()
 
+let force_switch =
+  Clic.switch
+    ~long:"force"
+    ~doc:"Inject the operation even if the simulation results in a failure."
+    ()
+
 let transfer_command amount source destination cctxt
     ( fee,
       dry_run,
       verbose_signing,
       simulation,
+      force,
       gas_limit,
       storage_limit,
       counter,
@@ -681,6 +688,7 @@ let transfer_command amount source destination cctxt
         ~dry_run
         ~verbose_signing
         ~simulation
+        ~force
         ~fee_parameter
         ?fee
         ~contract
@@ -704,6 +712,7 @@ let transfer_command amount source destination cctxt
         ?confirmations:cctxt#confirmations
         ~dry_run
         ~simulation
+        ~force
         ~verbose_signing
         ~fee_parameter
         ~source
@@ -1277,11 +1286,12 @@ let commands_rw () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args17
+      (args18
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
+         force_switch
          gas_limit_arg
          storage_limit_arg
          counter_arg
@@ -1310,6 +1320,7 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
+             force,
              gas_limit,
              storage_limit,
              counter,
@@ -1336,6 +1347,7 @@ let commands_rw () =
             dry_run,
             verbose_signing,
             simulation,
+            force,
             gas_limit,
             storage_limit,
             counter,
@@ -1433,11 +1445,12 @@ let commands_rw () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args17
+      (args18
          fee_arg
          dry_run_switch
          verbose_signing_switch
          simulate_switch
+         force_switch
          gas_limit_arg
          storage_limit_arg
          counter_arg
@@ -1464,6 +1477,7 @@ let commands_rw () =
              dry_run,
              verbose_signing,
              simulation,
+             force,
              gas_limit,
              storage_limit,
              counter,
@@ -1490,6 +1504,7 @@ let commands_rw () =
             dry_run,
             verbose_signing,
             simulation,
+            force,
             gas_limit,
             storage_limit,
             counter,
