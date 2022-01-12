@@ -3057,25 +3057,25 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let const = {apply = (fun kinfo k -> IConst (kinfo, v, k))} in
       typed ctxt loc const (Item_t (t, stack))
   | (Prim (loc, I_UNIT, [], annot), stack) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let const = {apply = (fun kinfo k -> IConst (kinfo, (), k))} in
       typed ctxt loc const (Item_t (unit_t, stack))
   (* options *)
   | (Prim (loc, I_SOME, [], annot), Item_t (t, rest)) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let cons_some = {apply = (fun kinfo k -> ICons_some (kinfo, k))} in
       option_t loc t >>?= fun ty -> typed ctxt loc cons_some (Item_t (ty, rest))
   | (Prim (loc, I_NONE, [t], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let cons_none = {apply = (fun kinfo k -> ICons_none (kinfo, k))} in
       option_t loc t >>?= fun ty ->
       let stack_ty = Item_t (ty, stack) in
       typed ctxt loc cons_none stack_ty
   | (Prim (loc, I_MAP, [body], annot), Item_t (Option_t (t, _), rest)) -> (
       check_kind [Seq_kind] body >>?= fun () ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       non_terminal_recursion
         ?type_logger
         ~legacy
@@ -3333,7 +3333,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_NIL, [t], annot), stack) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy t
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let nil = {apply = (fun kinfo k -> INil (kinfo, k))} in
       list_t loc t >>?= fun ty -> typed ctxt loc nil (Item_t (ty, stack))
   | ( Prim (loc, I_CONS, [], annot),
@@ -3374,13 +3374,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       Lwt.return @@ merge_branches ~legacy ctxt loc btr bfr {branch}
   | (Prim (loc, I_SIZE, [], annot), Item_t (List_t _, rest)) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let list_size = {apply = (fun kinfo k -> IList_size (kinfo, k))} in
       typed ctxt loc list_size (Item_t (nat_t, rest))
   | (Prim (loc, I_MAP, [body], annot), Item_t (List_t (elt, _), starting_rest))
     -> (
       check_kind [Seq_kind] body >>?= fun () ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       non_terminal_recursion
         ?type_logger
         tc_context
@@ -3455,7 +3455,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_EMPTY_SET, [t], annot), rest) ->
       parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt t
       >>?= fun (Ex_comparable_ty t, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEmpty_set (kinfo, t, k))} in
       set_t loc t >>?= fun ty -> typed ctxt loc instr (Item_t (ty, rest))
   | (Prim (loc, I_ITER, [body], annot), Item_t (Set_t (comp_elt, _), rest)) -> (
@@ -3498,7 +3498,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       )
   | (Prim (loc, I_MEM, [], annot), Item_t (v, Item_t (Set_t (elt, _), rest))) ->
       let elt = ty_of_comparable_ty elt in
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       check_item_ty ctxt elt v loc I_MEM 1 2 >>?= fun (Eq, _, ctxt) ->
       let instr = {apply = (fun kinfo k -> ISet_mem (kinfo, k))} in
       (typed ctxt loc instr (Item_t (bool_t, rest))
@@ -3521,14 +3521,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_comparable_ty tk, ctxt) ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IEmpty_map (kinfo, tk, k))} in
       map_t loc tk tv >>?= fun ty -> typed ctxt loc instr (Item_t (ty, stack))
   | ( Prim (loc, I_MAP, [body], annot),
       Item_t (Map_t (ck, elt, _), starting_rest) ) -> (
       let k = ty_of_comparable_ty ck in
       check_kind [Seq_kind] body >>?= fun () ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       pair_t loc (k, None) (elt, None) >>?= fun ty ->
       non_terminal_recursion
         ?type_logger
@@ -3660,7 +3660,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       >>?= fun (Ex_comparable_ty tk, ctxt) ->
       parse_big_map_value_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy tv
       >>?= fun (Ex_ty tv, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IEmpty_big_map (kinfo, tk, tv, k))}
       in
@@ -4411,7 +4411,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | (Prim (loc, I_UNPACK, [ty], annot), Item_t (Bytes_t _, rest)) ->
       parse_packable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
-      parse_var_type_annot loc annot >>?= fun () ->
+      check_var_type_annot loc annot >>?= fun () ->
       option_t loc t >>?= fun res_ty ->
       let instr = {apply = (fun kinfo k -> IUnpack (kinfo, t, k))} in
       let stack = Item_t (res_ty, rest) in
