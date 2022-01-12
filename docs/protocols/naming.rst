@@ -59,11 +59,11 @@ in-use and upcoming protocols:
 External resources
 ------------------
 
-The current protocol status can be found at tz-stats.com_ election page.
+The current protocol status can be found at tzstats.com_ election page.
 
 An interesting blog post on the history of the initial Tezos economic protocols
 is: `A quick history of past upgrades
 <https://blog.nomadic-labs.com/amendments-at-work-in-tezos.html#a-quick-history-of-past-upgrades>`_.
 
 .. _`voting procedure`: ../alpha/voting.html
-.. _tz-stats.com: https://tzstats.com/election/head
+.. _tzstats.com: https://tzstats.com/election/head
