@@ -351,6 +351,27 @@ let list_not_mem typ ?__LOC__ a l ~error_msg =
     let pp_list = get_pp (list typ) in
     fail ?__LOC__ error_msg pp a pp_list l
 
+let fails_with thunk exn ~error_msg =
+  let resulting_exn =
+    try
+      thunk () ;
+      None
+    with x -> Some x
+  in
+  match resulting_exn with
+  | None ->
+      Test.fail
+        "%s: expecting exception %s, got nothing"
+        error_msg
+        (Printexc.to_string exn)
+  | Some x when x <> exn ->
+      Test.fail
+        "%s: expecting exception %s, got %s"
+        error_msg
+        (Printexc.to_string exn)
+        (Printexc.to_string x)
+  | Some _ -> ()
+
 (* We define infix operators at the end to avoid using them accidentally. *)
 
 let ( = ) = eq
