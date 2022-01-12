@@ -94,8 +94,8 @@ let ordered_pool_encoding =
     (obj4
        (req "ordered_consensus" (list (dynamic_size Operation.encoding)))
        (req "ordered_votes" (list (dynamic_size Operation.encoding)))
-       (req "ordered_payload" (list (dynamic_size Operation.encoding)))
-       (req "ordered_payload" (list (dynamic_size Operation.encoding))))
+       (req "ordered_anonymous" (list (dynamic_size Operation.encoding)))
+       (req "ordered_managers" (list (dynamic_size Operation.encoding))))
 
 type payload = {
   votes_payload : packed_operation list;
