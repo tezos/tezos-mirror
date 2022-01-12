@@ -233,10 +233,11 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
     match kind with
     | Fresh pool ->
         let pool =
+          let node_pool = Operation_pool.Prioritized.of_pool pool in
           match extern_ops with
-          | None -> Operation_pool.Prioritized.of_pool pool
+          | None -> node_pool
           | Some ops ->
-              Operation_pool.Prioritized.merge_external_operations pool ops
+              Operation_pool.Prioritized.merge_external_operations node_pool ops
         in
         (Block_forge.Filter pool, round)
     | Reproposal {consensus_operations; payload_hash; payload_round; payload} ->
