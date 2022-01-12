@@ -76,20 +76,15 @@ end
 type pool = Operation_set.t t
 
 (* TODO refine this: unpack operations *)
-type ordered_pool = {
-  ordered_consensus : packed_operation list;
-  ordered_votes : packed_operation list;
-  ordered_anonymous : packed_operation list;
-  ordered_managers : packed_operation list;
-}
+type ordered_pool = packed_operation list t
 
 let ordered_pool_encoding =
   let open Data_encoding in
   conv
-    (fun {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers} ->
-      (ordered_consensus, ordered_votes, ordered_anonymous, ordered_managers))
-    (fun (ordered_consensus, ordered_votes, ordered_anonymous, ordered_managers) ->
-      {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers})
+    (fun {consensus; votes; anonymous; managers} ->
+      (consensus, votes, anonymous, managers))
+    (fun (consensus, votes, anonymous, managers) ->
+      {consensus; votes; anonymous; managers})
     (obj4
        (req "ordered_consensus" (list (dynamic_size Operation.encoding)))
        (req "ordered_votes" (list (dynamic_size Operation.encoding)))
@@ -133,13 +128,7 @@ let empty =
     managers = Operation_set.empty;
   }
 
-let empty_ordered =
-  {
-    ordered_consensus = [];
-    ordered_votes = [];
-    ordered_anonymous = [];
-    ordered_managers = [];
-  }
+let empty_ordered = {consensus = []; votes = []; anonymous = []; managers = []}
 
 let pp_pool fmt {consensus; votes; anonymous; managers} =
   Format.fprintf
@@ -150,15 +139,14 @@ let pp_pool fmt {consensus; votes; anonymous; managers} =
     (Operation_set.cardinal anonymous)
     (Operation_set.cardinal managers)
 
-let pp_ordered_pool fmt
-    {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers} =
+let pp_ordered_pool fmt {consensus; votes; anonymous; managers} =
   Format.fprintf
     fmt
     "[consensus: %d, votes: %d, anonymous: %d, managers: %d]"
-    (List.length ordered_consensus)
-    (List.length ordered_votes)
-    (List.length ordered_anonymous)
-    (List.length ordered_managers)
+    (List.length consensus)
+    (List.length votes)
+    (List.length anonymous)
+    (List.length managers)
 
 (* Hypothesis : we suppose [List.length Protocol.Main.validation_passes = 4] *)
 let consensus_index = 0
@@ -291,31 +279,28 @@ let filter_endorsements ops =
       | _ -> None)
     ops
 
-let ordered_to_list_list
-    {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers} =
-  [ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers]
+let ordered_to_list_list {consensus; votes; anonymous; managers} =
+  [consensus; votes; anonymous; managers]
 
 let ordered_of_list_list = function
-  | [ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers] ->
-      Some
-        {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers}
+  | [consensus; votes; anonymous; managers] ->
+      Some {consensus; votes; anonymous; managers}
   | _ -> None
 
-let payload_of_ordered_pool
-    {ordered_votes; ordered_anonymous; ordered_managers; _} =
+let payload_of_ordered_pool {votes; anonymous; managers; _} =
   {
-    votes_payload = ordered_votes;
-    anonymous_payload = ordered_anonymous;
-    managers_payload = ordered_managers;
+    votes_payload = votes;
+    anonymous_payload = anonymous;
+    managers_payload = managers;
   }
 
 let ordered_pool_of_payload ~consensus_operations
     {votes_payload; anonymous_payload; managers_payload} =
   {
-    ordered_consensus = consensus_operations;
-    ordered_votes = votes_payload;
-    ordered_anonymous = anonymous_payload;
-    ordered_managers = managers_payload;
+    consensus = consensus_operations;
+    votes = votes_payload;
+    anonymous = anonymous_payload;
+    managers = managers_payload;
   }
 
 let extract_operations_of_list_list = function
