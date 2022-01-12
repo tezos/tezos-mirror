@@ -84,7 +84,7 @@ let options =
     record = None;
     from_records = [];
     job = None;
-    job_count = 3;
+    job_count = 1;
     suggest_jobs = false;
     junit = None;
   }
@@ -316,7 +316,7 @@ let init ?args () =
           Arg.Int set_job_count,
           "<COUNT> Run COUNT tests in parallel, in separate processes.\n\
            With --suggest-jobs, set the number of target jobs for \
-           --suggest-jobs instead (default is 3)." );
+           --suggest-jobs instead (default is 1)." );
         ("-j", Arg.Int set_job_count, "<COUNT> Same as --job-count.");
         ( "--suggest-jobs",
           Arg.Unit (fun () -> options.suggest_jobs <- true),
