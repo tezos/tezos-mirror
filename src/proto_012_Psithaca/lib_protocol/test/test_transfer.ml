@@ -33,54 +33,11 @@
 open Protocol
 open Alpha_context
 open Test_tez
+open Transfers
 
 (*********************************************************************)
 (* Utility functions                                                 *)
 (*********************************************************************)
-
-(**
-   [transfer_and_check_balances b fee src dst amount]
-   this function takes a block, an optional parameter fee if fee does not
-   given it will be set to zero tez, a source contract, a destination contract
-   and the amount that one wants to transfer.
-
-   1- Transfer the amount of tez (w/wo fee) from a source contract to a
-       destination contract.
-
-    2- Check the equivalent of the balance of the source/destination
-       contract before and after transfer is validated.
-
-   This function returns a pair:
-   - A block that added a valid operation
-   - a valid operation *)
-let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
-    ?expect_failure src dst amount =
-  fee +? amount >>?= fun amount_fee ->
-  Context.Contract.balance (I b) src >>=? fun bal_src ->
-  Context.Contract.balance (I b) dst >>=? fun bal_dst ->
-  Op.transaction
-    ~gas_limit:(Alpha_context.Gas.Arith.integral_of_int_exn 3000)
-    (I b)
-    ~fee
-    src
-    dst
-    amount
-  >>=? fun op ->
-  Incremental.add_operation ?expect_failure b op >>=? fun b ->
-  Context.get_constants (I b)
-  >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
-  let amount_fee_maybe_burn =
-    if with_burn then
-      match Tez.(amount_fee +? origination_burn) with
-      | Ok r -> r
-      | Error _ -> assert false
-    else amount_fee
-  in
-  Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
-  >>=? fun () ->
-  Assert.balance_was_credited ~loc (I b) dst bal_dst amount >|=? fun () ->
-  (b, op)
 
 (**
    [transfer_to_itself_and_check_balances b fee contract amount]
@@ -103,32 +60,11 @@ let transfer_to_itself_and_check_balances ~loc b ?(fee = Tez.zero) contract
   Incremental.add_operation b op >>=? fun b ->
   Assert.balance_was_debited ~loc (I b) contract bal fee >|=? fun () -> (b, op)
 
-(**
-   [n_transactions n b fee source dest amount]
-   this function takes a number of "n" that one wish to transfer,
-   a block, an optional parameter fee, a source contract,
-   a destination contract and an amount one wants to transfer.
-
-   This function will do a transaction from a source contract to
-   a destination contract with the amount "n" times. *)
-let n_transactions n b ?fee source dest amount =
-  List.fold_left_es
-    (fun b _ ->
-      transfer_and_check_balances ~loc:__LOC__ b ?fee source dest amount
-      >|=? fun (b, _) -> b)
-    b
-    (1 -- n)
-
 let ten_tez = of_int 10
 
 (*********************************************************************)
 (* Tests                                                             *)
 (*********************************************************************)
-
-let register_two_contracts ?consensus_threshold () =
-  Context.init ?consensus_threshold 2 >|=? function
-  | (_, []) | (_, [_]) -> assert false
-  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
 
 (** Compute a fraction of 2/[n] of the balance of [contract] *)
 let two_over_n_of_balance incr contract n =
@@ -141,7 +77,7 @@ let two_over_n_of_balance incr contract n =
 (********************)
 
 let single_transfer ?fee ?expect_failure amount =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances
     ~loc:__LOC__
@@ -203,7 +139,7 @@ let test_transfer_to_originate_with_fee () =
 
 (** Transfer from balance. *)
 let test_transfer_amount_of_contract_balance () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Context.Contract.pkh contract_1 >>=? fun pkh1 ->
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
@@ -233,7 +169,7 @@ let test_transfers_to_self () =
 
 (** Forgot to add the valid transaction into the block. *)
 let test_missing_transaction () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   (* given that contract_1 no longer has a sufficient balance to bake,
      make sure it cannot be chosen as baker *)
   Context.Contract.pkh contract_1 >>=? fun pkh1 ->
@@ -382,7 +318,7 @@ let test_transfer_from_implicit_to_originated_contract () =
 (********************)
 
 let multiple_transfer n ?fee amount =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
   n_transactions n b ?fee contract_1 contract_2 amount >>=? fun b ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
@@ -429,7 +365,7 @@ let test_block_with_multiple_transfers_with_without_fee () =
 
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
-  register_two_contracts ~consensus_threshold:0 ()
+  Context.init2 ~consensus_threshold:0 ()
   >>=? fun (b, contract_1, contract_2) ->
   let ten = of_int 10 in
   List.fold_left_es
@@ -462,7 +398,7 @@ let test_empty_implicit () =
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
@@ -535,7 +471,7 @@ let test_balance_too_low_two_transfers fee () =
 
 (** The counter is already used for the previous operation. *)
 let invalid_counter () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op1 ->
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op2 ->
@@ -548,7 +484,7 @@ let invalid_counter () =
 (** Same as before but through a different way to perform this
     error. *)
 let test_add_the_same_operation_twice () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
   transfer_and_check_balances ~loc:__LOC__ b contract_1 contract_2 ten_tez
   >>=? fun (b, op_transfer) ->
@@ -560,7 +496,7 @@ let test_add_the_same_operation_twice () =
 
 (** The counter is in the future *)
 let invalid_counter_in_the_future () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
   Context.Contract.counter (I b) contract_1 >>=? fun cpt ->
   let counter = Z.add cpt (Z.of_int 10) in
@@ -573,7 +509,7 @@ let invalid_counter_in_the_future () =
 
 (** Check ownership. *)
 let test_ownership_sender () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Context.init2 () >>=? fun (b, contract_1, contract_2) ->
   Incremental.begin_construction b >>=? fun b ->
   (* get the manager of the contract_1 as a sender *)
   Context.Contract.manager (I b) contract_1 >>=? fun manager ->

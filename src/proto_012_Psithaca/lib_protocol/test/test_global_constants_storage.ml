@@ -24,7 +24,7 @@
 (*****************************************************************************)
 open Protocol
 open Alpha_context
-open Test_transfer
+open Transfers
 
 (** Testing
     -------
@@ -61,7 +61,7 @@ let expr_to_hash expr =
    that values written to the global table of constants persist across
    blocks. *)
 let get_happy_path () =
-  register_two_contracts () >>=? fun (b, alice, bob) ->
+  Context.init2 () >>=? fun (b, alice, bob) ->
   Incremental.begin_construction b >>=? fun b ->
   let expr_str = "Pair 3 7" in
   let expr = Expr.from_string expr_str in
@@ -91,7 +91,7 @@ let get_happy_path () =
 (* Blocks that include a registration of a bad expression should
    fail. *)
 let test_registration_of_bad_expr_fails () =
-  register_two_contracts () >>=? fun (b, alice, _) ->
+  Context.init1 () >>=? fun (b, alice) ->
   Incremental.begin_construction b >>=? fun b ->
   (* To produce the failure, we attempt to register an expression with
      a malformed hash. *)
@@ -106,7 +106,7 @@ let test_registration_of_bad_expr_fails () =
 
 (* You cannot register the same expression twice. *)
 let test_no_double_register () =
-  register_two_contracts () >>=? fun (b, alice, _) ->
+  Context.init1 () >>=? fun (b, alice) ->
   Incremental.begin_construction b >>=? fun b ->
   let expr = Expr.from_string "Pair 1 2" in
   Op.register_global_constant
