@@ -692,7 +692,7 @@ let bake_empty_block ?endpoint client =
     client
     (["bake"; "for"; Constant.bootstrap1.alias; "--minimal-timestamp"]
     @
-    let option_name = "--operation-pool" in
+    let option_name = "--operations-pool" in
     [option_name; mempool])
   |> Process.check
 

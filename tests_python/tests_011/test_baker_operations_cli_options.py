@@ -1,7 +1,7 @@
 """Simple tests to check support for the following operations-related options
 for baking
 - --ignore-node-mempool
-- --operation-pool [file|uri]
+- --operations-pool [file|uri]
 """
 
 import os
@@ -116,7 +116,7 @@ class TestExternalOperations:
             client,
             bake_args=[
                 '--minimal-timestamp',
-                "--operation-pool",
+                "--operations-pool",
                 get_filename(EMPTY_OPERATIONS),
             ],
         )
@@ -132,7 +132,7 @@ class TestExternalOperations:
             client,
             bake_args=[
                 '--minimal-timestamp',
-                "--operation-pool",
+                "--operations-pool",
                 f"http://localhost:{PORT}/{get_filename(EMPTY_OPERATIONS)}",
             ],
         )
@@ -147,7 +147,7 @@ class TestExternalOperations:
             client,
             bake_args=[
                 '--minimal-timestamp',
-                "--operation-pool",
+                "--operations-pool",
                 f"{ABSENT_OPERATIONS}",
             ],
         )
@@ -163,7 +163,7 @@ class TestExternalOperations:
             client,
             bake_args=[
                 '--minimal-timestamp',
-                "--operation-pool",
+                "--operations-pool",
                 f"http://{ABSENT_OPERATIONS}",
             ],
         )
@@ -193,7 +193,7 @@ class TestExternalOperations:
         self, client: Client, session: dict
     ):
         """Construct a transaction over the current state, put it into a file,
-        and bake it into the chain through --operation-pool option.
+        and bake it into the chain through --operations-pool option.
 
         This additionally compares the balance to a normal transfer (through the
         node's mempool) to check that there is no observable difference in
@@ -218,7 +218,7 @@ class TestExternalOperations:
             client,
             bake_args=[
                 '--minimal-timestamp',
-                "--operation-pool",
+                "--operations-pool",
                 file,
                 '--ignore-node-mempool',
             ],
@@ -255,7 +255,7 @@ class TestExternalOperations:
             client,
             bake_args=[
                 '--minimal-timestamp',
-                "--operation-pool",
+                "--operations-pool",
                 f"http://localhost:{PORT}/{file}",
                 '--ignore-node-mempool',
             ],
@@ -314,7 +314,7 @@ class TestBakerExternalOperations:
             0,
             ['bootstrap1'],
             proto=protocol.DAEMON,
-            run_params=['--operation-pool', session['operations_file']],
+            run_params=['--operations-pool', session['operations_file']],
         )
 
     @pytest.mark.timeout(3)

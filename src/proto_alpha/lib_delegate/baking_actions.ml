@@ -60,7 +60,6 @@ module Operations_source = struct
             (fun () ->
               return (Data_encoding.Json.destruct operations_encoding json))
         in
-
         match mempool with
         | Baking_configuration.Operations_source.Local {filename} ->
             if Sys.file_exists filename then
