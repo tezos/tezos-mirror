@@ -42,6 +42,5 @@ val find_cost :
 val update_cost :
   compare_key_cost:Alpha_context.Gas.cost -> size:int -> Alpha_context.Gas.cost
 
-(** [to_list_cost ~size] returns the cost of transforming a map of size [size]
-    to a list of key-value pairs. *)
-val to_list_cost : size:int -> Alpha_context.Gas.cost
+(** [fold_cost ~size] returns the cost of folding over a list of size [size]. *)
+val fold_cost : size:int -> Alpha_context.Gas.cost

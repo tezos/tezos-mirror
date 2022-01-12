@@ -61,10 +61,10 @@ let register (module BM : Benchmark.S) =
            (Model.For_codegen model))
 
 (**
-  Benchmarks the [to_list] function of [Carbonated_map].
+  Benchmarks the [fold] functions of [Carbonated_map].
   This benchmark does not depend on the size of the keys or types of elements.
 *)
-module To_list_benchmark : Benchmark.S = struct
+module Fold_benchmark : Benchmark.S = struct
   include Config_and_workload
 
   module Int = struct
@@ -74,19 +74,19 @@ module To_list_benchmark : Benchmark.S = struct
     let compare_cost _ = Saturation_repr.safe_int 0
   end
 
-  let name = carbonated_map_cost_name "to_list"
+  let name = carbonated_map_cost_name "fold"
 
   let info = "Carbonated map to list"
 
-  let to_list_model =
+  let fold_model =
     Model.make
       ~conv:(fun {size} -> (size, ()))
       ~model:
         (Model.affine
-           ~intercept:(Free_variable.of_string "to_list_const")
-           ~coeff:(Free_variable.of_string "to_list_cost_per_item"))
+           ~intercept:(Free_variable.of_string "fold_const")
+           ~coeff:(Free_variable.of_string "fold_cost_per_item"))
 
-  let models = [("carbonated_map", to_list_model)]
+  let models = [("carbonated_map", fold_model)]
 
   let benchmark rng_state config () =
     let module M = Carbonated_map.Make (Int) in
@@ -114,7 +114,9 @@ module To_list_benchmark : Benchmark.S = struct
       | _ -> assert false
     in
     let workload = {size = M.size map} in
-    let closure () = ignore @@ M.to_list ctxt map in
+    let closure () =
+      ignore @@ M.fold ctxt (fun ctxt _ _ _ -> ok ((), ctxt)) () map
+    in
     Generator.Plain {workload; closure}
 
   let create_benchmarks ~rng_state ~bench_num config =
@@ -332,7 +334,7 @@ end
 module Benchmarks_int = Make (Int)
 
 let () =
-  register (module To_list_benchmark) ;
+  register (module Fold_benchmark) ;
   register (module Benchmarks_int.Compare) ;
   register (module Benchmarks_int.Find) ;
   register (module Benchmarks_int.Find_intercept)
