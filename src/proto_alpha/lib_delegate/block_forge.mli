@@ -54,6 +54,7 @@ val forge :
   pred_info:Baking_state.block_info ->
   timestamp:Time.Protocol.t ->
   liquidity_baking_escape_vote:bool ->
+  user_activated_upgrades:User_activated.upgrades ->
   Baking_configuration.fees_config ->
   seed_nonce_hash:Nonce_hash.t option ->
   payload_round:Round.t ->
