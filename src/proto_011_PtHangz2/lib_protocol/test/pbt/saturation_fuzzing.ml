@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/saturation_fuzzing.exe
+    Invocation:   dune exec \
+                  src/proto_011_PtHangz2/lib_protocol/test/pbt/saturation_fuzzing.exe
     Subject:      Operations in Saturation_repr
 *)
 
@@ -173,7 +174,7 @@ let tests_boundaries = [test_leq_saturated; test_geq_zero]
 
 let () =
   Alcotest.run
-    "Saturation"
+    "protocol > pbt > saturation"
     [
       ("add", qcheck_wrap tests_add);
       ("mul", qcheck_wrap tests_mul);

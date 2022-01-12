@@ -1,0 +1,24 @@
+(tests
+ (package tezos-protocol-011-PtHangz2-tests)
+ (names liquidity_baking_pbt
+        saturation_fuzzing
+        test_gas_properties
+        test_script_comparison
+        test_tez_repr)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-client-base
+            tezos-test-helpers
+            tezos-011-PtHangz2-test-helpers
+            alcotest
+            qcheck-alcotest
+            tezos-benchmark
+            tezos-benchmark-011-PtHangz2)
+ (flags (:standard
+          -open Tezos_base__TzPervasives
+          -open Tezos_micheline
+          -open Tezos_client_011_PtHangz2
+          -open Tezos_protocol_011_PtHangz2
+          -open Tezos_011_PtHangz2_test_helpers
+          -open Tezos_benchmark_011_PtHangz2
+          -open Tezos_benchmark_type_inference_011_PtHangz2)))

@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Script_comparison
-    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/test_script_comparison.exe
+    Invocation:   dune exec \
+                  src/proto_011_PtHangz2/lib_protocol/test/pbt/test_script_comparison.exe
     Subject:      PBT of the Script_comparable.compare_comparable function.
 *)
 
@@ -357,7 +358,7 @@ let test_pack_unpack =
 
 let () =
   Alcotest.run
-    "Script_comparison"
+    "protocol > pbt > Script_comparison"
     [
       ("compatible_with_reference", qcheck_wrap [test_compatible_with_reference]);
       ("compatible_with_packing", qcheck_wrap [test_compatible_with_packing]);
