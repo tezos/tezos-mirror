@@ -156,8 +156,6 @@ Node
   from those older versions. It is also no longer possible to import
   snapshots that were exported using this version.
 
-- Reduced the memory consumption of the snapshot import.
-
 - Fixed an inconsistency of the cache: the shell now reloads the cache
   from scratch if the application fails because of a hash
   inconsistency.
@@ -168,9 +166,6 @@ Node
 
 - Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
   expose some metrics using the Prometheus format.
-
-- Fixed an incorrect behaviour of the store which could cause the node
-  to freeze for a few seconds.
 
 Client
 ------
@@ -229,6 +224,19 @@ Miscellaneous
    Micheline expressions whose primitives are ``strings``. The difference is
    returned as another Micheline expression annotated appropriately in places
    where compared values differ.
+
+Version 11.1
+============
+
+-  Octez can now be compiled using opam 2.1 instead of requiring opam 2.0.
+
+-  ADX instructions have been disabled in Docker images and static binaries.
+   This makes it possible to use them on older CPUs.
+
+-  Fixed an incorrect behaviour of the store which could cause the node
+   to freeze for a few seconds.
+
+-  Reduced the memory consumption of the snapshot import.
 
 Version 11.0
 ============
