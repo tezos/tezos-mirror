@@ -48,13 +48,10 @@ let () =
       ("delegation", Test_delegation.tests);
       ("deactivation", Test_deactivation.tests);
       ("combined", Test_combined_operations.tests);
-      ("qty", Test_qty.tests);
       ("voting", Test_voting.tests);
       ("interpretation", Test_interpretation.tests);
       ("typechecking", Test_typechecking.tests);
-      ("fixed point computation", Test_fixed_point.tests);
       ("gas levels", Test_gas_levels.tests);
-      ("saturation arithmetic", Test_saturation.tests);
       ("gas cost functions", Test_gas_costs.tests);
       ("lazy storage diff", Test_lazy_storage_diff.tests);
       ("global table of constants", Test_global_constants_storage.tests);
@@ -62,9 +59,7 @@ let () =
       ("helpers rpcs", Test_helpers_rpcs.tests);
       ("failing_noop operation", Test_failing_noop.tests);
       ("storage description", Test_storage.tests);
-      ("time", Test_time_repr.tests);
       ("constants", Test_constants.tests);
-      ("level module", Test_level_module.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
       ("temp big maps", Test_temp_big_maps.tests);
       ("timelock", Test_timelock.tests);
@@ -72,11 +67,8 @@ let () =
       ("ticket storage", Test_ticket_storage.tests);
       ("ticket scanner", Test_ticket_scanner.tests);
       ("ticket balance key", Test_ticket_balance_key.tests);
-      ("fitness", Test_fitness.tests);
-      ("round", Test_round_repr.tests);
       ("participation monitoring", Test_participation.tests);
       ("frozen deposits", Test_frozen_deposits.tests);
       ("token movements", Test_token.tests);
-      ("receipt encodings", Test_receipt.tests);
     ]
   |> Lwt_main.run
