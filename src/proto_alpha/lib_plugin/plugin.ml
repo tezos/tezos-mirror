@@ -124,6 +124,12 @@ module Mempool = struct
 
   let default_minimal_nanotez_per_byte = Q.of_int 1000
 
+  let quota = Main.validation_passes
+
+  let managers_index = 3 (* in Main.validation_passes *)
+
+  let managers_quota = Stdlib.List.nth quota managers_index
+
   (* If the drift is not specified, it will be the duration of round zero.
      It allows only to spam with one future round.
 
@@ -268,6 +274,12 @@ module Mempool = struct
             }))
     >|= Environment.wrap_tzresult
 
+  let manager_prio p = `Low p
+
+  let consensus_prio = `High
+
+  let other_prio = `Medium
+
   let on_flush config filter_state ?(validation_state : validation_state option)
       ~predecessor () =
     ignore filter_state ;
@@ -374,6 +386,7 @@ module Mempool = struct
         | _ -> None)
       (fun (old_hash, new_hash) ->
         Manager_operation_replaced {old_hash; new_hash})
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2238
      Write unit tests for the feature 'replace-by-fee' and for other changes
      introduced by other MRs in the plugin. *)
@@ -414,19 +427,54 @@ module Mempool = struct
                   (Manager_restriction {oph = old_hash; fee = old_fee});
               ])
 
+  let size_of_operation op =
+    (WithExceptions.Option.get ~loc:__LOC__
+    @@ Data_encoding.Binary.fixed_length
+         Tezos_base.Operation.shell_header_encoding)
+    + Data_encoding.Binary.length Operation.protocol_data_encoding op
+
+  (** Returns the weight of an operation. The weight corresponds to the one
+      implemented by the baker, to decide which operations to put in a block
+      first (the code is largely duplicated).
+      @see {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
+  let weight_manager_operation ?validation_state ?size ~fee ~gas op =
+    match validation_state with
+    | None -> None
+    | Some {ctxt; _} ->
+        let hard_gas_limit_per_block =
+          Constants.hard_gas_limit_per_block ctxt
+        in
+        let max_size = managers_quota.max_size in
+        let size =
+          match size with None -> size_of_operation op | Some s -> s
+        in
+        let size_f = Q.of_int size in
+        let gas_f = Q.of_bigint (Gas.Arith.integral_to_z gas) in
+        let fee_f = Q.of_int64 (Tez.to_mutez fee) in
+        let size_ratio = Q.(size_f / Q.of_int max_size) in
+        let gas_ratio =
+          Q.(
+            gas_f
+            / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
+        in
+        let resources = Q.max size_ratio gas_ratio in
+        Some Q.(fee_f / resources)
+
   let pre_filter_manager :
       type t.
       config ->
       state ->
+      validation_state_before:validation_state option ->
       public_key_hash ->
-      int ->
+      Operation.packed_protocol_data ->
       t Kind.manager contents_list ->
-      [ `Passed_prefilter
+      [ `Passed_prefilter of Q.t list
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
       | `Refused of tztrace
       | `Outdated of tztrace ] =
-   fun config filter_state source size op ->
+   fun config filter_state ~validation_state_before source packed_op op ->
+    let size = size_of_operation packed_op in
     let check_gas_and_fee fee gas_limit =
       let fees_in_nanotez =
         Q.mul (Q.of_int64 (Tez.to_mutez fee)) (Q.of_int 1000)
@@ -451,7 +499,7 @@ module Mempool = struct
                 minimal_fees_for_gas_in_nanotez
                 minimal_fees_for_size_in_nanotez))
         >= 0
-      then `Passed_prefilter
+      then `Ok
       else `Refused [Environment.wrap_tzerror Fees_too_low]
     in
     match get_manager_operation_gas_and_fee op with
@@ -461,7 +509,23 @@ module Mempool = struct
           check_manager_restriction config filter_state source ~fee ~gas_limit
         with
         | `Fail errs -> errs
-        | `Fresh | `Replace _ -> check_gas_and_fee fee gas_limit)
+        | `Fresh | `Replace _ -> (
+            match check_gas_and_fee fee gas_limit with
+            | `Refused _ as err -> err
+            | `Ok ->
+                let weight =
+                  match
+                    weight_manager_operation
+                      ?validation_state:validation_state_before
+                      ~fee
+                      ~gas:gas_limit
+                      ~size
+                      packed_op
+                  with
+                  | None -> []
+                  | Some weight -> [weight]
+                in
+                `Passed_prefilter weight))
 
   type Environment.Error_monad.error += Outdated_endorsement
 
@@ -705,17 +769,19 @@ module Mempool = struct
   let pre_filter config ~(filter_state : state) ?validation_state_before
       ({shell = _; protocol_data = Operation_data {contents; _} as op} :
         Main.operation) =
-    let bytes =
-      (WithExceptions.Option.get ~loc:__LOC__
-      @@ Data_encoding.Binary.fixed_length
-           Tezos_base.Operation.shell_header_encoding)
-      + Data_encoding.Binary.length Operation.protocol_data_encoding op
-    in
-    let prefilter_manager_op source op =
+    let prefilter_manager_op source manager_op =
       Lwt.return
       @@
-      match pre_filter_manager config filter_state source bytes op with
-      | `Passed_prefilter -> `Passed_prefilter `Low
+      match
+        pre_filter_manager
+          config
+          filter_state
+          ~validation_state_before
+          source
+          op
+          manager_op
+      with
+      | `Passed_prefilter prio -> `Passed_prefilter (manager_prio prio)
       | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
         err ->
           err
@@ -731,7 +797,7 @@ module Mempool = struct
           ?validation_state_before
           consensus_content
         >>= fun keep ->
-        if keep then Lwt.return @@ `Passed_prefilter `High
+        if keep then Lwt.return @@ `Passed_prefilter consensus_prio
         else
           Lwt.return
             (`Branch_refused
@@ -743,7 +809,7 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        Lwt.return @@ `Passed_prefilter `Low
+        Lwt.return @@ `Passed_prefilter other_prio
     | Single (Manager_operation {source; _}) as op ->
         prefilter_manager_op source op
     | Cons (Manager_operation {source; _}, _) as op ->
@@ -754,6 +820,7 @@ module Mempool = struct
       config ->
       state ->
       validation_state ->
+      Operation_hash.t ->
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
       fee:Tez.t ->
@@ -766,6 +833,7 @@ module Mempool = struct
    fun config
        filter_state
        validation_state
+       oph
        shell
        ({contents; _} as protocol_data : t Kind.manager protocol_data)
        ~fee
@@ -843,6 +911,7 @@ module Mempool = struct
             config
             filter_state
             validation_state
+            oph
             shell_header
             protocol_data
             source
@@ -851,7 +920,7 @@ module Mempool = struct
           >|= function
           | `Prechecked_manager replacement ->
               let filter_state =
-                add_manager_restriction config filter_state oph info source
+                add_manager_restriction filter_state oph info source
               in
               `Passed_precheck (filter_state, replacement)
           | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _)
