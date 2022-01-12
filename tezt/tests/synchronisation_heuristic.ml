@@ -111,14 +111,19 @@ let check_node_synchronization_state =
   in
   Log.info "Restarting the nodes..." ;
   let* _ =
-    Lwt_list.iter_p (fun node -> Node.restart node []) (main_node :: nodes)
+    Lwt_list.iter_p (fun node -> Node.terminate node) (main_node :: nodes)
   in
-  Log.info "Waiting for nodes to be synchronized." ;
-  let* () =
-    Lwt_list.iter_p
+  (* We register this event before restarting the node to avoid to register it too late. *)
+  let synchronisation_events =
+    List.map
       (fun node -> wait_for ~statuses:["synced"; "stuck"] node)
       (main_node :: nodes)
   in
+  let* _ =
+    Lwt_list.iter_p (fun node -> Node.run node []) (main_node :: nodes)
+  in
+  Log.info "Waiting for nodes to be synchronized." ;
+  let* () = Lwt.join synchronisation_events in
   unit
 
 (* In order to check that the prevalidator is not alive, we cannot
