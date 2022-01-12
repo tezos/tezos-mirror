@@ -48,12 +48,9 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
   let*? origination_burn =
     Tez.(cost_per_byte *? Int64.of_int origination_size)
   in
+  let*? amount_fee_burn = Tez.(amount_fee +? origination_burn) in
   let amount_fee_maybe_burn =
-    if with_burn then
-      match Tez.(amount_fee +? origination_burn) with
-      | Ok r -> r
-      | Error _ -> assert false
-    else amount_fee
+    if with_burn then amount_fee_burn else amount_fee
   in
   let* () =
     Assert.balance_was_debited ~loc (I b) src bal_src amount_fee_maybe_burn
