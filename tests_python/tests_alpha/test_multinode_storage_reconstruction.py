@@ -3,14 +3,27 @@ from tools import utils
 from launchers.sandbox import Sandbox
 from . import protocol
 
-PARAMS = ['--bootstrap-threshold', '0']
-# 2*cycle_size - (protocol_activation)
-CEMENTED_LIMIT = 2 * 8 - 1
-# The whole store is cemented
-BATCH_1 = 48
-# 2 cycles are pruned in full 5 mode
-# This constant is above MAX_OP_TTL
-BATCH_2 = 144
+NODE_PARAMS = ['--bootstrap-threshold', '0']
+parameters = protocol.get_parameters()
+
+# the default number of cycles stored by a full/rolling node
+DEFAULT_ADDITIONAL_CYCLES = 5
+ALPHA_ACTIVATION_LEVEL = 1
+# BATCH_1 represents the number of levels needed for the whole store
+# to be cemented
+BATCH_1 = (
+    parameters['preserved_cycles'] + DEFAULT_ADDITIONAL_CYCLES
+) * parameters['blocks_per_cycle'] + ALPHA_ACTIVATION_LEVEL
+
+# To be able to reconstruct the storage we need to bake enough blocks
+# in order to exceed both the max_op_ttl and the lafl, plus a few
+# blocks to escape the activation block and the trigger of the store's
+# cementing.
+BATCH_2 = (
+    parameters['max_operations_time_to_live']
+    + parameters['preserved_cycles'] * parameters['blocks_per_cycle']
+    + 5
+)
 
 SNAPSHOT_1 = f'snapshot_block_{BATCH_1}.full'
 SNAPSHOT_2 = f'snapshot_block_{BATCH_2}.full'
@@ -29,15 +42,13 @@ def clear_cache(sandbox, node_id):
 @pytest.mark.slow
 class TestMultiNodeStorageReconstruction:
     def test_init(self, sandbox: Sandbox):
-        sandbox.add_node(0, params=PARAMS)
-        parameters = protocol.get_parameters()
-        parameters['consensus_threshold'] = 0
+        sandbox.add_node(0, params=NODE_PARAMS)
         protocol.activate(
             sandbox.client(0), parameters=parameters, activate_in_the_past=True
         )
         # Keep node 3 in the dance
         # History mode by default (full)
-        sandbox.add_node(3, params=PARAMS)
+        sandbox.add_node(3, params=NODE_PARAMS)
 
     # Node 0 bakes a few blocks
     def test_bake_node0_level_a(self, sandbox: Sandbox, session: dict):
@@ -78,7 +89,7 @@ class TestMultiNodeStorageReconstruction:
             1,
             snapshot=file,
             reconstruct=True,
-            params=PARAMS + ['--history-mode', 'archive'],
+            params=NODE_PARAMS + ['--history-mode', 'archive'],
         )
         assert utils.check_level(sandbox.client(1), session['head_level'])
         clear_cache(sandbox, 1)
