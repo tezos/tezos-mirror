@@ -436,7 +436,7 @@ let baking_minimal_timestamp state =
   let pool =
     Operation_pool.add_operations
       current_mempool
-      (List.map (fun (_, endorsement) -> endorsement) signed_endorsements)
+      (List.map snd signed_endorsements)
   in
   let kind = Baking_actions.Fresh pool in
   let block_to_bake : Baking_actions.block_to_bake =
