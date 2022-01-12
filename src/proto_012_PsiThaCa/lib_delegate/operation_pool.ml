@@ -398,9 +398,9 @@ module Prioritized = struct
   let add_operations prioritized_pool operations =
     List.fold_left add_operation prioritized_pool operations
 
-  let merge_external_operations (pool : pool)
+  let merge_external_operations pool
       (external_operations : packed_operation list) =
-    List.fold_left add_external_operation (of_pool pool) external_operations
+    List.fold_left add_external_operation pool external_operations
 
   let filter p {consensus; votes; anonymous; managers} =
     let filter =
