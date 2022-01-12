@@ -1,7 +1,7 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   cd src/proto_011_PtHangz2/lib_protocol/test
+    Invocation:   cd src/proto_011_PtHangz2/lib_protocol/test/integration/michelson && \
                   dune exec ./main.exe -- test "^typechecking$"
     Subject:      Type-checking
 *)

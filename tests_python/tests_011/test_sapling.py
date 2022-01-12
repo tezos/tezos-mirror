@@ -8,7 +8,13 @@ from . import contract_paths
 from . import protocol
 
 CONTRACT_PATH = path.join(
-    paths.TEZOS_HOME, 'src', protocol.FOLDER, 'lib_protocol', 'test'
+    paths.TEZOS_HOME,
+    'src',
+    protocol.FOLDER,
+    'lib_protocol',
+    'test',
+    'integration',
+    'michelson',
 )
 TX_AMOUNT = 100.0
 

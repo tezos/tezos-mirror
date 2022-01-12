@@ -29,7 +29,7 @@ open Transfers
 (** Testing
     -------
     Component:  Protocol (global table of constants)
-    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe \
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/integration/michelson/main.exe \
                 -- test "^global table of constants$"
     Subject:  This module tests that the global table of constants
               can be written to and read from across blocks.
@@ -38,13 +38,6 @@ open Transfers
 let get_next_context b =
   Incremental.begin_construction b >>=? fun b ->
   return (Incremental.alpha_ctxt b)
-
-let assert_expr_equal loc =
-  Assert.equal
-    ~loc
-    ( = )
-    "Michelson Expressions Not Equal"
-    Michelson_v1_printer.print_expr
 
 let assert_proto_error_id loc id result =
   let test err =
@@ -77,7 +70,8 @@ let get_happy_path () =
     get_next_context b >>=? fun context ->
     Global_constants_storage.get context hash >|= Environment.wrap_tzresult
     >>=? fun (_, result_expr) ->
-    assert_expr_equal __LOC__ expr result_expr >|=? fun _ -> b
+    Test_global_constants.assert_expr_equal __LOC__ expr result_expr
+    >|=? fun _ -> b
   in
   assert_unchanged b >>=? fun b ->
   let do_many_transfers b =

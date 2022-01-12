@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,27 +26,21 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune build @src/proto_011_PtHangz2/lib_protocol/runtest
-    Subject:      Entrypoint
+    Invocation:   dune runtest src/proto_011_PtHangz2/lib_protocol/test/integration/michelson
+    Subject:      Integration > Michelson
 *)
 
 let () =
   Alcotest_lwt.run
-    "protocol_011_PtHangz2"
+    "protocol > integration > michelson"
     [
-      ("baking module", Test_baking_module.tests);
-      ("endorsement", Test_endorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("rolls", Test_rolls.tests);
-      ("gas levels", Test_gas_levels.tests);
-      ("gas cost functions", Test_gas_costs.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("storage description", Test_storage.tests);
-      ("constants", Test_constants.tests);
-      ("liquidity baking", Test_liquidity_baking.tests);
+      ("global table of constants", Test_global_constants_storage.tests);
+      ("interpretation", Test_interpretation.tests);
+      ("lazy storage diff", Test_lazy_storage_diff.tests);
+      ("sapling", Test_sapling.tests);
+      ("script typed ir size", Test_script_typed_ir_size.tests);
+      ("temp big maps", Test_temp_big_maps.tests);
+      ("timelock", Test_timelock.tests);
+      ("typechecking", Test_typechecking.tests);
     ]
   |> Lwt_main.run
