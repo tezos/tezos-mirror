@@ -58,12 +58,7 @@ val pp_pool : Format.formatter -> pool -> unit
 
 val filter_pool : (packed_operation -> bool) -> pool -> pool
 
-type ordered_pool = {
-  ordered_consensus : packed_operation list;
-  ordered_votes : packed_operation list;
-  ordered_anonymous : packed_operation list;
-  ordered_managers : packed_operation list;
-}
+type ordered_pool = packed_operation list t
 
 val ordered_pool_encoding : ordered_pool Data_encoding.t
 
