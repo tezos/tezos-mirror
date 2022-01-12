@@ -188,7 +188,7 @@ module Type_size : sig
   val to_int : 'a t -> Saturation_repr.mul_safe Saturation_repr.t
 end
 
-type 'a ty_metadata = {size : 'a Type_size.t}
+type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
 type _ comparable_ty =
   | Unit_key : unit ty_metadata -> unit comparable_ty

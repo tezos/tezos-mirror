@@ -310,7 +310,7 @@ type empty_cell = EmptyCell
 
 type end_of_stack = empty_cell * empty_cell
 
-type 'a ty_metadata = {size : 'a Type_size.t}
+type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
 type _ comparable_ty =
   | Unit_key : unit ty_metadata -> unit comparable_ty
