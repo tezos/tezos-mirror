@@ -4,8 +4,8 @@ Transaction Rollups
 High-frequency transactions are hard to achieve in a blockchain that is
 decentralized and open. For this reason, many blockchains offer the possibility
 to define layer-2 solutions that relax some constraints in terms of consensus to
-increase the transaction throughput. They relies on the layer-1 chain as a
-gatekeeper and are optimistic that economic incentives are sufficient to prevent
+increase the transaction throughput. Such solutions rely on the layer-1 chain as a
+gatekeeper and are "optimistic" in that they consider that economic incentives are sufficient to prevent
 attacks.
 
 Introduction
@@ -52,7 +52,7 @@ of optimistic rollups:
    share the whole tree, by means of Merkle proofs.
 
 Optimistic rollups implementations leverage these two properties. Firstly,
-**rollup nodes** can submit **commitment** to the layer-1 chain, to advertise
+**rollup nodes** can submit **commitments** to the layer-1 chain, to advertise
 the root hash of the **rollup context** after the application of a set of
 **rollup operations**. Secondly, **rollup participants** can assert the
 correctness of these **commitments**, and provide proofs asserting they are
@@ -117,8 +117,7 @@ prefixed by ``tru1``. For instance,
 
 is a valid transaction rollup address.
 
-When using the ``tezos-client`` to originate a transaction rollup, it outputs
-the address.
+When using the ``tezos-client`` to originate a transaction rollup, the client outputs
+the address of the new rollup.
 
-::
 .. TODO: https://gitlab.com/tezos/tezos/-/issues/2154
