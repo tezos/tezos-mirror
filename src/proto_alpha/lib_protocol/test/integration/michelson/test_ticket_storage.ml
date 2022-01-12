@@ -51,12 +51,7 @@ let hash_key ctxt ~ticketer ~typ ~contents ~owner =
   let owner = Micheline.root @@ Expr.from_string owner in
   wrap
   @@ Lwt.return
-       (Alpha_context.Ticket_balance.make_key_hash
-          ctxt
-          ~ticketer
-          ~typ
-          ~contents
-          ~owner)
+       (Alpha_context.Ticket_hash.make ctxt ~ticketer ~typ ~contents ~owner)
 
 let assert_balance ctxt ~loc key expected =
   let* (balance, _) = wrap @@ Ticket_balance.get_balance ctxt key in
@@ -92,8 +87,8 @@ let assert_non_overlapping_keys ~loc ~ticketer1 ~ticketer2 ~contents1 ~contents2
       ~contents:contents2
       ~owner:owner2
   in
-  let k1 = Ticket_balance.script_expr_hash_of_key_hash k1 in
-  let k2 = Ticket_balance.script_expr_hash_of_key_hash k2 in
+  let k1 = Ticket_hash.to_script_expr_hash k1 in
+  let k2 = Ticket_hash.to_script_expr_hash k2 in
   Assert.not_equal
     ~loc
     Script_expr_hash.equal

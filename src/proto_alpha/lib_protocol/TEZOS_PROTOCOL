@@ -56,6 +56,7 @@
 
         "Raw_context_intf",
         "Raw_context",
+        "Ticket_hash_repr",
         "Storage_costs",
         "Storage_sigs",
         "Storage_functors",

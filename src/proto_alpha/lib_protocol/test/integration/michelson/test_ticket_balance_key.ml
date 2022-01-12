@@ -72,8 +72,8 @@ let equal_script_hash ~loc msg key1 key2 =
     Script_expr_hash.equal
     msg
     Script_expr_hash.pp
-    (Ticket_balance.script_expr_hash_of_key_hash key1)
-    (Ticket_balance.script_expr_hash_of_key_hash key2)
+    (Ticket_hash.to_script_expr_hash key1)
+    (Ticket_hash.to_script_expr_hash key2)
 
 let not_equal_script_hash ~loc msg key1 key2 =
   Assert.not_equal
@@ -81,8 +81,8 @@ let not_equal_script_hash ~loc msg key1 key2 =
     Script_expr_hash.equal
     msg
     Script_expr_hash.pp
-    (Ticket_balance.script_expr_hash_of_key_hash key1)
-    (Ticket_balance.script_expr_hash_of_key_hash key2)
+    (Ticket_hash.to_script_expr_hash key1)
+    (Ticket_hash.to_script_expr_hash key2)
 
 let assert_keys ~ticketer1 ~ticketer2 ~typ1 ~typ2 ~amount1 ~amount2 ~content1
     ~content2 ~owner1 ~owner2 assert_condition =
