@@ -130,12 +130,20 @@ module Mempool = struct
      /!\ Warning /!\ : current plugin implementation implies that this drift
      cumulates with the accepted  drift regarding the current head's timestamp.
   *)
+  let default_config =
+    {
+      minimal_fees = default_minimal_fees;
+      minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
+      minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
+      allow_script_failure = true;
+      clock_drift = None;
+      replace_by_fee_factor =
+        Q.make (Z.of_int 105) (Z.of_int 100)
+        (* Default value of [replace_by_fee_factor] is set to 5% *);
+    }
 
   let config_encoding : config Data_encoding.t =
     let open Data_encoding in
-    (* 105/100 = 1.05%: This is the minumum fee increase ratio required between
-       an operation and another one it'd replace in the prevalidator. *)
-    let replace_factor = Q.make (Z.of_int 105) (Z.of_int 100) in
     conv
       (fun {
              minimal_fees;
@@ -166,33 +174,21 @@ module Mempool = struct
           replace_by_fee_factor;
         })
       (obj6
-         (dft "minimal_fees" Tez.encoding default_minimal_fees)
+         (dft "minimal_fees" Tez.encoding default_config.minimal_fees)
          (dft
             "minimal_nanotez_per_gas_unit"
             nanotez_enc
-            default_minimal_nanotez_per_gas_unit)
+            default_config.minimal_nanotez_per_gas_unit)
          (dft
             "minimal_nanotez_per_byte"
             nanotez_enc
-            default_minimal_nanotez_per_byte)
-         (dft "allow_script_failure" bool true)
+            default_config.minimal_nanotez_per_byte)
+         (dft "allow_script_failure" bool default_config.allow_script_failure)
          (opt "clock_drift" Period.encoding)
          (dft
             "replace_by_fee_factor"
             manager_op_replacement_factor_enc
-            replace_factor))
-
-  let default_config =
-    {
-      minimal_fees = default_minimal_fees;
-      minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
-      minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
-      allow_script_failure = true;
-      clock_drift = None;
-      replace_by_fee_factor =
-        Q.make (Z.of_int 105) (Z.of_int 100)
-        (* Default value of [replace_by_fee_factor] is set to 5% *);
-    }
+            default_config.replace_by_fee_factor))
 
   type manager_gas_witness
 
