@@ -26,7 +26,9 @@
 (** Testing
     -------
     Component:  Protocol (baking)
-    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^baking module$"
+    Invocation: dune exec \
+                src/proto_011_PtHangz2/lib_protocol/test/integration/consensus/main.exe \
+                -- test "^baking module$"
     Subject:    some functions in the Baking module
 *)
 

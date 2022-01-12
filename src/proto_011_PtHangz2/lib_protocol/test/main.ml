@@ -34,15 +34,6 @@ let () =
   Alcotest_lwt.run
     "protocol_011_PtHangz2"
     [
-      ("baking module", Test_baking_module.tests);
-      ("endorsement", Test_endorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("rolls", Test_rolls.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
       ("storage description", Test_storage.tests);
       ("constants", Test_constants.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
