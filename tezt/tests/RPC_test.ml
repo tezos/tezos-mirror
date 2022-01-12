@@ -617,7 +617,7 @@ let test_votes ?endpoint client =
 
 let test_tx_rollup ?endpoint client =
   let client_bake_for = make_client_bake_for () in
-  let* tx_rollup_hash =
+  let* tx_rollup =
     Client.originate_tx_rollup
       ~burn_cap:Tez.(of_int 9999999)
       ~storage_limit:60_000
@@ -625,7 +625,7 @@ let test_tx_rollup ?endpoint client =
       client
   in
   let* () = client_bake_for client in
-  let* _ = RPC.Tx_rollup.get_state ?endpoint ~tx_rollup_hash client in
+  let* _ = RPC.Tx_rollup.get_state ?endpoint ~tx_rollup client in
   unit
 
 (* Test the various other RPCs. *)
