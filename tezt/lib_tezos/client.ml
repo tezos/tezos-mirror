@@ -411,7 +411,7 @@ let spawn_bake_for ?endpoint ?protocol ?(keys = [Constant.bootstrap1.alias])
         minimal_nanotez_per_byte
     @ Option.fold
         ~none:[]
-        ~some:(fun operations_json -> ["--operation-pool"; operations_json])
+        ~some:(fun operations_json -> ["--operations-pool"; operations_json])
         mempool
     @ (match protocol with
       | Some (Ithaca | Alpha) ->

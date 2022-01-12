@@ -36,7 +36,7 @@ let directory_parameter =
       else return p)
 
 let http_headers_env_variable =
-  "TEZOS_CLIENT_REMOTE_OPERATION_POOL_HTTP_HEADERS"
+  "TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS"
 
 let http_headers =
   match Sys.getenv_opt http_headers_env_variable with
@@ -72,7 +72,7 @@ let http_headers =
 
 let operations_arg =
   Clic.arg
-    ~long:"operation-pool"
+    ~long:"operations-pool"
     ~placeholder:"file|uri"
     ~doc:
       (Printf.sprintf

@@ -247,15 +247,14 @@ let make_initial_state ?(monitor_node_operations = true) () =
   let canceler = Lwt_canceler.create () in
   let operation_pool = Operation_pool.empty in
   let lock = Lwt_mutex.create () in
-  Lwt.return
-    {
-      operation_pool;
-      canceler;
-      proposal_watched = None;
-      qc_event_stream;
-      lock;
-      monitor_node_operations;
-    }
+  {
+    operation_pool;
+    canceler;
+    proposal_watched = None;
+    qc_event_stream;
+    lock;
+    monitor_node_operations;
+  }
 
 let is_valid_consensus_content (candidate : candidate) consensus_content =
   let {hash = _; round_watched; payload_hash_watched} = candidate in
@@ -484,43 +483,42 @@ let update_operations_pool state (head_level, head_round) =
 
 let create ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
-  make_initial_state ~monitor_node_operations () >>= fun state ->
+  let state = make_initial_state ~monitor_node_operations () in
   (* TODO should we continue forever ? *)
   let rec worker_loop () =
-    if state.monitor_node_operations then (
-      monitor_operations cctxt >>= function
-      | Error err -> Events.(emit loop_failed err)
-      | Ok (head, operation_stream, op_stream_stopper) ->
-          Events.(emit starting_new_monitoring ()) >>= fun () ->
-          state.canceler <- Lwt_canceler.create () ;
-          Lwt_canceler.on_cancel state.canceler (fun () ->
+    monitor_operations cctxt >>= function
+    | Error err -> Events.(emit loop_failed err)
+    | Ok (head, operation_stream, op_stream_stopper) ->
+        Events.(emit starting_new_monitoring ()) >>= fun () ->
+        state.canceler <- Lwt_canceler.create () ;
+        Lwt_canceler.on_cancel state.canceler (fun () ->
+            op_stream_stopper () ;
+            cancel_monitoring state ;
+            Lwt.return_unit) ;
+        update_operations_pool state head ;
+        let rec loop () =
+          Lwt_stream.get operation_stream >>= function
+          | None ->
+              (* When the stream closes, it means a new head has been set,
+                 we cancel the monitoring and flush current operations *)
+              Events.(emit end_of_stream ()) >>= fun () ->
               op_stream_stopper () ;
               cancel_monitoring state ;
-              Lwt.return_unit) ;
-          update_operations_pool state head ;
-          let rec loop () =
-            Lwt_stream.get operation_stream >>= function
-            | None ->
-                (* When the stream closes, it means a new head has been set,
-                   we cancel the monitoring and flush current operations *)
-                Events.(emit end_of_stream ()) >>= fun () ->
-                op_stream_stopper () ;
-                state.operation_pool <- Operation_pool.empty ;
-                cancel_monitoring state ;
-                worker_loop ()
-            | Some ops ->
-                Events.(emit received_new_operations ()) >>= fun () ->
-                state.operation_pool <-
-                  Operation_pool.add_operations state.operation_pool ops ;
-                update_monitoring state ops >>= fun () -> loop ()
-          in
-          loop ())
-    else Lwt.return_unit
+              worker_loop ()
+          | Some ops ->
+              Events.(emit received_new_operations ()) >>= fun () ->
+              state.operation_pool <-
+                Operation_pool.add_operations state.operation_pool ops ;
+              update_monitoring state ops >>= fun () -> loop ()
+        in
+        loop ()
   in
   Lwt.dont_wait
     (fun () ->
       Lwt.finalize
-        (fun () -> worker_loop ())
+        (fun () ->
+          if state.monitor_node_operations then worker_loop ()
+          else Lwt.return_unit)
         (fun () -> shutdown_worker state >>= fun _ -> Lwt.return_unit))
     (fun exn ->
       Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;
