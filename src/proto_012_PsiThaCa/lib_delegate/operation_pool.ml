@@ -26,6 +26,14 @@
 open Protocol
 open Alpha_context
 
+(** Generic base type for pools *)
+type 'set t = {
+  consensus : 'set;
+  votes : 'set;
+  anonymous : 'set;
+  managers : 'set;
+}
+
 (* Should we use a better ordering ? *)
 
 module Prioritized_operation = struct
@@ -66,12 +74,7 @@ module Prioritized_operation_set = struct
 end
 
 (* TODO refine this: unpack operations *)
-type pool = {
-  consensus : Operation_set.t;
-  votes : Operation_set.t;
-  anonymous : Operation_set.t;
-  managers : Operation_set.t;
-}
+type pool = Operation_set.t t
 
 (* TODO refine this: unpack operations *)
 type ordered_pool = {
@@ -352,12 +355,7 @@ let filter_pool p {consensus; votes; anonymous; managers} =
   }
 
 module Prioritized = struct
-  type t = {
-    consensus : Prioritized_operation_set.t;
-    votes : Prioritized_operation_set.t;
-    anonymous : Prioritized_operation_set.t;
-    managers : Prioritized_operation_set.t;
-  }
+  type nonrec t = Prioritized_operation_set.t t
 
   let of_operation_set (operation_set : Operation_set.t) =
     Operation_set.fold

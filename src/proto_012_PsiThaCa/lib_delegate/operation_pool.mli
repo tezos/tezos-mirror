@@ -36,14 +36,17 @@ val managers_index : int
 
 module Operation_set : Set.S with type elt = packed_operation
 
+(** Generic base type pools *)
+type 'set t = {
+  consensus : 'set;
+  votes : 'set;
+  anonymous : 'set;
+  managers : 'set;
+}
+
 (** A pool of operations for a single origin, or undifferenciated origin,
    typically used for operations coming from the node *)
-type pool = {
-  consensus : Operation_set.t;
-  votes : Operation_set.t;
-  anonymous : Operation_set.t;
-  managers : Operation_set.t;
-}
+type pool = Operation_set.t t
 
 (**  on pool *)
 val empty : pool
@@ -151,12 +154,7 @@ end
 (** Pool of prioritized operations *)
 module Prioritized : sig
   (** Same record fields as [type pool], but with a different set base *)
-  type t = {
-    consensus : Prioritized_operation_set.t;
-    votes : Prioritized_operation_set.t;
-    anonymous : Prioritized_operation_set.t;
-    managers : Prioritized_operation_set.t;
-  }
+  type nonrec t = Prioritized_operation_set.t t
 
   (** [of_pool pool] transforms [pool] into a prioritized pool of operations of
       low priority. *)
