@@ -59,9 +59,9 @@ let (comparable_ty_size, ty_size) =
     | Chain_id_key a -> ret_succ_adding accu (base_basic a)
     | Never_key a -> ret_succ_adding accu (base_basic a)
     | Pair_key (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! hh6w)
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Union_key (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! hh6w)
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Option_key (_ty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
   and apply : type a. nodes_and_size -> a ty -> nodes_and_size =
@@ -87,7 +87,8 @@ let (comparable_ty_size, ty_size) =
     | Bls12_381_fr_t a -> ret_succ_adding accu @@ base_basic a
     | Chest_key_t a -> ret_succ_adding accu @@ base_basic a
     | Chest_t a -> ret_succ_adding accu @@ base_basic a
-    | Pair_t (_ty1, _ty2, a) -> ret_succ_adding accu @@ (base_compound a +! hh6w)
+    | Pair_t (_ty1, _ty2, a) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Union_t ((_ty1, _fa1), (_ty2, _fa2), a) ->
         ret_succ_adding accu @@ (base_compound a +! hh6w)
     | Lambda_t (_ty1, _ty2, a) ->
