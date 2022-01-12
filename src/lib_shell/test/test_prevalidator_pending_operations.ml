@@ -35,8 +35,7 @@ module Pending_ops = Prevalidator_pending_operations
 
 let pending_of_list =
   List.fold_left
-    (fun pendings (hash, op, priority) ->
-      Pending_ops.add hash op priority pendings)
+    (fun pendings (op, priority) -> Pending_ops.add op priority pendings)
     Pending_ops.empty
 
 (* 1. Test iterators ordering *)
