@@ -155,3 +155,41 @@ val init :
   ?liquidity_baking_subsidy:Tez.t ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+(** [init1] : returns an initial block with 1 initialized bootstrap account
+    and the associated implicit contract *)
+val init1 :
+  ?rng_state:Random.State.t ->
+  ?endorsers_per_block:int ->
+  ?with_commitments:bool ->
+  ?initial_balances:int64 list ->
+  ?initial_endorsers:int ->
+  ?min_proposal_quorum:int32 ->
+  ?time_between_blocks:Period.t list ->
+  ?minimal_block_delay:Period.t ->
+  ?delay_per_missing_endorsement:Period.t ->
+  ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
+  ?cost_per_byte:Tez.t ->
+  ?liquidity_baking_subsidy:Tez.t ->
+  unit ->
+  (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
+
+(** [init2] : returns an initial block with 2 initialized bootstrap accounts
+    and the associated implicit contracts *)
+val init2 :
+  ?rng_state:Random.State.t ->
+  ?endorsers_per_block:int ->
+  ?with_commitments:bool ->
+  ?initial_balances:int64 list ->
+  ?initial_endorsers:int ->
+  ?min_proposal_quorum:int32 ->
+  ?time_between_blocks:Period.t list ->
+  ?minimal_block_delay:Period.t ->
+  ?delay_per_missing_endorsement:Period.t ->
+  ?bootstrap_contracts:Parameters.bootstrap_contract list ->
+  ?level:int32 ->
+  ?cost_per_byte:Tez.t ->
+  ?liquidity_baking_subsidy:Tez.t ->
+  unit ->
+  (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t
