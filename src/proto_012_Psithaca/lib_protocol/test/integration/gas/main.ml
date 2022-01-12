@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,30 +25,16 @@
 
 (** Testing
     -------
-    Component:    Protocol
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
+    Component:    Protocol > Gas
+    Invocation:   dune runtest src/proto_012_Psithaca/lib_protocol/test/integration/gas
     Subject:      Entrypoint
 *)
 
 let () =
   Alcotest_lwt.run
-    "protocol_012_Psithaca"
+    "protocol > integration > gas"
     [
-      ("endorsement", Test_endorsement.tests);
-      ("preendorsement", Test_preendorsement.tests);
-      ("double endorsement", Test_double_endorsement.tests);
-      ("double preendorsement", Test_double_preendorsement.tests);
-      ("double baking", Test_double_baking.tests);
-      ("seed", Test_seed.tests);
-      ("baking", Test_baking.tests);
-      ("delegation", Test_delegation.tests);
-      ("deactivation", Test_deactivation.tests);
-      ("helpers rpcs", Test_helpers_rpcs.tests);
-      ("storage description", Test_storage.tests);
-      ("constants", Test_constants.tests);
-      ("liquidity baking", Test_liquidity_baking.tests);
-      ("participation monitoring", Test_participation.tests);
-      ("frozen deposits", Test_frozen_deposits.tests);
-      ("token movements", Test_token.tests);
+      ("gas levels", Test_gas_levels.tests);
+      ("gas cost functions", Test_gas_costs.tests);
     ]
   |> Lwt_main.run
