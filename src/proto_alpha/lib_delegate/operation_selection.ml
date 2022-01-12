@@ -219,8 +219,7 @@ let filter_valid_operations_up_to_quota inc (ops, quota) =
   with Full (inc, l) -> Lwt.return (inc, List.rev l)
 
 let filter_operations_with_simulation initial_inc fees_config
-    ~hard_gas_limit_per_block
-    Operation_pool.Prioritized.{consensus; votes; anonymous; managers} =
+    ~hard_gas_limit_per_block {consensus; votes; anonymous; managers} =
   let {
     Baking_configuration.minimal_fees;
     minimal_nanotez_per_gas_unit;
@@ -290,7 +289,7 @@ let filter_valid_operations_up_to_quota_without_simulation (ops, quota) =
   with Full l -> List.rev l
 
 let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
-    Operation_pool.Prioritized.{consensus; votes; anonymous; managers} =
+    {consensus; votes; anonymous; managers} =
   let consensus =
     filter_valid_operations_up_to_quota_without_simulation
       (Prioritized_operation_set.operations consensus, consensus_quota)
