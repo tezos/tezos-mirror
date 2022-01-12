@@ -84,3 +84,11 @@ val register :
     This will check command-line options and run the tests that have been selected,
     or display the list of tests. *)
 val run : unit -> unit
+
+(** Get the current worker id.
+
+    This returns a value between [0] and [Cli.options.job_count - 1] that uniquely
+    identifies the current worker process that is running the current test.
+
+    When called outside of a test, this always returns [0]. *)
+val current_worker_id : unit -> int

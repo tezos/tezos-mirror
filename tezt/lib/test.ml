@@ -773,6 +773,8 @@ module Scheduler : sig
     on_worker_available:(unit -> (request * (response -> unit)) option) ->
     worker_count:int ->
     unit
+
+  val get_current_worker_id : unit -> int
 end = struct
   type request = Run_test of {test_title : string}
 
@@ -845,12 +847,19 @@ end = struct
          So here we have an error of Tezt itself. *)
       internal_worker_error "%s" (Printexc.to_string exn)
 
+  let next_worker_id = ref 0
+
+  let current_worker_id = ref 0
+
   let spawn_worker () =
+    let worker_id = !next_worker_id in
+    incr next_worker_id ;
     let (pipe_to_worker_exit, pipe_to_worker_entrance) = Unix.pipe () in
     let (pipe_from_worker_exit, pipe_from_worker_entrance) = Unix.pipe () in
     let pid = Lwt_unix.fork () in
     if pid = 0 then (
       (* This is now a worker process. *)
+      current_worker_id := worker_id ;
       Unix.close pipe_to_worker_entrance ;
       Unix.close pipe_from_worker_exit ;
       worker_listen
@@ -982,11 +991,15 @@ end = struct
     else
       try run_multi_process ~on_worker_available ~worker_count
       with exn -> internal_scheduler_error "%s" (Printexc.to_string exn)
+
+  let get_current_worker_id () = !current_worker_id
 end
 
 (* [iteration] is between 1 and the value of [--loop-count].
    [index] is between 1 and [test_count]. *)
 type test_instance = {iteration : int; index : int}
+
+let current_worker_id = Scheduler.get_current_worker_id
 
 let run () =
   (* Check command-line options. *)

@@ -47,13 +47,6 @@ end
 open Parameters
 include Daemon.Make (Parameters)
 
-let next_port = ref 29932
-
-let fresh_port () =
-  let port = !next_port in
-  incr next_port ;
-  port
-
 let trigger_ready t value =
   let pending = t.persistent_state.pending_ready in
   t.persistent_state.pending_ready <- [] ;
@@ -71,7 +64,7 @@ let handle_event t ({name; _} : event) =
 let create ?runner ?name ?rpc_port ?(args = []) node =
   let path = Constant.tezos_proxy_server in
   let rpc_port =
-    match rpc_port with None -> fresh_port () | Some port -> port
+    match rpc_port with None -> Port.fresh () | Some port -> port
   in
   let user_arguments =
     List.map

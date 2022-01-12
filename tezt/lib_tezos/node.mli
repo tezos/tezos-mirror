@@ -195,14 +195,6 @@ val runner : t -> Runner.t option
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** Get a fresh, unused port.
-
-    Warning: this function does not guarantee that the given port is
-    not already in use by another process. It only guarantees that
-    it is not already in use by another node, and only if you let
-    the [Node] module choose all ports for you. *)
-val fresh_port : unit -> int
-
 (** Wait until a node terminates and return its status. If the node is not
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
