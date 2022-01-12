@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,37 +26,20 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe \
-                  -- test "^failing_noop operation$"
-    Subject:      The Failing_noop operation was added bearing in mind the
-                  possibility for the end user to sign arbitrary bytes,
-                  encapsulate in the operation, with the absolute garanty that
-                  the signed bytes can't be used for something against the
-                  user's will. The Failing_noop operation always fails when
-                  applied.
- *)
+    Invocation:   dune runtest src/proto_012_Psithaca/lib_protocol/test/integration/operations
+    Subject:      Entrypoint
+*)
 
-open Protocol
-open Alpha_context
-
-let register_one_contract () =
-  Context.init 1 >>=? fun (b, contracts) ->
-  let contract =
-    List.nth contracts 0 |> WithExceptions.Option.get ~loc:__LOC__
-  in
-  return (b, contract)
-
-(** try to apply a failing_noop and assert that the operation fails *)
-let failing_noop_must_fail_when_injected () =
-  register_one_contract () >>=? fun (blk, contract) ->
-  Contract.is_implicit contract |> function
-  | None -> Alcotest.fail "only implicit accounts can sign"
-  | Some source ->
-      Op.failing_noop (B blk) source "tezos" >>=? fun operation ->
-      Block.bake ~operation blk >>= fun res ->
-      Assert.proto_error ~loc:__LOC__ res (function
-          | Apply.Failing_noop_error -> true
-          | _ -> false)
-
-let tests =
-  [Tztest.tztest "injection fails" `Quick failing_noop_must_fail_when_injected]
+let () =
+  Alcotest_lwt.run
+    "protocol > integration > operations"
+    [
+      ("voting", Test_voting.tests);
+      ("origination", Test_origination.tests);
+      ("revelation", Test_reveal.tests);
+      ("transfer", Test_transfer.tests);
+      ("activation", Test_activation.tests);
+      ("combined", Test_combined_operations.tests);
+      ("failing_noop operation", Test_failing_noop.tests);
+    ]
+  |> Lwt_main.run
