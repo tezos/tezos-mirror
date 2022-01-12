@@ -125,8 +125,13 @@ let test_rollup_node_configuration =
         let open Ezjsonm in
         match from_channel (open_in filename) with
         | `O fields ->
-            (* Remove 'data-dir' as it is non deterministic. *)
-            `O (List.filter (fun (s, _) -> s <> "data-dir") fields) |> to_string
+            (* Remove "data-dir" and "rpc-port" as they are non deterministic. *)
+            `O
+              (List.filter
+                 (fun (s, _) ->
+                   match s with "data-dir" | "rpc-port" -> false | _ -> true)
+                 fields)
+            |> to_string
         | _ ->
             failwith "The configuration file does not have the expected format."
       in
