@@ -375,6 +375,36 @@ let test_invariants =
   in
   true
 
+module Unparsable = struct
+  (** Tests the relationship between [Classification.add_unparsable]
+      and [Classification.is_known_unparsable] *)
+  let test_add_is_known =
+    let open QCheck2 in
+    Test.make
+      ~name:"[is_known_unparsable oph (add_unparsable oph t)] holds"
+      Generators.(t_with_operation_gen ())
+    @@ fun (t, op) ->
+    let oph = op.Prevalidation.hash in
+    Classification.add_unparsable oph t ;
+    qcheck_eq_true ~actual:(Classification.is_known_unparsable oph t) ;
+    true
+
+  (** Tests the relationship between [flush] and
+     [Classification.is_known_unparsable]. This test shows that
+     flushing does not put any previously classified operations into
+     the [unparsable] field. *)
+  let test_flush_is_known =
+    let open QCheck2 in
+    Test.make
+      ~name:"[is_known_unparsable _ (flush t)] does not hold"
+      (Gen.pair (Generators.t_with_operation_gen ()) Gen.bool)
+    @@ fun ((t, op), handle_branch_refused) ->
+    let oph = op.Prevalidation.hash in
+    Classification.Internal_for_tests.flush ~handle_branch_refused t ;
+    qcheck_eq_false ~actual:(Classification.is_known_unparsable oph t) ;
+    true
+end
+
 module Bounded = struct
   type binding = unit Prevalidation.operation
 
@@ -811,6 +841,7 @@ let () =
         ];
       mk_tests "is_in_mempool" [test_is_in_mempool_remove];
       mk_tests "is_applied" [test_is_applied];
+      mk_tests "unparsable" Unparsable.[test_add_is_known; test_flush_is_known];
       mk_tests "invariants" [test_invariants];
       mk_tests "bounded" [Bounded.test_bounded];
       mk_tests
