@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,12 +26,17 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest
+    Invocation:   dune build @@src/proto_012_Psithaca/lib_protocol/test/integration/runtest
     Subject:      Entrypoint
 *)
 
 let () =
   Alcotest_lwt.run
-    "protocol_012_Psithaca"
-    []
+    "protocol > integration"
+    [
+      ("constants", Test_constants.tests);
+      ("liquidity baking", Test_liquidity_baking.tests);
+      ("storage description", Test_storage.tests);
+      ("token movements", Test_token.tests);
+    ]
   |> Lwt_main.run
