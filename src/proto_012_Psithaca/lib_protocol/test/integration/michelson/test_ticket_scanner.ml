@@ -26,7 +26,9 @@
 (** Testing
     -------
     Component:  Protocol (Ticket_scanner)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^ticket scanner"
+    Invocation: dune exec \
+                src/proto_012_Psithaca/lib_protocol/test/integration/michelson/main.exe \
+                -- test "^ticket scanner"
     Subject:    Ticket scanner tests
 *)
 

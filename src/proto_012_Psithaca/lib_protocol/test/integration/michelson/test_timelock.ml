@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Timelock)
-    Invocation: cd src/proto_alpha/lib_protocol/test
+    Invocation: cd src/proto_012_Psithaca/lib_protocol/test/integration/michelson && \
                 dune exec ./main.exe -- test "^timelock$"
     Subject:    On timelock
 *)
