@@ -26,8 +26,9 @@
 (** Testing
     -------
     Component:    Protocol Library
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/test_sampler.exe
-    Subject:      Sampler
+    Invocation:   dune exec \
+                  src/proto_012_Psithaca/lib_protocol/test/pbt/test_sampler.exe
+    Subject:      Operations in Saturation_repr
 *)
 
 open Lib_test.Qcheck_helpers
@@ -266,5 +267,5 @@ let alias_z_test =
 
 let () =
   Alcotest.run
-    "Sampling"
+    "protocol > pbt > sampling"
     [("sampling", qcheck_wrap [alias_float_test; alias_z_test])]
