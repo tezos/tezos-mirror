@@ -1,0 +1,26 @@
+(tests
+ (package tezos-protocol-alpha-tests)
+ (names liquidity_baking_pbt
+        saturation_fuzzing
+        test_gas_properties
+        test_sampler
+        test_script_comparison
+        test_tez_repr
+        test_carbonated_map)
+ (libraries tezos-base
+            tezos-micheline
+            tezos-client-alpha
+            tezos-test-helpers
+            tezos-alpha-test-helpers
+            alcotest
+            qcheck-alcotest
+            tezos-benchmark
+            tezos-benchmark-alpha)
+ (flags (:standard
+          -open Tezos_base__TzPervasives
+          -open Tezos_micheline
+          -open Tezos_client_alpha
+          -open Tezos_protocol_alpha
+          -open Tezos_alpha_test_helpers
+          -open Tezos_benchmark_alpha
+          -open Tezos_benchmark_type_inference_alpha)))

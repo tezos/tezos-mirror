@@ -1,0 +1,23 @@
+(test
+ (name main)
+ (package tezos-protocol-alpha-tests)
+ (deps (glob_files contracts/*))
+ (libraries alcotest-lwt
+            tezos-base
+            tezos-protocol-alpha
+            tezos-base-test-helpers
+            tezos-alpha-test-helpers
+
+            tezos-client-alpha
+            tezos-micheline
+            tezos-benchmark
+            tezos-benchmark-alpha)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
+                   -open Tezos_alpha_test_helpers
+                   -open Tezos_base_test_helpers
+
+                   -open Tezos_client_alpha
+                   -open Tezos_micheline
+                   -open Tezos_benchmark_alpha
+                   -open Tezos_benchmark_type_inference_alpha)))
