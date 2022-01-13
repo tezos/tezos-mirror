@@ -28,11 +28,11 @@ open Alpha_context
 
 (* Should we use a better ordering ? *)
 
-type 'set t = {
-  consensus : 'set;
-  votes : 'set;
-  anonymous : 'set;
-  managers : 'set;
+type 'collection t = {
+  consensus : 'collection;
+  votes : 'collection;
+  anonymous : 'collection;
+  managers : 'collection;
 }
 
 module Prioritized_operation = struct
