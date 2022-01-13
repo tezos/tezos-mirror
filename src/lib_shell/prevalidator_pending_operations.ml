@@ -25,19 +25,28 @@
 (*****************************************************************************)
 
 (* Ordering is important, as it is used below in map keys comparison *)
-type priority = [`High | `Low]
+type priority = [`High | `Medium | `Low of Q.t list]
 
 module Priority_map : Map.S with type key = priority = Map.Make (struct
   type t = priority
+
+  module CompareListQ = Compare.List (Q)
+
+  let compare_low_prio p1 p2 =
+    (* A higher priority operation should appear before in the map. So we use
+       the pointwise comparison of p2 and p1 *)
+    CompareListQ.compare p2 p1
 
   let compare p1 p2 =
     (* - Explicit comparison, `High is smaller,
        - Avoid fragile patterns in case the type is extended in the future *)
     match (p1, p2) with
-    | (`High, `High) -> 0
-    | (`High, `Low) -> -1
-    | (`Low, `High) -> 1
-    | (`Low, `Low) -> 0
+    | (`High, `High) | (`Medium, `Medium) -> 0
+    | (`Low p1, `Low p2) -> compare_low_prio p1 p2
+    | (`High, (`Low _ | `Medium)) -> -1
+    | ((`Low _ | `Medium), `High) -> 1
+    | (`Low _, `Medium) -> 1
+    | (`Medium, `Low _) -> -1
 end)
 
 module Set = Operation_hash.Set

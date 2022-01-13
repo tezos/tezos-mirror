@@ -75,7 +75,7 @@
    classify an operation as [Refused], [Branch_refused],
    [Branch_delayed], [Outdated] or [Applied].
 
-     - An operation is [Refused] if the protocol rejects this 
+     - An operation is [Refused] if the protocol rejects this
    operation with an error classified as [Permanent].
 
      - An operation is [Outdated] if the operation is too old to be
@@ -223,36 +223,6 @@ let default_limits =
 
 (* Minimal delay between two mempool advertisements *)
 let advertisement_delay = 0.1
-
-type error +=
-  | Manager_operation_replaced of {
-      old_hash : Operation_hash.t;
-      new_hash : Operation_hash.t;
-    }
-
-let () =
-  register_error_kind
-    `Permanent
-    ~id:"prevalidator.manager_operation_replaced"
-    ~title:"Manager operation replaced"
-    ~description:"The manager operation has been replaced"
-    ~pp:(fun ppf (old_hash, new_hash) ->
-      Format.fprintf
-        ppf
-        "The manager operation %a has been replaced with %a"
-        Operation_hash.pp
-        old_hash
-        Operation_hash.pp
-        new_hash)
-    (Data_encoding.obj2
-       (Data_encoding.req "old_hash" Operation_hash.encoding)
-       (Data_encoding.req "new_hash" Operation_hash.encoding))
-    (function
-      | Manager_operation_replaced {old_hash; new_hash} ->
-          Some (old_hash, new_hash)
-      | _ -> None)
-    (fun (old_hash, new_hash) ->
-      Manager_operation_replaced {old_hash; new_hash})
 
 module Name = struct
   type t = Chain_id.t * Protocol_hash.t
@@ -607,8 +577,8 @@ module Make_s
     Lwt_watcher.notify operation_stream (classification, op)
 
   let pre_filter shell ~filter_config ~filter_state ~validation_state ~notifier
-      (parsed_op : protocol_operation operation) : [`High | `Low | `Drop] Lwt.t
-      =
+      (parsed_op : protocol_operation operation) :
+      [Pending_ops.priority | `Drop] Lwt.t =
     let validation_state_before =
       Option.map
         Prevalidation_t.validation_state
@@ -624,7 +594,7 @@ module Make_s
       ->
         handle_classification ~notifier shell (parsed_op, errs) ;
         `Drop
-    | `Passed_prefilter priority -> (priority :> [`High | `Low | `Drop])
+    | `Passed_prefilter priority -> (priority :> [Pending_ops.priority | `Drop])
 
   let post_filter ~filter_config ~filter_state ~validation_state_before
       ~validation_state_after op receipt =
@@ -646,21 +616,21 @@ module Make_s
     | `None -> `None
 
   (* This function retrieves an old/replaced operation and reclassifies it as
-     [`Outdated]. Note that we don't need to re-flush the mempool, as this
-     function is only called in precheck mode.
+     [replacement_classification]. Note that we don't need to re-flush the
+     mempool, as this function is only called in precheck mode.
 
      The operation is expected to be (a) parsable and (b) in the "prechecked"
      class. So, we softly handle the situations where the operation is
      unparsable or not found in any class in case this invariant is broken
      for some reason.
   *)
-  let reclassify_replaced_manager_op old_hash new_hash shell =
+  let reclassify_replaced_manager_op old_hash shell
+      (replacement_classification : [< Classification.error_classification]) =
     shell.advertisement <-
       remove_from_advertisement old_hash shell.advertisement ;
     match Classification.remove old_hash shell.classification with
     | Some (op, _class) ->
-        let err = Manager_operation_replaced {old_hash; new_hash} in
-        [(op, `Outdated [err])]
+        [(op, (replacement_classification :> Classification.classification))]
     | None ->
         (* This case should not happen. *)
         shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
@@ -678,14 +648,10 @@ module Make_s
         op.hash
         op.protocol
       >|= function
-      | `Passed_precheck filter_state ->
+      | `Passed_precheck (filter_state, replacement) ->
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
-          `Passed_precheck filter_state
-      | `Passed_precheck_with_replace (old_oph, filter_state) ->
-          (* Same as `Passed_precheck, but the operation whose hash is returned
-             should be reclassified to Outdated *)
-          `Passed_precheck_with_replace (old_oph, filter_state)
+          `Passed_precheck (filter_state, replacement)
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -730,13 +696,22 @@ module Make_s
      | `Fail errs ->
          (* Precheck rejected the operation *)
          Lwt.return_error errs
-     | `Passed_precheck filter_state ->
+     | `Passed_precheck (filter_state, replacement) ->
          (* Precheck succeeded *)
-         Lwt.return_ok ((filter_state, validation_state), [], `Prechecked)
-     | `Passed_precheck_with_replace (old_oph, filter_state) ->
-         (* Precheck succeeded, but an old operation is replaced *)
-         let to_handle = reclassify_replaced_manager_op old_oph op.hash shell in
-         Lwt.return_ok ((filter_state, validation_state), to_handle, `Prechecked)
+         let to_handle =
+           match replacement with
+           | `No_replace -> [(op, `Prechecked)]
+           | `Replace (old_oph, replacement_classification) ->
+               (* Precheck succeeded, but an old operation is replaced *)
+               let to_replace =
+                 reclassify_replaced_manager_op
+                   old_oph
+                   shell
+                   replacement_classification
+               in
+               (op, `Prechecked) :: to_replace
+         in
+         Lwt.return_ok (filter_state, validation_state, to_handle)
      | `Undecided -> (
          (* Precheck was not able to classify *)
          Prevalidation_t.apply_operation validation_state op
@@ -756,7 +731,7 @@ module Make_s
              | `Passed_postfilter new_filter_state ->
                  (* Post_filter ok, accept operation *)
                  Lwt.return_ok
-                   ((new_filter_state, new_validation_state), [], `Applied)
+                   (new_filter_state, new_validation_state, [(op, `Applied)])
              | `Refused _ as op_class ->
                  (* Post_filter refused the operation *)
                  Lwt.return_error op_class)
@@ -766,11 +741,10 @@ module Make_s
          | Refused e -> Lwt.return_error (`Refused e)
          | Outdated e -> Lwt.return_error (`Outdated e)))
     >>= function
-    | Error op_class ->
-        Lwt.return (filter_state, validation_state, mempool, [(op, op_class)])
-    | Ok ((f_state, v_state), to_handle, op_class) ->
+    | Error err_class ->
+        Lwt.return (filter_state, validation_state, mempool, [(op, err_class)])
+    | Ok (f_state, v_state, to_handle) ->
         let mempool = Mempool.cons_valid op.hash mempool in
-        let to_handle = (op, op_class) :: to_handle in
         Lwt.return (f_state, v_state, mempool, to_handle)
 
   (* Classify pending operations into either: [Refused |
@@ -958,7 +932,7 @@ module Make_s
               parsed_op
             >>= function
             | `Drop -> return_unit
-            | (`High | `Low) as prio ->
+            | (`High | `Medium | `Low _) as prio ->
                 if
                   not
                     (Block_hash.Set.mem
@@ -976,7 +950,7 @@ module Make_s
 
     let on_inject (pv : types_state) ~force op =
       let oph = Operation.hash op in
-      (* Currently, an injection is always done with priority = `High, because:
+      (* Currently, an injection is always done with the highest priority, because:
          - We want to process and propagate the injected operations fast,
          - We don't want to call prefilter to get the priority.
          But, this may change in the future
@@ -1136,7 +1110,7 @@ module Make_s
             op
           >|= function
           | `Drop -> (pending, nb_pending)
-          | (`High | `Low) as prio ->
+          | (`High | `Medium | `Low _) as prio ->
               (* Here, an operation injected in this node with `High priority will
                  now get its approriate priority. *)
               (Pending_ops.add op prio pending, nb_pending + 1))
