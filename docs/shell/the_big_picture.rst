@@ -211,6 +211,8 @@ protocol in an alternative environment possible.
     node. It also contains a module that registers the protocol in the
     node's protocol table.
 
+.. _embedded_protocols:
+
 The Embedded Economic Protocols
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
