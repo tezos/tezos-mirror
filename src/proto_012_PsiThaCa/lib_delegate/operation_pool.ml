@@ -26,12 +26,11 @@
 open Protocol
 open Alpha_context
 
-(** Generic base type for pools *)
-type 'set t = {
-  consensus : 'set;
-  votes : 'set;
-  anonymous : 'set;
-  managers : 'set;
+type 'collection t = {
+  consensus : 'collection;
+  votes : 'collection;
+  anonymous : 'collection;
+  managers : 'collection;
 }
 
 (* Should we use a better ordering ? *)

@@ -37,11 +37,11 @@ val managers_index : int
 module Operation_set : Set.S with type elt = packed_operation
 
 (** Generic base type for pools *)
-type 'set t = {
-  consensus : 'set;
-  votes : 'set;
-  anonymous : 'set;
-  managers : 'set;
+type 'collection t = {
+  consensus : 'collection;
+  votes : 'collection;
+  anonymous : 'collection;
+  managers : 'collection;
 }
 
 (** A pool of operations for a single origin, or undifferenciated origin,
