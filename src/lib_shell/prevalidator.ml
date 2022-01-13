@@ -290,10 +290,6 @@ module Logger =
       let worker_name = "node_prevalidator"
     end)
 
-(* FIXME: https://gitlab.com/tezos/tezos/-/issues/1794
-   We should use chain_tools instead of chain_db *)
-type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
-
 module Classification = Prevalidator_classification
 
 (** This module encapsulates pending operations to maintain them in two
@@ -301,11 +297,85 @@ module Classification = Prevalidator_classification
     handling batches in [classify_pending_operations]. *)
 module Pending_ops = Prevalidator_pending_operations
 
+(** Module encapsulating some types that are used both in production
+    and in tests. Having them in a module makes it possible to
+    [include] this module in {!Internal_for_tests} below and avoid
+    code duplication.
+
+    The raison d'etre of these records of functions is to be able to use
+    alternative implementations of all functions in tests.
+
+    The purpose of the {!Tools.tools} record is to abstract away from {!Store.chain_store}.
+    Under the hood [Store.chain_store] requires an Irmin store on disk,
+    which makes it impractical for fast testing: every test would need
+    to create a temporary folder on disk which doesn't scale well.
+
+    The purpose of the {!Tools.worker_tools} record is to abstract away
+    from the {!Worker} implementation. This implementation is overkill
+    for testing: we don't need asynchronicity and concurrency in our
+    pretty basic existing tests. Having this abstraction allows to get
+    away with a much simpler state machine model of execution and
+    to have simpler test setup. *)
+module Tools = struct
+  (** Functions provided by {!Distributed_db} and {!Store.chain_store}
+      that are used in various places of the mempool. Gathered here so that we can test
+      the mempool without requiring a full-fledged [Distributed_db]/[Store.Chain_store]. *)
+  type 'prevalidation_t tools = {
+    advertise_current_head : mempool:Mempool.t -> Store.Block.t -> unit;
+        (** [advertise_current_head mempool head] sends a
+            [Current_head (chain_id, head_header, mempool)] message to all known
+            active peers for the chain being considered. *)
+    chain_tools : Store.Block.t Classification.chain_tools;
+        (** Lower-level tools provided by {!Prevalidator_classification} *)
+    create :
+      predecessor:Store.Block.t ->
+      live_operations:Operation_hash.Set.t ->
+      timestamp:Time.Protocol.t ->
+      unit ->
+      'prevalidation_t tzresult Lwt.t;
+        (** Creates a new prevalidation context w.r.t. the protocol associated to the
+            predecessor block. *)
+    fetch :
+      ?peer:P2p_peer.Id.t ->
+      ?timeout:Time.System.Span.t ->
+      Operation_hash.t ->
+      Operation.t tzresult Lwt.t;
+        (** [fetch ?peer ?timeout oph] returns the value when it is known.
+            It can fail with [Requester.Timeout] if [timeout] is provided and the value
+            isn't known before the timeout expires. It can fail with [Requester.Cancel] if
+            the request is canceled. *)
+    read_block : Block_hash.t -> Store.Block.t tzresult Lwt.t;
+        (** [read_block bh] tries to read the block [bh] from the chain store. *)
+    send_get_current_head : ?peer:P2p_peer_id.t -> unit -> unit;
+        (** [send_get_current_head ?peer ()] sends a [Get_Current_head]
+            to a given peer, or to all known active peers for the chain considered.
+            Expected answer is a [Get_current_head] message *)
+    set_mempool : head:Block_hash.t -> Mempool.t -> unit tzresult Lwt.t;
+        (** [set_mempool ~head mempool] sets the [mempool] of
+            the [chain_store] of the chain considered. Does nothing if [head] differs
+            from current_head which might happen when a new head concurrently arrives just
+            before this operation is being called. *)
+  }
+
+  (** Abstraction over services implemented in production by {!Worker}
+      but implemented differently in tests.
+
+      Also see the enclosing module documentation as to why we have this record. *)
+  type worker_tools = {
+    push_request : unit Prevalidator_worker_state.Request.t -> unit Lwt.t;
+        (** Adds a message to the queue. *)
+    push_request_now : unit Prevalidator_worker_state.Request.t -> unit;
+        (** Adds a message to the queue immediately. *)
+  }
+end
+
+type 'a parameters = {limits : limits; tools : 'a Tools.tools}
+
 (** The type needed for the implementation of [Make] below, but
  *  which is independent from the protocol. *)
-type 'protocol_data types_state_shell = {
+type ('protocol_data, 'a) types_state_shell = {
   classification : 'protocol_data Classification.t;
-  parameters : parameters;
+  parameters : 'a parameters;
   mutable predecessor : Store.Block.t;
   mutable timestamp : Time.System.t;
   mutable live_blocks : Block_hash.Set.t;
@@ -315,6 +385,7 @@ type 'protocol_data types_state_shell = {
   mutable mempool : Mempool.t;
   mutable advertisement : [`Pending of Mempool.t | `None];
   mutable banned_operations : Operation_hash.Set.t;
+  worker : Tools.worker_tools;
 }
 
 (** The concrete production instance of {!block_tools} *)
@@ -325,8 +396,7 @@ let block_tools : Store.Block.t Classification.block_tools =
     all_operation_hashes = Store.Block.all_operation_hashes;
   }
 
-(** How to create an instance of {!chain_tools} from a {!Distributed_db.chain_db}.
-    Prefer short-lived values, to avoid hiding mutable state for too long. *)
+(** How to create an instance of {!chain_tools} from a {!Distributed_db.chain_db}. *)
 let mk_chain_tools (chain_db : Distributed_db.chain_db) :
     Store.Block.t Classification.chain_tools =
   let new_blocks ~from_block ~to_block =
@@ -347,7 +417,8 @@ let mk_chain_tools (chain_db : Distributed_db.chain_db) :
     read_predecessor_opt;
   }
 
-module type T = sig
+(** Module type used both in production and in tests. *)
+module type S = sig
   (** Type instantiated by {!Filter.Mempool.state}. *)
   type filter_state
 
@@ -361,10 +432,8 @@ module type T = sig
   (** Type instantiated by {!Prevalidation.t} *)
   type prevalidation_t
 
-  val name : Name.t
-
   type types_state = {
-    shell : protocol_operation types_state_shell;
+    shell : (protocol_operation, prevalidation_t) types_state_shell;
     mutable filter_state : filter_state;
         (** Internal state of the filter in the plugin *)
     mutable validation_state : prevalidation_t tzresult;
@@ -376,6 +445,61 @@ module type T = sig
     mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
+
+  (** This function fetches an operation if it is not already handled
+      as defined by [already_handled] below. The implementation makes
+      sure to fetch an operation at most once, modulo operations
+      lost because of bounded buffers becoming full.
+
+      This function is an intruder to this module type. It just happens
+      that it is needed both by internals of the implementation of {!S}
+      and by the internals of the implementation of {!T}; so it needs
+      to be exposed here. *)
+  val may_fetch_operation :
+    (protocol_operation, prevalidation_t) types_state_shell ->
+    P2p_peer_id.t option ->
+    Operation_hash.t ->
+    unit Lwt.t
+
+  (** The function called after every call to a function of {!API}. *)
+  val handle_unprocessed : types_state -> unit Lwt.t
+
+  (** The inner API of the mempool i.e. functions called by the worker
+      when an individual request arrives. These functions are the
+      most high-level ones that we test. All these [on_*] functions
+      correspond to a single event. Possible
+      sequences of calls to this API are always of the form:
+
+      on_*; handle_unprocessed; on_*; handle_unprocessed; ... *)
+  module Requests : sig
+    val on_advertise : _ types_state_shell -> unit
+
+    val on_arrived :
+      types_state -> Operation_hash.t -> Operation.t -> unit tzresult Lwt.t
+
+    val on_ban : types_state -> Operation_hash.t -> unit tzresult Lwt.t
+
+    val on_flush :
+      handle_branch_refused:bool ->
+      types_state ->
+      Store.Block.t ->
+      Block_hash.Set.t ->
+      Operation_hash.Set.t ->
+      unit tzresult Lwt.t
+
+    val on_inject :
+      types_state -> force:bool -> Operation.t -> unit tzresult Lwt.t
+
+    val on_notify :
+      _ types_state_shell -> P2p_peer_id.t -> Mempool.t -> unit Lwt.t
+  end
+end
+
+(** Module type used exclusively in production. *)
+module type T = sig
+  include S
+
+  val name : Name.t
 
   module Types : Worker_intf.TYPES with type state = types_state
 
@@ -393,27 +517,22 @@ module type T = sig
   val worker : worker Lazy.t
 end
 
-module type ARG = sig
-  val limits : limits
-
-  val chain_db : Distributed_db.chain_db
-
-  val chain_id : Chain_id.t
-end
-
 type t = (module T)
 
-module Make
+(** A functor for obtaining the testable part of this file (see
+    the instantiation of this functor in {!Internal_for_tests} at the
+    end of this file). Contrary to the production-only functor {!Make} below,
+    this functor doesn't assume a specific chain store implementation,
+    which is the crux for having it easily unit-testable. *)
+module Make_s
     (Filter : Prevalidator_filters.FILTER)
-    (Arg : ARG)
     (Prevalidation_t : Prevalidation.T
                          with type validation_state =
                                Filter.Proto.validation_state
                           and type protocol_operation = Filter.Proto.operation
                           and type operation_receipt =
-                               Filter.Proto.operation_receipt
-                          and type chain_store = Store.chain_store) :
-  T
+                               Filter.Proto.operation_receipt) :
+  S
     with type filter_state = Filter.Mempool.state
      and type filter_config = Filter.Mempool.config
      and type protocol_operation = Filter.Proto.operation
@@ -426,12 +545,10 @@ module Make
 
   type prevalidation_t = Prevalidation_t.t
 
-  let name = (Arg.chain_id, Filter.Proto.hash)
-
   type 'operation_data operation = 'operation_data Prevalidation.operation
 
   type types_state = {
-    shell : protocol_operation types_state_shell;
+    shell : (protocol_operation, prevalidation_t) types_state_shell;
     mutable filter_state : filter_state;
     mutable validation_state : prevalidation_t tzresult;
     mutable operation_stream :
@@ -442,27 +559,6 @@ module Make
     mutable filter_config : filter_config;
     lock : Lwt_mutex.t;
   }
-
-  module Types = struct
-    type state = types_state
-
-    type parameters = limits * Distributed_db.chain_db
-  end
-
-  module Worker :
-    Worker.T
-      with type Name.t = Name.t
-       and type Event.t = Dummy_event.t
-       and type 'a Request.t = 'a Request.t
-       and type Request.view = Request.view
-       and type Types.state = Types.state
-       and type Types.parameters = Types.parameters =
-    Worker.Make (Name) (Dummy_event) (Prevalidator_worker_state.Request) (Types)
-      (Logger)
-
-  open Types
-
-  type worker = Worker.infinite Worker.queue Worker.t
 
   (* This function is in [Lwt] only for logging. *)
   let already_handled ~origin shell oph =
@@ -476,8 +572,7 @@ module Make
         || Classification.is_in_mempool oph shell.classification <> None
         || Classification.is_known_unparsable oph shell.classification)
 
-  let advertise (w : worker) (shell : 'operation_data types_state_shell) mempool
-      =
+  let advertise (shell : ('operation_data, _) types_state_shell) mempool =
     match shell.advertisement with
     | `Pending {Mempool.known_valid; pending} ->
         shell.advertisement <-
@@ -491,7 +586,7 @@ module Make
         Lwt.dont_wait
           (fun () ->
             Lwt_unix.sleep advertisement_delay >>= fun () ->
-            Worker.Queue.push_request_now w Advertise ;
+            shell.worker.push_request_now Advertise ;
             Lwt.return_unit)
           (fun exc ->
             Format.eprintf "Uncaught exception: %s\n%!" (Printexc.to_string exc))
@@ -542,9 +637,7 @@ module Make
 
   let set_mempool shell mempool =
     shell.mempool <- mempool ;
-    let chain_store = Distributed_db.chain_store shell.parameters.chain_db in
-    Store.Chain.set_mempool
-      chain_store
+    shell.parameters.tools.set_mempool
       ~head:(Store.Block.hash shell.predecessor)
       shell.mempool
 
@@ -570,9 +663,7 @@ module Make
         [(op, `Outdated [err])]
     | None ->
         (* This case should not happen. *)
-        Distributed_db.Operation.clear_or_cancel
-          shell.parameters.chain_db
-          old_hash ;
+        shell.parameters.tools.chain_tools.clear_or_cancel old_hash ;
         []
 
   let precheck ~disable_precheck ~filter_config ~filter_state ~validation_state
@@ -701,7 +792,7 @@ module Make
      operations are advertised to the remote peers. However, if a peer
      requests our mempool, we advertise all our classified operations and
      all our pending operations. *)
-  let classify_pending_operations ~notifier w shell filter_config filter_state
+  let classify_pending_operations ~notifier shell filter_config filter_state
       state =
     Pending_ops.fold_es
       (fun _prio
@@ -734,12 +825,12 @@ module Make
     >>= function
     | Error (filter_state, state, advertised_mempool) ->
         (* Early return after iteration limit was reached *)
-        Worker.Queue.push_request w Request.Leftover >>= fun () ->
+        shell.worker.push_request Request.Leftover >>= fun () ->
         Lwt.return (filter_state, state, advertised_mempool)
     | Ok (filter_state, state, advertised_mempool, _) ->
         Lwt.return (filter_state, state, advertised_mempool)
 
-  let update_advertised_mempool_fields w pv_shell delta_mempool =
+  let update_advertised_mempool_fields pv_shell delta_mempool =
     if Mempool.is_empty delta_mempool then Lwt.return_unit
     else
       (* We only advertise newly classified operations. *)
@@ -747,7 +838,7 @@ module Make
         Mempool.
           {delta_mempool with known_valid = List.rev delta_mempool.known_valid}
       in
-      advertise w pv_shell mempool_to_advertise ;
+      advertise pv_shell mempool_to_advertise ;
       let our_mempool =
         {
           (* Using List.rev_map is ok since the size of pv.shell.classification.applied
@@ -765,7 +856,7 @@ module Make
       in
       set_mempool pv_shell our_mempool >>= fun _res -> Lwt.pause ()
 
-  let handle_unprocessed w pv =
+  let handle_unprocessed pv =
     let notifier = mk_notifier pv.operation_stream in
     match pv.validation_state with
     | Error err ->
@@ -783,7 +874,6 @@ module Make
           Event.(emit processing_operations) () >>= fun () ->
           classify_pending_operations
             ~notifier
-            w
             pv.shell
             pv.filter_config
             pv.filter_state
@@ -791,22 +881,21 @@ module Make
           >>= fun (filter_state, validation_state, delta_mempool) ->
           pv.filter_state <- filter_state ;
           pv.validation_state <- Ok validation_state ;
-          update_advertised_mempool_fields w pv.shell delta_mempool
+          update_advertised_mempool_fields pv.shell delta_mempool
 
   (* This function fetches one operation through the
      [distributed_db]. On errors, we emit an event and proceed as
      usual. *)
-  let fetch_operation w (shell : 'operation_data types_state_shell) ?peer oph =
+  let fetch_operation (shell : ('operation_data, _) types_state_shell) ?peer oph
+      =
     Event.(emit fetching_operation) oph >|= fun () ->
-    Distributed_db.Operation.fetch
+    shell.parameters.tools.fetch
       ~timeout:shell.parameters.limits.operation_timeout
-      shell.parameters.chain_db
       ?peer
       oph
-      ()
     >>= function
     | Ok op ->
-        Worker.Queue.push_request_now w (Arrived (oph, op)) ;
+        shell.worker.push_request_now (Arrived (oph, op)) ;
         Lwt.return_unit
     | Error (Distributed_db.Operation.Canceled _ :: _) ->
         Event.(emit operation_included) oph
@@ -825,8 +914,8 @@ module Make
      promise [p] is terminated, we remove the operation from the
      fetching operations. This is to ensure that if an error
      happened, we can still fetch this operation in the future. *)
-  let may_fetch_operation w (shell : 'operation_data types_state_shell) peer oph
-      =
+  let may_fetch_operation (shell : ('operation_data, _) types_state_shell) peer
+      oph =
     let origin =
       match peer with
       | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
@@ -838,7 +927,7 @@ module Make
         (Lwt.finalize
            (fun () ->
              shell.fetching <- Operation_hash.Set.add oph shell.fetching ;
-             fetch_operation w shell ?peer oph)
+             fetch_operation shell ?peer oph)
            (fun () ->
              shell.fetching <- Operation_hash.Set.remove oph shell.fetching ;
              Lwt.return_unit)) ;
@@ -848,7 +937,7 @@ module Make
       of the mempool. These functions are called by the {!Worker} when
       an event arrives. *)
   module Requests = struct
-    let on_arrived (pv : state) oph op =
+    let on_arrived (pv : types_state) oph op =
       already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
       if already_handled then return_unit
       else
@@ -876,9 +965,7 @@ module Make
                        op.Operation.shell.branch
                        pv.shell.live_blocks)
                 then (
-                  Distributed_db.Operation.clear_or_cancel
-                    pv.shell.parameters.chain_db
-                    oph ;
+                  pv.shell.parameters.tools.chain_tools.clear_or_cancel oph ;
                   return_unit)
                 else (
                   (* TODO: https://gitlab.com/tezos/tezos/-/issues/1723
@@ -887,7 +974,7 @@ module Make
                     Pending_ops.add parsed_op prio pv.shell.pending ;
                   return_unit))
 
-    let on_inject w (pv : state) ~force op =
+    let on_inject (pv : types_state) ~force op =
       let oph = Operation.hash op in
       (* Currently, an injection is always done with priority = `High, because:
          - We want to process and propagate the injected operations fast,
@@ -911,11 +998,8 @@ module Make
               err
         | Ok parsed_op -> (
             if force then (
-              Distributed_db.inject_operation
-                pv.shell.parameters.chain_db
-                oph
-                op
-              >>= fun (_ : bool) ->
+              pv.shell.parameters.tools.chain_tools.inject_operation oph op
+              >>= fun () ->
               pv.shell.pending <-
                 Pending_ops.add parsed_op prio pv.shell.pending ;
               return_unit)
@@ -960,18 +1044,15 @@ module Make
                      In case of `Passed_precheck_with_replace, we may want to only do
                      the injection/replacement if a flag `replace` is set to true
                      in the injection query. *)
-                  Distributed_db.inject_operation
-                    pv.shell.parameters.chain_db
-                    oph
-                    op
-                  >>= fun (_ : bool) ->
+                  pv.shell.parameters.tools.chain_tools.inject_operation oph op
+                  >>= fun () ->
                   (* Call handle & update_advertised_mempool only if op is accepted *)
                   List.iter (handle_classification ~notifier pv.shell) to_handle ;
                   pv.filter_state <- filter_state ;
                   pv.validation_state <- Ok validation_state ;
                   (* Note that in this case, we may advertise an operation and bypass
                      the prioritirization strategy. *)
-                  update_advertised_mempool_fields w pv.shell delta_mempool
+                  update_advertised_mempool_fields pv.shell delta_mempool
                   >>= return
               | Some
                   ( _h,
@@ -994,8 +1075,9 @@ module Make
                     Operation_hash.pp
                     oph)
 
-    let on_notify w (shell : 'operation_data types_state_shell) peer mempool =
-      let may_fetch_operation = may_fetch_operation w shell (Some peer) in
+    let on_notify (shell : ('operation_data, _) types_state_shell) peer mempool
+        =
+      let may_fetch_operation = may_fetch_operation shell (Some peer) in
       List.iter_s may_fetch_operation mempool.Mempool.known_valid >>= fun () ->
       Seq.iter_s
         may_fetch_operation
@@ -1012,11 +1094,7 @@ module Make
       let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
-      let chain_store =
-        Distributed_db.chain_store pv.shell.parameters.chain_db
-      in
-      Prevalidation_t.create
-        chain_store
+      pv.shell.parameters.tools.create
         ~predecessor:new_predecessor
         ~live_operations:new_live_operations
         ~timestamp
@@ -1042,7 +1120,7 @@ module Make
         ~classes:pv.shell.classification
         ~pending:(Pending_ops.operations pv.shell.pending)
         ~block_store:block_tools
-        ~chain:(mk_chain_tools pv.shell.parameters.chain_db)
+        ~chain:pv.shell.parameters.tools.chain_tools
         ~handle_branch_refused
       >>= fun new_pending_operations ->
       (* Could be implemented as Operation_hash.Map.filter_s which
@@ -1069,7 +1147,7 @@ module Make
       pv.shell.pending <- new_pending_operations ;
       set_mempool pv.shell Mempool.empty
 
-    let on_advertise (shell : 'protocol_data types_state_shell) =
+    let on_advertise (shell : ('protocol_data, _) types_state_shell) =
       match shell.advertisement with
       | `None ->
           () (* May happen if nothing to advertise since last advertisement. *)
@@ -1078,8 +1156,7 @@ module Make
           (* In this case, mempool is not empty, but let's avoid advertising
              empty mempools in case this invariant is broken. *)
           if not (Mempool.is_empty mempool) then
-            Distributed_db.Advertise.current_head
-              shell.parameters.chain_db
+            shell.parameters.tools.advertise_current_head
               ~mempool
               shell.predecessor
 
@@ -1090,7 +1167,7 @@ module Make
        prechecked operation so that a branch delayed operation becomes
        [applied] again. *)
     let remove ~flush_if_prechecked pv oph =
-      Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db oph ;
+      pv.shell.parameters.tools.chain_tools.clear_or_cancel oph ;
       pv.shell.advertisement <-
         remove_from_advertisement oph pv.shell.advertisement ;
       pv.shell.banned_operations <-
@@ -1131,6 +1208,60 @@ module Make
         Operation_hash.Set.add oph_to_ban pv.shell.banned_operations ;
       remove ~flush_if_prechecked:true pv oph_to_ban
   end
+end
+
+module type ARG = sig
+  val limits : limits
+
+  val chain_db : Distributed_db.chain_db
+
+  val chain_id : Chain_id.t
+end
+
+(** The functor that is not tested, in other words used only in production.
+    This functor's code is not tested (contrary to functor {!Make_s} above),
+    because it hardcodes a dependency to [Store.chain_store] in its instantiation
+    of type [chain_store]. This is what makes the code of this functor
+    not testable for the moment, because [Store.chain_store] has poor
+    testing capabilities.
+
+    Note that, because this functor [include]s {!Make_s}, it is a
+    strict extension of [Make_s]. *)
+module Make
+    (Filter : Prevalidator_filters.FILTER)
+    (Arg : ARG)
+    (Prevalidation_t : Prevalidation.T
+                         with type validation_state =
+                               Filter.Proto.validation_state
+                          and type protocol_operation = Filter.Proto.operation
+                          and type operation_receipt =
+                               Filter.Proto.operation_receipt
+                          and type chain_store = Store.chain_store) :
+  T with type prevalidation_t = Prevalidation_t.t = struct
+  include Make_s (Filter) (Prevalidation_t)
+
+  let name = (Arg.chain_id, Filter.Proto.hash)
+
+  module Types = struct
+    type state = types_state
+
+    type parameters = limits * Distributed_db.chain_db
+  end
+
+  module Worker :
+    Worker.T
+      with type Name.t = Name.t
+       and type Event.t = Dummy_event.t
+       and type 'a Request.t = 'a Request.t
+       and type Request.view = Request.view
+       and type Types.state = Types.state
+       and type Types.parameters = Types.parameters =
+    Worker.Make (Name) (Dummy_event) (Prevalidator_worker_state.Request) (Types)
+      (Logger)
+
+  open Types
+
+  type worker = Worker.infinite Worker.queue Worker.t
 
   (** Mimics [Data_encoding.Json.construct] but accepts argument
       [?include_default_fields] to pass on to [Json_encoding.construct]. *)
@@ -1287,10 +1418,7 @@ module Make
            !dir
            (Proto_services.S.Mempool.request_operations RPC_path.open_root)
            (fun pv t () ->
-             Distributed_db.Request.current_head
-               pv.shell.parameters.chain_db
-               ?peer:t#peer_id
-               () ;
+             pv.shell.parameters.tools.send_get_current_head ?peer:t#peer_id () ;
              return_unit) ;
        dir :=
          RPC_directory.gen_register
@@ -1404,10 +1532,7 @@ module Make
           Requests.on_advertise pv.shell ;
           (* TODO: https://gitlab.com/tezos/tezos/-/issues/1727
              Rebase the advertisement instead. *)
-          let chain_store =
-            Distributed_db.chain_store pv.shell.parameters.chain_db
-          in
-          Store.Block.read_block chain_store hash
+          pv.shell.parameters.tools.read_block hash
           >>=? fun block : r tzresult Lwt.t ->
           let handle_branch_refused =
             Chain_validator_worker_state.Event.(
@@ -1423,25 +1548,69 @@ module Make
             live_blocks
             live_operations
       | Request.Notify (peer, mempool) ->
-          Requests.on_notify w pv.shell peer mempool >>= fun () -> return_unit
+          Requests.on_notify pv.shell peer mempool >>= fun () -> return_unit
       | Request.Leftover ->
           (* unprocessed ops are handled just below *)
           return_unit
-      | Request.Inject {op; force} -> Requests.on_inject w pv ~force op
+      | Request.Inject {op; force} -> Requests.on_inject pv ~force op
       | Request.Arrived (oph, op) -> Requests.on_arrived pv oph op
       | Request.Advertise ->
           Requests.on_advertise pv.shell ;
           return_unit
       | Request.Ban oph -> Requests.on_ban pv oph)
       >>=? fun r ->
-      handle_unprocessed w pv >>= fun () -> return r
+      handle_unprocessed pv >>= fun () -> return r
 
     let on_close w =
       let pv = Worker.state w in
       Operation_hash.Set.iter
-        (Distributed_db.Operation.clear_or_cancel pv.shell.parameters.chain_db)
+        pv.shell.parameters.tools.chain_tools.clear_or_cancel
         pv.shell.fetching ;
       Lwt.return_unit
+
+    let mk_tools (chain_db : Distributed_db.chain_db) :
+        prevalidation_t Tools.tools =
+      let advertise_current_head ~mempool bh =
+        Distributed_db.Advertise.current_head chain_db ~mempool bh
+      in
+      let chain_tools = mk_chain_tools chain_db in
+      let create ~predecessor ~live_operations ~timestamp =
+        let chain_store = Distributed_db.chain_store chain_db in
+        Prevalidation_t.create
+          chain_store
+          ?protocol_data:None
+          ~predecessor
+          ~live_operations
+          ~timestamp
+      in
+      let fetch ?peer ?timeout oph =
+        Distributed_db.Operation.fetch chain_db ?timeout ?peer oph ()
+      in
+      let read_block bh =
+        let chain_store = Distributed_db.chain_store chain_db in
+        Store.Block.read_block chain_store bh
+      in
+      let send_get_current_head ?peer () =
+        Distributed_db.Request.current_head chain_db ?peer ()
+      in
+      let set_mempool ~head mempool =
+        let chain_store = Distributed_db.chain_store chain_db in
+        Store.Chain.set_mempool chain_store ~head mempool
+      in
+      {
+        advertise_current_head;
+        chain_tools;
+        create;
+        fetch;
+        read_block;
+        send_get_current_head;
+        set_mempool;
+      }
+
+    let mk_worker_tools w : Tools.worker_tools =
+      let push_request r = Worker.Queue.push_request w r in
+      let push_request_now r = Worker.Queue.push_request_now w r in
+      {push_request; push_request_now}
 
     let on_launch w _ (limits, chain_db) =
       let chain_store = Distributed_db.chain_store chain_db in
@@ -1474,7 +1643,7 @@ module Make
           }
       in
       let classification = Classification.create classification_parameters in
-      let parameters = {limits; chain_db} in
+      let parameters = {limits; tools = mk_tools chain_db} in
       let shell =
         {
           classification;
@@ -1488,6 +1657,7 @@ module Make
           pending = Pending_ops.empty;
           advertisement = `None;
           banned_operations = Operation_hash.Set.empty;
+          worker = mk_worker_tools w;
         }
       in
 
@@ -1515,7 +1685,7 @@ module Make
         }
       in
       Seq.iter_s
-        (may_fetch_operation w pv.shell None)
+        (may_fetch_operation pv.shell None)
         (Operation_hash.Set.to_seq fetching)
       >>= fun () -> return pv
 
@@ -1696,3 +1866,86 @@ let rpc_directory : t option RPC_directory.t =
               let pv_rpc_dir = Lazy.force pv.rpc_directory in
               Lwt.return (RPC_directory.map (fun _ -> Lwt.return pv) pv_rpc_dir)
           ))
+
+module Internal_for_tests = struct
+  include Tools
+
+  type nonrec ('a, 'b) types_state_shell = ('a, 'b) types_state_shell
+
+  let mk_types_state_shell ~(predecessor : Store.Block.t) ~(tools : 'a tools)
+      ~(worker : worker_tools) : (_, 'a) types_state_shell =
+    let parameters = {limits = default_limits; tools} in
+    let c_parameters : Classification.parameters =
+      {map_size_limit = 32; on_discarded_operation = Fun.const ()}
+    in
+    let advertisement = `None in
+    let banned_operations = Operation_hash.Set.empty in
+    let classification = Classification.create c_parameters in
+    let fetching = Operation_hash.Set.empty in
+    let mempool = Mempool.empty in
+    let live_blocks = Block_hash.Set.empty in
+    let live_operations = Operation_hash.Set.empty in
+    let pending = Pending_ops.empty in
+    let timestamp = Tezos_stdlib_unix.Systime_os.now () in
+    {
+      advertisement;
+      banned_operations;
+      classification;
+      fetching;
+      live_blocks;
+      live_operations;
+      mempool;
+      parameters;
+      pending;
+      predecessor;
+      timestamp;
+      worker;
+    }
+
+  module Make
+      (Filter : Prevalidator_filters.FILTER)
+      (Prevalidation_t : Prevalidation.T
+                           with type validation_state =
+                                 Filter.Proto.validation_state
+                            and type protocol_operation = Filter.Proto.operation
+                            and type operation_receipt =
+                                 Filter.Proto.operation_receipt) =
+  struct
+    module Internal = Make_s (Filter) (Prevalidation_t)
+
+    type nonrec types_state = Internal.types_state
+
+    let mk_types_state
+        ~(shell :
+           ( Prevalidation_t.protocol_operation,
+             Prevalidation_t.t )
+           types_state_shell) ~(validation_state : Prevalidation_t.t) :
+        types_state Lwt.t =
+      let filter_config = Filter.Mempool.default_config in
+      let predecessor = Store.Block.header shell.predecessor in
+      Filter.Mempool.init filter_config ~predecessor () >>= function
+      | Error err ->
+          let err_string =
+            Format.asprintf "%a" Error_monad.pp_print_trace err
+          in
+          Lwt_io.eprintf "%s" err_string >>= fun () -> assert false
+      | Ok filter_state ->
+          Lwt.return
+            Internal.
+              {
+                shell;
+                filter_config;
+                filter_state;
+                lock = Lwt_mutex.create ();
+                operation_stream = Lwt_watcher.create_input ();
+                rpc_directory = Lazy.from_fun (fun () -> assert false);
+                validation_state = Ok validation_state;
+              }
+
+    let to_shell (t : types_state) = t.shell
+
+    let handle_unprocessed = Internal.handle_unprocessed
+
+    module Requests = Internal.Requests
+  end
+end
