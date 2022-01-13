@@ -14,7 +14,7 @@ depends: [
   "irmin-pack" { >= "2.10.0" & < "2.11.0" }
   "bigstringaf" { >= "0.2.0" }
   "tezos-shell-services"
-  "fmt"
+  "fmt" { >= "0.8.7" }
   "logs"
   "digestif" { >= "0.7.3" }
   "tezos-stdlib-unix"

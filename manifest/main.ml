@@ -69,7 +69,7 @@ let conf_rust = opam_only "conf-rust" []
 
 let coq_of_ocaml = opam_only "coq-of-ocaml" [Exactly "2.5.0"]
 
-let ctypes = external_lib "ctypes" []
+let ctypes = external_lib "ctypes" [At_least "0.18.0"]
 
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
@@ -82,9 +82,9 @@ let digestif_c = external_sublib digestif "digestif.c"
 
 let dynlink = external_lib "dynlink" [] ~opam:""
 
-let ezjsonm = external_lib "ezjsonm" [At_least "0.5.0"]
+let ezjsonm = external_lib "ezjsonm" [At_least "1.1.0"]
 
-let fmt = external_lib "fmt" []
+let fmt = external_lib "fmt" [At_least "0.8.7"]
 
 let fmt_cli = external_sublib fmt "fmt.cli"
 
@@ -96,7 +96,7 @@ let hacl_star_raw = external_lib "hacl-star-raw" []
 
 let hacl_x25519 = external_lib "hacl_x25519" []
 
-let hex = external_lib "hex" []
+let hex = external_lib "hex" [At_least "1.3.0"]
 
 let index = external_lib "index" [At_least "1.3.0"]
 
@@ -173,7 +173,7 @@ let prometheus_app_unix = external_sublib prometheus_app "prometheus-app.unix"
 
 let pyml = external_lib "pyml" []
 
-let qcheck_alcotest = external_lib "qcheck-alcotest" []
+let qcheck_alcotest = external_lib "qcheck-alcotest" [At_least "0.15"]
 
 let qcheck_core = external_lib "qcheck-core" []
 
@@ -612,6 +612,7 @@ let tezos_test_helpers =
     ~synopsis:"Tezos-agnostic test helpers"
     ~deps:[uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix]
     ~js_of_ocaml:[]
+    ~ocaml:[At_least "4.08"]
     ~linkall:true
     ~dune:
       Dune.
@@ -627,6 +628,7 @@ let tezos_stdlib =
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt]
+    ~ocaml:[At_least "4.08"]
     ~js_of_ocaml:[]
     ~inline_tests:true
     ~preprocess:[PPS ppx_inline_test]
@@ -746,7 +748,7 @@ let tezos_lwt_result_stdlib =
     "tezos-lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
     ~synopsis:"Tezos: error-aware stdlib replacement"
-    ~ocaml:[At_least "4.07"]
+    ~ocaml:[At_least "4.12"]
     ~js_of_ocaml:[]
     ~deps:
       [
@@ -814,6 +816,7 @@ let tezos_hacl_glue =
     "tezos-hacl-glue"
     ~path:"src/lib_hacl_glue/virtual"
     ~synopsis:"Tezos: thin layer of glue around hacl-star (virtual package)"
+    ~ocaml:[At_least "4.08"]
     ~virtual_modules:["hacl"]
 
 let tezos_hacl_glue_unix =
@@ -1105,6 +1108,7 @@ let tezos_stdlib_unix =
         lwt_unix;
         ipaddr_unix;
         re;
+        ezjsonm;
         ptime;
         ptime_clock_os;
         mtime;
@@ -1818,6 +1822,7 @@ let tezos_protocol_environment_packer =
     "tezos-protocol-environment-packer"
     ~path:"src/lib_protocol_environment/s_packer"
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment-packer"
+    ~ocaml:[At_least "4.03"]
     ~synopsis:"Tezos: sigs/structs packer for economic protocol environment"
     ~modules:[]
 
@@ -1826,6 +1831,7 @@ let tezos_protocol_environment_sigs =
     "tezos-protocol-environment-sigs"
     ~path:"src/lib_protocol_environment/sigs"
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment-sigs"
+    ~ocaml:[At_least "4.12"]
     ~synopsis:"Tezos: restricted typing environment for the economic protocols"
     ~opam_only_deps:
       [

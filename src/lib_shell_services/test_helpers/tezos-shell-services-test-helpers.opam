@@ -13,7 +13,7 @@ depends: [
   "tezos-shell-services"
   "tezos-test-helpers"
   "qcheck-core"
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [

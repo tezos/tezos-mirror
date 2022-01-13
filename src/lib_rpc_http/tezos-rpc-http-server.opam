@@ -16,7 +16,7 @@ depends: [
   "tezos-rpc-http"
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
