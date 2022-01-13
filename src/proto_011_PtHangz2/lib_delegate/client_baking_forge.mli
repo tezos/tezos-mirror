@@ -62,14 +62,10 @@ val inject_block :
 
 type error += Failed_to_preapply of Tezos_base.Operation.t * error list
 
-(** [forge_block cctxt ?fee_threshold ?force ?operations ?best_effort ?sort
-   ?timestamp ?max_priority ?priority ?mempool ?ignore_node_mempool ~seed_nonce
+(** [forge_block cctxt ?fee_threshold ?force ?extra_operations ?best_effort
+   ?sort ?timestamp ?max_priority ?priority ?ignore_node_mempool ~seed_nonce
    ~src_sk pk_hash parent_blk] injects a block in the node. In addition of
    inject_block, it will:
-
-    * Operations: If [?operations] is [None], it will get pending operations and
-   add them to the block. Otherwise, provided operations will be used. In both
-   cases, they will be validated.
 
     * Baking priority: If [`Auto] is used, it will be computed from the public
    key hash of the specified contract, optionally capped to a maximum value, and
@@ -82,14 +78,13 @@ type error += Failed_to_preapply of Tezos_base.Operation.t * error list
     * Fee Threshold: If [?fee_threshold] is given, operations with fees lower
    than it are not added to the block.
 
-    * if [?mempool] is provided, bake a block including the operations recorded
-      in this (out-of-node) mempool resource.
+    * if [?extra_operations] is provided, bake a block including the operations
+   recorded in this (out-of-node) operations resource.
 
     * if [?ignore_node_mempool] is set to true, do not ask the nodes for
-      operations to be included in the block to be baked. Use in conjunction
-      with [~mempool] to restrict the operations to the ones containes in [mempool].
-      Defaults to [false].
-*)
+   operations to be included in the block to be baked. Use in conjunction with
+   [~extra_operations] to restrict the operations to the ones contained in
+   [extra_operations].  Defaults to [false].  *)
 val forge_block :
   #Protocol_client_context.full ->
   ?force:bool ->
