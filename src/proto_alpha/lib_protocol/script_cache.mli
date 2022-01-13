@@ -79,3 +79,7 @@ val size : context -> int
 
 (** [size_limit ctxt] is the maximal size of the cache (in bytes). *)
 val size_limit : context -> int
+
+(** [insert] is a variant of [update] which identifies the contract to update
+    by its address (of type [Contract.t]) instead of its cache identifier. *)
+val insert : context -> Contract.t -> cached_contract -> int -> context tzresult
