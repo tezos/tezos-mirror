@@ -86,19 +86,19 @@ let rec check_2_by_2 l =
   match l with
   | [] | [_] -> true
   | x :: (y :: _ as l) -> (
-      if Compare.Int.(compare_priority x y > 0) then check_2_by_2 l
-      else
-        Compare.Int.(compare_priority x y = 0)
-        &&
-        match (I.get_manager_content x, I.get_manager_content y) with
-        | (Some (xsrc, xcounter), Some (ysrc, ycounter)) ->
-            if Signature.Public_key_hash.equal xsrc ysrc then
-              (* lower counter should come first *)
-              Z.compare xcounter ycounter < 0 && check_2_by_2 l
-            else check_2_by_2 l
-        (* As said in the opening comment, there is another weight criterion
-           used for ordering but we do not test it *)
-        | (None, _) | (_, None) -> false)
+      match (x, y) with
+      | (High _, Low _) -> check_2_by_2 l
+      | (Low _, High _) -> false
+      | (Low _, Low _) | (High _, High _) -> (
+          match (I.get_manager_content x, I.get_manager_content y) with
+          | (Some (xsrc, xcounter), Some (ysrc, ycounter)) ->
+              if Signature.Public_key_hash.equal xsrc ysrc then
+                (* lower counter should come first *)
+                Z.compare xcounter ycounter < 0 && check_2_by_2 l
+              else check_2_by_2 l
+          (* As said in the opening comment, there is another weight criterion
+             used for ordering but we do not test it *)
+          | (None, _) | (_, None) -> false))
 
 let test_sorting () =
   let sorted_operations =
