@@ -5,23 +5,15 @@ Gas remaining: 1039968.666 units remaining
 { parameter (pair (pair %set_pair int (option int)) (pair %check_pair int (option int))) ;
   storage (pair (big_map int int) unit) ;
   code { DUP
-         /* [ pair (pair (pair %set_pair int (option int)) (pair %check_pair int (option int)))
-                 (big_map int int)
-                 unit
-            : pair (pair (pair %set_pair int (option int)) (pair %check_pair int (option int)))
-                 (big_map int int)
-                 unit ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : pair (pair (pair int (option int)) int (option int)) (big_map int int) unit ] */ ;
          DIP { CDAR }
-         /* [ pair (pair (pair %set_pair int (option int)) (pair %check_pair int (option int)))
-                 (big_map int int)
-                 unit : big_map int int ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int ] */ ;
          DUP
-         /* [ pair (pair (pair %set_pair int (option int)) (pair %check_pair int (option int)))
-                 (big_map int int)
-                 unit
-            : pair (pair (pair %set_pair int (option int)) (pair %check_pair int (option int)))
-                 (big_map int int)
-                 unit : big_map int int ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int ] */ ;
          DIP { CADR ;
                DUP
                /* [ pair int (option int) : pair int (option int) : big_map int int ] */ ;
@@ -33,9 +25,8 @@ Gas remaining: 1039968.666 units remaining
                /* [ big_map int int ] */ ;
                DUP
                /* [ big_map int int : big_map int int ] */ }
-         /* [ pair (pair (pair %set_pair int (option int)) (pair %check_pair int (option int)))
-                 (big_map int int)
-                 unit : big_map int int : big_map int int ] */ ;
+         /* [ pair (pair (pair int (option int)) int (option int)) (big_map int int) unit
+            : big_map int int : big_map int int ] */ ;
          CADR ;
          DUP
          /* [ pair int (option int) : pair int (option int) : big_map int int

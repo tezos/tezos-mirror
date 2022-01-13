@@ -8,19 +8,14 @@ Gas remaining: 1039973.685 units remaining
   storage address ;
   code { AMOUNT
          /* [ mutez
-            : pair (or (ticket %burn unit)
-                     (pair %mint (contract %destination (ticket unit)) (nat %amount)))
-                 address ] */ ;
+            : pair (or (ticket %burn unit) (pair %mint (contract (ticket unit)) nat)) address ] */ ;
          PUSH mutez
               0
          /* [ mutez : mutez
-            : pair (or (ticket %burn unit)
-                     (pair %mint (contract %destination (ticket unit)) (nat %amount)))
-                 address ] */ ;
+            : pair (or (ticket %burn unit) (pair %mint (contract (ticket unit)) nat)) address ] */ ;
          ASSERT_CMPEQ ;
          UNPAIR
-         /* [ or (ticket %burn unit)
-               (pair %mint (contract %destination (ticket unit)) (nat %amount))
+         /* [ or (ticket %burn unit) (pair %mint (contract (ticket unit)) nat)
             : address ] */ ;
          IF_LEFT
            { READ_TICKET
@@ -34,13 +29,10 @@ Gas remaining: 1039973.685 units remaining
              /* [ address ] */ ;
              NIL operation
              /* [ list operation : address ] */ }
-           { DUP @manager
-               2
-             /* [ address : pair (contract %destination (ticket unit)) (nat %amount)
-                : address ] */ ;
+           { DUP @manager 2
+             /* [ address : pair (contract (ticket unit)) nat : address ] */ ;
              SENDER
-             /* [ address : address
-                : pair (contract %destination (ticket unit)) (nat %amount) : address ] */ ;
+             /* [ address : address : pair (contract (ticket unit)) nat : address ] */ ;
              ASSERT_CMPEQ ;
              UNPAIR
              /* [ contract (ticket unit) : nat : address ] */ ;

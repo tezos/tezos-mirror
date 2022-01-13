@@ -7,23 +7,18 @@ Gas remaining: 1039925.145 units remaining
         (pair %Withdraw (key %from) (pair (mutez %withdraw_amount) (signature %sig)))) ;
   storage (map :stored_balance key_hash mutez) ;
   code { DUP
-         /* [ pair (or (key_hash %Initialize)
-                     (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+         /* [ pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                  (map key_hash mutez)
-            : pair (or (key_hash %Initialize)
-                     (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+            : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                  (map key_hash mutez) ] */ ;
          CAR
-         /* [ or (key_hash %Initialize)
-               (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig))
-            : pair (or (key_hash %Initialize)
-                     (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+         /* [ or (key_hash %Initialize) (pair %Withdraw key mutez signature)
+            : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                  (map key_hash mutez) ] */ ;
          IF_LEFT
            { DUP
              /* [ key_hash : key_hash
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              DIIP { CDR %stored_balance
                     /* [ map key_hash mutez ] */ ;
@@ -63,86 +58,59 @@ Gas remaining: 1039925.145 units remaining
                  PAIR
                  /* [ pair (list operation) (map key_hash mutez) ] */ } }
            { DUP
-             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              DUP
-             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              DUP
-             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair key mutez signature : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              DUP
-             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ pair key mutez signature : pair key mutez signature
+                : pair key mutez signature : pair key mutez signature
+                : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              CAR %from
-             /* [ key : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ key : pair key mutez signature : pair key mutez signature
+                : pair key mutez signature : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              DIIP { CDAR %withdraw_amount ;
                     PACK
-                    /* [ bytes : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (or (key_hash %Initialize)
-                                (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                    /* [ bytes : pair key mutez signature : pair key mutez signature
+                       : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                             (map key_hash mutez) ] */ ;
                     BLAKE2B @signed_amount
-                    /* [ bytes : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                       : pair (or (key_hash %Initialize)
-                                (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                    /* [ bytes : pair key mutez signature : pair key mutez signature
+                       : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                             (map key_hash mutez) ] */ }
-             /* [ key : pair (key %from) (mutez %withdraw_amount) (signature %sig) : bytes
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ key : pair key mutez signature : bytes : pair key mutez signature
+                : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              DIP { CDDR %sig }
-             /* [ key : signature : bytes
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ key : signature : bytes : pair key mutez signature
+                : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
              CHECK_SIGNATURE
-             /* [ bool : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (or (key_hash %Initialize)
-                         (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             /* [ bool : pair key mutez signature : pair key mutez signature
+                : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                      (map key_hash mutez) ] */ ;
-             IF { /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (or (key_hash %Initialize)
-                              (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+             IF { /* [ pair key mutez signature : pair key mutez signature
+                     : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                           (map key_hash mutez) ] */ }
                 { PUSH string
                        "Bad signature"
-                  /* [ string : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                     : pair (or (key_hash %Initialize)
-                              (pair %Withdraw (key %from) (mutez %withdraw_amount) (signature %sig)))
+                  /* [ string : pair key mutez signature : pair key mutez signature
+                     : pair (or (key_hash %Initialize) (pair %Withdraw key mutez signature))
                           (map key_hash mutez) ] */ ;
                   FAILWITH
                   /* [] */ } ;
@@ -150,149 +118,97 @@ Gas remaining: 1039925.145 units remaining
                     /* [ map key_hash mutez ] */ ;
                     DUP
                     /* [ map key_hash mutez : map key_hash mutez ] */ }
-             /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : map key_hash mutez : map key_hash mutez ] */ ;
+             /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez
+                : map key_hash mutez ] */ ;
              CAR %from
-             /* [ key : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : map key_hash mutez : map key_hash mutez ] */ ;
+             /* [ key : pair key mutez signature : map key_hash mutez : map key_hash mutez ] */ ;
              HASH_KEY @from_hash
-             /* [ key_hash : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : map key_hash mutez : map key_hash mutez ] */ ;
+             /* [ key_hash : pair key mutez signature : map key_hash mutez
+                : map key_hash mutez ] */ ;
              DUP
-             /* [ key_hash : key_hash
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : map key_hash mutez : map key_hash mutez ] */ ;
+             /* [ key_hash : key_hash : pair key mutez signature : map key_hash mutez
+                : map key_hash mutez ] */ ;
              DIP { DIP { SWAP
-                         /* [ map key_hash mutez
-                            : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                            : map key_hash mutez ] */ }
-                   /* [ key_hash : map key_hash mutez
-                      : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                         /* [ map key_hash mutez : pair key mutez signature : map key_hash mutez ] */ }
+                   /* [ key_hash : map key_hash mutez : pair key mutez signature
                       : map key_hash mutez ] */ ;
                    SWAP
-                   /* [ map key_hash mutez : key_hash
-                      : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                   /* [ map key_hash mutez : key_hash : pair key mutez signature
                       : map key_hash mutez ] */ }
-             /* [ key_hash : map key_hash mutez : key_hash
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+             /* [ key_hash : map key_hash mutez : key_hash : pair key mutez signature
                 : map key_hash mutez ] */ ;
              GET
-             /* [ option mutez : key_hash
-                : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                : map key_hash mutez ] */ ;
+             /* [ option mutez : key_hash : pair key mutez signature : map key_hash mutez ] */ ;
              IF_NONE
                { PUSH string
                       "Account does not exist"
-                 /* [ string : key_hash
-                    : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
+                 /* [ string : key_hash : pair key mutez signature : map key_hash mutez ] */ ;
                  PAIR
-                 /* [ pair string key_hash
-                    : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
+                 /* [ pair string key_hash : pair key mutez signature : map key_hash mutez ] */ ;
                  FAILWITH
                  /* [] */ }
                { RENAME @previous_balance
-                 /* [ mutez : key_hash
-                    : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
-                 DIP { DROP
-                       /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                          : map key_hash mutez ] */ }
-                 /* [ mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
+                 /* [ mutez : key_hash : pair key mutez signature : map key_hash mutez ] */ ;
+                 DIP { DROP /* [ pair key mutez signature : map key_hash mutez ] */ }
+                 /* [ mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  DUP
-                 /* [ mutez : mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
+                 /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  DIIP { DUP
-                        /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                           : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                           : map key_hash mutez ] */ ;
+                        /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
                         CDAR %withdraw_amount ;
                         DUP
-                        /* [ mutez : mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                           : map key_hash mutez ] */ }
-                 /* [ mutez : mutez : mutez : mutez
-                    : pair (key %from) (mutez %withdraw_amount) (signature %sig)
+                        /* [ mutez : mutez : pair key mutez signature : map key_hash mutez ] */ }
+                 /* [ mutez : mutez : mutez : mutez : pair key mutez signature
                     : map key_hash mutez ] */ ;
                  DIP { CMPLT @not_enough }
-                 /* [ mutez : bool : mutez
-                    : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
+                 /* [ mutez : bool : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  SWAP
-                 /* [ bool : mutez : mutez
-                    : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                    : map key_hash mutez ] */ ;
+                 /* [ bool : mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                  IF { PUSH string
                            "Not enough funds"
-                      /* [ string : mutez : mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez ] */ ;
+                      /* [ string : mutez : mutez : pair key mutez signature : map key_hash mutez ] */ ;
                       FAILWITH
                       /* [] */ }
                     { SUB_MUTEZ @new_balance
-                      /* [ option mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez ] */ ;
+                      /* [ option mutez : pair key mutez signature : map key_hash mutez ] */ ;
                       ASSERT_SOME ;
                       DIP { DUP
-                            /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                               : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                               : map key_hash mutez ] */ ;
-                            DIP { SWAP
-                                  /* [ map key_hash mutez
-                                     : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ }
-                            /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                               : map key_hash mutez
-                               : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ }
-                      /* [ mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                            /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
+                            DIP { SWAP /* [ map key_hash mutez : pair key mutez signature ] */ }
+                            /* [ pair key mutez signature : map key_hash mutez : pair key mutez signature ] */ }
+                      /* [ mutez : pair key mutez signature : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       DUP
-                      /* [ mutez : mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ mutez : mutez : pair key mutez signature : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       PUSH @zero
                         mutez
                         0
-                      /* [ mutez : mutez : mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ mutez : mutez : mutez : pair key mutez signature : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       CMPEQ @null_balance ;
                       IF { DROP
-                           /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                              : map key_hash mutez
-                              : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                           /* [ pair key mutez signature : map key_hash mutez : pair key mutez signature ] */ ;
                            NONE @new_balance
                              mutez
-                           /* [ option mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                              : map key_hash mutez
-                              : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ }
+                           /* [ option mutez : pair key mutez signature : map key_hash mutez
+                              : pair key mutez signature ] */ }
                          { SOME @new_balance
-                           /* [ option mutez : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                              : map key_hash mutez
-                              : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ } ;
+                           /* [ option mutez : pair key mutez signature : map key_hash mutez
+                              : pair key mutez signature ] */ } ;
                       SWAP
-                      /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig) : option mutez
-                         : map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ pair key mutez signature : option mutez : map key_hash mutez
+                         : pair key mutez signature ] */ ;
                       CAR %from
-                      /* [ key : option mutez : map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ key : option mutez : map key_hash mutez : pair key mutez signature ] */ ;
                       HASH_KEY @from_hash
-                      /* [ key_hash : option mutez : map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ key_hash : option mutez : map key_hash mutez : pair key mutez signature ] */ ;
                       UPDATE
-                      /* [ map key_hash mutez
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig) ] */ ;
+                      /* [ map key_hash mutez : pair key mutez signature ] */ ;
                       SWAP
-                      /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez ] */ ;
+                      /* [ pair key mutez signature : map key_hash mutez ] */ ;
                       DUP
-                      /* [ pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : pair (key %from) (mutez %withdraw_amount) (signature %sig)
-                         : map key_hash mutez ] */ ;
+                      /* [ pair key mutez signature : pair key mutez signature : map key_hash mutez ] */ ;
                       CDAR %withdraw_amount ;
                       DIP { CAR %from
                             /* [ key : map key_hash mutez ] */ ;

@@ -12,399 +12,321 @@ Gas remaining: 1039931.026 units remaining
           (list %sigs (option signature))) ;
   storage (pair (nat %stored_counter) (pair (nat %threshold) (list %keys key))) ;
   code { UNPAIR
-         /* [ pair (pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key)))))
-                 (list %sigs (option signature))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+         /* [ pair (pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key)))))
+                 (list (option signature)) : pair nat nat (list key) ] */ ;
          SWAP
-         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : pair (pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key)))))
-                 (list %sigs (option signature)) ] */ ;
+         /* [ pair nat nat (list key)
+            : pair (pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key)))))
+                 (list (option signature)) ] */ ;
          DUP
-         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : pair (pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key)))))
-                 (list %sigs (option signature)) ] */ ;
+         /* [ pair nat nat (list key) : pair nat nat (list key)
+            : pair (pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key)))))
+                 (list (option signature)) ] */ ;
          DIP { SWAP
-               /* [ pair (pair (nat %counter)
-                             (or (pair (mutez %amount) (contract %dest unit))
-                                 (or (option %delegate key_hash)
-                                     (pair %change_keys (nat %threshold) (list %keys key)))))
-                       (list %sigs (option signature))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key)
-            : pair (pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key)))))
-                 (list %sigs (option signature))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+               /* [ pair (pair nat
+                             (or (pair mutez (contract unit))
+                                 (or (option %delegate key_hash) (pair %change_keys nat (list key)))))
+                       (list (option signature)) : pair nat nat (list key) ] */ }
+         /* [ pair nat nat (list key)
+            : pair (pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key)))))
+                 (list (option signature)) : pair nat nat (list key) ] */ ;
          DIP { UNPAIR
-               /* [ pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+               /* [ pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                DUP
-               /* [ pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+               /* [ pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                SELF
                /* [ contract
-                    (pair (pair (nat %counter)
-                                (or (pair (mutez %amount) (contract %dest unit))
-                                    (or (option %delegate key_hash)
-                                        (pair %change_keys (nat %threshold) (list %keys key)))))
-                          (list %sigs (option signature)))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                    (pair (pair nat
+                                (or (pair mutez (contract unit))
+                                    (or (option %delegate key_hash) (pair %change_keys nat (list key)))))
+                          (list (option signature)))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                ADDRESS
                /* [ address
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                CHAIN_ID
                /* [ chain_id : address
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                PAIR
                /* [ pair chain_id address
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                PAIR
                /* [ pair (pair chain_id address)
-                       (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                       nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                PACK
                /* [ bytes
-                  : pair (nat %counter)
-                       (or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key))))
-                  : list (option signature)
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : pair nat
+                       (or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key))))
+                  : list (option signature) : pair nat nat (list key) ] */ ;
                DIP { UNPAIR @counter
                      /* [ nat
-                        : or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key)))
-                        : list (option signature)
-                        : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                        : or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                        : list (option signature) : pair nat nat (list key) ] */ ;
                      DIP { SWAP
                            /* [ list (option signature)
-                              : or (pair (mutez %amount) (contract %dest unit))
-                                 (or (option %delegate key_hash)
-                                     (pair %change_keys (nat %threshold) (list %keys key)))
-                              : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                              : or (pair mutez (contract unit))
+                                 (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                              : pair nat nat (list key) ] */ }
                      /* [ nat : list (option signature)
-                        : or (pair (mutez %amount) (contract %dest unit))
-                           (or (option %delegate key_hash)
-                               (pair %change_keys (nat %threshold) (list %keys key)))
-                        : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                        : or (pair mutez (contract unit))
+                           (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                        : pair nat nat (list key) ] */ }
                /* [ bytes : nat : list (option signature)
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ ;
                SWAP
                /* [ nat : bytes : list (option signature)
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ pair (nat %stored_counter) (nat %threshold) (list %keys key) : nat : bytes
-            : list (option signature)
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ }
+         /* [ pair nat nat (list key) : nat : bytes : list (option signature)
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          UNPAIR @stored_counter
-         /* [ nat : pair (nat %threshold) (list %keys key) : nat : bytes
-            : list (option signature)
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+         /* [ nat : pair nat (list key) : nat : bytes : list (option signature)
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          DIP { SWAP
-               /* [ nat : pair (nat %threshold) (list %keys key) : bytes
-                  : list (option signature)
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ nat : nat : pair (nat %threshold) (list %keys key) : bytes
-            : list (option signature)
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+               /* [ nat : pair nat (list key) : bytes : list (option signature)
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ }
+         /* [ nat : nat : pair nat (list key) : bytes : list (option signature)
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          ASSERT_CMPEQ ;
          DIP { SWAP
                /* [ list (option signature) : bytes
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
-         /* [ pair (nat %threshold) (list %keys key) : list (option signature) : bytes
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ }
+         /* [ pair nat (list key) : list (option signature) : bytes
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          UNPAIR @threshold @keys
          /* [ nat : list key : list (option signature) : bytes
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          DIP { PUSH @valid
                  nat
                  0
                /* [ nat : list key : list (option signature) : bytes
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ ;
                SWAP
                /* [ list key : nat : list (option signature) : bytes
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ ;
                ITER { DIP { SWAP
                             /* [ list (option signature) : nat : bytes
-                               : or (pair (mutez %amount) (contract %dest unit))
-                                  (or (option %delegate key_hash)
-                                      (pair %change_keys (nat %threshold) (list %keys key)))
-                               : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                               : or (pair mutez (contract unit))
+                                  (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                               : pair nat nat (list key) ] */ }
                       /* [ key : list (option signature) : nat : bytes
-                         : or (pair (mutez %amount) (contract %dest unit))
-                            (or (option %delegate key_hash)
-                                (pair %change_keys (nat %threshold) (list %keys key)))
-                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                         : or (pair mutez (contract unit))
+                            (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                         : pair nat nat (list key) ] */ ;
                       SWAP
                       /* [ list (option signature) : key : nat : bytes
-                         : or (pair (mutez %amount) (contract %dest unit))
-                            (or (option %delegate key_hash)
-                                (pair %change_keys (nat %threshold) (list %keys key)))
-                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                         : or (pair mutez (contract unit))
+                            (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                         : pair nat nat (list key) ] */ ;
                       IF_CONS
                         { IF_SOME
                             { SWAP
                               /* [ list (option signature) : signature : key : nat : bytes
-                                 : or (pair (mutez %amount) (contract %dest unit))
-                                    (or (option %delegate key_hash)
-                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                 : or (pair mutez (contract unit))
+                                    (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                 : pair nat nat (list key) ] */ ;
                               DIP { SWAP
                                     /* [ key : signature : nat : bytes
-                                       : or (pair (mutez %amount) (contract %dest unit))
-                                          (or (option %delegate key_hash)
-                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                       : or (pair mutez (contract unit))
+                                          (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                       : pair nat nat (list key) ] */ ;
                                     DIIP { DUUP
                                            /* [ bytes : nat : bytes
-                                              : or (pair (mutez %amount) (contract %dest unit))
-                                                 (or (option %delegate key_hash)
-                                                     (pair %change_keys (nat %threshold) (list %keys key)))
-                                              : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                              : or (pair mutez (contract unit))
+                                                 (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                              : pair nat nat (list key) ] */ }
                                     /* [ key : signature : bytes : nat : bytes
-                                       : or (pair (mutez %amount) (contract %dest unit))
-                                          (or (option %delegate key_hash)
-                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                       : or (pair mutez (contract unit))
+                                          (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                       : pair nat nat (list key) ] */ ;
                                     { DUUUP
                                       /* [ bytes : key : signature : bytes : nat : bytes
-                                         : or (pair (mutez %amount) (contract %dest unit))
-                                            (or (option %delegate key_hash)
-                                                (pair %change_keys (nat %threshold) (list %keys key)))
-                                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                         : or (pair mutez (contract unit))
+                                            (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                         : pair nat nat (list key) ] */ ;
                                       DIP { CHECK_SIGNATURE
                                             /* [ bool : nat : bytes
-                                               : or (pair (mutez %amount) (contract %dest unit))
-                                                  (or (option %delegate key_hash)
-                                                      (pair %change_keys (nat %threshold) (list %keys key)))
-                                               : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                               : or (pair mutez (contract unit))
+                                                  (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                               : pair nat nat (list key) ] */ }
                                       /* [ bytes : bool : nat : bytes
-                                         : or (pair (mutez %amount) (contract %dest unit))
-                                            (or (option %delegate key_hash)
-                                                (pair %change_keys (nat %threshold) (list %keys key)))
-                                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                         : or (pair mutez (contract unit))
+                                            (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                         : pair nat nat (list key) ] */ ;
                                       SWAP
                                       /* [ bool : bytes : nat : bytes
-                                         : or (pair (mutez %amount) (contract %dest unit))
-                                            (or (option %delegate key_hash)
-                                                (pair %change_keys (nat %threshold) (list %keys key)))
-                                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                         : or (pair mutez (contract unit))
+                                            (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                         : pair nat nat (list key) ] */ ;
                                       IF { DROP
                                            /* [ nat : bytes
-                                              : or (pair (mutez %amount) (contract %dest unit))
-                                                 (or (option %delegate key_hash)
-                                                     (pair %change_keys (nat %threshold) (list %keys key)))
-                                              : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                              : or (pair mutez (contract unit))
+                                                 (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                              : pair nat nat (list key) ] */ }
                                          { FAILWITH /* [] */ } } ;
                                     PUSH nat
                                          1
                                     /* [ nat : nat : bytes
-                                       : or (pair (mutez %amount) (contract %dest unit))
-                                          (or (option %delegate key_hash)
-                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                       : or (pair mutez (contract unit))
+                                          (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                       : pair nat nat (list key) ] */ ;
                                     ADD @valid
                                     /* [ nat : bytes
-                                       : or (pair (mutez %amount) (contract %dest unit))
-                                          (or (option %delegate key_hash)
-                                              (pair %change_keys (nat %threshold) (list %keys key)))
-                                       : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                       : or (pair mutez (contract unit))
+                                          (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                       : pair nat nat (list key) ] */ }
                               /* [ list (option signature) : nat : bytes
-                                 : or (pair (mutez %amount) (contract %dest unit))
-                                    (or (option %delegate key_hash)
-                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                                 : or (pair mutez (contract unit))
+                                    (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                 : pair nat nat (list key) ] */ }
                             { SWAP
                               /* [ key : list (option signature) : nat : bytes
-                                 : or (pair (mutez %amount) (contract %dest unit))
-                                    (or (option %delegate key_hash)
-                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+                                 : or (pair mutez (contract unit))
+                                    (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                 : pair nat nat (list key) ] */ ;
                               DROP
                               /* [ list (option signature) : nat : bytes
-                                 : or (pair (mutez %amount) (contract %dest unit))
-                                    (or (option %delegate key_hash)
-                                        (pair %change_keys (nat %threshold) (list %keys key)))
-                                 : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ } }
+                                 : or (pair mutez (contract unit))
+                                    (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                                 : pair nat nat (list key) ] */ } }
                         { FAIL } ;
                       SWAP
                       /* [ nat : list (option signature) : bytes
-                         : or (pair (mutez %amount) (contract %dest unit))
-                            (or (option %delegate key_hash)
-                                (pair %change_keys (nat %threshold) (list %keys key)))
-                         : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                         : or (pair mutez (contract unit))
+                            (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                         : pair nat nat (list key) ] */ }
                /* [ nat : list (option signature) : bytes
-                  : or (pair (mutez %amount) (contract %dest unit))
-                     (or (option %delegate key_hash)
-                         (pair %change_keys (nat %threshold) (list %keys key)))
-                  : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ }
+                  : or (pair mutez (contract unit))
+                     (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+                  : pair nat nat (list key) ] */ }
          /* [ nat : nat : list (option signature) : bytes
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          ASSERT_CMPLE ;
          DROP
          /* [ bytes
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          DROP
-         /* [ or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair (nat %stored_counter) (nat %threshold) (list %keys key) ] */ ;
+         /* [ or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          DIP { UNPAIR
-               /* [ nat : pair (nat %threshold) (list %keys key) ] */ ;
+               /* [ nat : pair nat (list key) ] */ ;
                PUSH nat 1
-               /* [ nat : nat : pair (nat %threshold) (list %keys key) ] */ ;
+               /* [ nat : nat : pair nat (list key) ] */ ;
                ADD @new_counter
-               /* [ nat : pair (nat %threshold) (list %keys key) ] */ ;
+               /* [ nat : pair nat (list key) ] */ ;
                PAIR
-               /* [ pair nat (nat %threshold) (list %keys key) ] */ }
-         /* [ or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair nat (nat %threshold) (list %keys key) ] */ ;
+               /* [ pair nat nat (list key) ] */ }
+         /* [ or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          NIL operation
          /* [ list operation
-            : or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : pair nat (nat %threshold) (list %keys key) ] */ ;
+            : or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : pair nat nat (list key) ] */ ;
          SWAP
-         /* [ or (pair (mutez %amount) (contract %dest unit))
-               (or (option %delegate key_hash)
-                   (pair %change_keys (nat %threshold) (list %keys key)))
-            : list operation : pair nat (nat %threshold) (list %keys key) ] */ ;
+         /* [ or (pair mutez (contract unit))
+               (or (option %delegate key_hash) (pair %change_keys nat (list key)))
+            : list operation : pair nat nat (list key) ] */ ;
          IF_LEFT
            { UNPAIR
-             /* [ mutez : contract unit : list operation
-                : pair nat (nat %threshold) (list %keys key) ] */ ;
+             /* [ mutez : contract unit : list operation : pair nat nat (list key) ] */ ;
              UNIT
-             /* [ unit : mutez : contract unit : list operation
-                : pair nat (nat %threshold) (list %keys key) ] */ ;
+             /* [ unit : mutez : contract unit : list operation : pair nat nat (list key) ] */ ;
              TRANSFER_TOKENS
-             /* [ operation : list operation : pair nat (nat %threshold) (list %keys key) ] */ ;
+             /* [ operation : list operation : pair nat nat (list key) ] */ ;
              CONS
-             /* [ list operation : pair nat (nat %threshold) (list %keys key) ] */ }
+             /* [ list operation : pair nat nat (list key) ] */ }
            { IF_LEFT
                { SET_DELEGATE
-                 /* [ operation : list operation : pair nat (nat %threshold) (list %keys key) ] */ ;
+                 /* [ operation : list operation : pair nat nat (list key) ] */ ;
                  CONS
-                 /* [ list operation : pair nat (nat %threshold) (list %keys key) ] */ }
+                 /* [ list operation : pair nat nat (list key) ] */ }
                { DIP { SWAP
-                       /* [ pair nat (nat %threshold) (list %keys key) : list operation ] */ ;
+                       /* [ pair nat nat (list key) : list operation ] */ ;
                        CAR
                        /* [ nat : list operation ] */ }
-                 /* [ pair (nat %threshold) (list %keys key) : nat : list operation ] */ ;
+                 /* [ pair nat (list key) : nat : list operation ] */ ;
                  SWAP
-                 /* [ nat : pair (nat %threshold) (list %keys key) : list operation ] */ ;
+                 /* [ nat : pair nat (list key) : list operation ] */ ;
                  PAIR
-                 /* [ pair nat (nat %threshold) (list %keys key) : list operation ] */ ;
+                 /* [ pair nat nat (list key) : list operation ] */ ;
                  SWAP
-                 /* [ list operation : pair nat (nat %threshold) (list %keys key) ] */ } } ;
+                 /* [ list operation : pair nat nat (list key) ] */ } } ;
          PAIR
-         /* [ pair (list operation) nat (nat %threshold) (list %keys key) ] */ } }
+         /* [ pair (list operation) nat nat (list key) ] */ } }

@@ -11,13 +11,13 @@ Gas remaining: 1039985.509 units remaining
          PUSH @acc_k (int :k) 0
          /* [ int : int : map int int ] */ ;
          PAIR % %r
-         /* [ pair int (int %r) : map int int ] */ ;
+         /* [ pair int int : map int int ] */ ;
          SWAP
-         /* [ map int int : pair int (int %r) ] */ ;
+         /* [ map int int : pair int int ] */ ;
          ITER { DIP { DUP
-                      /* [ pair int (int %r) : pair int (int %r) ] */ ;
+                      /* [ pair int int : pair int int ] */ ;
                       CAR
-                      /* [ int : pair int (int %r) ] */ ;
+                      /* [ int : pair int int ] */ ;
                       DIP { CDR /* [ int ] */ }
                       /* [ int : int ] */ }
                 /* [ pair int int : int : int ] */ ;
@@ -30,9 +30,9 @@ Gas remaining: 1039985.509 units remaining
                 DIP { CDR /* [ int : int ] */ ; ADD /* [ int ] */ }
                 /* [ int : int ] */ ;
                 PAIR % %r
-                /* [ pair int (int %r) ] */ }
-         /* [ pair int (int %r) ] */ ;
+                /* [ pair int int ] */ }
+         /* [ pair int int ] */ ;
          NIL operation
-         /* [ list operation : pair int (int %r) ] */ ;
+         /* [ list operation : pair int int ] */ ;
          PAIR
-         /* [ pair (list operation) int (int %r) ] */ } }
+         /* [ pair (list operation) int int ] */ } }

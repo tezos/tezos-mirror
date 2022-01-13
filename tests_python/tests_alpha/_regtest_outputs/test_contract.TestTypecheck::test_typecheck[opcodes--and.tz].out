@@ -5,7 +5,7 @@ Gas remaining: 1039994.393 units remaining
 { parameter (pair :param (bool %first) (bool %second)) ;
   storage (option bool) ;
   code { CAR
-         /* [ pair (bool %first) (bool %second) ] */ ;
+         /* [ pair bool bool ] */ ;
          UNPAIR
          /* [ bool : bool ] */ ;
          AND @and
@@ -19,4 +19,4 @@ Gas remaining: 1039994.393 units remaining
          UNPAIR @x @y
          /* [ list operation : option bool ] */ ;
          PAIR %a %b
-         /* [ pair (list %a operation) (option %b bool) ] */ } }
+         /* [ pair (list operation) (option bool) ] */ } }
