@@ -300,3 +300,7 @@ variables:
       fi
     - TAG_NAME=$(echo "${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
     - echo "Building images ${DOCKER_IMAGE_NAME%?} ( /bare & /debug ) ${TAG_NAME}"
+
+.template__code_quality:
+  variables:
+    CODE_QUALITY_REPORT: "_reports/gl-code-quality-report.json"
