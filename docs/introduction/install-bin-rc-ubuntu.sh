@@ -8,7 +8,7 @@ apt-get update
 apt-get install sudo
 apt-get install -y software-properties-common </dev/null
 # [setup repository]
-sudo add-apt-repository ppa:serokell/tezos && sudo apt-get update
+sudo add-apt-repository ppa:serokell/tezos-rc && sudo apt-get update
 # [install tezos]
 sudo apt-get install -y tezos-client
 sudo apt-get install -y tezos-node

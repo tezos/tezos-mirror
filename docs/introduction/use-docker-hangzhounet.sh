@@ -1,5 +1,7 @@
+#!/bin/sh
+
 # TODO tezos/tezos#2170: search shifted protocol name/no; rename script
-trap 'exit $?' ERR
+set -e
 set -x
 cd
 # [install docker]

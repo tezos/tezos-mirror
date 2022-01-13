@@ -26,8 +26,10 @@ where <test-name> can be:
 * use-docker
 * install-bin-bionic
 * install-bin-focal
-* install-bin-fedora33
 * install-bin-fedora34
+* install-bin-rc-bionic
+* install-bin-rc-focal
+* install-bin-rc-fedora34
 * install-opam-scratch
 * install-opam-bionic
 * install-opam-focal
@@ -49,11 +51,17 @@ case "$1" in
   "install-bin-focal" )
     docker run --rm -i $UBUNTU_FOCAL <"$MYDIR"/install-bin-ubuntu.sh
     ;;
-  "install-bin-fedora33" )
-    docker run --rm -i fedora:33 <"$MYDIR"/install-bin-fedora.sh
-    ;;
   "install-bin-fedora34" )
     docker run --rm -i fedora:34 <"$MYDIR"/install-bin-fedora.sh
+    ;;
+  "install-bin-rc-bionic" )
+    docker run --rm -i $UBUNTU_BIONIC <"$MYDIR"/install-bin-rc-ubuntu.sh
+    ;;
+  "install-bin-rc-focal" )
+    docker run --rm -i $UBUNTU_FOCAL <"$MYDIR"/install-bin-rc-ubuntu.sh
+    ;;
+  "install-bin-rc-fedora34" )
+    docker run --rm -i fedora:34 <"$MYDIR"/install-bin-rc-fedora.sh
     ;;
   "install-opam-scratch" )
     docker run --rm -i --privileged $UBUNTU_BIONIC <"$MYDIR"/install-opam-scratch.sh

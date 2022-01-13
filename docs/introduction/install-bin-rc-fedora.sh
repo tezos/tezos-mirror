@@ -6,7 +6,7 @@ set -x
 # [install prerequisites]
 dnf install -y dnf-plugins-core
 # [setup repository]
-dnf copr enable -y @Serokell/Tezos && dnf update -y
+dnf copr enable -y @Serokell/Tezos-rc && dnf update -y
 # [install tezos]
 dnf install -y tezos-client
 dnf install -y tezos-node
