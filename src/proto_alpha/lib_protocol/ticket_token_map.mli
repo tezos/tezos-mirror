@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,50 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-module S = Saturation_repr
+(** A module exposing a carbonated map where keys are [Ticket_token.ex_token]
+    values. *)
 
-module Constants = struct
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_collect_tickets_step = S.safe_int 360
+(** A map where keys are [Ticket_token.ex_token] values. *)
+type 'a t
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_has_tickets_of_ty type_size = S.mul (S.safe_int 20) type_size
+(** [empty] is a map without any elements. *)
+val empty : 'a t
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_token_and_amount_of_ticket = S.safe_int 30
+(** [update ctxt k f map] updates or adds the value of the key [k] using [f].
+    The function accounts for the gas cost for finding the element. [f] must
+    account for its own gas costs. *)
+val update :
+  Alpha_context.context ->
+  Ticket_token.ex_token ->
+  (Alpha_context.context ->
+  'a option ->
+  ('a option * Alpha_context.context) tzresult) ->
+  'a t ->
+  ('a t * Alpha_context.context) tzresult Lwt.t
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_compare_ticket_hash = S.safe_int 100
-end
-
-let consume_gas_steps ctxt ~step_cost ~num_steps =
-  let ( * ) = S.mul in
-  if Compare.Int.(num_steps <= 0) then Ok ctxt
-  else
-    let gas =
-      Gas.atomic_step_cost (step_cost * Saturation_repr.safe_int num_steps)
-    in
-    Gas.consume ctxt gas
-
-let has_tickets_of_ty_cost ty =
-  Constants.cost_has_tickets_of_ty
-    Script_typed_ir.(ty_size ty |> Type_size.to_int)
-
-(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg]
-    Approximating 0.066076 x term *)
-let negate_cost z =
-  let size = (7 + Z.numbits z) / 8 in
-  Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
+(** [fold ctxt f z m] folds over the map [m] using the initial value [z] and
+    the accumulator function [f]. [f] must account for its own gas costs.  *)
+val fold :
+  Alpha_context.context ->
+  (Alpha_context.context ->
+  'state ->
+  Ticket_token.ex_token ->
+  'a ->
+  ('state * Alpha_context.context) tzresult) ->
+  'state ->
+  'a t ->
+  ('state * Alpha_context.context) tzresult

@@ -100,7 +100,7 @@ module Key_hash_map = Carbonated_map.Make (struct
 
   let compare = Script_expr_hash.compare
 
-  let compare_cost _ = Ticket_costs.Constants.cost_compare_key_script_expr_hash
+  let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
 end)
 
 (** Collects all ticket-token diffs from a big-map update and prepends them

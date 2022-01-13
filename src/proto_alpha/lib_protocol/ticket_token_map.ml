@@ -24,49 +24,40 @@
 (*****************************************************************************)
 
 open Alpha_context
-module S = Saturation_repr
 
-module Constants = struct
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
+(** A carbonated map where the keys are [Ticket_hash.t] values. *)
+module Ticket_token_map = Carbonated_map.Make (struct
+  type t = Ticket_hash.t
+
+  let compare = Ticket_hash.compare
+
+  let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
+end)
+
+(** Conceptually a map from [Ticket_token.ex_token] to values. Since
+    ticket-tokens are expensive to compare we use [Ticket_hash.t] keys instead,
+    and store the ticket-token along with the value.  *)
+type 'a t = (Ticket_token.ex_token * 'a) Ticket_token_map.t
+
+let empty = Ticket_token_map.empty
+
+let key_of_ticket_token ctxt (Ticket_token.Ex_token {ticketer; _} as token) =
+  (* We use the [ticket_balance_key] function for generating a key-hash
+     for comparing tokens. Since an owner contract is required we use [ticketer]
+     but any dummy value would work as long as it's consistent.
   *)
-  let cost_collect_tickets_step = S.safe_int 360
+  Ticket_balance_key.ticket_balance_key ctxt ~owner:ticketer token
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_has_tickets_of_ty type_size = S.mul (S.safe_int 20) type_size
+let update ctxt key f m =
+  key_of_ticket_token ctxt key >>=? fun (key_hash, ctxt) ->
+  let f ctxt val_opt =
+    (match val_opt with
+    | Some (_tkn, value) -> f ctxt (Some value)
+    | None -> f ctxt None)
+    >|? fun (val_opt, ctxt) -> (Option.map (fun v -> (key, v)) val_opt, ctxt)
+  in
+  Ticket_token_map.update ctxt key_hash f m |> Lwt.return
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_token_and_amount_of_ticket = S.safe_int 30
-
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_compare_ticket_hash = S.safe_int 100
-end
-
-let consume_gas_steps ctxt ~step_cost ~num_steps =
-  let ( * ) = S.mul in
-  if Compare.Int.(num_steps <= 0) then Ok ctxt
-  else
-    let gas =
-      Gas.atomic_step_cost (step_cost * Saturation_repr.safe_int num_steps)
-    in
-    Gas.consume ctxt gas
-
-let has_tickets_of_ty_cost ty =
-  Constants.cost_has_tickets_of_ty
-    Script_typed_ir.(ty_size ty |> Type_size.to_int)
-
-(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg]
-    Approximating 0.066076 x term *)
-let negate_cost z =
-  let size = (7 + Z.numbits z) / 8 in
-  Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
+let fold ctxt f =
+  Ticket_token_map.fold ctxt (fun ctxt acc _key_hash (tkn, value) ->
+      f ctxt acc tkn value)

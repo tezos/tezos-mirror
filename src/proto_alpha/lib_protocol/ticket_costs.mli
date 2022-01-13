@@ -32,7 +32,7 @@ module Constants : sig
 
   val cost_token_and_amount_of_ticket : Alpha_context.Gas.cost
 
-  val cost_compare_key_script_expr_hash : Alpha_context.Gas.cost
+  val cost_compare_ticket_hash : Alpha_context.Gas.cost
 end
 
 (** [consume_gas_steps ctxt ~num_steps] consumes gas corresponding to
