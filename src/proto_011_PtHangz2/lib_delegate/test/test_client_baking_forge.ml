@@ -42,7 +42,6 @@ let node_mempool_operations = [manager_operation ~counter:3 ()]
 let empty_operations = []
 
 let read_json_op_from_string s =
-  Format.printf "Decoding %s@." s ;
   match Data_encoding.Json.from_string s with
   | Ok json -> Data_encoding.Json.destruct A.Operation.encoding json
   | Error _ -> assert false
@@ -67,7 +66,9 @@ let test_empty () =
       empty_operations
   in
   if not @@ contains ~equal:( == ) empty_operations sorted_operations then
-    failwith "oops"
+    failwith
+      "sorting failure: expected empty list, got %d elements"
+      (List.length sorted_operations)
   else return_unit
 
 (* Check that any 2 consecutive elements in list l obey the following sorting
@@ -111,9 +112,10 @@ let test_sorting () =
   in
   (* All elements in the results exist in the original*)
   if not @@ contains ~equal:( == ) prioritized_operations sorted_operations then
-    failwith "oops"
+    failwith
+      "some operations were seemingly added by sorting prioritized operations"
   else if check_2_by_2 sorted_operations then return_unit
-  else failwith "oops resorted"
+  else failwith "operations are not sorted"
 
 let tests =
   [
