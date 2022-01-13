@@ -169,21 +169,23 @@ let classify op =
       else `Bad
   | _ -> `Bad
 
-let add_operation pool operation =
+let add_operation_to_pool add classify pool operation =
   match classify operation with
   | `Consensus ->
-      let consensus = Operation_set.add operation pool.consensus in
+      let consensus = add operation pool.consensus in
       {pool with consensus}
   | `Votes ->
-      let votes = Operation_set.add operation pool.votes in
+      let votes = add operation pool.votes in
       {pool with votes}
   | `Anonymous ->
-      let anonymous = Operation_set.add operation pool.anonymous in
+      let anonymous = add operation pool.anonymous in
       {pool with anonymous}
   | `Managers ->
-      let managers = Operation_set.add operation pool.managers in
+      let managers = add operation pool.managers in
       {pool with managers}
   | `Bad -> pool
+
+let add_operation = add_operation_to_pool Operation_set.add classify
 
 let add_operations pool ops = List.fold_left add_operation pool ops
 
@@ -356,25 +358,9 @@ module Prioritized = struct
       managers = of_operation_set pool.managers;
     }
 
-  let add_operation pool operation =
-    match classify (Prioritized_operation.packed operation) with
-    | `Consensus ->
-        let consensus =
-          Prioritized_operation_set.add operation pool.consensus
-        in
-        {pool with consensus}
-    | `Votes ->
-        let votes = Prioritized_operation_set.add operation pool.votes in
-        {pool with votes}
-    | `Anonymous ->
-        let anonymous =
-          Prioritized_operation_set.add operation pool.anonymous
-        in
-        {pool with anonymous}
-    | `Managers ->
-        let managers = Prioritized_operation_set.add operation pool.managers in
-        {pool with managers}
-    | `Bad -> pool
+  let add_operation =
+    add_operation_to_pool Prioritized_operation_set.add (fun op ->
+        classify (Prioritized_operation.packed op))
 
   let add_external_operation pool operation =
     add_operation pool (Prioritized_operation.extern operation)
