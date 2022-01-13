@@ -700,15 +700,18 @@ module Make_s
          (* Precheck succeeded *)
          let to_handle =
            match replacement with
-           | `No_replace -> []
+           | `No_replace -> [(op, `Prechecked)]
            | `Replace (old_oph, replacement_classification) ->
                (* Precheck succeeded, but an old operation is replaced *)
-               reclassify_replaced_manager_op
-                 old_oph
-                 shell
-                 replacement_classification
+               let to_replace =
+                 reclassify_replaced_manager_op
+                   old_oph
+                   shell
+                   replacement_classification
+               in
+               (op, `Prechecked) :: to_replace
          in
-         Lwt.return_ok ((filter_state, validation_state), to_handle, `Prechecked)
+         Lwt.return_ok (filter_state, validation_state, to_handle)
      | `Undecided -> (
          (* Precheck was not able to classify *)
          Prevalidation_t.apply_operation validation_state op
@@ -728,7 +731,7 @@ module Make_s
              | `Passed_postfilter new_filter_state ->
                  (* Post_filter ok, accept operation *)
                  Lwt.return_ok
-                   ((new_filter_state, new_validation_state), [], `Applied)
+                   (new_filter_state, new_validation_state, [(op, `Applied)])
              | `Refused _ as op_class ->
                  (* Post_filter refused the operation *)
                  Lwt.return_error op_class)
@@ -738,11 +741,10 @@ module Make_s
          | Refused e -> Lwt.return_error (`Refused e)
          | Outdated e -> Lwt.return_error (`Outdated e)))
     >>= function
-    | Error op_class ->
-        Lwt.return (filter_state, validation_state, mempool, [(op, op_class)])
-    | Ok ((f_state, v_state), to_handle, op_class) ->
+    | Error err_class ->
+        Lwt.return (filter_state, validation_state, mempool, [(op, err_class)])
+    | Ok (f_state, v_state, to_handle) ->
         let mempool = Mempool.cons_valid op.hash mempool in
-        let to_handle = (op, op_class) :: to_handle in
         Lwt.return (f_state, v_state, mempool, to_handle)
 
   (* Classify pending operations into either: [Refused |
