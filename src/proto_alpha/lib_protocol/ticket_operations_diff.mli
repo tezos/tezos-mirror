@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,59 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-module S = Saturation_repr
+(** A module that provides functionality for extracting ticket-token differences
+    from a list of operations. *)
 
-module Constants = struct
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_collect_tickets_step = S.safe_int 360
+(** A type representing ticket-token balance differences. Each value consists
+    of:
+    - [ticket_token] - the type of the ticket.
+    - [total_amount] - the total amount of transferred ticket-tokens.
+    - [destinations] - a list of amount and contract pairs.
+    Invariant: [total_amount] is the sum of the amounts in [destinations]. *)
+type ticket_token_diff = private {
+  ticket_token : Ticket_token.ex_token;
+  total_amount : Alpha_context.Script_int.n Alpha_context.Script_int.num;
+  destinations :
+    (Alpha_context.Contract.t
+    * Alpha_context.Script_int.n Alpha_context.Script_int.num)
+    list;
+}
 
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_has_tickets_of_ty type_size = S.mul (S.safe_int 20) type_size
-
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_token_and_amount_of_ticket = S.safe_int 30
-
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_compare_ticket_hash = S.safe_int 100
-
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
-  let cost_compare_key_contract = S.safe_int 100
-end
-
-let consume_gas_steps ctxt ~step_cost ~num_steps =
-  let ( * ) = S.mul in
-  if Compare.Int.(num_steps <= 0) then Ok ctxt
-  else
-    let gas =
-      Gas.atomic_step_cost (step_cost * Saturation_repr.safe_int num_steps)
-    in
-    Gas.consume ctxt gas
-
-let has_tickets_of_ty_cost ty =
-  Constants.cost_has_tickets_of_ty
-    Script_typed_ir.(ty_size ty |> Type_size.to_int)
-
-(** Reusing the gas model from [Michelson_v1_gas.Cost_of.neg]
-    Approximating 0.066076 x term *)
-let negate_cost z =
-  let size = (7 + Z.numbits z) / 8 in
-  Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
-
-(** Reusing the gas model from [Michelson_v1_gas.Cost_of.add] *)
-let add_cost = Michelson_v1_gas.Cost_of.Interpreter.add_int
+(** [ticket_diffs_of_operations ctxt ops] returns a list of ticket-tokens diffs
+    given a context, [ctxt], and list of packed operations, [ops]. The diffs
+    result from either a [Transaction] operation with parameters containing
+    tickets, or an [Origination] operation with the initial storage containing
+    tickets. *)
+val ticket_diffs_of_operations :
+  Alpha_context.context ->
+  Alpha_context.packed_internal_operation Script_typed_ir.boxed_list ->
+  (ticket_token_diff list * Alpha_context.context) tzresult Lwt.t

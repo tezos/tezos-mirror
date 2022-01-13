@@ -127,6 +127,7 @@
         "Ticket_balance_migration_for_j",
 
         "Ticket_token_map",
+        "Ticket_operations_diff",
         "Script_interpreter_defs",
         "Script_interpreter",
         "Sc_rollup_operations",
