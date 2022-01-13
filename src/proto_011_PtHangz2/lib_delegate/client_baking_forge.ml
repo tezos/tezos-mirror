@@ -478,7 +478,7 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
       Z.compare counter counter'
     else
       (* Prioritize according to tags first, then weight *)
-      match PrioritizedOperation.compare_priority op op' with
+      match PrioritizedOperation.compare_priority op' op with
       | 0 ->
           (* We want the biggest weight first *)
           Q.compare weight_ratio' weight_ratio
