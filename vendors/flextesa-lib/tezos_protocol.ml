@@ -173,7 +173,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("consensus_committee_size", int 67); ("consensus_threshold", int 6)
           ; ( "minimal_participation_ratio"
             , dict [("numerator", int 2); ("denominator", int 3)] )
-          ; ("minimal_block_delay", string "1")
+          ; ("minimal_block_delay", string (Int.to_string t.minimal_block_delay))
           ; ("delay_increment_per_round", string "1")
           ; ("max_slashing_period", int 2)
           ; ("frozen_deposits_percentage", int 10)
