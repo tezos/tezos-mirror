@@ -159,7 +159,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("sc_rollup_enable", bool false)
           ; ("sc_rollup_origination_size", int 6_314)
           ]
-      | `Granada | `Hangzhou | `Ithaca -> []
+      | `Hangzhou | `Ithaca -> []
       | _ -> failwith "unsupported protocol" in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
     let pre_alpha_specific_parameters =
@@ -181,7 +181,7 @@ let protocol_parameters_json t : Ezjsonm.t =
             , dict [("numerator", int 1); ("denominator", int 2)] )
           ; ("double_baking_punishment", string "640000000")
           ]
-      | `Granada | `Hangzhou ->
+      | `Hangzhou ->
           [ ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
           ; ("initial_endorsers", int 1)
           ; ("delay_per_missing_endorsement", string (Int.to_string 1))
@@ -196,14 +196,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("minimal_block_delay", string (Int.to_string t.minimal_block_delay))
           ]
       | _ -> failwith "unsupported protocol" in
-    let granada_specific_parameters =
-      match subkind with
-      | `Granada -> [("michelson_maximum_type_size", int 1_000)]
-      | `Hangzhou | `Ithaca | `Alpha -> []
-      | _ -> failwith "unsupported protocol" in
-    let open Ezjsonm in
-    alpha_specific_parameters @ pre_alpha_specific_parameters
-    @ granada_specific_parameters in
+    alpha_specific_parameters @ pre_alpha_specific_parameters in
   let common =
     [ ( "bootstrap_accounts"
       , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
