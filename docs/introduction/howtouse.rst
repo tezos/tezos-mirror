@@ -439,7 +439,7 @@ final, and for an important operation we advise to wait for 60 blocks.
 
 In the rare case when an operation is lost, how can we be sure that it
 will not be included in any future block, and then we may re-emit it?
-After 60 blocks a transaction is considered invalid and can't be
+After 120 blocks a transaction is considered invalid and can't be
 included anymore in a block.
 Furthermore each operation has a counter that prevents replays so it is usually safe to re-emit an
 operation that seems lost.
