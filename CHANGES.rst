@@ -30,6 +30,10 @@ Node
 Client
 ------
 
+- A new ``--force`` option was added to the ``transfer`` command. It
+  makes the client inject the transaction in a node even if the
+  simulation of the transaction fails.
+
 Baker / Endorser / Accuser
 --------------------------
 
