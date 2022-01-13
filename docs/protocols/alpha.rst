@@ -85,6 +85,9 @@ Michelson
 - Type annotations are ignored and not propagated.
   (MR :gl:`!4141`)
 
+- Field annotations are ignored and not propagated on comparable types and on
+  regular pairs (MR :gl:`!4175`)
+
 Internal
 --------
 
