@@ -71,16 +71,17 @@ Running a delegate
 
 A delegate is responsible for baking blocks, endorsing blocks and
 accusing other delegates in case they try to double bake or double
-endorse.
+endorse. A delegate is also responsible for taking part in the
+:doc:`governance process<../active/voting>`.
 
-In the network, rights for baking and endorsing are randomly assigned
+Rights for baking and endorsing are randomly assigned
 to delegates proportionally to the number of rolls they have been
 delegated.
 A roll is just a block of 8kꜩ and all computations with rolls are
 rounded to the nearest lower integer e.g. if you have 15kꜩ it amounts
 to 1 roll.
 
-When you obtain coins from :ref:`the faucet<faucet>`, if you
+On testnets, when you obtain coins from :ref:`the faucet<faucet>`, if you
 are lucky to obtain more than one roll, you can register a delegate
 using this identity.
 Otherwise, you need to ask the faucet for more accounts and
@@ -92,7 +93,7 @@ Deposits and over-delegation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 When baking or endorsing a block, a *security deposit* (or *bond*) is
-frozen for ``preserved_cycles`` cycles from the account of the
+frozen for :ref:`preserved_cycles<ps_constants>` cycles from the account of the
 delegate.
 Hence a delegate must have enough funds to be able to pay security
 deposits for all the blocks it can potentially bake/endorse during
@@ -109,9 +110,9 @@ If a delegate runs out of funds to deposit it won't be able to bake or
 endorse. Other than being a missed opportunity for them, this has also
 negative consequences on the network.
 Missing baking or endorsing slots slows down the network, as it is necessary to wait some time for the baker at the next priority to bake, and also some other time for each missed endorsing slot.
-Besides, missed endorsements also makes the chain more susceptible to forks.
+Besides, missed endorsements also make the chain more susceptible to forks.
 Running out of funds can happen if a delegate is *over-delegated*,
-that is if the amount of rolls it was delegate is disproportionate
+that is if the delegated amount is disproportionate
 with respect to its available funds.
 
 It is in the interest of every delegator to make sure a delegate is
@@ -124,75 +125,40 @@ each delegate should plan carefully its deposits, as explained next, by buying m
 Expected rights, deposits and rewards
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Let's assume we have 1 roll, we want to estimate our chances to bake
+Let's assume we have `x` rolls. We want to estimate our chances to bake
 or endorse to prepare the funds for our deposits.
 Our chances depend on how many rolls are currently active in the
-network, once we know that we can estimate how many blocks and
-endorsements we could be assigned in a cycle.
+network. Once we know this number, we can estimate how many baking and
+endorsing slots we could be assigned in a cycle.
 The number of active rolls can be computed with two RPCs. First, we
-list all the active delegates with ``delegates?active``. Then, we sum
-all their ``stacking_balance``. Finally, we simply divide by the size of a
+list all the active delegates with ``/chains/main/blocks/head/context/delegates?active``. Then, we sum
+all their ``staking_balance``. Finally, we divide by the size of a
 roll, 8kꜩ.
-For example, if the number of active rolls is ~30k then,
+For example, if the number of active rolls is ~80k then,
 for each block, we know that the chance that we get selected for
-baking is ``1/30k`` while for endorsing is 32 times that.
+baking is ``x/80k`` while for endorsing is 256 times that.
 Given that every draw is with replacement, the distribution that
 describes our chances of being selected is the binomial with
-probability of success ``p=1/30k``.
+probability of success ``p=x/80k``.
 The distribution has another parameter ``n`` for the number of times
-we draw, in our case in a cycle the draws for baking are ``n_b =
-4096`` while for endorsing are ``n_e = 4096 * 32``.
-Moreover we could extend ``n`` to cover ``preserved_cycles = 5``.
+we draw, in our case in a cycle the draws for baking are ``blocks_per_cycle``
+while for endorsing are ``blocks_per_cycle * endorsers_per_block``
+(see :ref:`this page<ps_constants>` for the current values of these constants).
+Moreover we could extend ``n`` to cover ``preserved_cycles``.
 Once we have ``p`` and ``n``, the expected number of times that we
 might get selected is ``p * n`` (the mean of the distribution).
-Over many cycles, our chances will fall around the mean, in some cycles,
+Over many cycles, our chances will fall around the mean; in some cycles,
 we might get unlucky and be assigned fewer rights, but in some cycles we might
 get lucky and be assigned more rights!
 Clearly, we would like to plan and have enough deposits to cover
 also the "lucky" cycles so we need to compute a sort of "maximum"
 number of rights that is safe for `most cases`.
 We can compute this maximum using the inverse of Cumulative
-Distribution Function of the Binomial where `most cases` is a value of
-confidence that we can put to 95%.
-There a simple `Python
+Distribution Function of the Binomial, where the so-called confidence is, in our case, the probability that the real deposits fall below the estimated maximum. We can set it, for instance, to 0.99.
+The computations can be found in this `Python
 script <https://gitlab.com/paracetamolo/utils/blob/master/estimated-rights.py>`_
-that does the computation for us and returns the deposits and rewards,
-expected and maximum, for a cycle and ``preserved_cycles``.
-
-::
-
-   prob success 3.333333e-05
-   confidence   0.95
-   ----------one-cycle--------------------
-   blocks
-    mean 0.14
-    max  1.00
-   endorsements
-    mean 4.37
-    max  8.00
-   deposits
-    mean 69.91 + 279.62
-    max  512.00 + 512.00
-   rewards
-    mean 2.18 + 8.74
-    max  16.00 + 16.00
-   ----------preserved-cycles-------------
-   blocks
-    mean 0.68
-    max  2.00
-   endorsements
-    mean 21.85
-    max  30.00
-   deposits
-    mean 349.53 + 1398.10
-    max  1024.00 + 1920.00
-   rewards
-    mean 10.92 + 43.69
-    max  32.00 + 60.00
-
-As a rule of thumb if we want to have very high confidence that we
-won't miss any opportunity we should have around ~3kꜩ for deposits,
-on the other hand, the expected returns will probably be around ~10ꜩ per cycle.
+which returns the deposits and rewards,
+expected and maximum, for a given number of rolls and cycles.
 
 After ``preserved_cycles``, not only does the delegate take back control of
 its frozen deposits, but it also receives its rewards for baking and endorsing.
