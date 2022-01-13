@@ -137,25 +137,24 @@ test-protocol-compile:
 	@dune build --profile=$(PROFILE) $(COVERAGE_OPTIONS) @runtest_out_of_opam
 
 PROTO_LIBS := $(shell find src/ -path src/proto_\* -name test -type d 2>/dev/null | LC_COLLATE=C sort)
-PROTO_LIBS_NAMES := $(patsubst %/test,%,$(PROTO_LIBS))
-PROTO_TARGETS := $(addsuffix .test_proto,${PROTO_LIBS_NAMES})
-
-$(PROTO_TARGETS): %.test_proto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/proto_%,%,$*)) --profile=$(PROFILE) $(COVERAGE_OPTIONS)
 
 .PHONY: test-proto-unit
-test-proto-unit: $(PROTO_TARGETS)
+test-proto-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-proto-unit \
+		$(addprefix @, $(addsuffix /runtest,$(PROTO_LIBS)))
+
 
 # We do not run vendor tests because they are a no-op from dune
 NONPROTO_LIBS := $(shell find src/ -path src/proto_\* -prune -o -name test -type d -exec test -f \{\}/dune \; -print | LC_COLLATE=C sort)
-NONPROTO_LIBS_NAMES := $(patsubst %/test,%,$(NONPROTO_LIBS))
-NONPROTO_TARGETS := $(addsuffix .test_nonproto,${NONPROTO_LIBS_NAMES})
-
-$(NONPROTO_TARGETS): %.test_nonproto:
-	scripts/test_wrapper.sh $* $(subst /,_,$(patsubst src/lib_%,%,$(patsubst src/bin_%,%,$*))) --profile=$(PROFILE) $(COVERAGE_OPTIONS)
 
 .PHONY: test-nonproto-unit
-test-nonproto-unit: $(NONPROTO_TARGETS)
+test-nonproto-unit:
+	DUNE_PROFILE=$(PROFILE) \
+		COVERAGE_OPTIONS="$(COVERAGE_OPTIONS)" \
+		scripts/test_wrapper.sh test-nonproto-unit \
+		$(addprefix @, $(addsuffix /runtest,$(NONPROTO_LIBS)))
 
 .PHONY: test-unit
 test-unit: test-nonproto-unit test-proto-unit

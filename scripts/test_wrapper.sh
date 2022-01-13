@@ -3,28 +3,29 @@
 set -eu
 
 if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 <test-package> <test-name> [<additional dune options>]"
+    echo "Usage: $0 <test-name> <test-package> [<test-package> ...]"
     echo
-    echo "Runs the tests in <test-package>, redirecting the output to \`tests_results/<test-name>.log\`."
+    echo "Runs the tests in <test-packages>, redirecting the output to \`tests_results/<test-name>.log\`."
     echo "In addition, it outputs a rudimentary JUnit test report file to \`tests_results/<test-name>.xml\`."
     echo
-    echo "Example: $0 src/lib_p2p p2p"
+    echo "Example: $0 p2p_and_base @src/lib_p2p/runtest @src/lib_base/runtest"
     exit 1
 fi
 
-nametest=${1:?}
-shift
 name=${1:?}
 shift
 
 mkdir -p test_results
 
-echo "Running test \"dune build $* @$nametest/runtest\" ..."
+echo "Running test \"dune build ${COVERAGE_OPTIONS:-} $*\" ..."
 
 START=$(date +%s.%N)
 
 EXITCODE=0
-dune build "$@" "@$nametest/runtest" > "test_results/$name.log" 2>&1 \
+# If set, COVERAGE_OPTIONS will typically contain "--instrument-with bisect_ppx".
+# We need this to be word split for the arguments to be properly parsed by dune.
+# shellcheck disable=SC2086
+dune build ${COVERAGE_OPTIONS:-} "$@" > "test_results/$name.log" 2>&1 \
     || EXITCODE=$?
 
 END=$(date +%s.%N)
@@ -63,7 +64,7 @@ if [ ! $EXITCODE -eq 0 ]; then
     msg="Exited with exitcode $EXITCODE."
 
     # Add link to log artifact when running in CI
-    if [ -n "$CI_SERVER_URL" ]; then
+    if [ -n "${CI_SERVER_URL:-}" ]; then
         url=$CI_SERVER_URL/$CI_PROJECT_NAMESPACE/$CI_PROJECT_NAME/-/jobs/$CI_JOB_ID/artifacts/file/test_results/$name.log
         msg="$msg See logs at $url"
     fi
