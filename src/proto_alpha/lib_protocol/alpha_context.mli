@@ -1773,6 +1773,48 @@ module Vote : sig
   val clear_current_proposal : context -> context tzresult Lwt.t
 end
 
+(** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
+module Sc_rollup : sig
+  module PVM : sig
+    type boot_sector
+
+    val boot_sector_of_string : string -> boot_sector
+  end
+
+  module Address : S.HASH
+
+  type t = Address.t
+
+  module Kind : sig
+    type t = Example_arith
+
+    val encoding : t Data_encoding.t
+  end
+
+  val originate :
+    context ->
+    kind:Kind.t ->
+    boot_sector:PVM.boot_sector ->
+    (t * Z.t * context) tzresult Lwt.t
+
+  val kind : context -> t -> Kind.t option tzresult Lwt.t
+
+  module Inbox : sig
+    type t
+
+    val encoding : t Data_encoding.encoding
+
+    val pp : Format.formatter -> t -> unit
+  end
+
+  val rpc_arg : t RPC_arg.t
+
+  val add_messages :
+    context -> t -> string list -> (Inbox.t * Z.t * context) tzresult Lwt.t
+
+  val inbox : context -> t -> (Inbox.t * context) tzresult Lwt.t
+end
+
 module Block_payload : sig
   val hash :
     predecessor:Block_hash.t ->
@@ -1901,33 +1943,6 @@ module Block_header : sig
     unit tzresult
 end
 
-(** See {!Sc_rollup_storage} and {!Sc_rollup_repr}. *)
-module Sc_rollup : sig
-  module PVM : sig
-    type boot_sector
-
-    val boot_sector_of_string : string -> boot_sector
-  end
-
-  module Address : S.HASH
-
-  type t = Address.t
-
-  module Kind : sig
-    type t = Example_arith
-
-    val encoding : t Data_encoding.t
-  end
-
-  val originate :
-    context ->
-    kind:Kind.t ->
-    boot_sector:PVM.boot_sector ->
-    (context * t * Z.t) tzresult Lwt.t
-
-  val kind : context -> t -> Kind.t option tzresult Lwt.t
-end
-
 module Kind : sig
   type preendorsement_consensus_kind = Preendorsement_consensus_kind
 
@@ -1978,6 +1993,8 @@ module Kind : sig
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
+  type sc_rollup_add_messages = Sc_rollup_add_messages_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -1987,6 +2004,7 @@ module Kind : sig
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
+    | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
 end
 
 type 'a consensus_operation_type =
@@ -2110,6 +2128,11 @@ and _ manager_operation =
       boot_sector : Sc_rollup.PVM.boot_sector;
     }
       -> Kind.sc_rollup_originate manager_operation
+  | Sc_rollup_add_messages : {
+      rollup : Sc_rollup.t;
+      messages : string list;
+    }
+      -> Kind.sc_rollup_add_messages manager_operation
 
 and counter = Z.t
 
@@ -2257,6 +2280,9 @@ module Operation : sig
 
     val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
+    val sc_rollup_add_messages_case :
+      Kind.sc_rollup_add_messages Kind.manager case
+
     module Manager_operations : sig
       type 'b case =
         | MCase : {
@@ -2284,6 +2310,8 @@ module Operation : sig
       val tx_rollup_origination_case : Kind.tx_rollup_origination case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
+
+      val sc_rollup_add_messages_case : Kind.sc_rollup_add_messages case
     end
   end
 

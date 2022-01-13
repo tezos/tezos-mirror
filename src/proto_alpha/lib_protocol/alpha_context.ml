@@ -60,6 +60,7 @@ end
 module Sc_rollup = struct
   include Sc_rollup_repr
   include Sc_rollup_storage
+  module Inbox = Sc_rollup_inbox
 end
 
 module Entrypoint = Entrypoint_repr

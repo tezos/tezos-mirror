@@ -34,4 +34,4 @@ val originate :
   context ->
   kind:Sc_rollup.Kind.t ->
   boot_sector:Sc_rollup.PVM.boot_sector ->
-  (context * origination_result) tzresult Lwt.t
+  (origination_result * context) tzresult Lwt.t

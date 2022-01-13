@@ -100,6 +100,8 @@ module Kind : sig
 
   type sc_rollup_originate = Sc_rollup_originate_kind
 
+  type sc_rollup_add_messages = Sc_rollup_add_messages_kind
+
   type 'a manager =
     | Reveal_manager_kind : reveal manager
     | Transaction_manager_kind : transaction manager
@@ -109,6 +111,7 @@ module Kind : sig
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
+    | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
 end
 
 type 'a consensus_operation_type =
@@ -245,6 +248,11 @@ and _ manager_operation =
       boot_sector : Sc_rollup_repr.PVM.boot_sector;
     }
       -> Kind.sc_rollup_originate manager_operation
+  | Sc_rollup_add_messages : {
+      rollup : Sc_rollup_repr.t;
+      messages : string list;
+    }
+      -> Kind.sc_rollup_add_messages manager_operation
 
 and counter = Z.t
 
@@ -368,6 +376,9 @@ module Encoding : sig
 
   val sc_rollup_originate_case : Kind.sc_rollup_originate Kind.manager case
 
+  val sc_rollup_add_messages_case :
+    Kind.sc_rollup_add_messages Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -395,5 +406,7 @@ module Encoding : sig
     val tx_rollup_origination_case : Kind.tx_rollup_origination case
 
     val sc_rollup_originate_case : Kind.sc_rollup_originate case
+
+    val sc_rollup_add_messages_case : Kind.sc_rollup_add_messages case
   end
 end

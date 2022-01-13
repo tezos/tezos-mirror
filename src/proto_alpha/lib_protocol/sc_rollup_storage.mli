@@ -34,7 +34,7 @@ val originate :
   Raw_context.t ->
   kind:Sc_rollup_repr.Kind.t ->
   boot_sector:Sc_rollup_repr.PVM.boot_sector ->
-  (Raw_context.t * Sc_rollup_repr.Address.t * Z.t) tzresult Lwt.t
+  (Sc_rollup_repr.Address.t * Z.t * Raw_context.t) tzresult Lwt.t
 
 (** [kind context address] returns [Some kind] iff [address] is an
     existing rollup of some [kind]. Returns [None] if [address] is
@@ -43,3 +43,21 @@ val kind :
   Raw_context.t ->
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Kind.t option tzresult Lwt.t
+
+(** [add_message context rollup msg] adds [msg] to [rollup]'s inbox.
+
+    This function is carbonated and returns the updated context as well as
+    the size diff. *)
+val add_messages :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  string list ->
+  (Sc_rollup_inbox.t * Z.t * Raw_context.t) tzresult Lwt.t
+
+(** [inbox context rollup] returns the current state of the inbox.
+
+    This function is carbonated. *)
+val inbox :
+  Raw_context.t ->
+  Sc_rollup_repr.t ->
+  (Sc_rollup_inbox.t * Raw_context.t) tzresult Lwt.t
