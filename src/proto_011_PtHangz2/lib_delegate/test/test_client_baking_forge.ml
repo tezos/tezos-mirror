@@ -35,9 +35,15 @@ let manager_operation ?(source = "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN")
 
 (* default contents for operation sources *)
 let external_mempool_operations =
-  [manager_operation ~counter:2 (); manager_operation ~counter:3 ()]
+  [
+    manager_operation ~counter:2 ();
+    manager_operation ~counter:3 ();
+    (* Test case High _, High _ with previous operation *)
+    manager_operation ~counter:3 ();
+  ]
 
-let node_mempool_operations = [manager_operation ~counter:3 ()]
+let node_mempool_operations =
+  [manager_operation ~counter:3 (); manager_operation ~counter:5 ()]
 
 let empty_operations = []
 
@@ -48,8 +54,16 @@ let read_json_op_from_string s =
 
 let prioritized_operations =
   List.map
-    (fun op -> I.PrioritizedOperation.extern (read_json_op_from_string op))
-    external_mempool_operations
+    (fun op -> I.PrioritizedOperation.node (read_json_op_from_string op))
+    [
+      manager_operation ~counter:6 ();
+      (* Test case Low _, Low _ with previous operation*)
+      manager_operation ~counter:6 ();
+      manager_operation ~counter:3 ();
+    ]
+  @ List.map
+      (fun op -> I.PrioritizedOperation.extern (read_json_op_from_string op))
+      external_mempool_operations
   @ List.map
       (fun op -> I.PrioritizedOperation.node (read_json_op_from_string op))
       node_mempool_operations
@@ -88,13 +102,22 @@ let rec check_2_by_2 l =
   | x :: (y :: _ as l) -> (
       match (x, y) with
       | (High _, Low _) -> check_2_by_2 l
-      | (Low _, High _) -> false
+      | (Low _, High _) -> (
+          match (I.get_manager_content x, I.get_manager_content y) with
+          | (Some (xsrc, xcounter), Some (ysrc, ycounter)) ->
+              (* the only way a low priority operation is before a high priority
+                 one is that they have the same emitter, and the former has a
+                 lower (or equal) counter than the latter*)
+              Signature.Public_key_hash.equal xsrc ysrc
+              && Z.compare xcounter ycounter <= 0
+              && check_2_by_2 l
+          | (None, _) | (_, None) -> false (* should not happen *))
       | (Low _, Low _) | (High _, High _) -> (
           match (I.get_manager_content x, I.get_manager_content y) with
           | (Some (xsrc, xcounter), Some (ysrc, ycounter)) ->
               if Signature.Public_key_hash.equal xsrc ysrc then
                 (* lower counter should come first *)
-                Z.compare xcounter ycounter < 0 && check_2_by_2 l
+                Z.compare xcounter ycounter <= 0 && check_2_by_2 l
               else check_2_by_2 l
           (* As said in the opening comment, there is another weight criterion
              used for ordering but we do not test it *)
