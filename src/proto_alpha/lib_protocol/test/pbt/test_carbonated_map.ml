@@ -509,4 +509,6 @@ let tests =
 let () =
   (* Ensure deterministic results. *)
   let rand = Random.State.make [|0x1337533D; 71287309; 397060904|] in
-  Alcotest.run "Carbonated map" [("Carbonated map", qcheck_wrap ~rand tests)]
+  Alcotest.run
+    "protocol > pbt > carbonated map"
+    [("Carbonated map", qcheck_wrap ~rand tests)]

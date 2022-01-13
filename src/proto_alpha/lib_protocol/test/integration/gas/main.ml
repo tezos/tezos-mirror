@@ -32,7 +32,7 @@
 
 let () =
   Alcotest_lwt.run
-    "protocol_alpha > Integration > Gas"
+    "protocol > integration > gas"
     [
       ("gas levels", Test_gas_levels.tests);
       ("gas cost functions", Test_gas_costs.tests);

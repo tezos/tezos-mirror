@@ -32,7 +32,7 @@
 
 let () =
   Alcotest_lwt.run
-    "protocol_alpha"
+    "protocol > integration > michelson"
     [
       ("global table of constants", Test_global_constants_storage.tests);
       ("interpretation", Test_interpretation.tests);

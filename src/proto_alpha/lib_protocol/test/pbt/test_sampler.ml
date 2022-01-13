@@ -267,5 +267,5 @@ let alias_z_test =
 
 let () =
   Alcotest.run
-    "Sampling"
+    "protocol > pbt > sampling"
     [("sampling", qcheck_wrap [alias_float_test; alias_z_test])]
