@@ -87,8 +87,10 @@ val run : unit -> unit
 
 (** Get the current worker id.
 
-    This returns a value between [0] and [Cli.options.job_count - 1] that uniquely
-    identifies the current worker process that is running the current test.
+    In single-process mode (with [-j 1]), this always returns [None].
 
-    When called outside of a test, this always returns [0]. *)
-val current_worker_id : unit -> int
+    In multi-process mode, this returns either:
+    - [None] (if called in the scheduler process, i.e. outside of a test);
+    - or [Some id] where [0 <= id < Cli.options.job_count] and where [id]
+      uniquely identifies the current worker process that is running the current test. *)
+val current_worker_id : unit -> int option

@@ -34,6 +34,8 @@ let next = ref 0
 let fresh () =
   let slot = !next mod interval_size in
   incr next ;
-  Cli.options.starting_port + (interval_size * Test.current_worker_id ()) + slot
+  Cli.options.starting_port
+  + (interval_size * (Test.current_worker_id () |> Option.value ~default:0))
+  + slot
 
 let () = Test.declare_reset_function @@ fun () -> next := 0

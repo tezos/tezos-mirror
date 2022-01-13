@@ -774,7 +774,7 @@ module Scheduler : sig
     worker_count:int ->
     unit
 
-  val get_current_worker_id : unit -> int
+  val get_current_worker_id : unit -> int option
 end = struct
   type request = Run_test of {test_title : string}
 
@@ -849,7 +849,7 @@ end = struct
 
   let next_worker_id = ref 0
 
-  let current_worker_id = ref 0
+  let current_worker_id = ref None
 
   let spawn_worker () =
     let worker_id = !next_worker_id in
@@ -859,7 +859,7 @@ end = struct
     let pid = Lwt_unix.fork () in
     if pid = 0 then (
       (* This is now a worker process. *)
-      current_worker_id := worker_id ;
+      current_worker_id := Some worker_id ;
       Unix.close pipe_to_worker_entrance ;
       Unix.close pipe_from_worker_exit ;
       worker_listen
