@@ -106,9 +106,10 @@ let ipaddr = external_lib "ipaddr" [At_least "5.0.0"; Less_than "6.0.0"]
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" [At_least "2.8.0"]
+let irmin = external_lib "irmin" [At_least "2.10.0"; Less_than "2.11.0"]
 
-let irmin_pack = external_lib "irmin-pack" [At_least "2.8.0"]
+let irmin_pack =
+  external_lib "irmin-pack" [At_least "2.10.0"; Less_than "2.11.0"]
 
 let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
 
@@ -197,9 +198,9 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 
 let resto_directory = external_lib "resto-directory" resto_version
 
-let ringo = external_lib "ringo" [Exactly "0.5"]
+let ringo = external_lib "ringo" [Exactly "0.7"]
 
-let ringo_lwt = external_lib "ringo-lwt" [Exactly "0.5"]
+let ringo_lwt = external_lib "ringo-lwt" [Exactly "0.7"]
 
 let secp256k1_internal = external_lib "secp256k1-internal" []
 

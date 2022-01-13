@@ -10,8 +10,8 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
-  "irmin" { >= "2.8.0" }
-  "irmin-pack" { >= "2.8.0" }
+  "irmin" { >= "2.10.0" & < "2.11.0" }
+  "irmin-pack" { >= "2.10.0" & < "2.11.0" }
   "bigstringaf" { >= "0.2.0" }
   "tezos-shell-services"
   "fmt"

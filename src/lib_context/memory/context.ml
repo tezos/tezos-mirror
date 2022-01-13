@@ -115,6 +115,8 @@ let mem_tree ctxt key = Tree.mem_tree ctxt.tree (data_key key)
 let list ctxt ?offset ?length key =
   Tree.list ctxt.tree ?offset ?length (data_key key)
 
+let length ctxt key = Tree.length ctxt.tree key
+
 let find ctxt key = Tree.find ctxt.tree (data_key key)
 
 let raw_add ctxt key data =
@@ -175,7 +177,7 @@ let create () =
   let cfg = Irmin_pack.config "/tmp" in
   let promise =
     Store.Repo.v cfg >>= fun repo ->
-    Lwt.return {repo; parents = []; tree = Store.Tree.empty}
+    Lwt.return {repo; parents = []; tree = Store.Tree.empty ()}
   in
   match Lwt.state promise with
   | Lwt.Return result -> result

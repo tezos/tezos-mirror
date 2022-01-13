@@ -67,6 +67,8 @@ module M = struct
 
     let list _ ?offset:_ ?length:_ _ = assert false
 
+    let length _ _ = assert false
+
     let fold ?depth:_ _ _ ~order:_ ~init:_ ~f:_ = assert false
   end
 

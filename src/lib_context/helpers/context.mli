@@ -44,6 +44,8 @@ module Make_tree (DB : DB) : sig
        and type value := DB.contents
        and type tree := DB.tree
 
+  module Proof : Tezos_context_sigs.Context.PROOF
+
   val pp : Format.formatter -> DB.tree -> unit
 
   val empty : _ -> DB.tree
@@ -65,6 +67,29 @@ module Make_tree (DB : DB) : sig
   val make_repo : unit -> DB.repo Lwt.t
 
   val shallow : DB.repo -> kinded_hash -> DB.tree
+
+  type tree_proof := Proof.tree Proof.t
+
+  type stream_proof := Proof.stream Proof.t
+
+  type ('proof, 'result) producer :=
+    repo ->
+    kinded_hash ->
+    (DB.tree -> (DB.tree * 'result) Lwt.t) ->
+    ('proof * 'result) Lwt.t
+
+  type ('proof, 'result) verifier :=
+    'proof ->
+    (DB.tree -> (DB.tree * 'result) Lwt.t) ->
+    (DB.tree * 'result, [`Msg of string]) result Lwt.t
+
+  val produce_proof : (tree_proof, 'a) producer
+
+  val verify_proof : (tree_proof, 'a) verifier
+
+  val produce_stream : (stream_proof, 'a) producer
+
+  val verify_stream : (stream_proof, 'a) verifier
 
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
     trees. It is exposed for so that the memory context can in turn raise it. *)
