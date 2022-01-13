@@ -90,6 +90,17 @@ let qcheck_eq_tests ~eq ~gen ~eq_name =
 let qcheck_eq' ?pp ?cmp ?eq ~expected ~actual () =
   qcheck_eq ?pp ?cmp ?eq expected actual
 
+let qcheck_cond ?pp ~cond e () =
+  if cond e then true
+  else
+    match pp with
+    | None ->
+        QCheck.Test.fail_reportf
+          "@[<h 0>The condition check failed, but no pretty printer was \
+           provided.@]"
+    | Some pp ->
+        QCheck.Test.fail_reportf "@[<v 2>The condition check failed!@,%a@]" pp e
+
 let int64_range_gen a b =
   let gen a b st =
     let range = Int64.sub b a in
