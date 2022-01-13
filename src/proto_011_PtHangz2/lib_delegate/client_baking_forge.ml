@@ -473,16 +473,23 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
   let compare (op, weight_ratio, source, counter)
       (op', weight_ratio', source', counter') =
     (* Be careful with the [compare]s *)
-    if Signature.Public_key_hash.equal source source' then
+    let cmp_src = Signature.Public_key_hash.compare source source' in
+    if cmp_src = 0 then
       (* we want the smallest counter first *)
-      Z.compare counter counter'
+      let c = Z.compare counter counter' in
+      if c <> 0 then c
+      else
+        (* Higher priority first *)
+        let c = PrioritizedOperation.compare_priority op' op in
+        if c <> 0 then c else Q.compare weight_ratio' weight_ratio
     else
-      (* Prioritize according to tags first, then weight *)
-      match PrioritizedOperation.compare_priority op' op with
-      | 0 ->
-          (* We want the biggest weight first *)
-          Q.compare weight_ratio' weight_ratio
-      | n -> n
+      (* Higher priority first *)
+      let c = PrioritizedOperation.compare_priority op' op in
+      if c <> 0 then c
+      else
+        (* We want the biggest weight first *)
+        let c = Q.compare weight_ratio' weight_ratio in
+        if c <> 0 then c else cmp_src
   in
   List.sort compare operations |> List.map (fun (op, _, _, _) -> op)
 
