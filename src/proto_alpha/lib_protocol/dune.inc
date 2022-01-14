@@ -65,6 +65,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -210,6 +212,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -355,6 +359,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -522,6 +528,8 @@ include Tezos_raw_protocol_alpha.Main
    Script_repr
    Cache_memory_helpers
    Contract_repr
+   Indexable
+   Tx_rollup_l2_address
    Tx_rollup_repr
    Tx_rollup_state_repr
    Roll_repr_legacy
@@ -708,6 +716,8 @@ include Tezos_raw_protocol_alpha.Main
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml

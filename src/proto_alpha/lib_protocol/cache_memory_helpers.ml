@@ -92,6 +92,8 @@ let word_size = !!8
 
 let header_size = word_size
 
+let int32_size = header_size +! word_size
+
 let int64_size = header_size +! (word_size *? 2)
 
 let h1w = header_size +! word_size
