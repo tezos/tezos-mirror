@@ -52,6 +52,14 @@ let get :
   | Some state -> return (ctxt, state)
   | None -> fail (Tx_rollup_does_not_exist tx_rollup)
 
+let assert_exist :
+    Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t =
+ fun ctxt tx_rollup ->
+  Storage.Tx_rollup.State.mem ctxt tx_rollup
+  >>=? fun (ctxt, tx_rollup_exists) ->
+  fail_unless tx_rollup_exists (Tx_rollup_does_not_exist tx_rollup)
+  >>=? fun () -> return ctxt
+
 (* ------ Error registration ------------------------------------------------ *)
 
 let () =

@@ -61,6 +61,8 @@
         "Raw_context_intf",
         "Raw_context",
         "Ticket_hash_repr",
+        "Tx_rollup_message_repr",
+        "Tx_rollup_inbox_repr",
         "Storage_costs",
         "Storage_sigs",
         "Storage_functors",
@@ -98,6 +100,7 @@
         "Global_constants_costs",
         "Global_constants_storage",
         "Tx_rollup_state_storage",
+        "Tx_rollup_inbox_storage",
         "Tx_rollup_storage",
         "Sc_rollup_storage",
 

@@ -258,6 +258,13 @@ module Tx_rollup_state = struct
   include Tx_rollup_state_storage
 end
 
+module Tx_rollup_message = Tx_rollup_message_repr
+
+module Tx_rollup_inbox = struct
+  include Tx_rollup_inbox_repr
+  include Tx_rollup_inbox_storage
+end
+
 module Global_constants_storage = Global_constants_storage
 
 module Big_map = struct

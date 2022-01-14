@@ -699,6 +699,37 @@ module Tx_rollup : sig
       with type key = Tx_rollup_repr.t
        and type value = Tx_rollup_state_repr.t
        and type t := Raw_context.t
+
+  (** The number of bytes allocated by the messages stored in each inbox. *)
+  module Inbox_cumulated_size :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * Raw_level_repr.t
+       and type key = Tx_rollup_repr.t
+       and type value = int
+
+  (** A carbonated storage to store the hashes of the messages
+      appended in an inbox, in reverse order.
+
+      The actual content is already stored in the block (as part of
+      the operations), so by only storing the hashes we avoid
+      unnecessary storage duplication. *)
+  module Inbox_rev_contents :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t * Raw_level_repr.t
+       and type key = Tx_rollup_repr.t
+       and type value = Tx_rollup_message_repr.hash list
+
+  (** [fold (ctxt, level) ~order ~init ~f] traverses all rollups with
+      a nonempty inbox at [level].
+
+      No assurances whatsoever are provided regarding the order of
+      traversal. *)
+  val fold :
+    Raw_context.t ->
+    Raw_level_repr.t ->
+    init:'a ->
+    f:(Tx_rollup_repr.t -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 end
 
 (** Smart contract rollup *)

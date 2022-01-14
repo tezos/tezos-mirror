@@ -25,50 +25,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A collection of functions to manipulate the state of a transaction
-    rollup.
+type t = {contents : Tx_rollup_message_repr.hash list; cumulated_size : int}
 
-    Except if the contrary is explicitly stated, the functions of this
-    module are carbonated. *)
+let pp fmt {contents; cumulated_size} =
+  Format.fprintf
+    fmt
+    "tx rollup inbox: %d messages using %d bytes"
+    (List.length contents)
+    cumulated_size
 
-type error +=
-  | Tx_rollup_already_exists of Tx_rollup_repr.t
-  | Tx_rollup_does_not_exist of Tx_rollup_repr.t
-
-(** [init ctxt tx_rollup] initializes the state of [tx_rollup].
-
-    Returns the error [Tx_rollup_already_exists] iff this function has
-    already been called for [tx_rollup], which is definitely something
-    that should not happen, because the protocol is expected to pick
-    fresh addresses when it originates new transaction rollups (and
-    does so by relying on the “origination nonce” derived from the
-    hash of the operation responsible for the origination, using the
-    same procedure as smart contracts).
-
-    Raising this error would therefore indicate a bug in the
-    protocol. *)
-val init : Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t
-
-(** [find ctxt tx_rollup] returns the current state of [tx_rollup]. If
-    [tx_rollup] is not the address of an existing transaction rollup,
-    [None] is returned instead. *)
-val find :
-  Raw_context.t ->
-  Tx_rollup_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t option) tzresult Lwt.t
-
-(** [get ctxt tx_rollup] returns the current state of [tx_rollup] in
-    the context.
-
-    Returns the [Tx_rollup_does_not_exist] error iff [tx_rollup] is
-    not the address of an existing transaction rollup. *)
-val get :
-  Raw_context.t ->
-  Tx_rollup_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
-
-(** [assert_exist ctxt tx_rollup] fails with
-    [Tx_rollup_does_not_exist] when [tx_rollup] is not a valid
-    transaction rollup address. *)
-val assert_exist :
-  Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {contents; cumulated_size} -> (contents, cumulated_size))
+    (fun (contents, cumulated_size) -> {contents; cumulated_size})
+    (obj2
+       (req "contents" @@ list Tx_rollup_message_repr.hash_encoding)
+       (req "cumulated_size" int31))
