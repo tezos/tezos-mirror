@@ -44,7 +44,11 @@ let block_hash_gen : Block_hash.t QCheck2.Gen.t =
       {!proto_gen} above. This default is fine for cases where having
       valid proto bytes doesn't matter (for example for {!Prevalidator_classification}).
     - [block_hash_t] is an optional generator for the branch.
-      If omitted {!block_hash_gen} is used. *)
+      If omitted {!block_hash_gen} is used.
+
+    This function should be renamed to [raw_operation_gen] at some point,
+    because it returns {!Operation.t} (the [op] prefix is for functions
+    returning {!Prevalidation.operation} values). *)
 let operation_gen ?(proto_gen = operation_proto_gen) ?block_hash_t () :
     Operation.t QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -77,6 +81,24 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
       let+ weights = small_list (q_in_0_1 ()) in
       `Low weights
 
+(** [operation_with_hash_gen ?proto_gen ?block_hash_t ()] is a generator
+    for parsable operations, i.e. values of type {!Prevalidation.operation}.
+
+    In production, this type guarantees that the underlying operation
+    has been successfully parsed. This is NOT the case with this generator.
+    This is a weakness of this function that can only be solved by
+    clearly making the difference between proto-dependent tests and
+    proto-independent tests.
+
+    By default, [?proto_gen] is [operation_proto_gen] which
+    generates random bytes, making generated operations unparsable generally
+    speaking. One can make sure that this generator generates
+    parsable operations by assuming a protocol and using a custom [proto_gen].
+    As an example this is the case when using
+    {!Environment_protocol_T_test.Internal_for_tests.Mock_all_unit} as the
+    protocol and specifying [proto_gen] to be [string_size (return 0)] i.e.
+    to have both [operation_data = unit] and strings generated for
+    [operation_data] always empty. *)
 let operation_with_hash_gen ?proto_gen ?block_hash_t () :
     unit Prevalidation.operation QCheck2.Gen.t =
   let open QCheck2.Gen in
