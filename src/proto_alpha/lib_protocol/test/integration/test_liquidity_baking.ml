@@ -179,37 +179,32 @@ let liquidity_baking_escape_hatch n_vote_on n_vote_off escape_level
 
 (* 100% of blocks have liquidity_baking_escape_vote = true *)
 let liquidity_baking_escape_hatch_100 n () =
-  liquidity_baking_escape_hatch 0 1 812 n ()
+  liquidity_baking_escape_hatch 0 1 1387 n ()
 
 (* 80% of blocks have liquidity_baking_escape_vote = true *)
 let liquidity_baking_escape_hatch_80 n () =
-  liquidity_baking_escape_hatch 1 4 1079 n ()
+  liquidity_baking_escape_hatch 1 4 1964 n ()
 
 (* 60% of blocks have liquidity_baking_escape_vote = true *)
 let liquidity_baking_escape_hatch_60 n () =
-  liquidity_baking_escape_hatch 2 3 1624 n ()
+  liquidity_baking_escape_hatch 2 3 3590 n ()
 
-(* 40% of blocks have liquidity_baking_escape_vote = true *)
-let liquidity_baking_escape_hatch_40 n () =
-  liquidity_baking_escape_hatch 3 2 3590 n ()
-
-(* 33% of blocks have liquidity_baking_escape_vote = LB_off.
+(* 50% of blocks have liquidity_baking_escape_vote = LB_off.
    Escape hatch should not be activated. *)
-let liquidity_baking_escape_hatch_33 n () =
+let liquidity_baking_escape_hatch_50 n () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.get_constants (B blk) >>=? fun csts ->
   let sunset = csts.parametric.liquidity_baking_sunset_level in
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
-  let rec bake_33_percent_escaping blk i =
+  let rec bake_50_percent_escaping blk i =
     if i < Int32.to_int sunset + n then
       Block.bake ~liquidity_baking_escape_vote:LB_on blk >>=? fun blk ->
-      Block.bake ~liquidity_baking_escape_vote:LB_on blk >>=? fun blk ->
       Block.bake ~liquidity_baking_escape_vote:LB_off blk >>=? fun blk ->
-      bake_33_percent_escaping blk (i + 3)
+      bake_50_percent_escaping blk (i + 2)
     else return blk
   in
-  bake_33_percent_escaping blk 0 >>=? fun blk ->
+  bake_50_percent_escaping blk 0 >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   (liquidity_baking_subsidy *? Int64.(sub (of_int32 sunset) 1L))
@@ -247,7 +242,7 @@ let liquidity_baking_escape_ema_zero () =
 
 (* The EMA should be not much over the threshold after the escape hatch has been activated. We add 1_000 to the constant to give room for the last update. *)
 let liquidity_baking_escape_ema_threshold () =
-  liquidity_baking_escape_ema 0 1 812 1 667_667 ()
+  liquidity_baking_escape_ema 0 1 1387 1 1_001_000 ()
 
 let liquidity_baking_storage n () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
@@ -490,35 +485,20 @@ let tests =
       `Quick
       (liquidity_baking_escape_hatch_60 100);
     Tztest.tztest
-      "test liquidity baking escape hatch with 40% of bakers flagging when \
-       baking one block longer"
+      "test liquidity baking shuts off at sunset level with escape hatch at \
+       50% and baking one block longer"
       `Quick
-      (liquidity_baking_escape_hatch_40 1);
-    Tztest.tztest
-      "test liquidity baking escape hatch with 40% of bakers flagging when \
-       baking two blocks longer"
-      `Quick
-      (liquidity_baking_escape_hatch_40 2);
-    Tztest.tztest
-      "test liquidity baking escape hatch with 40% of bakers flagging when \
-       baking 100 blocks longer"
-      `Quick
-      (liquidity_baking_escape_hatch_40 100);
+      (liquidity_baking_escape_hatch_50 1);
     Tztest.tztest
       "test liquidity baking shuts off at sunset level with escape hatch at \
-       33% and baking one block longer"
+       50% and baking two blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_33 1);
+      (liquidity_baking_escape_hatch_50 2);
     Tztest.tztest
       "test liquidity baking shuts off at sunset level with escape hatch at \
-       33% and baking two blocks longer"
+       50% and baking 100 blocks longer"
       `Quick
-      (liquidity_baking_escape_hatch_33 2);
-    Tztest.tztest
-      "test liquidity baking shuts off at sunset level with escape hatch at \
-       33% and baking 100 blocks longer"
-      `Quick
-      (liquidity_baking_escape_hatch_33 100);
+      (liquidity_baking_escape_hatch_50 100);
     Tztest.tztest
       "test liquidity baking escape ema in block metadata is zero with no \
        bakers flagging."

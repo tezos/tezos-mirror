@@ -228,7 +228,7 @@ trustworthy:
   "min_proposal_quorum": 500,
   "liquidity_baking_subsidy": "2500000",
   "liquidity_baking_sunset_level": 3063809,
-  "liquidity_baking_escape_ema_threshold": 666667,
+  "liquidity_baking_escape_ema_threshold": 1000000,
   "max_operations_time_to_live": 120,
   "minimal_block_delay": "30",
   "delay_increment_per_round": "15",

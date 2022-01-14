@@ -881,8 +881,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             min_proposal_quorum = c.min_proposal_quorum;
             liquidity_baking_subsidy = c.liquidity_baking_subsidy;
             liquidity_baking_sunset_level = c.liquidity_baking_sunset_level;
-            liquidity_baking_escape_ema_threshold =
-              c.liquidity_baking_escape_ema_threshold;
+            liquidity_baking_escape_ema_threshold = 1_000_000l;
             minimal_block_delay = c.minimal_block_delay;
             delay_increment_per_round = c.delay_increment_per_round;
             consensus_committee_size = c.consensus_committee_size;
