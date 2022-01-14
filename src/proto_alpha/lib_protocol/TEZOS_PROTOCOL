@@ -41,6 +41,7 @@
         "Cache_memory_helpers",
         "Contract_repr",
         "Tx_rollup_repr",
+        "Tx_rollup_state_repr",
         "Roll_repr_legacy",
         "Vote_repr",
         "Block_header_repr",
@@ -93,6 +94,7 @@
 
         "Global_constants_costs",
         "Global_constants_storage",
+        "Tx_rollup_state_storage",
         "Tx_rollup_storage",
         "Sc_rollup_storage",
 

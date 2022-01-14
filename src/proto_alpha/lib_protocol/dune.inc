@@ -66,6 +66,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -115,6 +116,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_state_storage.mli tx_rollup_state_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
@@ -205,6 +207,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -254,6 +257,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_state_storage.mli tx_rollup_state_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
@@ -344,6 +348,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -393,6 +398,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_state_storage.mli tx_rollup_state_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
@@ -505,6 +511,7 @@ include Tezos_raw_protocol_alpha.Main
    Cache_memory_helpers
    Contract_repr
    Tx_rollup_repr
+   Tx_rollup_state_repr
    Roll_repr_legacy
    Vote_repr
    Block_header_repr
@@ -554,6 +561,7 @@ include Tezos_raw_protocol_alpha.Main
    Sapling_validator
    Global_constants_costs
    Global_constants_storage
+   Tx_rollup_state_storage
    Tx_rollup_storage
    Sc_rollup_storage
    Alpha_context
@@ -685,6 +693,7 @@ include Tezos_raw_protocol_alpha.Main
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -734,6 +743,7 @@ include Tezos_raw_protocol_alpha.Main
    sapling_validator.ml
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
+   tx_rollup_state_storage.mli tx_rollup_state_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml

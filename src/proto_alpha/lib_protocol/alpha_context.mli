@@ -1519,9 +1519,8 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
-(** This simply re-exports [Tx_rollup_repr] and [tx_rollup_storage]. See
-    [tx_rollup_repr] and [tx_rollup_storage] for additional documentation of this
-    module *)
+(** This module re-exports definitions from {!Tx_rollup_repr} and
+    {!Tx_rollup_storage}. *)
 module Tx_rollup : sig
   include BASIC_DATA
 
@@ -1539,19 +1538,31 @@ module Tx_rollup : sig
 
   val originate : context -> (context * tx_rollup) tzresult Lwt.t
 
-  type state
-
-  val state : context -> tx_rollup -> state option tzresult Lwt.t
-
-  val state_encoding : state Data_encoding.t
-
-  val pp_state : Format.formatter -> state -> unit
-
   module Internal_for_tests : sig
     (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
     val originated_tx_rollup :
       Origination_nonce.Internal_for_tests.t -> tx_rollup
   end
+end
+
+(** This module re-exports definitions from {!Tx_rollup_state_repr}
+    and {!Tx_rollup_state_storage}. *)
+module Tx_rollup_state : sig
+  type t
+
+  val initial_state : t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val find : context -> Tx_rollup.t -> (context * t option) tzresult Lwt.t
+
+  val get : context -> Tx_rollup.t -> (context * t) tzresult Lwt.t
+
+  type error +=
+    | Tx_rollup_already_exists of Tx_rollup.t
+    | Tx_rollup_does_not_exist of Tx_rollup.t
 end
 
 module Delegate : sig

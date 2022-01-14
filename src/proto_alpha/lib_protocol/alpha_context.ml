@@ -251,6 +251,11 @@ module Tx_rollup = struct
   module Internal_for_tests = Tx_rollup_repr
 end
 
+module Tx_rollup_state = struct
+  include Tx_rollup_state_repr
+  include Tx_rollup_state_storage
+end
+
 module Global_constants_storage = Global_constants_storage
 
 module Big_map = struct

@@ -30,7 +30,4 @@ let fresh_tx_rollup_from_current_nonce ctxt =
 
 let originate ctxt =
   fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
-  Storage.Tx_rollup.State.add ctxt tx_rollup Tx_rollup_repr.empty_state
-  >|= fun ctxt -> ok (ctxt, tx_rollup)
-
-let state c tx_rollup = Storage.Tx_rollup.State.find c tx_rollup
+  Tx_rollup_state_storage.init ctxt tx_rollup >|=? fun ctxt -> (ctxt, tx_rollup)

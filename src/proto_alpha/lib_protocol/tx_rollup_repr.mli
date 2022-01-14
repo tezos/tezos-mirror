@@ -57,15 +57,3 @@ val originated_tx_rollup : Origination_nonce.t -> t
 val rpc_arg : t RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t
-
-(** [state] is an empty type but will be changed in a future MR to represent the
-    state of a tx_rollup. *)
-type state
-
-val state_encoding : state Data_encoding.t
-
-(** [empty_state] is the initial value at the origination of a
-    tx_rollup. It contains no inboxes. *)
-val empty_state : state
-
-val pp_state : Format.formatter -> state -> unit

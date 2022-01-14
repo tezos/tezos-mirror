@@ -1,0 +1,5 @@
+tezt/_regressions/tx_rollup_simple_use_case.out
+tru16exZdBrSxKkp8MrDxdzgR9yujW3RhF5vm
+
+./tezos-client rpc get /chains/main/blocks/head/context/tx_rollup/tru16exZdBrSxKkp8MrDxdzgR9yujW3RhF5vm/state
+{}

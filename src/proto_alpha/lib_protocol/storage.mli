@@ -693,13 +693,11 @@ module Tenderbake : sig
 end
 
 module Tx_rollup : sig
-  (** Storage from this submodule must only be accessed through the
-      module `Tx_rollup_storage`. *)
-
+  (** [State] stores the state of a transaction rollup. *)
   module State :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Tx_rollup_repr.t
-       and type value = Tx_rollup_repr.state
+       and type value = Tx_rollup_state_repr.t
        and type t := Raw_context.t
 end
 
