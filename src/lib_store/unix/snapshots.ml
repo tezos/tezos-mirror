@@ -2124,65 +2124,70 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
       (files : Cemented_block_store.cemented_blocks_file list) =
     let open Lwt_result_syntax in
     let open Cemented_block_store in
+    let*! () = Event.(emit exporting_cemented_cycles) () in
     let nb_cycles = List.length files in
     (* Rebuild fresh indexes: cannot cp because of concurrent accesses *)
     let fresh_level_index, fresh_hash_index =
       Exporter.create_cemented_block_indexes snapshot_exporter
     in
-    protect (fun () ->
-        let* () =
-          Animation.display_progress
-            ~pp_print_step:(fun fmt i ->
-              Format.fprintf
-                fmt
-                "Copying cemented blocks and populating indexes: %d/%d cycles"
-                i
-                nb_cycles)
-            ~progress_display_mode
-            (fun notify ->
-              (* Bound the number of copying threads *)
-              List.iter_es
-                (fun ({start_level; end_level; file} as cemented_file) ->
-                  let* () =
-                    Cemented_block_store.iter_cemented_file
-                      (fun block ->
-                        let hash = Block_repr.hash block in
-                        let level = Block_repr.level block in
-                        Cemented_block_level_index.replace
-                          fresh_level_index
-                          hash
-                          level ;
-                        Cemented_block_hash_index.replace
-                          fresh_hash_index
-                          level
-                          hash ;
-                        Lwt.return_unit)
-                      cemented_file
-                  in
-                  let file_path = Naming.file_path file in
-                  let*! () =
-                    Exporter.copy_cemented_block
-                      snapshot_exporter
-                      ~file:file_path
-                      ~start_level
-                      ~end_level
-                  in
-                  let*! () = notify () in
-                  return_unit)
-                files)
-        in
-        Cemented_block_level_index.close fresh_level_index ;
-        Cemented_block_hash_index.close fresh_hash_index ;
-        let*! () =
-          Exporter.clear_cemented_block_indexes_lockfiles snapshot_exporter
-        in
-        if should_filter_indexes && files <> [] then
-          Exporter.filter_cemented_block_indexes
-            snapshot_exporter
-            ~limit:
-              (List.last_opt files |> WithExceptions.Option.get ~loc:__LOC__)
-                .end_level ;
-        return_unit)
+    let* () =
+      protect (fun () ->
+          let* () =
+            Animation.display_progress
+              ~pp_print_step:(fun fmt i ->
+                Format.fprintf
+                  fmt
+                  "Copying cemented blocks and populating indexes: %d/%d cycles"
+                  i
+                  nb_cycles)
+              ~progress_display_mode
+              (fun notify ->
+                (* Bound the number of copying threads *)
+                List.iter_es
+                  (fun ({start_level; end_level; file} as cemented_file) ->
+                    let* () =
+                      Cemented_block_store.iter_cemented_file
+                        (fun block ->
+                          let hash = Block_repr.hash block in
+                          let level = Block_repr.level block in
+                          Cemented_block_level_index.replace
+                            fresh_level_index
+                            hash
+                            level ;
+                          Cemented_block_hash_index.replace
+                            fresh_hash_index
+                            level
+                            hash ;
+                          Lwt.return_unit)
+                        cemented_file
+                    in
+                    let file_path = Naming.file_path file in
+                    let*! () =
+                      Exporter.copy_cemented_block
+                        snapshot_exporter
+                        ~file:file_path
+                        ~start_level
+                        ~end_level
+                    in
+                    let*! () = notify () in
+                    return_unit)
+                  files)
+          in
+          Cemented_block_level_index.close fresh_level_index ;
+          Cemented_block_hash_index.close fresh_hash_index ;
+          let*! () =
+            Exporter.clear_cemented_block_indexes_lockfiles snapshot_exporter
+          in
+          if should_filter_indexes && files <> [] then
+            Exporter.filter_cemented_block_indexes
+              snapshot_exporter
+              ~limit:
+                (List.last_opt files |> WithExceptions.Option.get ~loc:__LOC__)
+                  .end_level ;
+          return_unit)
+    in
+    let*! () = Event.(emit cemented_cycles_exported) () in
+    return_unit
 
   let write_floating_block fd (block : Block_repr.t) =
     let bytes = Data_encoding.Binary.to_bytes_exn Block_repr.encoding block in
@@ -2250,6 +2255,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export_protocols snapshot_exporter export_block all_protocol_levels
       protocol_store_dir progress_display_mode =
     let open Lwt_syntax in
+    let* () = Event.(emit exporting_protocols) () in
     let export_proto_level = Store.Block.proto_level export_block in
     (* Export only the protocols with a protocol level below the
        protocol's level of the targeted export block. *)
@@ -2314,7 +2320,9 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
         in
         Lwt.finalize
           (fun () -> copy_protocols ())
-          (fun () -> Lwt_unix.closedir dir_handle))
+          (fun () ->
+            let* () = Lwt_unix.closedir dir_handle in
+            Event.(emit protocols_exported) ()))
 
   (* Ensures that the data needed to export the snapshot from the target
      block is available:
@@ -2523,6 +2531,7 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
   let export_floating_block_stream snapshot_exporter floating_block_stream
       progress_display_mode =
     let open Lwt_syntax in
+    let* () = Event.(emit exporting_floating_blocks) () in
     let f fd =
       let* is_empty = Lwt_stream.is_empty floating_block_stream in
       if is_empty then Lwt.return_unit
@@ -2540,20 +2549,28 @@ module Make_snapshot_exporter (Exporter : EXPORTER) : Snapshot_exporter = struct
           ~progress_display_mode
     in
     let* () = Exporter.write_floating_blocks snapshot_exporter ~f in
+    let* () = Event.(emit floating_blocks_exported) () in
     return_ok_unit
 
   let export_context snapshot_exporter ~context_dir context_hash =
     let open Lwt_result_syntax in
+    let*! () = Event.(emit exporting_context) () in
     let*! context_index = Context.init ~readonly:true context_dir in
     let is_gc_allowed = Context.is_gc_allowed context_index in
-    if not is_gc_allowed then tzfail Cannot_export_snapshot_format
-    else
-      Animation.three_dots ~progress_display_mode:Auto ~msg:"Exporting context"
-      @@ fun () ->
-      Lwt.finalize
-        (fun () ->
-          Exporter.export_context snapshot_exporter context_index context_hash)
-        (fun () -> Context.close context_index)
+    let* () =
+      if not is_gc_allowed then tzfail Cannot_export_snapshot_format
+      else
+        Animation.three_dots
+          ~progress_display_mode:Auto
+          ~msg:"Exporting context"
+        @@ fun () ->
+        Lwt.finalize
+          (fun () ->
+            Exporter.export_context snapshot_exporter context_index context_hash)
+          (fun () -> Context.close context_index)
+    in
+    let*! () = Event.(emit context_exported) () in
+    return_unit
 
   let export_rolling snapshot_exporter ~store_dir ~context_dir ~block ~rolling
       genesis =
@@ -3890,8 +3907,10 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
   let restore_cemented_blocks ?(check_consistency = true) ~dst_chain_dir
       ~genesis_hash ~progress_display_mode snapshot_importer =
     let open Lwt_result_syntax in
+    let*! () = Event.(emit restoring_cemented_indexes) () in
     let*! () = Importer.restore_cemented_indexes snapshot_importer in
     let* cemented_files = Importer.load_cemented_files snapshot_importer in
+    let*! () = Event.(emit restoring_cemented_cycles) () in
     let nb_cemented_files = List.length cemented_files in
     let* () =
       if nb_cemented_files > 0 then
@@ -3915,12 +3934,14 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               cemented_files)
       else return_unit
     in
+    let*! () = Event.(emit cemented_cycles_restored) () in
     let* cemented_store =
       Cemented_block_store.init
         ~log_size:cemented_import_log_size
         ~readonly:false
         dst_chain_dir
     in
+    let*! () = Event.(emit checking_cycles_consistency) () in
     let* () =
       if check_consistency && nb_cemented_files > 0 then
         match Cemented_block_store.cemented_blocks_files cemented_store with
@@ -3958,6 +3979,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       else return_unit
     in
     Cemented_block_store.close cemented_store ;
+    let*! () = Event.(emit cycles_consistency_checked) () in
     return_unit
 
   let read_floating_blocks snapshot_importer ~genesis_hash =
@@ -3965,6 +3987,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
 
   let restore_protocols snapshot_importer progress_display_mode =
     let open Lwt_result_syntax in
+    let*! () = Event.(emit restoring_protocols) () in
     (* Import protocol table *)
     let* protocol_levels = Importer.load_protocol_table snapshot_importer in
     (* Retrieve protocol files *)
@@ -3992,6 +4015,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
           in
           List.iter_es validate_and_copy protocols)
     in
+    let*! () = Event.(emit protocols_restored) () in
     return protocol_levels
 
   let import_log_notice ~snapshot_version ~snapshot_metadata filename block =
@@ -4151,6 +4175,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
               tzfail (Cannot_read {kind = `Metadata; path = "snapshot's file"})
           | Legacy metadata -> return metadata.context_elements
         in
+        let*! () = Event.(emit restoring_context) () in
         let* () =
           Importer.legacy_restore_context
             snapshot_importer
@@ -4159,6 +4184,8 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~nb_context_elements:context_elements
             ~progress_display_mode
         in
+        let*! () = Event.(emit context_restored) () in
+        let*! () = Event.(emit applying_target_block) () in
         let* block_validation_result =
           apply_context
             context_index
@@ -4173,6 +4200,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~user_activated_protocol_overrides
             ~operation_metadata_size_limit
         in
+        let*! () = Event.(emit target_block_applied) () in
         let*! () = Context.close context_index in
         return (genesis_ctxt_hash, block_validation_result)
       else
@@ -4416,6 +4444,7 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
       | Rolling _ -> return (Rolling None)
       | Full _ -> return (Full None)
     in
+    let*! () = Event.(emit restoring_floating_blocks) () in
     let* () =
       Animation.display_progress
         ~every:100
@@ -4437,8 +4466,9 @@ module Make_snapshot_importer (Importer : IMPORTER) : Snapshot_importer = struct
             ~history_mode)
     in
     let* () = reading_thread in
-    let*! () = Event.(emit import_success snapshot_path) in
+    let*! () = Event.(emit floating_blocks_restored) () in
     let*! () = close snapshot_importer in
+    let*! () = Event.(emit import_success snapshot_path) in
     return_unit
 end
 

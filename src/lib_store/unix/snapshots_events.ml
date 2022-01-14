@@ -157,4 +157,173 @@ module Event = struct
          version 7."
       ~pp1:Format.pp_print_int
       ("version", Data_encoding.int31)
+
+  (* Debug *)
+  let restoring_context =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"restoring_context"
+      ~msg:"restoring the context from the snapshot"
+      ()
+
+  let context_restored =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"context_restored"
+      ~msg:"context was successfully restored"
+      ()
+
+  let applying_target_block =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"applying_target_block"
+      ~msg:"applying the block targeted by the snapshot"
+      ()
+
+  let target_block_applied =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"target_block_applied"
+      ~msg:"block target was successfully applied"
+      ()
+
+  let restoring_protocols =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"restoring_protocols"
+      ~msg:"restoring protocols from snapshot"
+      ()
+
+  let protocols_restored =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"protocols_restored"
+      ~msg:"protocols were successfully restored"
+      ()
+
+  let restoring_cemented_indexes =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"restoring_cemented_indexes"
+      ~msg:"restoring cemented indexes"
+      ()
+
+  let restoring_cemented_cycles =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"restoring_cemented_cycles"
+      ~msg:"restoring cemented cycles"
+      ()
+
+  let cemented_cycles_restored =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"cemented_cycles_restored"
+      ~msg:"cemented cycles were successfully restored"
+      ()
+
+  let checking_cycles_consistency =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"checking_cycles_consistency"
+      ~msg:"checking cemented cycles consistency"
+      ()
+
+  let cycles_consistency_checked =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"cycles_consistency_checked"
+      ~msg:"cemented cycles consistency checked"
+      ()
+
+  let restoring_floating_blocks =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"restoring_floating_blocks"
+      ~msg:"restoring floating blocks"
+      ()
+
+  let floating_blocks_restored =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"floating_blocks_restored"
+      ~msg:"floating blocks were successfully restored"
+      ()
+
+  let exporting_cemented_cycles =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"exporting_cemented_cycles"
+      ~msg:"exporting cemented cycles"
+      ()
+
+  let cemented_cycles_exported =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"cemented_cycles_exported"
+      ~msg:"cemented cycles were successfully exported"
+      ()
+
+  let exporting_context =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"exporting_context"
+      ~msg:"exporting context"
+      ()
+
+  let context_exported =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"exported_context"
+      ~msg:"context was successfully exported"
+      ()
+
+  let exporting_floating_blocks =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"exporting_floating_blocks"
+      ~msg:"exporting floating blocks"
+      ()
+
+  let floating_blocks_exported =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"floating_blocks_exported"
+      ~msg:"floating blocks were successfully exported"
+      ()
+
+  let exporting_protocols =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"exporting_protocols"
+      ~msg:"exporting protocols"
+      ()
+
+  let protocols_exported =
+    declare_0
+      ~section
+      ~level:Debug
+      ~name:"protocols_exported"
+      ~msg:"protocols were successfully exported"
+      ()
 end
