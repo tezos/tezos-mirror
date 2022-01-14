@@ -587,10 +587,12 @@ let simulate_switch =
 let force_switch =
   Clic.switch
     ~long:"force"
-    ~doc:"Inject the operation even if the simulation results in a failure."
+    ~doc:
+      "Inject the operation even if the simulation results in a failure. This \
+       switch requires --gas-limit, --storage-limit, and --fee."
     ()
 
-let transfer_command amount source destination cctxt
+let transfer_command amount source destination (cctxt : #Client_context.printer)
     ( fee,
       dry_run,
       verbose_signing,
@@ -618,6 +620,22 @@ let transfer_command amount source destination cctxt
       burn_cap;
     }
   in
+  (* When --force is used we want to inject the transfer even if it fails.
+     In that case we cannot rely on simulation to compute limits and fees
+     so we require the corresponding options to be set. *)
+  let check_force_dependency name = function
+    | None ->
+        cctxt#error
+          "When the --force switch is used, the %s option is required."
+          name
+    | _ -> Lwt.return_unit
+  in
+  (if force then
+   check_force_dependency "--gas-limit" gas_limit >>= fun () ->
+   check_force_dependency "--storage-limit" storage_limit >>= fun () ->
+   check_force_dependency "--fee" fee
+  else Lwt.return_unit)
+  >>= fun () ->
   (match Contract.is_implicit source with
   | None ->
       let contract = source in
