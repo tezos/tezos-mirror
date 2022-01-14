@@ -38,11 +38,11 @@ val filter_operations_with_simulation :
   Baking_simulator.incremental ->
   Baking_configuration.fees_config ->
   hard_gas_limit_per_block:Gas.Arith.integral ->
-  Operation_pool.pool ->
+  Operation_pool.Prioritized.t ->
   simulation_result tzresult Lwt.t
 
 val filter_operations_without_simulation :
   Baking_configuration.fees_config ->
   hard_gas_limit_per_block:Gas.Arith.integral ->
-  Operation_pool.pool ->
+  Operation_pool.Prioritized.t ->
   packed_operation list list

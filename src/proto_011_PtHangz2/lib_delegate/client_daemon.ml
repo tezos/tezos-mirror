@@ -94,7 +94,8 @@ end
 module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-      ?per_block_vote_file ~chain ~context_path ~keep_alive delegates =
+      ?per_block_vote_file ?extra_operations ~chain ~context_path ~keep_alive
+      delegates =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -118,6 +119,7 @@ module Baker = struct
         ?minimal_nanotez_per_byte
         ?max_priority
         ?per_block_vote_file
+        ?extra_operations
         ~chain
         ~context_path
         delegates

@@ -34,31 +34,28 @@ val anonymous_index : int
 
 val managers_index : int
 
-module OpSet : Set.S with type elt = packed_operation
+module Operation_set : Set.S with type elt = packed_operation
 
-type pool = {
-  consensus : OpSet.t;
-  votes : OpSet.t;
-  anonymous : OpSet.t;
-  managers : OpSet.t;
+(** Generic base type pools *)
+type 'collection t = {
+  consensus : 'collection;
+  votes : 'collection;
+  anonymous : 'collection;
+  managers : 'collection;
 }
 
+(** A pool of operations for a single origin, or undifferenciated origin,
+   typically used for operations coming from the node *)
+type pool = Operation_set.t t
+
+(**  on pool *)
 val empty : pool
 
 val pp_pool : Format.formatter -> pool -> unit
 
-val pool_to_list_list : pool -> packed_operation list list
-
-val pool_of_list_list : packed_operation list list -> pool
-
 val filter_pool : (packed_operation -> bool) -> pool -> pool
 
-type ordered_pool = {
-  ordered_consensus : packed_operation list;
-  ordered_votes : packed_operation list;
-  ordered_anonymous : packed_operation list;
-  ordered_managers : packed_operation list;
-}
+type ordered_pool = packed_operation list t
 
 val ordered_pool_encoding : ordered_pool Data_encoding.t
 
@@ -96,8 +93,8 @@ type consensus_filter = {
 val filter_with_relevant_consensus_ops :
   endorsement_filter:consensus_filter ->
   preendorsement_filter:consensus_filter option ->
-  OpSet.t ->
-  OpSet.t
+  Operation_set.t ->
+  Operation_set.t
 
 val unpack_preendorsement :
   packed_operation -> Kind.preendorsement operation option
@@ -121,3 +118,49 @@ val extract_operations_of_list_list :
   * Kind.endorsement operation list
   * payload)
   option
+
+module Prioritized_operation : sig
+  type t
+
+  (** prioritize operations coming from an external source (file, uri, ...)*)
+  val extern : packed_operation -> t
+
+  (** prioritize operations coming from a node *)
+  val node : packed_operation -> t
+
+  (** [packed t] retrieves the [packed_operation] wrapped inside [t] *)
+  val packed : t -> packed_operation
+
+  (** [compare_priority o1 o2] compares whether [o1] has higher priority than [o2] *)
+  val compare_priority : t -> t -> int
+
+  (** [compare] is [compare_priority] when non-zero. This is suitable to
+      construct sets of prioritized operations **)
+  val compare : t -> t -> int
+end
+
+module Prioritized_operation_set : sig
+  include Set.S with type elt = Prioritized_operation.t
+
+  (** [operations set] is [elements set |> List.map Prioritized_operation.packed]*)
+  val operations : t -> packed_operation list
+end
+
+(** Pool of prioritized operations *)
+module Prioritized : sig
+  (** Same record fields as [type pool], but with a different set base *)
+  type nonrec t = Prioritized_operation_set.t t
+
+  (** [of_pool pool] transforms [pool] into a prioritized pool of operations of
+      low priority. *)
+  val of_pool : pool -> t
+
+  (** [merge_external_operations pool extern_ops] creates a prioritized pool
+     from a [pool] and [extern_ops] coming from an external source, which we
+     prioritize. *)
+  val merge_external_operations : t -> packed_operation list -> t
+
+  val filter : (packed_operation -> bool) -> t -> t
+
+  val add_operations : t -> Prioritized_operation.t list -> t
+end

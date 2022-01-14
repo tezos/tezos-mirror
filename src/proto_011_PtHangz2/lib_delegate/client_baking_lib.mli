@@ -35,7 +35,8 @@ val bake_block :
   ?force:bool ->
   ?max_priority:int ->
   ?minimal_timestamp:bool ->
-  ?mempool:string ->
+  ?ignore_node_mempool:bool ->
+  ?extra_operations:Client_baking_forge.Operations_source.t ->
   ?context_path:string ->
   ?src_sk:Client_keys.sk_uri ->
   liquidity_baking_escape_vote:bool ->

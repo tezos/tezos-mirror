@@ -667,6 +667,10 @@ The behavior of the client can be configured using the following environment var
   If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
   The two RPC calls this variable affects are queries that the client makes to the node in order to determine:
   (1) the protocol version of the node it connects to, and (2) the commands supported in that version.
+- `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`: This variable specifies
+  custom HTTP headers to use with the ``--operations-pool`` option. Only the Host
+  header is supported as of now (see description in `rfc2616, section 14.23
+  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_
 
 Other binaries
 --------------

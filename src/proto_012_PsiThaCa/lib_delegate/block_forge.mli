@@ -32,7 +32,7 @@ type unsigned_block = {
 }
 
 type simulation_kind =
-  | Filter of Operation_pool.pool
+  | Filter of Operation_pool.Prioritized.t
   | Apply of {
       ordered_pool : Operation_pool.ordered_pool;
       payload_hash : Block_payload_hash.t;

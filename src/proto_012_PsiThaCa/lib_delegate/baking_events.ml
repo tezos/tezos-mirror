@@ -600,6 +600,30 @@ module Actions = struct
       ~msg:"signing endorsement for {delegate}"
       ~pp1:Baking_state.pp_delegate
       ("delegate", Baking_state.delegate_encoding)
+
+  let invalid_json_file =
+    declare_1
+      ~section
+      ~name:"invalid_json_file"
+      ~level:Warning
+      ~msg:"{filename} is not a valid JSON file"
+      ("filename", Data_encoding.string)
+
+  let no_mempool_found_in_file =
+    declare_1
+      ~section
+      ~name:"no_mempool_found_in_file"
+      ~level:Warning
+      ~msg:"no mempool found in file {filename}"
+      ("filename", Data_encoding.string)
+
+  let cannot_fetch_mempool =
+    declare_1
+      ~section
+      ~name:"cannot_fetch_mempool"
+      ~level:Error
+      ~msg:"cannot fetch mempool: {errs}"
+      ("errs", Error_monad.(TzTrace.encoding error_encoding))
 end
 
 module Nonces = struct
