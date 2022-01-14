@@ -515,7 +515,7 @@ pipeline. The grain used varies slightly for different types of
 tests:
 
 Python integration and regression tests
-   Python tests are grouped in a number of batch jobs (chosen in ``.gitlab/ci/integration.yml``). This number is
+   Python tests are grouped in a number of batch jobs (chosen in :src:`.gitlab/ci/test/integration.yml`). This number is
    chosen to keep the duration of job each lower under 10 minutes on
    average, and to accommodate the addition of new protocol test
    suites.
@@ -560,7 +560,7 @@ The OCaml package tests (Alcotest & QCheck)
   Any non-protocol tests located in a folder named ``src/**/test/`` will be
   picked up automatically by the CI. No intervention is necessary.
 
-  Protocol tests must be added to :src:`.gitlab/ci/unittest.yml` under the
+  Protocol tests must be added to :src:`.gitlab/ci/test/unit.yml` under the
   protocol that they are testing. For example, to run a new protocol test for
   ``proto_XXX_YYYYYYYY``, add the corresponding
   ``src/proto_XXX_YYYYYYYY/lib_\*.test_proto`` to the ``unit:XXX_YYYYYYYY``

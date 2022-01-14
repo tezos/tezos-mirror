@@ -1,30 +1,3 @@
-test-script-gen-genesis:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
-  stage: test
-  needs: []
-  before_script:
-    - cd scripts/gen-genesis
-  script:
-    - dune build gen_genesis.exe
-
-.test_template:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
-    - .template__coverage
-  stage: test
-  before_script:
-    - . ./scripts/version.sh
-  retry: 2
-  # avoid pushing cache for testing stage
-  cache:
-    key: "$CI_COMMIT_REF_SLUG"
-    policy: pull
-
 .unit_test_template:
   extends: .test_template
   variables:

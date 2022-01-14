@@ -10,7 +10,7 @@
 # - by the CI to check them on a regular basis (e.g. every day)
 #
 # Therefore, mind keeping in sync the list of scenarios with both the Makefile
-# and the CI (file .gitlab/ci/test-doc-scripts.yml).
+# and the CI (file .gitlab/ci/doc/doc-scripts.yml).
 
 # Ubuntu Bionic Beaver 18.04 LTS:
 UBUNTU_BIONIC=public.ecr.aws/lts/ubuntu:18.04_stable

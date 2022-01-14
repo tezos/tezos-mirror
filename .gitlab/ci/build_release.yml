@@ -1,0 +1,67 @@
+.build_docker_release_template:
+  extends:
+    - .default_settings_template
+    - .image_template__latest
+    - .docker_registry_auth # this setup a before_script for the auth
+  services:
+    - docker:dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    IMAGE_ARCH_PREFIX: ""
+  script:
+    - apk --no-cache --virtual add git
+    # Build normal, bare and debug image
+    - ./scripts/create_docker_image.sh
+        "${DOCKER_IMAGE_NAME}"
+        "${TAG_NAME}"
+        "${build_deps_image_name}"
+        "${build_deps_image_version}"
+        "${CI_COMMIT_SHORT_SHA}"
+    # auth gitlab or dockerhub registry
+    # notice the different namespace for gitlab and that we remove the `-`
+    # Test the bare image
+    - ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${TAG_NAME}" "${CI_COMMIT_SHORT_SHA}" version
+    - docker push "${DOCKER_IMAGE_NAME%?}:${TAG_NAME}" ;
+    - docker push "${DOCKER_IMAGE_NAME}bare:${TAG_NAME}" ;
+    - docker push "${DOCKER_IMAGE_NAME}debug:${TAG_NAME}" ;
+  interruptible: false
+
+publish:docker_manual_amd64:
+  extends:
+    - .build_docker_release_template
+    - .rules_template__development_docker
+  variables:
+    IMAGE_ARCH_PREFIX: "amd64_"
+  stage: manual
+  needs: []
+
+publish:docker_manual_arm64:
+  extends:
+    - .build_docker_release_template
+    - .rules_template__development_docker
+  variables:
+    IMAGE_ARCH_PREFIX: "arm64_"
+  stage: manual
+  needs: []
+  tags:
+    - arm64
+
+build_release:docker_amd64:
+  extends:
+    - .build_docker_release_template
+    - .rules_template__master_and_releases
+  variables:
+    IMAGE_ARCH_PREFIX: "amd64_"
+  stage: build_release
+  tags:
+    - safe_docker
+
+build_release:docker_arm64:
+  extends:
+    - .build_docker_release_template
+    - .rules_template__master_and_releases
+  variables:
+    IMAGE_ARCH_PREFIX: "arm64_"
+  stage: build_release
+  tags:
+    - arm64

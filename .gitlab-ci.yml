@@ -28,32 +28,45 @@ workflow:
 # The "manual" stage exists to fix a UI problem that occurs when mixing
 # manual and non-manual jobs.
 stages:
-  - bootstrap
+  - packaging
   - sanity
   - build
   - test
   - doc
-  - packaging
   - build_release
   - publish_release
   - test_coverage
   - manual
+
+# All the jobs belonging to a stage X should be in
+# .gitlab/ci/X.yml. The stage "manual" is an exception to this rule,
+# as jobs of that stage are not logically related.
+
+# If the configuration for stage X is long, it can be broken up in
+# subfiles .gitlab/ci/X/a.yml, .gitlab/ci/X/b.yml, etc (see e.g. the
+# stage test).
+
+# Finally, templates shall not be defined in one stage file and used
+# in another. That is, a template defined in test.yml shall not be
+# used in doc.yml (but it's fine to use it in a subfile test/X.yml).
 
 include:
   - .gitlab/ci/templates.yml
 
 # Actual jobs are defined in these included files
 
-  - .gitlab/ci/bootstrap-opam-pipeline.yml
+  - .gitlab/ci/packaging.yml
   - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
-  - .gitlab/ci/lints.yml
-  - .gitlab/ci/unittest.yml
-  - .gitlab/ci/integration.yml
-  - .gitlab/ci/liquidity-baking-scripts-integrity.yml
-  - .gitlab/ci/coq.yml
-  - .gitlab/ci/tezt.yml
+  - .gitlab/ci/test/templates.yml
+  - .gitlab/ci/test/lints.yml
+  - .gitlab/ci/test/unit.yml
+  - .gitlab/ci/test/integration.yml
+  - .gitlab/ci/test/liquidity-baking-scripts-integrity.yml
+  - .gitlab/ci/test/coq.yml
+  - .gitlab/ci/test/tezt.yml
   - .gitlab/ci/doc.yml
-  - .gitlab/ci/publish.yml
-  - .gitlab/ci/coverage.yml
-  - .gitlab/ci/test-doc-scripts.yml
+  - .gitlab/ci/doc/test-scripts.yml
+  - .gitlab/ci/build_release.yml
+  - .gitlab/ci/publish_release.yml
+  - .gitlab/ci/test_coverage.yml

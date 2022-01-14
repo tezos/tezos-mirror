@@ -35,9 +35,9 @@ let () =
   let proto_version = Sys.argv.(1) in
   let proto_short_hash = Sys.argv.(2) in
   let new_proto_name = proto_version ^ "_" ^ proto_short_hash in
-  let in_ch = open_in ".gitlab/ci/unittest.yml" in
+  let in_ch = open_in ".gitlab/ci/test/unit.yml" in
   Fun.protect ~finally: (fun () -> close_in in_ch) @@ fun () ->
-  let out_ch = open_out ".gitlab/ci/unittest2.yml" in
+  let out_ch = open_out ".gitlab/ci/test/unit2.yml" in
   Fun.protect ~finally: (fun () -> close_out out_ch) @@ fun () ->
   let output_line line =
     output_string out_ch line;
@@ -72,7 +72,7 @@ let () =
       | exception End_of_file ->
           error
             "End of file reached before seeing unit:alpha: - check \
-             .gitlab/ci/unittest.yml"
+             .gitlab/ci/test/unit.yml"
       | "unit:alpha:" as line ->
           (* Found the job we were looking for, start replacing it. *)
           output_line (replace line);
@@ -82,4 +82,4 @@ let () =
           find_unit_alpha ()
   in
   find_unit_alpha ();
-  Sys.rename ".gitlab/ci/unittest2.yml" ".gitlab/ci/unittest.yml"
+  Sys.rename ".gitlab/ci/test/unit2.yml" ".gitlab/ci/test/unit.yml"
