@@ -1610,7 +1610,7 @@ module Ticket_balance = struct
   end
 
   module Sub_context = Make_subcontext (Registered) (Raw_context) (Name)
-  module Index = Make_index (Script_expr_hash)
+  module Index = Make_index (Ticket_hash_repr.Index)
   module Table =
     Make_indexed_carbonated_data_storage (Sub_context) (Index) (Encoding.Z)
 end

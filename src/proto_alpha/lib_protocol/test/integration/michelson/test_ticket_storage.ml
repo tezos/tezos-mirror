@@ -87,13 +87,11 @@ let assert_non_overlapping_keys ~loc ~ticketer1 ~ticketer2 ~contents1 ~contents2
       ~contents:contents2
       ~owner:owner2
   in
-  let k1 = Ticket_hash.to_script_expr_hash k1 in
-  let k2 = Ticket_hash.to_script_expr_hash k2 in
   Assert.not_equal
     ~loc
-    Script_expr_hash.equal
+    Ticket_hash.equal
     "Keys should not overlap"
-    Script_expr_hash.pp
+    Ticket_hash.pp
     k1
     k2
 

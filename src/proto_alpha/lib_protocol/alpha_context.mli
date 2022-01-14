@@ -1956,7 +1956,11 @@ module Ticket_hash : sig
 
   val encoding : t Data_encoding.t
 
-  val to_script_expr_hash : t -> Script_expr_hash.t
+  val pp : Format.formatter -> t -> unit
+
+  val equal : t -> t -> bool
+
+  val compare : t -> t -> int
 
   val make :
     context ->

@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type error +=
-  | Negative_ticket_balance of {key : Script_expr_hash.t; balance : Z.t}
+  | Negative_ticket_balance of {key : Ticket_hash_repr.t; balance : Z.t}
 
 let () =
   let open Data_encoding in
@@ -39,22 +39,18 @@ let () =
         "Attempted to set negative ticket balance value '%a' for key %a."
         Z.pp_print
         balance
-        Script_expr_hash.pp
+        Ticket_hash_repr.pp
         key)
-    (obj2 (req "key" Script_expr_hash.encoding) (req "balance" Data_encoding.z))
+    (obj2 (req "key" Ticket_hash_repr.encoding) (req "balance" Data_encoding.z))
     (function
       | Negative_ticket_balance {key; balance} -> Some (key, balance)
       | _ -> None)
     (fun (key, balance) -> Negative_ticket_balance {key; balance})
 
 let get_balance ctxt key =
-  Storage.Ticket_balance.Table.find
-    ctxt
-    (Ticket_hash_repr.to_script_expr_hash key)
-  >|=? fun (ctxt, res) -> (res, ctxt)
+  Storage.Ticket_balance.Table.find ctxt key >|=? fun (ctxt, res) -> (res, ctxt)
 
 let set_balance ctxt key balance =
-  let key = Ticket_hash_repr.to_script_expr_hash key in
   let cost_of_key = Z.of_int 65 in
   fail_when
     Compare.Z.(balance < Z.zero)

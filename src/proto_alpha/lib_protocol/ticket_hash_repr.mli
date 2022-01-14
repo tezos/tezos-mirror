@@ -24,9 +24,11 @@
 (*****************************************************************************)
 
 (** Ticket hashes are used to uniquely identify pairs made of
-    Michelson ticktes and their owner. They are used by the protocol
-    to keep record of a ticket ledger, that is how many tickets smart
-    contracts own. *)
+    Michelson ticktes and their owner.
+
+    They are used by the protocol to keep record of a tickets ledger,
+    that is how many tickets smart contracts own. More precisely, they
+    are used as keys for the {!Storage.Ticket_balance} table.  *)
 
 (** A ticket hash is computed by the function [make] and is a
     combination of a [ticketer], a [content type], a [content], and an
@@ -38,10 +40,11 @@ type t
 
 val encoding : t Data_encoding.t
 
-(** [to_script_expr_hash key_hash] returns a [Script_expr_hash.t]
-    value representation of the given [key_hash]. This is useful for
-    comparing and pretty-printing key-hash values. *)
-val to_script_expr_hash : t -> Script_expr_hash.t
+val pp : Format.formatter -> t -> unit
+
+val equal : t -> t -> bool
+
+val compare : t -> t -> int
 
 (** [make ctxt ~ticketer ~typ ~contents ~owner] creates a hashed
     representation of the given [ticketer], [typ], [contents] and
@@ -54,3 +57,5 @@ val make :
   contents:Script_repr.node ->
   owner:Script_repr.node ->
   (t * Raw_context.t) tzresult
+
+module Index : Storage_description.INDEX with type t = t

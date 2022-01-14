@@ -39,11 +39,7 @@ let () =
     (function Failed_to_hash_node -> Some () | _ -> None)
     (fun () -> Failed_to_hash_node)
 
-type t = Script_expr_hash.t
-
-let encoding = Script_expr_hash.encoding
-
-let to_script_expr_hash key_hash = key_hash
+include Script_expr_hash
 
 let hash_bytes_cost bytes =
   let module S = Saturation_repr in
@@ -72,3 +68,5 @@ let hash_of_node ctxt node =
 let make ctxt ~ticketer ~typ ~contents ~owner =
   hash_of_node ctxt
   @@ Micheline.Seq (Micheline.dummy_location, [ticketer; typ; contents; owner])
+
+module Index = Script_expr_hash
