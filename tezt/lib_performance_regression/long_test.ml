@@ -763,19 +763,6 @@ let register ~__FILE__ ~title ~tags ?team ~executors ~timeout body =
     ~tags
     (wrap_body title __FILE__ team timeout body)
 
-let register_with_protocol ~__FILE__ ~title ~tags ?team ~executors ~timeout body
-    =
-  if String.contains title '\n' then
-    invalid_arg
-      "Long_test.register_with_protocol: long test titles cannot contain \
-       newline characters" ;
-  let tags = make_tags team executors tags in
-  Protocol.register_test
-    ~__FILE__
-    ~title
-    ~tags
-    (wrap_body title __FILE__ team timeout body)
-
 let update_grafana_dashboard (dashboard : Grafana.dashboard) =
   Lwt_main.run
   @@

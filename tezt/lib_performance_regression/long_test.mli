@@ -102,20 +102,6 @@ val register :
   (unit -> unit Lwt.t) ->
   unit
 
-(** Wrapper over [Protocol.register_test] to register a performance regression test.
-
-    Same as [register], but for [Protocol.register_test] instead of [Test.register]. *)
-val register_with_protocol :
-  __FILE__:string ->
-  title:string ->
-  tags:string list ->
-  ?team:string ->
-  executors:executor list ->
-  timeout:timeout ->
-  (Protocol.t -> unit Lwt.t) ->
-  protocols:Protocol.t list ->
-  unit
-
 (** {2 Alerts} *)
 
 (** Emit an alert.

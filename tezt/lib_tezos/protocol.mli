@@ -137,6 +137,21 @@ val register_test :
   protocols:t list ->
   unit
 
+(** Register a long-test that uses the propocol.
+
+    This is the same as [Long_test.register], with the same differences
+    as [Protocol.register_test] compared to [Test.register]. *)
+val register_long_test :
+  __FILE__:string ->
+  title:string ->
+  tags:string list ->
+  ?team:string ->
+  executors:Long_test.executor list ->
+  timeout:Long_test.timeout ->
+  (t -> unit Lwt.t) ->
+  protocols:t list ->
+  unit
+
 (** Register a regression test that uses the protocol.
 
     This is the same as [Regression.register], with the same differences

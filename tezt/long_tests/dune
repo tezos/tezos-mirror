@@ -1,11 +1,12 @@
 (executable
  (name main)
- (libraries cohttp-lwt-unix
+ (libraries tezt
+            tezt-tezos
+            tezt-performance-regression
             tezos-alpha-test-helpers
             tezos-micheline
             tezos-openapi
             tezos-protocol-alpha
-            tezt-tezos
             qcheck-core
-            uri)
- (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))
+            )
+ (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base -open Tezt_performance_regression)))

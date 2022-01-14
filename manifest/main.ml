@@ -2281,7 +2281,14 @@ let tezt_tezos =
     ~path:"tezt/lib_tezos"
     ~synopsis:"Tezos test framework based on Tezt"
     ~bisect_ppx:false
-    ~deps:[tezt |> open_ |> open_ ~m:"Base"; hex; tezos_base; tezos_base_unix]
+    ~deps:
+      [
+        tezt |> open_ |> open_ ~m:"Base";
+        tezt_performance_regression |> open_;
+        hex;
+        tezos_base;
+        tezos_base_unix;
+      ]
 
 let tezos_openapi =
   public_lib

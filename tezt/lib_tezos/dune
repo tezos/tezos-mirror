@@ -6,7 +6,9 @@
  (public_name tezt-tezos)
  (libraries
   tezt
+  tezt-performance-regression
   hex
   tezos-base
   tezos-base.unix)
- (flags (:standard -open Tezt -open Tezt.Base)))
+ (flags
+  (:standard -open Tezt -open Tezt.Base -open Tezt_performance_regression)))
