@@ -115,6 +115,10 @@ module Mempool = struct
             in the mempool. Note that other criteria, such as the gas ratio,
             are also taken into account to decide whether to accept the
             replacement or not. *)
+    max_prechecked_manager_operations : int;
+        (** Maximal number of prechecked operations to keep. The mempool only
+            keeps the [max_prechecked_manager_operations] operations with the
+            highest fee/gas and fee/size ratios. *)
   }
 
   let default_minimal_fees =
@@ -146,6 +150,7 @@ module Mempool = struct
       replace_by_fee_factor =
         Q.make (Z.of_int 105) (Z.of_int 100)
         (* Default value of [replace_by_fee_factor] is set to 5% *);
+      max_prechecked_manager_operations = 5_000;
     }
 
   let config_encoding : config Data_encoding.t =
@@ -158,19 +163,22 @@ module Mempool = struct
              allow_script_failure;
              clock_drift;
              replace_by_fee_factor;
+             max_prechecked_manager_operations;
            } ->
         ( minimal_fees,
           minimal_nanotez_per_gas_unit,
           minimal_nanotez_per_byte,
           allow_script_failure,
           clock_drift,
-          replace_by_fee_factor ))
+          replace_by_fee_factor,
+          max_prechecked_manager_operations ))
       (fun ( minimal_fees,
              minimal_nanotez_per_gas_unit,
              minimal_nanotez_per_byte,
              allow_script_failure,
              clock_drift,
-             replace_by_fee_factor ) ->
+             replace_by_fee_factor,
+             max_prechecked_manager_operations ) ->
         {
           minimal_fees;
           minimal_nanotez_per_gas_unit;
@@ -178,8 +186,9 @@ module Mempool = struct
           allow_script_failure;
           clock_drift;
           replace_by_fee_factor;
+          max_prechecked_manager_operations;
         })
-      (obj6
+      (obj7
          (dft "minimal_fees" Tez.encoding default_config.minimal_fees)
          (dft
             "minimal_nanotez_per_gas_unit"
@@ -194,7 +203,11 @@ module Mempool = struct
          (dft
             "replace_by_fee_factor"
             manager_op_replacement_factor_enc
-            default_config.replace_by_fee_factor))
+            default_config.replace_by_fee_factor)
+         (dft
+            "max_prechecked_manager_operations"
+            int31
+            default_config.max_prechecked_manager_operations))
 
   type manager_gas_witness
 
@@ -210,7 +223,23 @@ module Mempool = struct
     operation_hash : Operation_hash.t;
     gas_limit : manager_gas_witness Gas.Arith.t;
     fee : Tez.t;
+    weight : Q.t;
   }
+
+  type manager_op_weight = {operation_hash : Operation_hash.t; weight : Q.t}
+
+  let op_weight_of_info (info : manager_op_info) : manager_op_weight =
+    {operation_hash = info.operation_hash; weight = info.weight}
+
+  module ManagerOpWeightSet = Set.Make (struct
+    type t = manager_op_weight
+
+    (* Sort by weight *)
+    let compare op1 op2 =
+      let c = Q.compare op1.weight op2.weight in
+      if c <> 0 then c
+      else Operation_hash.compare op1.operation_hash op2.operation_hash
+  end)
 
   type state = {
     grandparent_level_start : Alpha_context.Timestamp.t option;
@@ -221,10 +250,23 @@ module Mempool = struct
             a record of type [manager_op_info] (See for record details above).
             Each manager in the map should be accessible
             with an operation hash in [operation_hash_to_manager]. *)
-    operation_hash_to_manager : Signature.Public_key_hash.t Operation_hash.Map.t;
+    operation_hash_to_manager :
+      Signature.Public_key_hash.t Operation_hash.Map.t;
         (** Map of operation hash to manager used to remove a manager from
             [op_prechecked_managers] with an operation hash. Each manager in the
             map should also be in [op_prechecked_managers]. *)
+    prechecked_operations_count : int;
+        (** Number of prechecked manager operations.
+            Invariants:
+            - [Operation_hash.Map.cardinal operation_hash_to_manager =
+               prechecked_operations_count]
+            - [prechecked_operations_count <= max_prechecked_manager_operations] *)
+    ops_prechecked : ManagerOpWeightSet.t;
+    min_prechecked_op_weight : manager_op_weight option;
+        (** The prechecked operation in [op_prechecked_managers], if any, with
+            the minimal weight.
+            Invariant:
+            - [min_prechecked_op_weight = min { x | x \in ops_prechecked }] *)
   }
 
   let empty : state =
@@ -233,6 +275,9 @@ module Mempool = struct
       round_zero_duration = None;
       op_prechecked_managers = Signature.Public_key_hash.Map.empty;
       operation_hash_to_manager = Operation_hash.Map.empty;
+      prechecked_operations_count = 0;
+      ops_prechecked = ManagerOpWeightSet.empty;
+      min_prechecked_op_weight = None;
     }
 
   let init config ?(validation_state : validation_state option) ~predecessor ()
@@ -286,19 +331,60 @@ module Mempool = struct
     init config ?validation_state ~predecessor ()
 
   let remove ~(filter_state : state) oph =
-    match
-      Operation_hash.Map.find oph filter_state.operation_hash_to_manager
-    with
-    | None -> filter_state
+    let removed_oph_source = ref None in
+    let operation_hash_to_manager =
+      Operation_hash.Map.update
+        oph
+        (function
+          | None -> None
+          | Some source ->
+              removed_oph_source := Some source ;
+              None)
+        filter_state.operation_hash_to_manager
+    in
+    match !removed_oph_source with
+    | None ->
+        (* Not present anywhere in the filter state, because of invariants.
+           @see {!state} *)
+        filter_state
     | Some source ->
+        let prechecked_operations_count =
+          filter_state.prechecked_operations_count - 1
+        in
+        let removed_op = ref None in
+        let op_prechecked_managers =
+          Signature.Public_key_hash.Map.update
+            source
+            (function
+              | None -> None
+              | Some op ->
+                  removed_op := Some op ;
+                  None)
+            filter_state.op_prechecked_managers
+        in
+        let ops_prechecked =
+          match !removed_op with
+          | None -> filter_state.ops_prechecked
+          | Some op ->
+              ManagerOpWeightSet.remove
+                (op_weight_of_info op)
+                filter_state.ops_prechecked
+        in
+        let min_prechecked_op_weight =
+          match filter_state.min_prechecked_op_weight with
+          | None -> None
+          | Some op ->
+              if Operation_hash.equal op.operation_hash oph then
+                ManagerOpWeightSet.min_elt ops_prechecked
+              else Some op
+        in
         {
           filter_state with
-          op_prechecked_managers =
-            Signature.Public_key_hash.Map.remove
-              source
-              filter_state.op_prechecked_managers;
-          operation_hash_to_manager =
-            Operation_hash.Map.remove oph filter_state.operation_hash_to_manager;
+          op_prechecked_managers;
+          operation_hash_to_manager;
+          ops_prechecked;
+          prechecked_operations_count;
+          min_prechecked_op_weight;
         }
 
   let get_manager_operation_gas_and_fee contents =
@@ -387,6 +473,51 @@ module Mempool = struct
       (fun (old_hash, new_hash) ->
         Manager_operation_replaced {old_hash; new_hash})
 
+  type Environment.Error_monad.error += Fees_too_low_for_mempool of Tez.t
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"prefilter.fees_too_low_for_mempool"
+      ~title:"Operation fees are too low to be considered in full mempool"
+      ~description:"Operation fees are too low to be considered in full mempool"
+      ~pp:(fun ppf required_fees ->
+        Format.fprintf
+          ppf
+          "The mempool is full, the number of prechecked manager operations \
+           has reached the limit max_prechecked_manager_operations set by the \
+           filter. Increase operation fees to at least %atz for the operation \
+           to be considered and propagated by THIS node. Note that the \
+           operations with the minimum fees in the mempool risk being removed \
+           if better ones are received."
+          Tez.pp
+          required_fees)
+      Data_encoding.(obj1 (req "required_fees" Tez.encoding))
+      (function
+        | Fees_too_low_for_mempool required_fees -> Some required_fees
+        | _ -> None)
+      (fun required_fees -> Fees_too_low_for_mempool required_fees)
+
+  type Environment.Error_monad.error += Removed_fees_too_low_for_mempool
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"plugin.removed_fees_too_low_for_mempool"
+      ~title:"Operation removed because fees are too low for full mempool"
+      ~description:"Operation removed because fees are too low for full mempool"
+      ~pp:(fun ppf () ->
+        Format.fprintf
+          ppf
+          "The mempool is full, the number of prechecked manager operations \
+           has reached the limit max_prechecked_manager_operations set by the \
+           filter. Operation was removed because another operation with a \
+           better fees/gas-size ratio was received and accepted by the \
+           mempool.")
+      Data_encoding.unit
+      (function Removed_fees_too_low_for_mempool -> Some () | _ -> None)
+      (fun () -> Removed_fees_too_low_for_mempool)
+
   (* TODO: https://gitlab.com/tezos/tezos/-/issues/2238
      Write unit tests for the feature 'replace-by-fee' and for other changes
      introduced by other MRs in the plugin. *)
@@ -414,7 +545,13 @@ module Mempool = struct
         filter_state.op_prechecked_managers
     with
     | None -> `Fresh
-    | Some {operation_hash = old_hash; gas_limit = old_gas; fee = old_fee} ->
+    | Some
+        {
+          operation_hash = old_hash;
+          gas_limit = old_gas;
+          fee = old_fee;
+          weight = _;
+        } ->
         (* Manager already seen: one manager per block limitation triggered.
            Can replace old operation if new operation's fees are better *)
         if better_fees_and_ratio config old_gas old_fee gas_limit fee then
@@ -433,32 +570,92 @@ module Mempool = struct
          Tezos_base.Operation.shell_header_encoding)
     + Data_encoding.Binary.length Operation.protocol_data_encoding op
 
-  (** Returns the weight of an operation. The weight corresponds to the one
-      implemented by the baker, to decide which operations to put in a block
-      first (the code is largely duplicated).
+  (** Returns the weight and resources consumption of an operation. The weight
+      corresponds to the one implemented by the baker, to decide which operations
+      to put in a block first (the code is largely duplicated).
       @see {!Tezos_baking_alpha.Operation_selection.weight_manager} *)
-  let weight_manager_operation ?validation_state ?size ~fee ~gas op =
+  let weight_and_resources_manager_operation ~validation_state ?size ~fee ~gas
+      op =
+    let hard_gas_limit_per_block =
+      Constants.hard_gas_limit_per_block validation_state.ctxt
+    in
+    let max_size = managers_quota.max_size in
+    let size = match size with None -> size_of_operation op | Some s -> s in
+    let size_f = Q.of_int size in
+    let gas_f = Q.of_bigint (Gas.Arith.integral_to_z gas) in
+    let fee_f = Q.of_int64 (Tez.to_mutez fee) in
+    let size_ratio = Q.(size_f / Q.of_int max_size) in
+    let gas_ratio =
+      Q.(gas_f / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
+    in
+    let resources = Q.max size_ratio gas_ratio in
+    (Q.(fee_f / resources), resources)
+
+  (** Returns the weight of an operation, i.e. the fees w.r.t the gas and size
+      consumption in the block. *)
+  let weight_manager_operation ~validation_state ?size ~fee ~gas op =
+    let (weight, _resources) =
+      weight_and_resources_manager_operation
+        ~validation_state
+        ?size
+        ~fee
+        ~gas
+        op
+    in
+    weight
+
+  (** Return fee for an operation that consumes [op_resources] for its weight to
+      be strictly greater than [min_weight]. *)
+  let required_fee_manager_operation_weight ~op_resources ~min_weight =
+    let req_mutez_q = Q.((min_weight * op_resources) + Q.one) in
+    Tez.of_mutez_exn @@ Q.to_int64 req_mutez_q
+
+  (** Check if an operation as a weight (fees w.r.t gas and size) large enough to
+      be prechecked and return said weight. In the case where the prechecked
+      mempool is full, return an error if the weight is too small, or return the
+      operation to be replaced otherwise. *)
+  let check_minimal_weight ?validation_state config filter_state ~fee ~gas_limit
+      op =
     match validation_state with
-    | None -> None
-    | Some {ctxt; _} ->
-        let hard_gas_limit_per_block =
-          Constants.hard_gas_limit_per_block ctxt
+    | None -> `Weight_ok (`No_replace, [])
+    | Some validation_state -> (
+        let (weight, op_resources) =
+          weight_and_resources_manager_operation
+            ~validation_state
+            ~fee
+            ~gas:gas_limit
+            op
         in
-        let max_size = managers_quota.max_size in
-        let size =
-          match size with None -> size_of_operation op | Some s -> s
-        in
-        let size_f = Q.of_int size in
-        let gas_f = Q.of_bigint (Gas.Arith.integral_to_z gas) in
-        let fee_f = Q.of_int64 (Tez.to_mutez fee) in
-        let size_ratio = Q.(size_f / Q.of_int max_size) in
-        let gas_ratio =
-          Q.(
-            gas_f
-            / Q.of_bigint (Gas.Arith.integral_to_z hard_gas_limit_per_block))
-        in
-        let resources = Q.max size_ratio gas_ratio in
-        Some Q.(fee_f / resources)
+        if
+          filter_state.prechecked_operations_count
+          < config.max_prechecked_manager_operations
+        then
+          (* The precheck mempool is not full yet *)
+          `Weight_ok (`No_replace, [weight])
+        else
+          match filter_state.min_prechecked_op_weight with
+          | None ->
+              (* The precheck mempool is empty *)
+              `Weight_ok (`No_replace, [weight])
+          | Some {weight = min_weight; operation_hash = min_oph} ->
+              if Q.(weight > min_weight) then
+                (* The operation has a weight greater than the minimal
+                   prechecked operation, replace the latest with the new one *)
+                `Weight_ok (`Replace min_oph, [weight])
+              else
+                (* Otherwise fail and give indication as to what to fee should
+                   be for the operation to be prechecked *)
+                let required_fee =
+                  required_fee_manager_operation_weight
+                    ~op_resources
+                    ~min_weight
+                in
+                `Fail
+                  (`Branch_delayed
+                    [
+                      Environment.wrap_tzerror
+                        (Fees_too_low_for_mempool required_fee);
+                    ]))
 
   let pre_filter_manager :
       type t.
@@ -499,7 +696,7 @@ module Mempool = struct
                 minimal_fees_for_gas_in_nanotez
                 minimal_fees_for_size_in_nanotez))
         >= 0
-      then `Ok
+      then `Fees_ok
       else `Refused [Environment.wrap_tzerror Fees_too_low]
     in
     match get_manager_operation_gas_and_fee op with
@@ -512,20 +709,18 @@ module Mempool = struct
         | `Fresh | `Replace _ -> (
             match check_gas_and_fee fee gas_limit with
             | `Refused _ as err -> err
-            | `Ok ->
-                let weight =
-                  match
-                    weight_manager_operation
-                      ?validation_state:validation_state_before
-                      ~fee
-                      ~gas:gas_limit
-                      ~size
-                      packed_op
-                  with
-                  | None -> []
-                  | Some weight -> [weight]
-                in
-                `Passed_prefilter weight))
+            | `Fees_ok -> (
+                match
+                  check_minimal_weight
+                    ?validation_state:validation_state_before
+                    config
+                    filter_state
+                    ~fee
+                    ~gas_limit
+                    packed_op
+                with
+                | `Fail errs -> errs
+                | `Weight_ok (_, weight) -> `Passed_prefilter weight)))
 
   type Environment.Error_monad.error += Outdated_endorsement
 
@@ -859,9 +1054,6 @@ module Mempool = struct
       check_manager_restriction config filter_state source ~fee ~gas_limit
     with
     | `Fail err -> Lwt.return err
-    | `Fresh ->
-        precheck_manager_and_check_signature
-          ~on_success:(`Prechecked_manager `No_replace)
     | `Replace old_oph ->
         let err =
           Environment.wrap_tzerror
@@ -870,8 +1062,50 @@ module Mempool = struct
         precheck_manager_and_check_signature
           ~on_success:
             (`Prechecked_manager (`Replace (old_oph, `Outdated [err])))
+    | `Fresh -> (
+        match
+          check_minimal_weight
+            ~validation_state
+            config
+            filter_state
+            ~fee
+            ~gas_limit
+            (Operation_data protocol_data)
+        with
+        | `Fail err -> Lwt.return err
+        | `Weight_ok (replacement, _weight) ->
+            let on_success =
+              match replacement with
+              | `No_replace -> `Prechecked_manager `No_replace
+              | `Replace oph ->
+                  (* The operation with the lowest fees ratio, is reclassified as
+                     branch_delayed. *)
+                  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2347 The
+                     branch_delayed ring is bounded to 1000, so we may loose
+                     operations. We can probably do better. *)
+                  `Prechecked_manager
+                    (`Replace
+                      ( oph,
+                        `Branch_delayed
+                          [
+                            Environment.wrap_tzerror
+                              Removed_fees_too_low_for_mempool;
+                          ] ))
+            in
+            precheck_manager_and_check_signature ~on_success)
 
   let add_manager_restriction filter_state oph info source =
+    let prechecked_operations_count =
+      if Operation_hash.Map.mem oph filter_state.operation_hash_to_manager then
+        filter_state.prechecked_operations_count
+      else filter_state.prechecked_operations_count + 1
+    in
+    let op_weight = op_weight_of_info info in
+    let min_prechecked_op_weight =
+      match filter_state.min_prechecked_op_weight with
+      | Some mini when Q.(mini.weight < info.weight) -> Some mini
+      | Some _ | None -> Some op_weight
+    in
     {
       filter_state with
       op_prechecked_managers =
@@ -883,6 +1117,10 @@ module Mempool = struct
       operation_hash_to_manager =
         Operation_hash.Map.add oph source filter_state.operation_hash_to_manager
         (* Record which manager is used for the operation hash. *);
+      ops_prechecked =
+        ManagerOpWeightSet.add op_weight filter_state.ops_prechecked;
+      prechecked_operations_count;
+      min_prechecked_op_weight;
     }
 
   let precheck :
@@ -906,7 +1144,14 @@ module Mempool = struct
       match get_manager_operation_gas_and_fee op with
       | Error err -> Lwt.return (`Refused (Environment.wrap_tztrace err))
       | Ok (fee, gas_limit) -> (
-          let info = {operation_hash = oph; gas_limit; fee} in
+          let weight =
+            weight_manager_operation
+              ~validation_state
+              ~fee
+              ~gas:gas_limit
+              (Operation_data protocol_data)
+          in
+          let info = {operation_hash = oph; gas_limit; fee; weight} in
           precheck_manager
             config
             filter_state

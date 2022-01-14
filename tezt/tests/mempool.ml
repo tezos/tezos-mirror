@@ -74,6 +74,16 @@ module Revamped = struct
     let* () = flush_waiter in
     Node.wait_for_level node (level + 1)
 
+  (** Calls RPC [POST /chains/main/mempool/filter] from [client], with [data]
+      formatted from string [config_str]. If [log] is [true], also logs this
+      string. *)
+  let set_filter ?(log = false) config_str client =
+    let* res =
+      RPC.post_mempool_filter ~data:(Ezjsonm.from_string config_str) client
+    in
+    if log then Log.info "Updated filter config with: %s." config_str ;
+    return res
+
   (* Wait for the [operation_to_reclassify] event from the prevalidator and
      return the number of operations that were set to be reclassified. *)
   let wait_for_operations_not_flushed_event node =
@@ -1620,6 +1630,228 @@ module Revamped = struct
     Log.info "Step 5: Check that node 1 contains the right applied operations." ;
     let* () = check_mempool ~applied:[oph4; oph3; oph2; oph1] client1 in
     check_mempool ~applied:[oph4; oph3; oph2; oph1] client2
+
+  let test_prefiltered_limit =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test prefiltered limits of mempool"
+      ~tags:["mempool"; "gc"; "limit"]
+    @@ fun protocol ->
+    log_step 0 "Connect and initialise two nodes." ;
+    (* We configure the filter with a limit of 4, in order to easily be able to
+       inject more with our 5 bootstrap accounts *)
+    let max_prechecked_manager_operations = 4 in
+    (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
+    let fee = 1000 in
+    let gas_limit = 1500 in
+    let* node1 =
+      Node.init
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        [Synchronisation_threshold 0; Private_mode]
+    and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+    let* client1 = Client.init ~endpoint:(Node node1) ()
+    and* client2 = Client.init ~endpoint:(Node node2) () in
+    let* () = Client.Admin.trust_address client1 ~peer:node2
+    and* () = Client.Admin.trust_address client2 ~peer:node1 in
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+    let* () = Client.activate_protocol ~protocol client1 in
+    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+
+    log_step
+      1
+      "Update the nodes filter to allow only %d prechecked manager operations."
+      max_prechecked_manager_operations ;
+    let* _ =
+      set_filter
+        ~log:true
+        (sf
+           {|{ "max_prechecked_manager_operations" : %d }|}
+           max_prechecked_manager_operations)
+        client1
+    and* _ =
+      set_filter
+        ~log:true
+        (sf
+           {|{ "max_prechecked_manager_operations" : %d }|}
+           max_prechecked_manager_operations)
+        client2
+    in
+
+    log_step
+      2
+      "Inject max_prechecked_manager_operations %d operations."
+      max_prechecked_manager_operations ;
+    let* ops =
+      Lwt.all
+      @@ List.mapi
+           (fun i source ->
+             let* (`OpHash oph) =
+               Operation.inject_transfer
+                 ~source
+                 ~dest:Constant.bootstrap2
+                 ~wait_for_injection:node1
+                 ~amount:1
+                 ~fee:(fee + i)
+                 ~gas_limit
+                 client1
+             in
+             return oph)
+           Constant.[bootstrap1; bootstrap2; bootstrap3; bootstrap4]
+    in
+
+    log_step 3 "Check these operations are applied in mempool." ;
+    let* mempool = RPC.get_mempool client1 in
+    let expected_mempool0 = {Mempool.empty with applied = ops} in
+    Check.(
+      (expected_mempool0 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step
+      4
+      "The client should report when the mempool is full and not enough fees \
+       are provided." ;
+    let transfer_should_fail =
+      Client.spawn_transfer
+        ~giver:Constant.bootstrap5.alias
+        ~receiver:Constant.bootstrap2.alias
+        ~amount:(Tez.of_int 55)
+        ~fee:(Tez.of_mutez_int fee)
+        ~gas_limit
+        client1
+    in
+    let* std_err =
+      Process.check_and_read_stderr ~expect_failure:true transfer_should_fail
+    in
+    (match std_err =~* rex "Increase operation fees to at least (.*)tz" with
+    | None ->
+        Test.fail
+          ~__LOC__
+          "The client should fail when the mempool is full and not enough fees \
+           are provided."
+    | Some required ->
+        Check.(
+          (required = "0.001001")
+            string
+            ~error_msg:"The required fees are %L but expected %R")) ;
+
+    log_step 5 "Inject an extra operation with same fees (but mempool is full)." ;
+    let* (`OpHash oph5) =
+      Operation.inject_transfer
+        ~force:true
+        ~source:Constant.bootstrap5
+        ~dest:Constant.bootstrap2
+        ~wait_for_injection:node1
+        ~amount:1
+        ~fee
+        ~gas_limit
+        client1
+    in
+
+    log_step 6 "Check that this extra operation is branch_delayed." ;
+    let* mempool = RPC.get_mempool client1 in
+    let expected_mempool1 = {expected_mempool0 with branch_delayed = [oph5]} in
+    Check.(
+      (expected_mempool1 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step
+      7
+      "Check that the new operation is not propagated as part of a mempool." ;
+    let* mempool = RPC.get_mempool client2 in
+    Check.(
+      (expected_mempool0 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 8 "Inject an extra operation with more fees for same gas." ;
+    let* (`OpHash oph6) =
+      Operation.inject_transfer
+        ~source:Constant.bootstrap5
+        ~dest:Constant.bootstrap2
+        ~wait_for_injection:node1
+        ~amount:1
+        ~fee:(fee + 5)
+        ~gas_limit
+        client1
+    in
+
+    log_step
+      9
+      "Check that this extra operation is applied and replaces one with lower \
+       fees." ;
+    let* mempool = RPC.get_mempool client1 in
+    let (removed_oph, kept_ops) =
+      match expected_mempool1.applied with
+      | [] -> assert false
+      | removed :: applied -> (removed, applied)
+    in
+    let expected_mempool2 =
+      {
+        expected_mempool1 with
+        applied = oph6 :: kept_ops;
+        branch_delayed = removed_oph :: expected_mempool1.branch_delayed;
+      }
+    in
+    Check.(
+      (expected_mempool2 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 10 "Check that this new operation is propagated." ;
+    let* mempool = RPC.get_mempool client2 in
+    let expected_mempool3 =
+      {
+        expected_mempool2 with
+        branch_delayed = [removed_oph] (* The other one was never propagated *);
+      }
+    in
+    Check.(
+      (expected_mempool3 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+
+    log_step 11 "Check reclassification after flush." ;
+    let* _level =
+      bake_for
+        ~keys:[Constant.bootstrap1.public_key_hash]
+        ~empty:true
+        ~protocol
+        node1
+        client1
+    in
+    let* mempool = RPC.get_mempool client1 in
+    let expected_mempool4 =
+      {
+        expected_mempool2 with
+        (* oph6 is reconsidered before oph5 (more fees), which has same
+           manager/counter *)
+        applied = oph6 :: kept_ops;
+        branch_delayed = [removed_oph; oph5];
+      }
+    in
+    Check.(
+      (expected_mempool4 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* _level =
+      bake_for
+        ~keys:[Constant.bootstrap1.public_key_hash]
+        ~empty:false
+        ~protocol
+        node1
+        client1
+    in
+
+    log_step 12 "Check mempool after flush." ;
+    let* mempool = RPC.get_mempool client1 in
+    let expected_mempool5 = {Mempool.empty with branch_refused = [oph5]} in
+    Check.(
+      (expected_mempool5 = mempool)
+        Mempool.classified_typ
+        ~error_msg:"mempool expected to be %L, got %R") ;
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -2659,20 +2891,10 @@ let wait_for_arrival_of_ophash ophash node =
   in
   Node.wait_for node "request_completed_debug.v0" filter
 
-(** Calls RPC [POST /chains/main/mempool/filter] from [client], with [data]
-    formatted from string [config_str]. If [log] is [true], also logs this
-    string. *)
-let set_filter ?(log = false) config_str client =
-  let* res =
-    RPC.post_mempool_filter ~data:(Ezjsonm.from_string config_str) client
-  in
-  if log then Log.info "Updated filter config with: %s." config_str ;
-  return res
-
 (** [set_filter_no_fee_requirement client] sets all fields [minimal_*]
     to 0 in the filter configuration of [client]'s mempool. *)
 let set_filter_no_fee_requirement =
-  set_filter
+  Revamped.set_filter
     {|{ "minimal_fees": "0", "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
 
 (** Checks that arguments [applied] and [refused] are the number of operations
@@ -3429,7 +3651,7 @@ let test_get_post_mempool_filter =
   log_step 3 step3_msg ;
   let set_config_and_check msg config =
     Log.info "%s" msg ;
-    let* output = set_filter ~log:true (show config) client1 in
+    let* output = Revamped.set_filter ~log:true (show config) client1 in
     check_equal (fill_with_default config) (of_json output) ;
     check_RPC_GET_all_variations ~log:true config client1
   in
@@ -3477,7 +3699,7 @@ let test_get_post_mempool_filter =
         "invalid_mempool_filter_configuration.v0"
         (Fun.const (Some ()))
     in
-    let* output = set_filter invalid_config_str client1 in
+    let* output = Revamped.set_filter invalid_config_str client1 in
     check_equal config3_full (of_json output) ;
     let* () = waiter in
     let* output = RPC.get_mempool_filter client1 in
@@ -3496,7 +3718,7 @@ let test_get_post_mempool_filter =
       ]
   in
   log_step 5 step5_msg ;
-  let* output = set_filter ~log:true "{}" client1 in
+  let* output = Revamped.set_filter ~log:true "{}" client1 in
   check_equal default (of_json output) ;
   check_RPC_GET_all_variations ~log:true default client1
 
@@ -3696,7 +3918,7 @@ let test_mempool_filter_operation_arrival =
   in
   log_step 5 step5 ;
   let* _ =
-    set_filter
+    Revamped.set_filter
       ~log:true
       {|{ "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
       client1
@@ -3717,7 +3939,7 @@ let test_mempool_filter_operation_arrival =
   in
   log_step 7 step7 ;
   let* _ =
-    set_filter
+    Revamped.set_filter
       {|{ "minimal_fees": "10", "minimal_nanotez_per_gas_unit": [ "0", "1" ], "minimal_nanotez_per_byte": [ "0", "1" ] }|}
       client1
   in
@@ -3811,6 +4033,7 @@ let register ~protocols =
   Revamped.ban_operation ~protocols ;
   Revamped.unban_operation_and_reinject ~protocols ;
   Revamped.unban_all_operations ~protocols ;
+  Revamped.test_prefiltered_limit ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
