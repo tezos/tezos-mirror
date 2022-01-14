@@ -2722,6 +2722,13 @@ let record_endorsing_participation ctxt =
 let finalize_application ctxt (mode : finalize_application_mode) protocol_data
     ~payload_producer ~block_producer liquidity_baking_escape_ema
     implicit_operations_results ~round ~predecessor ~migration_balance_updates =
+  (* We update the states of every transaction rollups that have
+     received incoming messages during this block. *)
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2401
+     Provide tests to check the update is correctly done. *)
+  Alpha_context.Tx_rollup.update_tx_rollups_at_block_finalization ctxt
+  >>=? fun ctxt ->
+  (* Then we finalize the consensus. *)
   let level = Alpha_context.Level.current ctxt in
   let block_endorsing_power = Consensus.current_endorsement_power ctxt in
   let consensus_threshold = Constants.consensus_threshold ctxt in

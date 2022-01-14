@@ -1981,6 +1981,9 @@ module Tx_rollup : sig
 
   val originate : context -> (context * tx_rollup) tzresult Lwt.t
 
+  val update_tx_rollups_at_block_finalization :
+    context -> context tzresult Lwt.t
+
   module Internal_for_tests : sig
     (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
     val originated_tx_rollup :
