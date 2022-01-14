@@ -931,6 +931,9 @@ let apply_manager_operation_content :
               in
               (ctxt, result, []) )
       | Some (script, script_ir) ->
+          (* Token.transfer which is being called above already loads this
+             value into the Irmin cache, so no need to burn gas for it. *)
+          Contract.get_balance ctxt destination >>=? fun balance ->
           let now = Script_timestamp.now ctxt in
           let level =
             (Level.current ctxt).level |> Raw_level.to_int32
@@ -938,7 +941,16 @@ let apply_manager_operation_content :
           in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = destination; amount; chain_id; now; level}
+            {
+              source;
+              payer;
+              self = destination;
+              amount;
+              chain_id;
+              balance;
+              now;
+              level;
+            }
           in
           Script_interpreter.execute
             ctxt
@@ -2389,6 +2401,10 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
        match script with
        | None -> fail (Script_tc_errors.No_such_entrypoint Entrypoint.default)
        | Some (script, script_ir) -> (
+           (* Token.transfer which is being called above already loads this
+              value into the Irmin cache, so no need to burn gas for it. *)
+           Contract.get_balance ctxt liquidity_baking_cpmm_contract
+           >>=? fun balance ->
            let now = Script_timestamp.now ctxt in
            let level =
              (Level.current ctxt).level |> Raw_level.to_int32
@@ -2404,6 +2420,7 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                payer = liquidity_baking_cpmm_contract;
                self = liquidity_baking_cpmm_contract;
                amount = liquidity_baking_subsidy;
+               balance;
                chain_id = Chain_id.zero;
                now;
                level;

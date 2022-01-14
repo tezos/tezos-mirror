@@ -95,6 +95,7 @@ type step_constants = Script_typed_ir.step_constants = {
   payer : Contract.t;
   self : Contract.t;
   amount : Tez.t;
+  balance : Tez.t;
   chain_id : Chain_id.t;
   now : Script_timestamp.t;
   level : Script_int.n Script_int.num;
@@ -1102,6 +1103,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                               let kstack_ty = Item_t (output_ty, s) in
                               let kkinfo = {kkinfo with kstack_ty} in
                               let ks = KCons (ICons_some (kkinfo, k), ks) in
+                              Contract.get_balance_carbonated ctxt c
+                              >>=? fun (ctxt, balance) ->
                               (step [@ocaml.tailcall])
                                 ( outdated ctxt,
                                   {
@@ -1109,6 +1112,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                     source = sc.self;
                                     self = c;
                                     amount = Tez.zero;
+                                    balance;
                                   } )
                                 (update_local_gas_counter ctxt)
                                 kinstr
@@ -1155,12 +1159,10 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBalance (_, k) ->
           let ctxt = update_context gas ctxt in
-          Contract.get_balance_carbonated ctxt sc.self
-          >>=? fun (ctxt, balance) ->
           let gas = update_local_gas_counter ctxt in
           let ctxt = outdated ctxt in
           let g = (ctxt, sc) in
-          (step [@ocaml.tailcall]) g gas k ks balance (accu, stack)
+          (step [@ocaml.tailcall]) g gas k ks sc.balance (accu, stack)
       | ILevel (_, k) ->
           (step [@ocaml.tailcall]) g gas k ks sc.level (accu, stack)
       | INow (_, k) -> (step [@ocaml.tailcall]) g gas k ks sc.now (accu, stack)

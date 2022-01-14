@@ -567,10 +567,11 @@ let gen_and_show_keys ?alias client =
   let* alias = gen_keys ?alias client in
   show_address ~alias client
 
-let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
+let spawn_transfer ?hooks ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
     ?storage_limit ?counter ?arg ~amount ~giver ~receiver client =
   spawn_command
     ?endpoint
+    ?hooks
     client
     (["--wait"; wait]
     @ ["transfer"; Tez.to_string amount; "from"; giver; "to"; receiver]
@@ -596,10 +597,11 @@ let spawn_transfer ?endpoint ?(wait = "none") ?burn_cap ?fee ?gas_limit
         counter
     @ Option.fold ~none:[] ~some:(fun p -> ["--arg"; p]) arg)
 
-let transfer ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit ?counter
-    ?arg ~amount ~giver ~receiver client =
+let transfer ?hooks ?endpoint ?wait ?burn_cap ?fee ?gas_limit ?storage_limit
+    ?counter ?arg ~amount ~giver ~receiver client =
   spawn_transfer
     ?endpoint
+    ?hooks
     ?wait
     ?burn_cap
     ?fee
@@ -743,9 +745,10 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
-let spawn_originate_contract ?endpoint ?(wait = "none") ?init ?burn_cap ~alias
-    ~amount ~src ~prg client =
+let spawn_originate_contract ?hooks ?endpoint ?(wait = "none") ?init ?burn_cap
+    ~alias ~amount ~src ~prg client =
   spawn_command
+    ?hooks
     ?endpoint
     client
     (["--wait"; wait]
@@ -782,11 +785,12 @@ let convert_script_to_json ?endpoint ~script client =
 let convert_data_to_json ?endpoint ~data client =
   convert_michelson_to_json ~kind:"data" ?endpoint ~input:data client
 
-let originate_contract ?endpoint ?wait ?init ?burn_cap ~alias ~amount ~src ~prg
-    client =
+let originate_contract ?hooks ?endpoint ?wait ?init ?burn_cap ~alias ~amount
+    ~src ~prg client =
   let* client_output =
     spawn_originate_contract
       ?endpoint
+      ?hooks
       ?wait
       ?init
       ?burn_cap
@@ -885,14 +889,15 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     client
   |> Process.check
 
-let spawn_run_script ~src ~storage ~input client =
+let spawn_run_script ?hooks ~src ~storage ~input client =
   spawn_command
+    ?hooks
     client
     ["run"; "script"; src; "on"; "storage"; storage; "and"; "input"; input]
 
-let run_script ~src ~storage ~input client =
+let run_script ?hooks ~src ~storage ~input client =
   let* client_output =
-    spawn_run_script ~src ~storage ~input client
+    spawn_run_script ?hooks ~src ~storage ~input client
     |> Process.check_and_read_stdout
   in
   match client_output =~* rex "storage\n(.*)" with

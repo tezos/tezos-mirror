@@ -108,5 +108,6 @@ let () =
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols:[Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
+  Views.register ~protocols:[Alpha] () ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

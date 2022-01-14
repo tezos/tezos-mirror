@@ -49,3 +49,13 @@ Michelson
   In their output encodings, the objects containing the fields ``item`` and
   ``annot`` are replaced with the contents of the field ``item``.
   (MR :gl:`!4139`)
+
+Internal
+--------
+
+The following changes are not visible to the users but reflect
+improvements of the codebase.
+
+- ``BALANCE`` is now passed to the Michelson interpreter as a step constant
+  instead of being read from the context each time this instruction is
+  executed. (MR :gl:`!3871`)

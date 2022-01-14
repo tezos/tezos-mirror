@@ -49,6 +49,7 @@ type step_constants = {
      - as caller in VIEW, TRANSFER_TOKENS, and CREATE_CONTRACT *)
   amount : Tez.t;
       (** The amount of the current transaction, as returned by AMOUNT. *)
+  balance : Tez.t;  (** The balance of the contract as returned by BALANCE. *)
   chain_id : Chain_id.t;
       (** The chain id of the chain, as returned by CHAIN_ID. *)
   now : Script_timestamp.t;

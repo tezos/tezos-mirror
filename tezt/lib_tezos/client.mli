@@ -413,6 +413,7 @@ val gen_and_show_keys : ?alias:string -> t -> Account.key Lwt.t
 
 (** Run [tezos-client transfer amount from giver to receiver]. *)
 val transfer :
+  ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -429,6 +430,7 @@ val transfer :
 
 (** Same as [transfer], but do not wait for the process to exit. *)
 val spawn_transfer :
+  ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?burn_cap:Tez.t ->
@@ -563,6 +565,7 @@ val spawn_submit_ballot :
 (** Run [tezos-client originate contract alias transferring amount from src
     running prg]. Returns the originated contract hash *)
 val originate_contract :
+  ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
@@ -576,6 +579,7 @@ val originate_contract :
 
 (** Same as [originate_contract], but do not wait for the process to exit. *)
 val spawn_originate_contract :
+  ?hooks:Process.hooks ->
   ?endpoint:endpoint ->
   ?wait:string ->
   ?init:string ->
@@ -653,11 +657,21 @@ val spawn_stresstest :
 
     Fails if the new storage cannot be extracted from the output. *)
 val run_script :
-  src:string -> storage:string -> input:string -> t -> string Lwt.t
+  ?hooks:Process.hooks ->
+  src:string ->
+  storage:string ->
+  input:string ->
+  t ->
+  string Lwt.t
 
 (** Same as [run_script] but do not wait for the process to exit. *)
 val spawn_run_script :
-  src:string -> storage:string -> input:string -> t -> Process.t
+  ?hooks:Process.hooks ->
+  src:string ->
+  storage:string ->
+  input:string ->
+  t ->
+  Process.t
 
 (** Run [tezos-client register global constant value from src].
     Returns the address hash of the new constant. *)
