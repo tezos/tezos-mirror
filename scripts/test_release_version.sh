@@ -5,7 +5,7 @@
 # The script src/lib_version/tezos_print_version.exe prints the
 # same version displayed by tezos-node --version
 
-set -e
+set -eu
 
 VERSION=10.94
 RANDOMTAG="testtesttest"
