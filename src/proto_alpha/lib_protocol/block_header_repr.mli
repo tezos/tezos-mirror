@@ -25,7 +25,7 @@
 
 (** Options available for the Liquidity Baking per-block vote *)
 
-type liquidity_baking_escape_vote = LB_on | LB_off
+type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
 
 (** Representation of block headers. *)
 

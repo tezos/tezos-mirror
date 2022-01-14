@@ -1896,6 +1896,7 @@ module Block_header : sig
         Block_header_repr.liquidity_baking_escape_vote =
     | LB_on
     | LB_off
+    | LB_pass
 
   type contents = {
     payload_hash : Block_payload_hash.t;

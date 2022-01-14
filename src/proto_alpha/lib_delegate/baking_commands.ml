@@ -143,19 +143,22 @@ let keep_alive_arg =
 
 let liquidity_baking_escape_vote_parameter =
   Clic.parameter
-    ~autocomplete:(fun _ctxt -> return ["on"; "off"])
+    ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
     (let open Protocol.Alpha_context.Block_header in
     fun _ctxt -> function
       | "on" -> return LB_on
       | "off" -> return LB_off
+      | "pass" -> return LB_pass
       | s ->
-          failwith "unexpected vote: %s, expected either \"on\" or \"off\"." s)
+          failwith
+            "unexpected vote: %s, expected either \"on\", \"off\", or \"pass\"."
+            s)
 
 let liquidity_baking_escape_vote_arg =
   Clic.arg
     ~doc:
       "Vote to continue (option \"on\") or end (option \"off\") the liquidity \
-       baking subsidy."
+       baking subsidy. Or choose to pass (option \"pass\")."
     ~long:"liquidity-baking-escape-vote"
     ~placeholder:"vote"
     liquidity_baking_escape_vote_parameter

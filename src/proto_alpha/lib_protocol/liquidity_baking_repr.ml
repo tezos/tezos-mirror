@@ -43,8 +43,15 @@ let on_below_sunset ctxt f =
   if Compare.Int32.(level >= sunset_level) then return (ctxt, [])
   else on_cpmm_exists ctxt f
 
-(* ema starts at zero
-   ema[n+1] = (1999 * ema[n] // 2000) + (1000 if escape_vote[n] else 0)
+(* ema starts at zero and is always between 0 and 2_000_000. It is an
+   exponentional moving average representing the fraction of recent blocks
+   having the liquidity_baking_escape_vote flag set to "off". The computation
+   of this EMA ignores all blocks with the flag set to "pass".
+
+   More precisely,
+   if escape_vote[n] is pass, then ema[n+1] = ema[n].
+   if escape_vote[n] is off, then ema[n+1] = (1999 * ema[n] // 2000) + 1000
+   if escape_vote[n] is on, then ema[n+1] = (1999 * ema[n] // 2000)
    where escape_vote is protocol_data.contents.liquidity_baking_escape_vote *)
 let update_escape_ema ctxt ~escape_vote =
   get_escape_ema ctxt >>=? fun old_ema ->
@@ -54,12 +61,10 @@ let update_escape_ema ctxt ~escape_vote =
       old_ema < Constants_storage.liquidity_baking_escape_ema_threshold ctxt)
   then
     let new_ema =
-      Int32.(
-        add
-          (div (mul 1999l old_ema) 2000l)
-          (match escape_vote with
-          | Block_header_repr.LB_off -> 1000l
-          | LB_on -> 0l))
+      match escape_vote with
+      | Block_header_repr.LB_pass -> old_ema
+      | LB_off -> Int32.(add (div (mul 1999l old_ema) 2000l) 1000l)
+      | LB_on -> Int32.(div (mul 1999l old_ema) 2000l)
     in
     Storage.Liquidity_baking.Escape_ema.update ctxt new_ema >|=? fun ctxt ->
     (ctxt, new_ema, false)

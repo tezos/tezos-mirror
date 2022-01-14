@@ -2995,7 +2995,7 @@ module RPC = struct
                  dft
                    "liquidity_baking_escape_vote"
                    liquidity_baking_escape_vote_encoding
-                   LB_on))
+                   LB_pass))
           ~output:(obj1 (req "protocol_data" bytes))
           RPC_path.(path / "protocol_data")
     end

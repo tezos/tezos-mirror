@@ -262,7 +262,7 @@ let begin_construction ~chain_id ~predecessor_context:ctxt
   | None ->
       Alpha_context.Fitness.round_from_raw predecessor_fitness
       >>?= fun predecessor_round ->
-      let escape_vote = Alpha_context.Block_header.LB_on in
+      let escape_vote = Alpha_context.Block_header.LB_pass in
       Apply.begin_partial_construction ctxt ~predecessor_level ~escape_vote
       >>=? fun ( ctxt,
                  liquidity_baking_operations_results,
@@ -782,7 +782,7 @@ let init ctxt block_header =
       {
         payload_hash = Block_payload_hash.zero;
         payload_round = Alpha_context.Round.zero;
-        liquidity_baking_escape_vote = Alpha_context.Block_header.LB_on;
+        liquidity_baking_escape_vote = Alpha_context.Block_header.LB_pass;
         seed_nonce_hash = None;
         proof_of_work_nonce =
           Bytes.make Constants_repr.proof_of_work_nonce_size '0';

@@ -99,8 +99,9 @@ let () =
         ppf
         "@[The provided block vote file \"%s\" is a valid JSON file but its \
          content is unexpected. Expecting a JSON file containing either \
-         '{\"liquidity_baking_escape_vote\": \"on\"}' or \
-         '{\"liquidity_baking_escape_vote\": \"off\"}'.@]"
+         '{\"liquidity_baking_escape_vote\": \"on\"}', or \
+         '{\"liquidity_baking_escape_vote\": \"off\"}', or \
+         '{\"liquidity_baking_escape_vote\": \"pass\"}'.@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function
@@ -122,7 +123,8 @@ let () =
         "@[In the provided block vote file \"%s\", the \
          \"liquidity_baking_escape_vote\" boolean field is missing. Expecting \
          a JSON file containing either '{\"liquidity_baking_escape_vote\": \
-         \"on\"}' or '{\"liquidity_baking_escape_vote\": \"off\"}'.@]"
+         \"on\"}', or '{\"liquidity_baking_escape_vote\": \"off\"}', or \
+         '{\"liquidity_baking_escape_vote\": \"pass\"}'.@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function

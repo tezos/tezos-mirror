@@ -25,7 +25,7 @@
 
 (** Options available for the Liquidity Baking per-block vote *)
 
-type liquidity_baking_escape_vote = LB_on | LB_off
+type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
 
 (** Block header *)
 
@@ -75,15 +75,16 @@ let liquidity_baking_escape_vote_encoding =
   let of_int8 = function
     | 0 -> Ok LB_on
     | 1 -> Ok LB_off
+    | 2 -> Ok LB_pass
     | _ -> Error "liquidity_baking_escape_vote_of_int8"
   in
-  let to_int8 = function LB_on -> 0 | LB_off -> 1 in
+  let to_int8 = function LB_on -> 0 | LB_off -> 1 | LB_pass -> 2 in
   let open Data_encoding in
   (* union *)
   def "block_header.alpha.liquidity_baking_escape_vote"
   @@ splitted
        ~binary:(conv_with_guard to_int8 of_int8 int8)
-       ~json:(string_enum [("on", LB_on); ("off", LB_off)])
+       ~json:(string_enum [("on", LB_on); ("off", LB_off); ("pass", LB_pass)])
 
 let contents_encoding =
   let open Data_encoding in
@@ -181,7 +182,7 @@ let max_header_length =
       proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '0';
       seed_nonce_hash = Some Nonce_hash.zero;
-      liquidity_baking_escape_vote = LB_on;
+      liquidity_baking_escape_vote = LB_pass;
     }
   in
   Data_encoding.Binary.length

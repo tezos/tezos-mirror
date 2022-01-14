@@ -109,7 +109,7 @@ let default_retries_on_failure_config = 5
 let default_user_activated_upgrades = []
 
 let default_liquidity_baking_escape_vote =
-  Protocol.Alpha_context.Block_header.LB_on
+  Protocol.Alpha_context.Block_header.LB_pass
 
 let default_force = false
 
