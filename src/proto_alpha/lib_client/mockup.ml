@@ -73,6 +73,7 @@ module Protocol_constants_overrides = struct
     cache_sampler_state_cycles : int option;
     tx_rollup_enable : bool option;
     tx_rollup_origination_size : int option;
+    tx_rollup_hard_size_limit_per_inbox : int option;
     sc_rollup_enable : bool option;
     sc_rollup_origination_size : int option;
     (* Additional, "bastard" parameters (they are not protocol constants but partially treated the same way). *)
@@ -124,7 +125,9 @@ module Protocol_constants_overrides = struct
                 ( ( c.cache_script_size,
                     c.cache_stake_distribution_cycles,
                     c.cache_sampler_state_cycles ),
-                  ( (c.tx_rollup_enable, c.tx_rollup_origination_size),
+                  ( ( c.tx_rollup_enable,
+                      c.tx_rollup_origination_size,
+                      c.tx_rollup_hard_size_limit_per_inbox ),
                     (c.sc_rollup_enable, c.sc_rollup_origination_size) ) ) ) )
           ) ))
       (fun ( ( preserved_cycles,
@@ -165,7 +168,9 @@ module Protocol_constants_overrides = struct
                    ( ( cache_script_size,
                        cache_stake_distribution_cycles,
                        cache_sampler_state_cycles ),
-                     ( (tx_rollup_enable, tx_rollup_origination_size),
+                     ( ( tx_rollup_enable,
+                         tx_rollup_origination_size,
+                         tx_rollup_hard_size_limit_per_inbox ),
                        (sc_rollup_enable, sc_rollup_origination_size) ) ) ) ) )
            ) ->
         {
@@ -206,6 +211,7 @@ module Protocol_constants_overrides = struct
           cache_sampler_state_cycles;
           tx_rollup_enable;
           tx_rollup_origination_size;
+          tx_rollup_hard_size_limit_per_inbox;
           sc_rollup_enable;
           sc_rollup_origination_size;
           chain_id;
@@ -265,9 +271,10 @@ module Protocol_constants_overrides = struct
                         (opt "cache_stake_distribution_cycles" int8)
                         (opt "cache_sampler_state_cycles" int8))
                      (merge_objs
-                        (obj2
+                        (obj3
                            (opt "tx_rollup_enable" Data_encoding.bool)
-                           (opt "tx_rollup_origination_size" int31))
+                           (opt "tx_rollup_origination_size" int31)
+                           (opt "tx_rollup_hard_size_limit_per_inbox" int31))
                         (obj2
                            (opt "sc_rollup_enable" bool)
                            (opt "sc_rollup_origination_size" int31))))))))
@@ -335,6 +342,8 @@ module Protocol_constants_overrides = struct
         cache_sampler_state_cycles = Some parametric.cache_sampler_state_cycles;
         tx_rollup_enable = Some parametric.tx_rollup_enable;
         tx_rollup_origination_size = Some parametric.tx_rollup_origination_size;
+        tx_rollup_hard_size_limit_per_inbox =
+          Some parametric.tx_rollup_hard_size_limit_per_inbox;
         sc_rollup_enable = Some parametric.sc_rollup_enable;
         sc_rollup_origination_size = Some parametric.sc_rollup_origination_size;
         (* Bastard additional parameters. *)
@@ -384,6 +393,7 @@ module Protocol_constants_overrides = struct
       cache_sampler_state_cycles = None;
       tx_rollup_enable = None;
       tx_rollup_origination_size = None;
+      tx_rollup_hard_size_limit_per_inbox = None;
       sc_rollup_enable = None;
       sc_rollup_origination_size = None;
       chain_id = None;
@@ -630,6 +640,12 @@ module Protocol_constants_overrides = struct
             override_value = o.tx_rollup_origination_size;
             pp = pp_print_int;
           };
+        O
+          {
+            name = "tx_rollup_hard_size_limit_per_inbox";
+            override_value = o.tx_rollup_hard_size_limit_per_inbox;
+            pp = pp_print_int;
+          };
       ]
     in
     let fields_with_override =
@@ -766,6 +782,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.tx_rollup_origination_size
              o.tx_rollup_origination_size;
+         tx_rollup_hard_size_limit_per_inbox =
+           Option.value
+             ~default:c.tx_rollup_hard_size_limit_per_inbox
+             o.tx_rollup_hard_size_limit_per_inbox;
          sc_rollup_enable =
            Option.value ~default:c.sc_rollup_enable o.sc_rollup_enable;
          sc_rollup_origination_size =

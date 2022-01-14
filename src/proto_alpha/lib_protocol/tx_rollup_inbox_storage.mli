@@ -32,6 +32,7 @@
 
 type error +=
   | Tx_rollup_inbox_does_not_exist of Tx_rollup_repr.t * Raw_level_repr.t
+  | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup_repr.t
 
 (** [append_message ctxt tx_rollup message] tries to append message to
     the inbox of [tx_rollup] at the current level, creating it in the
@@ -40,7 +41,14 @@ type error +=
     from the message author.
 
     {b Note:} [tx_rollup] needs to be a valid transaction address. It
-    is the responsibility of the caller to assert it. *)
+    is the responsibility of the caller to assert it.
+
+    Returns the error
+
+    {ul {li [Tx_rollup_hard_size_limit_reached] if appending [message]
+            to the inbox would make it exceed the maximum size
+            specified by the [tx_rollup_hard_size_limit_per_inbox]
+            protocol parameter.}} *)
 val append_message :
   Raw_context.t ->
   Tx_rollup_repr.t ->

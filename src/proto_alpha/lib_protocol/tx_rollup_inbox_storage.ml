@@ -27,6 +27,7 @@
 
 type error +=
   | Tx_rollup_inbox_does_not_exist of Tx_rollup_repr.t * Raw_level_repr.t
+  | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup_repr.t
 
 let append_message :
     Raw_context.t ->
@@ -39,6 +40,13 @@ let append_message :
   >>=? fun (ctxt, msize) ->
   let message_size = Tx_rollup_message_repr.size message in
   let new_size = Option.value ~default:0 msize + message_size in
+  let inbox_limit =
+    Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
+  in
+  fail_unless
+    Compare.Int.(new_size < inbox_limit)
+    (Tx_rollup_inbox_size_would_exceed_limit rollup)
+  >>=? fun () ->
   Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) rollup
   >>=? fun (ctxt, mcontents) ->
   Storage.Tx_rollup.Inbox_rev_contents.add
@@ -161,4 +169,21 @@ let () =
     (function
       | Tx_rollup_inbox_does_not_exist (rollup, level) -> Some (rollup, level)
       | _ -> None)
-    (fun (rollup, level) -> Tx_rollup_inbox_does_not_exist (rollup, level))
+    (fun (rollup, level) -> Tx_rollup_inbox_does_not_exist (rollup, level)) ;
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_inbox_size_would_exceed_limit"
+    ~title:"Transaction rollup inbox’s size would exceed the limit"
+    ~description:"Transaction rollup inbox’s size would exceed the limit"
+    ~pp:(fun ppf addr ->
+      Format.fprintf
+        ppf
+        "Adding the submitted message would make the inbox of %a exceed the \
+         authorized limit at this level"
+        Tx_rollup_repr.pp
+        addr)
+    (obj1 (req "tx_rollup_address" Tx_rollup_repr.encoding))
+    (function
+      | Tx_rollup_inbox_size_would_exceed_limit rollup -> Some rollup
+      | _ -> None)
+    (fun rollup -> Tx_rollup_inbox_size_would_exceed_limit rollup)
