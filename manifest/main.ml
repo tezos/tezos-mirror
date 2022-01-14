@@ -2778,6 +2778,15 @@ let _tezos_shell_benchs =
         tezos_alpha_test_helpers |> open_;
       ]
 
+let _tezt_performance_regression =
+  public_lib
+    "tezt-performance-regression"
+    ~path:"tezt/lib_performance_regression"
+    ~synopsis:"Performance regression test framework based on Tezt"
+    ~bisect_ppx:false
+    ~deps:[tezt; tezt_tezos; uri; cohttp_lwt_unix]
+    ~opens:["Tezt"; "Tezt.Base"; "Tezt_tezos"]
+
 (* INTERNAL EXES *)
 
 (* Not released, so no ~opam. *)

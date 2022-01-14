@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezt_performance_regression)
+ (public_name tezt-performance-regression)
+ (libraries
+  tezt
+  tezt-tezos
+  uri
+  cohttp-lwt-unix)
+ (flags (:standard -open Tezt -open Tezt.Base -open Tezt_tezos)))
