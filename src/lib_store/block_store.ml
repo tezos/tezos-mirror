@@ -1120,10 +1120,9 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                         (* Critical section: update on-disk values *)
                         move_all_floating_stores block_store ~new_ro_store
                         >>=? fun () ->
-                        Stored_data.write block_store.caboose new_caboose
-                        >>=? fun () ->
-                        Stored_data.write block_store.savepoint new_savepoint
-                        >>=? fun () -> return_unit)
+                        write_caboose block_store new_caboose >>=? fun () ->
+                        write_savepoint block_store new_savepoint >>=? fun () ->
+                        return_unit)
                     >>=? fun () ->
                     (* Don't call the finalizer in the critical
                        section, in case it needs to access the block
