@@ -418,6 +418,9 @@ let ts_of_round_inverse (duration0_int64, dipr) round_int =
   Round.to_int round' >>>?= fun round' ->
   Assert.equal_int ~loc:__LOC__ round_int round'
 
+(* We restrict to round 134,217,727 as rounds above can lead to
+   integer overflow in [Round_repr.round_and_offset] and are already prevented
+   by returning an error. *)
 let test_ts_of_round_inverse () =
   List.iter_es
     (fun durations ->
@@ -428,7 +431,7 @@ let test_ts_of_round_inverse () =
   >>=? fun () ->
   List.iter_es
     (ts_of_round_inverse (1L, 1L))
-    (List.map (fun i -> Int32.to_int Int32.max_int - i) (1 --> 20))
+    (List.map (fun i -> Int32.to_int 134_217_727l - i) (1 --> 20))
 
 let round_of_ts_inverse ~first_round_duration ~delay_increment_per_round ts =
   Format.printf "ts = %Ld@." ts ;
