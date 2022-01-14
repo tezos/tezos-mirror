@@ -167,6 +167,8 @@ let pure_splitmix = external_lib "pure-splitmix" [Exactly "0.2"]
 
 let prbnmcn_stats = external_lib "prbnmcn-stats" [Exactly "0.0.2"]
 
+let prometheus = external_lib "prometheus" []
+
 let prometheus_app = external_lib "prometheus-app" []
 
 let prometheus_app_unix = external_sublib prometheus_app "prometheus-app.unix"
@@ -2126,6 +2128,7 @@ let tezos_store =
         camlzip;
         tar;
         tar_unix;
+        prometheus;
       ]
     ~opens:
       [
