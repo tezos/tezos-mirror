@@ -41,44 +41,51 @@ let check_base_dir s bd1 bd2 = Alcotest.check base_dir_class_testable s bd1 bd2
 
 (** [classify_base_dir] a non existing directory *)
 let test_classify_does_not_exist =
+  let open Lwt_tzresult_syntax in
   Tztest.tztest "Classify a non existing directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
-          Persistence.classify_base_dir
-            (Filename.concat base_dir "non_existing_directory")
-          >|=? check_base_dir "A non existing directory" Base_dir_does_not_exist))
+          let+ bd =
+            Persistence.classify_base_dir
+              (Filename.concat base_dir "non_existing_directory")
+          in
+          check_base_dir "A non existing directory" Base_dir_does_not_exist bd))
 
 (** [classify_base_dir] a file *)
 let test_classify_is_file =
+  let open Lwt_tzresult_syntax in
   Tztest.tztest "Classify a file" `Quick (fun () ->
       let tmp_file = Filename.temp_file "" "" in
-      Persistence.classify_base_dir tmp_file
-      >|=? check_base_dir "A file" Base_dir_is_file)
+      let+ bd = Persistence.classify_base_dir tmp_file in
+      check_base_dir "A file" Base_dir_is_file bd)
 
 (** [classify_base_dir] a mockup directory *)
 let test_classify_is_mockup =
+  let open Lwt_tzresult_syntax in
   Tztest.tztest "Classify a mockup directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun dirname ->
           let mockup_directory = (Files.get_mockup_directory ~dirname :> string)
           and mockup_file_name = Files.Context.get ~dirname in
-          Lwt_unix.mkdir mockup_directory 0o700 >>= fun () ->
+          let*! () = Lwt_unix.mkdir mockup_directory 0o700 in
           let () = close_out (open_out (mockup_file_name :> string)) in
-          Persistence.classify_base_dir dirname
-          >|=? check_base_dir "A mockup directory" Base_dir_is_mockup))
+          let+ bd = Persistence.classify_base_dir dirname in
+          check_base_dir "A mockup directory" Base_dir_is_mockup bd))
 
 (** [classify_base_dir] a non empty directory *)
 let test_classify_is_nonempty =
+  let open Lwt_tzresult_syntax in
   Tztest.tztest "Classify a non empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun temp_dir ->
           let _ = Filename.temp_file ~temp_dir "" "" in
-          Persistence.classify_base_dir temp_dir
-          >|=? check_base_dir "A non empty directory" Base_dir_is_nonempty))
+          let+ bd = Persistence.classify_base_dir temp_dir in
+          check_base_dir "A non empty directory" Base_dir_is_nonempty bd))
 
 (** [classify_base_dir] an empty directory *)
 let test_classify_is_empty =
+  let open Lwt_tzresult_syntax in
   Tztest.tztest "Classify an empty directory" `Quick (fun () ->
       Lwt_utils_unix.with_tempdir "test_persistence" (fun base_dir ->
-          Persistence.classify_base_dir base_dir
-          >|=? check_base_dir "An empty directory" Base_dir_is_empty))
+          let+ bd = Persistence.classify_base_dir base_dir in
+          check_base_dir "An empty directory" Base_dir_is_empty bd))
 
 module Mock_protocol : Registration.PROTOCOL = struct
   include Environment_protocol_T_test.Internal_for_tests.Mock_all_unit
@@ -138,13 +145,15 @@ let mock_printer () =
 
 (** [get_registered_mockup] fails when no environment was registered. *)
 let test_get_registered_mockup_no_env =
+  let open Lwt_result_syntax in
   Tztest.tztest
     "get_registered_mockup fails when no environment was registered"
     `Quick
     (fun () ->
       let module Registration = Registration.Internal_for_tests.Make () in
       let module Persistence = Persistence.Internal_for_tests.Make (Registration) in
-      Persistence.get_registered_mockup None (mock_printer ()) >>= function
+      let*! r = Persistence.get_registered_mockup None (mock_printer ()) in
+      match r with
       | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
           let actual =
@@ -162,6 +171,7 @@ let test_get_registered_mockup_no_env =
 
 (** [get_registered_mockup] fails if the requested protocol is not found. *)
 let test_get_registered_mockup_not_found =
+  let open Lwt_result_syntax in
   Tztest.tztest
     "get_registered_mockup fails if the requested protocol is not found"
     `Quick
@@ -173,8 +183,10 @@ let test_get_registered_mockup_not_found =
       let proto_hash_3 = Protocol_hash.hash_string ["mock3"] in
       Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment (mock_mockup_module proto_hash_2) ;
-      Persistence.get_registered_mockup (Some proto_hash_3) (mock_printer ())
-      >>= function
+      let*! r =
+        Persistence.get_registered_mockup (Some proto_hash_3) (mock_printer ())
+      in
+      match r with
       | Ok _ -> Alcotest.fail "Should have failed"
       | Error ([_] as errors) ->
           let actual =
@@ -201,6 +213,7 @@ let test_get_registered_mockup_not_found =
 
 (** [get_registered_mockup] returns Alpha if none is specified. *)
 let test_get_registered_mockup_take_alpha =
+  let open Lwt_result_syntax in
   Tztest.tztest
     "get_registered_mockup returns Alpha if none is specified"
     `Quick
@@ -218,7 +231,7 @@ let test_get_registered_mockup_take_alpha =
       Registration.register_mockup_environment
         (mock_mockup_module proto_hash_alpha) ;
       Registration.register_mockup_environment (mock_mockup_module proto_hash_3) ;
-      Persistence.get_registered_mockup None printer >|=? fun (module Result) ->
+      let+ (module Result) = Persistence.get_registered_mockup None printer in
       Alcotest.check'
         (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
         ~msg:"The Alpha protocol is returned"
@@ -233,6 +246,7 @@ let test_get_registered_mockup_take_alpha =
 
 (** [get_registered_mockup] returns the requested protocol. *)
 let test_get_registered_mockup_take_requested =
+  let open Lwt_result_syntax in
   Tztest.tztest
     "get_registered_mockup returns the requested protocol"
     `Quick
@@ -243,8 +257,9 @@ let test_get_registered_mockup_take_requested =
       let proto_hash_2 = Protocol_hash.hash_string ["mock2"] in
       Registration.register_mockup_environment (mock_mockup_module proto_hash_1) ;
       Registration.register_mockup_environment (mock_mockup_module proto_hash_2) ;
-      Persistence.get_registered_mockup (Some proto_hash_1) (mock_printer ())
-      >|=? fun (module Result) ->
+      let+ (module Result) =
+        Persistence.get_registered_mockup (Some proto_hash_1) (mock_printer ())
+      in
       Alcotest.check'
         (Alcotest.testable Protocol_hash.pp Protocol_hash.equal)
         ~msg:"The requested protocol is returned"
