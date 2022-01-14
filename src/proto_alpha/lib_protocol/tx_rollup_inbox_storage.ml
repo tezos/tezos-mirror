@@ -28,6 +28,7 @@
 type error +=
   | Tx_rollup_inbox_does_not_exist of Tx_rollup_repr.t * Raw_level_repr.t
   | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup_repr.t
+  | Tx_rollup_message_size_exceeds_limit
 
 let append_message :
     Raw_context.t ->
@@ -43,9 +44,16 @@ let append_message :
   let inbox_limit =
     Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
   in
+  let message_limit =
+    Constants_storage.tx_rollup_hard_size_limit_per_message ctxt
+  in
   fail_unless
     Compare.Int.(new_size < inbox_limit)
     (Tx_rollup_inbox_size_would_exceed_limit rollup)
+  >>=? fun () ->
+  fail_unless
+    Compare.Int.(message_size < message_limit)
+    Tx_rollup_message_size_exceeds_limit
   >>=? fun () ->
   Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) rollup
   >>=? fun (ctxt, mcontents) ->
@@ -186,4 +194,14 @@ let () =
     (function
       | Tx_rollup_inbox_size_would_exceed_limit rollup -> Some rollup
       | _ -> None)
-    (fun rollup -> Tx_rollup_inbox_size_would_exceed_limit rollup)
+    (fun rollup -> Tx_rollup_inbox_size_would_exceed_limit rollup) ;
+  (* Tx_rollup_message_size_exceed_limit *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_message_size_exceeds_limit"
+    ~title:"A message submtitted to a transaction rollup inbox exceeds limit"
+    ~description:
+      "A message submtitted to a transaction rollup inbox exceeds limit"
+    empty
+    (function Tx_rollup_message_size_exceeds_limit -> Some () | _ -> None)
+    (fun () -> Tx_rollup_message_size_exceeds_limit)

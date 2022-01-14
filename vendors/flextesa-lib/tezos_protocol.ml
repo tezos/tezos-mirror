@@ -157,6 +157,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; (* TODO: https://gitlab.com/tezos/tezos/-/issues/2152 *)
             ("tx_rollup_origination_size", int 60_000)
           ; ("tx_rollup_hard_size_limit_per_inbox", int 100_000)
+          ; ("tx_rollup_hard_size_limit_per_message", int 5_000)
           ; ("sc_rollup_enable", bool false)
           ; ("sc_rollup_origination_size", int 6_314)
           ]
