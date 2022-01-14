@@ -25,10 +25,63 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = unit
+type t = {fees_per_byte : Tez_repr.t}
 
-let initial_state = ()
+let initial_state = {fees_per_byte = Tez_repr.zero}
 
-let encoding = Data_encoding.unit
+let encoding : t Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {fees_per_byte} -> fees_per_byte)
+    (fun fees_per_byte ->
+      assert (Tez_repr.(zero <= fees_per_byte)) ;
+      {fees_per_byte})
+    (obj1 (req "fees_per_byte" Tez_repr.encoding))
 
-let pp fmt () = Format.fprintf fmt "Tx_rollup: ()"
+let pp fmt {fees_per_byte} =
+  Format.fprintf fmt "Tx_rollup: fees_per_byte = %a" Tez_repr.pp fees_per_byte
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2338
+   To get a smoother variation of fees, that is more resistant to
+   spurious pikes of data, we will use EMA.
+
+   The type [t] probably needs to be updated accordingly. *)
+let update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t =
+ fun {fees_per_byte} ~final_size ~hard_limit ->
+  let threshold_increase = 90 in
+  let threshold_decrease = 80 in
+  let variation_factor = 5L in
+  let computation =
+    let open Compare.Int in
+    let percentage = final_size * 100 / hard_limit in
+    if threshold_decrease < percentage && percentage <= threshold_increase then
+      (* constant case *)
+      ok fees_per_byte
+    else
+      Tez_repr.(fees_per_byte *? variation_factor >>? fun x -> x /? 100L)
+      >>? fun variation ->
+      let variation =
+        if Tez_repr.(variation = zero) then Tez_repr.one_mutez else variation
+      in
+      (* increase case *)
+      if threshold_increase < percentage then
+        Tez_repr.(fees_per_byte +? variation)
+      else if percentage < threshold_decrease && Tez_repr.(zero < fees_per_byte)
+      then
+        (* decrease case, and strictly positive fees *)
+        Tez_repr.(fees_per_byte -? variation)
+      else (* decrease case, and fees equals zero *)
+        ok fees_per_byte
+  in
+  match computation with
+  | Ok fees_per_byte -> {fees_per_byte}
+  (* In the (very unlikely) event of an overflow, we force the fees to
+     be the maximum amount. *)
+  | Error _ -> {fees_per_byte = Tez_repr.max_mutez}
+
+let fees {fees_per_byte} size = Tez_repr.(fees_per_byte *? Int64.of_int size)
+
+module Internal_for_tests = struct
+  let initial_state_with_fees_per_byte : Tez_repr.t -> t =
+   fun fees_per_byte -> {fees_per_byte}
+end

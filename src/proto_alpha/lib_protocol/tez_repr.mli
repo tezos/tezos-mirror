@@ -42,6 +42,8 @@ val fifty_cents : t
 
 val one : t
 
+val max_mutez : t
+
 val ( -? ) : t -> t -> t tzresult
 
 (** Same as ( -? ) but returns None instead of an error. *)

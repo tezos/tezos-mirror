@@ -2003,9 +2003,17 @@ module Tx_rollup_state : sig
 
   val get : context -> Tx_rollup.t -> (context * t) tzresult Lwt.t
 
+  val fees : t -> int -> Tez.t tzresult
+
   type error +=
     | Tx_rollup_already_exists of Tx_rollup.t
     | Tx_rollup_does_not_exist of Tx_rollup.t
+
+  module Internal_for_tests : sig
+    val initial_state_with_fees_per_byte : Tez.t -> t
+
+    val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+  end
 end
 
 (** This module re-exports definitions from {!Tx_rollup_message_repr}. *)

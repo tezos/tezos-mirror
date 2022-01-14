@@ -35,3 +35,28 @@ val initial_state : t
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
+
+(** [update_fees_per_byte state ~final_size ~hard_limit] updates the
+    fees to be paid for each byte submitted to a transaction rollup
+    inbox, based on the ratio of the [hard_limit] maximum amount of
+    byte an inbox can use and the [final_size] amount of bytes it uses
+    at the end of the construction of a Tezos block.
+
+    In a nutshell, if the ratio is lesser than 80%, the fees per byte
+    are reduced. If the ratio is somewhere between 80% and 90%, the
+    fees per byte remain constant. If the ratio is greater than 90%,
+    then the fees per byte are increased.
+
+    The rationale behind this mechanics is to reduce the activity of a
+    transaction rollup in case it becomes too intense. *)
+val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+
+(** [fees state size] computes the fees to be paid to submit [size]
+    bytes in the inbox of the transactional rollup. *)
+val fees : t -> int -> Tez_repr.t tzresult
+
+module Internal_for_tests : sig
+  (** [initial_state_with_fees_per_byte fees] returns [initial_state], but
+      wherein it costs [fees] per byte to add a message to an inbox. *)
+  val initial_state_with_fees_per_byte : Tez_repr.t -> t
+end
