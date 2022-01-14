@@ -427,6 +427,31 @@ module Opam = struct
         url;
       } =
     let (depopts, depends) = List.partition (fun dep -> dep.optional) depends in
+    let (depopts, conflicts) =
+      (* Opam documentation says this about [depopts]:
+         "If you require specific versions, add a [conflicts] field with the ones
+         that won't work."
+         One could assume that this is because version constraints need to existe
+         whether the optional dependencies are selected or not?
+         In any case the following piece of code converts version constraints
+         on optional dependencies into conflicts. *)
+      let optional_dep_conflicts =
+        let negate_dependency_constraint dependency =
+          match dependency.version with
+          | True ->
+              (* No conflict to introduce. *)
+              None
+          | version -> Some {dependency with version = Version.not_ version}
+        in
+        List.filter_map negate_dependency_constraint depopts
+      in
+      let depopts =
+        let remove_constraint dependency = {dependency with version = True} in
+        List.map remove_constraint depopts
+      in
+      let conflicts = conflicts @ optional_dep_conflicts in
+      (depopts, conflicts)
+    in
     let pp_line x =
       Format.kfprintf (fun fmt -> Format.pp_print_newline fmt ()) fmt x
     in
