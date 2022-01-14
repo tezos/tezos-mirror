@@ -313,25 +313,81 @@ module Dune = struct
 end
 
 (*****************************************************************************)
+(*                                VERSIONS                                   *)
+(*****************************************************************************)
+
+module Version = struct
+  type t = string
+
+  type atom = V of t | Version
+
+  (* Note: opam does not actually support [False], which makes sense since
+     why would one want to have a dependency which cannot be installed.
+     We support [False] in order to be able to negate any version constraint. *)
+  type constraints =
+    | True
+    | False
+    | Exactly of atom
+    | Different_from of atom
+    | At_least of atom
+    | More_than of atom
+    | At_most of atom
+    | Less_than of atom
+    | Not of constraints
+    | And of constraints * constraints
+    | Or of constraints * constraints
+
+  let exactly x = Exactly (V x)
+
+  let different_from x = Different_from (V x)
+
+  let at_least x = At_least (V x)
+
+  let more_than x = More_than (V x)
+
+  let at_most x = At_most (V x)
+
+  let less_than x = Less_than (V x)
+
+  let not_ = function
+    | True -> False
+    | False -> True
+    | Exactly x -> Different_from x
+    | Different_from x -> Exactly x
+    | At_least x -> Less_than x
+    | More_than x -> At_most x
+    | At_most x -> More_than x
+    | Less_than x -> At_least x
+    | Not x -> x
+    | (And _ | Or _) as x ->
+        (* We could distribute but it could lead to an exponential explosion. *)
+        Not x
+
+  let ( && ) a b =
+    match (a, b) with
+    | (True, x) | (x, True) -> x
+    | (False, _) | (_, False) -> False
+    | _ -> And (a, b)
+
+  let and_list = List.fold_left ( && ) True
+
+  let ( || ) a b =
+    match (a, b) with
+    | (True, _) | (_, True) -> True
+    | (False, x) | (x, False) -> x
+    | _ -> Or (a, b)
+
+  let or_list = List.fold_left ( || ) False
+end
+
+(*****************************************************************************)
 (*                                  OPAM                                     *)
 (*****************************************************************************)
 
 module Opam = struct
-  type version = string
-
-  type version_constraint =
-    | Same_as_current_package
-    | Exactly of version
-    | At_least of version
-    | Less_than of version
-    | At_most of version
-    | Not of version
-
-  type version_constraints = version_constraint list
-
   type dependency = {
     package : string;
-    version : version_constraints;
+    version : Version.constraints;
     with_test : bool;
     optional : bool;
   }
@@ -410,7 +466,6 @@ module Opam = struct
             "Cannot use strings with three consecutive double-quotes in opam \
              strings."
     in
-    let pp_version = pp_string in
     let pp_list ?(v = false) ?(prefix = "") pp_item fmt = function
       | [] -> Format.fprintf fmt "%s[]" prefix
       | list ->
@@ -431,37 +486,62 @@ module Opam = struct
             pp_sep_out
             ()
     in
-    let pp_version_constraint fmt = function
-      | Same_as_current_package -> Format.fprintf fmt "= version"
-      | Exactly version -> Format.fprintf fmt "= %a" pp_version version
-      | At_least version -> Format.fprintf fmt ">= %a" pp_version version
-      | Less_than version -> Format.fprintf fmt "< %a" pp_version version
-      | At_most version -> Format.fprintf fmt "<= %a" pp_version version
-      | Not version -> Format.fprintf fmt "!= %a" pp_version version
+    let pp_version_atom fmt = function
+      | Version.V x -> pp_string fmt x
+      | Version -> Format.pp_print_string fmt "version"
     in
-    let pp_version_constraints fmt list =
-      Format.pp_print_list pp_version_constraint fmt list ~pp_sep:(fun fmt () ->
-          Format.pp_print_string fmt " & ")
+    let rec pp_version_constraint ~in_and fmt = function
+      | Version.True ->
+          invalid_arg "pp_version_constraint cannot be called with True"
+      | False -> invalid_arg "pp_version_constraint cannot be called with False"
+      | Exactly version -> Format.fprintf fmt "= %a" pp_version_atom version
+      | Different_from version ->
+          Format.fprintf fmt "!= %a" pp_version_atom version
+      | At_least version -> Format.fprintf fmt ">= %a" pp_version_atom version
+      | More_than version -> Format.fprintf fmt "> %a" pp_version_atom version
+      | At_most version -> Format.fprintf fmt "<= %a" pp_version_atom version
+      | Less_than version -> Format.fprintf fmt "< %a" pp_version_atom version
+      | Not atom ->
+          Format.fprintf fmt "! (%a)" (pp_version_constraint ~in_and:false) atom
+      | And (a, b) ->
+          Format.fprintf
+            fmt
+            "%a & %a"
+            (pp_version_constraint ~in_and:true)
+            a
+            (pp_version_constraint ~in_and:true)
+            b
+      | Or (a, b) ->
+          Format.fprintf
+            fmt
+            "%s%a & %a%s"
+            (if in_and then "(" else "")
+            (pp_version_constraint ~in_and:false)
+            a
+            (pp_version_constraint ~in_and:false)
+            b
+            (if in_and then ")" else "")
     in
     let pp_dependency fmt {package; version; with_test; _} =
       match (version, with_test) with
-      | ([], false) -> pp_string fmt package
-      | ([], true) -> Format.fprintf fmt "@[%a {with-test}@]" pp_string package
-      | (_ :: _, false) ->
+      | (True, false) -> pp_string fmt package
+      | (True, true) ->
+          Format.fprintf fmt "@[%a {with-test}@]" pp_string package
+      | (version, false) ->
           Format.fprintf
             fmt
             "@[%a { %a }@]"
             pp_string
             package
-            pp_version_constraints
+            (pp_version_constraint ~in_and:false)
             version
-      | (_ :: _, true) ->
+      | (version, true) ->
           Format.fprintf
             fmt
             "@[%a { with-test & %a }@]"
             pp_string
             package
-            pp_version_constraints
+            (pp_version_constraint ~in_and:false)
             version
     in
     let pp_command_item fmt = function
@@ -515,13 +595,13 @@ module Target = struct
   type external_ = {
     name : string;
     opam : string option;
-    version : Opam.version_constraints;
+    version : Version.constraints;
     js_compatible : bool;
   }
 
   type vendored = {name : string; js_compatible : bool}
 
-  type opam_only = {name : string; version : Opam.version_constraints}
+  type opam_only = {name : string; version : Version.constraints}
 
   type modules =
     | All
@@ -559,7 +639,7 @@ module Target = struct
     modes : Dune.mode list option;
     modules : modules;
     nopervasives : bool;
-    ocaml : Opam.version_constraints option;
+    ocaml : Version.constraints option;
     opam : string option;
     opaque : bool;
     opens : string list;
@@ -683,7 +763,7 @@ module Target = struct
     ?modules:string list ->
     ?node_wrapper_flags:string list ->
     ?nopervasives:bool ->
-    ?ocaml:Opam.version_constraints ->
+    ?ocaml:Version.constraints ->
     ?opam:string ->
     ?opaque:bool ->
     ?opens:string list ->
@@ -1269,11 +1349,11 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
       if package = for_package then None
       else
         let version =
-          if fix_version then [Opam.Same_as_current_package] else []
+          if fix_version then Version.(Exactly Version) else Version.True
         in
         Some {Opam.package; version; with_test; optional = false}
   | Vendored {name = package; _} ->
-      Some {Opam.package; version = []; with_test; optional = false}
+      Some {Opam.package; version = True; with_test; optional = false}
   | External {opam = Some opam; version; _} | Opam_only {name = opam; version}
     ->
       Some {Opam.package = opam; version; with_test; optional = false}
@@ -1323,7 +1403,7 @@ let generate_opam ?release this_package (internals : Target.internal list) :
     | versions ->
         {
           Opam.package = "ocaml";
-          version = List.flatten versions;
+          version = Version.and_list versions;
           with_test = false;
           optional = false;
         }
@@ -1332,7 +1412,7 @@ let generate_opam ?release this_package (internals : Target.internal list) :
   let depends =
     {
       Opam.package = "dune";
-      version = [At_least "2.9"];
+      version = Version.at_least "2.9";
       with_test = false;
       optional = false;
     }

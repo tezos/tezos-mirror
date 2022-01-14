@@ -24,53 +24,56 @@
 (*****************************************************************************)
 
 open Manifest
+module V = Version
 
 (* EXTERNAL LIBS *)
 
-let alcotest = external_lib ~js_compatible:true "alcotest" [At_least "1.5.0"]
+let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
 
-let alcotest_lwt = external_lib "alcotest-lwt" [At_least "1.5.0"]
+let alcotest_lwt = external_lib "alcotest-lwt" V.(at_least "1.5.0")
 
-let astring = external_lib ~js_compatible:true "astring" []
+let astring = external_lib ~js_compatible:true "astring" V.True
 
-let bigstring = external_lib ~js_compatible:true "bigstring" []
+let bigstring = external_lib ~js_compatible:true "bigstring" V.True
 
 let bigstringaf =
-  external_lib ~js_compatible:true "bigstringaf" [At_least "0.2.0"]
+  external_lib ~js_compatible:true "bigstringaf" V.(at_least "0.2.0")
 
-let bisect_ppx = opam_only "bisect_ppx" [At_least "2.7.0"]
+let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
-let bls12_381 = external_lib "bls12-381" [At_least "1.1.0"; Less_than "1.2.0"]
+let bls12_381 =
+  external_lib "bls12-381" V.(at_least "1.1.0" && less_than "1.2.0")
 
-let bls12_381_legacy = external_lib "bls12-381-legacy" []
+let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
-let bls12_381_unix = external_lib "bls12-381-unix" []
+let bls12_381_unix = external_lib "bls12-381-unix" V.True
 
-let camlzip = external_lib "camlzip" [Exactly "1.10"]
+let camlzip = external_lib "camlzip" V.(exactly "1.10")
 
-let caqti = external_lib "caqti" []
+let caqti = external_lib "caqti" V.True
 
-let caqti_lwt = external_lib "caqti-lwt" []
+let caqti_lwt = external_lib "caqti-lwt" V.True
 
-let caqti_driver_postgresql = external_lib "caqti-driver-postgresql" []
+let caqti_driver_postgresql = external_lib "caqti-driver-postgresql" V.True
 
-let cmdliner = external_lib "cmdliner" []
+let cmdliner = external_lib "cmdliner" V.True
 
-let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" [At_least "2.2.0"]
+let cohttp_lwt_unix = external_lib "cohttp-lwt-unix" V.(at_least "2.2.0")
 
-let compiler_libs_common = external_lib "compiler-libs.common" [] ~opam:""
+let compiler_libs_common = external_lib "compiler-libs.common" V.True ~opam:""
 
-let compiler_libs_optcomp = external_lib "compiler-libs.optcomp" [] ~opam:""
+let compiler_libs_optcomp = external_lib "compiler-libs.optcomp" V.True ~opam:""
 
-let compiler_libs_toplevel = external_lib "compiler-libs.toplevel" [] ~opam:""
+let compiler_libs_toplevel =
+  external_lib "compiler-libs.toplevel" V.True ~opam:""
 
-let conf_libev = opam_only "conf-libev" []
+let conf_libev = opam_only "conf-libev" V.True
 
-let conf_rust = opam_only "conf-rust" []
+let conf_rust = opam_only "conf-rust" V.True
 
-let coq_of_ocaml = opam_only "coq-of-ocaml" [Exactly "2.5.0"]
+let coq_of_ocaml = opam_only "coq-of-ocaml" V.(exactly "2.5.0")
 
-let ctypes = external_lib "ctypes" [At_least "0.18.0"]
+let ctypes = external_lib "ctypes" V.(at_least "0.18.0")
 
 let ctypes_stubs = external_sublib ctypes "ctypes.stubs"
 
@@ -78,127 +81,127 @@ let data_encoding =
   external_lib
     ~js_compatible:true
     "data-encoding"
-    [At_least "0.4"; Less_than "0.5"]
+    V.(at_least "0.4" && less_than "0.5")
 
-let digestif = external_lib ~js_compatible:true "digestif" [At_least "0.7.3"]
+let digestif = external_lib ~js_compatible:true "digestif" V.(at_least "0.7.3")
 
 let digestif_c = external_sublib digestif "digestif.c"
 
-let dynlink = external_lib "dynlink" [] ~opam:""
+let dynlink = external_lib "dynlink" V.True ~opam:""
 
-let ezjsonm = external_lib ~js_compatible:true "ezjsonm" [At_least "1.1.0"]
+let ezjsonm = external_lib ~js_compatible:true "ezjsonm" V.(at_least "1.1.0")
 
-let fmt = external_lib ~js_compatible:true "fmt" [At_least "0.8.7"]
+let fmt = external_lib ~js_compatible:true "fmt" V.(at_least "0.8.7")
 
 let fmt_cli = external_sublib fmt "fmt.cli"
 
 let fmt_tty = external_sublib fmt "fmt.tty"
 
-let hacl_star = external_lib "hacl-star" [At_least "0.4.2"; Less_than "0.5"]
+let hacl_star = external_lib "hacl-star" V.(at_least "0.4.2" && less_than "0.5")
 
-let hacl_star_raw = external_lib "hacl-star-raw" []
+let hacl_star_raw = external_lib "hacl-star-raw" V.True
 
-let hacl_x25519 = external_lib "hacl_x25519" []
+let hacl_x25519 = external_lib "hacl_x25519" V.True
 
-let hex = external_lib ~js_compatible:true "hex" [At_least "1.3.0"]
+let hex = external_lib ~js_compatible:true "hex" V.(at_least "1.3.0")
 
-let index = external_lib "index" [At_least "1.3.0"]
+let index = external_lib "index" V.(at_least "1.3.0")
 
-let integers = external_lib "integers" []
+let integers = external_lib "integers" V.True
 
 let ipaddr =
   external_lib
     ~js_compatible:true
     "ipaddr"
-    [At_least "5.0.0"; Less_than "6.0.0"]
+    V.(at_least "5.0.0" && less_than "6.0.0")
 
 let ipaddr_unix = external_sublib ipaddr "ipaddr.unix"
 
-let irmin = external_lib "irmin" [At_least "2.10.0"; Less_than "2.11.0"]
+let irmin = external_lib "irmin" V.(at_least "2.10.0" && less_than "2.11.0")
 
 let irmin_pack =
-  external_lib "irmin-pack" [At_least "2.10.0"; Less_than "2.11.0"]
+  external_lib "irmin-pack" V.(at_least "2.10.0" && less_than "2.11.0")
 
 let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
 
-let js_of_ocaml = external_lib ~js_compatible:true "js_of_ocaml" []
+let js_of_ocaml = external_lib ~js_compatible:true "js_of_ocaml" V.True
 
 let json_data_encoding =
-  external_lib ~js_compatible:true "json-data-encoding" []
+  external_lib ~js_compatible:true "json-data-encoding" V.True
 
-let logs = external_lib "logs" []
+let logs = external_lib "logs" V.True
 
 let logs_fmt = external_sublib logs "logs.fmt"
 
-let lwt = external_lib ~js_compatible:true "lwt" [At_least "5.4.0"]
+let lwt = external_lib ~js_compatible:true "lwt" V.(at_least "5.4.0")
 
 let lwt_canceler =
   external_lib
     ~js_compatible:true
     "lwt-canceler"
-    [At_least "0.3"; Less_than "0.4"]
+    V.(at_least "0.3" && less_than "0.4")
 
-let lwt_exit = external_lib "lwt-exit" []
+let lwt_exit = external_lib "lwt-exit" V.True
 
-let lwt_log = external_lib "lwt_log" []
+let lwt_log = external_lib "lwt_log" V.True
 
 let lwt_log_core = external_sublib ~js_compatible:true lwt_log "lwt_log.core"
 
 let lwt_unix = external_sublib lwt "lwt.unix"
 
-let lwt_watcher = external_lib "lwt-watcher" [Exactly "0.1"]
+let lwt_watcher = external_lib "lwt-watcher" V.(exactly "0.1")
 
-let mtime = external_lib ~js_compatible:true "mtime" [At_least "1.0.0"]
+let mtime = external_lib ~js_compatible:true "mtime" V.(at_least "1.0.0")
 
 let mtime_clock_os = external_sublib mtime "mtime.clock.os"
 
-let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" []
+let ocaml_migrate_parsetree = external_lib "ocaml-migrate-parsetree" V.True
 
-let ocamlformat = opam_only "ocamlformat" [Exactly "0.18.0"]
+let ocamlformat = opam_only "ocamlformat" V.(exactly "0.18.0")
 
-let ocamlgraph = external_lib "ocamlgraph" []
+let ocamlgraph = external_lib "ocamlgraph" V.True
 
-let ocplib_endian = external_lib ~js_compatible:true "ocplib-endian" []
+let ocplib_endian = external_lib ~js_compatible:true "ocplib-endian" V.True
 
 let ocplib_endian_bigstring =
   external_sublib ocplib_endian "ocplib-endian.bigstring"
 
 let ocplib_ocamlres =
-  external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" [At_least "0.4"]
+  external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
-let parsexp = external_lib ~js_compatible:true "parsexp" []
+let parsexp = external_lib ~js_compatible:true "parsexp" V.True
 
-let ppx_blob = external_lib "ppx_blob" []
+let ppx_blob = external_lib "ppx_blob" V.True
 
-let ppx_inline_test = external_lib "ppx_inline_test" []
+let ppx_inline_test = external_lib "ppx_inline_test" V.True
 
-let ptime = external_lib ~js_compatible:true "ptime" [At_least "0.8.4"]
+let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "0.8.4")
 
 let ptime_clock_os = external_sublib ptime "ptime.clock.os"
 
 let pure_splitmix =
-  external_lib ~js_compatible:true "pure-splitmix" [Exactly "0.2"]
+  external_lib ~js_compatible:true "pure-splitmix" V.(exactly "0.2")
 
-let prbnmcn_stats = external_lib "prbnmcn-stats" [Exactly "0.0.2"]
+let prbnmcn_stats = external_lib "prbnmcn-stats" V.(exactly "0.0.2")
 
-let prometheus = external_lib "prometheus" []
+let prometheus = external_lib "prometheus" V.True
 
-let prometheus_app = external_lib "prometheus-app" []
+let prometheus_app = external_lib "prometheus-app" V.True
 
 let prometheus_app_unix = external_sublib prometheus_app "prometheus-app.unix"
 
-let pyml = external_lib "pyml" []
+let pyml = external_lib "pyml" V.True
 
 let qcheck_alcotest =
-  external_lib ~js_compatible:true "qcheck-alcotest" [At_least "0.15"]
+  external_lib ~js_compatible:true "qcheck-alcotest" V.(at_least "0.15")
 
-let qcheck_core = external_lib "qcheck-core" []
+let qcheck_core = external_lib "qcheck-core" V.True
 
-let re = external_lib ~js_compatible:true "re" [At_least "1.7.2"]
+let re = external_lib ~js_compatible:true "re" V.(at_least "1.7.2")
 
 let re_str = external_sublib ~js_compatible:true re "re.str"
 
-let resto_version = Opam.[At_least "0.6"; Less_than "0.7"]
+let resto_version = V.(at_least "0.6" && less_than "0.7")
 
 let resto = external_lib "resto" resto_version
 
@@ -215,37 +218,40 @@ let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 
 let resto_directory = external_lib "resto-directory" resto_version
 
-let ringo = external_lib "ringo" [Exactly "0.7"]
+let ringo = external_lib "ringo" V.(exactly "0.7")
 
-let ringo_lwt = external_lib "ringo-lwt" [Exactly "0.7"]
+let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
 
-let secp256k1_internal = external_lib "secp256k1-internal" []
+let secp256k1_internal = external_lib "secp256k1-internal" V.True
 
-let str = external_lib ~js_compatible:true "str" ~opam:"" []
+let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
-let tar = external_lib "tar" []
+let tar = external_lib "tar" V.True
 
-let tar_unix = external_lib "tar-unix" [Exactly "1.1.0"]
+let tar_unix = external_lib "tar-unix" V.(exactly "1.1.0")
 
-let tezos_rust_lib = opam_only "tezos-rust-libs" [Exactly "1.1"]
+let tezos_rust_lib = opam_only "tezos-rust-libs" V.(exactly "1.1")
 
-let tls = external_lib "tls" [At_least "0.10"]
+let tls = external_lib "tls" V.(at_least "0.10")
 
-let unix = external_lib ~opam:"base-unix" "unix" []
+let unix = external_lib ~opam:"base-unix" "unix" V.True
 
-let uri = external_lib ~js_compatible:true "uri" []
+let uri = external_lib ~js_compatible:true "uri" V.True
 
-let utop = external_lib "utop" [At_least "2.8"]
+let utop = external_lib "utop" V.(at_least "2.8")
 
-let uutf = external_lib ~js_compatible:true "uutf" []
+let uutf = external_lib ~js_compatible:true "uutf" V.True
 
-let vector = external_lib ~js_compatible:true "vector" []
+let vector = external_lib ~js_compatible:true "vector" V.True
 
 (* The signature of the [Z] module has changed in 1.12. *)
 let zarith =
-  external_lib ~js_compatible:true "zarith" [At_least "1.12"; Less_than "1.13"]
+  external_lib
+    ~js_compatible:true
+    "zarith"
+    V.(at_least "1.12" && less_than "1.13")
 
-let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" []
+let zarith_stubs_js = external_lib ~js_compatible:true "zarith_stubs_js" V.True
 
 (* VENDORED LIBS *)
 
@@ -267,7 +273,7 @@ let tezos_test_helpers =
     ~synopsis:"Tezos-agnostic test helpers"
     ~deps:[uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix]
     ~js_compatible:true
-    ~ocaml:[At_least "4.08"]
+    ~ocaml:V.(at_least "4.08")
     ~linkall:true
     ~dune:
       Dune.
@@ -283,7 +289,7 @@ let tezos_stdlib =
     ~path:"src/lib_stdlib"
     ~synopsis:"Tezos: yet-another local-extension of the OCaml standard library"
     ~deps:[hex; zarith; zarith_stubs_js; lwt]
-    ~ocaml:[At_least "4.08"]
+    ~ocaml:V.(at_least "4.08")
     ~js_compatible:true
     ~inline_tests:true
     ~preprocess:[PPS ppx_inline_test]
@@ -394,7 +400,7 @@ let tezos_lwt_result_stdlib =
     "tezos-lwt-result-stdlib"
     ~path:"src/lib_lwt_result_stdlib"
     ~synopsis:"Tezos: error-aware stdlib replacement"
-    ~ocaml:[At_least "4.12"]
+    ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
     ~deps:
       [
@@ -449,7 +455,7 @@ let tezos_error_monad =
     "tezos-error-monad"
     ~path:"src/lib_error_monad"
     ~synopsis:"Tezos: error monad"
-    ~ocaml:[At_least "4.07"]
+    ~ocaml:V.(at_least "4.07")
     ~deps:
       [tezos_stdlib; data_encoding; lwt_canceler; lwt; tezos_lwt_result_stdlib]
     ~js_compatible:true
@@ -462,7 +468,7 @@ let tezos_hacl_glue =
     "tezos-hacl-glue"
     ~path:"src/lib_hacl_glue/virtual"
     ~synopsis:"Tezos: thin layer of glue around hacl-star (virtual package)"
-    ~ocaml:[At_least "4.08"]
+    ~ocaml:V.(at_least "4.08")
     ~virtual_modules:["hacl"]
     ~js_compatible:true
 
@@ -1443,7 +1449,7 @@ let tezos_protocol_environment_packer =
     "tezos-protocol-environment-packer"
     ~path:"src/lib_protocol_environment/s_packer"
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment-packer"
-    ~ocaml:[At_least "4.03"]
+    ~ocaml:V.(at_least "4.03")
     ~synopsis:"Tezos: sigs/structs packer for economic protocol environment"
     ~modules:[]
 
@@ -1452,7 +1458,7 @@ let tezos_protocol_environment_sigs =
     "tezos-protocol-environment-sigs"
     ~path:"src/lib_protocol_environment/sigs"
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment-sigs"
-    ~ocaml:[At_least "4.12"]
+    ~ocaml:V.(at_least "4.12")
     ~synopsis:"Tezos: restricted typing environment for the economic protocols"
     ~opam_only_deps:
       [
@@ -1629,11 +1635,9 @@ let tezos_protocol_compiler_lib =
     ~path:"src/lib_protocol_compiler"
     ~synopsis:"Tezos: economic-protocol compiler"
     ~ocaml:
-      [
+      V.(
         (* Should be in sync with scripts/version.sh *)
-        At_least "4.12.1";
-        Less_than "4.13";
-      ]
+        at_least "4.12.1" && less_than "4.13")
     ~deps:
       [
         tezos_base;
@@ -2349,7 +2353,7 @@ let tezos_benchmark =
         benchmark_utils;
         pyml_plot;
         ocaml_migrate_parsetree;
-        opam_only "hashcons" [];
+        opam_only "hashcons" V.True;
       ]
     ~opens:["Tezos_base__TzPervasives"; "Tezos_stdlib_unix"]
 
@@ -2422,7 +2426,7 @@ let tezt =
     "tezt"
     ~path:"tezt/lib"
     ~synopsis:"Framework for integration tests with external processes"
-    ~ocaml:[At_least "4.08"]
+    ~ocaml:V.(at_least "4.08")
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]
 
@@ -2448,7 +2452,7 @@ let tezos_openapi =
 
 (* For now we declare them as external packages just so that we can depend on them,
    but their dune and .opam files are not yet generated. *)
-let todo ?opam name = external_lib ?opam name []
+let todo ?opam name = external_lib ?opam name V.True
 
 let todo_sub lib sub = external_sublib lib sub
 
