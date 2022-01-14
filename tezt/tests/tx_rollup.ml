@@ -25,8 +25,8 @@
 
 (*                               utils                                       *)
 
-let get_state tx_rollup_hash client =
-  let* json = RPC.Tx_rollup.get_state ~tx_rollup_hash client in
+let get_state tx_rollup client =
+  let* json = RPC.Tx_rollup.get_state ~tx_rollup client in
   JSON.(json |-> "state" |> as_opt |> Option.map (fun _ -> ())) |> Lwt.return
 
 (*                               test                                        *)
@@ -43,7 +43,7 @@ let test_simple_use_case =
   let* (_node, client) =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
-  let* tx_rollup_hash =
+  let* tx_rollup =
     Client.originate_tx_rollup
       ~burn_cap:Tez.(of_int 9999999)
       ~storage_limit:60_000
@@ -51,13 +51,13 @@ let test_simple_use_case =
       client
   in
   let* () = Client.bake_for client in
-  let* state = get_state tx_rollup_hash client in
+  let* state = get_state tx_rollup client in
   match state with
   | Some _ -> unit
   | None ->
       Test.fail
         "The tx rollups was not correctly originated and no state exists for \
          %s."
-        tx_rollup_hash
+        tx_rollup
 
 let register ~protocols = test_simple_use_case ~protocols

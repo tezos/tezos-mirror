@@ -964,13 +964,13 @@ module Script_cache : sig
 end
 
 module Tx_rollup : sig
-  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/state *)
+  (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/state *)
   val get_state :
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    tx_rollup_hash:string ->
+    tx_rollup:string ->
     Client.t ->
     JSON.t Lwt.t
 end

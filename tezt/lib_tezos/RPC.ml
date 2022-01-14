@@ -628,21 +628,11 @@ module Script_cache = struct
 end
 
 module Tx_rollup = struct
-  let sub_path ~chain ~block ~tx_rollup_hash sub =
-    [
-      "chains";
-      chain;
-      "blocks";
-      block;
-      "context";
-      "tx_rollup";
-      tx_rollup_hash;
-      sub;
-    ]
+  let sub_path ?(chain = "main") ?(block = "head") ~tx_rollup sub =
+    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; tx_rollup; sub]
 
-  let get_state ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~tx_rollup_hash client =
-    let path = sub_path ~chain ~block ~tx_rollup_hash "state" in
+  let get_state ?endpoint ?hooks ?chain ?block ~tx_rollup client =
+    let path = sub_path ?chain ?block ~tx_rollup "state" in
     Client.rpc ?endpoint ?hooks GET path client
 end
 
