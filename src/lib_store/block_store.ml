@@ -75,9 +75,19 @@ let caboose {caboose; _} = Stored_data.get caboose
 
 let status {status_data; _} = Stored_data.get status_data
 
-let write_savepoint {savepoint; _} v = Stored_data.write savepoint v
+let write_savepoint {savepoint; _} v =
+  Stored_data.write savepoint v >>=? fun () ->
+  Prometheus.Gauge.set
+    Store_metrics.metrics.savepoint_level
+    (Int32.to_float (snd v)) ;
+  return_unit
 
-let write_caboose {caboose; _} v = Stored_data.write caboose v
+let write_caboose {caboose; _} v =
+  Stored_data.write caboose v >>=? fun () ->
+  Prometheus.Gauge.set
+    Store_metrics.metrics.caboose_level
+    (Int32.to_float (snd v)) ;
+  return_unit
 
 let genesis_block {genesis_block; _} = genesis_block
 
@@ -1235,8 +1245,16 @@ let load ?block_cache_limit chain_dir ~genesis_block ~readonly =
   let genesis_descr = Block_repr.descriptor genesis_block in
   Stored_data.init (Naming.savepoint_file chain_dir) ~initial_data:genesis_descr
   >>=? fun savepoint ->
+  Stored_data.get savepoint >>= fun (_, savepoint_level) ->
+  Prometheus.Gauge.set
+    Store_metrics.metrics.savepoint_level
+    (Int32.to_float savepoint_level) ;
   Stored_data.init (Naming.caboose_file chain_dir) ~initial_data:genesis_descr
   >>=? fun caboose ->
+  Stored_data.get caboose >>= fun (_, caboose_level) ->
+  Prometheus.Gauge.set
+    Store_metrics.metrics.caboose_level
+    (Int32.to_float caboose_level) ;
   Stored_data.init (Naming.block_store_status_file chain_dir) ~initial_data:Idle
   >>=? fun status_data ->
   let block_cache =
