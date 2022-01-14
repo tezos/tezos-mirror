@@ -2275,6 +2275,14 @@ let tezt =
     ~bisect_ppx:false
     ~deps:[re; lwt_unix; ezjsonm]
 
+let tezt_performance_regression =
+  public_lib
+    "tezt-performance-regression"
+    ~path:"tezt/lib_performance_regression"
+    ~synopsis:"Performance regression test framework based on Tezt"
+    ~bisect_ppx:false
+    ~deps:[tezt |> open_ |> open_ ~m:"Base"; uri; cohttp_lwt_unix]
+
 let tezt_tezos =
   public_lib
     "tezt-tezos"
@@ -2785,15 +2793,6 @@ let _tezos_shell_benchs =
         tezos_alpha_test_helpers |> open_;
       ]
 
-let _tezt_performance_regression =
-  public_lib
-    "tezt-performance-regression"
-    ~path:"tezt/lib_performance_regression"
-    ~synopsis:"Performance regression test framework based on Tezt"
-    ~bisect_ppx:false
-    ~deps:[tezt; tezt_tezos; uri; cohttp_lwt_unix]
-    ~opens:["Tezt"; "Tezt.Base"; "Tezt_tezos"]
-
 (* INTERNAL EXES *)
 
 (* Not released, so no ~opam. *)
@@ -3170,6 +3169,7 @@ let _tezos_tps_evaluation =
         Protocol.(main alpha);
         tezt |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
+        tezt_performance_regression |> open_;
       ]
     ~preprocess:[pps ppx_blob]
     ~preprocessor_deps:[File "./sql/get_all_operations.sql"]

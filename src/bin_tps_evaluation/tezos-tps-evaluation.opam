@@ -22,6 +22,7 @@ depends: [
   "tezos-protocol-alpha"
   "tezt"
   "tezt-tezos"
+  "tezt-performance-regression"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

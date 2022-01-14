@@ -6,7 +6,6 @@
  (public_name tezt-performance-regression)
  (libraries
   tezt
-  tezt-tezos
   uri
   cohttp-lwt-unix)
- (flags (:standard -open Tezt -open Tezt.Base -open Tezt_tezos)))
+ (flags (:standard -open Tezt -open Tezt.Base)))

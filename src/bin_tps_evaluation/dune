@@ -19,7 +19,8 @@
   tezos-client-base-unix
   tezos-protocol-alpha
   tezt
-  tezt-tezos)
+  tezt-tezos
+  tezt-performance-regression)
  (preprocess (pps ppx_blob))
  (preprocessor_deps (file ./sql/get_all_operations.sql))
  (flags
@@ -27,4 +28,5 @@
    -open Tezos_base.TzPervasives
    -open Tezt
    -open Tezt.Base
-   -open Tezt_tezos)))
+   -open Tezt_tezos
+   -open Tezt_performance_regression)))
