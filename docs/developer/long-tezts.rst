@@ -31,7 +31,7 @@ in :src:`tezt/long_tests/main.ml` instead of
 ``Test.register``. The main difference is that you have to declare a
 timeout (that should be significantly overestimated, see the
 documentation of the ``timeout`` type in
-:src:`tezt/long_tests/long_test.mli`) and that ``Long_test.register``
+:src:`tezt/lib_performance_regression/long_test.mli`) and that ``Long_test.register``
 will handle InfluxDB, Grafana and Slack alerts.  Just like regular
 Tezt tests, your test should be implemented in the same file with other
 thematically-related tests, with only a single line in
@@ -49,7 +49,7 @@ Time Series, Alerts and Graphs
 ------------------------------
 
 Long tests can use functions from the ``Long_test`` module
-(:src:`tezt/long_tests/long_test.mli`) to send data points to InfluxDB,
+(:src:`tezt/lib_performance_regression/long_test.mli`) to send data points to InfluxDB,
 which is a time-series database. A time-series database stores values
 annotated with a timestamp. In the particular case of InfluxDB,
 data points are composed of:
