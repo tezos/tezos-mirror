@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -128,7 +128,8 @@ let mutez (_tez : Alpha_context.Tez.tez) : t =
 
 let bool (_ : bool) : t = 1
 
-let signature (_signature : Signature.t) : t = Signature.size
+let signature (_signature : Script_typed_ir.Script_signature.t) : t =
+  Script_typed_ir.Script_signature.size
 
 let key_hash (_keyhash : Signature.public_key_hash) : t =
   Signature.Public_key_hash.size
@@ -136,10 +137,11 @@ let key_hash (_keyhash : Signature.public_key_hash) : t =
 let public_key (public_key : Signature.public_key) : t =
   Signature.Public_key.size public_key
 
-let chain_id (_chain_id : Chain_id.t) : t = Chain_id.size
+let chain_id (_chain_id : Script_typed_ir.Script_chain_id.t) : t =
+  Script_typed_ir.Script_chain_id.size
 
 let address (addr : Script_typed_ir.address) : t =
-  let (_contract, entrypoint) = addr in
+  let entrypoint = addr.entrypoint in
   Signature.Public_key_hash.size
   + String.length (Alpha_context.Entrypoint.to_string entrypoint)
 

@@ -124,13 +124,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
-   script_comparable.mli script_comparable.ml
-   script_set.mli script_set.ml
-   script_map.mli script_map.ml
    script_tc_context.mli script_tc_context.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
@@ -262,13 +262,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
-   script_comparable.mli script_comparable.ml
-   script_set.mli script_set.ml
-   script_map.mli script_map.ml
    script_tc_context.mli script_tc_context.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
@@ -400,13 +400,13 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
-   script_comparable.mli script_comparable.ml
-   script_set.mli script_set.ml
-   script_map.mli script_map.ml
    script_tc_context.mli script_tc_context.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml
@@ -560,13 +560,13 @@ include Tezos_raw_protocol_alpha.Main
    Gas_monad
    Script_ir_annot
    Script_typed_ir
+   Script_comparable
+   Script_set
+   Script_map
    Script_typed_ir_size
    Script_typed_ir_size_costs
    Michelson_v1_gas
    Script_list
-   Script_comparable
-   Script_set
-   Script_map
    Script_tc_context
    Script_ir_translator
    Script_cache
@@ -739,13 +739,13 @@ include Tezos_raw_protocol_alpha.Main
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
    script_typed_ir.mli script_typed_ir.ml
+   script_comparable.mli script_comparable.ml
+   script_set.mli script_set.ml
+   script_map.mli script_map.ml
    script_typed_ir_size.mli script_typed_ir_size.ml
    script_typed_ir_size_costs.mli script_typed_ir_size_costs.ml
    michelson_v1_gas.mli michelson_v1_gas.ml
    script_list.mli script_list.ml
-   script_comparable.mli script_comparable.ml
-   script_set.mli script_set.ml
-   script_map.mli script_map.ml
    script_tc_context.mli script_tc_context.ml
    script_ir_translator.mli script_ir_translator.ml
    script_cache.mli script_cache.ml

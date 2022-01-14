@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -28,9 +29,13 @@
 
 open Script_int_repr
 
+type repr
+
 (** Representation of timestamps specific to the Michelson interpreter.
-    A number of seconds since the epoch. *)
-type t
+    A number of seconds since the epoch.
+    [t] is made algebraic in order to distinguish it from the other type
+    parameters of [Script_typed_ir.ty]. *)
+type t = Timestamp_tag of repr [@@ocaml.unboxed]
 
 (** Convert a number of seconds since the epoch to a timestamp.*)
 val of_int64 : int64 -> t

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -27,6 +28,10 @@
 open Alpha_context
 open Script_typed_ir
 
+let make x = Set_tag x
+
+let get (Set_tag x) = x
+
 let empty : type a. a comparable_ty -> a set =
  fun ty ->
   let module OPS = Set.Make (struct
@@ -34,42 +39,44 @@ let empty : type a. a comparable_ty -> a set =
 
     let compare = Script_comparable.compare_comparable ty
   end) in
-  (module struct
-    type elt = a
+  Set_tag
+    (module struct
+      type elt = a
 
-    let elt_ty = ty
+      let elt_ty = ty
 
-    module OPS = OPS
+      module OPS = OPS
 
-    let boxed = OPS.empty
+      let boxed = OPS.empty
 
-    let size = 0
-  end)
+      let size = 0
+    end)
 
 let update : type a. a -> bool -> a set -> a set =
- fun v b (module Box) ->
-  (module struct
-    type elt = a
+ fun v b (Set_tag (module Box)) ->
+  Set_tag
+    (module struct
+      type elt = a
 
-    let elt_ty = Box.elt_ty
+      let elt_ty = Box.elt_ty
 
-    module OPS = Box.OPS
+      module OPS = Box.OPS
 
-    let boxed =
-      if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
+      let boxed =
+        if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
 
-    let size =
-      let mem = Box.OPS.mem v Box.boxed in
-      if mem then if b then Box.size else Box.size - 1
-      else if b then Box.size + 1
-      else Box.size
-  end)
+      let size =
+        let mem = Box.OPS.mem v Box.boxed in
+        if mem then if b then Box.size else Box.size - 1
+        else if b then Box.size + 1
+        else Box.size
+    end)
 
 let mem : type elt. elt -> elt set -> bool =
- fun v (module Box) -> Box.OPS.mem v Box.boxed
+ fun v (Set_tag (module Box)) -> Box.OPS.mem v Box.boxed
 
 let fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
- fun f (module Box) -> Box.OPS.fold f Box.boxed
+ fun f (Set_tag (module Box)) -> Box.OPS.fold f Box.boxed
 
 let size : type elt. elt set -> Script_int.n Script_int.num =
- fun (module Box) -> Script_int.(abs (of_int Box.size))
+ fun (Set_tag (module Box)) -> Script_int.(abs (of_int Box.size))

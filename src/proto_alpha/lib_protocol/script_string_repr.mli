@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,7 +25,11 @@
 
 (** Strings of printable characters *)
 
-type t
+type repr
+
+(** [t] is made algebraic in order to distinguish it from the other type
+    parameters of [Script_typed_ir.ty]. *)
+type t = String_tag of repr [@@ocaml.unboxed]
 
 type error += Non_printable_character of (int * string)
 

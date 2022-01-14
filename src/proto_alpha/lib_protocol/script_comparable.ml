@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -27,9 +28,11 @@
 open Alpha_context
 open Script_typed_ir
 
-let compare_address (x, ex) (y, ey) =
-  let lres = Contract.compare x y in
-  if Compare.Int.(lres = 0) then Entrypoint.compare ex ey else lres
+let compare_address {contract = contract1; entrypoint = entrypoint1}
+    {contract = contract2; entrypoint = entrypoint2} =
+  let lres = Contract.compare contract1 contract2 in
+  if Compare.Int.(lres = 0) then Entrypoint.compare entrypoint1 entrypoint2
+  else lres
 
 type compare_comparable_cont =
   | Compare_comparable :
@@ -44,7 +47,8 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
     match (kind, x, y) with
     | (Unit_key _, (), ()) -> (apply [@tailcall]) 0 k
     | (Never_key _, _, _) -> .
-    | (Signature_key _, x, y) -> (apply [@tailcall]) (Signature.compare x y) k
+    | (Signature_key _, x, y) ->
+        (apply [@tailcall]) (Script_signature.compare x y) k
     | (String_key _, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
     | (Bool_key _, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
     | (Mutez_key _, x, y) -> (apply [@tailcall]) (Tez.compare x y) k
@@ -58,7 +62,8 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
         (apply [@tailcall]) (Script_timestamp.compare x y) k
     | (Address_key _, x, y) -> (apply [@tailcall]) (compare_address x y) k
     | (Bytes_key _, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
-    | (Chain_id_key _, x, y) -> (apply [@tailcall]) (Chain_id.compare x y) k
+    | (Chain_id_key _, x, y) ->
+        (apply [@tailcall]) (Script_chain_id.compare x y) k
     | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
         (compare_comparable [@tailcall])
           tl

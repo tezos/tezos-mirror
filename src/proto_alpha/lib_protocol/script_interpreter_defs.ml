@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -492,7 +492,6 @@ let apply ctxt gas capture_ty capture lam =
       let lam' = Lam (full_descr, full_expr) in
       let gas = update_local_gas_counter ctxt in
       return (lam', outdated ctxt, gas)
-  | _ -> assert false
 
 (* [transfer (ctxt, sc) gas tez tp p destination entrypoint]
    creates an operation that transfers an amount of [tez] to
@@ -524,7 +523,7 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
-  let res = (Internal_operation iop, lazy_storage_diff) in
+  let res = {piop = Internal_operation iop; lazy_storage_diff} in
   let gas = update_local_gas_counter ctxt in
   let ctxt = outdated ctxt in
   return (res, ctxt, gas)
@@ -599,9 +598,8 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
       }
   in
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
-  let res =
-    (Internal_operation {source = sc.self; operation; nonce}, lazy_storage_diff)
-  in
+  let piop = Internal_operation {source = sc.self; operation; nonce} in
+  let res = {piop; lazy_storage_diff} in
   let gas = update_local_gas_counter ctxt in
   let ctxt = outdated ctxt in
   return (res, contract, ctxt, gas)

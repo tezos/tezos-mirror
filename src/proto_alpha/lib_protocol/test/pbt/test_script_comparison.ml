@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -52,7 +52,7 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   match (ty, x, y) with
   | (Unit_key _, (), ()) -> 0
   | (Never_key _, _, _) -> .
-  | (Signature_key _, x, y) -> normalize_compare @@ Signature.compare x y
+  | (Signature_key _, x, y) -> normalize_compare @@ Script_signature.compare x y
   | (String_key _, x, y) -> normalize_compare @@ Script_string.compare x y
   | (Bool_key _, x, y) -> normalize_compare @@ Compare.Bool.compare x y
   | (Mutez_key _, x, y) -> normalize_compare @@ Tez.compare x y
@@ -65,7 +65,7 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
   | (Address_key _, x, y) ->
       normalize_compare @@ Script_comparable.compare_address x y
   | (Bytes_key _, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
-  | (Chain_id_key _, x, y) -> normalize_compare @@ Chain_id.compare x y
+  | (Chain_id_key _, x, y) -> normalize_compare @@ Script_chain_id.compare x y
   | (Pair_key ((tl, _), (tr, _), _), (lx, rx), (ly, ry)) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl

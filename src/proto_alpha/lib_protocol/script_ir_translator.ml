@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -464,26 +465,27 @@ let unparse_timestamp ~loc ctxt mode t =
       | None -> ok (Int (loc, Script_timestamp.to_zint t), ctxt)
       | Some s -> ok (String (loc, s), ctxt))
 
-let unparse_address ~loc ctxt mode (c, entrypoint) =
+let unparse_address ~loc ctxt mode {contract; entrypoint} =
   Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
   match mode with
   | Optimized | Optimized_legacy ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
           Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
-          (c, entrypoint)
+          (contract, entrypoint)
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       let notation =
-        Contract.to_b58check c ^ Entrypoint.to_address_suffix entrypoint
+        Contract.to_b58check contract ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
 
-let unparse_contract ~loc ctxt mode (_, address) =
+let unparse_contract ~loc ctxt mode {arg_ty = _; address} =
   unparse_address ~loc ctxt mode address
 
 let unparse_signature ~loc ctxt mode s =
+  let s = Script_signature.get s in
   match mode with
   | Optimized | Optimized_legacy ->
       Gas.consume ctxt Unparse_costs.signature_optimized >|? fun ctxt ->
@@ -519,9 +521,9 @@ let unparse_key_hash ~loc ctxt mode k =
       Gas.consume ctxt Unparse_costs.key_hash_readable >|? fun ctxt ->
       (String (loc, Signature.Public_key_hash.to_b58check k), ctxt)
 
-let unparse_operation ~loc ctxt (op, _big_map_diff) =
+let unparse_operation ~loc ctxt {piop; lazy_storage_diff = _} =
   let bytes =
-    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding op
+    Data_encoding.Binary.to_bytes_exn Operation.internal_operation_encoding piop
   in
   Gas.consume ctxt (Unparse_costs.operation bytes) >|? fun ctxt ->
   (Bytes (loc, bytes), ctxt)
@@ -531,26 +533,26 @@ let unparse_chain_id ~loc ctxt mode chain_id =
   | Optimized | Optimized_legacy ->
       Gas.consume ctxt Unparse_costs.chain_id_optimized >|? fun ctxt ->
       let bytes =
-        Data_encoding.Binary.to_bytes_exn Chain_id.encoding chain_id
+        Data_encoding.Binary.to_bytes_exn Script_chain_id.encoding chain_id
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       Gas.consume ctxt Unparse_costs.chain_id_readable >|? fun ctxt ->
-      (String (loc, Chain_id.to_b58check chain_id), ctxt)
+      (String (loc, Script_chain_id.to_b58check chain_id), ctxt)
 
 let unparse_bls12_381_g1 ~loc ctxt x =
   Gas.consume ctxt Unparse_costs.bls12_381_g1 >|? fun ctxt ->
-  let bytes = Bls12_381.G1.to_bytes x in
+  let bytes = Script_bls.G1.to_bytes x in
   (Bytes (loc, bytes), ctxt)
 
 let unparse_bls12_381_g2 ~loc ctxt x =
   Gas.consume ctxt Unparse_costs.bls12_381_g2 >|? fun ctxt ->
-  let bytes = Bls12_381.G2.to_bytes x in
+  let bytes = Script_bls.G2.to_bytes x in
   (Bytes (loc, bytes), ctxt)
 
 let unparse_bls12_381_fr ~loc ctxt x =
   Gas.consume ctxt Unparse_costs.bls12_381_fr >|? fun ctxt ->
-  let bytes = Bls12_381.Fr.to_bytes x in
+  let bytes = Script_bls.Fr.to_bytes x in
   (Bytes (loc, bytes), ctxt)
 
 let unparse_with_data_encoding ~loc ctxt s unparse_cost encoding =
@@ -2206,7 +2208,9 @@ let parse_signature ctxt : Script.node -> (signature * context) tzresult =
   function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_optimized >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes_opt Signature.encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt Script_signature.encoding bytes
+      with
       | Some k -> ok (k, ctxt)
       | None ->
           error
@@ -2214,7 +2218,7 @@ let parse_signature ctxt : Script.node -> (signature * context) tzresult =
                (loc, strip_locations expr, "a valid signature"))
   | String (loc, s) as expr (* As unparsed with [Readable]. *) -> (
       Gas.consume ctxt Typecheck_costs.signature_readable >>? fun ctxt ->
-      match Signature.of_b58check_opt s with
+      match Script_signature.of_b58check_opt s with
       | Some s -> ok (s, ctxt)
       | None ->
           error
@@ -2223,11 +2227,13 @@ let parse_signature ctxt : Script.node -> (signature * context) tzresult =
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_chain_id ctxt : Script.node -> (Chain_id.t * context) tzresult =
-  function
+let parse_chain_id ctxt : Script.node -> (Script_chain_id.t * context) tzresult
+    = function
   | Bytes (loc, bytes) as expr -> (
       Gas.consume ctxt Typecheck_costs.chain_id_optimized >>? fun ctxt ->
-      match Data_encoding.Binary.of_bytes_opt Chain_id.encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt Script_chain_id.encoding bytes
+      with
       | Some k -> ok (k, ctxt)
       | None ->
           error
@@ -2235,7 +2241,7 @@ let parse_chain_id ctxt : Script.node -> (Chain_id.t * context) tzresult =
                (loc, strip_locations expr, "a valid chain id"))
   | String (loc, s) as expr -> (
       Gas.consume ctxt Typecheck_costs.chain_id_readable >>? fun ctxt ->
-      match Chain_id.of_b58check_opt s with
+      match Script_chain_id.of_b58check_opt s with
       | Some s -> ok (s, ctxt)
       | None ->
           error
@@ -2252,7 +2258,7 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
           bytes
       with
-      | Some addr -> Ok (addr, ctxt)
+      | Some (contract, entrypoint) -> Ok ({contract; entrypoint}, ctxt)
       | None ->
           error
           @@ Invalid_syntactic_constant
@@ -2267,7 +2273,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Entrypoint.of_string_strict ~loc name >|? fun entrypoint ->
           (String.sub s 0 pos, entrypoint))
       >>? fun (addr, entrypoint) ->
-      Contract.of_b58check addr >|? fun c -> ((c, entrypoint), ctxt)
+      Contract.of_b58check addr >|? fun contract ->
+      ({contract; entrypoint}, ctxt)
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
@@ -2589,19 +2596,19 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       Lwt.return @@ traced_no_lwt @@ parse_chain_id ctxt expr
   | (Address_t _, expr) ->
       Lwt.return @@ traced_no_lwt @@ parse_address ctxt expr
-  | (Contract_t (ty, _), expr) ->
+  | (Contract_t (arg_ty, _), expr) ->
       traced
-        ( parse_address ctxt expr >>?= fun ((c, entrypoint), ctxt) ->
+        ( parse_address ctxt expr >>?= fun (address, ctxt) ->
           let loc = location expr in
           parse_contract
             ~stack_depth:(stack_depth + 1)
             ~legacy
             ctxt
             loc
-            ty
-            c
-            ~entrypoint
-          >|=? fun (ctxt, _) -> ((ty, (c, entrypoint)), ctxt) )
+            arg_ty
+            address.contract
+            ~entrypoint:address.entrypoint
+          >|=? fun (ctxt, _) -> ({arg_ty; address}, ctxt) )
   (* Pairs *)
   | (Pair_t ((tl, _, _), (tr, _, _), _), expr) ->
       let r_witness = comb_witness1 tr in
@@ -2657,8 +2664,8 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       if allow_forged then
         opened_ticket_type (location expr) t >>?= fun ty ->
         parse_comparable_data ?type_logger ctxt ty expr
-        >|=? fun (((ticketer, _entrypoint), (contents, amount)), ctxt) ->
-        ({ticketer; contents; amount}, ctxt)
+        >|=? fun (({contract; entrypoint = _}, (contents, amount)), ctxt) ->
+        ({ticketer = contract; contents; amount}, ctxt)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
@@ -2749,26 +2756,26 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   (* Bls12_381 types *)
   | (Bls12_381_g1_t _, Bytes (_, bs)) -> (
       Gas.consume ctxt Typecheck_costs.bls12_381_g1 >>?= fun ctxt ->
-      match Bls12_381.G1.of_bytes_opt bs with
+      match Script_bls.G1.of_bytes_opt bs with
       | Some pt -> return (pt, ctxt)
       | None -> fail_parse_data ())
   | (Bls12_381_g1_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   | (Bls12_381_g2_t _, Bytes (_, bs)) -> (
       Gas.consume ctxt Typecheck_costs.bls12_381_g2 >>?= fun ctxt ->
-      match Bls12_381.G2.of_bytes_opt bs with
+      match Script_bls.G2.of_bytes_opt bs with
       | Some pt -> return (pt, ctxt)
       | None -> fail_parse_data ())
   | (Bls12_381_g2_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   | (Bls12_381_fr_t _, Bytes (_, bs)) -> (
       Gas.consume ctxt Typecheck_costs.bls12_381_fr >>?= fun ctxt ->
-      match Bls12_381.Fr.of_bytes_opt bs with
+      match Script_bls.Fr.of_bytes_opt bs with
       | Some pt -> return (pt, ctxt)
       | None -> fail_parse_data ())
   | (Bls12_381_fr_t _, Int (_, v)) ->
       Gas.consume ctxt Typecheck_costs.bls12_381_fr >>?= fun ctxt ->
-      return (Bls12_381.Fr.of_z v, ctxt)
+      return (Script_bls.Fr.of_z v, ctxt)
   | (Bls12_381_fr_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
   (*
@@ -2816,7 +2823,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chest_key_t _, Bytes (_, bytes)) -> (
       Gas.consume ctxt Typecheck_costs.chest_key >>?= fun ctxt ->
       match
-        Data_encoding.Binary.of_bytes_opt Timelock.chest_key_encoding bytes
+        Data_encoding.Binary.of_bytes_opt
+          Script_timelock.chest_key_encoding
+          bytes
       with
       | Some chest_key -> return (chest_key, ctxt)
       | None -> fail_parse_data ())
@@ -2825,7 +2834,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
   | (Chest_t _, Bytes (_, bytes)) -> (
       Gas.consume ctxt (Typecheck_costs.chest ~bytes:(Bytes.length bytes))
       >>?= fun ctxt ->
-      match Data_encoding.Binary.of_bytes_opt Timelock.chest_encoding bytes with
+      match
+        Data_encoding.Binary.of_bytes_opt Script_timelock.chest_encoding bytes
+      with
       | Some chest -> return (chest, ctxt)
       | None -> fail_parse_data ())
   | (Chest_t _, expr) ->
@@ -4988,11 +4999,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             {apply = (fun kinfo k -> IJoin_tickets (kinfo, contents_ty, k))}
           in
           let stack = Item_t (res_ty, rest) in
-          typed ctxt loc instr stack
-      | _ ->
-          (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
-             fix injectivity of types *)
-          assert false)
+          typed ctxt loc instr stack)
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t _, Item_t (Chest_t _, Item_t (Nat_t _, rest))) ) ->
@@ -5215,8 +5222,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
         Lwt.return
           ( ty_eq ~legacy:true ctxt loc arg (unit_t ~annot:None)
           >|? fun (Eq, ctxt) ->
-            let contract : arg typed_contract = (arg, (contract, entrypoint)) in
-            (ctxt, contract) )
+            (ctxt, {arg_ty = arg; address = {contract; entrypoint}}) )
       else fail (No_such_entrypoint entrypoint)
   | None -> (
       (* Originated account *)
@@ -5252,11 +5258,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                    entrypoint
                    loc
               >>? fun (entrypoint_arg, ctxt) ->
-              entrypoint_arg >|? fun (entrypoint, arg) ->
-              let contract : arg typed_contract =
-                (arg, (contract, entrypoint))
-              in
-              (ctxt, contract) ))
+              entrypoint_arg >|? fun (entrypoint, arg_ty) ->
+              (ctxt, {arg_ty; address = {contract; entrypoint}}) ))
 
 and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
   function
@@ -5403,8 +5406,8 @@ let parse_contract_for_script :
           >|? fun (eq_ty, ctxt) ->
             match eq_ty with
             | Ok (Eq, _ty) ->
-                let contract : arg typed_contract =
-                  (arg, (contract, entrypoint))
+                let contract =
+                  {arg_ty = arg; address = {contract; entrypoint}}
                 in
                 (ctxt, Some contract)
             | Error Inconsistent_types_fast -> (ctxt, None) )
@@ -5448,9 +5451,9 @@ let parse_contract_for_script :
                            loc
                       >|? fun (entrypoint_arg, ctxt) ->
                       match entrypoint_arg with
-                      | Ok (entrypoint, arg) ->
-                          let contract : arg typed_contract =
-                            (arg, (contract, entrypoint))
+                      | Ok (entrypoint, arg_ty) ->
+                          let contract =
+                            {arg_ty; address = {contract; entrypoint}}
                           in
                           (ctxt, Some contract)
                       | Error Inconsistent_types_fast -> (ctxt, None))) ))
@@ -5799,12 +5802,13 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
       opened_ticket_type loc t >>?= fun opened_ticket_ty ->
       let t = ty_of_comparable_ty opened_ticket_ty in
+      let addr = {contract = ticketer; entrypoint = Entrypoint.default} in
       (unparse_data [@tailcall])
         ctxt
         ~stack_depth
         mode
         t
-        ((ticketer, Entrypoint.default), (contents, amount))
+        (addr, (contents, amount))
   | (Set_t (t, _), set) ->
       List.fold_left_es
         (fun (l, ctxt) item ->
@@ -5899,14 +5903,15 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
         ctxt
         s
         Unparse_costs.chest_key
-        Timelock.chest_key_encoding
+        Script_timelock.chest_key_encoding
   | (Chest_t _, s) ->
       unparse_with_data_encoding
         ~loc
         ctxt
         s
-        (Unparse_costs.chest ~plaintext_size:(Timelock.get_plaintext_size s))
-        Timelock.chest_encoding
+        (Unparse_costs.chest
+           ~plaintext_size:(Script_timelock.get_plaintext_size s))
+        Script_timelock.chest_encoding
 
 and unparse_items :
     type k v.
@@ -6194,8 +6199,10 @@ let diff_of_sapling_state ctxt ~temporary ~ids_to_copy
 
     Please keep the usage of this GADT local.
 *)
+
 type 'ty has_lazy_storage =
-  | True_f : _ has_lazy_storage
+  | Big_map_f : ('a, 'b) big_map has_lazy_storage
+  | Sapling_state_f : Sapling.state has_lazy_storage
   | False_f : _ has_lazy_storage
   | Pair_f :
       'a has_lazy_storage * 'b has_lazy_storage
@@ -6224,8 +6231,8 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
     | (h1, h2) -> cons h1 h2
   in
   match ty with
-  | Big_map_t (_, _, _) -> True_f
-  | Sapling_state_t _ -> True_f
+  | Big_map_t (_, _, _) -> Big_map_f
+  | Sapling_state_t _ -> Sapling_state_f
   | Unit_t _ -> False_f
   | Int_t _ -> False_f
   | Nat_t _ -> False_f
@@ -6282,7 +6289,7 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
     Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>?= fun ctxt ->
     match (has_lazy_storage, ty, x) with
     | (False_f, _, _) -> return (ctxt, x, ids_to_copy, acc)
-    | (_, Big_map_t (_, _, _), map) ->
+    | (Big_map_f, Big_map_t (_, _, _), map) ->
         diff_of_big_map ctxt mode ~temporary ~ids_to_copy map
         >|=? fun (diff, id, ctxt) ->
         let map =
@@ -6295,7 +6302,7 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         let diff = Lazy_storage.make Big_map id diff in
         let ids_to_copy = Lazy_storage.IdSet.add Big_map id ids_to_copy in
         (ctxt, map, ids_to_copy, diff :: acc)
-    | (_, Sapling_state_t _, sapling_state) ->
+    | (Sapling_state_f, Sapling_state_t _, sapling_state) ->
         diff_of_sapling_state ctxt ~temporary ~ids_to_copy sapling_state
         >|=? fun (diff, id, ctxt) ->
         let sapling_state =
@@ -6330,7 +6337,8 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         >|=? fun (ctxt, l, ids_to_copy, acc) ->
         let reversed = {length = l.length; elements = List.rev l.elements} in
         (ctxt, reversed, ids_to_copy, acc)
-    | (Map_f has_lazy_storage, Map_t (_, ty, _), (module M)) ->
+    | (Map_f has_lazy_storage, Map_t (_, ty, _), map) ->
+        let (module M) = Script_map.get_module map in
         let bindings m = M.OPS.fold (fun k v bs -> (k, v) :: bs) m [] in
         List.fold_left_es
           (fun (ctxt, m, ids_to_copy, acc) (k, x) ->
@@ -6354,14 +6362,13 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
           let size = M.size
         end in
         ( ctxt,
-          (module M : Boxed_map with type key = M.key and type value = M.value),
+          Script_map.make
+            (module M : Boxed_map
+              with type key = M.key
+               and type value = M.value),
           ids_to_copy,
           acc )
     | (_, Option_t (_, _), None) -> return (ctxt, None, ids_to_copy, acc)
-    | _ ->
-        (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
-           fix injectivity of types *)
-        assert false
   in
   let has_lazy_storage = has_lazy_storage ty in
   aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
@@ -6389,16 +6396,16 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
  fun ~f ~init ctxt ty x ~has_lazy_storage ->
   Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
   match (has_lazy_storage, ty, x) with
-  | (_, Big_map_t (_, _, _), {id = Some id; _}) ->
+  | (Big_map_f, Big_map_t (_, _, _), {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Big_map id (Fold_lazy_storage.Ok init), ctxt)
-  | (_, Sapling_state_t _, {id = Some id; _}) ->
+  | (Sapling_state_f, Sapling_state_t _, {id = Some id; _}) ->
       Gas.consume ctxt Typecheck_costs.parse_instr_cycle >>? fun ctxt ->
       ok (f.f Sapling_state id (Fold_lazy_storage.Ok init), ctxt)
   | (False_f, _, _) -> ok (Fold_lazy_storage.Ok init, ctxt)
-  | (_, Big_map_t (_, _, _), {id = None; _}) ->
+  | (Big_map_f, Big_map_t (_, _, _), {id = None; _}) ->
       ok (Fold_lazy_storage.Ok init, ctxt)
-  | (_, Sapling_state_t _, {id = None; _}) ->
+  | (Sapling_state_f, Sapling_state_t _, {id = None; _}) ->
       ok (Fold_lazy_storage.Ok init, ctxt)
   | (Pair_f (hl, hr), Pair_t ((tyl, _, _), (tyr, _, _), _), (xl, xr)) -> (
       fold_lazy_storage ~f ~init ctxt tyl xl ~has_lazy_storage:hl
@@ -6435,10 +6442,6 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
           | Fold_lazy_storage.Error -> ok (init, ctxt))
         m
         (ok (Fold_lazy_storage.Ok init, ctxt))
-  | _ ->
-      (* TODO: https://gitlab.com/tezos/tezos/-/issues/1962
-         fix injectivity of types *)
-      assert false
 
 let[@coq_axiom_with_reason "gadt"] collect_lazy_storage ctxt ty x =
   let has_lazy_storage = has_lazy_storage ty in

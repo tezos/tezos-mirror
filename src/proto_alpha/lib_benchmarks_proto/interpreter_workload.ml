@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1203,27 +1203,31 @@ let extract_ir_sized_step :
   | (IEmpty_set (_, _, _), _) -> Instructions.empty_set
   | (ISet_iter _, (set, _)) -> Instructions.set_iter (Size.set set)
   | (ISet_mem (_, _), (v, (set, _))) ->
-      let (module S) = set in
+      let (module S) = Script_set.get set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_mem sz (Size.set set)
   | (ISet_update (_, _), (v, (_flag, (set, _)))) ->
-      let (module S) = set in
+      let (module S) = Script_set.get set in
       let sz = size_of_comparable_value S.elt_ty v in
       Instructions.set_update sz (Size.set set)
   | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)
   | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
   | (IMap_map _, (map, _)) -> Instructions.map_map (Size.map map)
   | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
-  | (IMap_mem (_, _), (v, (((module Map) as map), _))) ->
+  | (IMap_mem (_, _), (v, (map, _))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_mem key_size (Size.map map)
-  | (IMap_get (_, _), (v, (((module Map) as map), _))) ->
+  | (IMap_get (_, _), (v, (map, _))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get key_size (Size.map map)
-  | (IMap_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
+  | (IMap_update (_, _), (v, (_elt_opt, (map, _)))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_update key_size (Size.map map)
-  | (IMap_get_and_update (_, _), (v, (_elt_opt, (((module Map) as map), _)))) ->
+  | (IMap_get_and_update (_, _), (v, (_elt_opt, (map, _)))) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty v in
       Instructions.map_get_and_update key_size (Size.map map)
   | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
@@ -1432,7 +1436,7 @@ let extract_ir_sized_step :
   | (IHalt _, _) -> Instructions.halt
   | (ILog _, _) -> Instructions.log
   | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
-      let plaintext_size = Timelock.get_plaintext_size chest - 1 in
+      let plaintext_size = Script_timelock.get_plaintext_size chest - 1 in
       let log_time = Z.log2 Z.(one + Script_int_repr.to_zint time) in
       Instructions.open_chest log_time plaintext_size
 
@@ -1454,7 +1458,8 @@ let extract_control_trace (type bef_top bef aft_top aft)
   | KList_exit_body (_, _, _, _, _) -> Control.list_exit_body
   | KMap_enter_body (_, xs, _, _) ->
       Control.map_enter_body (Size.of_int (List.length xs))
-  | KMap_exit_body (_, _, ((module Map) as map), k, _) ->
+  | KMap_exit_body (_, _, map, k, _) ->
+      let (module Map) = Script_map.get_module map in
       let key_size = size_of_comparable_value Map.key_ty k in
       Control.map_exit_body key_size (Size.map map)
   | KView_exit _ -> Control.view_exit

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -62,13 +63,159 @@ type step_constants = {
 
 type never = |
 
-type address = Contract.t * Entrypoint.t
+type address = {contract : Contract.t; entrypoint : Entrypoint.t}
+
+module Script_signature = struct
+  type t = Signature_tag of signature [@@ocaml.unboxed]
+
+  let make s = Signature_tag s
+
+  let get (Signature_tag s) = s
+
+  let encoding =
+    Data_encoding.conv
+      (fun (Signature_tag x) -> x)
+      (fun x -> Signature_tag x)
+      Signature.encoding
+
+  let of_b58check_opt x = Option.map make (Signature.of_b58check_opt x)
+
+  let check ?watermark pub_key (Signature_tag s) bytes =
+    Signature.check ?watermark pub_key s bytes
+
+  let compare (Signature_tag x) (Signature_tag y) = Signature.compare x y
+
+  let size = Signature.size
+end
+
+type signature = Script_signature.t
 
 type ('a, 'b) pair = 'a * 'b
 
 type ('a, 'b) union = L of 'a | R of 'b
 
-type operation = packed_internal_operation * Lazy_storage.diffs option
+type operation = {
+  piop : packed_internal_operation;
+  lazy_storage_diff : Lazy_storage.diffs option;
+}
+
+module Script_chain_id = struct
+  type t = Chain_id_tag of Chain_id.t [@@ocaml.unboxed]
+
+  let make x = Chain_id_tag x
+
+  let compare (Chain_id_tag x) (Chain_id_tag y) = Chain_id.compare x y
+
+  let size = Chain_id.size
+
+  let encoding =
+    Data_encoding.conv (fun (Chain_id_tag x) -> x) make Chain_id.encoding
+
+  let to_b58check (Chain_id_tag x) = Chain_id.to_b58check x
+
+  let of_b58check_opt x = Option.map make (Chain_id.of_b58check_opt x)
+end
+
+module Script_bls = struct
+  module type S = sig
+    type t
+
+    type fr
+
+    val add : t -> t -> t
+
+    val mul : t -> fr -> t
+
+    val negate : t -> t
+
+    val of_bytes_opt : Bytes.t -> t option
+
+    val to_bytes : t -> Bytes.t
+  end
+
+  module Fr = struct
+    type t = Fr_tag of Bls12_381.Fr.t [@@ocaml.unboxed]
+
+    open Bls12_381.Fr
+
+    let add (Fr_tag x) (Fr_tag y) = Fr_tag (add x y)
+
+    let mul (Fr_tag x) (Fr_tag y) = Fr_tag (mul x y)
+
+    let negate (Fr_tag x) = Fr_tag (negate x)
+
+    let of_bytes_opt bytes = Option.map (fun x -> Fr_tag x) (of_bytes_opt bytes)
+
+    let to_bytes (Fr_tag x) = to_bytes x
+
+    let of_z z = Fr_tag (of_z z)
+
+    let to_z (Fr_tag x) = to_z x
+  end
+
+  module G1 = struct
+    type t = G1_tag of Bls12_381.G1.t [@@ocaml.unboxed]
+
+    open Bls12_381.G1
+
+    let add (G1_tag x) (G1_tag y) = G1_tag (add x y)
+
+    let mul (G1_tag x) (Fr.Fr_tag y) = G1_tag (mul x y)
+
+    let negate (G1_tag x) = G1_tag (negate x)
+
+    let of_bytes_opt bytes = Option.map (fun x -> G1_tag x) (of_bytes_opt bytes)
+
+    let to_bytes (G1_tag x) = to_bytes x
+  end
+
+  module G2 = struct
+    type t = G2_tag of Bls12_381.G2.t [@@ocaml.unboxed]
+
+    open Bls12_381.G2
+
+    let add (G2_tag x) (G2_tag y) = G2_tag (add x y)
+
+    let mul (G2_tag x) (Fr.Fr_tag y) = G2_tag (mul x y)
+
+    let negate (G2_tag x) = G2_tag (negate x)
+
+    let of_bytes_opt bytes = Option.map (fun x -> G2_tag x) (of_bytes_opt bytes)
+
+    let to_bytes (G2_tag x) = to_bytes x
+  end
+
+  let pairing_check l =
+    let l = List.map (fun (G1.G1_tag x, G2.G2_tag y) -> (x, y)) l in
+    Bls12_381.pairing_check l
+end
+
+module Script_timelock = struct
+  type chest_key = Chest_key_tag of Timelock.chest_key [@@ocaml.unboxed]
+
+  let make_chest_key chest_key = Chest_key_tag chest_key
+
+  let chest_key_encoding =
+    Data_encoding.conv
+      (fun (Chest_key_tag x) -> x)
+      (fun x -> Chest_key_tag x)
+      Timelock.chest_key_encoding
+
+  type chest = Chest_tag of Timelock.chest [@@ocaml.unboxed]
+
+  let make_chest chest = Chest_tag chest
+
+  let chest_encoding =
+    Data_encoding.conv
+      (fun (Chest_tag x) -> x)
+      (fun x -> Chest_tag x)
+      Timelock.chest_encoding
+
+  let open_chest (Chest_tag chest) (Chest_key_tag chest_key) ~time =
+    Timelock.open_chest chest chest_key ~time
+
+  let get_plaintext_size (Chest_tag x) = Timelock.get_plaintext_size x
+end
 
 type 'a ticket = {ticketer : Contract.t; contents : 'a; amount : n num}
 
@@ -180,7 +327,9 @@ type _ comparable_ty =
   | Timestamp_key :
       Script_timestamp.t ty_metadata
       -> Script_timestamp.t comparable_ty
-  | Chain_id_key : Chain_id.t ty_metadata -> Chain_id.t comparable_ty
+  | Chain_id_key :
+      Script_chain_id.t ty_metadata
+      -> Script_chain_id.t comparable_ty
   | Address_key : address ty_metadata -> address comparable_ty
   | Pair_key :
       ('a comparable_ty * field_annot option)
@@ -300,7 +449,8 @@ module type Boxed_set = sig
   val size : int
 end
 
-type 'elt set = (module Boxed_set with type elt = 'elt)
+type 'elt set = Set_tag of (module Boxed_set with type elt = 'elt)
+[@@ocaml.unboxed]
 
 (*
 
@@ -340,7 +490,8 @@ module type Boxed_map = sig
 end
 
 type ('key, 'value) map =
-  (module Boxed_map with type key = 'key and type value = 'value)
+  | Map_tag of (module Boxed_map with type key = 'key and type value = 'value)
+[@@ocaml.unboxed]
 
 module Big_map_overlay = Map.Make (struct
   type t = Script_expr_hash.t
@@ -915,7 +1066,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('b, 'u, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | IChainId :
-      ('a, 's) kinfo * (Chain_id.t, 'a * 's, 'r, 'f) kinstr
+      ('a, 's) kinfo * (Script_chain_id.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
   | INever : (never, 's) kinfo -> (never, 's, 'r, 'f) kinstr
   | IVoting_power :
@@ -931,51 +1082,53 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       (bytes, 's) kinfo * (bytes, 's, 'r, 'f) kinstr
       -> (bytes, 's, 'r, 'f) kinstr
   | IAdd_bls12_381_g1 :
-      (Bls12_381.G1.t, Bls12_381.G1.t * 's) kinfo
-      * (Bls12_381.G1.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G1.t, Bls12_381.G1.t * 's, 'r, 'f) kinstr
+      (Script_bls.G1.t, Script_bls.G1.t * 's) kinfo
+      * (Script_bls.G1.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G1.t, Script_bls.G1.t * 's, 'r, 'f) kinstr
   | IAdd_bls12_381_g2 :
-      (Bls12_381.G2.t, Bls12_381.G2.t * 's) kinfo
-      * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, Bls12_381.G2.t * 's, 'r, 'f) kinstr
+      (Script_bls.G2.t, Script_bls.G2.t * 's) kinfo
+      * (Script_bls.G2.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G2.t, Script_bls.G2.t * 's, 'r, 'f) kinstr
   | IAdd_bls12_381_fr :
-      (Bls12_381.Fr.t, Bls12_381.Fr.t * 's) kinfo
-      * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_g1 :
-      (Bls12_381.G1.t, Bls12_381.Fr.t * 's) kinfo
-      * (Bls12_381.G1.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G1.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.G1.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.G1.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G1.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_g2 :
-      (Bls12_381.G2.t, Bls12_381.Fr.t * 's) kinfo
-      * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.G2.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.G2.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G2.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_fr :
-      (Bls12_381.Fr.t, Bls12_381.Fr.t * 's) kinfo
-      * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IMul_bls12_381_z_fr :
-      (Bls12_381.Fr.t, 'a num * 's) kinfo * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, 'a num * 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, 'a num * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, 'a num * 's, 'r, 'f) kinstr
   | IMul_bls12_381_fr_z :
-      ('a num, Bls12_381.Fr.t * 's) kinfo * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> ('a num, Bls12_381.Fr.t * 's, 'r, 'f) kinstr
+      ('a num, Script_bls.Fr.t * 's) kinfo
+      * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> ('a num, Script_bls.Fr.t * 's, 'r, 'f) kinstr
   | IInt_bls12_381_fr :
-      (Bls12_381.Fr.t, 's) kinfo * (z num, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, 's) kinfo * (z num, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_g1 :
-      (Bls12_381.G1.t, 's) kinfo * (Bls12_381.G1.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G1.t, 's, 'r, 'f) kinstr
+      (Script_bls.G1.t, 's) kinfo * (Script_bls.G1.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G1.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_g2 :
-      (Bls12_381.G2.t, 's) kinfo * (Bls12_381.G2.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.G2.t, 's, 'r, 'f) kinstr
+      (Script_bls.G2.t, 's) kinfo * (Script_bls.G2.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.G2.t, 's, 'r, 'f) kinstr
   | INeg_bls12_381_fr :
-      (Bls12_381.Fr.t, 's) kinfo * (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
-      -> (Bls12_381.Fr.t, 's, 'r, 'f) kinstr
+      (Script_bls.Fr.t, 's) kinfo * (Script_bls.Fr.t, 's, 'r, 'f) kinstr
+      -> (Script_bls.Fr.t, 's, 'r, 'f) kinstr
   | IPairing_check_bls12_381 :
-      ((Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list, 's) kinfo
+      ((Script_bls.G1.t, Script_bls.G2.t) pair boxed_list, 's) kinfo
       * (bool, 's, 'r, 'f) kinstr
-      -> ((Bls12_381.G1.t, Bls12_381.G2.t) pair boxed_list, 's, 'r, 'f) kinstr
+      -> ((Script_bls.G1.t, Script_bls.G2.t) pair boxed_list, 's, 'r, 'f) kinstr
   | IComb :
       ('a, 's) kinfo
       * int
@@ -1023,9 +1176,13 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       * ('a ticket option, 's, 'r, 'f) kinstr
       -> ('a ticket * 'a ticket, 's, 'r, 'f) kinstr
   | IOpen_chest :
-      (Timelock.chest_key, Timelock.chest * (n num * 's)) kinfo
+      (Script_timelock.chest_key, Script_timelock.chest * (n num * 's)) kinfo
       * ((bytes, bool) union, 's, 'r, 'f) kinstr
-      -> (Timelock.chest_key, Timelock.chest * (n num * 's), 'r, 'f) kinstr
+      -> ( Script_timelock.chest_key,
+           Script_timelock.chest * (n num * 's),
+           'r,
+           'f )
+         kinstr
   (*
      Internal control instructions
      -----------------------------
@@ -1045,7 +1202,7 @@ and ('arg, 'ret) lambda =
       -> ('arg, 'ret) lambda
 [@@coq_force_gadt]
 
-and 'arg typed_contract = 'arg ty * address
+and 'arg typed_contract = {arg_ty : 'arg ty; address : address}
 
 and (_, _, _, _) continuation =
   | KNil : ('r, 'f, 'r, 'f) continuation
@@ -1168,14 +1325,16 @@ and 'ty ty =
       Sapling.Memo_size.t * Sapling.state ty_metadata
       -> Sapling.state ty
   | Operation_t : operation ty_metadata -> operation ty
-  | Chain_id_t : Chain_id.t ty_metadata -> Chain_id.t ty
+  | Chain_id_t : Script_chain_id.t ty_metadata -> Script_chain_id.t ty
   | Never_t : never ty_metadata -> never ty
-  | Bls12_381_g1_t : Bls12_381.G1.t ty_metadata -> Bls12_381.G1.t ty
-  | Bls12_381_g2_t : Bls12_381.G2.t ty_metadata -> Bls12_381.G2.t ty
-  | Bls12_381_fr_t : Bls12_381.Fr.t ty_metadata -> Bls12_381.Fr.t ty
+  | Bls12_381_g1_t : Script_bls.G1.t ty_metadata -> Script_bls.G1.t ty
+  | Bls12_381_g2_t : Script_bls.G2.t ty_metadata -> Script_bls.G2.t ty
+  | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
-  | Chest_key_t : Timelock.chest_key ty_metadata -> Timelock.chest_key ty
-  | Chest_t : Timelock.chest ty_metadata -> Timelock.chest ty
+  | Chest_key_t :
+      Script_timelock.chest_key ty_metadata
+      -> Script_timelock.chest_key ty
+  | Chest_t : Script_timelock.chest ty_metadata -> Script_timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty
@@ -2144,11 +2303,11 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | Ticket_t (cty, _) -> (aux' [@ocaml.tailcall]) accu cty x.contents continue
     | List_t (ty', _) -> on_list ty' accu x.elements
     | Map_t (kty, ty', _) ->
-        let module M = (val x) in
+        let (Map_tag (module M)) = x in
         let bindings = M.OPS.fold (fun k v bs -> (k, v) :: bs) M.boxed [] in
         on_bindings accu kty ty' continue bindings
     | Set_t (ty', _) ->
-        let module M = (val x) in
+        let (Set_tag (module M)) = x in
         let elements = M.OPS.fold (fun x s -> x :: s) M.boxed [] in
         on_list' accu ty' elements continue
     | Big_map_t (_, _, _) ->

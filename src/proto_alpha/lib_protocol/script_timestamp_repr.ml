@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,33 +24,38 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = Z.t
+type repr = Z.t
 
-let compare = Z.compare
+type t = Timestamp_tag of repr [@@ocaml.unboxed]
 
-let of_int64 = Z.of_int64
+let compare (Timestamp_tag x) (Timestamp_tag y) = Z.compare x y
+
+let of_int64 i = Timestamp_tag (Z.of_int64 i)
 
 let of_string x =
   match Time_repr.of_notation x with
-  | None -> Option.catch (fun () -> Z.of_string x)
+  | None -> Option.catch (fun () -> Timestamp_tag (Z.of_string x))
   | Some time -> Some (of_int64 (Time_repr.to_seconds time))
 
-let to_notation x =
+let to_notation (Timestamp_tag x) =
   Option.catch (fun () ->
       Time_repr.to_notation (Time.of_seconds (Z.to_int64 x)))
 
-let to_num_str = Z.to_string
+let to_num_str (Timestamp_tag x) = Z.to_string x
 
 let to_string x = match to_notation x with None -> to_num_str x | Some s -> s
 
-let diff x y = Script_int_repr.of_zint @@ Z.sub x y
+let diff (Timestamp_tag x) (Timestamp_tag y) =
+  Script_int_repr.of_zint @@ Z.sub x y
 
-let sub_delta t delta = Z.sub t (Script_int_repr.to_zint delta)
+let sub_delta (Timestamp_tag t) delta =
+  Timestamp_tag (Z.sub t (Script_int_repr.to_zint delta))
 
-let add_delta t delta = Z.add t (Script_int_repr.to_zint delta)
+let add_delta (Timestamp_tag t) delta =
+  Timestamp_tag (Z.add t (Script_int_repr.to_zint delta))
 
-let to_zint x = x
+let to_zint (Timestamp_tag x) = x
 
-let of_zint x = x
+let of_zint x = Timestamp_tag x
 
-let encoding : t Data_encoding.encoding = Data_encoding.z
+let encoding = Data_encoding.(conv to_zint of_zint z)

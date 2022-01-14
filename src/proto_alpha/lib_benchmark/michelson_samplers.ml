@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -488,9 +488,12 @@ end)
   end = struct
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
-        ( Alpha_context.Contract.implicit_contract
-            (Crypto_samplers.pkh rng_state),
-          Alpha_context.Entrypoint.default )
+        {
+          contract =
+            Alpha_context.Contract.implicit_contract
+              (Crypto_samplers.pkh rng_state);
+          entrypoint = Alpha_context.Entrypoint.default;
+        }
       else
         (* For a description of the format, see
            tezos-codec describe alpha.contract binary encoding *)
@@ -506,11 +509,14 @@ end)
           Alpha_context.Entrypoint.of_string_strict_exn
           @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
         in
-        (contract, ep)
+        {contract; entrypoint = ep}
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in
-      Data_encoding.Binary.of_string_exn Chain_id.encoding string
+      Data_encoding.Binary.of_string_exn Script_chain_id.encoding string
+
+    let signature rng_state =
+      Script_signature.make (Michelson_base.signature rng_state)
 
     let rec value : type a. a Script_typed_ir.ty -> a sampler =
       let open Script_typed_ir in
@@ -520,7 +526,7 @@ end)
         | Unit_t _ -> M.return ()
         | Int_t _ -> Michelson_base.int
         | Nat_t _ -> Michelson_base.nat
-        | Signature_t _ -> Michelson_base.signature
+        | Signature_t _ -> signature
         | String_t _ -> Michelson_base.string
         | Bytes_t _ -> Michelson_base.bytes
         | Mutez_t _ -> Michelson_base.tez
@@ -662,39 +668,36 @@ end)
         arg Script_typed_ir.ty -> arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
-      let* addr = value (address_t ~annot:None) in
-      return (arg_ty, addr)
+      let* address = value (address_t ~annot:None) in
+      return {arg_ty; address}
 
-    and generate_operation :
-        (Alpha_context.packed_internal_operation
-        * Alpha_context.Lazy_storage.diffs option)
-        sampler =
+    and generate_operation : Script_typed_ir.operation sampler =
      fun rng_state ->
       let transfer = generate_transfer_tokens rng_state in
-      (transfer, None)
+      Script_typed_ir.{piop = transfer; lazy_storage_diff = None}
 
     and generate_transfer_tokens :
         Alpha_context.packed_internal_operation sampler =
      fun _rng_state -> fail_sampling "generate_transfer_tokens: unimplemented"
 
-    and generate_bls12_381_g1 : Environment.Bls12_381.G1.t sampler =
+    and generate_bls12_381_g1 : Script_bls.G1.t sampler =
      fun rng_state ->
       let b = Bls12_381.G1.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.G1.of_bytes_opt b with
+      match Script_bls.G1.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 
-    and generate_bls12_381_g2 : Environment.Bls12_381.G2.t sampler =
+    and generate_bls12_381_g2 : Script_bls.G2.t sampler =
      fun rng_state ->
       let b = Bls12_381.G2.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.G2.of_bytes_opt b with
+      match Script_bls.G2.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 
-    and generate_bls12_381_fr : Environment.Bls12_381.Fr.t sampler =
+    and generate_bls12_381_fr : Script_bls.Fr.t sampler =
      fun rng_state ->
       let b = Bls12_381.Fr.(to_bytes (random ~state:rng_state ())) in
-      match Environment.Bls12_381.Fr.of_bytes_opt b with
+      match Script_bls.Fr.of_bytes_opt b with
       | Some x -> x
       | None -> assert false
 

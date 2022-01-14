@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -89,7 +89,11 @@ module Slot : sig
 end
 
 module Tez : sig
-  include BASIC_DATA
+  type repr
+
+  type t = Tez_tag of repr [@@ocaml.unboxed]
+
+  include BASIC_DATA with type t := t
 
   type tez = t
 
@@ -460,7 +464,9 @@ module Script_int : module type of Script_int_repr
 module Script_timestamp : sig
   open Script_int
 
-  type t
+  type repr
+
+  type t = Timestamp_tag of repr [@@ocaml.unboxed]
 
   val compare : t -> t -> int
 

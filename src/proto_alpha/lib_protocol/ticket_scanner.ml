@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,9 +25,6 @@
 (*****************************************************************************)
 
 open Alpha_context
-
-(* Impossible error *)
-type error += Unsupported_type_invariant_violated
 
 type error += Unsupported_non_empty_overlay | Unsupported_type_operation
 
@@ -402,7 +400,6 @@ module Ticket_collection = struct
         else (k [@ocaml.tailcall]) ctxt acc
     | (True_ht, Ticket_t (comp_ty, _)) ->
         (k [@ocaml.tailcall]) ctxt (Ex_ticket (comp_ty, x) :: acc)
-    | _ -> fail Unsupported_type_invariant_violated
 
   and tickets_of_list :
       type a ret.
@@ -446,7 +443,8 @@ module Ticket_collection = struct
       accumulator ->
       ret continuation ->
       ret tzresult Lwt.t =
-   fun ~include_lazy ctxt val_hty val_ty (module M) acc k ->
+   fun ~include_lazy ctxt val_hty val_ty map acc k ->
+    let (module M) = Script_map.get_module map in
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     (* Pay gas for folding over the values *)
     consume_gas_steps ctxt ~num_steps:M.size >>?= fun ctxt ->

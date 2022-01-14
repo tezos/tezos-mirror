@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -137,8 +137,10 @@ let timestamp_size x = Script_timestamp.to_zint x |> z_size
 
 let contract_size = Contract.in_memory_size
 
-let address_size ((c, s) : address) =
-  h2w +! contract_size c +! Entrypoint.in_memory_size s
+let address_size addr =
+  h2w
+  +! contract_size addr.contract
+  +! Entrypoint.in_memory_size addr.entrypoint
 
 let view_signature_size (View_signature {name; input_ty; output_ty}) =
   ret_adding
@@ -166,7 +168,7 @@ let comb_set_gadt_witness_size = peano_shape_proof
 
 let dup_n_gadt_witness_size = peano_shape_proof
 
-let contract_size (arg_ty, address) =
+let contract_size {arg_ty; address} =
   ret_adding (ty_size arg_ty) (h2w +! address_size address)
 
 let sapling_state_size {Sapling.id; diff; memo_size = _} =
@@ -175,13 +177,10 @@ let sapling_state_size {Sapling.id; diff; memo_size = _} =
   +! Sapling.diff_in_memory_size diff
   +! sapling_memo_size_size
 
-let operation_size
-    (operation :
-      packed_internal_operation * Lazy_storage.diffs_item list option) =
-  let (poi, diffs) = operation in
+let operation_size {piop; lazy_storage_diff} =
   ret_adding
-    (Operation.packed_internal_operation_in_memory_size poi
-    ++ option_size_vec Lazy_storage.diffs_in_memory_size diffs)
+    (Operation.packed_internal_operation_in_memory_size piop
+    ++ option_size_vec Lazy_storage.diffs_in_memory_size lazy_storage_diff)
     h2w
 
 let chain_id_size = h1w +? Chain_id.size
@@ -200,7 +199,7 @@ let chest_size chest =
   *)
   let locked_value_size = 256 in
   let rsa_public_size = 256 in
-  let ciphertext_size = Timelock.get_plaintext_size chest in
+  let ciphertext_size = Script_timelock.get_plaintext_size chest in
   h3w +? (locked_value_size + rsa_public_size + ciphertext_size)
 
 let chest_key_size _ =
@@ -262,11 +261,11 @@ let rec value_size :
     | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
     | List_t (_, _) -> ret_succ_adding accu (h2w +! (h2w *? x.length))
     | Set_t (_, _) ->
-        let module M = (val x) in
+        let module M = (val Script_set.get x) in
         let boxing_space = !!300 in
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
-        let module M = (val x) in
+        let module M = (val Script_map.get_module x) in
         let boxing_space = !!300 in
         ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->

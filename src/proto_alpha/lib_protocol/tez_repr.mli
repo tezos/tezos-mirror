@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,7 +24,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+type repr
+
+(** [t] is made algebraic in order to distinguish it from the other type
+    parameters of [Script_typed_ir.ty]. *)
+type t = Tez_tag of repr [@@ocaml.unboxed]
 
 type tez = t
 

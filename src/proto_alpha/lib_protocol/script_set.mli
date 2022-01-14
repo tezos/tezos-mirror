@@ -25,13 +25,18 @@
 (*****************************************************************************)
 
 open Alpha_context
+open Script_typed_ir
 
-val empty : 'a Script_typed_ir.comparable_ty -> 'a Script_typed_ir.set
+val make : (module Boxed_set with type elt = 'elt) -> 'elt set
 
-val fold : ('elt -> 'acc -> 'acc) -> 'elt Script_typed_ir.set -> 'acc -> 'acc
+val get : 'elt set -> (module Boxed_set with type elt = 'elt)
 
-val update : 'a -> bool -> 'a Script_typed_ir.set -> 'a Script_typed_ir.set
+val empty : 'a comparable_ty -> 'a set
 
-val mem : 'elt -> 'elt Script_typed_ir.set -> bool
+val fold : ('elt -> 'acc -> 'acc) -> 'elt set -> 'acc -> 'acc
 
-val size : 'elt Script_typed_ir.set -> Script_int.n Script_int.num
+val update : 'a -> bool -> 'a set -> 'a set
+
+val mem : 'elt -> 'elt set -> bool
+
+val size : 'elt set -> Script_int.n Script_int.num

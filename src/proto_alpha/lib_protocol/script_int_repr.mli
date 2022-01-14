@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +30,11 @@
 
     This is internally a [Z.t].
     This module mostly adds signedness preservation guarantees. *)
-type 't num [@@coq_phantom]
+type 't repr [@@coq_phantom]
+
+(** [num] is made algebraic in order to distinguish it from the other type
+    parameters of [Script_typed_ir.ty]. *)
+type 't num = Num_tag of 't repr [@@ocaml.unboxed]
 
 (** Flag for natural numbers. *)
 type n = Natural_tag

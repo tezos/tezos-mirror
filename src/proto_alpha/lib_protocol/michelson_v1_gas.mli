@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -359,7 +360,8 @@ module Cost_of : sig
       'a Script_typed_ir.ticket ->
       Gas.cost
 
-    val open_chest : chest:Timelock.chest -> time:Z.t -> Gas.cost
+    val open_chest :
+      chest:Script_typed_ir.Script_timelock.chest -> time:Z.t -> Gas.cost
 
     module Control : sig
       val nil : Gas.cost
