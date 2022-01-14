@@ -39,6 +39,12 @@ Client
   makes the client inject the transaction in a node even if the
   simulation of the transaction fails.
 
+- A new ``--self-address`` option was added to the ``run script``
+  command. It makes the given address be considered the address of
+  the contract being run. The address must actually exist in the
+  context. If ``--balance`` wasn't specified, the script also
+  inherits the given contract's balance.
+
 Baker / Endorser / Accuser
 --------------------------
 
