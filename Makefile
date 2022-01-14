@@ -183,6 +183,10 @@ test-js:
 	@dune build @runtest_js
 	@dune exec ./src/tooling/run_js_inline_tests.exe
 
+.PHONY: build-tezt
+build-tezt:
+	@dune build tezt
+
 .PHONY: test-tezt test-tezt-i test-tezt-c test-tezt-v
 test-tezt:
 	@dune exec --profile=$(PROFILE) $(COVERAGE_OPTIONS) tezt/tests/main.exe
@@ -273,7 +277,7 @@ build-tps-deps:
 	@./scripts/install_build_deps.sh --tps
 
 .PHONY: build-tps
-build-tps: lift-protocol-limits-patch all
+build-tps: lift-protocol-limits-patch build build-tezt
 	@dune build ./src/bin_tps_evaluation
 	@cp -f ./_build/install/default/bin/tezos-tps-evaluation .
 
