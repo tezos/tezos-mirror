@@ -299,24 +299,28 @@ module All_sinks = struct
       (fun reason -> Activation_error reason)
 
   let activate uri =
+    let open Lwt_tzresult_syntax in
     match Uri.scheme uri with
     | None -> fail (Activation_error (Missing_uri_scheme (Uri.to_string uri)))
     | Some scheme_to_activate ->
         let activate (type a) scheme definition =
           let module S = (val definition : SINK with type t = a) in
-          S.configure uri >>=? fun sink ->
+          let* sink = S.configure uri in
           return (Active {scheme; configuration = uri; definition; sink})
         in
-        (match find_registered scheme_to_activate with
-        | Some (Registered {scheme; definition}) -> activate scheme definition
-        | None ->
-            fail
-              (Activation_error (Uri_scheme_not_registered (Uri.to_string uri))))
-        >>=? fun act ->
+        let* act =
+          match find_registered scheme_to_activate with
+          | Some (Registered {scheme; definition}) -> activate scheme definition
+          | None ->
+              fail
+                (Activation_error
+                   (Uri_scheme_not_registered (Uri.to_string uri)))
+        in
         active := act :: !active ;
         return_unit
 
   let close ?(except = fun _ -> false) () =
+    let open Lwt_syntax in
     let close_one (type a) sink definition =
       let module S = (val definition : SINK with type t = a) in
       S.close sink
@@ -332,10 +336,12 @@ module All_sinks = struct
     active := next_active ;
     (* We don't want one failure to prevent the attempt at closing as many
        sinks as possible, so we record all errors and combine them: *)
-    List.map_s
-      (fun (Active {sink; definition; _}) -> close_one sink definition)
-      to_close_list
-    >|= fun close_results -> Tzresult_syntax.join close_results
+    let+ close_results =
+      List.map_s
+        (fun (Active {sink; definition; _}) -> close_one sink definition)
+        to_close_list
+    in
+    Tzresult_syntax.join close_results
 
   let handle def section v =
     let handle (type a) sink definition =
@@ -1260,10 +1266,13 @@ module Legacy_logging = struct
         fmt
 
     let emit_lwt level fmt ?tags =
+      let open Lwt_syntax in
       Format.kasprintf
         (fun message ->
-          Event.emit ~section (fun () -> Definition.make ?tags level message)
-          >>= function
+          let* r =
+            Event.emit ~section (fun () -> Definition.make ?tags level message)
+          in
+          match r with
           | Ok () -> Lwt.return_unit
           | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
         fmt
@@ -1396,10 +1405,13 @@ module Error_event = struct
   include (Make (Definition) : EVENT with type t := t)
 
   let log_error_and_recover ?section ?message ?severity f =
-    f () >>= function
+    let open Lwt_syntax in
+    let* r = f () in
+    match r with
     | Ok () -> Lwt.return_unit
     | Error el -> (
-        emit ?section (fun () -> make ?message ?severity el ()) >>= function
+        let* r = emit ?section (fun () -> make ?message ?severity el ()) in
+        match r with
         | Ok () -> Lwt.return_unit
         | Error el ->
             Format.kasprintf
@@ -1539,6 +1551,7 @@ module Lwt_log_sink = struct
     let configure _ = return_unit
 
     let handle (type a) () m ?section (v : unit -> a) =
+      let open Lwt_syntax in
       let module M = (val m : EVENT_DEFINITION with type t = a) in
       protect (fun () ->
           let ev = v () in
@@ -1549,16 +1562,20 @@ module Lwt_log_sink = struct
           (* Only call printf if the event is to be printed. *)
           if should_log ~level ~sink_level:(Lwt_log_core.Section.level section)
           then
-            Format.kasprintf
-              (Lwt_log_core.log ~section ~level)
-              "%a"
-              (M.pp ~short:false)
-              ev
-            >>= fun () -> return_unit
-          else return_unit)
+            let* () =
+              Format.kasprintf
+                (Lwt_log_core.log ~section ~level)
+                "%a"
+                (M.pp ~short:false)
+                ev
+            in
+            return_ok_unit
+          else return_ok_unit)
 
     let close _ =
-      Lwt_log_core.close !Lwt_log_core.default >>= fun () -> return_unit
+      let open Lwt_syntax in
+      let* () = Lwt_log_core.close !Lwt_log_core.default in
+      return_ok_unit
   end
 
   include Sink
