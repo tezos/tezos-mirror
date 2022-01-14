@@ -229,7 +229,25 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
   Format.printf "TPS of injection (target): %d@\n" target_tps_of_injection ;
   Format.printf "TPS of injection (de facto): %.2f@\n" de_facto_tps_of_injection ;
   Format.printf "Empirical TPS: %.2f@." empirical_tps ;
-  Node.terminate ~kill:true node
+  Node.terminate ~kill:true node >>= fun () ->
+  return (de_facto_tps_of_injection, empirical_tps)
+
+let regression_handling defacto_tps_of_injection empirical_tps
+    lifted_protocol_limits ~previous_count =
+  let lifted_protocol_limits_tag = string_of_bool lifted_protocol_limits in
+  let save_and_check =
+    Long_test.measure_and_check_regression
+      ~previous_count
+      ~minimum_previous_count:previous_count
+      ~stddev:false
+      ~repeat:1
+      ~tags:[("lifted_protocol_limits", lifted_protocol_limits_tag)]
+  in
+  let* () =
+    save_and_check "defacto_tps_of_injection" @@ fun () ->
+    defacto_tps_of_injection
+  in
+  save_and_check "empirical_tps" @@ fun () -> empirical_tps
 
 module Term = struct
   let accounts_total_arg =
@@ -270,23 +288,46 @@ module Term = struct
     let docv = "TEZT_ARGS" in
     Arg.(value & pos_all string [] & info [] ~docv ~doc)
 
+  let previous_count_arg =
+    let open Cmdliner in
+    let doc =
+      "The number of previously recorded samples that must be compared to the \
+       result of this benchmark"
+    in
+    let docv = "PREVIOUS_SAMPLE_COUNT" in
+    Arg.(
+      value & opt int 10 & info ["regression-previous-sample-count"] ~docv ~doc)
+
   let term =
     let process accounts_total blocks_total average_block_path
-        lift_protocol_limits provided_tps_of_injection tezt_args =
+        lift_protocol_limits provided_tps_of_injection tezt_args previous_count
+        =
       (try Cli.init ~args:tezt_args ()
        with Arg.Help help_str ->
          Format.eprintf "%s@." help_str ;
          exit 0) ;
-      Test.register
+      let executors = Long_test.[x86_executor1] in
+      Long_test.register
         ~__FILE__
         ~title:"tezos_tps_benchmark"
         ~tags:[]
-        (run_benchmark
-           ~lift_protocol_limits
-           ~provided_tps_of_injection
-           ~accounts_total
-           ~blocks_total
-           ~average_block_path) ;
+        ~timeout:(Long_test.Minutes 60)
+        ~executors
+        (fun () ->
+          let* (defacto_tps_of_injection, empirical_tps) =
+            run_benchmark
+              ~lift_protocol_limits
+              ~provided_tps_of_injection
+              ~accounts_total
+              ~blocks_total
+              ~average_block_path
+              ()
+          in
+          regression_handling
+            defacto_tps_of_injection
+            empirical_tps
+            lift_protocol_limits
+            ~previous_count) ;
       Test.run () ;
       `Ok ()
     in
@@ -294,7 +335,7 @@ module Term = struct
     ret
       (const process $ accounts_total_arg $ blocks_total_arg
      $ average_block_path_arg $ lift_protocol_limits_arg $ tps_of_injection_arg
-     $ tezt_args)
+     $ tezt_args $ previous_count_arg)
 end
 
 module Manpage = struct
