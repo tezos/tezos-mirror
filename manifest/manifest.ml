@@ -28,6 +28,10 @@ module String_set = Set.Make (String)
 
 let ( // ) = Filename.concat
 
+let has_prefix ~prefix string =
+  let prefix_len = String.length prefix in
+  String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -1079,10 +1083,6 @@ type release = {version : string; url : Opam.url}
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
 
-let has_prefix ~prefix string =
-  let prefix_len = String.length prefix in
-  String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
-
 (* Gather the list of generated files so that we can find out whether
    there are other files that we should have generated. *)
 let generated_files = ref String_set.empty
@@ -1381,6 +1381,17 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
       Some {Opam.package; version = True; with_test; optional = false}
   | External {opam = Some opam; version; _} | Opam_only {name = opam; version}
     ->
+      let version =
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1453
+           Remove this once all packages (including protocol packages)
+           have been ported to the manifest. *)
+        if
+          fix_version
+          && (has_prefix ~prefix:"tezos-" (Filename.basename opam)
+             || has_prefix ~prefix:"octez-" (Filename.basename opam))
+        then Version.(Exactly Version)
+        else version
+      in
       Some {Opam.package = opam; version; with_test; optional = false}
   | Optional target | Select {package = target; _} ->
       Option.map
