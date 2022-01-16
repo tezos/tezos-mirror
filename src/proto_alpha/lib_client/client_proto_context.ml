@@ -784,6 +784,47 @@ let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result)
 
+let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~src_pk ~src_sk ~fee_parameter ~content ~tx_rollup () =
+  (match Hex.to_string (`Hex content) with
+  | Some content -> return content
+  | None ->
+      failwith
+        "%s is not a valid binary text encoded using the hexadecimal notation"
+        content)
+  >>=? fun content ->
+  let contents :
+      Kind.tx_rollup_submit_batch Annotated_manager_operation.annotated_list =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         (Tx_rollup_submit_batch {tx_rollup; content}))
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    contents
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
+
 let sc_rollup_originate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
     ~kind ~boot_sector ~src_pk ~src_sk ~fee_parameter () =

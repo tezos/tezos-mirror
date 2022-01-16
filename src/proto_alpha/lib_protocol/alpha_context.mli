@@ -1977,6 +1977,8 @@ module Tx_rollup : sig
 
   val of_b58check : string -> tx_rollup tzresult
 
+  val of_b58check_opt : string -> tx_rollup option
+
   val pp : Format.formatter -> tx_rollup -> unit
 
   val encoding : tx_rollup Data_encoding.t

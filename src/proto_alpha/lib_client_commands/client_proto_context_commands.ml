@@ -86,6 +86,18 @@ let block_hash_param =
       try return (Block_hash.of_b58check_exn s)
       with _ -> failwith "Parameter '%s' is an invalid block hash" s)
 
+let tx_rollup_parameter =
+  Clic.parameter (fun _ s ->
+      match Tx_rollup.of_b58check_opt s with
+      | Some c -> return c
+      | None -> failwith "Parameter '%s' is an invalid tx rollup address" s)
+
+let tx_rollup_param =
+  Clic.param
+    ~name:"tx_rollup address"
+    ~desc:"The tx rollup address that we are sending this batch to."
+    tx_rollup_parameter
+
 let rollup_kind_param =
   Clic.parameter (fun _ name ->
       match Sc_rollups.from ~name with
@@ -2126,6 +2138,83 @@ let commands_rw () =
               ~src_pk
               ~src_sk
               ~fee_parameter
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Submit a batch of optimistic transaction rollup operations."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["submit"; "tx"; "rollup"; "batch"]
+      @@ Clic.param
+           ~name:"bytes"
+           ~desc:"a bytes representation of the batch in hexadecimal form."
+           Client_proto_args.string_parameter
+      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account originating the transaction rollup."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           content
+           tx_rollup
+           (_, source)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit accounts can submit transaction rollup batches"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            submit_tx_rollup_batch
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~tx_rollup
+              ~content
               ()
             >>=? fun _res -> return_unit);
     command
