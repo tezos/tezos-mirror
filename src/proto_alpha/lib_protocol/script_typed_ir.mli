@@ -44,7 +44,7 @@ type step_constants = {
 
 type never = |
 
-type address = {contract : Contract.t; entrypoint : Entrypoint.t}
+type address = {destination : Destination.t; entrypoint : Entrypoint.t}
 
 module Script_signature : sig
   (** [t] is made algebraic in order to distinguish it from the other type

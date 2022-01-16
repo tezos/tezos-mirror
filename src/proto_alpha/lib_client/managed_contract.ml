@@ -152,7 +152,7 @@ let build_delegate_operation (cctxt : #full) ~chain ~block ?fee
        ~parameters
        ~entrypoint
        ?fee
-       contract)
+       (Contract contract))
 
 let set_delegate (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~fee_parameter ?fee ~source ~src_pk
@@ -282,7 +282,7 @@ let build_transaction_operation (cctxt : #full) ~chain ~block ~contract
        ?fee
        ?gas_limit
        ?storage_limit
-       contract)
+       (Contract contract))
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk

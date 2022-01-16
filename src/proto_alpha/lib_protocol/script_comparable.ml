@@ -28,9 +28,9 @@
 open Alpha_context
 open Script_typed_ir
 
-let compare_address {contract = contract1; entrypoint = entrypoint1}
-    {contract = contract2; entrypoint = entrypoint2} =
-  let lres = Contract.compare contract1 contract2 in
+let compare_address {destination = destination1; entrypoint = entrypoint1}
+    {destination = destination2; entrypoint = entrypoint2} =
+  let lres = Destination.compare destination1 destination2 in
   if Compare.Int.(lres = 0) then Entrypoint.compare entrypoint1 entrypoint2
   else lres
 

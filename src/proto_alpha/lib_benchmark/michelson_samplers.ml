@@ -485,10 +485,12 @@ end)
   end = struct
     let address rng_state =
       if Base_samplers.uniform_bool rng_state then
+        let contract =
+          Alpha_context.Contract.implicit_contract
+            (Crypto_samplers.pkh rng_state)
+        in
         {
-          contract =
-            Alpha_context.Contract.implicit_contract
-              (Crypto_samplers.pkh rng_state);
+          destination = Contract contract;
           entrypoint = Alpha_context.Entrypoint.default;
         }
       else
@@ -506,7 +508,7 @@ end)
           Alpha_context.Entrypoint.of_string_strict_exn
           @@ Base_samplers.string ~size:{min = 1; max = 31} rng_state
         in
-        {contract; entrypoint = ep}
+        {destination = Contract contract; entrypoint = ep}
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in

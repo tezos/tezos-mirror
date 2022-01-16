@@ -870,7 +870,8 @@ let apply_manager_operation_content :
              {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt}
             : kind successful_manager_operation_result),
           [] )
-  | Transaction {amount; parameters; destination; entrypoint} -> (
+  | Transaction
+      {amount; parameters; destination = Contract destination; entrypoint} -> (
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt

@@ -87,6 +87,14 @@ val pp_short : Format.formatter -> contract -> unit
 
 val encoding : contract Data_encoding.t
 
+(** [cases f g] exports the {!Data_encoding.cases} used to define {!encoding}.
+
+    The only reason why we export that is to let {!Destination_repr.encoding}
+    use it. This allows the latter to be compatible with {!encoding}, which
+    is of key importance for backward compatibility reasons. *)
+val cases :
+  ('a -> contract option) -> (contract -> 'a) -> 'a Data_encoding.case list
+
 val rpc_arg : contract RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t

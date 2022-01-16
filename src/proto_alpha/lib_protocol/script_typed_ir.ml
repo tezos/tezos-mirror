@@ -63,7 +63,7 @@ type step_constants = {
 
 type never = |
 
-type address = {contract : Contract.t; entrypoint : Entrypoint.t}
+type address = {destination : Destination.t; entrypoint : Entrypoint.t}
 
 module Script_signature = struct
   type t = Signature_tag of signature [@@ocaml.unboxed]

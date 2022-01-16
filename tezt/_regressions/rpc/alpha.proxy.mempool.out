@@ -699,11 +699,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "alpha.contract_id": {
-                        "title": "A contract handle",
-                        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
-                        "$ref": "#/definitions/unistring"
-                      },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
                         "description": "Named entrypoint to a Michelson smart contract",
@@ -1372,7 +1367,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.mutez"
                               },
                               "destination": {
-                                "$ref": "#/definitions/alpha.contract_id"
+                                "$ref": "#/definitions/alpha.transaction_destination"
                               },
                               "parameters": {
                                 "type": "object",
@@ -2040,6 +2035,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
+                      "alpha.transaction_destination": {
+                        "title": "A destination of a transaction",
+                        "description": "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "bignum": {
                         "title": "Big number",
                         "description": "Decimal representation of a big number",
@@ -2313,7 +2313,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "alpha.contract_id"
+                          "title": "alpha.transaction_destination"
                         },
                         "encoding": {
                           "tag_size": "Uint8",
@@ -3981,7 +3981,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "destination",
                                   "layout": {
-                                    "name": "alpha.contract_id",
+                                    "name": "alpha.transaction_destination",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -5430,11 +5430,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         ],
                         "additionalProperties": false
                       },
-                      "alpha.contract_id": {
-                        "title": "A contract handle",
-                        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
-                        "$ref": "#/definitions/unistring"
-                      },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
                         "description": "Named entrypoint to a Michelson smart contract",
@@ -6103,7 +6098,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 "$ref": "#/definitions/alpha.mutez"
                               },
                               "destination": {
-                                "$ref": "#/definitions/alpha.contract_id"
+                                "$ref": "#/definitions/alpha.transaction_destination"
                               },
                               "parameters": {
                                 "type": "object",
@@ -6770,6 +6765,11 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "code"
                         ],
                         "additionalProperties": false
+                      },
+                      "alpha.transaction_destination": {
+                        "title": "A destination of a transaction",
+                        "description": "A destination notation compatible with the contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+                        "$ref": "#/definitions/unistring"
                       },
                       "bignum": {
                         "title": "Big number",

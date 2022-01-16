@@ -232,6 +232,8 @@ module Origination_nonce = struct
   module Internal_for_tests = Origination_nonce
 end
 
+module Destination = Destination_repr
+
 module Contract = struct
   include Contract_repr
   include Contract_storage

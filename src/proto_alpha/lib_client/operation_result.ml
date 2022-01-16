@@ -41,7 +41,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         amount
         Contract.pp
         source
-        Contract.pp
+        Destination.pp
         destination ;
       if not (Entrypoint.is_default entrypoint) then
         Format.fprintf ppf "@,Entrypoint: %a" Entrypoint.pp entrypoint ;

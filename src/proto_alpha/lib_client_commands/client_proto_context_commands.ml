@@ -730,6 +730,7 @@ let transfer_command amount source destination (cctxt : #Client_context.printer)
         ()
   | Some source ->
       Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      let destination : Alpha_context.Destination.t = Contract destination in
       transfer
         cctxt
         ~chain:cctxt#chain
@@ -797,7 +798,7 @@ let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
            ?fee
            ?gas_limit
            ?storage_limit
-           destination))
+           (Contract destination)))
   >>=? fun operation ->
   return (Annotated_manager_operation.Annotated_manager_operation operation)
 

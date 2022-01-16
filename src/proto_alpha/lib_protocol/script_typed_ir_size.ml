@@ -146,11 +146,11 @@ let mutez_size = h2w
 
 let timestamp_size x = Script_timestamp.to_zint x |> z_size
 
-let contract_size = Contract.in_memory_size
+let destination_size = Destination.in_memory_size
 
 let address_size addr =
   h2w
-  +! contract_size addr.contract
+  +! destination_size addr.destination
   +! Entrypoint.in_memory_size addr.entrypoint
 
 let view_signature_size (View_signature {name; input_ty; output_ty}) =

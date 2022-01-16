@@ -1442,7 +1442,7 @@ module View_helpers = struct
      Internal_operation
        {operation = Transaction {destination; parameters; _}; _};
     ]
-      when Contract.equal destination callback ->
+      when Destination.equal destination (Contract callback) ->
         ok parameters
     | [] ->
         Environment.Error_monad.error

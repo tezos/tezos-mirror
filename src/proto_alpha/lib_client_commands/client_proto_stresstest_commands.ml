@@ -402,7 +402,7 @@ let manager_op_of_transfer parameters
            (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
     in
     let entrypoint = Entrypoint.default in
-    let destination = Contract.implicit_contract dst in
+    let destination = Destination.Contract (Contract.implicit_contract dst) in
     Transaction {amount; parameters; entrypoint; destination}
   in
   match counter with
