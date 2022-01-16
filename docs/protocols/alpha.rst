@@ -38,6 +38,15 @@ Smart Contract Optimistic Rollups
 
 - Add Inbox. (MR :gl:`!4020`)
 
+  
+Breaking Changes
+----------------
+
+- The binary encoding of the result of the ``Transaction`` operation
+  has changed.  Its contents now vary depending on the kind of
+  destination. The default cases (implicit and smart contracts) are
+  prefixed with the tag ``0``.
+
 Bug Fixes
 ---------
 

@@ -1092,7 +1092,9 @@ let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
       match result.contents with
       | Single_result (Manager_operation_result {operation_result; _}) -> (
           match operation_result with
-          | Applied (Transaction_result {consumed_gas; _}) ->
+          | Applied
+              (Transaction_result
+                (Transaction_to_contract_result {consumed_gas; _})) ->
               return (Gas.Arith.ceil consumed_gas)
           | _ -> cctxt#error "Simulation of regular transaction failed"))
 

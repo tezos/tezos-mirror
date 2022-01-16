@@ -311,7 +311,10 @@ let estimated_gas_single (type kind)
       kind Kind.manager contents_result) =
   let consumed_gas (type kind) (result : kind manager_operation_result) =
     match result with
-    | Applied (Transaction_result {consumed_gas; _}) -> Ok consumed_gas
+    | Applied
+        (Transaction_result (Transaction_to_contract_result {consumed_gas; _}))
+      ->
+        Ok consumed_gas
     | Applied (Origination_result {consumed_gas; _}) -> Ok consumed_gas
     | Applied (Reveal_result {consumed_gas}) -> Ok consumed_gas
     | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
@@ -344,7 +347,8 @@ let estimated_storage_single (type kind) ~tx_rollup_origination_size
     match result with
     | Applied
         (Transaction_result
-          {paid_storage_size_diff; allocated_destination_contract; _}) ->
+          (Transaction_to_contract_result
+            {paid_storage_size_diff; allocated_destination_contract; _})) ->
         if allocated_destination_contract then
           Ok (Z.add paid_storage_size_diff origination_size)
         else Ok paid_storage_size_diff
@@ -396,7 +400,9 @@ let originated_contracts_single (type kind)
   let originated_contracts (type kind) (result : kind manager_operation_result)
       =
     match result with
-    | Applied (Transaction_result {originated_contracts; _}) ->
+    | Applied
+        (Transaction_result
+          (Transaction_to_contract_result {originated_contracts; _})) ->
         Ok originated_contracts
     | Applied (Origination_result {originated_contracts; _}) ->
         Ok originated_contracts

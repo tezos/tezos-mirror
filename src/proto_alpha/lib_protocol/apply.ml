@@ -914,17 +914,18 @@ let apply_manager_operation_content :
             >|? fun ctxt ->
               let result =
                 Transaction_result
-                  {
-                    storage = None;
-                    lazy_storage_diff = None;
-                    balance_updates;
-                    originated_contracts = [];
-                    consumed_gas =
-                      Gas.consumed ~since:before_operation ~until:ctxt;
-                    storage_size = Z.zero;
-                    paid_storage_size_diff = Z.zero;
-                    allocated_destination_contract;
-                  }
+                  (Transaction_to_contract_result
+                     {
+                       storage = None;
+                       lazy_storage_diff = None;
+                       balance_updates;
+                       originated_contracts = [];
+                       consumed_gas =
+                         Gas.consumed ~since:before_operation ~until:ctxt;
+                       storage_size = Z.zero;
+                       paid_storage_size_diff = Z.zero;
+                       allocated_destination_contract;
+                     })
               in
               (ctxt, result, []) )
       | Some (script, script_ir) ->
@@ -982,17 +983,18 @@ let apply_manager_operation_content :
             >|? fun ctxt ->
               let result =
                 Transaction_result
-                  {
-                    storage = Some storage;
-                    lazy_storage_diff;
-                    balance_updates;
-                    originated_contracts;
-                    consumed_gas =
-                      Gas.consumed ~since:before_operation ~until:ctxt;
-                    storage_size = new_size;
-                    paid_storage_size_diff;
-                    allocated_destination_contract;
-                  }
+                  (Transaction_to_contract_result
+                     {
+                       storage = Some storage;
+                       lazy_storage_diff;
+                       balance_updates;
+                       originated_contracts;
+                       consumed_gas =
+                         Gas.consumed ~since:before_operation ~until:ctxt;
+                       storage_size = new_size;
+                       paid_storage_size_diff;
+                       allocated_destination_contract;
+                     })
               in
               (ctxt, result, operations) ))
   | Origination {delegate; script; preorigination; credit} ->
@@ -1314,7 +1316,7 @@ let burn_storage_fees :
     (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
  fun ctxt smopr ~storage_limit ~payer ->
   match smopr with
-  | Transaction_result payload ->
+  | Transaction_result (Transaction_to_contract_result payload) ->
       let consumed = payload.paid_storage_size_diff in
       let payer = `Contract payer in
       Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
@@ -1330,17 +1332,18 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Transaction_result
-            {
-              storage = payload.storage;
-              lazy_storage_diff = payload.lazy_storage_diff;
-              balance_updates;
-              originated_contracts = payload.originated_contracts;
-              consumed_gas = payload.consumed_gas;
-              storage_size = payload.storage_size;
-              paid_storage_size_diff = payload.paid_storage_size_diff;
-              allocated_destination_contract =
-                payload.allocated_destination_contract;
-            } )
+            (Transaction_to_contract_result
+               {
+                 storage = payload.storage;
+                 lazy_storage_diff = payload.lazy_storage_diff;
+                 balance_updates;
+                 originated_contracts = payload.originated_contracts;
+                 consumed_gas = payload.consumed_gas;
+                 storage_size = payload.storage_size;
+                 paid_storage_size_diff = payload.paid_storage_size_diff;
+                 allocated_destination_contract =
+                   payload.allocated_destination_contract;
+               }) )
   | Origination_result payload ->
       let consumed = payload.paid_storage_size_diff in
       let payer = `Contract payer in
@@ -2477,17 +2480,22 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                >>?= fun ctxt ->
                let result =
                  Transaction_result
-                   {
-                     storage = Some storage;
-                     lazy_storage_diff;
-                     balance_updates;
-                     (* At this point in application the origination nonce has not been initialized so it's not possible to originate new contracts. We've checked above that none were originated. *)
-                     originated_contracts = [];
-                     consumed_gas;
-                     storage_size = new_size;
-                     paid_storage_size_diff;
-                     allocated_destination_contract = false;
-                   }
+                   (Transaction_to_contract_result
+                      {
+                        storage = Some storage;
+                        lazy_storage_diff;
+                        balance_updates;
+                        (* At this point in application the
+                           origination nonce has not been initialized
+                           so it's not possible to originate new
+                           contracts. We've checked above that none
+                           were originated. *)
+                        originated_contracts = [];
+                        consumed_gas;
+                        storage_size = new_size;
+                        paid_storage_size_diff;
+                        allocated_destination_contract = false;
+                      })
                in
                let ctxt = Gas.set_unlimited ctxt in
                return (ctxt, [Successful_manager_result result])))
