@@ -57,6 +57,8 @@ let append_message :
   >>=? fun () ->
   Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) rollup
   >>=? fun (ctxt, mcontents) ->
+  (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2408
+     Carbonate hashing the message. *)
   Storage.Tx_rollup.Inbox_rev_contents.add
     (ctxt, level)
     rollup

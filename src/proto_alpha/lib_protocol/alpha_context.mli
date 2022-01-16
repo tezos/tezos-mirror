@@ -863,6 +863,8 @@ module Constants : sig
 
   val tx_rollup_hard_size_limit_per_inbox : context -> int
 
+  val tx_rollup_hard_size_limit_per_message : context -> int
+
   val sc_rollup_enable : context -> bool
 
   val sc_rollup_origination_size : context -> int
@@ -2137,6 +2139,8 @@ module Kind : sig
 
   type tx_rollup_origination = Tx_rollup_origination_kind
 
+  type tx_rollup_submit_batch = Tx_rollup_submit_batch_kind
+
   type sc_rollup_originate = Sc_rollup_originate_kind
 
   type sc_rollup_add_messages = Sc_rollup_add_messages_kind
@@ -2149,6 +2153,7 @@ module Kind : sig
     | Register_global_constant_manager_kind : register_global_constant manager
     | Set_deposits_limit_manager_kind : set_deposits_limit manager
     | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
+    | Tx_rollup_submit_batch_manager_kind : tx_rollup_submit_batch manager
     | Sc_rollup_originate_manager_kind : sc_rollup_originate manager
     | Sc_rollup_add_messages_manager_kind : sc_rollup_add_messages manager
 end
@@ -2269,6 +2274,11 @@ and _ manager_operation =
       Tez.t option
       -> Kind.set_deposits_limit manager_operation
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
+  | Tx_rollup_submit_batch : {
+      tx_rollup : Tx_rollup.t;
+      content : string;
+    }
+      -> Kind.tx_rollup_submit_batch manager_operation
   | Sc_rollup_originate : {
       kind : Sc_rollup.Kind.t;
       boot_sector : Sc_rollup.PVM.boot_sector;
@@ -2419,6 +2429,9 @@ module Operation : sig
     val tx_rollup_origination_case :
       Kind.tx_rollup_origination Kind.manager case
 
+    val tx_rollup_submit_batch_case :
+      Kind.tx_rollup_submit_batch Kind.manager case
+
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
 
@@ -2454,6 +2467,8 @@ module Operation : sig
       val set_deposits_limit_case : Kind.set_deposits_limit case
 
       val tx_rollup_origination_case : Kind.tx_rollup_origination case
+
+      val tx_rollup_submit_batch_case : Kind.tx_rollup_submit_batch case
 
       val sc_rollup_originate_case : Kind.sc_rollup_originate case
 
