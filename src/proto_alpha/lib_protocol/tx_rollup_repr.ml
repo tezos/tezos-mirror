@@ -40,6 +40,8 @@ let () =
     (function Invalid_rollup_notation loc -> Some loc | _ -> None)
     (fun loc -> Invalid_rollup_notation loc)
 
+let hash_size = 20
+
 module Hash = struct
   let rollup_hash = "\001\127\181\221" (* tru1(37) *)
 
@@ -53,7 +55,7 @@ module Hash = struct
 
         let b58check_prefix = rollup_hash
 
-        let size = Some 20
+        let size = Some hash_size
       end)
 
   include H
@@ -72,6 +74,10 @@ include Compare.Make (struct
 
   let compare r1 r2 = Hash.compare r1 r2
 end)
+
+let in_memory_size _ =
+  let open Cache_memory_helpers in
+  header_size +! word_size +! string_size_gen hash_size
 
 let to_b58check rollup = Hash.to_b58check rollup
 
@@ -145,3 +151,13 @@ module Index = struct
 
   let compare = compare
 end
+
+let deposit_entrypoint = Entrypoint_repr.of_string_strict_exn "deposit"
+
+type deposit_parameters = {
+  contents : Script_repr.node;
+  ty : Script_repr.node;
+  ticketer : Script_repr.node;
+  amount : int64;
+  destination : Tx_rollup_l2_address.Indexable.value;
+}

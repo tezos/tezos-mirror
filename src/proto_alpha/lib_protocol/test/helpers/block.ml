@@ -705,6 +705,8 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
                   balance_updates_rev
               | Transaction_result
                   (Transaction_to_contract_result {balance_updates; _})
+              | Transaction_result
+                  (Transaction_to_tx_rollup_result {balance_updates; _})
               | Origination_result {balance_updates; _}
               | Register_global_constant_result {balance_updates; _} ->
                   List.rev_append balance_updates balance_updates_rev)

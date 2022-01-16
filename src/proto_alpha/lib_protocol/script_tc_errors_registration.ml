@@ -229,6 +229,31 @@ let () =
     (obj1 (req "path" (list prim_encoding)))
     (function Unreachable_entrypoint path -> Some path | _ -> None)
     (fun path -> Unreachable_entrypoint path) ;
+  (* Tx rollup bad deposit parameter *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.tx_rollup_bad_deposit_parameter"
+    ~title:"Bad deposit parameter"
+    ~description:
+      "The parameter to the deposit entrypoint of a transaction rollup should \
+       be a pair of a ticket and the address of a recipient transaction \
+       rollup."
+    (located (obj1 (req "parameter" Script.expr_encoding)))
+    (function
+      | Tx_rollup_bad_deposit_parameter (loc, expr) -> Some (loc, expr)
+      | _ -> None)
+    (fun (loc, expr) -> Tx_rollup_bad_deposit_parameter (loc, expr)) ;
+  (* Tx rollup invalid ticket amount *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.invalid_tx_rollup_ticket_amount"
+    ~title:"Invalid ticket amount"
+    ~description:
+      "Ticket amount to be deposited in a transaction rollup should be \
+       strictly positive and fit in a signed 64-bit integer"
+    (obj1 (req "requested_value" Data_encoding.z))
+    (function Tx_rollup_invalid_ticket_amount z -> Some z | _ -> None)
+    (fun z -> Tx_rollup_invalid_ticket_amount z) ;
   (* Duplicate entrypoint *)
   register_error_kind
     `Permanent
@@ -762,4 +787,13 @@ let () =
     ~description:"DUP was used on a non-dupable type (e.g. tickets)."
     (obj2 (req "loc" location_encoding) (req "type" Script.expr_encoding))
     (function Non_dupable_type (loc, ty) -> Some (loc, ty) | _ -> None)
-    (fun (loc, ty) -> Non_dupable_type (loc, ty))
+    (fun (loc, ty) -> Non_dupable_type (loc, ty)) ;
+  (* Unexpected ticket owner*)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.unexpected_ticket_owner"
+    ~title:"Unexpected ticket owner"
+    ~description:"Ticket can only be created by a smart contract"
+    (obj1 (req "ticketer" Destination.encoding))
+    (function Unexpected_ticket_owner t -> Some t | _ -> None)
+    (fun t -> Unexpected_ticket_owner t)
