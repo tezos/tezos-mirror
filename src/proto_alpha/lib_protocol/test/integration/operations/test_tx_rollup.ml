@@ -291,7 +291,6 @@ let test_add_two_batches () =
   check_batch_in_inbox inbox 1 contents2 >>=? fun () ->
   inbox_fees state expected_cumulated_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
-  >>=? fun () -> return ()
 
 (** Try to add a batch too large in an inbox. *)
 let test_batch_too_big () =

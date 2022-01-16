@@ -850,6 +850,7 @@ val submit_tx_rollup_batch :
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?storage_limit:int ->
+  ?hooks:Process.hooks ->
   content:string ->
   tx_rollup:string ->
   src:string ->
@@ -861,6 +862,7 @@ val spawn_submit_tx_rollup_batch :
   ?wait:string ->
   ?burn_cap:Tez.t ->
   ?storage_limit:int ->
+  ?hooks:Process.hooks ->
   content:string ->
   tx_rollup:string ->
   src:string ->

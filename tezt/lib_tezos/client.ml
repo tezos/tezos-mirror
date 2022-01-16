@@ -1114,8 +1114,9 @@ let originate_tx_rollup ?wait ?burn_cap ?storage_limit ~src client =
   |> mandatory "tx rollup hash" |> Lwt.return
 
 let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
-    ~content ~tx_rollup ~src client =
+    ?hooks ~content ~tx_rollup ~src client =
   spawn_command
+    ?hooks
     client
     (["--wait"; wait]
     @ [
@@ -1138,12 +1139,13 @@ let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
         ~some:(fun s -> ["--storage-limit"; string_of_int s])
         storage_limit)
 
-let submit_tx_rollup_batch ?wait ?burn_cap ?storage_limit ~content ~tx_rollup
-    ~src client =
+let submit_tx_rollup_batch ?wait ?burn_cap ?storage_limit ?hooks ~content
+    ~tx_rollup ~src client =
   spawn_submit_tx_rollup_batch
     ?wait
     ?burn_cap
     ?storage_limit
+    ?hooks
     ~content
     ~tx_rollup
     ~src
