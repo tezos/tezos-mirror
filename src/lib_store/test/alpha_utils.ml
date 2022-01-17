@@ -400,10 +400,7 @@ let patch_context ctxt ~json =
   let* ctxt = Context.add ctxt ["version"] (Bytes.of_string "genesis") in
   let* ctxt = Context.add ctxt protocol_param_key proto_params in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  let* r =
-    let+ r = Main.init ctxt shell in
-    Environment.wrap_tzresult r
-  in
+  let* r = Main.init ctxt shell in
   match r with
   | Error _ -> assert false
   | Ok {context; _} -> return_ok (Shell_context.unwrap_disk_context context)
@@ -429,22 +426,21 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let*! rpc_ctxt = make_rpc_context ctxt in
   let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
       ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
-    let* f =
-      let*! r =
-        Main.value_of_key
-          ~chain_id
-          ~predecessor_context
-          ~predecessor_timestamp
-          ~predecessor_level
-          ~predecessor_fitness
-          ~predecessor
-          ~timestamp
-      in
-      Lwt.return @@ Environment.wrap_tzresult r
+    let*! f =
+      Main.value_of_key
+        ~chain_id
+        ~predecessor_context
+        ~predecessor_timestamp
+        ~predecessor_level
+        ~predecessor_fitness
+        ~predecessor
+        ~timestamp
     in
+    let*? f = Environment.wrap_tzresult f in
     return (fun x ->
         let*! r = f x in
-        Lwt.return @@ Environment.wrap_tzresult r)
+        let*? r = Environment.wrap_tzresult r in
+        return r)
   in
   let* {shell; contents; baker} =
     Forge.forge_header rpc_ctxt ?policy ~operations pred
@@ -503,7 +499,8 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       in
       Main.finalize_block vstate (Some shell)
     in
-    Lwt.return @@ Environment.wrap_tzresult r
+    let*? r = Environment.wrap_tzresult r in
+    return r
   in
   let max_operations_ttl =
     max

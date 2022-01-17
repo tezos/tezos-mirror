@@ -142,7 +142,7 @@ let dummy_patch_context ctxt =
         context = Context_hash.zero;
       }
   in
-  let* {context; _} = Lwt.return (Protocol.Environment.wrap_tzresult res) in
+  let*? {context; _} = Protocol.Environment.wrap_tzresult res in
   return (Tezos_shell_context.Shell_context.unwrap_disk_context context)
 
 let wrap_store_init ?(patch_context = dummy_patch_context)
