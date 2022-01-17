@@ -73,7 +73,7 @@ module type FILTER = sig
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
       Proto.operation_data ->
-      [ `Passed_prefilter
+      [ `Passed_prefilter of [`High | `Low]
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
       | `Refused of tztrace
@@ -116,7 +116,7 @@ module No_filter (Proto : Registered_protocol.T) = struct
       Lwt.return `Undecided
 
     let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =
-      Lwt.return `Passed_prefilter
+      Lwt.return @@ `Passed_prefilter `Low
 
     let post_filter _ ~filter_state ~validation_state_before:_
         ~validation_state_after:_ _ =
