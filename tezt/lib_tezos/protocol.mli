@@ -43,6 +43,9 @@ val tag : t -> string
 (** Get the full hash of a protocol. *)
 val hash : t -> string
 
+(** Hash of protocol genesis *)
+val genesis_hash : string
+
 (** Get the location of the parameter file.
 
     This returns the path to one of the parameter files of the ["parameters"]

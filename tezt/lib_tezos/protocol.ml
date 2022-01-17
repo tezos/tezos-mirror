@@ -42,6 +42,8 @@ let hash = function
   | Hangzhou -> "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
   | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
 
+let genesis_hash = "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
+
 let default_constants = Constants_sandbox
 
 let parameter_file ?(constants = default_constants) protocol =
