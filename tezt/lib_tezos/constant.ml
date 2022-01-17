@@ -109,3 +109,7 @@ let implicit_account_burn =
 
 (** The default time to live of an operation (in block) *)
 let max_op_ttl = 120
+
+(** A valid base58 encoded layer-2 address to be used to test
+    transaction rollups. *)
+let tx_rollup_l2_address = "tru2SS5NXzR5nWQkMAQGeqjmRqFcb4oQH9D2u"
