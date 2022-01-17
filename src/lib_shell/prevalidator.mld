@@ -1,0 +1,180 @@
+{0 Prevalidator}
+
+{1 General description of the prevalidator:}
+
+The main role of the prevalidator is the propagation of valid
+operations through the gossip network of Tezos. The baker also uses
+the prevalidator via the [monitor_operations] RPC to filter
+operations that can be included in blocks.
+
+The prevalidator manages a validation state based upon the current
+head chosen by the validation sub-system. Each time the
+prevalidator receives an operation, it tries to classify it on top
+of the current validation state. If the application of the incoming
+operation succeeds, the validation state is then updated and, the
+operation can be propagated. Otherwise, the handling of the
+operation depends on the classification: [Applied],
+[Branch_delayed], [Branch_refused] or [Refused]. This
+classification is detailed below. Given an operation, its
+classification may change if the head changes. When the validation
+sub-system switches its head, it notifies the prevalidator with the
+new [live_blocks] and [live_operations], triggering also a [flush]
+of the mempool: every operation classified as [Applied] or
+[Branch_delayed] which is anchored (i.e, the [block hash] on which
+the operation is based on when it was created) on a [live block]
+and which is not in the [live operations] (operations which are
+included in [live_blocks]) is set [pending], meaning they are
+waiting to be classified again. Operations classified as
+[Branch_refused] are reclassified only if the old head is not the
+predecessor block of the new head. We use the
+[Chain_validator_worker_state.Event.update] for that purpose (see
+{!on_flush}). [Refused] operations are never reclassified. We keep
+track on them to avoid to handle it if it is advertised again in a
+short period of time.
+
+Plugins may be used as an anti-spam protection mechanism, more
+restrictive than the economic protocol. They are not mandatory and
+come with the shell. By not mandatory, it means that without the
+plugin, the prevalidator still works. However, it may propagate
+outdated operations and the prevalidator can be slower. Indeed,
+plugins add more restrictions on the validation of operations. The
+plugin comes with three functions: [pre_filter], [precheck] and
+[post_filter]. With the exception of locally injected operations,
+pending operations are first pre-filtered.
+The [precheck] is applied before classifying an operation.
+The [post_filter] is applied every time an operation is classified
+as [Applied].
+
+{2 Error classification:}
+
+The [apply_operation] function from the economic protocol can
+classify an operation as [Refused], [Branch_refused],
+[Branch_delayed], [Outdated] or [Applied].
+
+- An operation is [Refused] if the protocol rejects this
+operation with an error classified as [Permanent].
+
+- An operation is [Outdated] if the operation is too old to be
+applied anymore or if the protocol rejects this operation with an
+error classified as [Outdated]
+
+- An operation is [Branch_refused] if the operation is anchored
+on a block that has not been validated by the node but could be in
+the future or if the protocol rejects this operation with an error
+classified as [Branch]. This semantics is likely to be weakened to
+also consider [Outdated] operations.
+
+- An operation is [Branch_delayed] if the initialization of the
+validation state failed (which presumably cannot happen currently)
+or if the protocol rejects this operation with an error classified
+as [Temporary].
+
+- An operation is [Applied] if it has been successfully
+prechecked, or if the economic protocol succeeded in applying the
+operation on the current validation state. The point of
+prechecking an operation is that it is faster than having the protocol apply
+the operation. Operations are stored in the reverse order of application
+so that adding a new [Applied] operation can be done at the head
+of the list.
+
+The [classification] data-structure (implemented in
+[Prevalidator_classification]) is used by the [prevalidator] to
+handle operations and their classification given either by the
+plugin or the economic protocol. One important property of this
+data-structure is to answer quickly if an operation is already
+classified or not.
+
+The interaction between the [Prevalidator_classification] module
+and the [Prevalidator] ensures an invariant that the different
+classifications are {e disjoint}: an operation cannot be in two (or
+more) of these subfields at the same time. The rationale to not
+make this invariant explicit is for performances reasons.
+
+{2 Operation status:}
+
+Operations are identified uniquely by their hash. Given an
+operation hash, the status can be either: [fetching], [pending],
+[classified], or [banned].
+
+- An operation is [fetching] if we only know its hash but we did
+not receive yet the corresponding operation.
+
+- An operation is [pending] if we know its hash and the
+corresponding operation but this operation is not classified on top
+of the current head yet.
+
+- An operation is [classified] if we know its hash, the
+corresponding operation and was classified according to the
+classification given above. Note that for [Branch_refused]
+operation, the classification may be prior to the last flush.
+
+- We may also ban an operation locally (through an RPC). A
+[banned] operation is removed from all other fields, and is ignored
+when it is received in any form (its hash, the corresponding
+operation, or a direct injection from the node).
+
+The prevalidator ensures that an operation cannot be at the same
+time in two of the following fields: [fetching], [pending],
+[in_mempool] (containing the [classified] operations), and
+[banned_operations].
+
+{2 Propagation of operations:}
+
+An operation is propagated through the [distributed database]
+component (aka [ddb]) which interacts directly with the [p2p]
+network. The prevalidator advertises its mempool (containing only
+operation hashes) through the [ddb]. If a remote peer requests an
+operation, such request will be handled directly by the [ddb]
+without going to the prevalidator. This is why every operation that
+is propagated by the prevalidator should also be in the [ddb]. But
+more important, an operation which we do not want to advertise
+should be removed explicitly from the [ddb] via the
+[Distributed_db.Operation.clear_or_cancel] function.
+
+It is important that every operation we do not want to propagate
+are cleaned up from the [Distributed_db] explicitely. Operations we
+do not want to propagate are operations classified as [Refused] or
+[Outdated], already included in block, or filtered out by the
+plugin.
+
+The [mempool] field contains only operations which are in the
+[in_mempool] field and that we accept to propagate. In particular,
+we do not propagate operations classified as [Refused] or
+[Outdated].
+
+There are two ways to propagate our mempool:
+
+- Either when we classify operations as applied
+
+- Or when a peer requests explicitly our mempool
+
+In the first case, only the newly classified operations are
+propagated. In the second case, current applied operations and
+pending operations are sent to the peer. Every time an operation is
+removed from the [in_mempool] field, this operation should be
+cleaned up in the [Distributed_db.Operation] requester.
+
+There is an [advertisement_delay] to postpone the next mempool
+advertisement if we advertised our mempool not long ago. Early
+consensus operations will be propagated once the block is
+validated. Every time an operation is [classified], it is recorded
+into the [operation_stream]. Such stream can be used by an external
+service to get the classification of an operation (via the
+[monitor_operations] RPC). This also means an operation can be
+notified several times if it is classified again after a
+[flush].
+
+Internally, the prevalidator implementation is split between
+the [Requests] module and the [Handlers] module.
+
+The [Requests] module contains the top-level functions called to implement
+the various requests defined in {!Prevalidator_worker_state}. These
+transitions form the meat of the prevalidator implementation: that is where
+the logic lies. This module is written in an imperative style: most
+functions return [unit] instead of returning an updated value.
+We aim to make this module functional in the near future.
+
+The [Handlers] module implement the functions needed by the
+{!Worker.T.HANDLERS} API. These functions concern the lifecycle
+of a [Worker], such as what happens when it starts and when it is shutdown.
+Except for initialization, the [Handlers] module is mostly boilerplate.
