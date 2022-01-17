@@ -32,7 +32,7 @@ module Baker : sig
     ?minimal_fees:Protocol.Alpha_context.Tez.t ->
     ?minimal_nanotez_per_gas_unit:Q.t ->
     ?minimal_nanotez_per_byte:Q.t ->
-    ?liquidity_baking_escape_vote:
+    liquidity_baking_escape_vote:
       Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote ->
     ?per_block_vote_file:string ->
     ?extra_operations:Baking_configuration.Operations_source.t ->

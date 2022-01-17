@@ -347,6 +347,13 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
            node_data_path
            sources
            cctxt ->
+        (match liquidity_baking_escape_vote with
+        | None ->
+            failwith
+              "Missing liquidity baking escape vote, please use the \
+               --liquidity-baking-escape-vote option"
+        | Some vote -> return vote)
+        >>=? fun liquidity_baking_escape_vote ->
         may_lock_pidfile pidfile @@ fun () ->
         get_delegates cctxt sources >>=? fun delegates ->
         let context_path = Filename.Infix.(node_data_path // "context") in
@@ -355,7 +362,7 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
           ~minimal_fees
           ~minimal_nanotez_per_gas_unit
           ~minimal_nanotez_per_byte
-          ?liquidity_baking_escape_vote
+          ~liquidity_baking_escape_vote
           ?per_block_vote_file
           ?extra_operations
           ~chain:cctxt#chain
