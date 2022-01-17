@@ -564,7 +564,7 @@ module Make (Proto : Registered_protocol.T) = struct
         let*! (ops_metadata_hashes, block_metadata_hash) =
           match new_protocol_env_version with
           | Protocol.V0 -> Lwt.return (None, None)
-          | Protocol.V1 | Protocol.V2 | Protocol.V3 | Protocol.V4 ->
+          | Protocol.(V1 | V2 | V3 | V4 | V5) ->
               Lwt.return
                 ( Some
                     (List.map
@@ -682,9 +682,10 @@ module Make (Proto : Registered_protocol.T) = struct
          testchain genesis block and activation block, even when they
          are using environment V1, they contain no operations. *)
       let is_from_genesis = predecessor_shell_header.validation_passes = 0 in
-      (match Proto.environment_version with
-      | Protocol.V0 -> false
-      | Protocol.V1 | Protocol.V2 | Protocol.V3 | Protocol.V4 -> true)
+      Protocol.(
+        match Proto.environment_version with
+        | V0 -> false
+        | V1 | V2 | V3 | V4 | V5 -> true)
       && not is_from_genesis
     in
     let* context =
@@ -910,7 +911,7 @@ module Make (Proto : Registered_protocol.T) = struct
     let*! (ops_metadata_hashes, block_metadata_hash) =
       match new_protocol_env_version with
       | Protocol.V0 -> Lwt.return (None, None)
-      | Protocol.V1 | Protocol.V2 | Protocol.V3 | Protocol.V4 ->
+      | Protocol.(V1 | V2 | V3 | V4 | V5) ->
           Lwt.return
             ( Some
                 (List.map

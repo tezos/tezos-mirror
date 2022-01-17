@@ -227,6 +227,8 @@ module V4 = struct
   end
 end
 
+module V5 = V4
+
 module type VIEW = sig
   (** @inline *)
   include Tezos_context_sigs.Context.VIEW
@@ -265,6 +267,7 @@ module type Sigs = sig
   module V2 = V2
   module V3 = V3
   module V4 = V4
+  module V5 = V5
 
   module type VIEW = VIEW
 

@@ -1840,7 +1840,7 @@ let tezos_protocol_environment_sigs =
         tezos_protocol_environment_packer;
       ]
     ~nopervasives:true
-    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"]
+    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"]
     ~dune:
       Dune.
         [
@@ -1849,6 +1849,7 @@ let tezos_protocol_environment_sigs =
           include_ "v2.dune.inc";
           include_ "v3.dune.inc";
           include_ "v4.dune.inc";
+          include_ "v5.dune.inc";
         ]
 
 let tezos_protocol_environment_structs =
@@ -1871,7 +1872,7 @@ let tezos_protocol_environment_structs =
            it's from one of the .inc files. *)
         tezos_protocol_environment_packer;
       ]
-    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"]
+    ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"]
     ~dune:
       Dune.
         [
@@ -1880,6 +1881,7 @@ let tezos_protocol_environment_structs =
           include_ "v2.dune.inc";
           include_ "v3.dune.inc";
           include_ "v4.dune.inc";
+          include_ "v5.dune.inc";
         ]
 
 let tezos_protocol_environment =
@@ -1912,6 +1914,7 @@ let tezos_protocol_environment =
         "Environment_V2";
         "Environment_V3";
         "Environment_V4";
+        "Environment_V5";
         "Environment_cache";
         "Environment_context";
         "Environment_context_intf";
@@ -1992,6 +1995,8 @@ let tezos_protocol_compiler_registerer =
                 "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi}";
               S
                 "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V4.cmi}";
+              S
+                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V5.cmi}";
             ];
           ];
         ];
