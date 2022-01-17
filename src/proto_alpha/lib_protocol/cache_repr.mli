@@ -75,15 +75,6 @@ module Admin : sig
   (** [pp fmt ctxt] is a pretty printter for the [cache] of [ctxt]. *)
   val pp : Format.formatter -> Raw_context.t -> unit
 
-  (** [set_cache_layout ctxt layout] sets the caches of [ctxt] to
-     comply with given [layout]. If there was already a cache in
-     [ctxt], it is erased by the new layout.
-
-     In that case, a fresh collection of empty caches is reconstructed
-     from the new [layout]. Notice that cache [key]s are invalidated
-     in that case, i.e. [find t k] will return [None]. *)
-  val set_cache_layout : Raw_context.t -> size list -> Raw_context.t Lwt.t
-
   (** [sync ctxt ~cache_nonce] updates the context with the domain of
      the cache computed so far. Such function is expected to be called
      at the end of the validation of a block, when there is no more
@@ -97,9 +88,6 @@ module Admin : sig
      block. Such nonce cannot be determined by the shell and its
      computation is delegated to the economic protocol. *)
   val sync : Raw_context.t -> cache_nonce:Bytes.t -> Raw_context.t Lwt.t
-
-  (** [clear ctxt] removes all cache entries. *)
-  val clear : Raw_context.t -> Raw_context.t
 
   (** {3 Cache helpers for RPCs} *)
 

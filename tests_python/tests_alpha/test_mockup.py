@@ -601,6 +601,8 @@ def _test_create_mockup_init_show_roundtrip(
 @pytest.mark.parametrize(
     'initial_bootstrap_accounts', [None, json.dumps(_create_accounts_list())]
 )
+# The following values should be different from the default ones in
+# order to check loading of the parameters.
 @pytest.mark.parametrize(
     'protocol_constants',
     [
@@ -650,6 +652,9 @@ def _test_create_mockup_init_show_roundtrip(
                     'denominator': 2,
                 },
                 "double_baking_punishment": "640000001",
+                "cache_script_size": 100000001,
+                "cache_stake_distribution_cycles": 10,
+                "cache_sampler_state_cycles": 10,
                 "tx_rollup_enable": False,
                 # TODO: https://gitlab.com/tezos/tezos/-/issues/2152
                 "tx_rollup_origination_size": 60_000,

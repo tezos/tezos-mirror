@@ -94,8 +94,6 @@ type operation = Alpha_context.packed_operation = {
   protocol_data : operation_data;
 }
 
-val init_cache : Context.t -> Context.t Lwt.t
-
 (** [check_manager_signature validation_state op raw_operation]
     The function starts by retrieving the public key hash [pkh] of the manager
     operation. In case the operation is batched, the function also checks that

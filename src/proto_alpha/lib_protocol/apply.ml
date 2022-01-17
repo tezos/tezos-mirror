@@ -814,8 +814,6 @@ open Apply_results
 let assert_sc_rollup_feature_enabled ctxt =
   fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
-let cache_layout = Constants_repr.cache_layout
-
 (**
 
    Retrieving the source code of a contract from its address is costly

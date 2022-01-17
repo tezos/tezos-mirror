@@ -134,12 +134,34 @@ let initial_context
     let proxy_mem = M.proxy_mem pgi
   end in
   let empty = Proxy_context.empty @@ Some (module N) in
-  let version_value = "alpha_current" in
   Tezos_protocol_environment.Context.add
     empty
     ["version"]
-    (Bytes.of_string version_value)
-  >>= fun ctxt -> Protocol.Main.init_cache ctxt
+    (Bytes.of_string "alpha_current")
+  >>= fun ctxt ->
+  (* There is something fundamentally strange here. The purpose of the
+     proxy mode is to fetch pieces of data that are missing. Hence,
+     there is no need to initialize the context properly. It is
+     sufficient that the proxy client is connected to a node with a
+     valid context. However, this makes the assumption that any
+     interaction with the context is pure: Only the Irmin context can
+     be modified. The cache breaks this since initializing the cache
+     changes the Irmin context but also loads values into memory. If
+     the cache is not initialized, then any cache access will fail.
+     Hence, the initialization is done here. This means that the
+     caller needs to maintain a cache on its own. But I suspect this
+     is not wanted: The cache of the proxied node should be used
+     instead. *)
+  let cache_layout =
+    (* The order matters, be careful to maintain it correctly. *)
+    Default_parameters.
+      [
+        constants_mainnet.cache_script_size;
+        constants_mainnet.cache_stake_distribution_cycles;
+        constants_mainnet.cache_sampler_state_cycles;
+      ]
+  in
+  Tezos_protocol_environment.Context.Cache.set_cache_layout ctxt cache_layout
 
 let round_durations (rpc_context : RPC_context.generic)
     (chain : Tezos_shell_services.Block_services.chain)

@@ -342,7 +342,6 @@ let initial_alpha_context ?(commitments = []) constants
     in
     (({script with storage}, lazy_storage_diff), ctxt)
   in
-  Main.init_cache ctxt >>= fun ctxt ->
   Alpha_context.prepare_first_block ~typecheck ~level ~timestamp ctxt
   >|= Environment.wrap_tzresult
 
