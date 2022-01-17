@@ -67,22 +67,10 @@ let make_key ctxt ~ticketer ~typ ~content ~owner =
   return (key, ctxt)
 
 let equal_script_hash ~loc msg key1 key2 =
-  Assert.equal
-    ~loc
-    Script_expr_hash.equal
-    msg
-    Script_expr_hash.pp
-    (Ticket_balance.script_expr_hash_of_key_hash key1)
-    (Ticket_balance.script_expr_hash_of_key_hash key2)
+  Assert.equal ~loc Ticket_hash.equal msg Ticket_hash.pp key1 key2
 
 let not_equal_script_hash ~loc msg key1 key2 =
-  Assert.not_equal
-    ~loc
-    Script_expr_hash.equal
-    msg
-    Script_expr_hash.pp
-    (Ticket_balance.script_expr_hash_of_key_hash key1)
-    (Ticket_balance.script_expr_hash_of_key_hash key2)
+  Assert.not_equal ~loc Ticket_hash.equal msg Ticket_hash.pp key1 key2
 
 let assert_keys ~ticketer1 ~ticketer2 ~typ1 ~typ2 ~amount1 ~amount2 ~content1
     ~content2 ~owner1 ~owner2 assert_condition =

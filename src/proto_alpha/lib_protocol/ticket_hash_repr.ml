@@ -23,30 +23,50 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [get_balance ctxt key] receives the ticket balance for the given
-    [key] in the context [ctxt]. The [key] represents a ticket content and a
-    ticket creator pair. In case there exists no value for the given [key],
-    [None] is returned.
-    *)
-val get_balance :
-  Raw_context.t ->
-  Ticket_hash_repr.t ->
-  (Z.t option * Raw_context.t) tzresult Lwt.t
+type error += Failed_to_hash_node
 
-(** [adjust_balance ctxt key ~delta] adjusts the balance of the
-    given key (representing a ticket content, creator and owner pair)
-    and [delta]. The value of [delta] can be positive as well as negative.
-    If there is no pre-exising balance for the given ticket type and owner,
-    it is assumed to be 0 and the new balance is [delta]. The function also
-    returns the difference between the old and the new size of the storage.
-    Note that the difference may be negative. For example, because when
-    setting the balance to zero, an entry is removed.
+let () =
+  register_error_kind
+    `Branch
+    ~id:"Failed_to_hash_node"
+    ~title:"Failed to hash node"
+    ~description:"Failed to hash node for a key in the ticket-balance table"
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Failed to hash node for a key in the ticket-balance table")
+    Data_encoding.empty
+    (function Failed_to_hash_node -> Some () | _ -> None)
+    (fun () -> Failed_to_hash_node)
 
-    The function fails with a [Negative_ticket_balance] error
-    in case the resulting balance is negative.
- *)
-val adjust_balance :
-  Raw_context.t ->
-  Ticket_hash_repr.t ->
-  delta:Z.t ->
-  (Z.t * Raw_context.t) tzresult Lwt.t
+include Script_expr_hash
+
+let hash_bytes_cost bytes =
+  let module S = Saturation_repr in
+  let ( + ) = S.add in
+  let v0 = S.safe_int @@ Bytes.length bytes in
+  let ( lsr ) = S.shift_right in
+  S.safe_int 200 + (v0 + (v0 lsr 2)) |> Gas_limit_repr.atomic_step_cost
+
+let hash_of_node ctxt node =
+  Raw_context.consume_gas ctxt (Script_repr.strip_locations_cost node)
+  >>? fun ctxt ->
+  let node = Micheline.strip_locations node in
+  match Data_encoding.Binary.to_bytes_opt Script_repr.expr_encoding node with
+  | Some bytes ->
+      Raw_context.consume_gas ctxt (hash_bytes_cost bytes) >|? fun ctxt ->
+      (Script_expr_hash.hash_bytes [bytes], ctxt)
+  | None -> error Failed_to_hash_node
+
+(** TODO: https://gitlab.com/tezos/tezos/-/issues/2345
+    Remove [Raw_context.t] argument.
+    The fact that [make] takes a [Raw_context.t] value as its argument
+    is unconventional for a [*_repr] module. [ctxt] is only used to do
+    gas accounting, and this function could be refactored to use the
+    [Gas_monad] framework, but it requires to adapt it to be
+    compatible with [Raw_context]. *)
+let make ctxt ~ticketer ~typ ~contents ~owner =
+  hash_of_node ctxt
+  @@ Micheline.Seq (Micheline.dummy_location, [ticketer; typ; contents; owner])
+
+module Index = Script_expr_hash

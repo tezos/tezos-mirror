@@ -448,6 +448,7 @@ let description = Raw_context.description
 
 module Parameters = Parameters_repr
 module Liquidity_baking = Liquidity_baking_repr
+module Ticket_hash = Ticket_hash_repr
 
 module Ticket_balance = struct
   include Ticket_storage

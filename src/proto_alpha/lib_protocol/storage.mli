@@ -663,7 +663,7 @@ module Ticket_balance : sig
   module Table :
     Non_iterable_indexed_carbonated_data_storage
       with type t := Raw_context.t
-       and type key = Script_expr_hash.t
+       and type key = Ticket_hash_repr.t
        and type value = Z.t
 end
 

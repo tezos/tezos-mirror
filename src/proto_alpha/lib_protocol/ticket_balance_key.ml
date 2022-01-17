@@ -70,4 +70,4 @@ let ticket_balance_key ctxt ~owner
     address_t
     owner_address
   >>=? fun (owner, ctxt) ->
-  Lwt.return (Ticket_balance.make_key_hash ctxt ~ticketer ~typ ~contents ~owner)
+  Lwt.return (Ticket_hash.make ctxt ~ticketer ~typ ~contents ~owner)

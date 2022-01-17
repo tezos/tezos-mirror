@@ -80,6 +80,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -218,6 +219,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -356,6 +358,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -516,6 +519,7 @@ include Tezos_raw_protocol_alpha.Main
    Migration_repr
    Raw_context_intf
    Raw_context
+   Ticket_hash_repr
    Storage_costs
    Storage_sigs
    Storage_functors
@@ -695,6 +699,7 @@ include Tezos_raw_protocol_alpha.Main
    migration_repr.mli migration_repr.ml
    raw_context_intf.ml
    raw_context.mli raw_context.ml
+   ticket_hash_repr.mli ticket_hash_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
