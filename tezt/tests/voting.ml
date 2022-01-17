@@ -49,17 +49,8 @@
 (* Protocol to inject when testing injection. *)
 let test_proto_dir = "src/bin_client/test/proto_test_injection"
 
-(* Files that are to be copied from [test_proto_dir].
-   We do not copy [TEZOS_PROTOCOL] because it declares an environment version
-   which is too old for our use case. *)
-let test_proto_files = ["main.ml"; "main.mli"]
-
-let test_proto_TEZOS_PROTOCOL =
-  {|{
-    "modules": ["Main"],
-    "expected_env_version": 3
-}
-|}
+(* Files that are to be copied from [test_proto_dir]. *)
+let test_proto_files = ["main.ml"; "main.mli"; "TEZOS_PROTOCOL"]
 
 type period = {
   index : int;
@@ -319,8 +310,6 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
                test_proto_files
             @ [protocol_path])
         in
-        ( with_open_out (protocol_path // "TEZOS_PROTOCOL") @@ fun ch ->
-          output_string ch test_proto_TEZOS_PROTOCOL ) ;
         let* protocols_before = Client.Admin.list_protocols client in
         let* test_proto_hash =
           Client.Admin.inject_protocol client ~protocol_path
