@@ -44,6 +44,7 @@ let () =
       ("ticket scanner", Test_ticket_scanner.tests);
       ("ticket storage", Test_ticket_storage.tests);
       ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
+      ("ticket operations diff", Test_ticket_operations_diff.tests);
       ("timelock", Test_timelock.tests);
       ("typechecking", Test_typechecking.tests);
       ("script cache", Test_script_cache.tests);
