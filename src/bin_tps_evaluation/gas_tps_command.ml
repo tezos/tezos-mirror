@@ -54,9 +54,9 @@ let estimate_gas_tps ~average_block_path () =
   let transaction_cost =
     Gas.average_transaction_cost transaction_costs average_block
   in
-  Format.printf "Average transaction cost: %d@." transaction_cost ;
+  Log.info "Average transaction cost: %d" transaction_cost ;
   let gas_tps = Gas.deduce_tps ~protocol ~constants ~transaction_cost () in
-  Format.printf "Gas TPS: %d@." gas_tps ;
+  Log.info "Gas TPS: %d" gas_tps ;
   Lwt.return @@ float_of_int gas_tps
 
 module Term = struct
@@ -68,7 +68,10 @@ module Term = struct
 
   let tezt_args =
     let open Cmdliner in
-    let doc = "Extra arguments after -- to be passed directly to Tezt" in
+    let doc =
+      "Extra arguments after -- to be passed directly to Tezt. Contains `-i` \
+       by default to display info log level."
+    in
     let docv = "TEZT_ARGS" in
     Arg.(value & pos_all string [] & info [] ~docv ~doc)
 
@@ -89,7 +92,7 @@ module Term = struct
          stress test uses. This functionality is also protocol-dependent, so
          we need to start a node, too. Hence we use the tezt network to spin
          up the network. *)
-      (try Cli.init ~args:tezt_args ()
+      (try Cli.init ~args:("-i" :: tezt_args) ()
        with Arg.Help help_str ->
          Format.eprintf "%s@." help_str ;
          exit 0) ;

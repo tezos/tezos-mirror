@@ -119,10 +119,10 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
       accounts_total
       (List.map (fun {Account.alias; _} -> alias) all_bootstraps)
   in
-  Format.printf "Tezos TPS benchmark@\n" ;
-  Format.printf "Protocol: %s@\n" (Protocol.name protocol) ;
-  Format.printf "Total number of accounts to use: %d@\n" accounts_total ;
-  Format.printf "Blocks to bake: %d@." blocks_total ;
+  Log.info "Tezos TPS benchmark" ;
+  Log.info "Protocol: %s" (Protocol.name protocol) ;
+  Log.info "Total number of accounts to use: %d" accounts_total ;
+  Log.info "Blocks to bake: %d" blocks_total ;
   Protocol.write_parameter_file
     ~base:(Either.right (protocol, Some constants))
     (if lift_protocol_limits then
@@ -133,7 +133,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
      ]
     else [])
   >>= fun parameter_file ->
-  Format.printf "Spinning up the network...@." ;
+  Log.info "Spinning up the network..." ;
   (* For now we disable operations precheck, but ideally we should
      pre-populate enough bootstrap accounts and do 1 transaction per
      account per block. *)
@@ -156,12 +156,12 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
   in
   Log.info "Average transaction cost: %d@\n" transaction_cost ;
   Baker.init ~protocol ~delegates node client >>= fun _baker ->
-  Format.printf "Using the parameter file: %s@.@." parameter_file ;
+  Log.info "Using the parameter file: %s" parameter_file ;
   print_out_file parameter_file >>= fun () ->
-  Format.printf "Waiting to reach level %d@." benchmark_starting_level ;
+  Log.info "Waiting to reach level %d" benchmark_starting_level ;
   Node.wait_for_level node benchmark_starting_level >>= fun _ ->
   let bench_start = Unix.gettimeofday () in
-  Format.printf "The benchmark has been started@." ;
+  Log.info "The benchmark has been started" ;
   (* It is important to use a good estimate of max possible TPS that is
      theoretically achievable. If we send operations with lower TPS than
      this we risk obtaining a sub-estimated value for TPS. If we use a
@@ -203,10 +203,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
   Process.wait client_stresstest_process >>= fun _ ->
   let bench_end = Unix.gettimeofday () in
   let bench_duration = bench_end -. bench_start in
-  Format.printf
-    "Produced %d block(s) in %.2f seconds@."
-    blocks_total
-    bench_duration ;
+  Log.info "Produced %d block(s) in %.2f seconds" blocks_total bench_duration ;
   get_blocks blocks_total client >>= fun produced_block_hashes ->
   let total_injected_transactions = get_total_injected_transactions () in
   let total_applied_transactions = ref 0 in
@@ -215,20 +212,20 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
     >|= fun applied_transactions ->
     total_applied_transactions :=
       !total_applied_transactions + applied_transactions ;
-    Format.printf "%s -> %d@." block_hash applied_transactions
+    Log.info "%s -> %d" block_hash applied_transactions
   in
   List.iter_s handle_one_block (List.rev produced_block_hashes) >>= fun () ->
-  Format.printf "Total applied transactions: %d@." !total_applied_transactions ;
-  Format.printf "Total injected transactions: %d@." total_injected_transactions ;
+  Log.info "Total applied transactions: %d" !total_applied_transactions ;
+  Log.info "Total injected transactions: %d" total_injected_transactions ;
   let empirical_tps =
     Float.of_int !total_applied_transactions /. bench_duration
   in
   let de_facto_tps_of_injection =
     Float.of_int total_injected_transactions /. bench_duration
   in
-  Format.printf "TPS of injection (target): %d@\n" target_tps_of_injection ;
-  Format.printf "TPS of injection (de facto): %.2f@\n" de_facto_tps_of_injection ;
-  Format.printf "Empirical TPS: %.2f@." empirical_tps ;
+  Log.info "TPS of injection (target): %d" target_tps_of_injection ;
+  Log.info "TPS of injection (de facto): %.2f" de_facto_tps_of_injection ;
+  Log.info "Empirical TPS: %.2f" empirical_tps ;
   Node.terminate ~kill:true node >>= fun () ->
   return (de_facto_tps_of_injection, empirical_tps)
 
@@ -284,7 +281,10 @@ module Term = struct
 
   let tezt_args =
     let open Cmdliner in
-    let doc = "Extra arguments after -- to be passed directly to Tezt" in
+    let doc =
+      "Extra arguments after -- to be passed directly to Tezt. Contains `-i` \
+       by default to display info log level."
+    in
     let docv = "TEZT_ARGS" in
     Arg.(value & pos_all string [] & info [] ~docv ~doc)
 
@@ -302,7 +302,7 @@ module Term = struct
     let process accounts_total blocks_total average_block_path
         lift_protocol_limits provided_tps_of_injection tezt_args previous_count
         =
-      (try Cli.init ~args:tezt_args ()
+      (try Cli.init ~args:("-i" :: tezt_args) ()
        with Arg.Help help_str ->
          Format.eprintf "%s@." help_str ;
          exit 0) ;
