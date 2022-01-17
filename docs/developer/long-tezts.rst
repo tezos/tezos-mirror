@@ -1,5 +1,5 @@
-Tezt: Long Tests
-================
+Tezt: Long Tests and Performance Regression Test Framework
+============================================================
 
 :doc:`Tezt <tezt>` can also be used for long tests.
 Here are the differences with regular Tezt tests:
@@ -11,13 +11,16 @@ Here are the differences with regular Tezt tests:
   :src:`tezt/tests/main.ml`;
 - long tests are registered with ``Long_test.register`` instead
   of ``Test.register``;
-- long tests have easy access to an InfluxDB database to send data
-  points such as how long it takes to do something;
-- long tests have easy access to a Grafana instance that they can
-  update to create graphs displaying the data points sent to InfluxDB;
-- long tests have easy access to a Slack webhook that can be used to
-  send alerts when measurements differ significantly from previous
-  tests.
+- long tests have easy access to a Performance Regression Test framework
+  wich provides these features:
+
+  - Persist measurement samples (in an InfluxDB) such as how long it takes
+    to do something. These samples will be used to prevent regressions of
+    performance.
+  - Provide easy access to a Grafana instance that can be updated to
+    create graphs displaying the samples sent to InfluxDB;
+  - Call Slack webhooks to send alerts when a performance regression has
+    been detected.
 
 Adding a Long Test
 ------------------
@@ -45,8 +48,8 @@ however ask that a new dedicated machine is created to run your test.
 Please ask on the ``#tests`` Slack channel of ``tezos-dev`` before
 merging.
 
-Time Series, Alerts and Graphs
-------------------------------
+Performance Regression Test framework: Time Series, Alerts and Graphs
+---------------------------------------------------------------------
 
 Long tests can use functions from the ``Long_test`` module
 (:src:`tezt/lib_performance_regression/long_test.mli`) to send data points to InfluxDB,
@@ -138,9 +141,9 @@ tests will find it under ``/s3data/myfolder/myfile``.
 Testing Your Benchmarks Locally
 -------------------------------
 
-When developing a benchmark depending on the long test framework, it can
-be useful to test it using a development database so that your tests does
-not impact the production database.
+When developing a benchmark depending on the Performance Regression Test
+framework, it can be useful to test it using a development database so
+that your tests does not impact the production database.
 
 This section describes how to easily set up an InfluxDB database so that the
 framework can operate with it.
