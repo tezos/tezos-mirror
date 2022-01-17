@@ -102,8 +102,7 @@ let create_prevalidation
     Internal_for_tests.Make (Chain_store) (Mock_protocol)
   in
   (module Prevalidation : Tezos_shell.Prevalidation.T
-    with type operation_data = unit
-     and type operation_receipt = unit
+    with type operation_receipt = unit
      and type validation_state = unit
      and type chain_store = Chain_store.chain_store)
 
@@ -128,11 +127,12 @@ let test_create ctxt =
 (** A generator of [Prevalidation.operation] values that make sure
     to return distinct operations (hashes are not fake and they are
     all different). Returned maps are exactly of size [n]. *)
-let prevalidation_operations_gen
-    (module P : Prevalidation.T with type operation_data = unit) ~(n : int) :
-    unit Prevalidation.operation list QCheck2.Gen.t =
-  let mk_operation (_, (raw : Operation.t)) : unit Prevalidation.operation =
-    match P.parse raw with
+let prevalidation_operations_gen (type a)
+    (module P : Prevalidation.T with type protocol_operation = a) ~(n : int) :
+    a Prevalidation.operation list QCheck2.Gen.t =
+  let mk_operation (hash, (raw : Operation.t)) :
+      P.protocol_operation Prevalidation.operation =
+    match P.parse hash raw with
     | Ok x -> x
     | Error err ->
         Format.printf "%a" Error_monad.pp_print_trace err ;
@@ -144,15 +144,16 @@ let prevalidation_operations_gen
      bytes being too long (hereby looking like an attack). *)
   let string_gen : string QCheck2.Gen.t = QCheck2.Gen.return "" in
   let+ (ops : Operation.t Operation_hash.Map.t) =
-    Generators.op_map_gen_n ~string_gen ?block_hash_t:None n
+    Generators.raw_op_map_gen_n ~string_gen ?block_hash_t:None n
   in
   List.map mk_operation (Operation_hash.Map.bindings ops)
 
 (** The number of operations used by tests that follow *)
 let nb_ops = 100
 
-let mk_ops (module P : Prevalidation.T with type operation_data = unit) :
-    unit Prevalidation.operation list =
+let mk_ops (type a)
+    (module P : Prevalidation.T with type protocol_operation = a) :
+    a Prevalidation.operation list =
   let ops =
     QCheck2.Gen.generate1 (prevalidation_operations_gen (module P) ~n:nb_ops)
   in
@@ -165,7 +166,9 @@ let test_apply_operation_crash ctxt =
   let live_operations = Operation_hash.Set.empty in
   let timestamp : Time.Protocol.t = now () in
   let (module P) = create_prevalidation (module Mock_protocol) ctxt in
-  let ops : unit Prevalidation.operation list = mk_ops (module P) in
+  let ops : P.protocol_operation Prevalidation.operation list =
+    mk_ops (module P)
+  in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt
   in
@@ -197,7 +200,7 @@ let mk_rand () =
 (** [mk_live_operations rand ops] returns a subset of [ops], which is
     appropriate for being passed as the [live_operations] argument
     of [Prevalidation.create] *)
-let mk_live_operations rand (ops : unit Prevalidation.operation list) =
+let mk_live_operations (type a) rand (ops : a Prevalidation.operation list) =
   List.fold_left
     (fun acc (op : _ Prevalidation.operation) ->
       if Random.State.bool rand then
@@ -227,7 +230,9 @@ let test_apply_operation_live_operations ctxt =
     end)
   in
   let (module P) = create_prevalidation (module Protocol) ctxt in
-  let ops : unit Prevalidation.operation list = mk_ops (module P) in
+  let ops : P.protocol_operation Prevalidation.operation list =
+    mk_ops (module P)
+  in
   let live_operations : Operation_hash.Set.t = mk_live_operations rand ops in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt
@@ -273,7 +278,9 @@ let test_apply_operation_applied ctxt =
     end)
   in
   let (module P) = create_prevalidation (module Protocol) ctxt in
-  let ops : unit Prevalidation.operation list = mk_ops (module P) in
+  let ops : P.protocol_operation Prevalidation.operation list =
+    mk_ops (module P)
+  in
   let live_operations : Operation_hash.Set.t = mk_live_operations rand ops in
   let predecessor : Store.Block.t =
     Init.genesis_block @@ Context.hash ~time:timestamp ctxt

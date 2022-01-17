@@ -215,7 +215,7 @@ module Block = struct
       [Prevalidator.Internal_for_tests.handle_live_operations] *)
   type t = {
     hash : Block_hash.t;
-    operations : (Operation_hash.t * Operation.t) list list;
+    operations : unit Prevalidation.operation list list;
   }
 
   (* Because we use hashes to implement equality, we must make sure
@@ -226,17 +226,18 @@ module Block = struct
 
   let compare (t1 : t) (t2 : t) = Block_hash.compare t1.hash t2.hash
 
-  (** [hash_of_blocks ops_and_hashes] is used to compute the hash of a block whose
-      [operations] field contains [ops_and_hashes].
+  (** [hash_of_blocks ops] is used to compute the hash of a block whose
+      [operations] field contains [ops].
 
       We want the hash to be sound, because it is used to implement equality
       (see {!equal} above), like in the production implementation. Given
       that {!t} above contains a single field besides the [hash], we hash
       the content of this field to obtain the hash of a block. That
       is why we hash the hashes of operations. *)
-  let hash_of_block ops_and_hashes =
+  let hash_of_block ops =
     let hash =
-      Operation_list_hash.compute (List.map fst @@ List.concat ops_and_hashes)
+      Operation_list_hash.compute
+        (List.map (fun op -> op.Prevalidation.hash) @@ List.concat ops)
     in
     (* We forge a fake [block_header] hash by first hashing the operations
        and change the [b58] signature into a signature that looks like
@@ -253,15 +254,21 @@ module Block = struct
   let to_hash (blk : t) = blk.hash
 
   let tools : t Classification.block_tools =
-    let operations block = List.map (List.map snd) block.operations in
-    let all_operation_hashes block = List.map (List.map fst) block.operations in
+    let operations block =
+      List.map (List.map (fun op -> op.Prevalidation.raw)) block.operations
+    in
+    let all_operation_hashes block =
+      List.map (List.map (fun op -> op.Prevalidation.hash)) block.operations
+    in
     {hash = to_hash; operations; all_operation_hashes}
 
   let to_string t =
     let ops_list_to_string ops =
       String.concat
         "|"
-        (List.map Operation_hash.to_short_b58check (List.map fst ops))
+        (List.map
+           Operation_hash.to_short_b58check
+           (List.map (fun op -> op.Prevalidation.hash) ops))
     in
     let ops_string =
       List.fold_left
@@ -379,19 +386,26 @@ module Generators = struct
   (** A generator for passing the last argument of
       [Prevalidator.handle_live_operations] *)
   let old_mempool_gen (tree : Block.t Tree.tree) :
-      Operation.t Operation_hash.Map.t QCheck2.Gen.t =
+      unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
     let blocks = Tree.values tree in
     let pairs =
       List.map Block.tools.operations blocks |> List.concat |> List.concat
     in
     let elements =
-      List.map (fun (op : Operation.t) -> (Operation.hash op, op)) pairs
+      List.map
+        (fun (op : Operation.t) ->
+          let hash = Operation.hash op in
+          Prevalidation.Internal_for_tests.make_operation op hash ())
+        pairs
     in
     if elements = [] then QCheck2.Gen.return Operation_hash.Map.empty
     else
       let list_gen = QCheck2.Gen.(oneofl elements |> list) in
       QCheck2.Gen.map
-        (fun l -> Operation_hash.Map.of_seq (List.to_seq l))
+        (fun l ->
+          List.to_seq l
+          |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+          |> Operation_hash.Map.of_seq)
         list_gen
 
   (** Returns an instance of [block chain_tools] as well as:
@@ -408,7 +422,7 @@ module Generators = struct
       (Block.t Classification.chain_tools
       * Block.t Tree.tree
       * (Block.t * Block.t) option
-      * Operation.t Operation_hash.Map.t)
+      * unit Prevalidation.operation Operation_hash.Map.t)
       QCheck2.Gen.t =
     let open QCheck2.Gen in
     let* tree = tree_gen ?blocks () in
@@ -513,8 +527,14 @@ let op_set_pp fmt x =
 
 (** Pretty print values of type [Operation.t Operation_hash.Map] *)
 let op_map_pp fmt x =
-  let pp_pair fmt (oph, op) =
-    Format.fprintf fmt "%a:%a" Operation_hash.pp oph Operation.pp op
+  let pp_pair fmt (hash, op) =
+    Format.fprintf
+      fmt
+      "%a:%a"
+      Operation_hash.pp
+      hash
+      Operation.pp
+      op.Prevalidation.raw
   in
   Format.fprintf
     fmt
@@ -548,18 +568,32 @@ let blocks_to_oph_set (blocks : Operation_hash.t list list list) :
 
 (** [is_subset m1 m2] returns whether all bindings of [m1] are in [m2].
     In other words, it returns whether [m2] is a superset of [m1]. *)
-let is_subset (m1 : Operation.t Op_map.t) (m2 : Operation.t Op_map.t) =
-  let rec go (m1_seq : (Operation_hash.t * Operation.t) Seq.t) =
+let is_subset (m1 : unit Prevalidation.operation Op_map.t)
+    (m2 : unit Prevalidation.operation Op_map.t) =
+  let rec go (m1_seq : (Operation_hash.t * unit Prevalidation.operation) Seq.t)
+      =
     match m1_seq () with
     | Seq.Nil -> true
     | Seq.Cons ((m1_key, m1_value), m1_rest) -> (
         match Op_map.find m1_key m2 with
         | None -> (* A key in [m1] that is not in [m2] *) false
-        | Some m2_value -> Operation.equal m1_value m2_value && go m1_rest)
+        | Some m2_value ->
+            Operation_hash.equal
+              m1_value.Prevalidation.hash
+              m2_value.Prevalidation.hash
+            && go m1_rest)
   in
   go (Op_map.to_seq m1)
 
 module Handle_operations = struct
+  (* This is used only if operations are not parsable*)
+  let dummy_classes =
+    Classification.(
+      create {map_size_limit = 1; on_discarded_operation = (fun _oph -> ())})
+
+  let parse raw hash =
+    Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
+
   (** Test that operations returned by [handle_live_operations]
       are all in the alive branch. *)
   let test_handle_live_operations_is_branch_alive =
@@ -589,7 +623,7 @@ module Handle_operations = struct
     @@ fun (chain, tree, pair_blocks_opt, old_mempool, live_blocks) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
-    let expected_superset : Operation.t Op_map.t =
+    let expected_superset : unit Prevalidation.operation Op_map.t =
       (* Take all blocks *)
       Tree.values tree
       (* Keep only the ones in live_blocks *)
@@ -597,16 +631,20 @@ module Handle_operations = struct
              Block_hash.Set.mem blk.hash live_blocks)
       (* Then extract (oph, op) pairs from them *)
       |> List.map (fun (blk : Block.t) -> blk.operations)
-      |> List.concat |> List.concat |> List.to_seq |> Op_map.of_seq
+      |> List.concat |> List.concat |> List.to_seq
+      |> Seq.map (fun op -> (op.Prevalidation.hash, op))
+      |> Op_map.of_seq
     in
-    let actual : Operation.t Op_map.t =
+    let actual : unit Prevalidation.operation Op_map.t =
       Classification.Internal_for_tests.handle_live_operations
+        ~classes:dummy_classes
         ~block_store:Block.tools
         ~chain
         ~from_branch
         ~to_branch
         ~is_branch_alive:(fun blk_hash ->
           Block_hash.Set.mem blk_hash live_blocks)
+        ~parse
         old_mempool
       |> Lwt_main.run
     in
@@ -636,11 +674,13 @@ module Handle_operations = struct
     in
     let actual =
       Classification.Internal_for_tests.handle_live_operations
+        ~classes:dummy_classes
         ~block_store:Block.tools
         ~chain
         ~from_branch
         ~to_branch
         ~is_branch_alive:(Fun.const true)
+        ~parse
         Operation_hash.Map.empty
       |> Lwt_main.run |> Op_map.bindings |> List.map fst
       |> Operation_hash.Set.of_list
@@ -672,11 +712,13 @@ module Handle_operations = struct
       |> blocks_to_oph_set
     in
     Classification.Internal_for_tests.handle_live_operations
+      ~classes:dummy_classes
       ~block_store:Block.tools
       ~chain
       ~from_branch
       ~to_branch
       ~is_branch_alive:(Fun.const true)
+      ~parse
       old_mempool
     |> Lwt_main.run |> ignore ;
     qcheck_cond
@@ -713,11 +755,13 @@ module Handle_operations = struct
       |> blocks_to_oph_set
     in
     Classification.Internal_for_tests.handle_live_operations
+      ~classes:dummy_classes
       ~block_store:Block.tools
       ~chain
       ~from_branch
       ~to_branch
       ~is_branch_alive:(Fun.const true)
+      ~parse
       old_mempool
     |> Lwt_main.run |> ignore ;
     qcheck_cond
@@ -738,11 +782,11 @@ module Recyle_operations = struct
       given operations and hashes, spreading them among the different
       classes of {!Prevalidator_classification.t}. This generator is NOT
       a fully random generator like {!Prevalidator_generators.t_gen}. *)
-  let classification_of_ops_gen (ops : Operation.t Op_map.t) :
-      Classification.t QCheck2.Gen.t =
+  let classification_of_ops_gen (ops : unit Prevalidation.operation Op_map.t) :
+      unit Classification.t QCheck2.Gen.t =
     let open QCheck2.Gen in
-    let bindings = Operation_hash.Map.bindings ops in
-    let length = List.length bindings in
+    let ops = Operation_hash.Map.bindings ops |> List.map snd in
+    let length = List.length ops in
     let* empty_space = 0 -- 100 in
     (* To avoid throwing part of [ops], we want the capacity of the classification
        to be equal or larger than [length], hence: *)
@@ -758,9 +802,9 @@ module Recyle_operations = struct
     assert (List.length classes == length) ;
     let t = Prevalidator_classification.create parameters in
     List.iter
-      (fun (classification, (oph, op)) ->
-        External_generators.add_if_not_present classification oph op t)
-      (List.combine_drop classes bindings) ;
+      (fun (classification, op) ->
+        External_generators.add_if_not_present classification op t)
+      (List.combine_drop classes ops) ;
     return t
 
   (** Returns data to test {!Classification.recyle_operations}:
@@ -783,7 +827,9 @@ module Recyle_operations = struct
     let to_ops (blk : Block.t) = List.concat blk.operations in
     let oph_op_list_to_map l = List.to_seq l |> Op_map.of_seq in
     let blocks_ops =
-      List.map to_ops blocks |> List.concat |> oph_op_list_to_map
+      List.map to_ops blocks |> List.concat
+      |> List.map (fun op -> (op.Prevalidation.hash, op))
+      |> oph_op_list_to_map
     in
     let both f (a, b) = (f a, f b) in
     let blocks_hashes = List.map Block.to_hash blocks in
@@ -827,20 +873,24 @@ module Recyle_operations = struct
     Test.make
       ~name:"[recycle_operations ~live_blocks:empty] is empty"
       Gen.(pair gen bool)
-    @@ fun ( (chain, _tree, pair_blocks_opt, classification, pending),
+    @@ fun ( (chain, _tree, pair_blocks_opt, classes, pending),
              handle_branch_refused ) ->
     assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
-    let actual : Operation.t Op_map.t =
+    let parse raw hash =
+      Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
+    in
+    let actual : unit Prevalidation.operation Op_map.t =
       Classification.recycle_operations
         ~block_store:Block.tools
         ~chain
         ~from_branch
         ~to_branch
         ~live_blocks:Block_hash.Set.empty
-        ~classification
+        ~classes
         ~pending
         ~handle_branch_refused
+        ~parse
       |> Lwt_main.run
     in
     qcheck_eq' ~pp:op_map_pp ~actual ~expected:Op_map.empty ()
@@ -854,7 +904,7 @@ module Recyle_operations = struct
     QCheck2.Test.make
       ~name:"[recycle_operations] returned value can be approximated"
       QCheck2.Gen.(pair gen bool)
-    @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
+    @@ fun ( (chain, tree, pair_blocks_opt, classes, pending),
              handle_branch_refused ) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
@@ -885,7 +935,7 @@ module Recyle_operations = struct
         ~branch_refused:handle_branch_refused
         ~refused:false
         ~outdated:false
-        classification
+        classes
       |> op_map_to_hash_list
     in
     let expected_from_pending = op_map_to_hash_list pending in
@@ -896,6 +946,9 @@ module Recyle_operations = struct
            expected_from_classification)
         expected_from_pending
     in
+    let parse raw hash =
+      Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
+    in
     let actual : Operation_hash.Set.t =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -903,9 +956,10 @@ module Recyle_operations = struct
         ~from_branch
         ~to_branch
         ~live_blocks
-        ~classification
+        ~classes
         ~pending
         ~handle_branch_refused
+        ~parse
       |> Lwt_main.run |> Op_map.bindings |> List.map fst
       |> Operation_hash.Set.of_list
     in
@@ -922,13 +976,13 @@ module Recyle_operations = struct
     QCheck2.Test.make
       ~name:"[recycle_operations] correctly trims its input classification"
       QCheck2.Gen.(pair gen bool)
-    @@ fun ( (chain, tree, pair_blocks_opt, classification, pending),
+    @@ fun ( (chain, tree, pair_blocks_opt, classes, pending),
              handle_branch_refused ) ->
     QCheck2.assume @@ Option.is_some pair_blocks_opt ;
     let live_blocks : Block_hash.Set.t =
       Tree.values tree |> List.map Block.to_hash |> Block_hash.Set.of_list
     in
-    let expected : Operation.t Op_map.t =
+    let expected : unit Prevalidation.operation Op_map.t =
       Classification.Internal_for_tests.to_map
         ~applied:false
         ~prechecked:false
@@ -936,9 +990,12 @@ module Recyle_operations = struct
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
         ~outdated:true
-        classification
+        classes
     in
     let (from_branch, to_branch) = force_opt ~loc:__LOC__ pair_blocks_opt in
+    let parse raw hash =
+      Some (Prevalidation.Internal_for_tests.make_operation hash raw ())
+    in
     let () =
       Classification.recycle_operations
         ~block_store:Block.tools
@@ -946,9 +1003,10 @@ module Recyle_operations = struct
         ~from_branch
         ~to_branch
         ~live_blocks
-        ~classification
+        ~classes
         ~pending
         ~handle_branch_refused
+        ~parse
       |> Lwt_main.run |> ignore
     in
     let actual =
@@ -959,7 +1017,7 @@ module Recyle_operations = struct
         ~branch_refused:true
         ~refused:true
         ~outdated:true
-        classification
+        classes
     in
     qcheck_eq' ~pp:op_map_pp ~expected ~actual ()
 end

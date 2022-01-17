@@ -56,9 +56,8 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       validation_state:Proto.validation_state ->
-      Tezos_base.Operation.shell_header ->
       Operation_hash.t ->
-      Proto.operation_data ->
+      Proto.operation ->
       [ `Passed_precheck of state
       | `Passed_precheck_with_replace of Operation_hash.t * state
       | `Branch_delayed of tztrace
@@ -72,7 +71,7 @@ module type FILTER = sig
       config ->
       filter_state:state ->
       ?validation_state_before:Proto.validation_state ->
-      Proto.operation_data ->
+      Proto.operation ->
       [ `Passed_prefilter of [`High | `Low]
       | `Branch_delayed of tztrace
       | `Branch_refused of tztrace
@@ -85,7 +84,7 @@ module type FILTER = sig
       filter_state:state ->
       validation_state_before:Proto.validation_state ->
       validation_state_after:Proto.validation_state ->
-      Proto.operation_data * Proto.operation_receipt ->
+      Proto.operation * Proto.operation_receipt ->
       [`Passed_postfilter of state | `Refused of tztrace] Lwt.t
   end
 
@@ -112,7 +111,7 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
 
-    let precheck _ ~filter_state:_ ~validation_state:_ _ _ _ =
+    let precheck _ ~filter_state:_ ~validation_state:_ _ _ =
       Lwt.return `Undecided
 
     let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =

@@ -672,7 +672,8 @@ module Mempool = struct
       We add [config.clock_drift] time as a safety margin.
   *)
   let pre_filter config ~(filter_state : state) ?validation_state_before
-      (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
+      ({shell = _; protocol_data = Operation_data {contents; _} as op} :
+        Main.operation) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
       @@ Data_encoding.Binary.fixed_length
@@ -786,9 +787,8 @@ module Mempool = struct
       config ->
       filter_state:state ->
       validation_state:validation_state ->
-      Tezos_base.Operation.shell_header ->
       Operation_hash.t ->
-      Main.operation_data ->
+      Main.operation ->
       [ `Passed_precheck of state
       | `Passed_precheck_with_replace of Operation_hash.t * state
       | `Branch_delayed of tztrace
@@ -800,9 +800,8 @@ module Mempool = struct
    fun config
        ~filter_state
        ~validation_state
-       shell_header
        oph
-       (Operation_data protocol_data) ->
+       {shell = shell_header; protocol_data = Operation_data protocol_data} ->
     let precheck_manager protocol_data source op =
       match get_manager_operation_gas_and_fee op with
       | Error err -> Lwt.return (`Refused (Environment.wrap_tztrace err))

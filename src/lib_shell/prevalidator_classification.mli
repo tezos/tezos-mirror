@@ -31,10 +31,12 @@ type classification =
   | `Refused of tztrace
   | `Outdated of tztrace ]
 
-type bounded_map
+type 'protocol_data bounded_map
 
 (** [map bounded_map] gets the underling map of the [bounded_map]. *)
-val map : bounded_map -> (Operation.t * tztrace) Operation_hash.Map.t
+val map :
+  'protocol_data bounded_map ->
+  ('protocol_data Prevalidation.operation * tztrace) Operation_hash.Map.t
 
 type parameters = {
   map_size_limit : int;
@@ -52,20 +54,30 @@ type parameters = {
    fields: [refused; branch_refused; branch_delayed; prechecked;
    applied].
 
+    Note: unparsable operations are handled in a different way because
+   they cannot be handled as a [Prevalidation.operation] since this
+   datatype requires an operation to be parsable. Hence, unparsable
+   operations are handled differently. In particular, unparsable
+   operations are removed on flush.
+
     Note: We could always enforce these invariants by checking in
    {!add} whether the operation is already present. However, this
    would make the behavior of {!add} less predictable, so we do not
    think this to be an improvement from the point of view of the
    caller. *)
-type t = private {
+type 'protocol_data t = private {
   parameters : parameters;
-  refused : bounded_map;
-  outdated : bounded_map;
-  branch_refused : bounded_map;
-  branch_delayed : bounded_map;
-  mutable applied_rev : (Operation_hash.t * Operation.t) list;
-  mutable prechecked : Operation.t Operation_hash.Map.t;
-  mutable in_mempool : (Operation.t * classification) Operation_hash.Map.t;
+  refused : 'protocol_data bounded_map;
+  outdated : 'protocol_data bounded_map;
+  branch_refused : 'protocol_data bounded_map;
+  branch_delayed : 'protocol_data bounded_map;
+  mutable applied_rev : 'protocol_data Prevalidation.operation list;
+  mutable prechecked :
+    'protocol_data Prevalidation.operation Operation_hash.Map.t;
+  mutable unparsable : Operation_hash.Set.t;
+  mutable in_mempool :
+    ('protocol_data Prevalidation.operation * classification)
+    Operation_hash.Map.t;
 }
 
 (** [create parameters] returns an empty {!t} whose bounded maps hold
@@ -75,16 +87,23 @@ type t = private {
 
     {!Invalid_argument} is raised if [ring_size] is [0] or less.
     *)
-val create : parameters -> t
+val create : parameters -> 'protocol_data t
 
 (** [is_empty t] returns [true] iff [t] doesn't contain any operation. *)
-val is_empty : t -> bool
+val is_empty : 'protocol_data t -> bool
 
 (** [is_in_mempool oph classes] indicates whether [oph] is present
     in field [in_mempool] of [classes]. It returns the corresponding
     operation and its classification if present, and None otherwise. *)
 val is_in_mempool :
-  Operation_hash.t -> t -> (Operation.t * classification) option
+  Operation_hash.t ->
+  'protocol_data t ->
+  ('protocol_data Prevalidation.operation * classification) option
+
+(** [is_known_unparsable oph] returns [true] if the [oph] is
+   associated to an operation which is known to be unparsable. [false]
+   otherwise. *)
+val is_known_unparsable : Operation_hash.t -> 'protocol_data t -> bool
 
 (** [remove oph classes] removes operation of hash [oph] from all
     fields of [classes]. If the [oph] was classified as [Applied], the
@@ -99,11 +118,13 @@ val is_in_mempool :
     {b Warning:} If an operation is removed from the [applied] field,
     this may invalidate the classification of all the other operations.
     It is left to the caller to restore a consistent state. *)
-val remove : Operation_hash.t -> t -> (Operation.t * classification) option
+val remove :
+  Operation_hash.t ->
+  'protocol_data t ->
+  ('protocol_data Prevalidation.operation * classification) option
 
-(** [add ~notify classification oph op classes] adds the operation
-   [op] with hash [oph] classified as [classification] to the
-   classifier [classes]. The
+(** [add ~notify classification op classes] adds the operation [op]
+    classified as [classification] to the classifier [classes]. The
    [classes.parameters.on_discarded_operation] callback is called for
    any operation discarded in this process. Currently, an operation is
    discarded in the following cases:
@@ -127,7 +148,17 @@ val remove : Operation_hash.t -> t -> (Operation.t * classification) option
 
     - [Refused] is discarded 1 or 2 times (if the corresponding
    bounded_map is full) *)
-val add : classification -> Operation_hash.t -> Operation.t -> t -> unit
+val add :
+  classification ->
+  'protocol_data Prevalidation.operation ->
+  'protocol_data t ->
+  unit
+
+(** [add_unparsable oph classes] adds [oph] as an unparsable
+   operation. [unparsable] operations are removed automatically by the
+   [recycle_operations] function. [on_discard_operation] is also
+   called on those operations. *)
+val add_unparsable : Operation_hash.t -> 'protocol_data t -> unit
 
 (** Functions to query data on a polymorphic block-like type ['block]. *)
 type 'block block_tools = {
@@ -174,36 +205,45 @@ type 'block chain_tools = {
     This function guarantees that the branch of all returned operations
     is in [live_blocks] ([live_blocks] acts as a filter).
 
+    Operation which where included in [from_branch] and which are NOT in 
+    [to_branch] need to be parsed again using the [parse] argument. If the 
+    parsing fails those operations are just dropped. This may happen if those
+    operations comes from another protocol.
+
     See also {!Internal_for_tests.handle_live_operations}. *)
 val recycle_operations :
   from_branch:'block ->
   to_branch:'block ->
   live_blocks:Block_hash.Set.t ->
-  classification:t ->
-  pending:Operation.t Operation_hash.Map.t ->
+  classes:'protocol_data t ->
+  parse:
+    (Operation_hash.t ->
+    Operation.t ->
+    'protocol_data Prevalidation.operation option) ->
+  pending:'protocol_data Prevalidation.operation Operation_hash.Map.t ->
   block_store:'block block_tools ->
   chain:'block chain_tools ->
   handle_branch_refused:bool ->
-  Operation.t Operation_hash.Map.t Lwt.t
+  'protocol_data Prevalidation.operation Operation_hash.Map.t Lwt.t
 
 (**/**)
 
 module Internal_for_tests : sig
-  val pp : Format.formatter -> t -> unit
+  val pp : Format.formatter -> 'protocol_data t -> unit
 
-  val bounded_map_pp : Format.formatter -> bounded_map -> unit
+  val bounded_map_pp : Format.formatter -> 'protocol_data bounded_map -> unit
 
   (** Returns a deep copy of the input [t], so that mutating the one
       doesn't affect the other. *)
-  val copy : t -> t
+  val copy : 'protocol_data t -> 'protocol_data t
 
   (** [set_of_bounded_map m] returns all the operation hashes in [m]. *)
-  val set_of_bounded_map : bounded_map -> Operation_hash.Set.t
+  val set_of_bounded_map : 'protocol_data bounded_map -> Operation_hash.Set.t
 
   (** [pp_t_sizes t] prints the [map_size_limit] parameter of [t]
       and the sizes of its fields (number of elements in the map and
       in the ring of [bounded_map] / length of list / cardinal of set). *)
-  val pp_t_sizes : Format.formatter -> t -> unit
+  val pp_t_sizes : Format.formatter -> 'protocol_data t -> unit
 
   (** [map applied branch_delayed branch_refused refused t]
     returns the pairs [(operation_hash, operation)] contained in [t].
@@ -216,21 +256,21 @@ module Internal_for_tests : sig
     branch_refused:bool ->
     refused:bool ->
     outdated:bool ->
-    t ->
-    Operation.t Operation_hash.Map.t
+    'protocol_data t ->
+    'protocol_data Prevalidation.operation Operation_hash.Map.t
 
   (** [flush classes ~handle_branch_refused] partially resets [classes]:
-      - fields [applied_rev] and [branch_delayed] are emptied;
+      - fields [applied_rev], [branch_delayed] and [unparsable] are emptied;
       - field [branch_refused] is emptied iff [handle_branch_refused] is [true];
       - field [refused] is left unchanged, to avoid revalidating operations that
         will never be valid;
       - field [outdated] is left unchanged.
       Also updates field [in_mempool] to maintain the corresponding invariant
       of {!t}. *)
-  val flush : t -> handle_branch_refused:bool -> unit
+  val flush : 'protocol_data t -> handle_branch_refused:bool -> unit
 
-  (** [handle_live_operations chain_db from_branch to_branch is_branch_alive old_mempool]
-      returns the operations from:
+  (** [handle_live_operations chain_db from_branch to_branch is_branch_alive parse 
+      old_mempool] returns the operations from:
 
       1. [old_mempool],
       2. [from_branch] that are NOT in [to_branch],
@@ -258,11 +298,16 @@ module Internal_for_tests : sig
                 from_branch = ancestor
       *)
   val handle_live_operations :
+    classes:'protocol_data t ->
     block_store:'block block_tools ->
     chain:'block chain_tools ->
     from_branch:'block ->
     to_branch:'block ->
     is_branch_alive:(Block_hash.t -> bool) ->
-    Operation.t Operation_hash.Map.t ->
-    Operation.t Operation_hash.Map.t Lwt.t
+    parse:
+      (Operation_hash.t ->
+      Operation.t ->
+      'protocol_data Prevalidation.operation option) ->
+    'protocol_data Prevalidation.operation Operation_hash.Map.t ->
+    'protocol_data Prevalidation.operation Operation_hash.Map.t Lwt.t
 end
