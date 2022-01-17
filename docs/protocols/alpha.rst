@@ -28,6 +28,13 @@ Minor Changes
   participate in consensus and in governance, or do not have such a
   minimal stake, respectively. (MR :gl:`!3951`)
 
+- In the ``michelson_v1.runtime_error`` error, which appears in the
+  error trace of operations failing because of runtime errors (such as
+  interpreting the ``FAILWITH`` instruction) during the execution of a
+  smart contract, the ``contract_code`` field is deprecated. The
+  failed script can still be fetched from the address returned in the
+  ``contract_handle`` field.
+
 Michelson
 ---------
 
