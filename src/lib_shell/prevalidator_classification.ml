@@ -149,7 +149,7 @@ let flush (classes : t) ~handle_branch_refused =
   remove_map_from_in_mempool classes.prechecked ;
   classes.prechecked <- Operation_hash.Map.empty
 
-let is_in_mempool oph classes = Operation_hash.Map.mem oph classes.in_mempool
+let is_in_mempool oph classes = Operation_hash.Map.find oph classes.in_mempool
 
 (* Removing an operation is currently used for operations which are
    banned (this can only be achieved by the adminstrator of the
