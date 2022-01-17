@@ -289,8 +289,9 @@ end
 
 module External_generators = Generators
 
-(** [QCheck2] generators used in tests below *)
-let block_gen : Block.t QCheck2.Gen.t =
+(** [block_gen ?proto_gen ()] generates a block. [proto_gen] is used
+    to generate protocol bytes of operations. *)
+let block_gen ?proto_gen () : Block.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* ops =
     let ops_list_gen =
@@ -298,7 +299,7 @@ let block_gen : Block.t QCheck2.Gen.t =
          In addition it slows everything down. *)
       list_size
         (int_range 0 10)
-        (External_generators.operation_with_hash_gen ())
+        (External_generators.operation_with_hash_gen ?proto_gen ())
     in
     (* In production these lists are exactly of size 4, being more general *)
     ops_list_gen |> list_size (int_range 0 8)
@@ -308,17 +309,35 @@ let block_gen : Block.t QCheck2.Gen.t =
 
 (* A generator of sets of {!Block.t} where all elements are guaranteed
    to be different. [list_gen] is an optional list generator. If omitted
-   it is defaulted to {!QCheck2.Gen.small_list}. *)
-let unique_block_gen ?(list_gen = QCheck2.Gen.small_list) () :
+   it is defaulted to {!QCheck2.Gen.small_list}. [?proto_gen] is an
+   optional generator for protocol bytes of operations. *)
+let unique_block_gen ?(list_gen = QCheck2.Gen.small_list) ?proto_gen () :
     Block.Set.t QCheck2.Gen.t =
-  QCheck2.Gen.(list_gen block_gen >|= Block.Set.of_list)
+  QCheck2.Gen.(list_gen (block_gen ?proto_gen ()) >|= Block.Set.of_list)
 
 (* A generator of sets of {!Block.t} where all elements are guaranteed
    to be different and returned sets are guaranteed to be non empty. *)
 let unique_nonempty_block_gen =
   let open QCheck2.Gen in
-  let+ block = block_gen and+ l = unique_block_gen () in
+  let+ block = block_gen () and+ l = unique_block_gen () in
   Block.Set.add block l
+
+(** [unique_block_gen n] returns sets of {!Block.t} such that:
+    - all blocks are different
+    - the cardinal of returned sets is equal or greater than [n].
+
+    [?proto_gen] is an optional generator for protocol bytes of operations. *)
+let unique_block_gen_gt ?proto_gen ~(n : int) () : Block.Set.t QCheck2.Gen.t =
+  assert (n >= 0) ;
+  let open QCheck2.Gen in
+  let list_gen = list_size (return n) in
+  let rec go generated =
+    if Block.Set.cardinal generated >= n then return generated
+    else
+      let* new_blocks = unique_block_gen ?proto_gen ~list_gen () in
+      go (Block.Set.union generated new_blocks)
+  in
+  go Block.Set.empty
 
 (** A tree generator. Written in a slightly unusual style because it
       generates all values beforehand, to make sure they are all different.

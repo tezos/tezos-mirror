@@ -29,33 +29,47 @@ let add_if_not_present classification op t =
   Prevalidator_classification.(
     if is_in_mempool op.Prevalidation.hash t = None then add classification op t)
 
-let string_gen = QCheck2.Gen.small_string ?gen:None
+(** A generator for the protocol bytes of an operation. *)
+let operation_proto_gen = QCheck2.Gen.small_string ?gen:None
+
+(** A generator for the protocol bytes of an operation, when the protocol
+    being used has [type operation_data = unit]. *)
+let operation_mock_proto_gen =
+  let open QCheck2.Gen in
+  (* 9/10 generates the right size (empty), 1/10 generates too long. *)
+  let* len_gen = frequencya [|(9, return 0); (1, 0 -- 31)|] in
+  string_size ?gen:None len_gen
 
 let block_hash_gen : Block_hash.t QCheck2.Gen.t =
   let open QCheck2.Gen in
+  let string_gen = QCheck2.Gen.small_string ?gen:None in
   let+ key = opt (string_size (0 -- 64))
   and+ path = list_size (0 -- 10) string_gen in
   Block_hash.hash_string ?key path
 
 (** A generator of operations.
-    - [string_gen] is the generator for protocol bytes. By default, it is
-      {!string_gen} above. This default is fine for cases where having
+    - [proto_gen] is the generator for protocol bytes. By default, it is
+      {!proto_gen} above. This default is fine for cases where having
       valid proto bytes doesn't matter (for example for {!Prevalidator_classification}).
     - [block_hash_t] is an optional generator for the branch.
-      If omitted {!block_hash_gen} is used. *)
-let operation_gen ?(string_gen = string_gen) ?block_hash_t () :
+      If omitted {!block_hash_gen} is used.
+
+    This function should be renamed to [raw_operation_gen] at some point,
+    because it returns {!Operation.t} (the [op] prefix is for functions
+    returning {!Prevalidation.operation} values). *)
+let operation_gen ?(proto_gen = operation_proto_gen) ?block_hash_t () :
     Operation.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let prod_block_hash_gen = Option.value ~default:block_hash_gen block_hash_t in
   let+ branch = prod_block_hash_gen
-  and+ proto = string_gen >|= Bytes.of_string in
+  and+ proto = proto_gen >|= Bytes.of_string in
   Operation.{shell = {branch}; proto}
 
 (** Like {!operation_gen} with a hash. *)
-let raw_operation_with_hash_gen ?string_gen ?block_hash_t () :
+let raw_operation_with_hash_gen ?proto_gen ?block_hash_t () :
     (Operation_hash.t * Operation.t) QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ op = operation_gen ?string_gen ?block_hash_t () in
+  let+ op = operation_gen ?proto_gen ?block_hash_t () in
   let hash = Operation.hash op in
   (hash, op)
 
@@ -75,41 +89,57 @@ let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
       let+ weights = small_list (q_in_0_1 ()) in
       `Low weights
 
-let operation_with_hash_gen ?string_gen ?block_hash_t () :
+(** [operation_with_hash_gen ?proto_gen ?block_hash_t ()] is a generator
+    for parsable operations, i.e. values of type {!Prevalidation.operation}.
+
+    In production, this type guarantees that the underlying operation
+    has been successfully parsed. This is NOT the case with this generator.
+    This is a weakness of this function that can only be solved by
+    clearly making the difference between proto-dependent tests and
+    proto-independent tests.
+
+    By default, [?proto_gen] is [operation_proto_gen] which
+    generates random bytes, making generated operations unparsable generally
+    speaking. One can make sure that this generator generates
+    parsable operations by assuming a protocol and using a custom [proto_gen].
+    As an example this is the case when using
+    {!Environment_protocol_T_test.Internal_for_tests.Mock_all_unit} as the
+    protocol and specifying [proto_gen] to be [string_size (return 0)] i.e.
+    to have both [operation_data = unit] and strings generated for
+    [operation_data] always empty. *)
+let operation_with_hash_gen ?proto_gen ?block_hash_t () :
     unit Prevalidation.operation QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ (oph, op) = raw_operation_with_hash_gen ?string_gen ?block_hash_t () in
+  let+ (oph, op) = raw_operation_with_hash_gen ?proto_gen ?block_hash_t () in
   Prevalidation.Internal_for_tests.make_operation op oph ()
 
-let operation_with_hash_and_priority_gen ?string_gen ?block_hash_t () :
+let operation_with_hash_and_priority_gen ?proto_gen ?block_hash_t () :
     (unit Prevalidation.operation * Prevalidator_pending_operations.priority)
     QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let* op = operation_with_hash_gen ?string_gen ?block_hash_t () in
+  let* op = operation_with_hash_gen ?proto_gen ?block_hash_t () in
   let* priority = priority_gen () in
   return (op, priority)
 
-let raw_op_map_gen ?string_gen ?block_hash_t () :
+let raw_op_map_gen ?proto_gen ?block_hash_t () :
     Operation.t Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let+ ops =
-    small_list (raw_operation_with_hash_gen ?string_gen ?block_hash_t ())
+    small_list (raw_operation_with_hash_gen ?proto_gen ?block_hash_t ())
   in
   List.to_seq ops |> Operation_hash.Map.of_seq
 
 (** A generator of maps of operations and their hashes. Parameters are:
-    - [string_gen] is an optional generator for the protocol bytes.
+    - [?proto_gen] is an optional generator for the protocol bytes.
     - [?block_hash_t] is an optional generator for the branch of operations.
 
     Because it returns a map,
     this generator guarantees that all returned operations are distinct
     (because their hashes differ). *)
-let op_map_gen ?string_gen ?block_hash_t () :
+let op_map_gen ?proto_gen ?block_hash_t () :
     unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let+ ops =
-    small_list (operation_with_hash_gen ?string_gen ?block_hash_t ())
-  in
+  let+ ops = small_list (operation_with_hash_gen ?proto_gen ?block_hash_t ()) in
   List.to_seq ops
   |> Seq.map (fun op -> (op.Prevalidation.hash, op))
   |> Operation_hash.Map.of_seq
@@ -119,7 +149,7 @@ let op_map_gen ?string_gen ?block_hash_t () :
     a custom function (as opposed to using a QCheck2 function for lists
     of fixed lengths) because we *need* to return maps, because we need
     the properties that all operations hashes are different. *)
-let raw_op_map_gen_n ?string_gen ?block_hash_t (n : int) :
+let raw_op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
     Operation.t Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let map_take_n n m =
@@ -133,7 +163,7 @@ let raw_op_map_gen_n ?string_gen ?block_hash_t (n : int) :
       return (map_take_n n ops)
     else
       (* Not enough operations yet, generate more *)
-      let* new_ops = raw_op_map_gen ?string_gen ?block_hash_t () in
+      let* new_ops = raw_op_map_gen ?proto_gen ?block_hash_t () in
       go (Operation_hash.Map.union merge ops new_ops)
   in
   go Operation_hash.Map.empty
@@ -143,7 +173,7 @@ let raw_op_map_gen_n ?string_gen ?block_hash_t (n : int) :
     a custom function (as opposed to using a QCheck2 function for lists
     of fixed lengths) because we *need* to return maps, because we need
     the properties that all operations hashes are different. *)
-let op_map_gen_n ?string_gen ?block_hash_t (n : int) :
+let op_map_gen_n ?proto_gen ?block_hash_t (n : int) :
     unit Prevalidation.operation Operation_hash.Map.t QCheck2.Gen.t =
   let open QCheck2.Gen in
   let map_take_n n m =
@@ -157,7 +187,7 @@ let op_map_gen_n ?string_gen ?block_hash_t (n : int) :
       return (map_take_n n ops)
     else
       (* Not enough operations yet, generate more *)
-      let* new_ops = op_map_gen ?string_gen ?block_hash_t () in
+      let* new_ops = op_map_gen ?proto_gen ?block_hash_t () in
       go (Operation_hash.Map.union merge ops new_ops)
   in
   go Operation_hash.Map.empty
