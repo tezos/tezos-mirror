@@ -148,7 +148,6 @@ struct
      shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
      versions. Thus we open the module, hiding the incompatible, newer modules.
   *)
-  open Tezos_protocol_environment_structs.V4.M
   module Pervasives = Stdlib
 
   module Logging = struct
@@ -188,7 +187,7 @@ struct
 
   module Char = Char
   module Bytes = Bytes
-  module Hex = Hex
+  module Hex = Tezos_stdlib.Hex
   module String = String
   module Bits = Bits
   module TzEndian = TzEndian

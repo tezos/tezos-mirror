@@ -1,7 +1,6 @@
 (rule
  (targets v5.ml)
  (deps
-   v4/hex.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}
