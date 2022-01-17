@@ -52,9 +52,42 @@ let test_proto_dir = "src/bin_client/test/proto_test_injection"
 (* Files that are to be copied from [test_proto_dir]. *)
 let test_proto_files = ["main.ml"; "main.mli"; "TEZOS_PROTOCOL"]
 
+type period_kind = Proposal | Exploration | Adoption | Cooldown | Promotion
+
+let periods = [Proposal; Exploration; Adoption; Cooldown; Promotion]
+
+let period_kind_to_string = function
+  | Proposal -> "proposal"
+  | Exploration -> "exploration"
+  | Adoption -> "adoption"
+  | Cooldown -> "cooldown"
+  | Promotion -> "promotion"
+
+let period_kind_to_int = function
+  | Proposal -> 0
+  | Exploration -> 1
+  | Adoption -> 2
+  | Cooldown -> 3
+  | Promotion -> 4
+
+let period_kind_of_string = function
+  | "proposal" -> Proposal
+  | "exploration" -> Exploration
+  | "adoption" -> Adoption
+  | "cooldown" -> Cooldown
+  | "promotion" -> Promotion
+  | p ->
+      Test.fail
+        "Unexpected period kind %s, expected one of: %s"
+        p
+        (String.concat ", " (List.map period_kind_to_string periods))
+
+let period_kind_type : period_kind Check.typ =
+  Check.convert period_kind_to_int Check.int
+
 type period = {
   index : int;
-  kind : string;
+  kind : period_kind;
   start_position : int;
   position : int;
   remaining : int;
@@ -64,11 +97,14 @@ let period_type : period Check.typ =
   Check.convert
     (fun {index; kind; start_position; position; remaining} ->
       (index, kind, start_position, position, remaining))
-    Check.(tuple5 int string int int int)
+    Check.(tuple5 int period_kind_type int int int)
 
 let decode_period json =
   let index = JSON.(json |-> "voting_period" |-> "index" |> as_int) in
-  let kind = JSON.(json |-> "voting_period" |-> "kind" |> as_string) in
+  let kind =
+    JSON.(
+      json |-> "voting_period" |-> "kind" |> as_string |> period_kind_of_string)
+  in
   let start_position =
     JSON.(json |-> "voting_period" |-> "start_position" |> as_int)
   in
@@ -234,7 +270,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 0;
-        kind = "proposal";
+        kind = Proposal;
         start_position = 0;
         position = 0;
         remaining = 3;
@@ -245,7 +281,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 0;
-        kind = "proposal";
+        kind = Proposal;
         start_position = 0;
         position = 1;
         remaining = 2;
@@ -271,7 +307,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 0;
-        kind = "proposal";
+        kind = Proposal;
         start_position = 0;
         position = 2;
         remaining = 1;
@@ -283,7 +319,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 0;
-        kind = "proposal";
+        kind = Proposal;
         start_position = 0;
         position = 3;
         remaining = 0;
@@ -377,7 +413,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 1;
-        kind = "proposal";
+        kind = Proposal;
         start_position = 4;
         position = 3;
         remaining = 0;
@@ -391,7 +427,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 2;
-        kind = "exploration";
+        kind = Exploration;
         start_position = 8;
         position = 0;
         remaining = 3;
@@ -430,7 +466,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 2;
-        kind = "exploration";
+        kind = Exploration;
         start_position = 8;
         position = 1;
         remaining = 2;
@@ -443,7 +479,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 2;
-        kind = "exploration";
+        kind = Exploration;
         start_position = 8;
         position = 3;
         remaining = 0;
@@ -455,7 +491,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 3;
-        kind = "cooldown";
+        kind = Cooldown;
         start_position = 12;
         position = 0;
         remaining = 3;
@@ -486,7 +522,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 3;
-        kind = "cooldown";
+        kind = Cooldown;
         start_position = 12;
         position = 1;
         remaining = 2;
@@ -499,7 +535,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 3;
-        kind = "cooldown";
+        kind = Cooldown;
         start_position = 12;
         position = 3;
         remaining = 0;
@@ -511,7 +547,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 4;
-        kind = "promotion";
+        kind = Promotion;
         start_position = 16;
         position = 0;
         remaining = 3;
@@ -548,7 +584,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 4;
-        kind = "promotion";
+        kind = Promotion;
         start_position = 16;
         position = 1;
         remaining = 2;
@@ -561,7 +597,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 4;
-        kind = "promotion";
+        kind = Promotion;
         start_position = 16;
         position = 3;
         remaining = 0;
@@ -573,7 +609,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 5;
-        kind = "adoption";
+        kind = Adoption;
         start_position = 20;
         position = 0;
         remaining = 3;
@@ -604,7 +640,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
       client
       {
         index = 5;
-        kind = "adoption";
+        kind = Adoption;
         start_position = 20;
         position = 1;
         remaining = 2;
@@ -711,7 +747,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
           client
           {
             index = 5;
-            kind = "adoption";
+            kind = Adoption;
             start_position = 20;
             position = 3;
             remaining = 0;
@@ -734,7 +770,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
           client
           {
             index = 6;
-            kind = "proposal";
+            kind = Proposal;
             start_position = 24;
             position = 0;
             remaining = 3;
@@ -751,7 +787,7 @@ let register ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols =
           client
           {
             index = 6;
-            kind = "proposal";
+            kind = Proposal;
             start_position = 24;
             position = 1;
             remaining = 2;
