@@ -136,48 +136,11 @@ according to the protocol's decision.
 Prevalidator
 ------------
 
-To each chain validator is associated a *prevalidator* (this may become
-an option in the future, to allow running nodes on machines with less
-RAM), that is responsible for the transmission of operations for this
-chain over the peer-to-peer network.
+Each chain validator is associated to a *prevalidator* that is
+responsible for determining which operations to propagate for this chain over the
+peer-to-peer network. The page :doc:`./prevalidation` gives a detailed
+description of the prevalidator component.
 
-To prevent spam, this prevalidator must select the set of operations
-that it considers valid and the ones that it chooses to broadcast.
-This is done by constantly baking a dummy block, floating over the
-current head, and growing as new operations are received.
-
-Operations that get included can be broadcast unconditionally.
-
-Operations that are included are classified. Some (such as bad
-signatures or garbage byte sequences) are dismissed. They are put in a
-temporary bounded set for quick rejection, and the peer that sent it
-is kicked. Some other operations are temporarily refused: they come
-too soon or too late. For instance, in Alpha, contracts have counters,
-and operations with counters in the future are classified as
-temporarily refused. A malicious peer could easily flood the mempool
-with such operations, so they are put in a bounded set. Another
-bounded set is also kept for a third kind of non-inclusion: operations
-that could be valid in another branch.
-
-As a complement to the built-in classification mechanism above, which rejects operations that could flood the network with useless messages, there is a filtering mechanism implemented as a :doc:`protocol plugin <../active/plugins>`, that can be customized for each protocol version.
-
-The prevalidator ensures that a given manager can only have one
-Applied manager operation (e.g., transfers, contract calls) per block.
-This restriction only exists in the prevalidator, e.g., a baker can
-include more that one manager operation per manager in a block.
-Operations with a given manager will be temporarily refused
-(Branch Delayed) if the prevalidator has already classified as applied
-an operation with the same manager. This limitation was already
-present implicitely if you were using the `tezos-client` commands.
-Batches of operations can be used to get around this restriction.
-
-To mitigate the limitation itself, a user can inject an operation with the same
-manager and the same counter, but with a higher fee to replace an already existing
-operation in the prevalidator. Only one of the two operations will be eventually
-included in a block. To be able to replace the first operation, the fee and the
-"fee/gas limit" ratio of the second one is supposed to be higher than the first's
-by a factor (currently fixed to 5%). In case of successful replacement, the old
-operation is re-classified as `\`Outdated`.
 
 
 Distributed DB
