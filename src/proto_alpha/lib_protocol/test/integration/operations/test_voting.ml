@@ -338,7 +338,7 @@ let test_successful_vote num_delegates () =
   Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay >>=? fun op ->
   Block.bake ~operations:[op] b >>= fun res ->
   Assert.proto_error ~loc:__LOC__ res (function
-      | Amendment.Unauthorized_ballot -> true
+      | Amendment.Duplicate_ballot -> true
       | _ -> false)
   >>=? fun () ->
   (* Allocate votes from weight (rolls) of active delegates *)

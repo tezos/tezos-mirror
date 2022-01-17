@@ -71,7 +71,11 @@ type error +=
 val record_proposals :
   context -> public_key_hash -> Protocol_hash.t list -> context tzresult Lwt.t
 
-type error += Invalid_proposal | Unexpected_ballot | Unauthorized_ballot
+type error +=
+  | Invalid_proposal
+  | Unexpected_ballot
+  | Unauthorized_ballot
+  | Duplicate_ballot
 
 val record_ballot :
   context ->
