@@ -5,23 +5,21 @@ Gas remaining: 1039992.198 units remaining
 { parameter unit ;
   storage unit ;
   code { SENDER
-         /* [ address : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : pair unit unit ] */ ;
          SOURCE
-         /* [ address : address : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : address : pair unit unit ] */ ;
          PAIR 2
-         /* [ pair address address : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair address address : pair unit unit ] */ ;
          SOURCE
-         /* [ address : pair address address : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : pair address address : pair unit unit ] */ ;
          SENDER
-         /* [ address : address : pair address address
-            : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ address : address : pair address address : pair unit unit ] */ ;
          PAIR 2
-         /* [ pair address address : pair address address
-            : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair address address : pair address address : pair unit unit ] */ ;
          COMPARE
-         /* [ int : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ int : pair unit unit ] */ ;
          DROP
-         /* [ pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair unit unit ] */ ;
          CDR
          /* [ unit ] */ ;
          NIL operation

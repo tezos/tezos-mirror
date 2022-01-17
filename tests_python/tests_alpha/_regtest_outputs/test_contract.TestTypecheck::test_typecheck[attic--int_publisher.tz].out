@@ -5,94 +5,78 @@ Gas remaining: 1039967.523 units remaining
 { parameter (option (pair signature int)) ;
   storage (pair key int) ;
   code { DUP
-         /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-            : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+         /* [ pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int ] */ ;
          DUP
-         /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-            : pair (option @parameter (pair signature int)) (pair @storage key int)
-            : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+         /* [ pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int ] */ ;
          CAR
-         /* [ option (pair signature int)
-            : pair (option @parameter (pair signature int)) (pair @storage key int)
-            : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+         /* [ option (pair signature int) : pair (option (pair signature int)) key int
+            : pair (option (pair signature int)) key int ] */ ;
          IF_NONE
            { PUSH mutez
                   1000000
-             /* [ mutez
-                : pair (option @parameter (pair signature int)) (pair @storage key int)
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+             /* [ mutez : pair (option (pair signature int)) key int
+                : pair (option (pair signature int)) key int ] */ ;
              AMOUNT
-             /* [ mutez : mutez
-                : pair (option @parameter (pair signature int)) (pair @storage key int)
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+             /* [ mutez : mutez : pair (option (pair signature int)) key int
+                : pair (option (pair signature int)) key int ] */ ;
              CMPLE ;
              IF { FAIL }
-                { /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                     : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ } ;
+                { /* [ pair (option (pair signature int)) key int
+                     : pair (option (pair signature int)) key int ] */ } ;
              CDR
-             /* [ pair key int
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+             /* [ pair key int : pair (option (pair signature int)) key int ] */ ;
              DIP { CDDR }
              /* [ pair key int : int ] */ }
            { DUP
              /* [ pair signature int : pair signature int
-                : pair (option @parameter (pair signature int)) (pair @storage key int)
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                : pair (option (pair signature int)) key int
+                : pair (option (pair signature int)) key int ] */ ;
              DIP { SWAP
-                   /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                      : pair signature int
-                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ }
-             /* [ pair signature int
-                : pair (option @parameter (pair signature int)) (pair @storage key int)
-                : pair signature int
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                   /* [ pair (option (pair signature int)) key int : pair signature int
+                      : pair (option (pair signature int)) key int ] */ }
+             /* [ pair signature int : pair (option (pair signature int)) key int
+                : pair signature int : pair (option (pair signature int)) key int ] */ ;
              SWAP
-             /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                : pair signature int : pair signature int
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+             /* [ pair (option (pair signature int)) key int : pair signature int
+                : pair signature int : pair (option (pair signature int)) key int ] */ ;
              CDAR ;
              DIP { DUP
                    /* [ pair signature int : pair signature int : pair signature int
-                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                      : pair (option (pair signature int)) key int ] */ ;
                    CAR
                    /* [ signature : pair signature int : pair signature int
-                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                      : pair (option (pair signature int)) key int ] */ ;
                    DIP { CDR
-                         /* [ int : pair signature int
-                            : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                         /* [ int : pair signature int : pair (option (pair signature int)) key int ] */ ;
                          PACK
-                         /* [ bytes : pair signature int
-                            : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                         /* [ bytes : pair signature int : pair (option (pair signature int)) key int ] */ ;
                          BLAKE2B
-                         /* [ bytes : pair signature int
-                            : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ }
+                         /* [ bytes : pair signature int : pair (option (pair signature int)) key int ] */ }
                    /* [ signature : bytes : pair signature int
-                      : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ }
+                      : pair (option (pair signature int)) key int ] */ }
              /* [ key : signature : bytes : pair signature int
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                : pair (option (pair signature int)) key int ] */ ;
              CHECK_SIGNATURE
-             /* [ bool : pair signature int
-                : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+             /* [ bool : pair signature int : pair (option (pair signature int)) key int ] */ ;
              IF { CDR
-                  /* [ int
-                     : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                  /* [ int : pair (option (pair signature int)) key int ] */ ;
                   SWAP
-                  /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                     : int ] */ ;
+                  /* [ pair (option (pair signature int)) key int : int ] */ ;
                   DIP { DUP /* [ int : int ] */ }
-                  /* [ pair (option @parameter (pair signature int)) (pair @storage key int) : int
-                     : int ] */ ;
+                  /* [ pair (option (pair signature int)) key int : int : int ] */ ;
                   CDAR ;
                   PAIR
                   /* [ pair key int : int ] */ }
                 { DROP
-                  /* [ pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                  /* [ pair (option (pair signature int)) key int ] */ ;
                   DUP
-                  /* [ pair (option @parameter (pair signature int)) (pair @storage key int)
-                     : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                  /* [ pair (option (pair signature int)) key int
+                     : pair (option (pair signature int)) key int ] */ ;
                   CDR
-                  /* [ pair key int
-                     : pair (option @parameter (pair signature int)) (pair @storage key int) ] */ ;
+                  /* [ pair key int : pair (option (pair signature int)) key int ] */ ;
                   DIP { CDDR }
                   /* [ pair key int : int ] */ } } ;
          DIP { DROP /* [] */ }

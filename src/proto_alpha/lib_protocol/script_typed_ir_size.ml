@@ -80,8 +80,8 @@ let (comparable_ty_size, ty_size) =
     | Bls12_381_fr_t a -> ret_succ_adding accu @@ base a
     | Chest_key_t a -> ret_succ_adding accu @@ base a
     | Chest_t a -> ret_succ_adding accu @@ base a
-    | Pair_t ((_ty1, _fa1, _va1), (_ty2, _fa2, _va2), a) ->
-        ret_succ_adding accu @@ (base a +! hh8w)
+    | Pair_t ((_ty1, _fa1), (_ty2, _fa2), a) ->
+        ret_succ_adding accu @@ (base a +! hh6w)
     | Union_t ((_ty1, _fa1), (_ty2, _fa2), a) ->
         ret_succ_adding accu @@ (base a +! hh6w)
     | Lambda_t (_ty1, _ty2, a) ->

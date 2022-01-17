@@ -50,6 +50,9 @@ Michelson
   ``annot`` are replaced with the contents of the field ``item``.
   (MR :gl:`!4139`)
 
+- Variable annotations in pairs are ignored and not propagated.
+  (MR :gl:`!4140`)
+
 Internal
 --------
 

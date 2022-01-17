@@ -8,17 +8,17 @@ Gas remaining: 1039935.806 units remaining
   storage (pair (address %manager) (big_map %tickets address (ticket unit))) ;
   code { AMOUNT
          /* [ mutez
-            : pair (or @parameter
-                    (ticket %receive unit)
-                    (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer)))
-                 (pair @storage (address %manager) (big_map %tickets address (ticket unit))) ] */ ;
+            : pair (or (ticket %receive unit)
+                     (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer)))
+                 (address %manager)
+                 (big_map %tickets address (ticket unit)) ] */ ;
          PUSH mutez
               0
          /* [ mutez : mutez
-            : pair (or @parameter
-                    (ticket %receive unit)
-                    (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer)))
-                 (pair @storage (address %manager) (big_map %tickets address (ticket unit))) ] */ ;
+            : pair (or (ticket %receive unit)
+                     (pair %send (contract %destination (ticket unit)) (nat %amount) (address %ticketer)))
+                 (address %manager)
+                 (big_map %tickets address (ticket unit)) ] */ ;
          ASSERT_CMPEQ ;
          UNPAIR
            3

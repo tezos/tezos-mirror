@@ -5,10 +5,9 @@ Gas remaining: 1039989.643 units remaining
 { parameter nat ;
   storage (pair (pair nat bool) timestamp) ;
   code { DUP
-         /* [ pair (nat @parameter) (pair @storage (pair nat bool) timestamp)
-            : pair (nat @parameter) (pair @storage (pair nat bool) timestamp) ] */ ;
+         /* [ pair nat (pair nat bool) timestamp : pair nat (pair nat bool) timestamp ] */ ;
          CAR
-         /* [ nat : pair (nat @parameter) (pair @storage (pair nat bool) timestamp) ] */ ;
+         /* [ nat : pair nat (pair nat bool) timestamp ] */ ;
          DIP { CDDR ;
                DUP
                /* [ timestamp : timestamp ] */ ;

@@ -5,9 +5,9 @@ Gas remaining: 1039996.340 units remaining
 { parameter unit ;
   storage unit ;
   code { CHAIN_ID
-         /* [ chain_id : pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ chain_id : pair unit unit ] */ ;
          DROP
-         /* [ pair (unit @parameter) (unit @storage) ] */ ;
+         /* [ pair unit unit ] */ ;
          CAR
          /* [ unit ] */ ;
          NIL operation

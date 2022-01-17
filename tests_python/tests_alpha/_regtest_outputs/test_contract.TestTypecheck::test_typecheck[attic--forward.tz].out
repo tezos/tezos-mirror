@@ -8,240 +8,213 @@ Gas remaining: 1039634.172 units remaining
           (pair (pair nat (pair timestamp timestamp))
                 (pair (pair mutez mutez) (pair (pair address address) address)))) ;
   code { DUP
-         /* [ pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address)
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+         /* [ pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          CDDADDR ;
          PUSH int
               86400
          /* [ int : timestamp
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          SWAP
          /* [ timestamp : int
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          ADD
          /* [ timestamp
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          NOW
          /* [ timestamp : timestamp
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          COMPARE
          /* [ int
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          LT
          /* [ bool
-            : pair (or @parameter string nat)
-                 (pair @storage
-                    (pair nat mutez mutez)
-                    (pair nat timestamp timestamp)
-                    (pair mutez mutez)
-                    (pair address address)
-                    address) ] */ ;
+            : pair (or string nat)
+                 (pair nat mutez mutez)
+                 (pair nat timestamp timestamp)
+                 (pair mutez mutez)
+                 (pair address address)
+                 address ] */ ;
          IF { DUP
-              /* [ pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address)
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+              /* [ pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               CAR
               /* [ or string nat
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               IF_LEFT
                 { DUP
                   /* [ string : string
-                     : pair (or @parameter string nat)
-                          (pair @storage
-                             (pair nat mutez mutez)
-                             (pair nat timestamp timestamp)
-                             (pair mutez mutez)
-                             (pair address address)
-                             address) ] */ ;
+                     : pair (or string nat)
+                          (pair nat mutez mutez)
+                          (pair nat timestamp timestamp)
+                          (pair mutez mutez)
+                          (pair address address)
+                          address ] */ ;
                   PUSH string
                        "buyer"
                   /* [ string : string : string
-                     : pair (or @parameter string nat)
-                          (pair @storage
-                             (pair nat mutez mutez)
-                             (pair nat timestamp timestamp)
-                             (pair mutez mutez)
-                             (pair address address)
-                             address) ] */ ;
+                     : pair (or string nat)
+                          (pair nat mutez mutez)
+                          (pair nat timestamp timestamp)
+                          (pair mutez mutez)
+                          (pair address address)
+                          address ] */ ;
                   COMPARE
                   /* [ int : string
-                     : pair (or @parameter string nat)
-                          (pair @storage
-                             (pair nat mutez mutez)
-                             (pair nat timestamp timestamp)
-                             (pair mutez mutez)
-                             (pair address address)
-                             address) ] */ ;
+                     : pair (or string nat)
+                          (pair nat mutez mutez)
+                          (pair nat timestamp timestamp)
+                          (pair mutez mutez)
+                          (pair address address)
+                          address ] */ ;
                   EQ
                   /* [ bool : string
-                     : pair (or @parameter string nat)
-                          (pair @storage
-                             (pair nat mutez mutez)
-                             (pair nat timestamp timestamp)
-                             (pair mutez mutez)
-                             (pair address address)
-                             address) ] */ ;
+                     : pair (or string nat)
+                          (pair nat mutez mutez)
+                          (pair nat timestamp timestamp)
+                          (pair mutez mutez)
+                          (pair address address)
+                          address ] */ ;
                   IF { DROP
-                       /* [ pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                       /* [ pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        DUP
-                       /* [ pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address)
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                       /* [ pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        CDADAR ;
                        DIP { AMOUNT
                              /* [ mutez
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ }
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ }
                        /* [ mutez : mutez
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        ADD
                        /* [ mutez
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        DIP { DUP
-                             /* [ pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address)
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                             /* [ pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              CDADDR }
                        /* [ mutez : mutez
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        PAIR
                        /* [ pair mutez mutez
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        PUSH nat
                             0
                        /* [ nat : pair mutez mutez
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        PAIR
                        /* [ pair nat mutez mutez
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        DIP { CDDR }
                        /* [ pair nat mutez mutez
                           : pair (pair nat timestamp timestamp) (pair mutez mutez) (pair address address) address ] */ ;
@@ -268,134 +241,119 @@ Gas remaining: 1039634.172 units remaining
                      { PUSH string
                             "seller"
                        /* [ string : string
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        COMPARE
                        /* [ int
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        EQ
                        /* [ bool
-                          : pair (or @parameter string nat)
-                               (pair @storage
-                                  (pair nat mutez mutez)
-                                  (pair nat timestamp timestamp)
-                                  (pair mutez mutez)
-                                  (pair address address)
-                                  address) ] */ ;
+                          : pair (or string nat)
+                               (pair nat mutez mutez)
+                               (pair nat timestamp timestamp)
+                               (pair mutez mutez)
+                               (pair address address)
+                               address ] */ ;
                        IF { DUP
-                            /* [ pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address)
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                            /* [ pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             CDADDR ;
                             DIP { AMOUNT
                                   /* [ mutez
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ }
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ }
                             /* [ mutez : mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             ADD
                             /* [ mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             DIP { DUP
-                                  /* [ pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address)
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                  /* [ pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   CDADAR }
                             /* [ mutez : mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             SWAP
                             /* [ mutez : mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             PAIR
                             /* [ pair mutez mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             PUSH nat
                                  0
                             /* [ nat : pair mutez mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             PAIR
                             /* [ pair nat mutez mutez
-                               : pair (or @parameter string nat)
-                                    (pair @storage
-                                       (pair nat mutez mutez)
-                                       (pair nat timestamp timestamp)
-                                       (pair mutez mutez)
-                                       (pair address address)
-                                       address) ] */ ;
+                               : pair (or string nat)
+                                    (pair nat mutez mutez)
+                                    (pair nat timestamp timestamp)
+                                    (pair mutez mutez)
+                                    (pair address address)
+                                    address ] */ ;
                             DIP { CDDR }
                             /* [ pair nat mutez mutez
                                : pair (pair nat timestamp timestamp) (pair mutez mutez) (pair address address) address ] */ ;
@@ -423,127 +381,113 @@ Gas remaining: 1039634.172 units remaining
                 { FAIL } }
             { BALANCE
               /* [ mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               PUSH mutez
                    0
               /* [ mutez : mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               IFCMPEQ
                 { FAIL }
-                { /* [ pair (or @parameter string nat)
-                          (pair @storage
-                             (pair nat mutez mutez)
-                             (pair nat timestamp timestamp)
-                             (pair mutez mutez)
-                             (pair address address)
-                             address) ] */ } ;
+                { /* [ pair (or string nat)
+                          (pair nat mutez mutez)
+                          (pair nat timestamp timestamp)
+                          (pair mutez mutez)
+                          (pair address address)
+                          address ] */ } ;
               DUP
-              /* [ pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address)
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+              /* [ pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               CDDAAR ;
               DIP { DUP
-                    /* [ pair (or @parameter string nat)
-                            (pair @storage
-                               (pair nat mutez mutez)
-                               (pair nat timestamp timestamp)
-                               (pair mutez mutez)
-                               (pair address address)
-                               address)
-                       : pair (or @parameter string nat)
-                            (pair @storage
-                               (pair nat mutez mutez)
-                               (pair nat timestamp timestamp)
-                               (pair mutez mutez)
-                               (pair address address)
-                               address) ] */ ;
+                    /* [ pair (or string nat)
+                            (pair nat mutez mutez)
+                            (pair nat timestamp timestamp)
+                            (pair mutez mutez)
+                            (pair address address)
+                            address
+                       : pair (or string nat)
+                            (pair nat mutez mutez)
+                            (pair nat timestamp timestamp)
+                            (pair mutez mutez)
+                            (pair address address)
+                            address ] */ ;
                     CDDDADR }
               /* [ nat : mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               MUL
               /* [ mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               PUSH nat
                    2
               /* [ nat : mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               MUL
               /* [ mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               BALANCE
               /* [ mutez : mutez
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               COMPARE
               /* [ int
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               LT
               /* [ bool
-                 : pair (or @parameter string nat)
-                      (pair @storage
-                         (pair nat mutez mutez)
-                         (pair nat timestamp timestamp)
-                         (pair mutez mutez)
-                         (pair address address)
-                         address) ] */ ;
+                 : pair (or string nat)
+                      (pair nat mutez mutez)
+                      (pair nat timestamp timestamp)
+                      (pair mutez mutez)
+                      (pair address address)
+                      address ] */ ;
               IF { CDR
                    /* [ pair (pair nat mutez mutez)
                            (pair nat timestamp timestamp)
@@ -834,358 +778,317 @@ Gas remaining: 1039634.172 units remaining
                            (pair address address)
                            address ] */ }
                  { DUP
-                   /* [ pair (or @parameter string nat)
-                           (pair @storage
-                              (pair nat mutez mutez)
-                              (pair nat timestamp timestamp)
-                              (pair mutez mutez)
-                              (pair address address)
-                              address)
-                      : pair (or @parameter string nat)
-                           (pair @storage
-                              (pair nat mutez mutez)
-                              (pair nat timestamp timestamp)
-                              (pair mutez mutez)
-                              (pair address address)
-                              address) ] */ ;
+                   /* [ pair (or string nat)
+                           (pair nat mutez mutez)
+                           (pair nat timestamp timestamp)
+                           (pair mutez mutez)
+                           (pair address address)
+                           address
+                      : pair (or string nat)
+                           (pair nat mutez mutez)
+                           (pair nat timestamp timestamp)
+                           (pair mutez mutez)
+                           (pair address address)
+                           address ] */ ;
                    CDDADAR ;
                    NOW
                    /* [ timestamp : timestamp
-                      : pair (or @parameter string nat)
-                           (pair @storage
-                              (pair nat mutez mutez)
-                              (pair nat timestamp timestamp)
-                              (pair mutez mutez)
-                              (pair address address)
-                              address) ] */ ;
+                      : pair (or string nat)
+                           (pair nat mutez mutez)
+                           (pair nat timestamp timestamp)
+                           (pair mutez mutez)
+                           (pair address address)
+                           address ] */ ;
                    COMPARE
                    /* [ int
-                      : pair (or @parameter string nat)
-                           (pair @storage
-                              (pair nat mutez mutez)
-                              (pair nat timestamp timestamp)
-                              (pair mutez mutez)
-                              (pair address address)
-                              address) ] */ ;
+                      : pair (or string nat)
+                           (pair nat mutez mutez)
+                           (pair nat timestamp timestamp)
+                           (pair mutez mutez)
+                           (pair address address)
+                           address ] */ ;
                    LT
                    /* [ bool
-                      : pair (or @parameter string nat)
-                           (pair @storage
-                              (pair nat mutez mutez)
-                              (pair nat timestamp timestamp)
-                              (pair mutez mutez)
-                              (pair address address)
-                              address) ] */ ;
+                      : pair (or string nat)
+                           (pair nat mutez mutez)
+                           (pair nat timestamp timestamp)
+                           (pair mutez mutez)
+                           (pair address address)
+                           address ] */ ;
                    IF { FAIL }
                       { DUP
-                        /* [ pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address)
-                           : pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address) ] */ ;
+                        /* [ pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address
+                           : pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address ] */ ;
                         CDDADAR ;
                         PUSH int
                              86400
                         /* [ int : timestamp
-                           : pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address) ] */ ;
+                           : pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address ] */ ;
                         ADD
                         /* [ timestamp
-                           : pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address) ] */ ;
+                           : pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address ] */ ;
                         NOW
                         /* [ timestamp : timestamp
-                           : pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address) ] */ ;
+                           : pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address ] */ ;
                         COMPARE
                         /* [ int
-                           : pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address) ] */ ;
+                           : pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address ] */ ;
                         LT
                         /* [ bool
-                           : pair (or @parameter string nat)
-                                (pair @storage
-                                   (pair nat mutez mutez)
-                                   (pair nat timestamp timestamp)
-                                   (pair mutez mutez)
-                                   (pair address address)
-                                   address) ] */ ;
+                           : pair (or string nat)
+                                (pair nat mutez mutez)
+                                (pair nat timestamp timestamp)
+                                (pair mutez mutez)
+                                (pair address address)
+                                address ] */ ;
                         IF { DUP
-                             /* [ pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address)
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                             /* [ pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              CAR
                              /* [ or string nat
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              IF_LEFT
                                { PUSH string
                                       "buyer"
                                  /* [ string : string
-                                    : pair (or @parameter string nat)
-                                         (pair @storage
-                                            (pair nat mutez mutez)
-                                            (pair nat timestamp timestamp)
-                                            (pair mutez mutez)
-                                            (pair address address)
-                                            address) ] */ ;
+                                    : pair (or string nat)
+                                         (pair nat mutez mutez)
+                                         (pair nat timestamp timestamp)
+                                         (pair mutez mutez)
+                                         (pair address address)
+                                         address ] */ ;
                                  COMPARE
                                  /* [ int
-                                    : pair (or @parameter string nat)
-                                         (pair @storage
-                                            (pair nat mutez mutez)
-                                            (pair nat timestamp timestamp)
-                                            (pair mutez mutez)
-                                            (pair address address)
-                                            address) ] */ ;
+                                    : pair (or string nat)
+                                         (pair nat mutez mutez)
+                                         (pair nat timestamp timestamp)
+                                         (pair mutez mutez)
+                                         (pair address address)
+                                         address ] */ ;
                                  EQ
                                  /* [ bool
-                                    : pair (or @parameter string nat)
-                                         (pair @storage
-                                            (pair nat mutez mutez)
-                                            (pair nat timestamp timestamp)
-                                            (pair mutez mutez)
-                                            (pair address address)
-                                            address) ] */ ;
+                                    : pair (or string nat)
+                                         (pair nat mutez mutez)
+                                         (pair nat timestamp timestamp)
+                                         (pair mutez mutez)
+                                         (pair address address)
+                                         address ] */ ;
                                  IF { DUP
-                                      /* [ pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address)
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                      /* [ pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       CDADAR ;
                                       DIP { AMOUNT
                                             /* [ mutez
-                                               : pair (or @parameter string nat)
-                                                    (pair @storage
-                                                       (pair nat mutez mutez)
-                                                       (pair nat timestamp timestamp)
-                                                       (pair mutez mutez)
-                                                       (pair address address)
-                                                       address) ] */ }
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ }
                                       /* [ mutez : mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       ADD
                                       /* [ mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       DUP
                                       /* [ mutez : mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       DIIP { DUP
-                                             /* [ pair (or @parameter string nat)
-                                                     (pair @storage
-                                                        (pair nat mutez mutez)
-                                                        (pair nat timestamp timestamp)
-                                                        (pair mutez mutez)
-                                                        (pair address address)
-                                                        address)
-                                                : pair (or @parameter string nat)
-                                                     (pair @storage
-                                                        (pair nat mutez mutez)
-                                                        (pair nat timestamp timestamp)
-                                                        (pair mutez mutez)
-                                                        (pair address address)
-                                                        address) ] */ ;
+                                             /* [ pair (or string nat)
+                                                     (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address
+                                                : pair (or string nat)
+                                                     (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address ] */ ;
                                              CDDAAR ;
                                              DIP { DUP
-                                                   /* [ pair (or @parameter string nat)
-                                                           (pair @storage
-                                                              (pair nat mutez mutez)
-                                                              (pair nat timestamp timestamp)
-                                                              (pair mutez mutez)
-                                                              (pair address address)
-                                                              address)
-                                                      : pair (or @parameter string nat)
-                                                           (pair @storage
-                                                              (pair nat mutez mutez)
-                                                              (pair nat timestamp timestamp)
-                                                              (pair mutez mutez)
-                                                              (pair address address)
-                                                              address) ] */ ;
+                                                   /* [ pair (or string nat)
+                                                           (pair nat mutez mutez)
+                                                           (pair nat timestamp timestamp)
+                                                           (pair mutez mutez)
+                                                           (pair address address)
+                                                           address
+                                                      : pair (or string nat)
+                                                           (pair nat mutez mutez)
+                                                           (pair nat timestamp timestamp)
+                                                           (pair mutez mutez)
+                                                           (pair address address)
+                                                           address ] */ ;
                                                    CDDDAAR }
                                              /* [ nat : mutez
-                                                : pair (or @parameter string nat)
-                                                     (pair @storage
-                                                        (pair nat mutez mutez)
-                                                        (pair nat timestamp timestamp)
-                                                        (pair mutez mutez)
-                                                        (pair address address)
-                                                        address) ] */ ;
+                                                : pair (or string nat)
+                                                     (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address ] */ ;
                                              MUL
                                              /* [ mutez
-                                                : pair (or @parameter string nat)
-                                                     (pair @storage
-                                                        (pair nat mutez mutez)
-                                                        (pair nat timestamp timestamp)
-                                                        (pair mutez mutez)
-                                                        (pair address address)
-                                                        address) ] */ }
+                                                : pair (or string nat)
+                                                     (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address ] */ }
                                       /* [ mutez : mutez : mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       DIP { COMPARE
                                             /* [ int
-                                               : pair (or @parameter string nat)
-                                                    (pair @storage
-                                                       (pair nat mutez mutez)
-                                                       (pair nat timestamp timestamp)
-                                                       (pair mutez mutez)
-                                                       (pair address address)
-                                                       address) ] */ ;
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ ;
                                             GT
                                             /* [ bool
-                                               : pair (or @parameter string nat)
-                                                    (pair @storage
-                                                       (pair nat mutez mutez)
-                                                       (pair nat timestamp timestamp)
-                                                       (pair mutez mutez)
-                                                       (pair address address)
-                                                       address) ] */ ;
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ ;
                                             IF { FAIL }
-                                               { /* [ pair (or @parameter string nat)
-                                                         (pair @storage
-                                                            (pair nat mutez mutez)
-                                                            (pair nat timestamp timestamp)
-                                                            (pair mutez mutez)
-                                                            (pair address address)
-                                                            address) ] */ } }
+                                               { /* [ pair (or string nat)
+                                                         (pair nat mutez mutez)
+                                                         (pair nat timestamp timestamp)
+                                                         (pair mutez mutez)
+                                                         (pair address address)
+                                                         address ] */ } }
                                       /* [ mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       DIP { DUP
-                                            /* [ pair (or @parameter string nat)
-                                                    (pair @storage
-                                                       (pair nat mutez mutez)
-                                                       (pair nat timestamp timestamp)
-                                                       (pair mutez mutez)
-                                                       (pair address address)
-                                                       address)
-                                               : pair (or @parameter string nat)
-                                                    (pair @storage
-                                                       (pair nat mutez mutez)
-                                                       (pair nat timestamp timestamp)
-                                                       (pair mutez mutez)
-                                                       (pair address address)
-                                                       address) ] */ ;
+                                            /* [ pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address
+                                               : pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ ;
                                             CDADDR }
                                       /* [ mutez : mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       PAIR
                                       /* [ pair mutez mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       PUSH nat
                                            0
                                       /* [ nat : pair mutez mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       PAIR
                                       /* [ pair nat mutez mutez
-                                         : pair (or @parameter string nat)
-                                              (pair @storage
-                                                 (pair nat mutez mutez)
-                                                 (pair nat timestamp timestamp)
-                                                 (pair mutez mutez)
-                                                 (pair address address)
-                                                 address) ] */ ;
+                                         : pair (or string nat)
+                                              (pair nat mutez mutez)
+                                              (pair nat timestamp timestamp)
+                                              (pair mutez mutez)
+                                              (pair address address)
+                                              address ] */ ;
                                       DIP { CDDR }
                                       /* [ pair nat mutez mutez
                                          : pair (pair nat timestamp timestamp) (pair mutez mutez) (pair address address) address ] */ ;
@@ -1212,129 +1115,114 @@ Gas remaining: 1039634.172 units remaining
                                     { FAIL } }
                                { FAIL } }
                            { DUP
-                             /* [ pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address)
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                             /* [ pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              CDDAAR ;
                              DIP { DUP
-                                   /* [ pair (or @parameter string nat)
-                                           (pair @storage
-                                              (pair nat mutez mutez)
-                                              (pair nat timestamp timestamp)
-                                              (pair mutez mutez)
-                                              (pair address address)
-                                              address)
-                                      : pair (or @parameter string nat)
-                                           (pair @storage
-                                              (pair nat mutez mutez)
-                                              (pair nat timestamp timestamp)
-                                              (pair mutez mutez)
-                                              (pair address address)
-                                              address) ] */ ;
+                                   /* [ pair (or string nat)
+                                           (pair nat mutez mutez)
+                                           (pair nat timestamp timestamp)
+                                           (pair mutez mutez)
+                                           (pair address address)
+                                           address
+                                      : pair (or string nat)
+                                           (pair nat mutez mutez)
+                                           (pair nat timestamp timestamp)
+                                           (pair mutez mutez)
+                                           (pair address address)
+                                           address ] */ ;
                                    CDDDAAR }
                              /* [ nat : mutez
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              MUL
                              /* [ mutez
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              DIP { DUP
-                                   /* [ pair (or @parameter string nat)
-                                           (pair @storage
-                                              (pair nat mutez mutez)
-                                              (pair nat timestamp timestamp)
-                                              (pair mutez mutez)
-                                              (pair address address)
-                                              address)
-                                      : pair (or @parameter string nat)
-                                           (pair @storage
-                                              (pair nat mutez mutez)
-                                              (pair nat timestamp timestamp)
-                                              (pair mutez mutez)
-                                              (pair address address)
-                                              address) ] */ ;
+                                   /* [ pair (or string nat)
+                                           (pair nat mutez mutez)
+                                           (pair nat timestamp timestamp)
+                                           (pair mutez mutez)
+                                           (pair address address)
+                                           address
+                                      : pair (or string nat)
+                                           (pair nat mutez mutez)
+                                           (pair nat timestamp timestamp)
+                                           (pair mutez mutez)
+                                           (pair address address)
+                                           address ] */ ;
                                    CDADAR }
                              /* [ mutez : mutez
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              COMPARE
                              /* [ int
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              NEQ
                              /* [ bool
-                                : pair (or @parameter string nat)
-                                     (pair @storage
-                                        (pair nat mutez mutez)
-                                        (pair nat timestamp timestamp)
-                                        (pair mutez mutez)
-                                        (pair address address)
-                                        address) ] */ ;
+                                : pair (or string nat)
+                                     (pair nat mutez mutez)
+                                     (pair nat timestamp timestamp)
+                                     (pair mutez mutez)
+                                     (pair address address)
+                                     address ] */ ;
                              IF { BALANCE
                                   /* [ mutez
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   DIP { DUP
-                                        /* [ pair (or @parameter string nat)
-                                                (pair @storage
-                                                   (pair nat mutez mutez)
-                                                   (pair nat timestamp timestamp)
-                                                   (pair mutez mutez)
-                                                   (pair address address)
-                                                   address)
-                                           : pair (or @parameter string nat)
-                                                (pair @storage
-                                                   (pair nat mutez mutez)
-                                                   (pair nat timestamp timestamp)
-                                                   (pair mutez mutez)
-                                                   (pair address address)
-                                                   address) ] */ ;
+                                        /* [ pair (or string nat)
+                                                (pair nat mutez mutez)
+                                                (pair nat timestamp timestamp)
+                                                (pair mutez mutez)
+                                                (pair address address)
+                                                address
+                                           : pair (or string nat)
+                                                (pair nat mutez mutez)
+                                                (pair nat timestamp timestamp)
+                                                (pair mutez mutez)
+                                                (pair address address)
+                                                address ] */ ;
                                         CDDDDADR }
                                   /* [ mutez : address
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   DIIP { CDR
                                          /* [ pair (pair nat mutez mutez)
                                                  (pair nat timestamp timestamp)
@@ -1405,229 +1293,203 @@ Gas remaining: 1039634.172 units remaining
                                           (pair address address)
                                           address ] */ }
                                 { DUP
-                                  /* [ pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address)
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                  /* [ pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   CDDADAR ;
                                   PUSH int
                                        86400
                                   /* [ int : timestamp
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   ADD
                                   /* [ timestamp
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   PUSH int
                                        86400
                                   /* [ int : timestamp
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   ADD
                                   /* [ timestamp
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   NOW
                                   /* [ timestamp : timestamp
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   COMPARE
                                   /* [ int
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   LT
                                   /* [ bool
-                                     : pair (or @parameter string nat)
-                                          (pair @storage
-                                             (pair nat mutez mutez)
-                                             (pair nat timestamp timestamp)
-                                             (pair mutez mutez)
-                                             (pair address address)
-                                             address) ] */ ;
+                                     : pair (or string nat)
+                                          (pair nat mutez mutez)
+                                          (pair nat timestamp timestamp)
+                                          (pair mutez mutez)
+                                          (pair address address)
+                                          address ] */ ;
                                   IF { DUP
-                                       /* [ pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address)
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                       /* [ pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        CDDDDDR ;
                                        SENDER
                                        /* [ address : address
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        COMPARE
                                        /* [ int
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        NEQ
                                        /* [ bool
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        IF { FAIL }
-                                          { /* [ pair (or @parameter string nat)
-                                                    (pair @storage
-                                                       (pair nat mutez mutez)
-                                                       (pair nat timestamp timestamp)
-                                                       (pair mutez mutez)
-                                                       (pair address address)
-                                                       address) ] */ } ;
+                                          { /* [ pair (or string nat)
+                                                    (pair nat mutez mutez)
+                                                    (pair nat timestamp timestamp)
+                                                    (pair mutez mutez)
+                                                    (pair address address)
+                                                    address ] */ } ;
                                        DUP
-                                       /* [ pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address)
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                       /* [ pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        CAR
                                        /* [ or string nat
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        IF_LEFT
                                          { FAIL }
                                          { DIP { DUP
-                                                 /* [ pair (or @parameter string nat)
-                                                         (pair @storage
-                                                            (pair nat mutez mutez)
-                                                            (pair nat timestamp timestamp)
-                                                            (pair mutez mutez)
-                                                            (pair address address)
-                                                            address)
-                                                    : pair (or @parameter string nat)
-                                                         (pair @storage
-                                                            (pair nat mutez mutez)
-                                                            (pair nat timestamp timestamp)
-                                                            (pair mutez mutez)
-                                                            (pair address address)
-                                                            address) ] */ ;
+                                                 /* [ pair (or string nat)
+                                                         (pair nat mutez mutez)
+                                                         (pair nat timestamp timestamp)
+                                                         (pair mutez mutez)
+                                                         (pair address address)
+                                                         address
+                                                    : pair (or string nat)
+                                                         (pair nat mutez mutez)
+                                                         (pair nat timestamp timestamp)
+                                                         (pair mutez mutez)
+                                                         (pair address address)
+                                                         address ] */ ;
                                                  CDAAR }
                                            /* [ nat : nat
-                                              : pair (or @parameter string nat)
-                                                   (pair @storage
-                                                      (pair nat mutez mutez)
-                                                      (pair nat timestamp timestamp)
-                                                      (pair mutez mutez)
-                                                      (pair address address)
-                                                      address) ] */ ;
+                                              : pair (or string nat)
+                                                   (pair nat mutez mutez)
+                                                   (pair nat timestamp timestamp)
+                                                   (pair mutez mutez)
+                                                   (pair address address)
+                                                   address ] */ ;
                                            ADD
                                            /* [ nat
-                                              : pair (or @parameter string nat)
-                                                   (pair @storage
-                                                      (pair nat mutez mutez)
-                                                      (pair nat timestamp timestamp)
-                                                      (pair mutez mutez)
-                                                      (pair address address)
-                                                      address) ] */ ;
+                                              : pair (or string nat)
+                                                   (pair nat mutez mutez)
+                                                   (pair nat timestamp timestamp)
+                                                   (pair mutez mutez)
+                                                   (pair address address)
+                                                   address ] */ ;
                                            DIP { DUP
-                                                 /* [ pair (or @parameter string nat)
-                                                         (pair @storage
-                                                            (pair nat mutez mutez)
-                                                            (pair nat timestamp timestamp)
-                                                            (pair mutez mutez)
-                                                            (pair address address)
-                                                            address)
-                                                    : pair (or @parameter string nat)
-                                                         (pair @storage
-                                                            (pair nat mutez mutez)
-                                                            (pair nat timestamp timestamp)
-                                                            (pair mutez mutez)
-                                                            (pair address address)
-                                                            address) ] */ ;
+                                                 /* [ pair (or string nat)
+                                                         (pair nat mutez mutez)
+                                                         (pair nat timestamp timestamp)
+                                                         (pair mutez mutez)
+                                                         (pair address address)
+                                                         address
+                                                    : pair (or string nat)
+                                                         (pair nat mutez mutez)
+                                                         (pair nat timestamp timestamp)
+                                                         (pair mutez mutez)
+                                                         (pair address address)
+                                                         address ] */ ;
                                                  CDADR }
                                            /* [ nat : pair mutez mutez
-                                              : pair (or @parameter string nat)
-                                                   (pair @storage
-                                                      (pair nat mutez mutez)
-                                                      (pair nat timestamp timestamp)
-                                                      (pair mutez mutez)
-                                                      (pair address address)
-                                                      address) ] */ ;
+                                              : pair (or string nat)
+                                                   (pair nat mutez mutez)
+                                                   (pair nat timestamp timestamp)
+                                                   (pair mutez mutez)
+                                                   (pair address address)
+                                                   address ] */ ;
                                            PAIR
                                            /* [ pair nat mutez mutez
-                                              : pair (or @parameter string nat)
-                                                   (pair @storage
-                                                      (pair nat mutez mutez)
-                                                      (pair nat timestamp timestamp)
-                                                      (pair mutez mutez)
-                                                      (pair address address)
-                                                      address) ] */ ;
+                                              : pair (or string nat)
+                                                   (pair nat mutez mutez)
+                                                   (pair nat timestamp timestamp)
+                                                   (pair mutez mutez)
+                                                   (pair address address)
+                                                   address ] */ ;
                                            DIP { CDDR }
                                            /* [ pair nat mutez mutez
                                               : pair (pair nat timestamp timestamp) (pair mutez mutez) (pair address address) address ] */ ;
@@ -1815,37 +1677,33 @@ Gas remaining: 1039634.172 units remaining
                                                address ] */ }
                                      { BALANCE
                                        /* [ mutez
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        DIP { DUP
-                                             /* [ pair (or @parameter string nat)
-                                                     (pair @storage
-                                                        (pair nat mutez mutez)
-                                                        (pair nat timestamp timestamp)
-                                                        (pair mutez mutez)
-                                                        (pair address address)
-                                                        address)
-                                                : pair (or @parameter string nat)
-                                                     (pair @storage
-                                                        (pair nat mutez mutez)
-                                                        (pair nat timestamp timestamp)
-                                                        (pair mutez mutez)
-                                                        (pair address address)
-                                                        address) ] */ ;
+                                             /* [ pair (or string nat)
+                                                     (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address
+                                                : pair (or string nat)
+                                                     (pair nat mutez mutez)
+                                                     (pair nat timestamp timestamp)
+                                                     (pair mutez mutez)
+                                                     (pair address address)
+                                                     address ] */ ;
                                              CDDDDAAR }
                                        /* [ mutez : address
-                                          : pair (or @parameter string nat)
-                                               (pair @storage
-                                                  (pair nat mutez mutez)
-                                                  (pair nat timestamp timestamp)
-                                                  (pair mutez mutez)
-                                                  (pair address address)
-                                                  address) ] */ ;
+                                          : pair (or string nat)
+                                               (pair nat mutez mutez)
+                                               (pair nat timestamp timestamp)
+                                               (pair mutez mutez)
+                                               (pair address address)
+                                               address ] */ ;
                                        DIIP { CDR
                                               /* [ pair (pair nat mutez mutez)
                                                       (pair nat timestamp timestamp)

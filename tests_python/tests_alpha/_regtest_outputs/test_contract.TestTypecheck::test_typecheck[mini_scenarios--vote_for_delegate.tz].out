@@ -7,33 +7,28 @@ Gas remaining: 1039933.671 units remaining
     (pair (pair %mgr1 (address %addr) (option %key key_hash))
           (pair %mgr2 (address %addr) (option %key key_hash))) ;
   code { DUP
-         /* [ pair (option @parameter key_hash)
-                 (pair @storage
-                    (pair %mgr1 (address %addr) (option %key key_hash))
-                    (pair %mgr2 (address %addr) (option %key key_hash)))
-            : pair (option @parameter key_hash)
-                 (pair @storage
-                    (pair %mgr1 (address %addr) (option %key key_hash))
-                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+         /* [ pair (option key_hash)
+                 (pair %mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 (address %addr) (option %key key_hash))
+            : pair (option key_hash)
+                 (pair %mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
          CDAAR %addr @% ;
          SENDER
          /* [ address : address
-            : pair (option @parameter key_hash)
-                 (pair @storage
-                    (pair %mgr1 (address %addr) (option %key key_hash))
-                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+            : pair (option key_hash)
+                 (pair %mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
          PAIR %@ %@
          /* [ pair address address
-            : pair (option @parameter key_hash)
-                 (pair @storage
-                    (pair %mgr1 (address %addr) (option %key key_hash))
-                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+            : pair (option key_hash)
+                 (pair %mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
          UNPAIR
          /* [ address : address
-            : pair (option @parameter key_hash)
-                 (pair @storage
-                    (pair %mgr1 (address %addr) (option %key key_hash))
-                    (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+            : pair (option key_hash)
+                 (pair %mgr1 (address %addr) (option %key key_hash))
+                 (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
          IFCMPEQ
            { UNPAIR
              /* [ option key_hash
@@ -44,21 +39,18 @@ Gas remaining: 1039933.671 units remaining
                      (pair %mgr2 (address %addr) (option %key key_hash)) : option key_hash ] */ ;
              SET_CADR %key @changed_mgr1_key }
            { DUP
-             /* [ pair (option @parameter key_hash)
-                     (pair @storage
-                        (pair %mgr1 (address %addr) (option %key key_hash))
-                        (pair %mgr2 (address %addr) (option %key key_hash)))
-                : pair (option @parameter key_hash)
-                     (pair @storage
-                        (pair %mgr1 (address %addr) (option %key key_hash))
-                        (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+             /* [ pair (option key_hash)
+                     (pair %mgr1 (address %addr) (option %key key_hash))
+                     (pair %mgr2 (address %addr) (option %key key_hash))
+                : pair (option key_hash)
+                     (pair %mgr1 (address %addr) (option %key key_hash))
+                     (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
              CDDAR ;
              SENDER
              /* [ address : address
-                : pair (option @parameter key_hash)
-                     (pair @storage
-                        (pair %mgr1 (address %addr) (option %key key_hash))
-                        (pair %mgr2 (address %addr) (option %key key_hash))) ] */ ;
+                : pair (option key_hash)
+                     (pair %mgr1 (address %addr) (option %key key_hash))
+                     (pair %mgr2 (address %addr) (option %key key_hash)) ] */ ;
              IFCMPEQ
                { UNPAIR
                  /* [ option key_hash

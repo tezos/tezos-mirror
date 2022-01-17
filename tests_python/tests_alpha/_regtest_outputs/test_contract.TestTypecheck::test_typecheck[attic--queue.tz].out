@@ -5,14 +5,11 @@ Gas remaining: 1039952.504 units remaining
 { parameter (option string) ;
   storage (pair (option string) (pair (pair nat nat) (map nat string))) ;
   code { DUP
-         /* [ pair (option @parameter string)
-                 (pair @storage (option string) (pair nat nat) (map nat string))
-            : pair (option @parameter string)
-                 (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
+         /* [ pair (option string) (option string) (pair nat nat) (map nat string)
+            : pair (option string) (option string) (pair nat nat) (map nat string) ] */ ;
          CAR
          /* [ option string
-            : pair (option @parameter string)
-                 (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
+            : pair (option string) (option string) (pair nat nat) (map nat string) ] */ ;
          IF_NONE
            { CDDR ;
              DUP
@@ -68,10 +65,8 @@ Gas remaining: 1039952.504 units remaining
                  PAIR
                  /* [ pair (option string) (pair nat nat) (map nat string) ] */ } }
            { DIP { DUP
-                   /* [ pair (option @parameter string)
-                           (pair @storage (option string) (pair nat nat) (map nat string))
-                      : pair (option @parameter string)
-                           (pair @storage (option string) (pair nat nat) (map nat string)) ] */ ;
+                   /* [ pair (option string) (option string) (pair nat nat) (map nat string)
+                      : pair (option string) (option string) (pair nat nat) (map nat string) ] */ ;
                    CDDAR ;
                    DIP { CDDDR }
                    /* [ pair nat nat : map nat string ] */ ;

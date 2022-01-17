@@ -16,53 +16,47 @@ Gas remaining: 1039662.882 units remaining
           (pair (big_map %allowances (pair (address %owner) (address %spender)) nat)
                 (pair (address %admin) (nat %total_supply)))) ;
   code { DUP
-         /* [ pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply))
-            : pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply)) ] */ ;
+         /* [ pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply)
+            : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply) ] */ ;
          CDR
          /* [ pair (big_map %tokens address nat)
                  (big_map %allowances (pair (address %owner) (address %spender)) nat)
                  (address %admin)
                  (nat %total_supply)
-            : pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply)) ] */ ;
+            : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply) ] */ ;
          PUSH mutez
               0
          /* [ mutez
@@ -70,80 +64,72 @@ Gas remaining: 1039662.882 units remaining
                  (big_map %allowances (pair (address %owner) (address %spender)) nat)
                  (address %admin)
                  (nat %total_supply)
-            : pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply)) ] */ ;
+            : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply) ] */ ;
          AMOUNT
          /* [ mutez : mutez
             : pair (big_map %tokens address nat)
                  (big_map %allowances (pair (address %owner) (address %spender)) nat)
                  (address %admin)
                  (nat %total_supply)
-            : pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply)) ] */ ;
+            : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply) ] */ ;
          COMPARE
          /* [ int
             : pair (big_map %tokens address nat)
                  (big_map %allowances (pair (address %owner) (address %spender)) nat)
                  (address %admin)
                  (nat %total_supply)
-            : pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply)) ] */ ;
+            : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply) ] */ ;
          NEQ
          /* [ bool
             : pair (big_map %tokens address nat)
                  (big_map %allowances (pair (address %owner) (address %spender)) nat)
                  (address %admin)
                  (nat %total_supply)
-            : pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply)) ] */ ;
+            : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply) ] */ ;
          IF { PUSH string
                    "DontSendTez"
               /* [ string
@@ -151,55 +137,49 @@ Gas remaining: 1039662.882 units remaining
                       (big_map %allowances (pair (address %owner) (address %spender)) nat)
                       (address %admin)
                       (nat %total_supply)
-                 : pair (or @parameter
-                         (or (or (pair %approve (address %spender) (nat %value))
-                                 (pair %getAllowance
-                                    (pair %request (address %owner) (address %spender))
-                                    (contract %callback nat)))
-                             (or (pair %getBalance (address %owner) (contract %callback nat))
-                                 (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                         (or (pair %mintOrBurn (int %quantity) (address %target))
-                             (pair %transfer (address %from) (address %to) (nat %value))))
-                      (pair @storage
-                         (big_map %tokens address nat)
-                         (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                         (address %admin)
-                         (nat %total_supply)) ] */ ;
+                 : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                                  (pair %getAllowance
+                                     (pair %request (address %owner) (address %spender))
+                                     (contract %callback nat)))
+                              (or (pair %getBalance (address %owner) (contract %callback nat))
+                                  (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                          (or (pair %mintOrBurn (int %quantity) (address %target))
+                              (pair %transfer (address %from) (address %to) (nat %value))))
+                      (big_map %tokens address nat)
+                      (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                      (address %admin)
+                      (nat %total_supply) ] */ ;
               FAILWITH
               /* [] */ }
             { /* [ pair (big_map %tokens address nat)
                       (big_map %allowances (pair (address %owner) (address %spender)) nat)
                       (address %admin)
                       (nat %total_supply)
-                 : pair (or @parameter
-                         (or (or (pair %approve (address %spender) (nat %value))
-                                 (pair %getAllowance
-                                    (pair %request (address %owner) (address %spender))
-                                    (contract %callback nat)))
-                             (or (pair %getBalance (address %owner) (contract %callback nat))
-                                 (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                         (or (pair %mintOrBurn (int %quantity) (address %target))
-                             (pair %transfer (address %from) (address %to) (nat %value))))
-                      (pair @storage
-                         (big_map %tokens address nat)
-                         (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                         (address %admin)
-                         (nat %total_supply)) ] */ } ;
+                 : pair (or (or (or (pair %approve (address %spender) (nat %value))
+                                  (pair %getAllowance
+                                     (pair %request (address %owner) (address %spender))
+                                     (contract %callback nat)))
+                              (or (pair %getBalance (address %owner) (contract %callback nat))
+                                  (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                          (or (pair %mintOrBurn (int %quantity) (address %target))
+                              (pair %transfer (address %from) (address %to) (nat %value))))
+                      (big_map %tokens address nat)
+                      (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                      (address %admin)
+                      (nat %total_supply) ] */ } ;
          SWAP
-         /* [ pair (or @parameter
-                    (or (or (pair %approve (address %spender) (nat %value))
-                            (pair %getAllowance
-                               (pair %request (address %owner) (address %spender))
-                               (contract %callback nat)))
-                        (or (pair %getBalance (address %owner) (contract %callback nat))
-                            (pair %getTotalSupply (unit %request) (contract %callback nat))))
-                    (or (pair %mintOrBurn (int %quantity) (address %target))
-                        (pair %transfer (address %from) (address %to) (nat %value))))
-                 (pair @storage
-                    (big_map %tokens address nat)
-                    (big_map %allowances (pair (address %owner) (address %spender)) nat)
-                    (address %admin)
-                    (nat %total_supply))
+         /* [ pair (or (or (or (pair %approve (address %spender) (nat %value))
+                             (pair %getAllowance
+                                (pair %request (address %owner) (address %spender))
+                                (contract %callback nat)))
+                         (or (pair %getBalance (address %owner) (contract %callback nat))
+                             (pair %getTotalSupply (unit %request) (contract %callback nat))))
+                     (or (pair %mintOrBurn (int %quantity) (address %target))
+                         (pair %transfer (address %from) (address %to) (nat %value))))
+                 (big_map %tokens address nat)
+                 (big_map %allowances (pair (address %owner) (address %spender)) nat)
+                 (address %admin)
+                 (nat %total_supply)
             : pair (big_map %tokens address nat)
                  (big_map %allowances (pair (address %owner) (address %spender)) nat)
                  (address %admin)

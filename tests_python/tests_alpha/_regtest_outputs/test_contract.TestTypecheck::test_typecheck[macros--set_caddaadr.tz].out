@@ -5,17 +5,13 @@ Gas remaining: 1039968.110 units remaining
 { parameter mutez ;
   storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
   code { DUP
-         /* [ pair (mutez @parameter)
-                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat)
-            : pair (mutez @parameter)
-                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat) ] */ ;
+         /* [ pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
+            : pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat ] */ ;
          CAR
          /* [ mutez
-            : pair (mutez @parameter)
-                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat) ] */ ;
+            : pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat ] */ ;
          SWAP
-         /* [ pair (mutez @parameter)
-                 (pair @storage (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat)
+         /* [ pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
             : mutez ] */ ;
          CDR
          /* [ pair (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat

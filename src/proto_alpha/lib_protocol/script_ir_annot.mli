@@ -25,45 +25,21 @@
 
 open Alpha_context
 
-type var_annot = private Var_annot of Non_empty_string.t [@@ocaml.unboxed]
-
 type type_annot = private Type_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 type field_annot = private Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 module FOR_TESTS : sig
-  val unsafe_var_annot_of_string : string -> var_annot
-
   val unsafe_type_annot_of_string : string -> type_annot
 
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
-(** Default annotations *)
-
-val default_param_annot : var_annot option
-
-val default_storage_annot : var_annot option
-
-val default_sapling_balance_annot : var_annot option
-
-val default_elt_annot : field_annot option
-
-val default_key_annot : field_annot option
-
 (** Unparse annotations to their string representation *)
 
 val unparse_type_annot : type_annot option -> string list
 
-val unparse_var_annot : var_annot option -> string list
-
 val unparse_field_annot : field_annot option -> string list
-
-(** Conversion functions between different annotation kinds *)
-
-val field_to_var_annot : field_annot option -> var_annot option
-
-val type_to_var_annot : type_annot option -> var_annot option
 
 (** Converts a field annot option to an entrypoint.
     An error is returned if the field annot is too long or is "default".
@@ -76,9 +52,6 @@ val field_annot_opt_to_entrypoint_strict :
     When the field annot option is [None], the result is always [false]. *)
 val field_annot_opt_eq_entrypoint_lax :
   field_annot option -> Entrypoint.t -> bool
-
-(** Replace an annotation by its default value if it is [None] *)
-val default_annot : default:'a option -> 'a option -> 'a option
 
 (** Merge type annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
@@ -99,9 +72,6 @@ val merge_field_annot :
   field_annot option ->
   field_annot option ->
   (field_annot option, 'error_trace) result
-
-(** Merge variable annotations, does not fail ([None] if different). *)
-val merge_var_annot : var_annot option -> var_annot option -> var_annot option
 
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult

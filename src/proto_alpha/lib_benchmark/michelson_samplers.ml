@@ -369,9 +369,7 @@ end)
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match
-              pair_t (-1) (left, None, None) (right, None, None) ~annot:None
-            with
+            match pair_t (-1) (left, None) (right, None) ~annot:None with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TLambda -> (
@@ -535,7 +533,7 @@ end)
         | Timestamp_t _ -> Michelson_base.timestamp
         | Bool_t _ -> Base_samplers.uniform_bool
         | Address_t _ -> address
-        | Pair_t ((left_t, _, _), (right_t, _, _), _) ->
+        | Pair_t ((left_t, _), (right_t, _), _) ->
             M.(
               let* left_v = value left_t in
               let* right_v = value right_t in

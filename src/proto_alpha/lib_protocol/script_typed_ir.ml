@@ -1294,8 +1294,8 @@ and 'ty ty =
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
   | Pair_t :
-      ('a ty * field_annot option * var_annot option)
-      * ('b ty * field_annot option * var_annot option)
+      ('a ty * field_annot option)
+      * ('b ty * field_annot option)
       * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair ty
   | Union_t :
@@ -1836,9 +1836,9 @@ let address_t ~annot = Address_t {annot; size = Type_size.one}
 
 let bool_t ~annot = Bool_t {annot; size = Type_size.one}
 
-let pair_t loc (l, fannot_l, vannot_l) (r, fannot_r, vannot_r) ~annot =
+let pair_t loc (l, fannot_l) (r, fannot_r) ~annot =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Pair_t ((l, fannot_l, vannot_l), (r, fannot_r, vannot_r), {annot; size})
+  Pair_t ((l, fannot_l), (r, fannot_r), {annot; size})
 
 let union_t loc (l, fannot_l) (r, fannot_r) ~annot =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
@@ -1875,8 +1875,8 @@ let option_nat_t =
 let option_pair_nat_nat_t =
   Option_t
     ( Pair_t
-        ( (nat_t ~annot:None, None, None),
-          (nat_t ~annot:None, None, None),
+        ( (nat_t ~annot:None, None),
+          (nat_t ~annot:None, None),
           {annot = None; size = Type_size.three} ),
       {annot = None; size = Type_size.four} )
 
@@ -1884,8 +1884,8 @@ let option_pair_nat'_nat'_t meta =
   let {annot; size = _} = meta in
   Option_t
     ( Pair_t
-        ( (nat_t ~annot, None, None),
-          (nat_t ~annot, None, None),
+        ( (nat_t ~annot, None),
+          (nat_t ~annot, None),
           {annot = None; size = Type_size.three} ),
       {annot = None; size = Type_size.four} )
 
@@ -1893,8 +1893,8 @@ let option_pair_nat_mutez'_t meta =
   let {annot; size = _} = meta in
   Option_t
     ( Pair_t
-        ( (nat_t ~annot:None, None, None),
-          (mutez_t ~annot, None, None),
+        ( (nat_t ~annot:None, None),
+          (mutez_t ~annot, None),
           {annot = None; size = Type_size.three} ),
       {annot = None; size = Type_size.four} )
 
@@ -1902,8 +1902,8 @@ let option_pair_mutez'_mutez'_t meta =
   let {annot; size = _} = meta in
   Option_t
     ( Pair_t
-        ( (mutez_t ~annot, None, None),
-          (mutez_t ~annot, None, None),
+        ( (mutez_t ~annot, None),
+          (mutez_t ~annot, None),
           {annot = None; size = Type_size.three} ),
       {annot = None; size = Type_size.four} )
 
@@ -1911,8 +1911,8 @@ let option_pair_int'_nat_t meta =
   let {annot; size = _} = meta in
   Option_t
     ( Pair_t
-        ( (int_t ~annot, None, None),
-          (nat_t ~annot:None, None, None),
+        ( (int_t ~annot, None),
+          (nat_t ~annot:None, None),
           {annot = None; size = Type_size.three} ),
       {annot = None; size = Type_size.four} )
 
@@ -1920,8 +1920,8 @@ let option_pair_int_nat'_t meta =
   let {annot; size = _} = meta in
   Option_t
     ( Pair_t
-        ( (int_t ~annot:None, None, None),
-          (nat_t ~annot, None, None),
+        ( (int_t ~annot:None, None),
+          (nat_t ~annot, None),
           {annot = None; size = Type_size.three} ),
       {annot = None; size = Type_size.four} )
 
@@ -2208,7 +2208,7 @@ let (ty_traverse, comparable_ty_traverse) =
         (continue [@ocaml.tailcall]) accu
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t _ | Chest_t _ -> (continue [@ocaml.tailcall]) accu
-    | Pair_t ((ty1, _, _), (ty2, _, _), _) ->
+    | Pair_t ((ty1, _), (ty2, _), _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Union_t ((ty1, _), (ty2, _), _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
@@ -2290,7 +2290,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | Bls12_381_g2_t _ | Bls12_381_fr_t _ | Chest_key_t _ | Chest_t _
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
-    | Pair_t ((ty1, _, _), (ty2, _, _), _) ->
+    | Pair_t ((ty1, _), (ty2, _), _) ->
         (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
     | Union_t ((ty1, _), (ty2, _), _) -> (
         match x with

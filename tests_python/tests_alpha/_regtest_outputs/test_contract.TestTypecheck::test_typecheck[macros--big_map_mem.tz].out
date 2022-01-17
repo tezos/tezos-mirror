@@ -5,12 +5,12 @@ Gas remaining: 1039982.471 units remaining
 { parameter (pair int bool) ;
   storage (pair (big_map int unit) unit) ;
   code { DUP
-         /* [ pair (pair @parameter int bool) (pair @storage (big_map int unit) unit)
-            : pair (pair @parameter int bool) (pair @storage (big_map int unit) unit) ] */ ;
+         /* [ pair (pair int bool) (big_map int unit) unit
+            : pair (pair int bool) (big_map int unit) unit ] */ ;
          DUP
-         /* [ pair (pair @parameter int bool) (pair @storage (big_map int unit) unit)
-            : pair (pair @parameter int bool) (pair @storage (big_map int unit) unit)
-            : pair (pair @parameter int bool) (pair @storage (big_map int unit) unit) ] */ ;
+         /* [ pair (pair int bool) (big_map int unit) unit
+            : pair (pair int bool) (big_map int unit) unit
+            : pair (pair int bool) (big_map int unit) unit ] */ ;
          CADR ;
          DIP { CAAR ;
                DIP { CDAR ; DUP /* [ big_map int unit : big_map int unit ] */ }

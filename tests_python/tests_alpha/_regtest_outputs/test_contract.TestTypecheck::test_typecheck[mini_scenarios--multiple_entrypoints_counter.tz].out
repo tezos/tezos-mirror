@@ -5,19 +5,17 @@ Gas remaining: 1039924.032 units remaining
 { parameter unit ;
   storage (option address) ;
   code { SENDER
-         /* [ address : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ address : pair unit (option address) ] */ ;
          SELF
-         /* [ contract unit : address
-            : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ contract unit : address : pair unit (option address) ] */ ;
          ADDRESS
-         /* [ address : address : pair (unit @parameter) (option @storage address) ] */ ;
+         /* [ address : address : pair unit (option address) ] */ ;
          IFCMPEQ
            { CDR
              /* [ option address ] */ ;
              ASSERT_SOME
-             /* [ int
-                : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ ;
-             DIP { /* [ pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */
+             /* [ int : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ ;
+             DIP { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
                    NIL operation
                    /* [ list operation ] */ }
              /* [] */ ;
@@ -149,5 +147,4 @@ Gas remaining: 1039924.032 units remaining
              /* [ list operation : option address ] */ ;
              PAIR
              /* [ pair (list operation) (option address) ] */ }
-         /* [ mutez
-            : pair (or @parameter (or (nat %add) (nat %sub)) (unit %default)) (int @storage) ] */ } }
+         /* [ mutez : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ } }

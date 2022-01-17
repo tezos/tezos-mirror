@@ -462,7 +462,7 @@ let apply ctxt gas capture_ty capture lam =
   let loc = Micheline.dummy_location in
   unparse_ty ~loc ctxt capture_ty >>?= fun (ty_expr, ctxt) ->
   match full_arg_ty with
-  | Pair_t ((capture_ty, _, _), (arg_ty, _, _), _) ->
+  | Pair_t ((capture_ty, _), (arg_ty, _), _) ->
       let arg_stack_ty = Item_t (arg_ty, Bot_t) in
       let full_descr =
         {
@@ -543,7 +543,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
   let loc = Micheline.dummy_location in
   unparse_ty ~loc ctxt param_type >>?= fun (unparsed_param_type, ctxt) ->
   let unparsed_param_type =
-    Script_ir_translator.add_field_annot root_name None unparsed_param_type
+    Script_ir_translator.add_field_annot root_name unparsed_param_type
   in
   unparse_ty ~loc ctxt storage_type >>?= fun (unparsed_storage_type, ctxt) ->
   let open Micheline in
