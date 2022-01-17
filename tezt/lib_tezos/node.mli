@@ -56,6 +56,9 @@
    parameters). *)
 type history_mode = Archive | Full of int option | Rolling of int option
 
+(** Values that can be passed to the node's [--media-type] argument *)
+type media_type = Json | Binary | Any
+
 (** Tezos node command-line arguments.
 
     Not all arguments are available here.
@@ -119,6 +122,7 @@ val create :
   ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
+  ?media_type:media_type ->
   argument list ->
   t
 
@@ -449,6 +453,7 @@ val init :
   ?rpc_port:int ->
   ?event_level:Daemon.Level.default_level ->
   ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?media_type:media_type ->
   argument list ->
   t Lwt.t
 
