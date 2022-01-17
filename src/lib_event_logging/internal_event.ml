@@ -303,18 +303,20 @@ module All_sinks = struct
     match Uri.scheme uri with
     | None -> fail (Activation_error (Missing_uri_scheme (Uri.to_string uri)))
     | Some scheme_to_activate ->
-        let activate (type a) scheme definition =
-          let module S = (val definition : SINK with type t = a) in
-          let* sink = S.configure uri in
-          return (Active {scheme; configuration = uri; definition; sink})
-        in
         let* act =
           match find_registered scheme_to_activate with
-          | Some (Registered {scheme; definition}) -> activate scheme definition
           | None ->
               fail
                 (Activation_error
                    (Uri_scheme_not_registered (Uri.to_string uri)))
+          | Some (Registered {scheme; definition}) ->
+              (* We need the intermediate function to introduce the type *)
+              let activate (type a) scheme definition =
+                let module S = (val definition : SINK with type t = a) in
+                let* sink = S.configure uri in
+                return (Active {scheme; configuration = uri; definition; sink})
+              in
+              activate scheme definition
         in
         active := act :: !active ;
         return_unit
