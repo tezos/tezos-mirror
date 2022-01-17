@@ -147,47 +147,72 @@ let liquidity_baking_sunset_level n () =
     expected_credit
   >>=? fun () -> return_unit
 
-(* Test that subsidy shuts off at correct escape level alternating baking [n_vote_on] blocks with liquidity_baking_escape_vote = LB_on and [n_vote_off] blocks with it LB_off followed by [bake_after_escape] blocks with it LB_on. *)
+(* Test that subsidy shuts off at correct escape level alternating baking
+   blocks with liquidity_baking_escape_vote set to [LB_on], [LB_off], and [LB_pass] followed by [bake_after_escape] blocks with it set to [LB_pass]. *)
 (* Escape level is roughly 2*(log(1-1/(2*percent_flagging)) / log(0.999)) *)
-let liquidity_baking_escape_hatch n_vote_on n_vote_off escape_level
-    bake_after_escape () =
+let liquidity_baking_escape_hatch ~n_vote_on ~n_vote_off ~n_vote_pass
+    escape_level bake_after_escape () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
+  Context.get_liquidity_baking_subsidy (B blk)
+  >>=? fun liquidity_baking_subsidy ->
   let rec bake_escaping blk i =
     if i < escape_level then
       Block.bake_n ~liquidity_baking_escape_vote:LB_on n_vote_on blk
       >>=? fun blk ->
       Block.bake_n ~liquidity_baking_escape_vote:LB_off n_vote_off blk
-      >>=? fun blk -> bake_escaping blk (i + n_vote_on + n_vote_off)
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_escape_vote:LB_pass n_vote_pass blk
+      >>=? fun blk ->
+      bake_escaping blk (i + n_vote_on + n_vote_off + n_vote_pass)
     else return blk
   in
   bake_escaping blk 0 >>=? fun blk ->
-  Block.bake_n ~liquidity_baking_escape_vote:LB_on bake_after_escape blk
+  Context.Contract.balance (B blk) liquidity_baking >>=? fun escape_balance ->
+  Block.bake_n ~liquidity_baking_escape_vote:LB_pass bake_after_escape blk
   >>=? fun blk ->
-  Context.get_liquidity_baking_subsidy (B blk)
-  >>=? fun liquidity_baking_subsidy ->
-  liquidity_baking_subsidy *? Int64.of_int escape_level
-  >>?= fun expected_balance ->
+  Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking escape_balance
+  >>=? fun () ->
+  liquidity_baking_subsidy *? Int64.of_int (escape_level - 1)
+  >>?= fun expected_final_balance ->
   Assert.balance_was_credited
     ~loc:__LOC__
     (B blk)
     liquidity_baking
     old_balance
-    expected_balance
+    expected_final_balance
   >>=? fun () -> return_unit
 
-(* 100% of blocks have liquidity_baking_escape_vote = true *)
+(* 100% of blocks have liquidity_baking_escape_vote = LB_off *)
 let liquidity_baking_escape_hatch_100 n () =
-  liquidity_baking_escape_hatch 0 1 1387 n ()
+  liquidity_baking_escape_hatch
+    ~n_vote_on:0
+    ~n_vote_off:1
+    ~n_vote_pass:0
+    1387
+    n
+    ()
 
-(* 80% of blocks have liquidity_baking_escape_vote = true *)
+(* 80% of blocks have liquidity_baking_escape_vote = LB_off *)
 let liquidity_baking_escape_hatch_80 n () =
-  liquidity_baking_escape_hatch 1 4 1964 n ()
+  liquidity_baking_escape_hatch
+    ~n_vote_on:1
+    ~n_vote_off:4
+    ~n_vote_pass:0
+    1964
+    n
+    ()
 
-(* 60% of blocks have liquidity_baking_escape_vote = true *)
+(* 60% of blocks have liquidity_baking_escape_vote = LB_off *)
 let liquidity_baking_escape_hatch_60 n () =
-  liquidity_baking_escape_hatch 2 3 3590 n ()
+  liquidity_baking_escape_hatch
+    ~n_vote_on:2
+    ~n_vote_off:3
+    ~n_vote_pass:0
+    3590
+    n
+    ()
 
 (* 50% of blocks have liquidity_baking_escape_vote = LB_off.
    Escape hatch should not be activated. *)

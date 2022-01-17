@@ -37,11 +37,10 @@ let on_cpmm_exists ctxt f =
       return (ctxt, [])
   | true -> f ctxt cpmm_contract
 
-let on_below_sunset ctxt f =
+let check_below_sunset ctxt =
   let sunset_level = Constants_storage.liquidity_baking_sunset_level ctxt in
   let level = Raw_level_repr.to_int32 (Level_storage.current ctxt).level in
-  if Compare.Int32.(level >= sunset_level) then return (ctxt, [])
-  else on_cpmm_exists ctxt f
+  Compare.Int32.(level < sunset_level)
 
 (* ema starts at zero and is always between 0 and 2_000_000. It is an
    exponentional moving average representing the fraction of recent blocks
@@ -55,26 +54,22 @@ let on_below_sunset ctxt f =
    where escape_vote is protocol_data.contents.liquidity_baking_escape_vote *)
 let update_escape_ema ctxt ~escape_vote =
   get_escape_ema ctxt >>=? fun old_ema ->
-  (* if ema is over threshold, we don't update it because liquidity baking is permanently off *)
-  if
-    Compare.Int32.(
-      old_ema < Constants_storage.liquidity_baking_escape_ema_threshold ctxt)
-  then
-    let new_ema =
-      match escape_vote with
-      | Block_header_repr.LB_pass -> old_ema
-      | LB_off -> Int32.(add (div (mul 1999l old_ema) 2000l) 1000l)
-      | LB_on -> Int32.(div (mul 1999l old_ema) 2000l)
-    in
-    Storage.Liquidity_baking.Escape_ema.update ctxt new_ema >|=? fun ctxt ->
-    (ctxt, new_ema, false)
-  else return (ctxt, old_ema, true)
+  let new_ema =
+    match escape_vote with
+    | Block_header_repr.LB_pass -> old_ema
+    | LB_off -> Int32.(add (div (mul 1999l old_ema) 2000l) 1000l)
+    | LB_on -> Int32.(div (mul 1999l old_ema) 2000l)
+  in
+  Storage.Liquidity_baking.Escape_ema.update ctxt new_ema >|=? fun ctxt ->
+  (ctxt, new_ema)
+
+let check_ema_below_threshold ctxt ema =
+  Compare.Int32.(
+    ema < Constants_storage.liquidity_baking_escape_ema_threshold ctxt)
 
 let on_subsidy_allowed ctxt ~escape_vote f =
-  update_escape_ema ctxt ~escape_vote
-  >>=? fun (ctxt, escape_ema, threshold_reached) ->
-  (* liquidity baking permanently shuts off if threshold is reached once *)
-  if threshold_reached then return (ctxt, [], escape_ema)
-  else
-    on_below_sunset ctxt f >|=? fun (ctxt, operation_results) ->
+  update_escape_ema ctxt ~escape_vote >>=? fun (ctxt, escape_ema) ->
+  if check_ema_below_threshold ctxt escape_ema && check_below_sunset ctxt then
+    on_cpmm_exists ctxt f >|=? fun (ctxt, operation_results) ->
     (ctxt, operation_results, escape_ema)
+  else return (ctxt, [], escape_ema)
