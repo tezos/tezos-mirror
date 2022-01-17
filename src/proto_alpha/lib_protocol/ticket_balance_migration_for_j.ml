@@ -27,10 +27,10 @@ open Alpha_context
 
 (* In the ticket balance table, credit the ticket [ticket] to the owner [contract]. *)
 let add_ticket_balance contract ctxt ticket =
-  let (token, delta) = Ticket_token.token_and_amount_of_ex_ticket ticket in
+  let (token, amount) = Ticket_token.token_and_amount_of_ex_ticket ticket in
   Ticket_balance_key.ticket_balance_key ctxt ~owner:contract token
   >>=? fun (hash, ctxt) ->
-  Ticket_balance.adjust_balance ctxt hash ~delta
+  Ticket_balance.adjust_balance ctxt hash ~delta:(Script_int.to_zint amount)
   >|=? fun ((_added_size : Z.t), ctxt) -> ctxt
 
 let update_contract_tickets ctxt contract =
