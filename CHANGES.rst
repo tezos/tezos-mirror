@@ -27,6 +27,11 @@ Node
   output unparsable operations anymore. Previously, they were in the
   ``Refused`` field with a parsing error.
 
+- Added an optional parameter ``media-type``.
+  It defines which format of data serialisation must be used for RPC requests to the node.
+  The value can be  ``json``, ``binary`` or ``any``. By default, the value is set to ``any``.
+
+
 Client
 ------
 

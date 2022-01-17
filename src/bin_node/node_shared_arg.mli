@@ -73,6 +73,7 @@ type t = {
   allow_all_rpc : P2p_point.Id.addr_port_id list;
       (** a list of RPC listening addresses for which a full
           access should be granted *)
+  media_type : Media_type.Command_line.t;
 }
 
 module Term : sig

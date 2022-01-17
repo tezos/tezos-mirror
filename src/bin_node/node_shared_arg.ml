@@ -62,6 +62,7 @@ type t = {
   synchronisation_threshold : int option;
   latency : int option;
   allow_all_rpc : P2p_point.Id.addr_port_id list;
+  media_type : Media_type.Command_line.t;
 }
 
 type error +=
@@ -146,7 +147,7 @@ let wrap data_dir config_file network connections max_download_speed
     bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
     enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
     cors_headers log_output history_mode synchronisation_threshold latency
-    disable_config_validation allow_all_rpc =
+    disable_config_validation allow_all_rpc media_type =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -188,6 +189,7 @@ let wrap data_dir config_file network connections max_download_speed
     synchronisation_threshold;
     latency;
     allow_all_rpc;
+    media_type;
   }
 
 module Manpage = struct
@@ -584,6 +586,20 @@ module Term = struct
       & opt_all (addr_port_id, P2p_point.Id.pp_addr_port_id) []
       & info ~docs ~doc ~docv:"ADDR:PORT" ["allow-all-rpc"])
 
+  let media_type =
+    let media_type str =
+      match Media_type.Command_line.parse_cli_parameter str with
+      | Some media_type -> `Ok media_type
+      | None -> `Error "media-type parameter must be `json`, `binary`, or `any`"
+    in
+    let doc = "Set the media-types supported by the server." in
+    Arg.(
+      value
+      & opt
+          (media_type, Media_type.Command_line.pp_parameter)
+          Media_type.Command_line.Any
+      & info ~docs ~doc ~docv:"MEDIATYPE" ["media-type"])
+
   (* Args. *)
 
   let args =
@@ -595,7 +611,7 @@ module Term = struct
     $ disable_mempool $ disable_mempool_precheck $ enable_testchain
     $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
     $ log_output $ history_mode $ synchronisation_threshold $ latency
-    $ disable_config_validation $ allow_all_rpc
+    $ disable_config_validation $ allow_all_rpc $ media_type
 end
 
 let read_config_file args =
@@ -712,6 +728,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     synchronisation_threshold;
     latency;
     allow_all_rpc;
+    media_type;
   } =
     args
   in
@@ -843,6 +860,7 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?discovery_addr
     ~rpc_listen_addrs
     ~allow_all_rpc
+    ~media_type
     ~private_mode
     ~disable_mempool
     ~disable_mempool_precheck

@@ -346,8 +346,8 @@ let sanitize_cors_headers ~default headers =
   |> String.Set.(union (of_list default))
   |> String.Set.elements
 
-let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port)
-    =
+let launch_rpc_server ~acl_policy ~media_types (config : Node_config_file.t)
+    node (addr, port) =
   let open Lwt_tzresult_syntax in
   let rpc_config = config.rpc in
   let host = Ipaddr.V6.to_string addr in
@@ -383,7 +383,7 @@ let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port
           mode
           dir
           ~acl
-          ~media_types:Media_type.all_media_types
+          ~media_types:(Media_type.Command_line.of_command_line media_types)
           ~cors:
             {
               allowed_origins = rpc_config.cors_origins;
@@ -401,6 +401,7 @@ let launch_rpc_server ~acl_policy (config : Node_config_file.t) node (addr, port
 
 let init_rpc (config : Node_config_file.t) node =
   let open Lwt_tzresult_syntax in
+  let media_types = config.rpc.media_type in
   List.concat_map_es
     (fun addr ->
       let* addrs = Node_config_file.resolve_rpc_listening_addrs addr in
@@ -411,7 +412,8 @@ let init_rpc (config : Node_config_file.t) node =
             RPC_server.Acl.resolve_domain_names config.rpc.acl
           in
           List.map_es
-            (fun addr -> launch_rpc_server ~acl_policy config node addr)
+            (fun addr ->
+              launch_rpc_server ~acl_policy ~media_types config node addr)
             addrs)
     config.rpc.listen_addrs
 
