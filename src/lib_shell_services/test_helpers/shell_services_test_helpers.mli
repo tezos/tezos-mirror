@@ -25,11 +25,17 @@
 
 open Tezos_shell_services
 
-(** [raw_context_arb] is a {!QCheck.arbitrary} for [raw_context]. *)
-val raw_context_arb : Block_services.raw_context QCheck.arbitrary
+(** [raw_context_gen] is a {!QCheck2.Gen.t} for [raw_context]. *)
+val raw_context_gen : Block_services.raw_context QCheck2.Gen.t
 
-(** [merkle_node_arb] is a {!QCheck.arbitrary} for [merkle_node]. *)
-val merkle_node_arb : Block_services.merkle_node QCheck.arbitrary
+val print_raw_context : Block_services.raw_context -> string
 
-(** [merkle_tree_arb] is a {!QCheck.arbitrary} for [merkle_tree]. *)
-val merkle_tree_arb : Block_services.merkle_tree QCheck.arbitrary
+(** [merkle_node_gen] is a {!QCheck2.Gen.t} for [merkle_node]. *)
+val merkle_node_gen : Block_services.merkle_node QCheck2.Gen.t
+
+val print_merkle_node : Block_services.merkle_node -> string
+
+(** [merkle_tree_gen] is a {!QCheck2.Gen.t} for [merkle_tree]. *)
+val merkle_tree_gen : Block_services.merkle_tree QCheck2.Gen.t
+
+val print_merkle_tree : Block_services.merkle_tree -> string

@@ -30,7 +30,7 @@
     Subject:      Fuzzing tests of equalities
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 
@@ -39,13 +39,13 @@ open Tezos_shell_services.Block_services
 let raw_context_eq_tests =
   qcheck_eq_tests
     ~eq:raw_context_eq
-    ~arb:raw_context_arb
+    ~gen:raw_context_gen
     ~eq_name:"raw_context_eq"
 
 let merkle_tree_eq_tests =
   qcheck_eq_tests
     ~eq:merkle_tree_eq
-    ~arb:merkle_tree_arb
+    ~gen:merkle_tree_gen
     ~eq_name:"merkle_tree_eq"
 
 let () =

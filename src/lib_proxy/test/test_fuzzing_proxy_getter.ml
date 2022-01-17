@@ -33,16 +33,18 @@
 module Local = Tezos_proxy.Local_context
 module Proxy_getter = Tezos_proxy.Proxy_getter
 module Tree = Proxy_getter.Internal.Tree
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 open Tezos_shell_services_test_helpers.Shell_services_test_helpers
 
-let key_arb =
+let key_gen =
   (* Using small_list, otherwise the test takes considerably longer.
      This test is quite slow already *)
-  QCheck.(small_list string)
+  QCheck2.Gen.(small_list (small_string ?gen:None))
 
-let tree_arb =
+let print_key = QCheck2.Print.(list string)
+
+let tree_gen =
   let open Lwt_syntax in
   let rec mk_tree acc sets =
     match sets with
@@ -54,19 +56,21 @@ let tree_arb =
         | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
   in
   let mk_tree acc sets = Lwt_main.run @@ mk_tree acc sets in
-  QCheck.(map (mk_tree Tree.empty) (list (pair key_arb raw_context_arb)))
+  QCheck2.Gen.(map (mk_tree Tree.empty) (list (pair key_gen raw_context_gen)))
 
 (** [Tree.set_leaf] then [Tree.get] should return the inserted data *)
 let test_set_leaf_get =
-  QCheck.Test.make
+  QCheck2.Test.make
     ~name:"Tree.get (Tree.set_leaf t k v) k = v"
-    QCheck.(triple tree_arb key_arb raw_context_arb)
+    ~print:
+      (QCheck2.Print.triple (fun _ -> "<tree>") print_key print_raw_context)
+    QCheck2.Gen.(triple tree_gen key_gen raw_context_gen)
   @@ fun (tree, key, value) ->
   let expected =
     Lwt_main.run @@ Proxy_getter.Internal.raw_context_to_tree value
   in
   (* We need to make sure that we are actually setting something: *)
-  QCheck.assume @@ Option.is_some expected ;
+  QCheck2.assume @@ Option.is_some expected ;
   let tree' = Lwt_main.run @@ Tree.set_leaf tree key value in
   let tree' =
     match tree' with
