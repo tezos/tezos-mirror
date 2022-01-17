@@ -92,6 +92,7 @@ module type V5 = sig
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type Bls_signature.pk = Bls12_381.Signature.pk
+       and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -178,6 +179,7 @@ struct
   end
 
   module Compare = Compare
+  module Either = Either
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
 
   module List = struct

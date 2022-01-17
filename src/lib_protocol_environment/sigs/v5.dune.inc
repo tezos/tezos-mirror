@@ -4,6 +4,7 @@
 
    ;; Part of OCaml stdlib 4.09.1
    v5/pervasives.mli
+   v5/either.mli
    v5/string.mli
    v5/char.mli
    v5/bytes.mli
