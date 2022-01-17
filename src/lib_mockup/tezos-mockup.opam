@@ -22,7 +22,7 @@ depends: [
   "tezos-rpc-http-client"
   "tezos-mockup-registration"
   "tezos-base-test-helpers" {with-test}
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [

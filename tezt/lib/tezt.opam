@@ -12,7 +12,7 @@ depends: [
   "ocaml" { >= "4.08" }
   "re" { >= "1.7.2" }
   "lwt" { >= "5.4.0" }
-  "ezjsonm" { >= "0.5.0" }
+  "ezjsonm" { >= "1.1.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

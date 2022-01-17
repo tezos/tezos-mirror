@@ -23,7 +23,7 @@ depends: [
   "tezos-shell-context"
   "tezos-protocol-updater"
   "cmdliner"
-  "fmt"
+  "fmt" { >= "0.8.7" }
   "tls" { >= "0.10" }
   "prometheus-app"
   "lwt-exit"

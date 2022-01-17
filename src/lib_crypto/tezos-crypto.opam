@@ -23,7 +23,7 @@ depends: [
   "tezos-hacl-glue-unix" {with-test}
   "alcotest" { with-test & >= "1.5.0" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "tezos-test-helpers" {with-test}
 ]
 build: [

@@ -15,6 +15,7 @@
   lwt.unix
   ipaddr.unix
   re
+  ezjsonm
   ptime
   ptime.clock.os
   mtime

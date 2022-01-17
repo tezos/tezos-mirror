@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "conf-rust"
   "integers"
-  "ctypes"
+  "ctypes" { >= "0.18.0" }
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-crypto"
   "tezos-stdlib"

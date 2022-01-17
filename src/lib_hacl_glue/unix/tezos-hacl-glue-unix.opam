@@ -17,7 +17,7 @@ depends: [
   "zarith" { with-test & >= "1.12" & < "1.13" }
   "zarith_stubs_js" {with-test}
   "data-encoding" { with-test & >= "0.4" & < "0.5" }
-  "qcheck-alcotest" {with-test}
+  "qcheck-alcotest" { with-test & >= "0.15" }
   "tezos-test-helpers" {with-test}
 ]
 conflicts: [
