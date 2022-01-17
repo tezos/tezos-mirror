@@ -81,23 +81,25 @@ module Make (Registration : Registration.S) = struct
       Registration.mockup_environment tzresult Lwt.t =
     let open Lwt_result_syntax in
     let mockup_environments = Registration.get_registered_environments () in
-    let*! criterion =
-      match protocol_hash_opt with
+    let hash_is_of_mockup hash (module Mockup : Registration.MOCKUP) =
+      match hash with
       | Some protocol_hash ->
-          Lwt.return (fun (module Mockup : Registration.MOCKUP) ->
-              Protocol_hash.equal protocol_hash Mockup.protocol_hash)
+          Protocol_hash.equal protocol_hash Mockup.protocol_hash
       | None ->
-          let*! () =
-            printer#warning
-              "No protocol specified: using Alpha as default protocol."
-          in
-          Lwt.return (fun (module Mockup : Registration.MOCKUP) ->
-              Re.Str.string_match
-                is_proto_alpha_regexp
-                (Protocol_hash.to_b58check Mockup.protocol_hash)
-                0)
+          Re.Str.string_match
+            is_proto_alpha_regexp
+            (Protocol_hash.to_b58check Mockup.protocol_hash)
+            0
     in
-    match List.find criterion mockup_environments with
+    let*! () =
+      if Option.is_none protocol_hash_opt then
+        printer#warning
+          "No protocol specified: using Alpha as default protocol."
+      else Lwt.return_unit
+    in
+    match
+      List.find (hash_is_of_mockup protocol_hash_opt) mockup_environments
+    with
     | Some mockup -> return mockup
     | None ->
         let requested_protocol =

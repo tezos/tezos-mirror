@@ -337,39 +337,35 @@ module Make (E : MENV) = struct
     match r with Error errs -> RPC_answer.fail errs | Ok () -> k ()
 
   let pending_operations () =
-    let open Lwt_syntax in
+    let open Lwt_result_syntax in
     Directory.register
       Directory.empty
       (* /chains/<chain_id>/mempool/pending_operations *)
       (E.Block_services.S.Mempool.pending_operations
       @@ Block_services.mempool_path Block_services.chain_path)
       (fun ((), chain) params () ->
-        let* r = check_chain chain in
-        match r with
+        let*! pending_operations =
+          let* () = check_chain chain in
+          let* pooled_operations = Mempool.read () in
+          let* applied = List.map_es to_applied pooled_operations in
+          let pending_operations =
+            {
+              E.Block_services.Mempool.applied;
+              refused = Operation_hash.Map.empty;
+              outdated = Operation_hash.Map.empty;
+              branch_refused = Operation_hash.Map.empty;
+              branch_delayed = Operation_hash.Map.empty;
+              unprocessed = Operation_hash.Map.empty;
+            }
+          in
+          return pending_operations
+        in
+        match pending_operations with
         | Error errs -> RPC_answer.fail errs
-        | Ok () -> (
-            let* r = Mempool.read () in
-            match r with
-            | Error errs -> RPC_answer.fail errs
-            | Ok pooled_operations -> (
-                let* r = List.map_es to_applied pooled_operations in
-                match r with
-                | Error _ -> RPC_answer.fail [Cannot_parse_op]
-                | Ok applied ->
-                    let pending_operations =
-                      {
-                        E.Block_services.Mempool.applied;
-                        refused = Operation_hash.Map.empty;
-                        outdated = Operation_hash.Map.empty;
-                        branch_refused = Operation_hash.Map.empty;
-                        branch_delayed = Operation_hash.Map.empty;
-                        unprocessed = Operation_hash.Map.empty;
-                      }
-                    in
-                    E.Block_services.Mempool
-                    .pending_operations_version_dispatcher
-                      ~version:params#version
-                      pending_operations)))
+        | Ok pending_operations ->
+            E.Block_services.Mempool.pending_operations_version_dispatcher
+              ~version:params#version
+              pending_operations)
 
   let shell_header () =
     Directory.prefix
