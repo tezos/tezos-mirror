@@ -1294,7 +1294,7 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
     let dir_contents = Sys.readdir dir in
     let add_item acc filename =
       let full_filename = dir // filename in
-      if Sys.is_directory full_filename then
+      if try Sys.is_directory full_filename with Sys_error _ -> false then
         find_opam_and_dune_files acc full_filename
       else if filename = "dune" || Filename.extension filename = ".opam" then
         String_set.add full_filename acc

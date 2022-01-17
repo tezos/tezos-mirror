@@ -595,17 +595,12 @@ let _tezos_hacl_glue_js_tests_2 =
         alias_rule
           "runtest_js"
           ~package:"tezos-hacl-glue-js"
-          ~deps:["../.npmrc"; "../package.json"; "../package-lock.json"]
           ~action:
             [
-              S "progn";
-              [S "run"; S "npm"; S "install"; S "hacl-wasm"];
-              [
-                S "run";
-                S "%{dep:../../../tooling/node_wrapper.exe}";
-                S "--hacl";
-                S ("%{dep:./" ^ hacl ^ ".bc.js}");
-              ];
+              S "run";
+              S "%{dep:../../../tooling/node_wrapper.exe}";
+              S "--hacl";
+              S ("%{dep:./" ^ hacl ^ ".bc.js}");
             ]
       in
       [

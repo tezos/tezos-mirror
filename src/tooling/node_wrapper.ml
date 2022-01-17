@@ -1,4 +1,47 @@
-type lib = Hacl | Secp256k1
+module Lib = struct
+  type t = Hacl | Secp256k1
+
+  let to_string = function Hacl -> "hacl" | Secp256k1 -> "secp256k1"
+
+  let to_js_lib = function
+    | Hacl -> "hacl-wasm"
+    | Secp256k1 -> "@nomadic-labs/secp256k1wasm"
+
+  let to_load_ident x = Printf.sprintf "load_%s" (to_string x)
+
+  let to_js x =
+    let load_ident = to_load_ident x in
+    let js_lib = to_js_lib x in
+    match x with
+    | Hacl ->
+        Printf.sprintf
+          {|
+function %s() {
+  /* We have to cheat to avoid the noise from hacl-wasm */
+  var old_log = console.log;
+  console.log = function () {};
+  var loader = require('%s');
+  console.log = old_log;
+  return loader.getInitializedHaclModule().then(function(loaded){
+    console.log('hacl loaded');
+    global._HACL = loaded})
+}
+|}
+          load_ident
+          js_lib
+    | Secp256k1 ->
+        Printf.sprintf
+          {|
+function %s() {
+  var loader = require('%s');
+  return loader().then(function(loaded) {
+    console.log('secp256k1 loaded');
+    global._SECP256K1 = loaded})
+}
+|}
+          load_ident
+          js_lib
+end
 
 let files = ref []
 
@@ -9,9 +52,9 @@ let args = ref []
 let () =
   Arg.parse
     [
-      ("--hacl", Unit (fun () -> libs := Hacl :: !libs), "Load hacl-wasm");
+      ("--hacl", Unit (fun () -> libs := Lib.Hacl :: !libs), "Load hacl-wasm");
       ( "--secp256k1",
-        Unit (fun () -> libs := Secp256k1 :: !libs),
+        Unit (fun () -> libs := Lib.Secp256k1 :: !libs),
         "Load @nomadic-labs/secp256k1wasm" );
       ( "--",
         Rest_all (fun l -> args := List.rev_append l !args),
@@ -25,29 +68,38 @@ let () =
        "%s [FLAGS] FILE.js -- args"
        (Filename.basename Sys.executable_name))
 
-let load_js = function
-  | Hacl ->
-      {|
-function load_hacl() {
-  /* We have to cheat to avoid the noise from hacl-wasm */
-  var old_log = console.log;
-  console.log = function () {};
-  var loader = require('hacl-wasm');
-  console.log = old_log;
-  return loader.getInitializedHaclModule().then(function(loaded){
-    console.log('hacl loaded');
-    global._HACL = loaded})
+let setup () =
+  let package_json =
+    {|
+{
+  "private": true,
+  "type": "commonjs",
+  "description": "n/a",
+  "license": "n/a"
 }
 |}
-  | Secp256k1 ->
-      {|
-function load_secp256k1() {
-  var loader = require('@nomadic-labs/secp256k1wasm');
-  return loader().then(function(loaded) {
-    console.log('secp256k1 loaded');
-    global._SECP256K1 = loaded})
-}
-|}
+  in
+  let npmrc =
+    "@nomadic-labs:registry=https://gitlab.com/api/v4/packages/npm/"
+  in
+  let write_file name content =
+    let oc = open_out_bin name in
+    output_string oc content ;
+    close_out oc
+  in
+  write_file "package.json" package_json ;
+  write_file ".npmrc" npmrc
+
+let install x =
+  let cmd = Printf.sprintf "npm install %s" (Lib.to_js_lib x) in
+  match Sys.command cmd with
+  | 0 -> ()
+  | _ ->
+      failwith
+        (Printf.sprintf
+           "unable to install %s (%s)"
+           (Lib.to_js_lib x)
+           (Lib.to_string x))
 
 let run i file args =
   let argv = "node" :: file :: args in
@@ -81,13 +133,9 @@ let () =
     {|process.on('uncaughtException', function (error) {
    console.log(error.stack);
 });|} ;
-  List.iter (fun lib -> Buffer.add_string b (load_js lib)) libs ;
+  List.iter (fun lib -> Buffer.add_string b (Lib.to_js lib)) libs ;
   List.iteri (fun i file -> Buffer.add_string b (run i file args)) files ;
-  let promises =
-    List.map
-      (function Hacl -> "load_hacl" | Secp256k1 -> "load_secp256k1")
-      libs
-  in
+  let promises = List.map Lib.to_load_ident libs in
   Buffer.add_string b "Promise.resolve('Loading')" ;
   List.iter
     (fun p -> Buffer.add_string b (Printf.sprintf ".then(%s)" p))
@@ -99,6 +147,11 @@ let () =
     b
     ".catch(function (e) { console.log(e); process.exit(1) })\n" ;
   print_newline () ;
+  (match libs with
+  | [] -> ()
+  | _ :: _ ->
+      setup () ;
+      List.iter install libs) ;
   let oc = Unix.open_process_out "node" in
   Buffer.output_buffer oc b ;
   flush_all () ;
