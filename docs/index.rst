@@ -3,7 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
+.. TODO https://gitlab.com/tezos/tezos/-/issues/2170:
+   search shifted protocol name/number & adapt
 
 Welcome to the Tezos Developer Documentation!
 =============================================
@@ -201,6 +202,7 @@ in the :ref:`introduction <howtoget>`.
    developer/contributing
    developer/merge_team
    developer/guidelines
+   developer/repository
    developer/time_measurement_ppx
    README
 
