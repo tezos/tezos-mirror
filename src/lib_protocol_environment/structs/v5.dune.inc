@@ -2,7 +2,6 @@
  (targets v5.ml)
  (deps
    v4/hex.ml
-   v3/lwtreslib_list_combine.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}

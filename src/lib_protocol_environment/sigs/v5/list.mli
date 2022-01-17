@@ -520,6 +520,26 @@ val rev_filter_error : ('a, 'b) result list -> 'b list
     [[3; 3; 5]]. *)
 val filter_error : ('a, 'b) result list -> 'b list
 
+(** [rev_filter_left es] is [rev @@ filter_left es] but more efficient. *)
+val rev_filter_left : ('a, 'b) Either.t list -> 'a list
+
+(** [filter_left] extracts all the payloads of the [Left] variants.
+    The order is preserved.
+
+    [filter_left [Right 3; Left 'a'; Right 3; Right 5; Left 'z'; Left 'u']] is
+    [['a'; 'z'; 'u']]. *)
+val filter_left : ('a, 'b) Either.t list -> 'a list
+
+(** [rev_filter_right es] is [rev @@ filter_right es] but more efficient. *)
+val rev_filter_right : ('a, 'b) Either.t list -> 'b list
+
+(** [filter_right] extracts all the payloads of the [Right] variants.
+    The order is preserved.
+
+    [filter_right [Right 3; Left 'a'; Right 3; Right 5; Left 'z'; Left 'u']] is
+    [[3; 3; 5]]. *)
+val filter_right : ('a, 'b) Either.t list -> 'b list
+
 (** [rev_filter_e] is a Result-aware variant of {!rev_filter}. *)
 val rev_filter_e :
   ('a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
@@ -572,6 +592,18 @@ val rev_partition_result : ('a, 'b) result list -> 'a list * 'b list
     [partition_result rs] is [(filter_ok rs, filter_error rs)] but more
     efficient. *)
 val partition_result : ('a, 'b) result list -> 'a list * 'b list
+
+(** [rev_partition_either rs] is [partition_either @@ rev rs] but more
+    efficient. *)
+val rev_partition_either : ('a, 'b) Either.t list -> 'a list * 'b list
+
+(** [partition_either es] is a tuple of lists [(ls, rs)] where [ls] contains
+    all the payloads of [Left] variants of [ls] and [rs] contains all the
+    payloads of [Right] variants of [es].
+
+    [partition_either es] is [(filter_left es, filter_right es)] but more
+    efficient. *)
+val partition_either : ('a, 'b) Either.t list -> 'a list * 'b list
 
 (** [rev_partition_e] is a Result-aware variant of {!rev_partition}. *)
 val rev_partition_e :
@@ -1078,18 +1110,13 @@ val exists2_es :
     *)
 val combine_drop : 'a list -> 'b list -> ('a * 'b) list
 
-(** A type like [result] but which is symmetric *)
-type ('a, 'b) left_or_right_list = [`Left of 'a list | `Right of 'b list]
-
 (** [combine_with_leftovers ll lr] is a tuple [(combined, leftover)]
     where [combined] is [combine_drop ll lr]
-    and [leftover] is either [`Left lsuffix] or [`Right rsuffix] depending on
-    which of [ll] or [lr] is longer. [leftover] is [None] if the two lists
-    have the same length. *)
+      and [leftover] is either [Either.Left lsuffix] or [Either.Right rsuffix]
+      depending on which of [ll] or [lr] is longer. [leftover] is [None] if the
+      two lists have the same length. *)
 val combine_with_leftovers :
-  'a list ->
-  'b list ->
-  ('a * 'b) list * ('a, 'b) left_or_right_list option
+    'a list -> 'b list -> ('a * 'b) list * ('a list, 'b list) Either.t option
 
 (** {3 Comparison and equality} *)
 
