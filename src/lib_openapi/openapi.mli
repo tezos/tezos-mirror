@@ -166,3 +166,5 @@ val make :
   t
 
 val to_json : t -> Json.u
+
+val of_json : Json.t -> t
