@@ -69,6 +69,26 @@ val transaction :
   Tez.t ->
   Operation.packed tzresult Lwt.t
 
+(** Same as [transaction], but with a more generic destination
+    parameter. It is said unsafe because it can construct transactions
+    that will always fail, such as
+
+    {ul {li Transaction to the deposit entrypoint of a transaction rollup,
+            as these transactions are necessarily internals.}}
+ *)
+val unsafe_transaction :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?parameters:Script.lazy_expr ->
+  ?entrypoint:Entrypoint.t ->
+  Context.t ->
+  Contract.t ->
+  Destination.t ->
+  Tez.t ->
+  Operation.packed tzresult Lwt.t
+
 val delegation :
   ?fee:Tez.tez ->
   Context.t ->
