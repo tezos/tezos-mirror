@@ -46,7 +46,7 @@ val accept_header : t list -> string
 
 val first_complete_media : t list -> ((string * string) * t) option
 
-val encoding : t RPC_encoding.t
+val encoding : t Data_encoding.t
 
 module Content_type : sig
   type t = string * string
@@ -61,3 +61,16 @@ module Content_type : sig
 end
 
 val of_content_type : Content_type.t -> t option
+
+module Command_line : sig
+  type t = Any | Json | Binary
+
+  val parse_cli_parameter : string -> t option
+
+  val pp_parameter : Format.formatter -> t -> unit
+
+  val of_command_line :
+    t -> Resto_cohttp.Media_type.Make(Tezos_rpc__RPC_encoding).t list
+
+  val encoding : t Data_encoding.encoding
+end

@@ -363,7 +363,7 @@ module Signer_config = struct
 
   let default_base_dir = default_base_dir
 
-  let default_media_type = [Media_type.octet_stream]
+  let default_media_type = Media_type.Command_line.Json
 
   let other_registrations = None
 
