@@ -51,6 +51,9 @@ let bounded_encoding ?max_operations () =
 
 let empty = {known_valid = []; pending = Operation_hash.Set.empty}
 
+let is_empty {known_valid; pending} =
+  known_valid = [] && Operation_hash.Set.is_empty pending
+
 let remove oph {known_valid; pending} =
   {
     known_valid =
