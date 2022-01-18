@@ -1309,7 +1309,13 @@ module Registration : sig
   type id = string
 
   (** A encoding that has been {!register}ed. It can be retrieved using either
-      {!list} or {!find}. *)
+      {!list} or {!find}.
+
+      Note registration/retrieval erases the type information that is built by
+      the combinator. In other words, [t] is a non-parametric type. As a result,
+      you cannot recover an OCaml value of the type of the registered
+      encoding. You can only perform operations where the type doesn't
+      escape — e.g., converting between binary and json. *)
   type t
 
   (** Descriptions and schemas of registered encodings. *)
@@ -1324,9 +1330,17 @@ module Registration : sig
 
   val binary_pretty_printer : t -> Format.formatter -> Bytes.t -> unit
 
-  (** [register ~id encoding] registers the [encoding] with the [id]. It can
-      later be found using {!find} and providing the matching [id]. It will
-      also appear in the results of {!list}. *)
+  (** [register (def id encoding)] registers the [encoding] with the [id]. It
+      can later be found using {!find} and providing the matching [id]. It will
+      also appear in the results of {!list}.
+
+      @raise [Invalid_argument] if [encoding] is not of one of the following
+      form:
+
+      - [def id _] (see {!val:Encoding.def})
+      - [splitted ~binary:(def id _)] (see {!val:Encoding.splitted})
+      - [dynamic_size (def id _)] (see {!val:Encoding.dynamic_size})
+      - [check_size _ (def id _)] (see {!val:Encoding.check_size}) *)
   val register : ?pp:(Format.formatter -> 'a -> unit) -> 'a Encoding.t -> unit
 
   (** [slice r b] attempts to slice a binary representation [b] of some data
