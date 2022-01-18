@@ -143,6 +143,7 @@ type error +=
   | Empty_proposal
   | Unexpected_ballot
   | Unauthorized_ballot
+  | Duplicate_ballot
 
 let () =
   let open Data_encoding in
@@ -198,6 +199,16 @@ let () =
     empty
     (function Unauthorized_ballot -> Some () | _ -> None)
     (fun () -> Unauthorized_ballot) ;
+  (* Duplicate ballot *)
+  register_error_kind
+    `Branch
+    ~id:"duplicate_ballot"
+    ~title:"Duplicate ballot"
+    ~description:"The delegate has already submitted a ballot."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Duplicate ballot")
+    empty
+    (function Duplicate_ballot -> Some () | _ -> None)
+    (fun () -> Duplicate_ballot) ;
   (* Too many proposals *)
   register_error_kind
     `Branch
@@ -255,7 +266,7 @@ let record_ballot ctxt delegate proposal ballot =
         Invalid_proposal
       >>?= fun () ->
       Vote.has_recorded_ballot ctxt delegate >>= fun has_ballot ->
-      error_when has_ballot Unauthorized_ballot >>?= fun () ->
+      error_when has_ballot Duplicate_ballot >>?= fun () ->
       Vote.in_listings ctxt delegate >>= fun in_listings ->
       if in_listings then Vote.record_ballot ctxt delegate ballot
       else fail Unauthorized_ballot
