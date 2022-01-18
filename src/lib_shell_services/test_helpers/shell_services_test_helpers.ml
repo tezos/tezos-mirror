@@ -23,51 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
-let raw_context_arb =
+let raw_context_gen =
   let open Tezos_shell_services.Block_services in
-  let module MapArb = MakeMapArb (TzString.Map) in
-  let open QCheck in
-  let {gen = bytes_gen; shrink = bytes_shrink_opt; _} = bytes_arb in
-  let gen =
-    let open Gen in
-    (* Factor used to limit the depth of the tree. *)
-    let max_depth_factor = 10 in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            (max_depth_factor, map (fun b -> Key b) bytes_gen);
-            (max_depth_factor, pure Cut);
-            ( current_depth_factor,
-              map
-                (fun d -> Dir d)
-                (MapArb.gen_of_size
-                   (0 -- 10)
-                   string
-                   (self (current_depth_factor / 2))) );
-          ])
-      max_depth_factor
-  in
-  let rec shrink =
-    let open Iter in
-    function
-    | Cut -> empty
-    | Key bigger_bytes ->
-        shrink Cut
-        <+> ( of_option_shrink bytes_shrink_opt bigger_bytes
-            >|= fun smaller_bytes -> Key smaller_bytes )
-    | Dir bigger_raw_context_map ->
-        shrink Cut <+> shrink (Key Bytes.empty)
-        <+> ( MapArb.shrink
-                ~key:Shrink.string
-                ~value:shrink
-                bigger_raw_context_map
-            >|= fun smaller_dir -> Dir smaller_dir )
-  in
-  let print = Format.asprintf "%a" pp_raw_context in
-  make ~print ~shrink gen
+  let module MapGen = MakeMapGen (TzString.Map) in
+  let open QCheck2 in
+  let open Gen in
+  (* Factor used to limit the depth of the tree. *)
+  let max_depth_factor = 10 in
+  fix
+    (fun self current_depth_factor ->
+      frequency
+        [
+          (max_depth_factor, map (fun b -> Key b) bytes_gen);
+          (max_depth_factor, pure Cut);
+          ( current_depth_factor,
+            map
+              (fun d -> Dir d)
+              (MapGen.gen_of_size
+                 (0 -- 10)
+                 string
+                 (self (current_depth_factor / 2))) );
+        ])
+    max_depth_factor
+
+let print_raw_context =
+  Format.asprintf "%a" Tezos_shell_services.Block_services.pp_raw_context
 
 (** Strings that are valid Irmin hashes. Taken from the output of:
 
@@ -89,59 +71,42 @@ let irmin_hashes =
     "CoVnWzSVjbYHCQLD53JGJfWRSjUBrkbtCrNMgmsXX6bMhy7CE7E6";
   ]
 
-let irmin_hash_arb = QCheck.oneofl ~print:Fun.id irmin_hashes
+let irmin_hash_gen = QCheck2.Gen.oneofl irmin_hashes
 
-let merkle_node_arb =
+let merkle_node_gen =
   let open Tezos_shell_services.Block_services in
-  let module MapArb = MakeMapArb (TzString.Map) in
-  let open QCheck in
-  let open Gen in
-  let {gen = raw_context_gen; shrink = raw_context_shrink_opt; _} =
-    raw_context_arb
-  in
-  let {gen = irmin_hash_gen; _} = irmin_hash_arb in
-  let gen =
-    let max_depth_factor = 4 in
-    fix
-      (fun self current_depth_factor ->
-        frequency
-          [
-            ( max_depth_factor,
-              map
-                (fun (kind, hash) -> Hash (kind, hash))
-                (pair (oneofl [Contents; Node]) irmin_hash_gen) );
-            ( max_depth_factor,
-              map (fun raw_context -> Data raw_context) raw_context_gen );
-            ( current_depth_factor,
-              map
-                (fun merkle_node_map -> Continue merkle_node_map)
-                (MapArb.gen_of_size
-                   (0 -- 10)
-                   string
-                   (self (current_depth_factor / 2))) );
-          ])
-      max_depth_factor
-  in
-  let first_irmin_hash =
-    List.hd irmin_hashes |> function None -> assert false | Some hash -> hash
-  in
-  let rec shrink =
-    let open Iter in
-    function
-    | Hash _ -> empty
-    | Data bigger_raw_context ->
-        shrink (Hash (Contents, first_irmin_hash))
-        <+> ( of_option_shrink raw_context_shrink_opt bigger_raw_context
-            >|= fun smaller_raw_context -> Data smaller_raw_context )
-    | Continue bigger_mnode ->
-        shrink (Hash (Contents, first_irmin_hash))
-        <+> shrink (Data Cut)
-        <+> ( MapArb.shrink ~key:Shrink.string ~value:shrink bigger_mnode
-            >|= fun smaller_mnode -> Continue smaller_mnode )
-  in
-  let print = Format.asprintf "%a" pp_merkle_node in
-  make ~print ~shrink gen
+  let module MapGen = MakeMapGen (TzString.Map) in
+  let open QCheck2.Gen in
+  let max_depth_factor = 4 in
+  fix
+    (fun self current_depth_factor ->
+      frequency
+        [
+          ( max_depth_factor,
+            map
+              (fun (kind, hash) -> Hash (kind, hash))
+              (pair (oneofl [Contents; Node]) irmin_hash_gen) );
+          ( max_depth_factor,
+            map (fun raw_context -> Data raw_context) raw_context_gen );
+          ( current_depth_factor,
+            map
+              (fun merkle_node_map -> Continue merkle_node_map)
+              (MapGen.gen_of_size
+                 (0 -- 5)
+                 (small_string ?gen:None)
+                 (self (current_depth_factor / 2))) );
+        ])
+    max_depth_factor
 
-let merkle_tree_arb =
-  let open MakeMapArb (TzString.Map) in
-  arb_of_size QCheck.Gen.(0 -- 10) QCheck.string merkle_node_arb
+let print_merkle_node =
+  Format.asprintf "%a" Tezos_shell_services.Block_services.pp_merkle_node
+
+let merkle_tree_gen =
+  let open MakeMapGen (TzString.Map) in
+  gen_of_size
+    QCheck2.Gen.(0 -- 5)
+    (QCheck2.Gen.small_string ?gen:None)
+    merkle_node_gen
+
+let print_merkle_tree =
+  Format.asprintf "%a" Tezos_shell_services.Block_services.pp_merkle_tree
