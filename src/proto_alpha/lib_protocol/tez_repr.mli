@@ -24,6 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Internal representation of the Tez currency. Behaves mostly like a natural
+   number where number 1 represents 1/1,000,000 Tez (1 micro-Tez or mutez).
+   It's protected from ever becoming negative and overflowing by special
+   arithmetic functions, which fail in case something undesired would happen.
+   When divided, it's always rounded down to 1 mutez.
+
+   Internally encoded as [int64], which may be relevant to guard against
+   overflow errors. *)
 type repr
 
 (** [t] is made algebraic in order to distinguish it from the other type
