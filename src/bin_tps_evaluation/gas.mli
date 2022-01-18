@@ -24,7 +24,8 @@
 (*****************************************************************************)
 
 (** Calculate the average transaction cost. *)
-val average_transaction_cost : Average_block.t -> int
+val average_transaction_cost :
+  Client.stresstest_gas_estimation -> Average_block.t -> int
 
 (** Deduce the maximal theoretical TPS based on hard gas limit per block and
    the gas cost of the average operation. *)

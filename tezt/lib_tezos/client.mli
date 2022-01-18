@@ -621,6 +621,9 @@ val convert_data_to_json :
 
     Optional parameters (provided only if the function is called with
     the corresponding optional argument):
+    - [seed] is the seed used for the rangom number generator
+    - [fee] is the custom fee to pay instead of the default one
+    - [gas_limit] is the custom gas limit
     - [--transfers <transfers>]
     - [--tps <tps>]
     - [--single-op-per-pkh-per-block] (if the argument
@@ -635,6 +638,8 @@ val stresstest :
   ?source_pkhs:string list ->
   ?source_accounts:Account.key list ->
   ?seed:int ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
   ?transfers:int ->
   ?tps:int ->
   ?single_op_per_pkh_per_block:bool ->
@@ -649,12 +654,23 @@ val spawn_stresstest :
   ?source_pkhs:string list ->
   ?source_accounts:Account.key list ->
   ?seed:int ->
+  ?fee:Tez.t ->
+  ?gas_limit:int ->
   ?transfers:int ->
   ?tps:int ->
   ?single_op_per_pkh_per_block:bool ->
   ?fresh_probability:float ->
   t ->
   Process.t
+
+(** Costs of every kind of transaction used in the stress test. *)
+type stresstest_gas_estimation = {
+  regular : int;  (** Cost of a regular transaction. *)
+}
+
+(** Call the [stresstest estimate gas] command. *)
+val stresstest_estimate_gas :
+  ?endpoint:endpoint -> t -> stresstest_gas_estimation Lwt.t
 
 (** Run [tezos-client run script .. on storage .. and input ..].
 

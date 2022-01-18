@@ -52,6 +52,17 @@ val preapply :
   'kind contents_list ->
   'kind preapply_result tzresult Lwt.t
 
+(** Perform simulation of the given operations and return the corresponding
+   [preapply_result]s. *)
+val simulate :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?branch:int ->
+  ?latency:int ->
+  'kind contents_list ->
+  'kind preapply_result tzresult Lwt.t
+
 type 'kind result_list =
   Operation_hash.t * 'kind contents_list * 'kind contents_result_list
 

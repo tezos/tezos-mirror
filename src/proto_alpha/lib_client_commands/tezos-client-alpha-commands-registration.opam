@@ -13,6 +13,7 @@ depends: [
   "tezos-shell-services"
   "tezos-client-base"
   "tezos-client-alpha"
+  "tezos-protocol-alpha-parameters"
   "tezos-client-alpha-commands"
   "tezos-client-sapling-alpha"
   "tezos-client-commands"

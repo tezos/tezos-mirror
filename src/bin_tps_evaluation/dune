@@ -14,6 +14,7 @@
   data-encoding
   lwt
   ppx_blob
+  tezos-baking-alpha
   tezos-client-base-unix
   tezos-protocol-alpha
   tezt

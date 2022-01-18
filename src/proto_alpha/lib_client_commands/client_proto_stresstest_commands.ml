@@ -90,6 +90,11 @@ type state = {
   injected_operations : Operation_hash.t list Block_hash.Table.t;
 }
 
+(** Costs of every kind of transaction used in the stress test. *)
+type transaction_costs = {
+  regular : Gas.cost;  (** Cost of a regular transaction. *)
+}
+
 let verbose = ref false
 
 let debug = ref false
@@ -151,6 +156,13 @@ let injected_operations_encoding =
     (obj2
        (req "block_hash_when_injected" Block_hash.encoding)
        (req "operation_hashes" (list Operation_hash.encoding)))
+
+let transaction_costs_encoding =
+  let open Data_encoding in
+  conv
+    (fun {regular} -> regular)
+    (fun regular -> {regular})
+    (obj1 (req "regular" Gas_limit_repr.Arith.n_integral_encoding))
 
 let parse_strategy s =
   match String.split ~limit:1 ':' s with
@@ -1015,7 +1027,95 @@ let generate_random_transactions =
                (fun _retcode -> save_injected_operations ())) ;
           launch cctxt parameters state rng_state save_pool)
 
+let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
+    Gas.Arith.integral tzresult Lwt.t =
+  let sources_json =
+    From_string
+      {
+        json =
+          `A
+            [
+              `O [("alias", `String "bootstrap1")];
+              `O [("alias", `String "bootstrap2")];
+            ];
+      }
+  in
+  match
+    Data_encoding.Json.destruct
+      input_source_list_encoding
+      (json_of_pool_source sources_json)
+  with
+  | exception _ -> cctxt#error "Could not decode list of sources"
+  | [] -> cctxt#error "It is required to provide sources"
+  | sources0 -> (
+      List.filter_map_p (normalize_source cctxt) sources0 >>= fun sources ->
+      Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
+      let counters = Signature.Public_key_hash.Table.create 1023 in
+      Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
+      >>=? fun current_target_block ->
+      let state =
+        {
+          current_head_on_start;
+          counters;
+          pool = sources;
+          pool_size = List.length sources;
+          shuffled_pool = None;
+          revealed = Signature.Public_key_hash.Set.empty;
+          last_block = current_head_on_start;
+          target_block = current_target_block;
+          new_block_condition = Lwt_condition.create ();
+          injected_operations = Block_hash.Table.create 1023;
+        }
+      in
+      (* Parameters do not influence gas cost of the command, so we just
+         always use default_parameters for this estimation. *)
+      let parameters = default_parameters in
+      let rng_state = Random.State.make [|parameters.seed|] in
+      let chain = cctxt#chain in
+      let block = cctxt#block in
+      sample_transfer cctxt chain block parameters state rng_state
+      >>=? fun transfer ->
+      Alpha_services.Contract.counter cctxt (chain, block) transfer.src.pkh
+      >>=? fun current_counter ->
+      let transf_counter = Z.succ current_counter in
+      let manager_op =
+        manager_op_of_transfer
+          {
+            parameters with
+            gas_limit =
+              Default_parameters.constants_mainnet.hard_gas_limit_per_operation;
+          }
+          {transfer with counter = Some transf_counter}
+      in
+      Injection.simulate cctxt ~chain ~block (Single manager_op)
+      >>=? fun (_oph, _op, result) ->
+      match result.contents with
+      | Single_result (Manager_operation_result {operation_result; _}) -> (
+          match operation_result with
+          | Applied (Transaction_result {consumed_gas; _}) ->
+              return (Gas.Arith.ceil consumed_gas)
+          | _ -> cctxt#error "Simulation of regular transaction failed"))
+
+let estimate_transaction_costs : Protocol_client_context.full Clic.command =
+  let open Clic in
+  command
+    ~group
+    ~desc:"Output gas estimations for transactions that stresstest uses"
+    no_options
+    (prefixes ["stresstest"; "estimate"; "gas"] @@ stop)
+    (fun () cctxt ->
+      estimate_regular_transaction_cost cctxt >>=? fun regular ->
+      let transaction_costs : transaction_costs = {regular} in
+      let json =
+        Data_encoding.Json.construct
+          transaction_costs_encoding
+          transaction_costs
+      in
+      Format.printf "%a" Data_encoding.Json.pp json ;
+      return_unit)
+
 let commands network () =
   match network with
   | Some `Mainnet -> []
-  | Some `Testnet | None -> [generate_random_transactions]
+  | Some `Testnet | None ->
+      [generate_random_transactions; estimate_transaction_costs]
