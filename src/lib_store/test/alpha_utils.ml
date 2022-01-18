@@ -129,13 +129,50 @@ module Account = struct
     return @@ (unactivated_account, {blinded_public_key_hash = bpkh; amount})
 end
 
-let make_rpc_context ctxt =
-  let open Lwt_syntax in
+let make_rpc_context ~chain_id ctxt block =
+  let open Lwt_tzresult_syntax in
+  let header = Store.Block.shell_header block in
+  let ({
+         timestamp = predecessor_timestamp;
+         level = predecessor_level;
+         fitness = predecessor_fitness;
+         _;
+       }
+        : Block_header.shell_header) =
+    header
+  in
+  let timestamp =
+    Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
+  in
+  (* We need to forge a predecessor hash to pass it to [value_of_key].
+     This initial context is used for RPC, hence this piece of
+     information is not important and does not have to be meaningful
+  *)
+  let predecessor =
+    Tezos_base.Block_header.hash
+      {shell = header; protocol_data = Store.Block.protocol_data block}
+  in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  (* Wrap mark the cache as non-initialised, we need to initialize
-     again. *)
-  let* ctxt = Main.init_cache ctxt in
-  Lwt.return
+  let* value_of_key =
+    Main.value_of_key
+      ~chain_id
+      ~predecessor_context:ctxt
+      ~predecessor_timestamp
+      ~predecessor_level
+      ~predecessor_fitness
+      ~predecessor
+      ~timestamp
+    >|= Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult
+  in
+  Tezos_protocol_environment.Context.load_cache
+    (Store.Block.hash block)
+    ctxt
+    `Lazy
+    (fun key ->
+      value_of_key key
+      >|= Tezos_protocol_alpha.Protocol.Environment.wrap_tzresult)
+  >>=? fun ctxt ->
+  return
   @@ new Environment.proto_rpc_context_of_directory
        (fun block ->
          {
@@ -423,7 +460,7 @@ let empty_operations = list_init_exn nb_validation_passes (fun _ -> [])
 
 let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let open Lwt_tzresult_syntax in
-  let*! rpc_ctxt = make_rpc_context ctxt in
+  let* rpc_ctxt = make_rpc_context ~chain_id ctxt pred in
   let element_of_key ~chain_id ~predecessor_context ~predecessor_timestamp
       ~predecessor_level ~predecessor_fitness ~predecessor ~timestamp =
     let*! f =
@@ -647,7 +684,9 @@ let bake_n chain_store ?synchronous_merge ?policy n b =
 let bake_until_cycle_end chain_store ?synchronous_merge ?policy b =
   let open Lwt_result_syntax in
   let* ctxt = Store.Block.context chain_store b in
-  let*! rpc_ctxt = make_rpc_context ctxt in
+  let* rpc_ctxt =
+    make_rpc_context ~chain_id:(Store.Chain.chain_id chain_store) ctxt b
+  in
   let* Constants.{parametric = {blocks_per_cycle; _}; _} =
     get_constants rpc_ctxt b
   in
@@ -673,7 +712,9 @@ let bake_until_n_cycle_end chain_store ?synchronous_merge ?policy n b =
 let bake_until_cycle chain_store ?synchronous_merge ?policy cycle b =
   let open Lwt_result_syntax in
   let* ctxt = Store.Block.context chain_store b in
-  let*! rpc_ctxt = make_rpc_context ctxt in
+  let* rpc_ctxt =
+    make_rpc_context ~chain_id:(Store.Chain.chain_id chain_store) ctxt b
+  in
   let* constants = get_constants rpc_ctxt b in
   let Constants.{parametric = {blocks_per_cycle; _}; _} = constants in
   let rec loop (bl, b) =
@@ -694,5 +735,7 @@ let bake_until_cycle chain_store ?synchronous_merge ?policy cycle b =
 let get_constants chain_store b =
   let open Lwt_result_syntax in
   let* ctxt = Store.Block.context chain_store b in
-  let*! rpc_ctxt = make_rpc_context ctxt in
+  let* rpc_ctxt =
+    make_rpc_context ~chain_id:(Store.Chain.chain_id chain_store) ctxt b
+  in
   get_constants rpc_ctxt b
