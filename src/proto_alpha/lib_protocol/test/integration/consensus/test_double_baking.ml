@@ -136,7 +136,7 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   Block.bake genesis >>=? fun b ->
-  Context.Delegate.frozen_deposits (B b) baker1
+  Context.Delegate.current_frozen_deposits (B b) baker1
   >>=? fun frozen_deposits_before ->
   block_fork ~policy:(By_account baker1) contracts b >>=? fun (blk_a, blk_b) ->
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
@@ -155,7 +155,7 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
   >>=? fun blk_final ->
-  Context.Delegate.frozen_deposits (B blk_final) baker1
+  Context.Delegate.current_frozen_deposits (B blk_final) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
   let r =
@@ -187,7 +187,7 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
   Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork_diff genesis >>=? fun (blk_1, blk_2) ->
-  Context.Delegate.frozen_deposits (B genesis) baker1
+  Context.Delegate.current_frozen_deposits (B genesis) baker1
   >>=? fun frozen_deposits_before ->
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
@@ -209,7 +209,7 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
   Block.bake ~policy:(By_account baker2) ~operation blk_with_de_evidence
   >>=? fun blk_with_db_evidence ->
-  Context.Delegate.frozen_deposits (B blk_with_db_evidence) baker1
+  Context.Delegate.current_frozen_deposits (B blk_with_db_evidence) baker1
   >>=? fun frozen_deposits_after ->
   Context.get_constants (B genesis) >>=? fun csts ->
   let r =
