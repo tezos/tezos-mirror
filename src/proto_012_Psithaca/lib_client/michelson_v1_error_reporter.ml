@@ -124,6 +124,42 @@ let collect_error_locations errs =
   in
   collect [] errs
 
+(* Error raised while fetching the script of a contract for error reporting when the script is not found. *)
+type error += Fetch_script_not_found_meta_error of Contract.t
+
+(* Errors raised while fetching the script of a contract for error reporting. *)
+type error += Fetch_script_meta_error of error trace
+
+let fetch_script (cctxt : #Protocol_client_context.rpc_context) ~chain ~block
+    contract =
+  Plugin.RPC.Contract.get_script_normalized
+    cctxt
+    (chain, block)
+    ~unparsing_mode:Readable
+    ~contract
+  >>=? function
+  | None -> fail (Fetch_script_not_found_meta_error contract)
+  | Some {code; storage = _} ->
+      Lwt.return @@ Environment.wrap_tzresult @@ Script_repr.force_decode code
+
+type error +=
+  | Rich_runtime_contract_error of Contract.t * Michelson_v1_parser.parsed
+
+let enrich_runtime_errors cctxt ~chain ~block ~parsed =
+  List.map_s (function
+      | Environment.Ecoproto_error (Runtime_contract_error (contract, _)) -> (
+          (* If we know the script already, we don't fetch it *)
+          match parsed with
+          | Some parsed ->
+              Lwt.return @@ Rich_runtime_contract_error (contract, parsed)
+          | None -> (
+              fetch_script cctxt ~chain ~block contract >|= function
+              | Ok script ->
+                  let parsed = Michelson_v1_printer.unparse_toplevel script in
+                  Rich_runtime_contract_error (contract, parsed)
+              | Error err -> Fetch_script_meta_error err))
+      | e -> Lwt.return e)
+
 let report_errors ~details ~show_source ?parsed ppf errs =
   let rec print_trace locations errs =
     let print_loc ppf loc =
@@ -322,14 +358,16 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Environment.Ecoproto_error (Runtime_contract_error (contract, expr))
+    | Environment.Ecoproto_error (Runtime_contract_error (contract, _script))
       :: rest ->
-        let parsed =
-          match parsed with
-          | Some parsed when expr = parsed.Michelson_v1_parser.expanded ->
-              parsed
-          | Some _ | None -> Michelson_v1_printer.unparse_toplevel expr
-        in
+        Format.fprintf
+          ppf
+          "@[<v 2>Runtime error in unknown contract %a@]"
+          Contract.pp
+          contract ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Rich_runtime_contract_error (contract, parsed) :: rest ->
         let hilights = collect_error_locations rest in
         Format.fprintf
           ppf
