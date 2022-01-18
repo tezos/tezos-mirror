@@ -43,8 +43,11 @@ let may_lock_pidfile pidfile_opt f =
         ~filename:pidfile
         f
 
+let http_headers_env_variable =
+  "TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS"
+
 let http_headers =
-  match Sys.getenv_opt "TEZOS_REMOTE_MEMPOOL_HTTP_HEADERS" with
+  match Sys.getenv_opt http_headers_env_variable with
   | None -> None
   | Some contents ->
       let lines = String.split_on_char '\n' contents in
@@ -53,20 +56,20 @@ let http_headers =
            (fun acc line ->
              match String.index_opt line ':' with
              | None ->
-                 Stdlib.failwith
-                   "Http headers: invalid TEZOS_REMOTE_MEMPOOL_HTTP_HEADERS \
-                    environment variable, missing colon"
+                 invalid_arg
+                   (Printf.sprintf
+                      "Http headers: invalid %s environment variable, missing \
+                       colon"
+                      http_headers_env_variable)
              | Some pos ->
                  let header = String.trim (String.sub line 0 pos) in
                  let header = String.lowercase_ascii header in
-                 if
-                   header <> "host"
-                   && (String.length header < 2 || String.sub header 0 2 <> "x-")
-                 then
-                   Stdlib.failwith
-                     "Http headers: invalid TEZOS_REMOTE_MEMPOOL_HTTP_HEADERS \
-                      environment variable, only 'host' or 'x-' headers are \
-                      supported" ;
+                 if header <> "host" then
+                   invalid_arg
+                     (Printf.sprintf
+                        "Http headers: invalid %s environment variable, only \
+                         'host' headers are supported"
+                        http_headers_env_variable) ;
                  let value =
                    String.trim
                      (String.sub line (pos + 1) (String.length line - pos - 1))
@@ -75,37 +78,30 @@ let http_headers =
            []
            lines)
 
-let check_endpoint_validity uri =
-  match Uri.scheme uri with
-  | Some "http" | Some "https" -> ()
-  | None ->
-      Stdlib.failwith "no scheme detected, http and https scheme are required"
-  | Some x ->
-      Printf.ksprintf
-        Stdlib.failwith
-        "invalid scheme '%s' only http and https endpoints are supported"
-        x
-
-let mempool_arg =
+let operations_arg =
   Clic.arg
-    ~long:"mempool"
-    ~placeholder:"file"
+    ~long:"operations-pool"
+    ~placeholder:"file|uri"
     ~doc:
-      "When specified, the baker will try to fetch a mempool from this file \
-       (or uri) and will try to include the retrieved operations in the block. \
-       The expected format of the content is of the form of the \
-       '/chains/<chain_id>/mempool/pending_operations' RPC. Environment \
-       variable 'TEZOS_REMOTE_MEMPOOL_HTTP_HEADERS' may also be specified to \
-       add headers to the requests (only 'host' and custom 'x-...' headers are \
-       supported)."
+      (Printf.sprintf
+         "When specified, the baker will try to fetch operations from this \
+          file (or uri) and to include retrieved operations in the block. The \
+          expected format of the contents is a list of operations [ \
+          012-PsiThaCa.operation ].  Environment variable '%s' may also be \
+          specified to add headers to the requests (only 'host'  headers are \
+          supported). If the resource cannot be retrieved, e.g., if the file \
+          is absent, unreadable, or the web service returns a 404 error, the \
+          resource is simply ignored."
+         http_headers_env_variable)
     (Clic.map_parameter
        ~f:(fun uri ->
          let open Baking_configuration in
-         let path = Uri.to_string uri in
-         if Sys.file_exists path then Mempool.(Local {filename = path})
-         else (
-           check_endpoint_validity uri ;
-           Mempool.(Remote {uri; http_headers})))
+         match Uri.scheme uri with
+         | Some "http" | Some "https" ->
+             Operations_source.(Remote {uri; http_headers})
+         | None | Some _ ->
+             (* acts as if it were file even though it might no be *)
+             Operations_source.(Local {filename = Uri.to_string uri}))
        uri_parameter)
 
 let context_path_arg =
@@ -132,8 +128,8 @@ let do_not_monitor_node_mempool_arg =
     ~long:"ignore-node-mempool"
     ~doc:
       "Ignore mempool operations from the node and do not subsequently monitor \
-       them. Use in conjunction with --mempool option to restrict the observed \
-       operations to those of the mempool file."
+       them. Use in conjunction with --operations option to restrict the \
+       observed operations to those of the mempool file."
     ()
 
 let keep_alive_arg =
@@ -179,7 +175,7 @@ let get_delegates (cctxt : Protocol_client_context.full)
        delegates)
   >>=? fun () ->
   let delegates_no_duplicates = List.sort_uniq compare delegates in
-  (if Compare.List_lengths.(delegates <> delegates_no_duplicates) then
+  (if List.compare_lengths delegates delegates_no_duplicates <> 0 then
    cctxt#warning
      "Warning: the list of public key hash aliases contains duplicate hashes, \
       which are ignored"
@@ -207,7 +203,7 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
          minimal_nanotez_per_byte_arg
          minimal_timestamp_switch
          force_switch
-         mempool_arg
+         operations_arg
          context_path_arg
          do_not_monitor_node_mempool_arg)
       (prefixes ["bake"; "for"] @@ sources_param)
@@ -216,7 +212,7 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
              minimal_nanotez_per_byte,
              minimal_timestamp,
              force,
-             mempool,
+             extra_operations,
              context_path,
              do_not_monitor_node_mempool )
            pkhs
@@ -230,7 +226,7 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
           ~minimal_fees
           ~force
           ~monitor_node_mempool:(not do_not_monitor_node_mempool)
-          ?mempool
+          ?extra_operations
           ?context_path
           delegates);
     command
@@ -258,7 +254,7 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
          minimal_nanotez_per_byte_arg
          minimal_timestamp_switch
          force_switch
-         mempool_arg
+         operations_arg
          context_path_arg)
       (prefixes ["propose"; "for"] @@ sources_param)
       (fun ( minimal_fees,
@@ -266,7 +262,7 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
              minimal_nanotez_per_byte,
              minimal_timestamp,
              force,
-             mempool,
+             extra_operations,
              context_path )
            sources
            cctxt ->
@@ -278,7 +274,7 @@ let delegate_commands () : Protocol_client_context.full Clic.command list =
           ~minimal_nanotez_per_byte
           ~minimal_fees
           ~force
-          ?mempool
+          ?extra_operations
           ?context_path
           delegates);
   ]
@@ -309,14 +305,15 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
     command
       ~group
       ~desc:"Launch the baker daemon."
-      (args7
+      (args8
          pidfile_arg
          minimal_fees_arg
          minimal_nanotez_per_gas_unit_arg
          minimal_nanotez_per_byte_arg
          keep_alive_arg
          liquidity_baking_escape_vote_switch
-         per_block_vote_file_arg)
+         per_block_vote_file_arg
+         operations_arg)
       (prefixes ["run"; "with"; "local"; "node"]
       @@ param
            ~name:"node_data_path"
@@ -329,7 +326,8 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
              minimal_nanotez_per_byte,
              keep_alive,
              liquidity_baking_escape_vote,
-             per_block_vote_file )
+             per_block_vote_file,
+             extra_operations )
            node_data_path
            sources
            cctxt ->
@@ -343,6 +341,7 @@ let baker_commands () : Protocol_client_context.full Clic.command list =
           ~minimal_nanotez_per_byte
           ~liquidity_baking_escape_vote
           ?per_block_vote_file
+          ?extra_operations
           ~chain:cctxt#chain
           ~context_path
           ~keep_alive

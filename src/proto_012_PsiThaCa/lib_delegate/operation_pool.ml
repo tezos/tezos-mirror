@@ -26,42 +26,70 @@
 open Protocol
 open Alpha_context
 
+type 'collection t = {
+  consensus : 'collection;
+  votes : 'collection;
+  anonymous : 'collection;
+  managers : 'collection;
+}
+
 (* Should we use a better ordering ? *)
 
-module OpSet = Set.Make (struct
+module Prioritized_operation = struct
+  (* Higher priority operations will be included first *)
+  type t = High of packed_operation | Low of packed_operation
+
+  let extern op = High op
+
+  let node op = Low op
+
+  let packed = function High op | Low op -> op
+
+  let compare_priority t1 t2 =
+    match (t1, t2) with
+    | (High _, Low _) -> 1
+    | (Low _, High _) -> -1
+    | (Low _, Low _) | (High _, High _) -> 0
+
+  let compare a b =
+    let c = compare_priority a b in
+    if c <> 0 then c else compare (packed a) (packed b)
+end
+
+module Operation_set = Set.Make (struct
   type t = packed_operation
 
-  let compare = compare
+  let compare = Stdlib.compare
 end)
 
-(* TODO refine this: unpack operations *)
-type pool = {
-  consensus : OpSet.t;
-  votes : OpSet.t;
-  anonymous : OpSet.t;
-  managers : OpSet.t;
-}
+module Prioritized_operation_set = struct
+  include Set.Make (struct
+    type t = Prioritized_operation.t
+
+    let compare = Prioritized_operation.compare
+  end)
+
+  let operations set = elements set |> List.map Prioritized_operation.packed
+end
 
 (* TODO refine this: unpack operations *)
-type ordered_pool = {
-  ordered_consensus : packed_operation list;
-  ordered_votes : packed_operation list;
-  ordered_anonymous : packed_operation list;
-  ordered_managers : packed_operation list;
-}
+type pool = Operation_set.t t
+
+(* TODO refine this: unpack operations *)
+type ordered_pool = packed_operation list t
 
 let ordered_pool_encoding =
   let open Data_encoding in
   conv
-    (fun {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers} ->
-      (ordered_consensus, ordered_votes, ordered_anonymous, ordered_managers))
-    (fun (ordered_consensus, ordered_votes, ordered_anonymous, ordered_managers) ->
-      {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers})
+    (fun {consensus; votes; anonymous; managers} ->
+      (consensus, votes, anonymous, managers))
+    (fun (consensus, votes, anonymous, managers) ->
+      {consensus; votes; anonymous; managers})
     (obj4
        (req "ordered_consensus" (list (dynamic_size Operation.encoding)))
        (req "ordered_votes" (list (dynamic_size Operation.encoding)))
-       (req "ordered_payload" (list (dynamic_size Operation.encoding)))
-       (req "ordered_payload" (list (dynamic_size Operation.encoding))))
+       (req "ordered_anonymous" (list (dynamic_size Operation.encoding)))
+       (req "ordered_managers" (list (dynamic_size Operation.encoding))))
 
 type payload = {
   votes_payload : packed_operation list;
@@ -94,38 +122,31 @@ let pp_payload fmt {votes_payload; anonymous_payload; managers_payload} =
 
 let empty =
   {
-    consensus = OpSet.empty;
-    votes = OpSet.empty;
-    anonymous = OpSet.empty;
-    managers = OpSet.empty;
+    consensus = Operation_set.empty;
+    votes = Operation_set.empty;
+    anonymous = Operation_set.empty;
+    managers = Operation_set.empty;
   }
 
-let empty_ordered =
-  {
-    ordered_consensus = [];
-    ordered_votes = [];
-    ordered_anonymous = [];
-    ordered_managers = [];
-  }
+let empty_ordered = {consensus = []; votes = []; anonymous = []; managers = []}
 
 let pp_pool fmt {consensus; votes; anonymous; managers} =
   Format.fprintf
     fmt
     "[consensus: %d, votes: %d, anonymous: %d, managers: %d]"
-    (OpSet.cardinal consensus)
-    (OpSet.cardinal votes)
-    (OpSet.cardinal anonymous)
-    (OpSet.cardinal managers)
+    (Operation_set.cardinal consensus)
+    (Operation_set.cardinal votes)
+    (Operation_set.cardinal anonymous)
+    (Operation_set.cardinal managers)
 
-let pp_ordered_pool fmt
-    {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers} =
+let pp_ordered_pool fmt {consensus; votes; anonymous; managers} =
   Format.fprintf
     fmt
     "[consensus: %d, votes: %d, anonymous: %d, managers: %d]"
-    (List.length ordered_consensus)
-    (List.length ordered_votes)
-    (List.length ordered_anonymous)
-    (List.length ordered_managers)
+    (List.length consensus)
+    (List.length votes)
+    (List.length anonymous)
+    (List.length managers)
 
 (* Hypothesis : we suppose [List.length Protocol.Main.validation_passes = 4] *)
 let consensus_index = 0
@@ -148,23 +169,23 @@ let classify op =
       else `Bad
   | _ -> `Bad
 
-let add_operation pool op =
-  match classify op with
+let add_operation pool operation =
+  match classify operation with
   | `Consensus ->
-      let consensus = OpSet.add op pool.consensus in
+      let consensus = Operation_set.add operation pool.consensus in
       {pool with consensus}
   | `Votes ->
-      let votes = OpSet.add op pool.votes in
+      let votes = Operation_set.add operation pool.votes in
       {pool with votes}
   | `Anonymous ->
-      let anonymous = OpSet.add op pool.anonymous in
+      let anonymous = Operation_set.add operation pool.anonymous in
       {pool with anonymous}
   | `Managers ->
-      let managers = OpSet.add op pool.managers in
+      let managers = Operation_set.add operation pool.managers in
       {pool with managers}
   | `Bad -> pool
 
-let add_operations pool new_ops = List.fold_left add_operation pool new_ops
+let add_operations pool ops = List.fold_left add_operation pool ops
 
 type consensus_filter = {
   level : int32;
@@ -178,7 +199,7 @@ type consensus_filter = {
     as well as preendorsements. *)
 let filter_with_relevant_consensus_ops ~(endorsement_filter : consensus_filter)
     ~(preendorsement_filter : consensus_filter option) operation_set =
-  OpSet.filter
+  Operation_set.filter
     (fun {protocol_data; _} ->
       match (protocol_data, preendorsement_filter) with
       (* 1a. Remove preendorsements. *)
@@ -258,37 +279,28 @@ let filter_endorsements ops =
       | _ -> None)
     ops
 
-let pool_to_list_list {consensus; votes; anonymous; managers} =
-  List.map OpSet.elements [consensus; votes; anonymous; managers]
-
-let pool_of_list_list (ll : packed_operation list list) =
-  List.fold_left add_operations empty ll
-
-let ordered_to_list_list
-    {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers} =
-  [ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers]
+let ordered_to_list_list {consensus; votes; anonymous; managers} =
+  [consensus; votes; anonymous; managers]
 
 let ordered_of_list_list = function
-  | [ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers] ->
-      Some
-        {ordered_consensus; ordered_votes; ordered_anonymous; ordered_managers}
+  | [consensus; votes; anonymous; managers] ->
+      Some {consensus; votes; anonymous; managers}
   | _ -> None
 
-let payload_of_ordered_pool
-    {ordered_votes; ordered_anonymous; ordered_managers; _} =
+let payload_of_ordered_pool {votes; anonymous; managers; _} =
   {
-    votes_payload = ordered_votes;
-    anonymous_payload = ordered_anonymous;
-    managers_payload = ordered_managers;
+    votes_payload = votes;
+    anonymous_payload = anonymous;
+    managers_payload = managers;
   }
 
 let ordered_pool_of_payload ~consensus_operations
     {votes_payload; anonymous_payload; managers_payload} =
   {
-    ordered_consensus = consensus_operations;
-    ordered_votes = votes_payload;
-    ordered_anonymous = anonymous_payload;
-    ordered_managers = managers_payload;
+    consensus = consensus_operations;
+    votes = votes_payload;
+    anonymous = anonymous_payload;
+    managers = managers_payload;
   }
 
 let extract_operations_of_list_list = function
@@ -320,8 +332,69 @@ let extract_operations_of_list_list = function
 
 let filter_pool p {consensus; votes; anonymous; managers} =
   {
-    consensus = OpSet.filter p consensus;
-    votes = OpSet.filter p votes;
-    anonymous = OpSet.filter p anonymous;
-    managers = OpSet.filter p managers;
+    consensus = Operation_set.filter p consensus;
+    votes = Operation_set.filter p votes;
+    anonymous = Operation_set.filter p anonymous;
+    managers = Operation_set.filter p managers;
   }
+
+module Prioritized = struct
+  type nonrec t = Prioritized_operation_set.t t
+
+  let of_operation_set (operation_set : Operation_set.t) =
+    Operation_set.fold
+      (fun elt set ->
+        Prioritized_operation_set.add (Prioritized_operation.node elt) set)
+      operation_set
+      Prioritized_operation_set.empty
+
+  let of_pool (pool : pool) : t =
+    {
+      consensus = of_operation_set pool.consensus;
+      votes = of_operation_set pool.votes;
+      anonymous = of_operation_set pool.anonymous;
+      managers = of_operation_set pool.managers;
+    }
+
+  let add_operation pool operation =
+    match classify (Prioritized_operation.packed operation) with
+    | `Consensus ->
+        let consensus =
+          Prioritized_operation_set.add operation pool.consensus
+        in
+        {pool with consensus}
+    | `Votes ->
+        let votes = Prioritized_operation_set.add operation pool.votes in
+        {pool with votes}
+    | `Anonymous ->
+        let anonymous =
+          Prioritized_operation_set.add operation pool.anonymous
+        in
+        {pool with anonymous}
+    | `Managers ->
+        let managers = Prioritized_operation_set.add operation pool.managers in
+        {pool with managers}
+    | `Bad -> pool
+
+  let add_external_operation pool operation =
+    add_operation pool (Prioritized_operation.extern operation)
+
+  let add_operations prioritized_pool operations =
+    List.fold_left add_operation prioritized_pool operations
+
+  let merge_external_operations pool
+      (external_operations : packed_operation list) =
+    List.fold_left add_external_operation pool external_operations
+
+  let filter p {consensus; votes; anonymous; managers} =
+    let filter =
+      Prioritized_operation_set.filter (fun pop ->
+          p (Prioritized_operation.packed pop))
+    in
+    {
+      consensus = filter consensus;
+      votes = filter votes;
+      anonymous = filter anonymous;
+      managers = filter managers;
+    }
+end

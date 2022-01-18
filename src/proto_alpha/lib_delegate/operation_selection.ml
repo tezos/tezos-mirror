@@ -37,8 +37,8 @@ let anonymous_quota = Stdlib.List.nth quota Operation_pool.anonymous_index
 
 let managers_quota = Stdlib.List.nth quota Operation_pool.managers_index
 
-type weighted_manager = {
-  op : packed_operation;
+type prioritized_manager = {
+  op : Prioritized_operation.t;
   size : int;
   fee : Tez.t;
   gas : Fixed_point_repr.integral_tag Gas.Arith.t;
@@ -47,32 +47,39 @@ type weighted_manager = {
   counter : counter;
 }
 
-module WeightedManagerSet = Set.Make (struct
-  type t = weighted_manager
+module PrioritizedManagerSet = Set.Make (struct
+  type t = prioritized_manager
 
   (* We order the operations by their weights except if they belong
      to the same manager, if they do, we order them by their
      counter. *)
-  let compare {source; counter; weight; _}
-      {source = source'; counter = counter'; weight = weight'; _} =
+  let compare {source; counter; weight; op; _}
+      {source = source'; counter = counter'; weight = weight'; op = op'; _} =
     (* Be careful with the [compare] *)
     let cmp_src = Signature.Public_key_hash.compare source source' in
     if cmp_src = 0 then
       (* we want the smallest counter first *)
       let c = Z.compare counter counter' in
-      if c <> 0 then c else Q.compare weight' weight
+      if c <> 0 then c
+      else
+        let c = Prioritized_operation.compare_priority op' op in
+        if c <> 0 then c else Q.compare weight' weight
       (* if same counter, biggest weight first *)
     else
-      (* We want the biggest weight first *)
-      let c = Q.compare weight' weight in
-      if c <> 0 then c else cmp_src
+      let c = Prioritized_operation.compare_priority op' op in
+      if c <> 0 then c
+      else
+        (* We want the biggest weight first *)
+        let c = Q.compare weight' weight in
+        if c <> 0 then c else cmp_src
 end)
 
 (* Note: This weight is also used by the plugin and the prevalidator to sort
    operations in the pending mempool.
    @see {!Tezos_protocol_plugin_alpha.Plugin.Mempool.weight_manager_operation}. *)
-let weight_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
-    ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte op =
+let prioritize_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
+    ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte operation =
+  let op = Operation_pool.Prioritized_operation.packed operation in
   let {protocol_data = Operation_data {contents; _}; _} = op in
   let open Operation in
   let l = to_list (Contents_list contents) in
@@ -127,16 +134,16 @@ let weight_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
           Q.compare minimal_fees_in_nanotez fees_in_nanotez <= 0
         in
         if enough_fees_for_size && enough_fees_for_gas then
-          Some {op; size; weight; fee; gas; source; counter}
+          Some {op = operation; size; weight; fee; gas; source; counter}
         else None
   | _ -> None
 
-let weight_managers ~hard_gas_limit_per_block ~minimal_fees
+let prioritize_managers ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte managers =
-  OpSet.fold
+  Prioritized_operation_set.fold
     (fun op acc ->
       match
-        weight_manager
+        prioritize_manager
           ~max_size:managers_quota.max_size
           ~hard_gas_limit_per_block
           ~minimal_fees
@@ -145,9 +152,9 @@ let weight_managers ~hard_gas_limit_per_block ~minimal_fees
           op
       with
       | None -> acc
-      | Some w_op -> WeightedManagerSet.add w_op acc)
+      | Some w_op -> PrioritizedManagerSet.add w_op acc)
     managers
-    WeightedManagerSet.empty
+    PrioritizedManagerSet.empty
 
 (** Simulation *)
 
@@ -222,17 +229,19 @@ let filter_operations_with_simulation initial_inc fees_config
   in
   filter_valid_operations_up_to_quota
     initial_inc
-    (OpSet.elements consensus, consensus_quota)
+    (Prioritized_operation_set.operations consensus, consensus_quota)
   >>= fun (inc, consensus) ->
-  filter_valid_operations_up_to_quota inc (OpSet.elements votes, votes_quota)
+  filter_valid_operations_up_to_quota
+    inc
+    (Prioritized_operation_set.operations votes, votes_quota)
   >>= fun (inc, votes) ->
   filter_valid_operations_up_to_quota
     inc
-    (OpSet.elements anonymous, anonymous_quota)
+    (Prioritized_operation_set.operations anonymous, anonymous_quota)
   >>= fun (inc, anonymous) ->
   (* Sort the managers *)
-  let weighted_managers =
-    weight_managers
+  let prioritized_managers =
+    prioritize_managers
       ~hard_gas_limit_per_block
       ~minimal_fees
       ~minimal_nanotez_per_gas_unit
@@ -241,8 +250,8 @@ let filter_operations_with_simulation initial_inc fees_config
   in
   filter_valid_operations_up_to_quota
     inc
-    ( WeightedManagerSet.elements weighted_managers
-      |> List.map (fun {op; _} -> op),
+    ( PrioritizedManagerSet.elements prioritized_managers
+      |> List.map (fun {op; _} -> Prioritized_operation.packed op),
       managers_quota )
   >>= fun (inc, managers) ->
   let operations = [consensus; votes; anonymous; managers] in
@@ -283,15 +292,15 @@ let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
     {consensus; votes; anonymous; managers} =
   let consensus =
     filter_valid_operations_up_to_quota_without_simulation
-      (OpSet.elements consensus, consensus_quota)
+      (Prioritized_operation_set.operations consensus, consensus_quota)
   in
   let votes =
     filter_valid_operations_up_to_quota_without_simulation
-      (OpSet.elements votes, votes_quota)
+      (Prioritized_operation_set.operations votes, votes_quota)
   in
   let anonymous =
     filter_valid_operations_up_to_quota_without_simulation
-      (OpSet.elements anonymous, anonymous_quota)
+      (Prioritized_operation_set.operations anonymous, anonymous_quota)
   in
   let {
     Baking_configuration.minimal_fees;
@@ -301,8 +310,8 @@ let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
     fees_config
   in
   (* Sort the managers *)
-  let weighted_managers =
-    weight_managers
+  let prioritized_managers =
+    prioritize_managers
       ~hard_gas_limit_per_block
       ~minimal_fees
       ~minimal_nanotez_per_gas_unit
@@ -311,8 +320,8 @@ let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
   in
   let managers =
     filter_valid_operations_up_to_quota_without_simulation
-      ( WeightedManagerSet.elements weighted_managers
-        |> List.map (fun {op; _} -> op),
+      ( PrioritizedManagerSet.elements prioritized_managers
+        |> List.map (fun {op; _} -> Prioritized_operation.packed op),
         managers_quota )
   in
   let operations = [consensus; votes; anonymous; managers] in

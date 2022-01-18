@@ -185,6 +185,20 @@ Client
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be  ``json``, ``binary`` or ``any``.
 
+- Renamed the ``--mempool`` option into ``--operations-pool``.
+  The format of the file passed as parameter has changed from the one of RPC
+  ``pending_operations`` (that is, a key-value dictionary whose values are list
+  of operations) to a single list of operations to be considered for inclusion.
+
+- ``--operations-pool`` option supports URL parameters to fetch remote mempools
+  through HTTP.  Environment variable `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`
+  may be set to specify custom HTTP headers. Only the Host header is supported
+  as of now (see description in `rfc2616, section 14.23
+  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_)
+
+- Added new option ``--ignore-node-mempool`` to the ``bake for`` command
+  to avoid querying the node's mempool when baking a block.
+
 - Added two options, ``--now`` and ``--level`` to the ``run script``
   and ``run view`` commands simulating exectution of Michelson
   code. These options can be used to override the values normally
@@ -211,6 +225,9 @@ Baker / Endorser / Accuser
   The default ``media_type`` is ``binary`` for bakers.
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be ``json``, ``binary`` or ``any``.
+
+- Ported the ``--operations-pool`` option of the ``bake for`` command of the client
+  to the baker daemon.
 
 -  Removed baker, endorser and accuser for Granada.
 

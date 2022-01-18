@@ -150,122 +150,6 @@ module Events = struct
       ~level:Info
       ~msg:"shutting down operation worker"
       ()
-
-  let mempool_initial_additions =
-    declare_1
-      ~section
-      ~name:"mempool_initial_additions"
-      ~level:Info
-      ~msg:"added {count} initial operations in baker mempool"
-      ("count", Data_encoding.int31)
-
-  let invalid_json_file =
-    declare_1
-      ~section
-      ~name:"invalid_json_file"
-      ~level:Warning
-      ~msg:"{filename} is not a valid JSON file"
-      ("filename", Data_encoding.string)
-
-  let no_mempool_found_in_file =
-    declare_1
-      ~section
-      ~name:"no_mempool_found_in_file"
-      ~level:Warning
-      ~msg:"no mempool found in file {filename}"
-      ("filename", Data_encoding.string)
-
-  let cannot_fetch_mempool =
-    declare_1
-      ~section
-      ~name:"cannot_fetch_mempool"
-      ~level:Error
-      ~msg:"cannot fetch mempool: {errs}"
-      ("errs", Error_monad.(TzTrace.encoding error_encoding))
-end
-
-module Mempool = struct
-  type error +=
-    | Failed_mempool_fetch of {
-        path : string;
-        reason : string;
-        details : Data_encoding.json option;
-      }
-
-  let ops_of_mempool
-      (ops : Protocol_client_context.Alpha_block_services.Mempool.t) =
-    (* We only retain the applied, unprocessed and delayed operations *)
-    List.rev
-      (Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed
-      @@ Operation_hash.Map.fold
-           (fun _ (op, _) acc -> op :: acc)
-           ops.branch_delayed
-      @@ List.rev_map (fun (_, op) -> op) ops.applied)
-
-  let retrieve mempool =
-    match mempool with
-    | None -> Lwt.return_none
-    | Some mempool -> (
-        let fail reason details =
-          let path =
-            match mempool with
-            | Baking_configuration.Mempool.Local {filename} -> filename
-            | Baking_configuration.Mempool.Remote {uri; _} -> Uri.to_string uri
-          in
-          fail (Failed_mempool_fetch {path; reason; details})
-        in
-        let decode_mempool json =
-          protect
-            ~on_error:(fun _ ->
-              fail "cannot decode the received JSON into mempool" (Some json))
-            (fun () ->
-              let mempool =
-                Data_encoding.Json.destruct
-                  Protocol_client_context.Alpha_block_services.S.Mempool
-                  .encoding
-                  json
-              in
-              return (ops_of_mempool mempool))
-        in
-        match mempool with
-        | Baking_configuration.Mempool.Local {filename} ->
-            if Sys.file_exists filename then
-              Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file filename
-              >>= function
-              | Error _ ->
-                  Events.(emit invalid_json_file filename) >>= fun () ->
-                  Lwt.return_none
-              | Ok json -> (
-                  decode_mempool json >>= function
-                  | Ok mempool -> Lwt.return_some mempool
-                  | Error errs ->
-                      Events.(emit cannot_fetch_mempool errs) >>= fun () ->
-                      Lwt.return_none)
-            else
-              Events.(emit no_mempool_found_in_file filename) >>= fun () ->
-              Lwt.return_none
-        | Baking_configuration.Mempool.Remote {uri; http_headers} -> (
-            ( (with_timeout
-                 (Systime_os.sleep (Time.System.Span.of_seconds_exn 5.))
-                 (fun _ ->
-                   Tezos_rpc_http_client_unix.RPC_client_unix.generic_json_call
-                     ?headers:http_headers
-                     `GET
-                     uri)
-               >>=? function
-               | `Ok json -> return json
-               | `Unauthorized json -> fail "unauthorized request" json
-               | `Gone json -> fail "gone" json
-               | `Error json -> fail "error" json
-               | `Not_found json -> fail "not found" json
-               | `Forbidden json -> fail "forbidden" json
-               | `Conflict json -> fail "conflict" json)
-            >>=? fun json -> decode_mempool json )
-            >>= function
-            | Ok mempool -> Lwt.return_some mempool
-            | Error errs ->
-                Events.(emit cannot_fetch_mempool errs) >>= fun () ->
-                Lwt.return_none))
 end
 
 type candidate = {
@@ -355,18 +239,13 @@ let monitor_operations (cctxt : #Protocol_client_context.full) =
   in
   return ((shell_header.level, round), operation_stream, stream_stopper)
 
-let make_initial_state ?initial_mempool ?(monitor_node_operations = true) () =
+let make_initial_state ?(monitor_node_operations = true) () =
   let qc_event_stream =
     let (stream, push) = Lwt_stream.create () in
     {stream; push}
   in
   let canceler = Lwt_canceler.create () in
-  let operation_pool =
-    Option.fold
-      ~none:Operation_pool.empty
-      ~some:(Operation_pool.add_operations Operation_pool.empty)
-      initial_mempool
-  in
+  let operation_pool = Operation_pool.empty in
   let lock = Lwt_mutex.create () in
   {
     operation_pool;
@@ -519,7 +398,7 @@ let monitor_quorum state new_proposal_watched =
   if state.proposal_watched <> None then cancel_monitoring state ;
   state.proposal_watched <- new_proposal_watched ;
   let current_consensus_operations =
-    Operation_pool.OpSet.elements state.operation_pool.consensus
+    Operation_pool.Operation_set.elements state.operation_pool.consensus
   in
   (* initialize with the currently present consensus operations *)
   update_monitoring ~should_lock:false state current_consensus_operations
@@ -577,11 +456,11 @@ let shutdown_worker state =
    to add them. But these endorsements become 'Outdated' in the mempool once
    (L+1, 0) is received. Hence the cache for previous level.
 *)
-let may_update_operations_pool state (head_level, head_round) =
+let update_operations_pool state (head_level, head_round) =
   let endorsements =
     let head_round_i32 = Round.to_int32 head_round in
     let head_level_i32 = head_level in
-    Operation_pool.OpSet.filter
+    Operation_pool.Operation_set.filter
       (function
         | {
             protocol_data =
@@ -599,15 +478,12 @@ let may_update_operations_pool state (head_level, head_round) =
         | _ -> false)
       state.operation_pool.consensus
   in
-  let operation_pool =
-    {Operation_pool.empty with Operation_pool.consensus = endorsements}
-  in
+  let operation_pool = {Operation_pool.empty with consensus = endorsements} in
   state.operation_pool <- operation_pool
 
-let create ?initial_mempool ?(monitor_node_operations = true)
+let create ?(monitor_node_operations = true)
     (cctxt : #Protocol_client_context.full) =
-  Mempool.retrieve initial_mempool >>= fun initial_mempool ->
-  let state = make_initial_state ?initial_mempool ~monitor_node_operations () in
+  let state = make_initial_state ~monitor_node_operations () in
   (* TODO should we continue forever ? *)
   let rec worker_loop () =
     monitor_operations cctxt >>= function
@@ -619,7 +495,7 @@ let create ?initial_mempool ?(monitor_node_operations = true)
             op_stream_stopper () ;
             cancel_monitoring state ;
             Lwt.return_unit) ;
-        may_update_operations_pool state head ;
+        update_operations_pool state head ;
         let rec loop () =
           Lwt_stream.get operation_stream >>= function
           | None ->
@@ -637,17 +513,12 @@ let create ?initial_mempool ?(monitor_node_operations = true)
         in
         loop ()
   in
-  let worker_loop () =
-    (match initial_mempool with
-    | None -> Lwt.return_unit
-    | Some ops -> Events.(emit mempool_initial_additions (List.length ops)))
-    >>= fun () ->
-    if state.monitor_node_operations then worker_loop () else Lwt.return_unit
-  in
   Lwt.dont_wait
     (fun () ->
       Lwt.finalize
-        (fun () -> worker_loop ())
+        (fun () ->
+          if state.monitor_node_operations then worker_loop ()
+          else Lwt.return_unit)
         (fun () -> shutdown_worker state >>= fun _ -> Lwt.return_unit))
     (fun exn ->
       Events.(emit__dont_wait__use_with_care ended (Printexc.to_string exn))) ;

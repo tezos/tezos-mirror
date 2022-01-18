@@ -50,22 +50,14 @@ type event =
 
 (** {1 Constructors}*)
 
-(** [create ?initial_mempool ?monitor_node cctxt] create a monitoring process to
+(** [create ?monitor_node_operations cctxt] creates a monitoring process to
    fetch operations for the baker to process.
 
-
-    @param initial_mempool initial operations to put in the worker's queue
-   (default: [None])
-
-    @param monitor_node_operations monitor operations on the node (defaults: [true]).  Set
-   [monitor_node] to [false] to only consider the [initial_mempool] operations.
-
-*)
+    @param monitor_node_operations monitor operations on the node (defaults:
+   [true]).  Set [monitor_node_operations] to [false] to only consider
+   externally provided (non-node) operations.  *)
 val create :
-  ?initial_mempool:Baking_configuration.Mempool.t ->
-  ?monitor_node_operations:bool ->
-  #Protocol_client_context.full ->
-  t Lwt.t
+  ?monitor_node_operations:bool -> #Protocol_client_context.full -> t Lwt.t
 
 (** {2 Accessors}*)
 

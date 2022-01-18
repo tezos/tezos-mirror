@@ -18,6 +18,9 @@ depends: [
   "tezos-client-011-PtHangz2"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
+  "tezos-base-test-helpers" {with-test}
+  "alcotest-lwt" {with-test}
+  "tezos-011-PtHangz2-test-helpers" { with-test }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

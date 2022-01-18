@@ -34,6 +34,7 @@ module Baker : sig
     ?minimal_nanotez_per_byte:Q.t ->
     ?liquidity_baking_escape_vote:bool ->
     ?per_block_vote_file:string ->
+    ?extra_operations:Baking_configuration.Operations_source.t ->
     chain:Shell_services.chain ->
     context_path:string ->
     keep_alive:bool ->

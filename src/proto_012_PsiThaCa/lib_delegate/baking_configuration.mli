@@ -22,8 +22,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-(** {1 Mempool abstraction} *)
-module Mempool : sig
+(** {1 Operations_source abstraction} *)
+module Operations_source : sig
   type t =
     | Local of {filename : string}
         (** local mempool resource located in [filename] *)
@@ -32,6 +32,8 @@ module Mempool : sig
             parameters *)
 
   val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
 end
 
 type fees_config = {
@@ -59,7 +61,7 @@ type t = {
   per_block_vote_file : string option;
   force : bool;
   state_recorder : state_recorder_config;
-  initial_mempool : Mempool.t option;
+  extra_operations : Operations_source.t option;
 }
 
 val default_fees_config : fees_config
@@ -78,7 +80,7 @@ val default_force : bool
 
 val default_state_recorder_config : state_recorder_config
 
-val default_initial_mempool : Mempool.t option
+val default_extra_operations : Operations_source.t option
 
 val default_per_block_vote_file : string option
 
@@ -96,7 +98,7 @@ val make :
   ?per_block_vote_file:string ->
   ?force:bool ->
   ?state_recorder:state_recorder_config ->
-  ?initial_mempool:Mempool.t ->
+  ?extra_operations:Operations_source.t ->
   unit ->
   t
 
