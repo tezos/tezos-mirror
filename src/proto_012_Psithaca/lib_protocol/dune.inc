@@ -20,7 +20,7 @@
  (targets environment.ml)
  (action
   (write-file %{targets}
-              "module Name = struct let name = \"012-PsiThaCa\" end
+              "module Name = struct let name = \"012-Psithaca\" end
 include Tezos_protocol_environment.MakeV4(Name)()
 module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 ")))
@@ -145,7 +145,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    (:src_dir TEZOS_PROTOCOL))
  (action
   (with-stdout-to %{targets}
-                  (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "012_PsiThaCa")))))
+                  (chdir %{workspace_root} (run %{bin:tezos-embedded-protocol-packer} "%{src_dir}" "012_Psithaca")))))
 
 (rule
  (targets functor.ml)
@@ -388,31 +388,31 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    main.mli main.ml)
  (action
   (write-file %{targets}
-    "module Environment = Tezos_protocol_environment_012_PsiThaCa.Environment
-let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"PsiThaCaT47Zboaw71QWScM8sXeMM7bbQFncK9FLqYc6EKdpjVP\"
+    "module Environment = Tezos_protocol_environment_012_Psithaca.Environment
+let hash = Tezos_crypto.Protocol_hash.of_b58check_exn \"Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A\"
 let name = Environment.Name.name
-include Tezos_raw_protocol_012_PsiThaCa
-include Tezos_raw_protocol_012_PsiThaCa.Main
+include Tezos_raw_protocol_012_Psithaca
+include Tezos_raw_protocol_012_Psithaca.Main
 ")))
 
 (library
- (name tezos_protocol_environment_012_PsiThaCa)
+ (name tezos_protocol_environment_012_Psithaca)
  (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-012-PsiThaCa.environment)
+ (public_name tezos-protocol-012-Psithaca.environment)
  (library_flags (:standard -linkall))
  (libraries tezos-protocol-environment)
  (modules Environment))
 
 (library
- (name tezos_raw_protocol_012_PsiThaCa)
+ (name tezos_raw_protocol_012_Psithaca)
  (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-012-PsiThaCa.raw)
- (libraries tezos_protocol_environment_012_PsiThaCa)
+ (public_name tezos-protocol-012-Psithaca.raw)
+ (libraries tezos_protocol_environment_012_Psithaca)
  (library_flags (:standard -linkall))
  (flags (:standard -nopervasives -nostdlib
                    -w +a-4-40..42-44-45-48
                    -warn-error +a
-                   -open Tezos_protocol_environment_012_PsiThaCa__Environment
+                   -open Tezos_protocol_environment_012_Psithaca__Environment
                    -open Pervasives
                    -open Error_monad))
  (modules
@@ -533,43 +533,43 @@ include Tezos_raw_protocol_012_PsiThaCa.Main
 
 (install
  (section lib)
- (package tezos-protocol-012-PsiThaCa)
+ (package tezos-protocol-012-Psithaca)
  (files (TEZOS_PROTOCOL as raw/TEZOS_PROTOCOL)))
 
 (library
- (name tezos_protocol_012_PsiThaCa)
+ (name tezos_protocol_012_Psithaca)
  (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-012-PsiThaCa)
+ (public_name tezos-protocol-012-Psithaca)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos_raw_protocol_012_PsiThaCa)
+      tezos_raw_protocol_012_Psithaca)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
         -nopervasives)
  (modules Protocol))
 
 (library
- (name tezos_protocol_012_PsiThaCa_functor)
+ (name tezos_protocol_012_Psithaca_functor)
  ; The instrumentation is removed as it can lead to a stack overflow
  ; https://gitlab.com/tezos/tezos/-/issues/1927
  ; (instrumentation (backend bisect_ppx))
- (public_name tezos-protocol-functor-012-PsiThaCa)
+ (public_name tezos-protocol-functor-012-Psithaca)
  (libraries
       tezos-protocol-environment
       tezos-protocol-environment-sigs
-      tezos-protocol-012-PsiThaCa.raw)
+      tezos-protocol-012-Psithaca.raw)
  (flags -w "+a-4-40..42-44-45-48"
         -warn-error "+a"
         -nopervasives)
  (modules Functor))
 
 (library
- (name tezos_embedded_protocol_012_PsiThaCa)
+ (name tezos_embedded_protocol_012_Psithaca)
  (instrumentation (backend bisect_ppx))
- (public_name tezos-embedded-protocol-012-PsiThaCa)
+ (public_name tezos-embedded-protocol-012-Psithaca)
  (library_flags (:standard -linkall))
- (libraries tezos-protocol-012-PsiThaCa
+ (libraries tezos-protocol-012-Psithaca
             tezos-protocol-updater
             tezos-protocol-environment)
  (flags (:standard -w +a-4-40..42-44-45-48
@@ -698,11 +698,11 @@ include Tezos_raw_protocol_012_PsiThaCa.Main
 
 (rule
  (alias runtest_sandbox)
- (deps .tezos_protocol_012_PsiThaCa.objs/native/tezos_protocol_012_PsiThaCa.cmx)
+ (deps .tezos_protocol_012_Psithaca.objs/native/tezos_protocol_012_Psithaca.cmx)
  (action (progn)))
 
 (rule
  (alias runtest)
- (package tezos-protocol-012-PsiThaCa)
+ (package tezos-protocol-012-Psithaca)
  (deps (alias runtest_sandbox))
  (action (progn)))

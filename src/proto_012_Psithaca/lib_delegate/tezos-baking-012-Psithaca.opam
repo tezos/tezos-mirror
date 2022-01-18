@@ -7,23 +7,23 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
-  "tezos-012-PsiThaCa-test-helpers" { with-test }
+  "tezos-012-Psithaca-test-helpers" { with-test }
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-version"
   "tezos-protocol-environment"
-  "tezos-protocol-012-PsiThaCa"
+  "tezos-protocol-012-Psithaca"
   "tezos-shell-context"
   "tezos-shell-services"
   "tezos-context"
   "tezos-client-base"
   "tezos-client-commands"
-  "tezos-client-012-PsiThaCa"
+  "tezos-client-012-Psithaca"
   "tezos-rpc-http-client-unix"
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "lwt-exit"
   "tezos-base-test-helpers" {with-test}
-  "tezos-protocol-012-PsiThaCa-parameters" {with-test}
+  "tezos-protocol-012-Psithaca-parameters" {with-test}
   "alcotest-lwt" {with-test}
 ]
 build: [

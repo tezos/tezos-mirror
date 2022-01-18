@@ -14,7 +14,7 @@
   "error_filename_blacklist": [
   ],
   "error_message_blacklist": [
-    "Unbound module Tezos_protocol_012_PsiThaCa_functor",
+    "Unbound module Tezos_protocol_012_Psithaca_functor",
     "The placeholders `_` in types are not handled",
     "No type known for the following variants: `Ge, `Lt, `Eq, `Le, `Gt",
     "No type known for the following variants: `Eq, `Ge, `Gt, `Le, `Lt",
@@ -27,7 +27,7 @@
     "A variable name instead of a pattern was expected",
     "We only support extensible types in patterns at the head",
     "This kind of signature is not handled",
-    "Tezos_raw_protocol_012_PsiThaCa.Raw_context_intf.T",
+    "Tezos_raw_protocol_012_Psithaca.Raw_context_intf.T",
     "No type known for the following variants:",
     "Constructor of the variant",
     "Polymorphic variant types are defined as standard algebraic types"
@@ -91,7 +91,7 @@
     "type_logger"
   ],
   "first_class_module_path_blacklist": [
-    "Tezos_raw_protocol_012_PsiThaCa",
+    "Tezos_raw_protocol_012_Psithaca",
     "Tezos_protocol_environment_alpha.Environment",
     "Tezos_protocol_environment_alpha.Environment.Sapling"
   ],
@@ -99,9 +99,9 @@
     "Environment_context.TREE",
     "Tezos_protocol_environment_alpha__Environment.Map.OrderedType",
     "Tezos_protocol_environment_alpha__Environment.Set.OrderedType",
-    "Tezos_raw_protocol_012_PsiThaCa__Raw_context.T",
-    "Tezos_raw_protocol_012_PsiThaCa.Alpha_context.Cache.CLIENT",
-    "Tezos_raw_protocol_012_PsiThaCa.Alpha_context.Cache.INTERFACE",
+    "Tezos_raw_protocol_012_Psithaca__Raw_context.T",
+    "Tezos_raw_protocol_012_Psithaca.Alpha_context.Cache.CLIENT",
+    "Tezos_raw_protocol_012_Psithaca.Alpha_context.Cache.INTERFACE",
     "Tezos_sapling__Core_sig.T_encoding"
   ],
   "merge_returns": [
@@ -197,7 +197,7 @@
     ["Compare.Z.(Compare.S.t)", "Z.t"]
   ],
   "require": [
-    ["Tezos_raw_protocol_012_PsiThaCa", "TezosOfOCaml.Proto_alpha"]
+    ["Tezos_raw_protocol_012_Psithaca", "TezosOfOCaml.Proto_alpha"]
   ],
   "require_import": [
     ["Tezos_protocol_environment_alpha", "TezosOfOCaml.Proto_alpha"]

@@ -1,6 +1,6 @@
 tezt/_regressions/encoding/ithaca.level.out
 
-./tezos-codec encode 012-PsiThaCa.level from '{
+./tezos-codec encode 012-Psithaca.level from '{
   "level": 1331,
   "level_position": 2147483647,
   "cycle": 300,
@@ -9,6 +9,6 @@ tezt/_regressions/encoding/ithaca.level.out
 }'
 000005337fffffff0000012c00000258ff
 
-./tezos-codec decode 012-PsiThaCa.level from 000005337fffffff0000012c00000258ff
+./tezos-codec decode 012-Psithaca.level from 000005337fffffff0000012c00000258ff
 { "level": 1331, "level_position": 2147483647, "cycle": 300,
   "cycle_position": 600, "expected_commitment": true }

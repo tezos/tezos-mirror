@@ -584,7 +584,7 @@ end = struct
 
   let _011_PtHangz2 = active ~number:011 "PtHangz2"
 
-  let _012_PsiThaCa = active ~number:012 "PsiThaCa"
+  let _012_Psithaca = active ~number:012 "Psithaca"
 
   let alpha = active "alpha"
 

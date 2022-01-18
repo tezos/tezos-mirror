@@ -354,7 +354,7 @@ let init_with_constants constants n =
       (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
       accounts
   in
-  let open Tezos_protocol_012_PsiThaCa_parameters in
+  let open Tezos_protocol_012_Psithaca_parameters in
   let bootstrap_accounts =
     List.map
       (fun (acc, tez) ->

@@ -9,8 +9,8 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-stdlib-unix"
-  "tezos-protocol-012-PsiThaCa"
-  "tezos-protocol-012-PsiThaCa-parameters" {with-test}
+  "tezos-protocol-012-Psithaca"
+  "tezos-protocol-012-Psithaca-parameters" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest-lwt" {with-test}
   "qcheck-alcotest" {with-test}

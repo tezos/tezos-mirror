@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "tezos-protocol-012-PsiThaCa"
+  "tezos-protocol-012-Psithaca"
   "tezos-protocol-compiler"
 ]
 build: [
@@ -16,7 +16,7 @@ build: [
     "%{tezos-protocol-compiler:lib}%/dune_protocol.template.v1"
     "dune"
     "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
-    "012_PsiThaCa"
+    "012_Psithaca"
   ]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}

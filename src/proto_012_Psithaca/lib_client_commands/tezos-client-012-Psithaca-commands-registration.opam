@@ -9,12 +9,12 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-protocol-environment"
-  "tezos-protocol-012-PsiThaCa"
+  "tezos-protocol-012-Psithaca"
   "tezos-shell-services"
   "tezos-client-base"
-  "tezos-client-012-PsiThaCa"
-  "tezos-client-012-PsiThaCa-commands"
-  "tezos-client-sapling-012-PsiThaCa"
+  "tezos-client-012-Psithaca"
+  "tezos-client-012-Psithaca-commands"
+  "tezos-client-sapling-012-Psithaca"
   "tezos-client-commands"
 ]
 build: [

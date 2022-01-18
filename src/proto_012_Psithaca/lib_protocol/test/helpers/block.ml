@@ -270,7 +270,7 @@ let check_constants_consistency constants =
 
 let prepare_main_init_params ?bootstrap_contracts commitments constants
     initial_accounts =
-  let open Tezos_protocol_012_PsiThaCa_parameters in
+  let open Tezos_protocol_012_Psithaca_parameters in
   let bootstrap_accounts =
     List.map
       (fun (Account.{pk; pkh; _}, amount) ->
@@ -373,7 +373,7 @@ let genesis_with_parameters parameters =
       ~seed_nonce_hash:None
       ()
   in
-  let open Tezos_protocol_012_PsiThaCa_parameters in
+  let open Tezos_protocol_012_Psithaca_parameters in
   let json = Default_parameters.json_of_parameters parameters in
   let proto_params =
     Data_encoding.Binary.to_bytes_exn Data_encoding.json json
@@ -412,7 +412,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?level ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
     ?blocks_per_cycle initial_accounts =
-  let open Tezos_protocol_012_PsiThaCa_parameters in
+  let open Tezos_protocol_012_Psithaca_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
     Option.value ~default:constants.min_proposal_quorum min_proposal_quorum

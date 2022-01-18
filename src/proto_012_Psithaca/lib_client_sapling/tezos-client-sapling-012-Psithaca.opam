@@ -13,9 +13,9 @@ depends: [
   "tezos-crypto"
   "tezos-client-base"
   "tezos-signer-backends"
-  "tezos-client-012-PsiThaCa"
-  "tezos-client-012-PsiThaCa-commands"
-  "tezos-protocol-012-PsiThaCa"
+  "tezos-client-012-Psithaca"
+  "tezos-client-012-Psithaca-commands"
+  "tezos-protocol-012-Psithaca"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
