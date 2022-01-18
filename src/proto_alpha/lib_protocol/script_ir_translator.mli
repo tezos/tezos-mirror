@@ -74,7 +74,7 @@ type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 type ex_parameter_ty_and_entrypoints =
   | Ex_parameter_ty_and_entrypoints : {
       arg_type : 'a Script_typed_ir.ty;
-      root_name : Script_ir_annot.field_annot option;
+      root_name : Entrypoint.t option;
     }
       -> ex_parameter_ty_and_entrypoints
 
@@ -88,7 +88,7 @@ type toplevel = {
   arg_type : Script.node;
   storage_type : Script.node;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Script_ir_annot.field_annot option;
+  root_name : Entrypoint.t option;
 }
 
 type ('arg, 'storage) code = {
@@ -101,7 +101,7 @@ type ('arg, 'storage) code = {
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Script_ir_annot.field_annot option;
+  root_name : Entrypoint.t option;
   code_size : Cache_memory_helpers.sint;
       (** This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
@@ -279,7 +279,7 @@ val parse_comparable_ty :
 val parse_parameter_ty_and_entrypoints :
   context ->
   legacy:bool ->
-  root_name:Script_ir_annot.field_annot option ->
+  root_name:Entrypoint.t option ->
   Script.node ->
   (ex_parameter_ty_and_entrypoints * context) tzresult
 
@@ -358,7 +358,7 @@ val add_field_annot :
 val unparse_parameter_ty :
   loc:'loc ->
   context ->
-  root_name:Script_ir_annot.field_annot option ->
+  root_name:Entrypoint.t option ->
   'a Script_typed_ir.ty ->
   ('loc Script.michelson_node * context) tzresult
 
@@ -428,14 +428,14 @@ val parse_contract_for_script :
 val find_entrypoint :
   error_details:'error_trace error_details ->
   't Script_typed_ir.ty ->
-  root_name:Script_ir_annot.field_annot option ->
+  root_name:Entrypoint.t option ->
   Entrypoint.t ->
   ((Script.node -> Script.node) * ex_ty, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
   't Script_typed_ir.ty ->
   context ->
-  root_name:Script_ir_annot.field_annot option ->
+  root_name:Entrypoint.t option ->
   (Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
     Entrypoint.Map.t)

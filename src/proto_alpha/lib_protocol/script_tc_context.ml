@@ -31,7 +31,7 @@ type callsite =
   | Toplevel : {
       storage_type : 'sto ty;
       param_type : 'param ty;
-      root_name : Script_ir_annot.field_annot option;
+      root_name : Alpha_context.Entrypoint.t option;
     }
       -> callsite
   | View : callsite

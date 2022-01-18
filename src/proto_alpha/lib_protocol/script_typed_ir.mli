@@ -363,7 +363,7 @@ type ('arg, 'storage) script = {
   storage : 'storage;
   storage_type : 'storage ty;
   views : view SMap.t;
-  root_name : field_annot option;
+  root_name : Entrypoint.t option;
   code_size : Cache_memory_helpers.sint;
 }
 
@@ -910,7 +910,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
       views : view SMap.t;
-      root_name : field_annot option;
+      root_name : Entrypoint.t option;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
       -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr

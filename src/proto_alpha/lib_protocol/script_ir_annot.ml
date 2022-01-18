@@ -55,6 +55,9 @@ let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
       | None -> false
       | Some a' -> Entrypoint.(a' = entrypoint))
 
+let field_annot_of_entrypoint entrypoint =
+  Field_annot (Entrypoint.to_non_empty_string entrypoint)
+
 let merge_field_annot :
     type error_trace.
     legacy:bool ->

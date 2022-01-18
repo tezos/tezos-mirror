@@ -41,6 +41,9 @@ val is_default : t -> bool
 (** Root entrypoint "root" *)
 val root : t
 
+(** Checks whether an entrypoint is the root entrypoint *)
+val is_root : t -> bool
+
 (** Entrypoint "do" *)
 val do_ : t
 
@@ -79,6 +82,10 @@ val of_annot_lax_opt : Non_empty_string.t -> t option
     Returns an error if the string is too long.
     Accepts "default" and converts "" to "default". *)
 val of_string_lax : string -> t tzresult
+
+(** Converts an entrypoint to a non-empty string.
+    "default" is kept as is. *)
+val to_non_empty_string : t -> Non_empty_string.t
 
 (** Converts an entrypoint to a string.
     "default" is kept as is. *)
