@@ -55,7 +55,7 @@ module type S = sig
   val full_logger : Format.formatter -> logger
 
   type config = {
-    media_type : Media_type.t list;
+    media_type : Media_type.Command_line.t;
     endpoint : Uri.t;
     logger : logger;
   }
@@ -405,7 +405,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     >>= fun ans -> handle accept ans
 
   type config = {
-    media_type : Media_type.t list;
+    media_type : Media_type.Command_line.t;
     endpoint : Uri.t;
     logger : logger;
   }
@@ -417,12 +417,12 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
       (fun (media_type, endpoint) ->
         {media_type; endpoint; logger = null_logger})
       (obj2
-         (req "media-type" (list Media_type.encoding))
+         (req "media-type" Media_type.Command_line.encoding)
          (req "endpoint" RPC_encoding.uri_encoding))
 
   let default_config =
     {
-      media_type = Media_type.all_media_types;
+      media_type = Media_type.Command_line.Any;
       endpoint = Uri.of_string "http://localhost:8732";
       logger = null_logger;
     }
@@ -437,7 +437,11 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         let prefixed_path = if prefix = "" then path else prefix ^ "/" ^ path in
         let uri = Uri.with_path base prefixed_path in
         let uri = Uri.with_query uri query in
-        generic_media_type_call ?body ~accept:config.media_type meth uri
+        generic_media_type_call
+          ?body
+          ~accept:(Media_type.Command_line.of_command_line config.media_type)
+          meth
+          uri
 
       method call_service
           : 'm 'p 'q 'i 'o.

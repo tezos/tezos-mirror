@@ -128,7 +128,7 @@ let main_promise (config_file : string option)
     else RPC_client_unix.null_logger
   in
   let rpc_config : RPC_client_unix.config =
-    {media_type = Media_type.all_media_types; endpoint; logger}
+    {media_type = Media_type.Command_line.Any; endpoint; logger}
   in
   let printer =
     let logger channel msg : unit Lwt.t =

@@ -183,7 +183,7 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     inherit
       Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
         rpc_config
-        rpc_config.media_type
+        (Media_type.Command_line.of_command_line rpc_config.media_type)
 
     inherit unix_ui
 
@@ -235,7 +235,7 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
         (new unix_logger ~base_dir)
         (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
            rpc_config
-           rpc_config.media_type)
+           (Media_type.Command_line.of_command_line rpc_config.media_type))
         mode
         proxy_env
 

@@ -199,7 +199,7 @@ let default_block = `Head 0
 
 let default_endpoint = Uri.of_string "http://localhost:8732"
 
-let default_media_type = Media_type.all_media_types
+let default_media_type = Media_type.Command_line.Any
 
 open Filename.Infix
 
@@ -212,7 +212,7 @@ module Cfg_file = struct
     node_addr : string option;
     node_port : int option;
     tls : bool option;
-    media_type : Media_type.t list option;
+    media_type : Media_type.Command_line.t option;
     endpoint : Uri.t option;
     web_port : int;
     remote_signer : Uri.t option;
@@ -288,7 +288,7 @@ module Cfg_file = struct
          (opt "node_addr" string)
          (opt "node_port" uint16)
          (opt "tls" bool)
-         (opt "media_type" (list Media_type.encoding))
+         (opt "media_type" Media_type.Command_line.encoding)
          (opt "endpoint" RPC_encoding.uri_encoding)
          (opt "web_port" uint16)
          (opt "remote_signer" RPC_encoding.uri_encoding)
@@ -325,13 +325,11 @@ let string_parameter () : (string, #Client_context.full) parameter =
   parameter (fun _ x -> return x)
 
 let media_type_parameter () :
-    (Media_type.t list, #Client_context.full) parameter =
+    (Media_type.Command_line.t, #Client_context.full) parameter =
   parameter (fun _ x ->
-      match x with
-      | "json" -> return Media_type.[json; bson]
-      | "binary" -> return Media_type.[octet_stream]
-      | "any" -> return Media_type.all_media_types
-      | _ -> fail (Invalid_media_type_arg x))
+      match Media_type.Command_line.parse_cli_parameter x with
+      | Some v -> return v
+      | None -> fail (Invalid_media_type_arg x))
 
 let endpoint_parameter () =
   parameter (fun _ x ->
@@ -1154,7 +1152,7 @@ type t =
   * string option
   * int option
   * bool
-  * Media_type.t list option
+  * Media_type.Command_line.t option
   * Uri.t option
   * Tezos_proxy.Light.sources_config option
   * Uri.t option

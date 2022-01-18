@@ -76,6 +76,7 @@ and rpc = {
   cors_headers : string list;
   tls : tls option;
   acl : RPC_server.Acl.policy;
+  media_type : Media_type.Command_line.t;
 }
 
 and tls = {cert : string; key : string}
@@ -121,6 +122,7 @@ val update :
   ?discovery_addr:string ->
   ?rpc_listen_addrs:string list ->
   ?allow_all_rpc:P2p_point.Id.addr_port_id list ->
+  ?media_type:Media_type.Command_line.t ->
   ?private_mode:bool ->
   ?disable_mempool:bool ->
   ?disable_mempool_precheck:bool ->

@@ -55,7 +55,7 @@ module type S = sig
   val full_logger : Format.formatter -> logger
 
   type config = {
-    media_type : Media_type.t list;
+    media_type : Media_type.Command_line.t;
     endpoint : Uri.t;
     logger : logger;
   }

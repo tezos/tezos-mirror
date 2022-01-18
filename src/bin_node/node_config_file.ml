@@ -368,6 +368,7 @@ and rpc = {
   cors_headers : string list;
   tls : tls option;
   acl : RPC_server.Acl.policy;
+  media_type : Media_type.Command_line.t;
 }
 
 and tls = {cert : string; key : string}
@@ -432,6 +433,7 @@ let default_rpc =
     cors_headers = [];
     tls = None;
     acl = RPC_server.Acl.empty_policy;
+    media_type = Media_type.Command_line.Any;
   }
 
 let default_shell =
@@ -792,20 +794,28 @@ let p2p =
 let rpc : rpc Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {cors_origins; cors_headers; listen_addrs; tls; acl} ->
+    (fun {cors_origins; cors_headers; listen_addrs; tls; acl; media_type} ->
       let (cert, key) =
         match tls with
         | None -> (None, None)
         | Some {cert; key} -> (Some cert, Some key)
       in
-      (Some listen_addrs, None, cors_origins, cors_headers, cert, key, acl))
+      ( Some listen_addrs,
+        None,
+        cors_origins,
+        cors_headers,
+        cert,
+        key,
+        acl,
+        media_type ))
     (fun ( listen_addrs,
            legacy_listen_addr,
            cors_origins,
            cors_headers,
            cert,
            key,
-           acl ) ->
+           acl,
+           media_type ) ->
       let tls =
         match (cert, key) with
         | (None, _) | (_, None) -> None
@@ -821,8 +831,8 @@ let rpc : rpc Data_encoding.t =
               "Config file: Use only \"listen-addrs\" and not (legacy) \
                \"listen-addr\"."
       in
-      {listen_addrs; cors_origins; cors_headers; tls; acl})
-    (obj7
+      {listen_addrs; cors_origins; cors_headers; tls; acl; media_type})
+    (obj8
        (opt
           "listen-addrs"
           ~description:
@@ -853,7 +863,12 @@ let rpc : rpc Data_encoding.t =
           "acl"
           ~description:"A list of RPC ACLs for specific listening addresses."
           RPC_server.Acl.policy_encoding
-          RPC_server.Acl.empty_policy))
+          default_rpc.acl)
+       (dft
+          "media-type"
+          ~description:"The media types supported by the server."
+          Media_type.Command_line.encoding
+          default_rpc.media_type))
 
 let timeout_encoding = Time.System.Span.encoding
 
@@ -1231,7 +1246,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
     ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
-    ?(allow_all_rpc = []) ?(private_mode = false) ?(disable_mempool = false)
+    ?(allow_all_rpc = []) ?(media_type = Media_type.Command_line.Any)
+    ?(private_mode = false) ?(disable_mempool = false)
     ?(disable_mempool_precheck =
       default_shell.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
@@ -1302,6 +1318,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       cors_headers = unopt_list ~default:cfg.rpc.cors_headers cors_headers;
       tls = Option.either rpc_tls cfg.rpc.tls;
       acl;
+      media_type;
     }
   and log : Lwt_log_sink_unix.cfg =
     {cfg.log with output = Option.value ~default:cfg.log.output log_output}

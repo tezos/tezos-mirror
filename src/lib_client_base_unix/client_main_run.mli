@@ -52,7 +52,7 @@ sig
        define your own one. *)
     string
 
-  val default_media_type : Media_type.t list
+  val default_media_type : Media_type.Command_line.t
 
   val other_registrations :
     (* You may give an **optional** function that will work on the
