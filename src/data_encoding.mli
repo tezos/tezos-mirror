@@ -898,7 +898,7 @@ module Json : sig
       instructions become invalid: the content of [buff] may have been rewritten
       by the side effect of forcing the next element.
 
-      @raise [Invalid_argument _] if [Bytes.length buffer] is less than 32. *)
+      @raise [Invalid_argument] if [Bytes.length buffer] is less than 32. *)
   val blit_instructions_seq_of_jsonm_lexeme_seq :
     newline:bool ->
     buffer:bytes ->
@@ -1257,7 +1257,7 @@ let iter socket encoding f =
 
   module Slicer : sig
     (** A [slice] is a part of a binary representation of some data. The
-      concatenation of multiple slice represents the whole data. *)
+        concatenation of multiple slices represents the whole data. *)
     type slice = {name : string; value : string; pretty_printed : string}
 
     type slicer_state
@@ -1266,11 +1266,15 @@ let iter socket encoding f =
     val make_slicer_state :
       string -> offset:int -> length:int -> slicer_state option
 
-    (** [slice e b offset length] slices the data represented by the [length]
-      bytes in [b] starting at index [offset].
+    (** [slice e state] slices the data represented by the substring described
+        by [state].
 
-      If [e] does not correctly describe the given bytes (i.e., if [read]
-      would fail on equivalent parameters) then it returns [Error]. *)
+        If [e] does not correctly describe the given bytes (i.e., if [read]
+        would fail on equivalent parameters) then it returns [Error].
+
+        Otherwise it returns [Ok sl] and
+        [String.concat "" (List.map (fun s -> s.value) sl] is byte-for-byte
+        identical to the substring described by [state]. *)
     val slice :
       _ Encoding.t ->
       slicer_state ->
@@ -1280,7 +1284,10 @@ let iter socket encoding f =
 
     val slice_exn : _ Encoding.t -> slicer_state -> slice list
 
-    (** [slice_string] slices the whole content of the buffer. *)
+    (** [slice_string] slices the whole content of the string.
+
+        In other words, [slice_string e s] is
+        [slice e (Option.get @@ make_slicer_state s 0 (String.length s)]. *)
     val slice_string : _ Encoding.t -> string -> (slice list, read_error) result
 
     val slice_string_opt : _ Encoding.t -> string -> slice list option
@@ -1358,7 +1365,7 @@ module Registration : sig
       See {!Binary.slice_string} for details about slicing. *)
   val slice_all : string -> (string * Binary.Slicer.slice list) list
 
-  (** [find id] is [Some r] if [register id e] has been called, in which
+  (** [find id] is [Some r] if [register (def id e)] has been called, in which
       case [r] matches [e]. Otherwise, it is [None]. *)
   val find : id -> t option
 
@@ -1366,8 +1373,9 @@ module Registration : sig
       a registered encoding for the [id]. *)
   val list : unit -> (id * t) list
 
-  (** Conversion functions from/to json to/from bytes. *)
+  (** Conversion functions from JSON to bytes. *)
   val bytes_of_json : t -> Json.t -> Bytes.t option
 
+  (** Conversion functions from bytes to JSON. *)
   val json_of_bytes : t -> Bytes.t -> Json.t option
 end
