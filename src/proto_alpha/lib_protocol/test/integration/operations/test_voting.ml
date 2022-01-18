@@ -306,17 +306,12 @@ let test_successful_vote num_delegates () =
   (* proposing more than maximum_proposals fails *)
   Op.proposals (B b) del1 (Protocol_hash.zero :: props) >>=? fun ops ->
   Block.bake ~operations:[ops] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Amendment.Too_many_proposals -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Too many proposals"
   >>=? fun () ->
   (* proposing less than one proposal fails *)
   Op.proposals (B b) del1 [] >>=? fun ops ->
   Block.bake ~operations:[ops] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Amendment.Empty_proposal -> true
-      | _ -> false)
-  >>=? fun () ->
+  Assert.proto_error_with_info ~loc:__LOC__ res "Empty proposal" >>=? fun () ->
   (* first block of exploration period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
   (* next block is first block of exploration *)
@@ -348,9 +343,7 @@ let test_successful_vote num_delegates () =
   Block.bake ~operations b >>=? fun b ->
   Op.ballot (B b) del1 Protocol_hash.zero Vote.Nay >>=? fun op ->
   Block.bake ~operations:[op] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Amendment.Duplicate_ballot -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Duplicate ballot"
   >>=? fun () ->
   (* Allocate votes from weight of active delegates *)
   List.fold_left (fun acc v -> Int64.(add v acc)) 0L power_p2

@@ -113,7 +113,7 @@ end = struct
     aux_simple_preendorsement_inclusion (* inject the op twice *)
       ~mk_ops:(fun op -> [op; op])
       ~loc:__LOC__
-      ~post_process:(Error ("double inclusion of consensus operation", `Branch))
+      ~post_process:(Error ("Double inclusion of consensus operation", `Branch))
       ()
 
   (** KO: locked round declared in the block is not smaller than
@@ -151,7 +151,7 @@ end = struct
     (* preendorsement should be for _curr block to be valid *)
       ~preendorsed_block:(fun _predpred pred _curr -> pred)
       ~loc:__LOC__
-      ~post_process:(Error ("wrong level for consensus operation", `Permanent))
+      ~post_process:(Error ("Wrong level for consensus operation", `Permanent))
       ()
 
   (** OK: explicit the correct endorser and preendorsing slot in the test *)
@@ -179,7 +179,7 @@ end = struct
         | _ -> assert false
         (* there is at least one endorser with a slot *))
       ~loc:__LOC__
-      ~post_process:(Error ("wrong slot", `Permanent))
+      ~post_process:(Error ("Wrong slot", `Permanent))
       ()
 
   (** KO: the delegate tries to injects with a canonical slot of another delegate *)
@@ -205,7 +205,7 @@ end = struct
     *)
     let post_process =
       if Mode.baking_mode == Application then
-        Error ("wrong round for consensus operation", `Permanent)
+        Error ("Wrong round for consensus operation", `Permanent)
       else Ok (fun _ -> return_unit)
     in
     aux_simple_preendorsement_inclusion

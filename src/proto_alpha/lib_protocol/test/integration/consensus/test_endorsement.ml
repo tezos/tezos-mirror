@@ -117,11 +117,7 @@ let test_non_normalized_slot () =
       >>=? fun op ->
       let policy = Block.Excluding [delegate] in
       Block.bake ~policy ~operations:[Operation.pack op] b >>= fun res ->
-      Assert.proto_error ~loc:__LOC__ res (function err ->
-          let error_info =
-            Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-          in
-          error_info.title = "wrong slot")
+      Assert.proto_error_with_info ~loc:__LOC__ res "Wrong slot"
 
 (** Wrong endorsement predecessor : apply an endorsement with an
     incorrect block predecessor. *)
@@ -131,9 +127,10 @@ let test_wrong_endorsement_predecessor () =
   >>=? fun operation ->
   let operation = Operation.pack operation in
   Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Wrong_consensus_operation_branch _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "Wrong consensus operation branch"
 
 (** Invalid_endorsement_level: apply an endorsement with an incorrect
     level (i.e. the predecessor level). *)
@@ -143,9 +140,10 @@ let test_invalid_endorsement_level () =
   Op.endorsement ~level:genesis_level ~endorsed_block:b (B genesis) ()
   >>=? fun op ->
   Block.bake ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Wrong_level_for_consensus_operation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "Wrong level for consensus operation"
 
 (** Duplicate endorsement : apply an endorsement that has already been applied. *)
 let test_duplicate_endorsement () =
@@ -160,7 +158,7 @@ let test_duplicate_endorsement () =
   Assert.proto_error_with_info
     ~loc:__LOC__
     res
-    "double inclusion of consensus operation"
+    "Double inclusion of consensus operation"
 
 (** Consensus operation for future level : apply an endorsement with a level in the future *)
 let test_consensus_operation_endorsement_for_future_level () =
@@ -258,7 +256,7 @@ let test_wrong_round () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~round
-    ~error_title:"wrong round for consensus operation"
+    ~error_title:"Wrong round for consensus operation"
     ~context:(Context.B genesis)
     ()
 
@@ -273,7 +271,7 @@ let test_wrong_level () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~level
-    ~error_title:"wrong level for consensus operation"
+    ~error_title:"Wrong level for consensus operation"
     ~context
     ()
 
@@ -285,7 +283,7 @@ let test_wrong_payload_hash () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~block_payload_hash:Block_payload_hash.zero
-    ~error_title:"wrong payload hash for consensus operation"
+    ~error_title:"Wrong payload hash for consensus operation"
     ~context:(Context.B genesis)
     ()
 
@@ -301,7 +299,7 @@ let test_wrong_slot_used () =
     ~is_preendorsement:false
     ~endorsed_block:b
     ~slot
-    ~error_title:"wrong slot"
+    ~error_title:"Wrong slot"
     ~context:(Context.B genesis)
     ()
 
@@ -340,12 +338,7 @@ let test_endorsement_threshold ~sufficient_threshold () =
   >>=? fun (_, endos) ->
   Block.bake ~operations:endos b >>= fun b ->
   if sufficient_threshold then return_unit
-  else
-    Assert.proto_error ~loc:__LOC__ b (function err ->
-        let error_info =
-          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-        in
-        error_info.title = "Not enough endorsements")
+  else Assert.proto_error_with_info ~loc:__LOC__ b "Not enough endorsements"
 
 (** Fitness gap: this is a straightforward update from Emmy to Tenderbake, that
     is, check that the level is incremented in a child block. *)
@@ -396,7 +389,7 @@ let test_wrong_endorsement_slot_in_mempool_mode () =
   let endo = Operation.pack endo in
   Incremental.begin_construction ~mempool_mode:true b1 >>=? fun i ->
   Incremental.add_operation i endo >>= fun res ->
-  Assert.proto_error_with_info ~loc:__LOC__ res "wrong slot"
+  Assert.proto_error_with_info ~loc:__LOC__ res "Wrong slot"
 
 (** Endorsement for next level *)
 let test_endorsement_for_next_level () =
@@ -449,7 +442,7 @@ let test_double_endorsement_grandparent () =
   Assert.proto_error_with_info
     ~loc:__LOC__
     res
-    "double inclusion of consensus operation"
+    "Double inclusion of consensus operation"
   >>=? fun () ->
   Incremental.add_operation i op2 >>=? fun _i -> return ()
 
@@ -478,9 +471,10 @@ let test_endorsement_grandparent_application () =
   Block.bake b_gp >>=? fun b ->
   Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op ->
   Block.bake ~operations:[Operation.pack op] b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Wrong_level_for_consensus_operation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "Wrong level for consensus operation"
 
 (** Endorsement of grandparent in full construction mode should be rejected *)
 let test_endorsement_grandparent_full_construction () =
@@ -492,9 +486,10 @@ let test_endorsement_grandparent_full_construction () =
   Op.endorsement ~endorsed_block:b_gp (B genesis) () >>=? fun op1 ->
   let op1 = Alpha_context.Operation.pack op1 in
   Incremental.add_operation i op1 >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Wrong_level_for_consensus_operation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "Wrong level for consensus operation"
 
 let tests =
   [

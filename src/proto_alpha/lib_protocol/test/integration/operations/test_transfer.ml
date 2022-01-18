@@ -101,13 +101,17 @@ let test_block_with_a_single_transfer_with_fee () =
 
 (** Single transfer without fee. *)
 let test_transfer_zero_tez () =
-  single_transfer
-    ~expect_failure:(function
-      | Environment.Ecoproto_error (Apply.Empty_transaction _ as e) :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | _ -> failwith "Empty transaction should fail")
-    Tez.zero
+  let expect_failure = function
+    | Environment.Ecoproto_error err :: _ ->
+        Assert.test_error_encodings err ;
+        let error_info =
+          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+        in
+        if error_info.title = "Empty transaction" then return_unit
+        else failwith "unexpected error"
+    | _ -> failwith "Empty transaction should fail"
+  in
+  single_transfer ~expect_failure Tez.zero
 
 (** Transfer zero tez from an implicit contract. *)
 let test_transfer_zero_implicit () =
@@ -118,9 +122,7 @@ let test_transfer_zero_implicit () =
   let src = Contract.implicit_contract account.Account.pkh in
   Op.transaction (I i) src dest Tez.zero >>=? fun op ->
   Incremental.add_operation i op >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Empty_implicit_contract _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Empty implicit contract"
 
 (** Transfer to originated contract. *)
 let test_transfer_to_originate_with_fee () =
@@ -197,9 +199,7 @@ let test_transfer_zero_implicit_with_bal_src_as_fee () =
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
   Op.transaction (I i) ~fee:bal_src src dest Tez.zero >>=? fun op ->
   Incremental.add_operation i op >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Empty_transaction _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Empty transaction"
 
 (** Transfer zero tez to an originated contract, with fee equals balance of src. *)
 let test_transfer_zero_to_originated_with_bal_src_as_fee () =
@@ -232,9 +232,7 @@ let test_transfer_one_to_implicit_with_bal_src_as_fee () =
   Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
   Op.transaction (I i) ~fee:bal_src src dest Tez.one >>=? fun op ->
   Incremental.add_operation i op >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Balance_too_low _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Balance too low"
 
 (********************)
 (* The following tests are for different kind of contracts:
@@ -394,9 +392,7 @@ let test_empty_implicit () =
   (* Transfer zero tez from an implicit contract. *)
   Op.transaction (I incr) src dest amount >>=? fun op ->
   Incremental.add_operation incr op >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Empty_implicit_contract _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Empty implicit contract"
 
 (** Balance is too low to transfer. *)
 let test_balance_too_low fee () =
@@ -407,10 +403,13 @@ let test_balance_too_low fee () =
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
   Op.transaction ~fee (I i) contract_1 contract_2 max_tez >>=? fun op ->
   let expect_failure = function
-    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as e) :: _
-      ->
-        Assert.test_error_encodings e ;
-        return_unit
+    | Environment.Ecoproto_error err :: _ ->
+        Assert.test_error_encodings err ;
+        let error_info =
+          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+        in
+        if String.equal error_info.title "Balance too low" then return_unit
+        else failwith "unexpected error: %s" error_info.title
     | _ -> failwith "balance too low should fail"
   in
   (* the fee is higher than the balance then raise an error "Balance_too_low" *)
@@ -458,10 +457,13 @@ let test_balance_too_low_two_transfers fee () =
   Op.transaction ~fee (I i) contract_1 contract_3 two_third_of_balance
   >>=? fun operation ->
   let expect_failure = function
-    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as e) :: _
-      ->
-        Assert.test_error_encodings e ;
-        return_unit
+    | Environment.Ecoproto_error err :: _ ->
+        Assert.test_error_encodings err ;
+        let error_info =
+          Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+        in
+        if error_info.title = "Balance too low" then return_unit
+        else failwith "unexpected error"
     | _ -> failwith "balance too low should fail"
   in
   Incremental.add_operation ~expect_failure i operation >>=? fun i ->
@@ -479,9 +481,10 @@ let invalid_counter () =
   Op.transaction (I b) contract_1 contract_2 Tez.one >>=? fun op2 ->
   Incremental.add_operation b op1 >>=? fun b ->
   Incremental.add_operation b op2 >>= fun b ->
-  Assert.proto_error ~loc:__LOC__ b (function
-      | Contract_storage.Counter_in_the_past _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    b
+    "Invalid counter (already used) in a manager operation"
 
 (** Same as before but through a different way to perform this
     error. *)
@@ -492,9 +495,10 @@ let test_add_the_same_operation_twice () =
   >>=? fun (b, op_transfer) ->
   Op.transaction (I b) contract_1 contract_2 ten_tez >>=? fun _ ->
   Incremental.add_operation b op_transfer >>= fun b ->
-  Assert.proto_error ~loc:__LOC__ b (function
-      | Contract_storage.Counter_in_the_past _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    b
+    "Invalid counter (already used) in a manager operation"
 
 (** The counter is in the future *)
 let invalid_counter_in_the_future () =

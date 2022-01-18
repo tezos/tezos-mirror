@@ -158,13 +158,15 @@ let test_multiple_origination_and_delegation () =
     (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
     new_contracts
 
-let expect_balance_too_low = function
-  | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
-      return_unit
-  | _ ->
-      failwith
-        "Contract should not have a sufficient balance : operation expected to \
-         fail."
+let expect_failure = function
+  | Environment.Ecoproto_error err :: _ ->
+      Assert.test_error_encodings err ;
+      let error_info =
+        Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+      in
+      if error_info.title = "Balance too low" then return_unit
+      else failwith "unexpected error"
+  | _ -> failwith "balance too low should fail"
 
 (** Groups three operations, the middle one failing.
     Checks that the receipt is consistent.
@@ -183,8 +185,7 @@ let test_failing_operation_in_the_middle () =
   Incremental.begin_construction blk >>=? fun inc ->
   Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
   Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
-  Incremental.add_operation ~expect_failure:expect_balance_too_low inc operation
-  >>=? fun inc ->
+  Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
   let tickets = Incremental.rev_tickets inc in
   let open Apply_results in
   let tickets =
@@ -232,8 +233,7 @@ let test_failing_operation_in_the_middle_with_fees () =
   Incremental.begin_construction blk >>=? fun inc ->
   Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
   Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
-  Incremental.add_operation ~expect_failure:expect_balance_too_low inc operation
-  >>=? fun inc ->
+  Incremental.add_operation ~expect_failure inc operation >>=? fun inc ->
   let tickets = Incremental.rev_tickets inc in
   let open Apply_results in
   let tickets =
@@ -272,21 +272,6 @@ let test_failing_operation_in_the_middle_with_fees () =
   Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance >>=? fun () ->
   return_unit
 
-let expect_wrong_signature list =
-  if
-    List.exists
-      (function
-        | Environment.Ecoproto_error Apply.Inconsistent_sources -> true
-        | _ -> false)
-      list
-  then return_unit
-  else
-    failwith
-      "Packed operation has invalid source in the middle : operation expected \
-       to fail but got errors: %a."
-      Error_monad.pp_print_trace
-      list
-
 let test_wrong_signature_in_the_middle () =
   Context.init 2 >>=? function
   | (_, []) | (_, [_]) -> assert false
@@ -321,10 +306,21 @@ let test_wrong_signature_in_the_middle () =
       let operations = [op1; op2; op3] in
       Op.combine_operations ~spurious_operation ~source:c1 (I inc) operations
       >>=? fun operation ->
-      Incremental.add_operation
-        ~expect_apply_failure:expect_wrong_signature
-        inc
-        operation
+      let expect_apply_failure = function
+        | Environment.Ecoproto_error err :: _ ->
+            Assert.test_error_encodings err ;
+            let error_info =
+              Error_monad.find_info_of_error (Environment.wrap_tzerror err)
+            in
+            if error_info.title = "Inconsistent sources in operation pack" then
+              return_unit
+            else failwith "unexpected error"
+        | _ ->
+            failwith
+              "Packed operation has invalid source in the middle : operation \
+               expected to fail."
+      in
+      Incremental.add_operation ~expect_apply_failure inc operation
       >>=? fun _inc -> return_unit
 
 let expect_inconsistent_counters list =

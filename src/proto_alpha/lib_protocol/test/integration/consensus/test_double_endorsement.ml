@@ -191,11 +191,7 @@ let test_two_double_endorsement_evidences_leadsto_no_bake () =
   Assert.equal_tez ~loc:__LOC__ Tez.zero frozen_deposits_after >>=? fun () ->
   Block.bake ~policy:(By_account delegate) blk_with_evidence2 >>= fun b ->
   (* a delegate with 0 frozen deposits cannot bake *)
-  Assert.proto_error ~loc:__LOC__ b (function err ->
-      let error_info =
-        Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-      in
-      error_info.title = "Zero frozen deposits")
+  Assert.proto_error_with_info ~loc:__LOC__ b "Zero frozen deposits"
 
 (****************************************************************)
 (*  The following test scenarios are supposed to raise errors.  *)
@@ -210,9 +206,7 @@ let test_invalid_double_endorsement () =
   Block.bake ~operation:(Operation.pack endorsement) b >>=? fun b ->
   Op.double_endorsement (B b) endorsement endorsement |> fun operation ->
   Block.bake ~operation b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_denunciation Endorsement -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid denunciation"
 
 (** Check that an double endorsement operation that is invalid due to
    incorrect ordering of the endorsements fails. *)
@@ -231,9 +225,7 @@ let test_invalid_double_endorsement_variant () =
     endorsement_b
   |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_denunciation Endorsement -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid denunciation"
 
 (** Check that a future-cycle double endorsement fails. *)
 let test_too_early_double_endorsement_evidence () =
@@ -246,9 +238,7 @@ let test_too_early_double_endorsement_evidence () =
   Op.endorsement ~endorsed_block:blk_b (B blk_2) () >>=? fun endorsement_b ->
   double_endorsement (B genesis) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation genesis >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Too_early_denunciation {kind = Endorsement; _} -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Too early denunciation"
 
 (** Check that after [max_slashing_period * blocks_per_cycle + 1], it is not possible
     to create a double_endorsement anymore. *)
@@ -266,9 +256,7 @@ let test_too_late_double_endorsement_evidence () =
   >>=? fun blk ->
   double_endorsement (B blk) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Outdated_denunciation {kind = Endorsement; _} -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Outdated denunciation"
 
 (** Check that an invalid double endorsement evidence that exposes two
     endorsements made by two different endorsers fails. *)
@@ -301,9 +289,7 @@ let test_different_delegates () =
   Block.bake ~operation:(Operation.pack e_b) blk_b >>=? fun _ ->
   double_endorsement (B blk_b) e_a e_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Inconsistent_denunciation {kind = Endorsement; _} -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Inconsistent denunciation"
 
 (** Check that a double endorsement evidence that exposes a ill-formed
     endorsement fails. *)
@@ -334,9 +320,7 @@ let test_wrong_delegate () =
   >>=? fun endorsement_b ->
   double_endorsement (B blk_b) endorsement_a endorsement_b |> fun operation ->
   Block.bake ~operation blk_b >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Inconsistent_denunciation {kind = Endorsement; _} -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Inconsistent denunciation"
 
 let test_freeze_more_with_low_balance =
   let get_endorsing_slots_for_account ctxt account =

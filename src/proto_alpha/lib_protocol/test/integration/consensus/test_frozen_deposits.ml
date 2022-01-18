@@ -300,7 +300,12 @@ let test_cannot_bake_with_zero_deposits () =
      get_next_baker_by_account fails with "No slots found" *)
   Assert.error ~loc:__LOC__ b1 (fun _ -> true) >>=? fun () ->
   Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
+  Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
+  Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
+  Format.printf "fd = %a@." Tez.pp fd ;
   Block.bake ~policy:(By_account account1) b >>= fun b1 ->
+  (* don't know why the zero frozen deposits error is not caught here *)
+  (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)
   Assert.error ~loc:__LOC__ b1 (fun _ -> true)
 
 let test_deposits_after_stake_removal () =

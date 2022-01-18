@@ -183,9 +183,7 @@ let test_not_tez_in_contract_to_pay_fee () =
     ~script:Op.dummy_script
   >>=? fun (op, _) ->
   Incremental.add_operation inc op >>= fun inc ->
-  Assert.proto_error ~loc:__LOC__ inc (function
-      | Contract_storage.Balance_too_low _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ inc "Balance too low"
 
 (* Set the endorser of the block as manager/delegate of the originated
    account. *)
@@ -229,9 +227,10 @@ let test_counter () =
   >>=? fun (op2, _) ->
   Incremental.add_operation inc op1 >>=? fun inc ->
   Incremental.add_operation inc op2 >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Counter_in_the_past _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    res
+    "Invalid counter (already used) in a manager operation"
 
 (******************************************************)
 

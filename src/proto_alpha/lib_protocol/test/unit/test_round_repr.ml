@@ -380,11 +380,7 @@ let test_error_is_triggered_for_too_high_timestamp () =
   let res = Environment.wrap_tzresult res in
   match res with
   | Error _ ->
-      Assert.proto_error ~loc:__LOC__ res (function err ->
-          let error_info =
-            Error_monad.find_info_of_error (Environment.wrap_tzerror err)
-          in
-          error_info.title = "level offset too high")
+      Assert.proto_error_with_info ~loc:__LOC__ res "level offset too high"
   | Ok _ -> Assert.error ~loc:__LOC__ res (fun _ -> false)
 
 let rec ( --> ) i j =
