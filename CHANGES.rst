@@ -70,7 +70,8 @@ Node
   3. ``/workers/chain_validators/<chain_id>``,
   4. ``/workers/chain_validator/<chain_id>/peer_validators``,
   5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``,
-  6. ``/workers/prevalidators``.
+  6. ``/workers/prevalidators``,
+  7. ``/chains/<chain_id>/mempool/filter``.
 
   The field ``backlog`` is removed. Those logs can be obtained via the
   node itself. Logging can be redirected to a file via the option
@@ -92,7 +93,7 @@ Node
   If those fields are present in your configuration file, they can
   simply be removed.
 
-- Added version ``1`` to RPC ``GET chains/main/mempool/pending_operations``.
+- Added version ``1`` to RPC ``GET /chains/main/mempool/pending_operations``.
   It can be used by calling the RPC with the parameter ``?version=1``
   (default version is still ``0``).
 
@@ -169,6 +170,11 @@ Node
 - Removed the ``granadanet`` built-in network alias.
 
 - Added the ``ithacanet`` built-in network alias.
+
+- Added two optional fields, ``replace_by_fee_factor`` and
+  ``max_prechecked_manager_operations`` to ``/chains/<chain_id>/mempool/filter``
+  in order to control when the mempool accepts a manager operation replacement,
+  and how many manager operations we keep in the prechecked classification.
 
 Client
 ------
