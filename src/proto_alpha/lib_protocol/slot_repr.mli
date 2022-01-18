@@ -32,6 +32,8 @@
    max_value]. In this case it returns an [Invalid_slot] error.*)
 type t
 
+type slot = t
+
 val encoding : t Data_encoding.t
 
 (** {1 Constructors }*)
@@ -80,12 +82,14 @@ module Set : Set.S with type elt = t
 
 include Compare.S with type t := t
 
-module List : sig
-  (** A list of slot is an ordered list of increasing slot values *)
-  type nonrec t = private t list
-
-  val encoding : t Data_encoding.t
+module Range : sig
+  type t
 
   (** {3 Constructors} *)
-  val slot_range : min:int -> count:int -> t tzresult
+  val create : min:int -> count:int -> t tzresult
+
+  val fold : ('a -> slot -> 'a) -> 'a -> t -> 'a
+
+  val fold_es :
+    ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
 end

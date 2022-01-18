@@ -79,13 +79,13 @@ let baking_rights c level =
 
 let endorsing_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
-  Slot.slot_range ~min:0 ~count:consensus_committee_size >>?= fun slots ->
-  List.fold_left_es
+  Slot.Range.create ~min:0 ~count:consensus_committee_size >>?= fun slots ->
+  Slot.Range.fold_es
     (fun (ctxt, acc) slot ->
       Stake_distribution.slot_owner ctxt level slot >>=? fun (ctxt, (_, pkh)) ->
       return (ctxt, (slot, pkh) :: acc))
     (ctxt, [])
-    (slots :> Slot.t list)
+    slots
   >>=? fun (ctxt, right_owners) ->
   let rights =
     List.fold_left
@@ -102,9 +102,9 @@ let endorsing_rights (ctxt : t) level =
   return (ctxt, rights)
 
 let endorsing_rights_by_first_slot ctxt level =
-  Slot.slot_range ~min:0 ~count:(Constants.consensus_committee_size ctxt)
+  Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   >>?= fun slots ->
-  List.fold_left_es
+  Slot.Range.fold_es
     (fun (ctxt, (delegates_map, slots_map)) slot ->
       Stake_distribution.slot_owner ctxt level slot
       >|=? fun (ctxt, (pk, pkh)) ->
@@ -126,5 +126,5 @@ let endorsing_rights_by_first_slot ctxt level =
       in
       (ctxt, (delegates_map, slots_map)))
     (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
-    (slots :> Slot.t list)
+    slots
   >>=? fun (ctxt, (_, slots_map)) -> return (ctxt, slots_map)

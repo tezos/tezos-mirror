@@ -49,13 +49,7 @@ module Timestamp = struct
   let predecessor = Raw_context.predecessor_timestamp
 end
 
-module Slot = struct
-  include Slot_repr
-
-  type slot_range = List.t
-
-  let slot_range ~min ~count = List.slot_range ~min ~count
-end
+module Slot = Slot_repr
 
 module Sc_rollup = struct
   include Sc_rollup_repr
