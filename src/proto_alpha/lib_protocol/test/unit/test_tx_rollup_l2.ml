@@ -35,6 +35,7 @@
 
 open Tztest
 open Tx_rollup_l2_helpers
+open Protocol
 
 type Environment.Error_monad.error += Test
 
