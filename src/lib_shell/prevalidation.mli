@@ -88,7 +88,7 @@ module type T = sig
 
   (** Creates a new prevalidation context w.r.t. the protocol associated with
       the predecessor block. When [?protocol_data] is passed to this function,
-      it will  be used to create the new block *)
+      it will be used to create the new block. *)
   val create :
     chain_store ->
     ?protocol_data:Bytes.t ->
