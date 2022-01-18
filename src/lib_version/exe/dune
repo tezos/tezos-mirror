@@ -1,0 +1,22 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(env (static (flags (:standard -ccopt -static))))
+
+(executable
+ (name get_git_info)
+ (libraries
+  dune-configurator
+  tezos-version.parser)
+ (flags (:standard \ -ccopt -static))
+ (modules get_git_info))
+
+(executable
+ (name tezos_print_version)
+ (public_name tezos-version)
+ (package tezos-version)
+ (libraries
+  tezos-version
+  tezos-base.unix)
+ (flags (:standard -open Tezos_version))
+ (modules tezos_print_version))

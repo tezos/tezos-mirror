@@ -5,31 +5,12 @@
  (name tezos_version)
  (public_name tezos-version)
  (instrumentation (backend bisect_ppx))
- (modules (:standard \ get_git_info tezos_print_version))
- (libraries tezos-base tezos-version.parser)
- (flags (:standard -open Tezos_base.TzPervasives)))
-
-(executable
- (name get_git_info)
- (modules get_git_info)
  (libraries
-   dune-configurator
-   tezos-version.parser
- )
-)
+  tezos-base
+  tezos-version.parser)
+ (flags (:standard -open Tezos_base.TzPervasives)))
 
 (rule
  (targets generated_git_info.ml)
- ; Ensures the hash update whenever a source file is modified ;
  (deps (universe))
- (action (run ./get_git_info.exe))
-)
-
-(executable
- (name tezos_print_version)
- (public_name tezos-print-version)
- (package tezos-version)
- (modules tezos_print_version)
- (libraries tezos-version tezos-base.unix)
- (flags (:standard -open Tezos_version))
- )
+ (action (run ./exe/get_git_info.exe)))
