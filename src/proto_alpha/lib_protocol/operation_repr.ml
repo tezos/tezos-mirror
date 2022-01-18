@@ -658,7 +658,6 @@ module Encoding = struct
     Case
       {
         tag = 20;
-        (* Preendorsement where added after *)
         name = "preendorsement";
         encoding = consensus_content_encoding;
         select =
@@ -667,7 +666,6 @@ module Encoding = struct
         inj = (fun preendorsement -> Preendorsement preendorsement);
       }
 
-  (* Defined before endorsement encoding because this is used there *)
   let preendorsement_encoding =
     let make (Case {tag; name; encoding; select = _; proj; inj}) =
       case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
