@@ -104,11 +104,10 @@ let build_transaction_operation ~amount ~parameters
     ~storage_limit:(Limit.of_option storage_limit)
     operation
 
-let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+let transfer_with_script (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
-    ~src_sk ~destination ?(entrypoint = Entrypoint.default) ?arg ~amount ?fee
-    ?gas_limit ?storage_limit ?counter ~fee_parameter ?replace_by_fees () =
-  parse_arg_transfer arg >>=? fun parameters ->
+    ~src_sk ~destination ?(entrypoint = Entrypoint.default) ~parameters ~amount
+    ?fee ?gas_limit ?storage_limit ?counter ~fee_parameter ?replace_by_fees () =
   let contents =
     build_transaction_operation
       ~amount
@@ -146,6 +145,36 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return ((oph, op, result), contracts)
+
+let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
+    ~src_sk ~destination ?entrypoint ?arg ~amount ?fee ?gas_limit ?storage_limit
+    ?counter ~fee_parameter ?replace_by_fees () =
+  parse_arg_transfer arg >>=? fun parameters ->
+  transfer_with_script
+    (cctxt : #full)
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ~force
+    ?branch
+    ~source
+    ~src_pk
+    ~src_sk
+    ~destination
+    ?entrypoint
+    ~parameters
+    ~amount
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ?counter
+    ~fee_parameter
+    ?replace_by_fees
+    ()
 
 let build_reveal_operation ?fee ?gas_limit ?storage_limit pk =
   let operation = Reveal pk in

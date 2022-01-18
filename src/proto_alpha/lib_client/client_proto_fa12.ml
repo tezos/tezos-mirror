@@ -730,8 +730,11 @@ let contract_has_fa12_interface :
 
 let translate_action_to_argument action =
   let entrypoint = action_to_entrypoint action in
-  let expr = Micheline.strip_locations (action_to_expr ~loc:() action) in
-  (entrypoint, Format.asprintf "%a" Michelson_v1_printer.print_expr expr)
+  let expr =
+    Micheline.strip_locations (action_to_expr ~loc:() action)
+    |> Script.lazy_expr
+  in
+  (entrypoint, expr)
 
 let parse_error =
   let open Micheline in
@@ -766,8 +769,8 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ~contract ~action ~tez_amount ?fee ?gas_limit ?storage_limit ?counter
     ~fee_parameter () =
   contract_has_fa12_interface cctxt ~chain ~block ~contract () >>=? fun () ->
-  let (entrypoint, arg) = translate_action_to_argument action in
-  Client_proto_context.transfer
+  let (entrypoint, parameters) = translate_action_to_argument action in
+  Client_proto_context.transfer_with_script
     cctxt
     ~chain
     ~block
@@ -778,7 +781,7 @@ let call_contract (cctxt : #Protocol_client_context.full) ~chain ~block
     ~src_pk
     ~src_sk
     ~destination:(Contract contract)
-    ~arg
+    ~parameters
     ~amount:tez_amount
     ~entrypoint
     ?fee
