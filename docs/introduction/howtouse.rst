@@ -435,7 +435,9 @@ Once it receives a block with the operation inside it will return the
 receipt.
 
 It is advisable to wait for several blocks to consider the transaction as
-final, and for an important operation we advise to wait for 60 blocks.
+final.
+Please refer to the :doc:`consensus algorithm documentation <../active/consensus>` and `analysis <https://research-development.nomadic-labs.com/faster-finality-with-emmy.html>`__ to better understand block finality in Tezos.
+`This page <https://nomadic-labs.gitlab.io/emmyplus-experiments/>`__ provides concrete values for the number of blocks one should wait.
 
 In the rare case when an operation is lost, how can we be sure that it
 will not be included in any future block, and then we may re-emit it?
