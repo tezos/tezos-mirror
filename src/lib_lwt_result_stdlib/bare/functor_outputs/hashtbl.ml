@@ -36,8 +36,6 @@ module type S = sig
 
   type !'a t
 
-  module Legacy : Stdlib.Hashtbl.S with type key = key and type 'a t = 'a t
-
   val create : int -> 'a t
 
   val clear : 'a t -> unit
@@ -124,9 +122,6 @@ module type SeededS = sig
   type key
 
   type !'a t
-
-  module Legacy :
-    Stdlib.Hashtbl.SeededS with type key = key and type 'a t = 'a t
 
   val create : ?random:bool -> int -> 'a t
 

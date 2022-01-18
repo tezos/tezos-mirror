@@ -37,8 +37,7 @@ module type S = Bare_functor_outputs.Hashtbl.S
 
 module Make (H : Stdlib.Hashtbl.HashedType) : S with type key = H.t = struct
   open Seq
-  module Legacy = Stdlib.Hashtbl.Make (H)
-  include Legacy
+  include Stdlib.Hashtbl.Make (H)
 
   let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
 
@@ -72,8 +71,7 @@ module type SeededS = Bare_functor_outputs.Hashtbl.SeededS
 module MakeSeeded (H : Stdlib.Hashtbl.SeededHashedType) :
   SeededS with type key = H.t = struct
   open Seq
-  module Legacy = Stdlib.Hashtbl.MakeSeeded (H)
-  include Legacy
+  include Stdlib.Hashtbl.MakeSeeded (H)
 
   let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
 
