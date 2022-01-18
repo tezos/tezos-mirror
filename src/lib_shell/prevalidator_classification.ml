@@ -37,13 +37,13 @@ module Event = struct
       ("blk_h", Block_hash.encoding)
 end
 
-type classification =
-  [ `Applied
-  | `Prechecked
-  | `Branch_delayed of tztrace
+type error_classification =
+  [ `Branch_delayed of tztrace
   | `Branch_refused of tztrace
   | `Refused of tztrace
   | `Outdated of tztrace ]
+
+type classification = [`Applied | `Prechecked | error_classification]
 
 (** This type wraps together:
 

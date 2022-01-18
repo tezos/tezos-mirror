@@ -68,6 +68,9 @@ module WeightedManagerSet = Set.Make (struct
       if c <> 0 then c else cmp_src
 end)
 
+(* Note: This weight is also used by the plugin and the prevalidator to sort
+   operations in the pending mempool.
+   @see {!Tezos_protocol_plugin_alpha.Plugin.Mempool.weight_manager_operation}. *)
 let weight_manager ~max_size ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte op =
   let {protocol_data = Operation_data {contents; _}; _} = op in

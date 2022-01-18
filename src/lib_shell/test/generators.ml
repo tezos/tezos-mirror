@@ -59,10 +59,21 @@ let raw_operation_with_hash_gen ?string_gen ?block_hash_t () :
   let hash = Operation.hash op in
   (hash, op)
 
-let priority_gen () : [`High | `Low] QCheck2.Gen.t =
+let q_in_0_1 () =
   let open QCheck2.Gen in
-  let* bool_value = bool in
-  if bool_value then pure `High else pure `Low
+  let* q = Lib_test.Qcheck2_helpers.int64_range_gen 1L Int64.max_int in
+  let+ p = Lib_test.Qcheck2_helpers.int64_range_gen 0L q in
+  Q.make (Z.of_int64 p) (Z.of_int64 q)
+
+let priority_gen () : Prevalidator_pending_operations.priority QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* top_prio_value = oneofl [`High; `Medium; `Low] in
+  match top_prio_value with
+  | `High -> pure `High
+  | `Medium -> pure `Medium
+  | `Low ->
+      let+ weights = small_list (q_in_0_1 ()) in
+      `Low weights
 
 let operation_with_hash_gen ?string_gen ?block_hash_t () :
     unit Prevalidation.operation QCheck2.Gen.t =
@@ -71,7 +82,8 @@ let operation_with_hash_gen ?string_gen ?block_hash_t () :
   Prevalidation.Internal_for_tests.make_operation op oph ()
 
 let operation_with_hash_and_priority_gen ?string_gen ?block_hash_t () :
-    (unit Prevalidation.operation * [`High | `Low]) QCheck2.Gen.t =
+    (unit Prevalidation.operation * Prevalidator_pending_operations.priority)
+    QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* op = operation_with_hash_gen ?string_gen ?block_hash_t () in
   let* priority = priority_gen () in

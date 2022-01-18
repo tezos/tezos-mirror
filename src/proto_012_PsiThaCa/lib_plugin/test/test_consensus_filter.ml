@@ -29,15 +29,11 @@ open Alpha_context
 
 let config drift_opt =
   {
-    minimal_fees = default_minimal_fees;
-    minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
-    minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
-    allow_script_failure = true;
+    default_config with
     clock_drift =
       Option.map
         (fun drift -> Period.of_seconds_exn (Int64.of_int drift))
         drift_opt;
-    replace_by_fee_factor = Q.make (Z.of_int 105) (Z.of_int 100);
   }
 
 type Environment.Error_monad.error += Generation_failure
