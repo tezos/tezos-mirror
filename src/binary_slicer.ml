@@ -155,7 +155,7 @@ module Atom = struct
     let byte = read_byte state in
     let value = value lor ((byte land 0x7F) lsl bit_in_value) in
     let bit_in_value = bit_in_value + 7 in
-    let (bit_in_value, value) =
+    let bit_in_value, value =
       if bit_in_value < 8 then (bit_in_value, value)
       else (
         Buffer.add_char res (Char.unsafe_chr (value land 0xFF)) ;
@@ -371,11 +371,11 @@ and read_variable_pair :
     left * right =
  fun e1 e2 ?name state ->
   match (Encoding.classify e1, Encoding.classify e2) with
-  | ((`Dynamic | `Fixed _), `Variable) ->
+  | (`Dynamic | `Fixed _), `Variable ->
       let left = read_rec e1 ?name state in
       let right = read_rec e2 ?name state in
       (left, right)
-  | (`Variable, `Fixed n) ->
+  | `Variable, `Fixed n ->
       if n > state.remaining_bytes then raise Not_enough_data ;
       state.remaining_bytes <- state.remaining_bytes - n ;
       let left = read_rec e1 ?name state in

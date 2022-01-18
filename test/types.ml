@@ -170,7 +170,7 @@ module Alcotest = struct
   let float =
     testable Fmt.float (fun f1 f2 ->
         match (classify_float f1, classify_float f2) with
-        | (FP_nan, FP_nan) -> true
+        | FP_nan, FP_nan -> true
         | _ -> f1 = f2)
 
   let bytes =

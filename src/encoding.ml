@@ -34,18 +34,17 @@ module Kind = struct
   let combine name : t -> t -> t =
    fun k1 k2 ->
     match (k1, k2) with
-    | (`Fixed n1, `Fixed n2) -> `Fixed (n1 + n2)
-    | (`Dynamic, `Dynamic) | (`Fixed _, `Dynamic) | (`Dynamic, `Fixed _) ->
-        `Dynamic
-    | (`Variable, `Fixed _) | ((`Dynamic | `Fixed _), `Variable) -> `Variable
-    | (`Variable, `Dynamic) ->
+    | `Fixed n1, `Fixed n2 -> `Fixed (n1 + n2)
+    | `Dynamic, `Dynamic | `Fixed _, `Dynamic | `Dynamic, `Fixed _ -> `Dynamic
+    | `Variable, `Fixed _ | (`Dynamic | `Fixed _), `Variable -> `Variable
+    | `Variable, `Dynamic ->
         Printf.ksprintf
           invalid_arg
           "Cannot merge two %s when the left element is of variable length and \
            the right one of dynamic length. You should use the reverse order, \
            or wrap the second one with Data_encoding.dynamic_size."
           name
-    | (`Variable, `Variable) ->
+    | `Variable, `Variable ->
         Printf.ksprintf
           invalid_arg
           "Cannot merge two %s with variable length. You should wrap one of \
@@ -55,13 +54,12 @@ module Kind = struct
   let merge : t -> t -> t =
    fun k1 k2 ->
     match (k1, k2) with
-    | (`Fixed n1, `Fixed n2) when n1 = n2 -> `Fixed n1
-    | (`Fixed _, `Fixed _) -> `Dynamic
-    | (`Dynamic, `Dynamic) | (`Fixed _, `Dynamic) | (`Dynamic, `Fixed _) ->
-        `Dynamic
-    | (`Variable, (`Dynamic | `Fixed _))
-    | ((`Dynamic | `Fixed _), `Variable)
-    | (`Variable, `Variable) ->
+    | `Fixed n1, `Fixed n2 when n1 = n2 -> `Fixed n1
+    | `Fixed _, `Fixed _ -> `Dynamic
+    | `Dynamic, `Dynamic | `Fixed _, `Dynamic | `Dynamic, `Fixed _ -> `Dynamic
+    | `Variable, (`Dynamic | `Fixed _)
+    | (`Dynamic | `Fixed _), `Variable
+    | `Variable, `Variable ->
         `Variable
 
   let merge_list sz : t list -> t = function
@@ -362,20 +360,20 @@ module Variable = struct
     check_not_zeroable "an array" e ;
     let encoding = make @@ Array (max_length, e) in
     match (classify e, max_length) with
-    | (`Fixed n, Some max_length) ->
+    | `Fixed n, Some max_length ->
         let limit = n * max_length in
         make @@ Check_size {limit; encoding}
-    | (_, _) -> encoding
+    | _, _ -> encoding
 
   let list ?max_length e =
     check_not_variable "a list" e ;
     check_not_zeroable "a list" e ;
     let encoding = make @@ List (max_length, e) in
     match (classify e, max_length) with
-    | (`Fixed n, Some max_length) ->
+    | `Fixed n, Some max_length ->
         let limit = n * max_length in
         make @@ Check_size {limit; encoding}
-    | (_, _) -> encoding
+    | _, _ -> encoding
 end
 
 let dynamic_size ?(kind = `Uint30) e = make @@ Dynamic_size {kind; encoding = e}

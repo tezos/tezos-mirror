@@ -435,9 +435,9 @@ let full_option : type a. a full -> a option full =
 
       let eq a b =
         match (a, b) with
-        | (None, None) -> true
-        | (Some a, Some b) -> Full.eq a b
-        | (Some _, None) | (None, Some _) -> false
+        | None, None -> true
+        | Some a, Some b -> Full.eq a b
+        | Some _, None | None, Some _ -> false
 
       let pp ppf = function
         | None -> Crowbar.pp ppf "none"
@@ -662,9 +662,9 @@ let full_union2 : type a b. a full -> b full -> (a, b) either full =
 
     let eq x y =
       match (x, y) with
-      | (Left _, Right _) | (Right _, Left _) -> false
-      | (Left x, Left y) -> Fulla.eq x y
-      | (Right x, Right y) -> Fullb.eq x y
+      | Left _, Right _ | Right _, Left _ -> false
+      | Left x, Left y -> Fulla.eq x y
+      | Right x, Right y -> Fullb.eq x y
 
     let a_ding =
       let open Data_encoding in
@@ -713,9 +713,9 @@ let full_matching2 : type a b. a full -> b full -> (a, b) either full =
 
     let eq x y =
       match (x, y) with
-      | (Left _, Right _) | (Right _, Left _) -> false
-      | (Left x, Left y) -> Fulla.eq x y
-      | (Right x, Right y) -> Fullb.eq x y
+      | Left _, Right _ | Right _, Left _ -> false
+      | Left x, Left y -> Fulla.eq x y
+      | Right x, Right y -> Fullb.eq x y
 
     let a_ding =
       let open Data_encoding in
@@ -771,9 +771,9 @@ let full_mu_matching : type a. a full -> a list full =
 
     let rec eq x y =
       match (x, y) with
-      | ([], []) -> true
-      | (x :: xs, y :: ys) -> Fulla.eq x y && eq xs ys
-      | (_ :: _, []) | ([], _ :: _) -> false
+      | [], [] -> true
+      | x :: xs, y :: ys -> Fulla.eq x y && eq xs ys
+      | _ :: _, [] | [], _ :: _ -> false
 
     let encoding =
       let open Data_encoding in

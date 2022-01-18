@@ -63,10 +63,10 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Union {kind = `Fixed n; _} -> n
   (* Dynamic *)
   | Objs {kind = `Dynamic; left; right} ->
-      let (v1, v2) = value in
+      let v1, v2 = value in
       length left v1 + length right v2
   | Tups {kind = `Dynamic; left; right} ->
-      let (v1, v2) = value in
+      let v1, v2 = value in
       length left v1 + length right v2
   | Mu {kind = `Dynamic; fix; _} -> length (fix e) value
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) -> (
@@ -83,10 +83,10 @@ let rec length : type x. x Encoding.t -> x -> int =
       raise (Write_error List_too_long)
   | List (_, e) -> List.fold_left (fun acc v -> length e v + acc) 0 value
   | Objs {kind = `Variable; left; right} ->
-      let (v1, v2) = value in
+      let v1, v2 = value in
       length left v1 + length right v2
   | Tups {kind = `Variable; left; right} ->
-      let (v1, v2) = value in
+      let v1, v2 = value in
       length left v1 + length right v2
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> (
       match value with None -> 0 | Some value -> length e value)

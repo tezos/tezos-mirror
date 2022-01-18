@@ -42,9 +42,9 @@ let bench ?(num_iterations = default_num_iterations) name thunk =
 let read_stream encoding bytes =
   let rec loop bytes status =
     match (bytes, status) with
-    | ([], Data_encoding.Binary.Success _) -> ()
-    | (bytes :: bytess, Await f) -> loop bytess (f bytes)
-    | (_, _) -> assert false
+    | [], Data_encoding.Binary.Success _ -> ()
+    | bytes :: bytess, Await f -> loop bytess (f bytes)
+    | _, _ -> assert false
   in
   loop bytes (Data_encoding.Binary.read_stream encoding)
 

@@ -35,7 +35,7 @@ type jsonm_lexeme =
   | `Oe ]
 
 let string_of_float f =
-  let (fract, intr) = modf f in
+  let fract, intr = modf f in
   if fract = 0.0 then Format.asprintf "%.0f" intr else Format.asprintf "%g" f
 
 let string_needs_escaping_at index s =

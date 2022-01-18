@@ -49,7 +49,7 @@ let tree_points = ref 0
 
 let forest_points = ref 0
 
-let (tree_encoding, forest_encoding) =
+let tree_encoding, forest_encoding =
   let open Data_encoding in
   let mu_tree forest_enc =
     mu "tree" @@ fun tree_enc ->

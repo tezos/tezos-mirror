@@ -62,8 +62,10 @@ let ezjson : json Crowbar.gen =
       let field = map [names; json] (fun k v -> (k, v)) in
       choose
         [
-          map [list field] (fun kvs ->
-              let (has_dup, _) =
+          map
+            [list field]
+            (fun kvs ->
+              let has_dup, _ =
                 List.fold_left
                   (fun (has, seen) (k, _) ->
                     let has = has || List.exists (( = ) k) seen in
@@ -77,8 +79,8 @@ let ezjson : json Crowbar.gen =
           const `Null;
           map [string] (fun s -> `String s);
           map [longstring] (fun s -> `String s);
-          map [int32] (fun i -> `Float (Int32.to_float i));
-          (* map [float] (fun f -> `Float f); *)
+          map [int32] (fun i -> `Float (Int32.to_float i))
+          (* map [float] (fun f -> `Float f); *);
         ])
 
 let ezjson = Crowbar.with_printer pp_json ezjson
