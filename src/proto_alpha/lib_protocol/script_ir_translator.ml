@@ -4623,11 +4623,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | (Prim (loc, (I_SELF as prim), [], annot), stack) ->
       Lwt.return
-        ( parse_entrypoint_annot loc annot >>? fun entrypoint ->
-          (match entrypoint with
-          | None -> Ok Entrypoint.default
-          | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot)
-          >>? fun entrypoint ->
+        ( parse_entrypoint_annot_lax loc annot >>? fun entrypoint ->
           let open Tc_context in
           match tc_context.callsite with
           | _ when is_in_lambda tc_context ->

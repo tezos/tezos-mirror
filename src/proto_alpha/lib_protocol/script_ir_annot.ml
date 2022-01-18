@@ -266,6 +266,11 @@ let parse_entrypoint_annot_strict loc annot =
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
 
+let parse_entrypoint_annot_lax loc annot =
+  parse_entrypoint_annot loc annot >>? function
+  | None -> Ok Entrypoint.default
+  | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot
+
 let check_var_type_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
