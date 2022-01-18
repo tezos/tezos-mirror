@@ -36,25 +36,33 @@ module Make (Register : sig
 end)
 (Name : PrefixedName) =
 struct
-  include Make (Register) (Name)
+  include Tezos_crypto.Blake2B.Make (Register) (Name)
 
   module Set = struct
-    include Set.Legacy
+    include Stdlib.Set.Make (struct
+      type nonrec t = t
 
-    let random_elt = Set.random_elt
+      let compare = compare
+    end)
 
-    let encoding = Set.encoding
+    let encoding =
+      Data_encoding.conv
+        elements
+        (fun l -> List.fold_left (fun m x -> add x m) empty l)
+        Data_encoding.(list encoding)
   end
 
   module Map = struct
-    include Map.Legacy
+    include Stdlib.Map.Make (struct
+      type nonrec t = t
 
-    let encoding = Map.encoding
-  end
+      let compare = compare
+    end)
 
-  module Table = struct
-    include Table.Legacy
-
-    let encoding = Table.encoding
+    let encoding arg_encoding =
+      Data_encoding.conv
+        bindings
+        (fun l -> List.fold_left (fun m (k, v) -> add k v m) empty l)
+        Data_encoding.(list (tup2 encoding arg_encoding))
   end
 end

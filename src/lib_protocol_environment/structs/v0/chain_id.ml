@@ -26,21 +26,38 @@
 include Tezos_crypto.Chain_id
 
 module Set = struct
-  include Set.Legacy
+  include Stdlib.Set.Make (Tezos_crypto.Chain_id)
 
-  let random_elt = Set.random_elt
-
-  let encoding = Set.encoding
+  let encoding =
+    Data_encoding.conv
+      elements
+      (fun l -> List.fold_left (fun m x -> add x m) empty l)
+      Data_encoding.(list Tezos_crypto.Chain_id.encoding)
 end
 
 module Map = struct
-  include Map.Legacy
+  include Stdlib.Map.Make (Tezos_crypto.Chain_id)
 
-  let encoding = Map.encoding
+  let encoding arg_encoding =
+    Data_encoding.conv
+      bindings
+      (fun l -> List.fold_left (fun m (k, v) -> add k v m) empty l)
+      Data_encoding.(list (tup2 Tezos_crypto.Chain_id.encoding arg_encoding))
 end
 
 module Table = struct
-  include Table.Legacy
+  include Stdlib.Hashtbl.MakeSeeded (struct
+    include Tezos_crypto.Chain_id
 
-  let encoding = Table.encoding
+    let hash = Stdlib.Hashtbl.seeded_hash
+  end)
+
+  let encoding arg_encoding =
+    Data_encoding.conv
+      (fun h -> fold (fun k v l -> (k, v) :: l) h [])
+      (fun l ->
+        let h = create (List.length l) in
+        List.iter (fun (k, v) -> add h k v) l ;
+        h)
+      Data_encoding.(list (tup2 Tezos_crypto.Chain_id.encoding arg_encoding))
 end
