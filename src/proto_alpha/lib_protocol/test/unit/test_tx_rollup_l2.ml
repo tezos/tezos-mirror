@@ -24,50 +24,57 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-module Unit_test : sig
-  (** 
-   * Example: [spec "Alpha_context.ml" Test_alpha_context.test_cases]
-   * Unit tests needs tag in log (like "[UNIT] some test description here...")
-   * This function handles such meta data *)
-  val spec :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
 
-  (** Tests with description string without [Unit] are skipped *)
-  val skip :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
-end = struct
-  let spec unit_name test_cases = ("[Unit] " ^ unit_name, test_cases)
+(** Testing
+    -------
+    Component:  Protocol (tx rollup l2)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
+                -- test "tx rollup l2"
+    Subject:    test the layer-2 implementation of transaction rollup
+*)
 
-  let skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
-end
+open Tztest
+open Tx_rollup_l2_helpers
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha unit tests"
-    [
-      Unit_test.spec "Alpha_context.ml" Test_alpha_context.tests;
-      Unit_test.spec "Raw_level_repr.ml" Test_raw_level_repr.tests;
-      Unit_test.skip "Raw_level_repr.ml" Test_raw_level_repr.skipped_tests;
-      Unit_test.spec "Tez_repr.ml" Test_tez_repr.tests;
-      Unit_test.spec "Contract_repr.ml" Test_contract_repr.tests;
-      Unit_test.spec "Destination_repr.ml" Test_destination_repr.tests;
-      Unit_test.spec "Operation_repr.ml" Test_operation_repr.tests;
-      Unit_test.spec
-        "Global_constants_storage.ml"
-        Test_global_constants_storage.tests;
-      Unit_test.spec "fitness" Test_fitness.tests;
-      Unit_test.spec "fixed point computation" Test_fixed_point.tests;
-      Unit_test.spec "level module" Test_level_module.tests;
-      Unit_test.spec "qty" Test_qty.tests;
-      Unit_test.spec "round" Test_round_repr.tests;
-      Unit_test.spec "time" Test_time_repr.tests;
-      Unit_test.spec "receipt encodings" Test_receipt.tests;
-      Unit_test.spec "saturation arithmetic" Test_saturation.tests;
-      Unit_test.spec "gas monad" Test_gas_monad.tests;
-      Unit_test.spec "tx rollup l2" Test_tx_rollup_l2.tests;
-    ]
-  |> Lwt_main.run
+type Environment.Error_monad.error += Test
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/2362
+   Use the Irmin store provided by [lib_context] for layer-2
+   solutions, once available.
+   As of now, we define a ad-hoc [STORAGE] implementation to run our
+   tests, but eventually we need to actually make use of the same
+   implementation as the transaction rollup node and the protocol. *)
+
+(** [test_irmin_storage] checks that the implementation of [STORAGE]
+    has the expected properties. *)
+let test_irmin_storage () =
+  let open Irmin_storage.Syntax in
+  let store = empty_storage in
+
+  let k1 = Bytes.of_string "k1" in
+  let k2 = Bytes.of_string "k2" in
+  let v1 = Bytes.of_string "v1" in
+  let v2 = Bytes.of_string "v2" in
+
+  (* 1. get (set store k1 v1) k1 == Some v1 *)
+  let* store = Irmin_storage.set store k1 v1 in
+  let* v1' = Irmin_storage.get store k1 in
+  assert (v1' = Some v1) ;
+
+  (* 2. k1 != k2 -> get (set store k2 v2) k1 = get store k1*)
+  let* store = Irmin_storage.set store k2 v2 in
+  let* v1'' = Irmin_storage.get store k1 in
+  assert (v1' = v1'') ;
+
+  (* 3. catch (fail e) f return == e *)
+  let* e = catch (fail Test) (fun _ -> assert false) return in
+  assert (e = Test) ;
+
+  return_unit
+
+let wrap_test t () =
+  t () >|= function
+  | Ok x -> Ok x
+  | Error err -> Error [Environment.Ecoproto_error err]
+
+let tests = [tztest "test irmin storage" `Quick @@ wrap_test test_irmin_storage]

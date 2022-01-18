@@ -24,50 +24,60 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-module Unit_test : sig
-  (** 
-   * Example: [spec "Alpha_context.ml" Test_alpha_context.test_cases]
-   * Unit tests needs tag in log (like "[UNIT] some test description here...")
-   * This function handles such meta data *)
-  val spec :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
 
-  (** Tests with description string without [Unit] are skipped *)
-  val skip :
-    string ->
-    unit Alcotest_lwt.test_case list ->
-    string * unit Alcotest_lwt.test_case list
-end = struct
-  let spec unit_name test_cases = ("[Unit] " ^ unit_name, test_cases)
+open Protocol.Tx_rollup_l2_storage_sig
 
-  let skip unit_name test_cases = ("[SKIPPED] " ^ unit_name, test_cases)
+(* Build a Tezos context with binary trees *)
+module Store = struct
+  open Tezos_context_encoding.Context
+
+  module Conf : Irmin_pack.Conf.S = struct
+    let entries = 2
+
+    let stable_hash = 2
+
+    let inode_child_order = `Seeded_hash
+  end
+
+  (* We could directly use a simpler encoding for commits
+     instead of keeping the same as in the current context. *)
+  include
+    Irmin_pack_mem.Make (Node) (Commit) (Conf) (Metadata) (Contents) (Path)
+      (Branch)
+      (Hash)
 end
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha unit tests"
-    [
-      Unit_test.spec "Alpha_context.ml" Test_alpha_context.tests;
-      Unit_test.spec "Raw_level_repr.ml" Test_raw_level_repr.tests;
-      Unit_test.skip "Raw_level_repr.ml" Test_raw_level_repr.skipped_tests;
-      Unit_test.spec "Tez_repr.ml" Test_tez_repr.tests;
-      Unit_test.spec "Contract_repr.ml" Test_contract_repr.tests;
-      Unit_test.spec "Destination_repr.ml" Test_destination_repr.tests;
-      Unit_test.spec "Operation_repr.ml" Test_operation_repr.tests;
-      Unit_test.spec
-        "Global_constants_storage.ml"
-        Test_global_constants_storage.tests;
-      Unit_test.spec "fitness" Test_fitness.tests;
-      Unit_test.spec "fixed point computation" Test_fixed_point.tests;
-      Unit_test.spec "level module" Test_level_module.tests;
-      Unit_test.spec "qty" Test_qty.tests;
-      Unit_test.spec "round" Test_round_repr.tests;
-      Unit_test.spec "time" Test_time_repr.tests;
-      Unit_test.spec "receipt encodings" Test_receipt.tests;
-      Unit_test.spec "saturation arithmetic" Test_saturation.tests;
-      Unit_test.spec "gas monad" Test_gas_monad.tests;
-      Unit_test.spec "tx rollup l2" Test_tx_rollup_l2.tests;
-    ]
-  |> Lwt_main.run
+module Irmin_storage :
+  STORAGE
+    with type t = Store.tree
+     and type 'a m = ('a, Environment.Error_monad.error) result Lwt.t = struct
+  type t = Store.tree
+
+  type 'a m = ('a, Environment.Error_monad.error) result Lwt.t
+
+  let path k = [Bytes.to_string k]
+
+  let get store key =
+    let open Lwt_syntax in
+    let* res = Store.Tree.find store (path key) in
+    return_ok res
+
+  let set store key value =
+    let open Lwt_syntax in
+    let* store = Store.Tree.add store (path key) value in
+    return_ok store
+
+  module Syntax = struct
+    include Lwt_result_syntax
+
+    let fail : Environment.Error_monad.error -> 'a m =
+     fun e -> Lwt.return (Error e)
+
+    let catch (m : 'a m) k h =
+      Lwt.bind m (function Ok x -> k x | Error e -> h e)
+
+    let list_fold_left_m = List.fold_left_es
+  end
+end
+
+let empty_storage : Irmin_storage.t = Store.Tree.empty ()

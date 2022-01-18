@@ -109,6 +109,8 @@
         "Carbonated_map_costs",
         "Carbonated_map",
 
+        "Tx_rollup_l2_storage_sig",
+
         "Local_gas_counter",
         "Script_tc_errors",
         "Gas_monad",
