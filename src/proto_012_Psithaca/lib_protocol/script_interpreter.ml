@@ -83,7 +83,6 @@
 *)
 
 open Alpha_context
-open Script
 open Script_typed_ir
 open Script_ir_translator
 open Local_gas_counter
@@ -106,7 +105,7 @@ type error += Reject of Script.location * Script.expr * execution_trace option
 
 type error += Overflow of Script.location * execution_trace option
 
-type error += Runtime_contract_error : Contract.t * Script.expr -> error
+type error += Runtime_contract_error of Contract.t
 
 type error += Bad_contract_parameter of Contract.t (* `Permanent *)
 
@@ -159,11 +158,10 @@ let () =
     ~description:"Toplevel error for all runtime script errors"
     (obj2
        (req "contract_handle" Contract.encoding)
-       (req "contract_code" Script.expr_encoding))
+       (req "contract_code" (constant "Deprecated")))
     (function
-      | Runtime_contract_error (contract, expr) -> Some (contract, expr)
-      | _ -> None)
-    (fun (contract, expr) -> Runtime_contract_error (contract, expr)) ;
+      | Runtime_contract_error contract -> Some (contract, ()) | _ -> None)
+    (fun (contract, ()) -> Runtime_contract_error contract) ;
   (* Bad contract parameter *)
   register_error_kind
     `Permanent
@@ -1689,17 +1687,12 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     (Bad_contract_parameter step_constants.self)
     (parse_data ctxt ~legacy:false ~allow_forged:internal arg_type (box arg))
   >>=? fun (arg, ctxt) ->
-  Script.force_decode_in_context
-    ~consume_deserialization_gas:When_needed
-    ctxt
-    unparsed_script.code
-  >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt storage_type storage
   >>?= fun (to_update, ctxt) ->
   trace
-    (Runtime_contract_error (step_constants.self, script_code))
+    (Runtime_contract_error step_constants.self)
     (interp logger (ctxt, step_constants) code (arg, storage))
   >>=? fun ((ops, storage), ctxt) ->
   Script_ir_translator.extract_lazy_storage_diff
