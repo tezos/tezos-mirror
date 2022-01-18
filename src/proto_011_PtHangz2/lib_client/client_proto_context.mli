@@ -185,6 +185,7 @@ val transfer :
   ?dry_run:bool ->
   ?verbose_signing:bool ->
   ?simulation:bool ->
+  ?force:bool ->
   ?branch:int ->
   source:public_key_hash ->
   src_pk:public_key ->

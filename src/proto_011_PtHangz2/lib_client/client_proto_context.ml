@@ -101,9 +101,9 @@ let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
     operation
 
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~destination
-    ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () =
+    ?verbose_signing ?simulation ?(force = false) ?branch ~source ~src_pk
+    ~src_sk ~destination ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit
+    ?storage_limit ?counter ~fee_parameter () =
   parse_arg_transfer arg >>=? fun parameters ->
   let contents =
     build_transaction_operation
@@ -124,6 +124,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?dry_run
     ?verbose_signing
     ?simulation
+    ~force
     ?branch
     ~source
     ~fee:(Limit.of_option fee)
@@ -135,7 +136,8 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~fee_parameter
     contents
   >>=? fun (oph, op, result) ->
-  Lwt.return (Injection.originated_contracts result) >>=? fun contracts ->
+  Lwt.return (Injection.originated_contracts ~force result)
+  >>=? fun contracts ->
   match Apply_results.pack_contents_list op result with
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return ((oph, op, result), contracts)
@@ -338,7 +340,7 @@ let originate_contract (cctxt : #full) ~chain ~block ?confirmations ?dry_run
   | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
       return (oph, op, result))
   >>=? fun res ->
-  Lwt.return (Injection.originated_contracts result) >>=? function
+  Lwt.return (Injection.originated_contracts ~force:false result) >>=? function
   | [contract] -> return (res, contract)
   | contracts ->
       failwith
