@@ -80,8 +80,7 @@ let collect_error_locations errs =
     | Environment.Ecoproto_error
         ( Ill_formed_type (_, _, _)
         | No_such_entrypoint _ | Duplicate_entrypoint _
-        | Unreachable_entrypoint _
-        | Runtime_contract_error (_, _)
+        | Unreachable_entrypoint _ | Runtime_contract_error _
         | Michelson_v1_primitives.Invalid_primitive_name (_, _)
         | Ill_typed_data (_, _, _)
         | Ill_typed_contract (_, _) )
@@ -147,7 +146,7 @@ type error +=
 
 let enrich_runtime_errors cctxt ~chain ~block ~parsed =
   List.map_s (function
-      | Environment.Ecoproto_error (Runtime_contract_error (contract, _)) -> (
+      | Environment.Ecoproto_error (Runtime_contract_error contract) -> (
           (* If we know the script already, we don't fetch it *)
           match parsed with
           | Some parsed ->
@@ -358,8 +357,7 @@ let report_errors ~details ~show_source ?parsed ppf errs =
           loc ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
-    | Environment.Ecoproto_error (Runtime_contract_error (contract, _script))
-      :: rest ->
+    | Environment.Ecoproto_error (Runtime_contract_error contract) :: rest ->
         Format.fprintf
           ppf
           "@[<v 2>Runtime error in unknown contract %a@]"
