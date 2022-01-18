@@ -198,6 +198,53 @@ let test_set_limit balance_percentage () =
   >>=? fun frozen_deposits ->
   Assert.equal_tez ~loc:__LOC__ frozen_deposits limit
 
+let test_unset_limit () =
+  Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
+  let ((contract1, account1), (_contract2, account2)) =
+    get_first_2_accounts_contracts contracts
+  in
+  Context.Delegate.frozen_deposits (B genesis) account1
+  >>=? fun frozen_deposits_at_genesis ->
+  (* set the limit to 0 *)
+  Op.set_deposits_limit (B genesis) contract1 (Some Tez.zero)
+  >>=? fun operation ->
+  Block.bake ~policy:(By_account account2) ~operation genesis >>=? fun b ->
+  (Context.Delegate.frozen_deposits_limit (B b) account1 >>=? function
+   | Some set_limit -> Assert.equal_tez ~loc:__LOC__ set_limit Tez.zero
+   | None -> Alcotest.fail "unexpected absence of deposits limit")
+  >>=? fun () ->
+  let expected_number_of_cycles_with_previous_deposit =
+    constants.preserved_cycles + constants.max_slashing_period
+  in
+  Block.bake_until_n_cycle_end
+    ~policy:(By_account account2)
+    expected_number_of_cycles_with_previous_deposit
+    b
+  >>=? fun b ->
+  Context.Delegate.frozen_deposits (B b) account1
+  >>=? fun frozen_deposits_at_b ->
+  (* after [expected_number_of_cycles_with_previous_deposit] cycles
+     the 0 limit is reflected in the deposit which becomes 0 itself *)
+  Assert.equal_tez ~loc:__LOC__ frozen_deposits_at_b Tez.zero >>=? fun () ->
+  (* unset the 0 limit *)
+  Op.set_deposits_limit (B b) contract1 None >>=? fun operation ->
+  Block.bake ~policy:(By_account account2) ~operation b >>=? fun b ->
+  (Context.Delegate.frozen_deposits_limit (B b) account1 >>=? function
+   | Some _ -> Alcotest.fail "unexpected deposits limit"
+   | None -> return_unit)
+  >>=? fun () ->
+  (* removing the 0 limit is visible once the cycle ends *)
+  Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun bfin ->
+  Context.Delegate.frozen_deposits (B bfin) account1
+  >>=? fun frozen_deposits_at_bfin ->
+  (* without a limit, the new deposit matches the one at genesis; note
+     that account1 hasn't baked any block so its stake did not change. *)
+  Assert.equal_tez
+    ~loc:__LOC__
+    frozen_deposits_at_bfin
+    frozen_deposits_at_genesis
+  >>=? fun () -> return_unit
+
 let test_cannot_bake_with_zero_deposits () =
   Context.init_with_constants constants 2 >>=? fun (genesis, contracts) ->
   let ((contract1, account1), (_contract2, account2)) =
@@ -605,6 +652,7 @@ let tests =
       tztest "test invariants" `Quick test_invariants;
       tztest "set deposits limit to 0%" `Quick (test_set_limit 0);
       tztest "set deposits limit to 5%" `Quick (test_set_limit 5);
+      tztest "unset deposits limit" `Quick test_unset_limit;
       tztest
         "cannot bake with zero deposits"
         `Quick
