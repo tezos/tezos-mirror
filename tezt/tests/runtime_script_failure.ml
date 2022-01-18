@@ -61,7 +61,7 @@ let check_client_force =
       ~storage_limit:10000
       ~giver:"bootstrap1"
       ~receiver:contract_id
-      ~arg:"20"
+      ~arg:"\"saucisse\""
       ~force:true
       client
   in
@@ -72,12 +72,23 @@ let check_client_force =
       ["chains"; "main"; "blocks"; "head"; "operations"; "3"; "0"]
       client
   in
-  let first_result =
+  let first_operation_result =
     JSON.(
       first_manager_operation |-> "contents" |=> 0 |-> "metadata"
-      |-> "operation_result" |-> "status" |> as_string)
+      |-> "operation_result")
   in
-  assert (first_result = "failed") ;
+  assert (JSON.(first_operation_result |-> "status" |> as_string = "failed")) ;
+  let first_failed_script =
+    JSON.(first_operation_result |-> "errors" |=> 0 |-> "contract_code")
+  in
+  (match protocol with
+  | Alpha ->
+      (* In Alpha this field is deprecated *)
+      assert (JSON.(first_failed_script |> as_string = "Deprecated"))
+  | Hangzhou | Ithaca ->
+      (* In Hangzhou and Ithaca, this field contains the failed script, it
+         is a sequence of length 3 (parameter, storage, and code). *)
+      assert (JSON.(first_failed_script |> as_list |> List.length = 3))) ;
   return ()
 
 let register ~protocols = check_client_force ~protocols
