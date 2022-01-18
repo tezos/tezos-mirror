@@ -76,8 +76,7 @@ let percent_percent = Non_empty_string.of_string_exn "%%"
 
 let at = Non_empty_string.of_string_exn "@"
 
-let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
-    l =
+let parse_annot loc s =
   (* allow empty annotations as wildcards but otherwise only accept
      annotations that start with [a-zA-Z_] *)
   let sub_or_wildcard wrap s =
@@ -91,23 +90,26 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
             ok @@ wrap (Some s)
         | _ -> error (Unexpected_annotation loc))
   in
+  let len = String.length s in
+  if Compare.Int.(len = 0 || len > max_annot_length) then
+    error (Unexpected_annotation loc)
+  else
+    let rest = String.sub s 1 (len - 1) in
+    match s.[0] with
+    | ':' -> sub_or_wildcard (fun a -> Type_annot_opt a) rest
+    | '@' -> sub_or_wildcard (fun a -> Var_annot_opt a) rest
+    | '%' -> sub_or_wildcard (fun a -> Field_annot_opt a) rest
+    | _ -> error (Unexpected_annotation loc)
+
+let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
+    l =
   List.map_e
     (function
       | "@%" when allow_special_var -> ok @@ Var_annot_opt (Some percent)
       | "@%%" when allow_special_var ->
           ok @@ Var_annot_opt (Some percent_percent)
       | "%@" when allow_special_field -> ok @@ Field_annot_opt (Some at)
-      | s -> (
-          let len = String.length s in
-          if Compare.Int.(len = 0 || len > max_annot_length) then
-            error (Unexpected_annotation loc)
-          else
-            let rest = String.sub s 1 (len - 1) in
-            match s.[0] with
-            | ':' -> sub_or_wildcard (fun a -> Type_annot_opt a) rest
-            | '@' -> sub_or_wildcard (fun a -> Var_annot_opt a) rest
-            | '%' -> sub_or_wildcard (fun a -> Field_annot_opt a) rest
-            | _ -> error (Unexpected_annotation loc)))
+      | s -> parse_annot loc s)
     l
 
 let opt_var_of_var_opt = function None -> None | Some a -> Some (Var_annot a)
