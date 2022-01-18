@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+val enrich_runtime_errors :
+  #Protocol_client_context.rpc_context ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  parsed:Michelson_v1_parser.parsed option ->
+  Error_monad.error list ->
+  Error_monad.error list Lwt.t
+
 val report_errors :
   details:bool ->
   show_source:bool ->

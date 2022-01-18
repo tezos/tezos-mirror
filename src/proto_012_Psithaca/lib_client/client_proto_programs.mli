@@ -89,10 +89,12 @@ val trace :
   Lwt.t
 
 val print_view_result :
-  #Client_context.printer -> Script_repr.expr tzresult -> unit tzresult Lwt.t
+  #Protocol_client_context.full ->
+  Script_repr.expr tzresult ->
+  unit tzresult Lwt.t
 
 val print_run_result :
-  #Client_context.printer ->
+  #Protocol_client_context.full ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
@@ -102,7 +104,7 @@ val print_run_result :
   unit tzresult Lwt.t
 
 val print_trace_result :
-  #Client_context.printer ->
+  #Protocol_client_context.full ->
   show_source:bool ->
   parsed:Michelson_v1_parser.parsed ->
   (Script_repr.expr
@@ -162,7 +164,7 @@ val entrypoint_type :
   Script.expr option tzresult Lwt.t
 
 val print_entrypoint_type :
-  #Client_context.printer ->
+  #Protocol_client_context.full ->
   emacs:bool ->
   ?script_name:string ->
   show_source:bool ->
@@ -179,7 +181,7 @@ val list_entrypoints :
   (string * Script.expr) list tzresult Lwt.t
 
 val print_entrypoints_list :
-  #Client_context.printer ->
+  #Protocol_client_context.full ->
   emacs:bool ->
   ?script_name:string ->
   show_source:bool ->
@@ -195,7 +197,7 @@ val list_unreachables :
   Michelson_v1_primitives.prim list list tzresult Lwt.t
 
 val print_unreachables :
-  #Client_context.printer ->
+  #Protocol_client_context.full ->
   emacs:bool ->
   ?script_name:string ->
   show_source:bool ->
