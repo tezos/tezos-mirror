@@ -51,7 +51,15 @@ module Program = Client_aliases.Alias (struct
   let name = "script"
 end)
 
-let print_errors ?parsed (cctxt : #Client_context.printer) errs ~show_source =
+let print_errors ?parsed (cctxt : #Protocol_client_context.full) errs
+    ~show_source =
+  Michelson_v1_error_reporter.enrich_runtime_errors
+    cctxt
+    ~chain:cctxt#chain
+    ~block:cctxt#block
+    ~parsed
+    errs
+  >>= fun errs ->
   cctxt#warning
     "%a"
     (Michelson_v1_error_reporter.report_errors
@@ -62,7 +70,7 @@ let print_errors ?parsed (cctxt : #Client_context.printer) errs ~show_source =
   >>= fun () ->
   cctxt#error "error running script" >>= fun () -> return_unit
 
-let print_view_result (cctxt : #Client_context.printer) = function
+let print_view_result (cctxt : #Protocol_client_context.full) = function
   | Ok expr -> cctxt#message "%a" print_expr expr >>= fun () -> return_unit
   | Error errs -> print_errors cctxt ~show_source:false errs
 

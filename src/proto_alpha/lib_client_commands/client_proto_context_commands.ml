@@ -35,8 +35,15 @@ let encrypted_switch =
   Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
 
 let report_michelson_errors ?(no_print_source = false) ~msg
-    (cctxt : #Client_context.printer) = function
+    (cctxt : #Client_context.full) = function
   | Error errs ->
+      Michelson_v1_error_reporter.enrich_runtime_errors
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ~parsed:None
+        errs
+      >>= fun errs ->
       cctxt#warning
         "%a"
         (Michelson_v1_error_reporter.report_errors
