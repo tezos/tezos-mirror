@@ -261,7 +261,7 @@ are the same (``'e``):
    val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
 
 When you need to mix those function, you have to either handle the
-errors of each idependently (see the section above about recovering from
+errors of each independently (see the section above about recovering from
 errors) or you need to convert the errors so they have the same type.
 You should use ``Result.map_error`` to do that.
 
@@ -768,7 +768,7 @@ dedicated to binding Result-only expressions.
 .. sidebar:: Mnemonic
 
    The ``let*?`` binding operator uses the question mark (``?``) to represent
-   the uncertainty of the ``result``. Is it a sucess? Is it a failure?
+   the uncertainty of the ``result``. Is it a success? Is it a failure?
 
 
 From Lwt-only into Lwt-``result``
@@ -786,10 +786,10 @@ dedicated to binding Lwt-only expressions.
 .. sidebar:: Mnemonic
 
    The ``let*!`` binding operator uses the exclamation mark (``!``) to represent
-   the impossibilty of errors: Thou shall not fail!
+   the impossibility of errors: Thou shall not fail!
 
 
-Wait! there is too much! what module am I supposed to open locally and what operators should I use?
+Wait! There is too much! What module am I supposed to open locally and what operators should I use?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 If you are feeling overwhelmed by the different syntax modules, here are
@@ -993,10 +993,10 @@ the errors to a common type.
 You can also use the ``Result.map_error`` and ``lwt_map_error``
 functions introduced in previous sections.
 
-Wait! it was supposed to be “one single uniform way of dealing with errors”! what is this?
+Wait! It was supposed to be “one single uniform way of dealing with errors”! What is this?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The error management in Octez is through a unified way (syntax modules
+The error management in Octez is a unified way (syntax modules
 with regular, predictable interfaces) of handling different types of
 errors.
 
@@ -1098,7 +1098,7 @@ They do not even require the syntax modules to be open.
         in
         retry original_limit f
 
-   You can use all the formating percent-escapes from the `Format
+   You can use all the formatting percent-escapes from the `Format
    module <https://ocaml.org/api/Format.html>`__. However, you should
    generally keep the message on a single line so that it can be printed
    nicely in logs.
@@ -1216,7 +1216,7 @@ in the shell, just use :literal:`\`Temporary`.
 -  ``description``: a longer human readable string.
 -  ``pp``: a pretty-printing function carrying enough information for a full
    error message for the user. Note that the function does not receive the error,
-   instead it receives the *projected payload of the error* (here a 3-uple
+   instead it receives the *projected payload of the error* (here a 3-tuple
    ``(expected, got, line)``.
 -  encoding: an encoding for the projected payload of the error.
 -  projection: a partial function that matches the specific error
@@ -2144,9 +2144,9 @@ E.g., Haskell relies heavily on monads and has the dedicated
 
       let add x y =
         let ( let* ) = OptionMonad.bind in
-        let* x = int_of_strin_opt x in
-        let* y = int_of_strin_opt y in
-        Some (strin_of_int (x + y))
+        let* x = int_of_string_opt x in
+        let* y = int_of_string_opt y in
+        Some (string_of_int (x + y))
 
 -  `infix
    operators <https://ocaml.org/manual/lex.html#sss:lex-ops-symbols>`__
@@ -2155,9 +2155,9 @@ E.g., Haskell relies heavily on monads and has the dedicated
 
       let add x y =
         let ( >>= ) = OptionMonad.bind in
-        int_of_strin_opt x >>= fun x ->
-        int_of_strin_opt y >>= fun y ->
-        Some (strin_of_int (x + y))
+        int_of_string_opt x >>= fun x ->
+        int_of_string_opt y >>= fun y ->
+        Some (string_of_int (x + y))
 
    Note that mixing multiple infix operators is not always easy because
    of precedence and associativity.
@@ -2167,9 +2167,9 @@ E.g., Haskell relies heavily on monads and has the dedicated
    ::
 
       let add x y =
-        OptionMonad.bind (int_of_strin_opt x) @@ fun x ->
-        OptionMonad.bind (int_of_strin_opt y) @@ fun y ->
-        Some (strin_of_int (x + y))
+        OptionMonad.bind (int_of_string_opt x) @@ fun x ->
+        OptionMonad.bind (int_of_string_opt y) @@ fun y ->
+        Some (string_of_int (x + y))
 
    This is useful for the occasional application: you do not need to
    declare a dedicated operator nor open a dedicated syntax module.
@@ -2181,7 +2181,7 @@ In depth discussion: ``Error_monad``, ``src/lib_error_monad/``, ``Tezos_base__Tz
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The different parts of the error monad (syntax modules, extended stdlib,
-tracing promitives, etc.) are defined in separate files. Yet, they are
+tracing primitives, etc.) are defined in separate files. Yet, they are
 all available to you directly. This section explains where each part is
 defined and how it reaches the scope of your code.
 

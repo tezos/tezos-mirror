@@ -1,17 +1,17 @@
 Time measurement PPX
 ====================
 
-The time measurement PPX is an Ocaml preprocessing tool that intends to
-embed generated benchmark tooling into specific pieces of Ocaml code.
+The time measurement PPX is an OCaml preprocessing tool that intends to
+embed generated benchmark tooling into specific pieces of OCaml code.
 
-It is able to measure the time spent in the execution of annotated Ocaml
+It is able to measure the time spent in the execution of annotated OCaml
 expressions and to log these measurements when desired. Since it uses
 ``Tezos_event_logging`` for the logging part, this PPX can easily be used
 together with ``Tezt`` framework to perform the benchmarking of specific
 parts of Tezos node.
 
 **This PPX is only intended to be used for tests. As the current runtime
-implemetation performs memory allocation, an unwise usage could mess with
+implementation performs memory allocation, an unwise usage could mess with
 the garbage collector or blow up your memory.**
 
 **PLEASE, MAKE SURE THAT IT IS NOT ACTIVATED WHEN COMPILING CODE FOR
@@ -21,9 +21,9 @@ Getting started
 ---------------
 
 Suppose we want to measure the performance of some specific parts of
-the following Ocaml function inside the module ``lib_my_module``:
+the following OCaml function inside the module ``lib_my_module``:
 
-.. code-block:: Ocaml
+.. code-block:: OCaml
 
     let my_function () =
       let a = f () in
@@ -40,10 +40,10 @@ Suppose also that module ``lib_my_module`` contains the following dune file:
       (libraries lwt)
       (flags (:standard -open Lwt)))
 
-We can mesure the execution time of ``f ()`` and ``g ()`` and log them by
-adding the following Ocaml attributes:
+We can measure the execution time of ``f ()`` and ``g ()`` and log them by
+adding the following OCaml attributes:
 
-.. code-block:: Ocaml
+.. code-block:: OCaml
 
     let my_function () =
       let a = f () [@time.duration f_time] in
@@ -51,13 +51,13 @@ adding the following Ocaml attributes:
       h () >>= fun c ->
       foo a b c [@time.flush]
 
-``[@time.duration]`` will be used to mesure the time of ``f ()`` and ``g ()``
+``[@time.duration]`` will be used to measure the time of ``f ()`` and ``g ()``
 expressions execution and to name them respectively ``f_time`` and
 ``g_time``. ``[@time.flush]`` will then be used to log these measurements.
 
-When the preprocessig will occur, the code will be transform as follows:
+When the preprocessing will occur, the code will be transformed as follows:
 
-.. code-block:: Ocaml
+.. code-block:: OCaml
 
     let my_function () =
       let a = Tezos_time_measurement_runtime.Default.Time_measurement.duration
@@ -81,7 +81,7 @@ The resulting thunk is passed to the function ``Time_measurement.duration`` from
 the module ``Tezos_time_measurement_runtime.Default`` along with the argument
 ``("f_time", [])``.
 
-``Time_measurement.duration`` mesures the current time before and after executing
+``Time_measurement.duration`` measures the current time before and after executing
 the given thunk in order to compute the span between the two timestamps. The resulting
 measurement is then bufferized in memory and, at last, the function evaluates in the
 result of the thunk so that we can respect the invariants of the initial program.
@@ -110,11 +110,11 @@ and also removes them from memory.
 The flushing promise is then bounded again to return ``__flush__id__0`` value
 to preserve the program invariants as well.
 
-That's great, but since Ocaml attributes are ignored by default,
+That's great, but since OCaml attributes are ignored by default,
 we still need to update the dune stanza of ``lib_my_module`` so that
 it can take effect:
 
-.. code-block:: Ocaml
+.. code-block:: OCaml
 
     (library
       (name tezos_my_module)
@@ -124,11 +124,11 @@ it can take effect:
 
 This update adds the ``tezos-time-measurement`` instrumentation backend, which,
 if set using ``--instrument-with tezos-time-measurement`` on ``dune build``
-command line, will preprocess our Ocaml code using the PPX.
+command line, will preprocess our OCaml code using the PPX.
 
 This is useful to prevent our code from embedding benchmarking tooling in
 production by mistake: If no backend is specified for the compilation, added
-attributes will just be ignored by the Ocaml compiler and that's it!
+attributes will just be ignored by the OCaml compiler and that's it!
 
 We can now compile our ready-to-benchmark code:::
 
@@ -146,18 +146,18 @@ is displayed on standard output. For example:
     Aug 23 17:52:58.593 - benchmarking: time measurements:
     Aug 23 17:52:58.593 - benchmarking:   [(f_time, 0.000177); (g_time, 0.005658)]
 
-Compatible Ocaml Attributes
+Compatible OCaml Attributes
 ---------------------------
 
 The PPX provides the handling of three attributes:
 
 - ``[@time.duration <label> (<metadata>)]`` is used to measure the time of
-  Ocaml expressions execution.
+  OCaml expressions execution.
   The ``<label>`` inside the payload will be used to tag the measured time.
-  The ``<metadata>`` is an Ocaml expression that can be added optionally
+  The ``<metadata>`` is an OCaml expression that can be added optionally
   and should evaluate to a list of ``string``\s. It can be given to add
   additional contextual information to the measurement and it can permit
-  to discrimine it from other measurements registered with the same label.
+  to discriminate it from other measurements registered with the same label.
 
   Be careful, annotating ``Lwt.t`` values with this attribute may
   not give consistent time measurements since it will only measure
@@ -168,7 +168,7 @@ The PPX provides the handling of three attributes:
   in a ``Lwt.t`` value. The measured time will then be the time spent by the
   promise to be fulfilled.
 
-- ``[@time.timestamp_pre <label> (<metadata>)]`` is used to mesure the current
+- ``[@time.timestamp_pre <label> (<metadata>)]`` is used to measure the current
   timestamp before the annotated expression is evaluated. The measurement
   will be tagged with the given ``<label>`` and optional ``<metadata>`` like
   with ``[@time.duration]``.

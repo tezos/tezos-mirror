@@ -17,7 +17,7 @@ Periods
 
 The amendment process consists of five *periods*. Each period lasts for 40960
 blocks (5 cycles) (or approximately two weeks). The periods (listed below)
-typically succeed one another for a total duration of approximately 2 months and
+typically succeed one to another for a total duration of approximately 2 months and
 a half, after which the whole amendment process starts again.
 
 The five periods are as follows:
@@ -25,7 +25,8 @@ The five periods are as follows:
 - *Proposal period*: During this period, delegates can
 
   - submit *protocol amendment proposals* (or, simply, *proposals*) using the
-    ``Proposals`` operation (see below).
+    ``Proposals`` operation (see below);
+  - upvote one or several proposals, using the same ``Proposals`` operation.
 
   Each delegate can submit a maximum of 20 proposals. Duplicates count towards
   this total.

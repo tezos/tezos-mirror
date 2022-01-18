@@ -78,7 +78,7 @@ Old Networks
 ============
 
 Granadanet
-==========
+----------
 
 Granadanet was a test network running the Granada protocol.
 Following the activation of the Hangzhou protocol replacing Granada on Mainnet,
