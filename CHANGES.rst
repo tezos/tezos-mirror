@@ -23,7 +23,7 @@ be documented here either.
 Node
 ----
 
-- The RPC GET `/chains/main/mempool/pending_operations` does not
+- The RPC GET ``/chains/main/mempool/pending_operations`` does not
   output unparsable operations anymore. Previously, they were in the
   ``Refused`` field with a parsing error.
 
@@ -67,7 +67,7 @@ Client
   of operations) to a single list of operations to be considered for inclusion.
 
 - ``--operations-pool`` option supports URL parameters to fetch remote mempools
-  through HTTP.  Environment variable `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`
+  through HTTP.  Environment variable ``TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS``
   may be set to specify custom HTTP headers. Only the Host header is supported
   as of now (see description in `rfc2616, section 14.23
   <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_)
@@ -192,9 +192,9 @@ Node
 - The prevalidator (which handles operations which have been received but not
   yet included in a block) was made more restrictive: it now accepts a single
   manager operation from a given manager for a given block. This limitation
-  was already present implicitly if you were using the `tezos-client` commands.
+  was already present implicitly if you were using the ``tezos-client`` commands.
   Batches of operations can be used to get around this restriction, see the
-  `multiple transfers` command to learn more. In addition, operations
+  ``multiple transfers`` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
 
 - Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
@@ -597,7 +597,7 @@ Node
    using store version 0.0.4. In both cases, use command
    ``tezos-node upgrade storage`` to upgrade to 0.0.6.
 
--  Added an upgrade procedure to upgrade from `v0.0.5` to `v0.0.6`. The
+-  Added an upgrade procedure to upgrade from ``v0.0.5`` to ``v0.0.6``. The
    procedure is implemented through the ``tezos-node upgrade storage``
    command.
 
@@ -717,8 +717,8 @@ Node
    number of additional cycles to keep is set to 5.
 
 -  Updated the RPC ``chains/main/checkpoint`` by renaming the
-   `save_point` field into `savepoint` to be consistent to the
-   `v0.0.5` store naming.
+   ``save_point`` field into ``savepoint`` to be consistent to the
+   ``v0.0.5`` store naming.
 
 -  Improved the shutdown procedure for external validator process.
 
