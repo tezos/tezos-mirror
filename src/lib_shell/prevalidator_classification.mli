@@ -45,8 +45,8 @@ type parameters = {
   on_discarded_operation : Operation_hash.t -> unit;
 }
 
-(** Invariants ensured by this module **provided that the caller does
-   not {!add} an operation which is already present in [t]**:
+(** Invariants ensured by this module, provided that the caller does
+    not {!add} an operation which is already present in [t]:
 
     - The field [in_mempool] is the set of all operation hashes
    present in fields: [refused; branch_refused; branch_delayed;
