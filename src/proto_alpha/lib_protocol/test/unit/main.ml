@@ -25,7 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 module Unit_test : sig
-  (** 
+  (**
    * Example: [spec "Alpha_context.ml" Test_alpha_context.test_cases]
    * Unit tests needs tag in log (like "[UNIT] some test description here...")
    * This function handles such meta data *)

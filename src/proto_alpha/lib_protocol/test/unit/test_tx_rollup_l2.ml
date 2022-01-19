@@ -494,7 +494,65 @@ module Test_Ticket_ledger = struct
       ]
 end
 
+(* ------ L2 Batch encodings ------------------------------------------------ *)
+
+let test_l2_operation_size () =
+  let open Protocol.Tx_rollup_l2_batch.V1 in
+  let open Data_encoding in
+  (* Encoding from compact encoding *)
+  let operation_content_encoding = Compact.make compact_operation_content in
+  let operation_encoding = Compact.make compact_operation in
+  let transaction_encoding = Compact.make compact_transaction in
+  (* Helper functions to encode and decode *)
+  let encode_content op = Binary.to_bytes_exn operation_content_encoding op in
+  let decode_content buffer =
+    Data_encoding.Binary.of_bytes_exn operation_content_encoding buffer
+  in
+  let encode_operation op = Binary.to_bytes_exn operation_encoding op in
+  let decode_operation buffer = Binary.of_bytes_exn operation_encoding buffer in
+  let encode_transaction t = Binary.to_bytes_exn transaction_encoding t in
+  let decode_transaction buffer =
+    Binary.of_bytes_exn transaction_encoding buffer
+  in
+
+  (* Assert the smallest operation_content size is 4 *)
+  let opc =
+    {
+      destination = Layer2 (Indexable.from_index_exn 0l);
+      ticket_hash = Indexable.from_index_exn 1l;
+      qty = 12L;
+    }
+  in
+  let buffer = encode_content opc in
+  let opc' = decode_content buffer in
+
+  Alcotest.(check int "smallest transfer content" 4 (Bytes.length buffer)) ;
+  assert (opc = opc') ;
+
+  (* Assert the smallest operation size is 7 *)
+  let op =
+    {signer = Indexable.from_index_exn 2l; counter = 0L; contents = [opc]}
+  in
+  let buffer = encode_operation op in
+  let op' = decode_operation buffer in
+
+  Alcotest.(check int "smallest transfer" 7 (Bytes.length buffer)) ;
+  assert (op = op') ;
+
+  (* Assert the smallest transaction size is 8 *)
+  let t = [op] in
+  let buffer = encode_transaction t in
+  let t' = decode_transaction buffer in
+
+  Alcotest.(check int "smallest transaction" 8 (Bytes.length buffer)) ;
+  assert (t = t') ;
+
+  return_unit
+
 let tests =
   [tztest "test irmin storage" `Quick @@ wrap_test test_irmin_storage]
   @ Test_Address_index.tests @ Test_Ticket_index.tests
   @ Test_Address_medata.tests @ Test_Ticket_ledger.tests
+  @ [
+      tztest "test layer-2 operation encoding size" `Quick test_l2_operation_size;
+    ]
