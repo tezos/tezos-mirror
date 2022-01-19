@@ -86,9 +86,9 @@ module type T = sig
   val increment_successful_precheck :
     protocol_operation operation -> protocol_operation operation
 
-  (** Creates a new prevalidation context w.r.t. the protocol associate to the
-      predecessor block . When ?protocol_data is passed to this function, it will
-      be used to create the new block *)
+  (** Creates a new prevalidation context w.r.t. the protocol associated with
+      the predecessor block. When [?protocol_data] is passed to this function,
+      it will  be used to create the new block *)
   val create :
     chain_store ->
     ?protocol_data:Bytes.t ->
@@ -99,7 +99,8 @@ module type T = sig
     t tzresult Lwt.t
 
   (** Values returned by {!create}. They are obtained from the result
-      of the protocol [apply_operation] function and the classification of errors. *)
+      of the protocol [apply_operation] function and the classification of
+      errors. *)
   type result =
     | Applied of t * operation_receipt
     | Branch_delayed of tztrace
@@ -133,22 +134,22 @@ module Make : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
      and type validation_state = Proto.validation_state
      and type chain_store = Store.chain_store
 
+(**/**)
+
 module Internal_for_tests : sig
   (** Returns the {!Operation.t} underlying an {!operation} *)
   val to_raw : _ operation -> Operation.t
 
   (** A constructor for the [operation] datatype. It by-passes the
-     checks done by the [parse] function. *)
+      checks done by the [parse] function. *)
   val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
 
-  (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
+  (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding].
+      Any error happening during parsing becomes {!Parse_error}.
 
-      If one day the functor signature is simplified, tests could use [parse_unsafe] directly rather than relying on this function to
-      replace [Proto.operation_data_encoding].
-
-      TODO: https://gitlab.com/tezos/tezos/-/issues/1487
-      Move this function to [data_encoding] or [tezos_base] and consider not catching some exceptions
-      *)
+      If one day the functor's signature is simplified, tests could use
+      [parse_unsafe] directly rather than relying on this function to
+      replace [Proto.operation_data_encoding]. *)
   val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
 
   module type CHAIN_STORE = sig
@@ -160,7 +161,8 @@ module Internal_for_tests : sig
     (** [context store block] checkouts and returns the context of [block] *)
     val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
 
-    (** [chain_id store] returns the {!Chain_id.t} to which [store] corresponds *)
+    (** [chain_id store] returns the {!Chain_id.t} to which [store]
+        corresponds *)
     val chain_id : chain_store -> Chain_id.t
   end
 
