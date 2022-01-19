@@ -1,7 +1,7 @@
 tezt/_regressions/encoding/ithaca.seed.out
 
-./tezos-codec encode 012-PsiThaCa.seed from '"0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"'
+./tezos-codec encode 012-Psithaca.seed from '"0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"'
 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
 
-./tezos-codec decode 012-PsiThaCa.seed from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
+./tezos-codec decode 012-Psithaca.seed from 0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8
 "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"

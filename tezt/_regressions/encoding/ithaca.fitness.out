@@ -1,6 +1,6 @@
 tezt/_regressions/encoding/ithaca.fitness.out
 
-./tezos-codec encode 012-PsiThaCa.fitness from '{
+./tezos-codec encode 012-Psithaca.fitness from '{
   "level": 1,
   "locked_round": 1,
   "predecessor_round": 1,
@@ -8,5 +8,5 @@ tezt/_regressions/encoding/ithaca.fitness.out
 }'
 0000000101000000010000000100000002
 
-./tezos-codec decode 012-PsiThaCa.fitness from 0000000101000000010000000100000002
+./tezos-codec decode 012-Psithaca.fitness from 0000000101000000010000000100000002
 { "level": 1, "locked_round": 1, "predecessor_round": 1, "round": 2 }

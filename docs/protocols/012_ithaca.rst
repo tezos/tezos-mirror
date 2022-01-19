@@ -4,7 +4,7 @@ Protocol Ithaca
 This page contains all the relevant information for protocol Ithaca
 (see :ref:`naming_convention`).
 
-The code can be found in the :src:`src/proto_012_PsiThaCa` directory of the
+The code can be found in the :src:`src/proto_012_Psithaca` directory of the
 ``master`` branch of Tezos.
 
 This page documents the changes brought by protocol Ithaca with respect

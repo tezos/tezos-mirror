@@ -186,7 +186,7 @@ let blockchain_network_ithacanet =
     ~chain_name:"TEZOS_ITHACANET_2021-12-22T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
-      [(8191l, "PsiThaCaT47Zboaw71QWScM8sXeMM7bbQFncK9FLqYc6EKdpjVP")]
+      [(8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A")]
     ~default_bootstrap_peers:
       [
         "ithacanet.teztnets.xyz";
