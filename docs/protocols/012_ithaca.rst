@@ -150,6 +150,13 @@ Minor Changes
 
 - Update gas costs for the new version of bls12-381, and other minor gas changes. (MR :gl:`!3955`)
 
+- In the ``michelson_v1.runtime_error`` error, which appears in the
+  error trace of operations failing because of runtime errors (such as
+  interpreting the ``FAILWITH`` instruction) during the execution of a
+  smart contract, the ``contract_code`` field is deprecated. The
+  failed script can still be fetched from the address returned in the
+  ``contract_handle`` field. (MR :gl:`!4223`)
+
 - Other internal refactorings or documentation. (MRs :gl:`!3506`, :gl:`!3550`,
   :gl:`!3593`, :gl:`!3552`, :gl:`!3588`, :gl:`!3612`, :gl:`!3575`,
   :gl:`!3622`, :gl:`!3631`, :gl:`!3630`, :gl:`!3707`, :gl:`!3644`,
