@@ -31,6 +31,9 @@ Node
   It defines which format of data serialisation must be used for RPC requests to the node.
   The value can be  ``json``, ``binary`` or ``any``. By default, the value is set to ``any``.
 
+- The ``ithacanet`` network alias now denotes the configuration for
+  the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
+  instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
 
 Client
 ------
