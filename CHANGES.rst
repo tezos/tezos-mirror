@@ -27,6 +27,10 @@ Node
   output unparsable operations anymore. Previously, they were in the
   ``Refused`` field with a parsing error.
 
+- The ``ithacanet`` network alias now denotes the configuration for
+  the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
+  instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
+
 Client
 ------
 
