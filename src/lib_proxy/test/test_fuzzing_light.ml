@@ -353,7 +353,7 @@ module HashStability = struct
     let hash = Store.Tree.hash tree in
     let data =
       match Store.Tree.kind tree with
-      | `Value -> `Contents hash
+      | `Value -> `Value hash
       | `Tree -> `Node hash
     in
     Store.Tree.shallow repo data
