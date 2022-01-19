@@ -216,12 +216,6 @@ module Lazy_storage = struct
   module Kind = Lazy_storage_kind
   module IdSet = Kind.IdSet
   include Lazy_storage_diff
-
-  let legacy_big_map_diff_encoding =
-    Data_encoding.conv
-      Contract_storage.Legacy_big_map_diff.of_lazy_storage_diff
-      Contract_storage.Legacy_big_map_diff.to_lazy_storage_diff
-      Contract_storage.Legacy_big_map_diff.encoding
 end
 
 module Origination_nonce = struct

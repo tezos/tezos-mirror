@@ -115,7 +115,6 @@ let default_samples =
     "block_header.raw";
     "block_header.unsigned";
     "contract";
-    "contract.big_map_diff";
     "cycle";
     "delegate.frozen_balance";
     "delegate.frozen_balance_by_cycles";
@@ -147,7 +146,6 @@ let alpha_samples =
     "block_header.raw";
     "block_header.unsigned";
     "contract";
-    "contract.big_map_diff";
     "cycle";
     "fitness";
     "gas.cost";

@@ -1356,8 +1356,6 @@ module Lazy_storage : sig
 
   val diffs_in_memory_size : diffs -> Cache_memory_helpers.nodes_and_size
 
-  val legacy_big_map_diff_encoding : diffs Data_encoding.t
-
   val cleanup_temporaries : context -> context Lwt.t
 
   val apply : t -> diffs -> (t * Z.t) tzresult Lwt.t

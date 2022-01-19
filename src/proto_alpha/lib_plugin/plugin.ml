@@ -1596,17 +1596,12 @@ module RPC = struct
       let run_code_output_encoding =
         conv
           (fun (storage, operations, lazy_storage_diff) ->
-            (storage, operations, lazy_storage_diff, lazy_storage_diff))
-          (fun (storage, operations, legacy_lazy_storage_diff, lazy_storage_diff)
-               ->
-            let lazy_storage_diff =
-              Option.either lazy_storage_diff legacy_lazy_storage_diff
-            in
             (storage, operations, lazy_storage_diff))
-          (obj4
+          (fun (storage, operations, lazy_storage_diff) ->
+            (storage, operations, lazy_storage_diff))
+          (obj3
              (req "storage" Script.expr_encoding)
              (req "operations" (list Operation.internal_operation_encoding))
-             (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
       let trace_code_input_encoding = run_code_input_encoding
@@ -1621,21 +1616,13 @@ module RPC = struct
       let trace_code_output_encoding =
         conv
           (fun (storage, operations, trace, lazy_storage_diff) ->
-            (storage, operations, trace, lazy_storage_diff, lazy_storage_diff))
-          (fun ( storage,
-                 operations,
-                 trace,
-                 legacy_lazy_storage_diff,
-                 lazy_storage_diff ) ->
-            let lazy_storage_diff =
-              Option.either lazy_storage_diff legacy_lazy_storage_diff
-            in
             (storage, operations, trace, lazy_storage_diff))
-          (obj5
+          (fun (storage, operations, trace, lazy_storage_diff) ->
+            (storage, operations, trace, lazy_storage_diff))
+          (obj4
              (req "storage" Script.expr_encoding)
              (req "operations" (list Operation.internal_operation_encoding))
              (req "trace" trace_encoding)
-             (opt "big_map_diff" Lazy_storage.legacy_big_map_diff_encoding)
              (opt "lazy_storage_diff" Lazy_storage.encoding))
 
       let run_view_encoding =
