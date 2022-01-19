@@ -25,9 +25,32 @@
 
 open Binary_error_types
 
+let invalid_int_encoding =
+  let open Encoding in
+  obj3 (req "min" int31) (req "v" int31) (req "max" int31)
+
+let invalid_float_encoding =
+  let open Encoding in
+  obj3 (req "min" float) (req "v" float) (req "max" float)
+
 let read_error_encoding : read_error Encoding.t =
   let open Encoding in
-  union
+  matching
+    (function
+      | Not_enough_data -> Matched (0, empty, ())
+      | Extra_bytes -> Matched (1, empty, ())
+      | No_case_matched -> Matched (2, empty, ())
+      | Unexpected_tag tag -> Matched (3, int31, tag)
+      | Invalid_int {min; v; max} ->
+          Matched (5, invalid_int_encoding, (min, v, max))
+      | Invalid_float {min; v; max} ->
+          Matched (6, invalid_float_encoding, (min, v, max))
+      | Trailing_zero -> Matched (7, empty, ())
+      | Size_limit_exceeded -> Matched (8, empty, ())
+      | List_too_long -> Matched (9, empty, ())
+      | Array_too_long -> Matched (10, empty, ())
+      | Exception_raised_in_user_function msg -> Matched (11, string, msg)
+      | User_invariant_guard msg -> Matched (12, string, msg))
     [
       case
         (Tag 0)
@@ -56,7 +79,7 @@ let read_error_encoding : read_error Encoding.t =
       case
         (Tag 5)
         ~title:"Invalid int"
-        (obj3 (req "min" int31) (req "v" int31) (req "max" int31))
+        invalid_int_encoding
         (function
           | (Invalid_int {min; v; max} : read_error) -> Some (min, v, max)
           | _ -> None)
@@ -64,7 +87,7 @@ let read_error_encoding : read_error Encoding.t =
       case
         (Tag 6)
         ~title:"Invalid float"
-        (obj3 (req "min" float) (req "v" float) (req "max" float))
+        invalid_float_encoding
         (function
           | (Invalid_float {min; v; max} : read_error) -> Some (min, v, max)
           | _ -> None)
@@ -132,7 +155,29 @@ let pp_read_error ppf = function
 
 let write_error_encoding =
   let open Encoding in
-  union
+  matching
+    (function
+      | Size_limit_exceeded -> Matched (0, empty, ())
+      | No_case_matched -> Matched (1, empty, ())
+      | Invalid_int {min; v; max} ->
+          Matched (2, invalid_int_encoding, (min, v, max))
+      | Invalid_float {min; v; max} ->
+          Matched (3, invalid_float_encoding, (min, v, max))
+      | Invalid_bytes_length {expected; found} ->
+          Matched
+            ( 4,
+              obj2 (req "expected" int31) (req "found" int31),
+              (expected, found) )
+      | Invalid_string_length {expected; found} ->
+          Matched
+            ( 5,
+              obj2 (req "expected" int31) (req "found" int31),
+              (expected, found) )
+      | Invalid_natural -> Matched (6, empty, ())
+      | List_too_long -> Matched (7, empty, ())
+      | Array_too_long -> Matched (8, empty, ())
+      | (Exception_raised_in_user_function s : write_error) ->
+          Matched (9, string, s))
     [
       case
         (Tag 0)

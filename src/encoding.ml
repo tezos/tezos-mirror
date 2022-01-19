@@ -804,8 +804,9 @@ let option ty =
   if is_nullable ty then
     invalid_arg "Data_encoding.option: cannot nest nullable encodings" ;
   (* TODO add a special construct `Option` in the GADT *)
-  union
+  matching
     ~tag_size:`Uint8
+    (function Some x -> Matched (1, ty, x) | None -> Matched (0, null, ()))
     [
       case (Tag 1) ty ~title:"Some" (fun x -> x) (fun x -> Some x);
       case
@@ -858,18 +859,22 @@ let mu name ?title ?description fix =
       fixed_precursor
 
 let result ok_enc error_enc =
-  union
+  let ok_enc = obj1 (req "ok" ok_enc) in
+  let error_enc = obj1 (req "error" error_enc) in
+  matching
     ~tag_size:`Uint8
+    (function
+      | Ok x -> Matched (1, ok_enc, x) | Error x -> Matched (0, error_enc, x))
     [
       case
         (Tag 1)
-        (obj1 (req "ok" ok_enc))
+        ok_enc
         ~title:"Ok"
         (function Ok x -> Some x | Error _ -> None)
         (fun x -> Ok x);
       case
         (Tag 0)
-        (obj1 (req "error" error_enc))
+        error_enc
         ~title:"Result"
         (function Ok _ -> None | Error x -> Some x)
         (fun x -> Error x);
