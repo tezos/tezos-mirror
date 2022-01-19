@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component: Node
-   Invocation: dune exec tezt/tests/main.exe -- --file qcheck_rpc.ml
+   Invocation: dune exec tezt/long_tests/main.exe -- --file qcheck_rpc.ml
    Subject: Property testing the RPC server
   *)
 
