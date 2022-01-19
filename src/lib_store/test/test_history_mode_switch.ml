@@ -224,6 +224,7 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
   in
   let stored_history_mode = Store.Chain.history_mode chain_store in
   Assert.equal
+    ~eq:History_mode.equal
     ~prn:(Format.asprintf "%a" History_mode.pp)
     ~msg:("expected history mode: " ^ descr)
     stored_history_mode
