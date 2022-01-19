@@ -122,7 +122,7 @@ let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult =
   | Some _ -> ok x
 
 let pk_uri_parameter () =
-  Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s >>?= return)
+  Clic.parameter (fun _ s -> Lwt.return @@ make_pk_uri (Uri.of_string s))
 
 let pk_uri_param ?name ?desc params =
   let name = Option.value ~default:"uri" name in
@@ -137,7 +137,7 @@ let pk_uri_param ?name ?desc params =
   Clic.param ~name ~desc (pk_uri_parameter ()) params
 
 let sk_uri_parameter () =
-  Clic.parameter (fun _ s -> make_sk_uri @@ Uri.of_string s >>?= return)
+  Clic.parameter (fun _ s -> Lwt.return (make_sk_uri @@ Uri.of_string s))
 
 let sk_uri_param ?name ?desc params =
   let name = Option.value ~default:"uri" name in
@@ -158,7 +158,7 @@ module Secret_key = Client_aliases.Alias (struct
 
   include (CompareUri : Compare.S with type t := t)
 
-  let of_source s = make_sk_uri @@ Uri.of_string s >>?= return
+  let of_source s = Lwt.return (make_sk_uri @@ Uri.of_string s)
 
   let to_source t = return (Uri.to_string t)
 
@@ -179,7 +179,9 @@ module Public_key = Client_aliases.Alias (struct
   end)
 
   let of_source s =
-    make_pk_uri @@ Uri.of_string s >>?= fun pk_uri -> return (pk_uri, None)
+    let open Lwt_result_syntax in
+    let*? pk_uri = make_pk_uri @@ Uri.of_string s in
+    return (pk_uri, None)
 
   let to_source (t, _) = return (Uri.to_string t)
 
@@ -270,7 +272,7 @@ module PVSS_secret_key = Client_aliases.Alias (struct
 
   let encoding = uri_encoding
 
-  let of_source s = make_pvss_sk_uri @@ Uri.of_string s >>?= return
+  let of_source s = Lwt.return (make_pvss_sk_uri @@ Uri.of_string s)
 
   let to_source t = return (Uri.to_string t)
 end)
@@ -341,9 +343,12 @@ let () =
     (fun sk -> Signature_mismatch sk)
 
 let with_scheme_signer (uri : Uri.t) (f : (module SIGNER) -> 'a) : 'a =
+  let open Lwt_result_syntax in
   match Uri.scheme uri with
   | None -> assert false
-  | Some scheme -> find_signer_for_key ~scheme >>=? fun signer -> f signer
+  | Some scheme ->
+      let* signer = find_signer_for_key ~scheme in
+      f signer
 
 let neuterize sk_uri =
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
@@ -362,30 +367,38 @@ let import_secret_key ~io pk_uri =
       Signer.import_secret_key ~io pk_uri)
 
 let sign cctxt ?watermark sk_uri buf =
+  let open Lwt_tzresult_syntax in
   with_scheme_signer sk_uri (fun (module Signer : SIGNER) ->
-      Signer.sign ?watermark sk_uri buf >>=? fun signature ->
-      Signer.neuterize sk_uri >>=? fun pk_uri ->
-      (Secret_key.rev_find cctxt sk_uri >>=? function
-       | None -> public_key pk_uri
-       | Some name -> (
-           Public_key.find cctxt name >>=? function
-           | (_, None) ->
-               public_key pk_uri >>=? fun pk ->
-               Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
-               return pk
-           | (_, Some pubkey) -> return pubkey))
-      >>=? fun pubkey ->
-      fail_unless
-        (Signature.check ?watermark pubkey signature buf)
-        (Signature_mismatch sk_uri)
-      >>=? fun () -> return signature)
+      let* signature = Signer.sign ?watermark sk_uri buf in
+      let* pk_uri = Signer.neuterize sk_uri in
+      let* pubkey =
+        let* o = Secret_key.rev_find cctxt sk_uri in
+        match o with
+        | None -> public_key pk_uri
+        | Some name -> (
+            let* r = Public_key.find cctxt name in
+            match r with
+            | (_, None) ->
+                let* pk = public_key pk_uri in
+                let* () = Public_key.update cctxt name (pk_uri, Some pk) in
+                return pk
+            | (_, Some pubkey) -> return pubkey)
+      in
+      let* () =
+        fail_unless
+          (Signature.check ?watermark pubkey signature buf)
+          (Signature_mismatch sk_uri)
+      in
+      return signature)
 
 let append cctxt ?watermark loc buf =
-  sign cctxt ?watermark loc buf >|=? fun signature ->
+  let open Lwt_result_syntax in
+  let+ signature = sign cctxt ?watermark loc buf in
   Signature.concat buf signature
 
 let check ?watermark pk_uri signature buf =
-  public_key pk_uri >>=? fun pk ->
+  let open Lwt_result_syntax in
+  let* pk = public_key pk_uri in
   return (Signature.check ?watermark pk signature buf)
 
 let deterministic_nonce sk_uri data =
@@ -402,9 +415,10 @@ let supports_deterministic_nonces sk_uri =
 
 let register_key cctxt ?(force = false) (public_key_hash, pk_uri, sk_uri)
     ?public_key name =
-  Public_key.add ~force cctxt name (pk_uri, public_key) >>=? fun () ->
-  Secret_key.add ~force cctxt name sk_uri >>=? fun () ->
-  Public_key_hash.add ~force cctxt name public_key_hash >>=? fun () ->
+  let open Lwt_result_syntax in
+  let* () = Public_key.add ~force cctxt name (pk_uri, public_key) in
+  let* () = Secret_key.add ~force cctxt name sk_uri in
+  let* () = Public_key_hash.add ~force cctxt name public_key_hash in
   return_unit
 
 (* This function is used to chose between two aliases associated
@@ -422,53 +436,67 @@ let join_keys keys1_opt keys2 =
    [pks], [sks] represent the already loaded list of public key
    hashes, public keys, and secret keys. *)
 let raw_get_key_aux (cctxt : #Client_context.wallet) pkhs pks sks pkh =
+  let open Lwt_tzresult_syntax in
   let rev_find_all list pkh =
     List.filter_map
       (fun (name, pkh') ->
         if Signature.Public_key_hash.equal pkh pkh' then Some name else None)
       list
   in
-  (let names = rev_find_all pkhs pkh in
-   List.fold_left_es
-     (fun keys_opt name ->
-       let sk_uri_opt = List.assoc ~equal:String.equal name sks in
-       (match List.assoc ~equal:String.equal name pks with
-       | None -> return_none
-       | Some (_, Some pk) -> return_some pk
-       | Some (pk_uri, None) ->
-           public_key pk_uri >>=? fun pk ->
-           Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
-           return_some pk)
-       >>=? fun pk_opt -> return @@ join_keys keys_opt (name, pk_opt, sk_uri_opt))
-     None
-     names
-   >>=? function
-   | None ->
-       failwith
-         "no keys for the source contract %a"
-         Signature.Public_key_hash.pp
-         pkh
-   | Some keys -> return keys)
-  >>= function
+  let*! r =
+    let names = rev_find_all pkhs pkh in
+    let* o =
+      List.fold_left_es
+        (fun keys_opt name ->
+          let sk_uri_opt = List.assoc ~equal:String.equal name sks in
+          let* pk_opt =
+            match List.assoc ~equal:String.equal name pks with
+            | None -> return_none
+            | Some (_, Some pk) -> return_some pk
+            | Some (pk_uri, None) ->
+                let* pk = public_key pk_uri in
+                let* () = Public_key.update cctxt name (pk_uri, Some pk) in
+                return_some pk
+          in
+          return @@ join_keys keys_opt (name, pk_opt, sk_uri_opt))
+        None
+        names
+    in
+    match o with
+    | None ->
+        failwith
+          "no keys for the source contract %a"
+          Signature.Public_key_hash.pp
+          pkh
+    | Some keys -> return keys
+  in
+  match r with
   | (Ok (_, _, None) | Error _) as initial_result -> (
       (* try to lookup for a remote key *)
-      ( find_signer_for_key ~scheme:"remote" >>=? fun signer ->
+      let*! r =
+        let* signer = find_signer_for_key ~scheme:"remote" in
         let module Signer = (val signer : SIGNER) in
         let path = Signature.Public_key_hash.to_b58check pkh in
         let uri = Uri.make ~scheme:Signer.scheme ~path () in
-        Signer.public_key uri >>=? fun pk -> return (path, Some pk, Some uri) )
-      >>= function
+        let* pk = Signer.public_key uri in
+        return (path, Some pk, Some uri)
+      in
+      match r with
       | Error _ -> Lwt.return initial_result
       | Ok _ as success -> Lwt.return success)
   | Ok _ as success -> Lwt.return success
 
 let raw_get_key (cctxt : #Client_context.wallet) pkh =
-  Public_key_hash.load cctxt >>=? fun pkhs ->
-  Public_key.load cctxt >>=? fun pks ->
-  Secret_key.load cctxt >>=? fun sks -> raw_get_key_aux cctxt pkhs pks sks pkh
+  let open Lwt_result_syntax in
+  let* pkhs = Public_key_hash.load cctxt in
+  let* pks = Public_key.load cctxt in
+  let* sks = Secret_key.load cctxt in
+  raw_get_key_aux cctxt pkhs pks sks pkh
 
 let get_key cctxt pkh =
-  raw_get_key cctxt pkh >>=? function
+  let open Lwt_tzresult_syntax in
+  let* r = raw_get_key cctxt pkh in
+  match r with
   | (pkh, Some pk, Some sk) -> return (pkh, pk, sk)
   | (_pkh, _pk, None) ->
       failwith "Unknown secret key for %a" Signature.Public_key_hash.pp pkh
@@ -476,48 +504,59 @@ let get_key cctxt pkh =
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_public_key cctxt pkh =
-  raw_get_key cctxt pkh >>=? function
+  let open Lwt_tzresult_syntax in
+  let* r = raw_get_key cctxt pkh in
+  match r with
   | (pkh, Some pk, _sk) -> return (pkh, pk)
   | (_pkh, None, _sk) ->
       failwith "Unknown public key for %a" Signature.Public_key_hash.pp pkh
 
 let get_keys (cctxt : #Client_context.wallet) =
-  Secret_key.load cctxt >>=? fun sks ->
-  Public_key_hash.load cctxt >>=? fun pkhs ->
-  Public_key.load cctxt >>=? fun pks ->
-  List.filter_map_s
-    (fun (name, sk_uri) ->
-      (match List.assoc ~equal:String.equal name pkhs with
-      | Some pkh ->
-          (match List.assoc ~equal:String.equal name pks with
-          | Some (_, Some pk) -> return pk
-          | Some (pk_uri, None) ->
-              public_key pk_uri >>=? fun pk ->
-              Public_key.update cctxt name (pk_uri, Some pk) >>=? fun () ->
-              return pk
-          | None -> failwith "no public key alias named %s" name)
-          >>=? fun pk -> return (name, pkh, pk, sk_uri)
-      | None -> failwith "no public key hash alias named %s" name)
-      >>= function
-      | Ok r -> Lwt.return_some r
-      | Error _ -> Lwt.return_none)
-    sks
-  >>= fun keys -> return keys
+  let open Lwt_tzresult_syntax in
+  let* sks = Secret_key.load cctxt in
+  let* pkhs = Public_key_hash.load cctxt in
+  let* pks = Public_key.load cctxt in
+  let*! keys =
+    List.filter_map_s
+      (fun (name, sk_uri) ->
+        let*! r =
+          match List.assoc ~equal:String.equal name pkhs with
+          | Some pkh ->
+              let* pk =
+                match List.assoc ~equal:String.equal name pks with
+                | Some (_, Some pk) -> return pk
+                | Some (pk_uri, None) ->
+                    let* pk = public_key pk_uri in
+                    let* () = Public_key.update cctxt name (pk_uri, Some pk) in
+                    return pk
+                | None -> failwith "no public key alias named %s" name
+              in
+              return (name, pkh, pk, sk_uri)
+          | None -> failwith "no public key hash alias named %s" name
+        in
+        match r with Ok r -> Lwt.return_some r | Error _ -> Lwt.return_none)
+      sks
+  in
+  return keys
 
 let list_keys cctxt =
-  Public_key_hash.load cctxt >>=? fun pkhs ->
-  Public_key.load cctxt >>=? fun pks ->
-  Secret_key.load cctxt >>=? fun sks ->
+  let open Lwt_result_syntax in
+  let* pkhs = Public_key_hash.load cctxt in
+  let* pks = Public_key.load cctxt in
+  let* sks = Secret_key.load cctxt in
   List.map_es
     (fun (name, pkh) ->
-      raw_get_key_aux cctxt pkhs pks sks pkh >>= function
+      let*! r = raw_get_key_aux cctxt pkhs pks sks pkh in
+      match r with
       | Ok (_name, pk, sk_uri) -> return (name, pkh, pk, sk_uri)
       | Error _ -> return (name, pkh, None, None))
     pkhs
 
 let alias_keys cctxt name =
-  Public_key_hash.find cctxt name >>=? fun pkh ->
-  raw_get_key cctxt pkh >>= function
+  let open Lwt_result_syntax in
+  let* pkh = Public_key_hash.find cctxt name in
+  let*! r = raw_get_key cctxt pkh in
+  match r with
   | Ok (_name, pk, sk_uri) -> return_some (pkh, pk, sk_uri)
   | Error _ -> return_none
 
