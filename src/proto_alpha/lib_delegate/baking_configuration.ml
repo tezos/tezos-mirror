@@ -82,7 +82,8 @@ type t = {
   validation : validation_config;
   retries_on_failure : int;
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
-  liquidity_baking_escape_vote : bool;
+  liquidity_baking_escape_vote :
+    Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote;
   per_block_vote_file : string option;
   force : bool;
   state_recorder : state_recorder_config;
@@ -107,7 +108,8 @@ let default_retries_on_failure_config = 5
 
 let default_user_activated_upgrades = []
 
-let default_liquidity_baking_escape_vote = false
+let default_liquidity_baking_escape_vote =
+  Protocol.Alpha_context.Block_header.LB_on
 
 let default_force = false
 
@@ -221,7 +223,8 @@ let user_activate_upgrades_config_encoding =
   let open Data_encoding in
   list (tup2 int32 Protocol_hash.encoding)
 
-let liquidity_baking_escape_vote_config_encoding = Data_encoding.bool
+let liquidity_baking_escape_vote_config_encoding =
+  Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote_encoding
 
 let force_config_encoding = Data_encoding.bool
 

@@ -55,7 +55,7 @@ type error += (* `Permanent *) Inconsistent_counters
 val begin_partial_construction :
   t ->
   predecessor_level:Level.t ->
-  escape_vote:bool ->
+  escape_vote:Block_header.liquidity_baking_escape_vote ->
   (t
   * packed_successful_manager_operation_result list
   * Liquidity_baking.escape_ema)

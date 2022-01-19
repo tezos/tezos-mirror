@@ -31,6 +31,6 @@ type escape_ema = Int32.t
     contract exists. *)
 val on_subsidy_allowed :
   Raw_context.t ->
-  escape_vote:bool ->
+  escape_vote:Block_header_repr.liquidity_baking_escape_vote ->
   (Raw_context.t -> Contract_repr.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
   (Raw_context.t * 'a list * escape_ema) tzresult Lwt.t

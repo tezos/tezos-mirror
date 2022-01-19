@@ -26,7 +26,10 @@
 open Protocol_client_context
 module Events = Baking_events.Liquidity_baking
 
-type per_block_votes = {liquidity_baking_escape_vote : bool option}
+type per_block_votes = {
+  liquidity_baking_escape_vote :
+    Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote option;
+}
 
 let per_block_votes_encoding =
   let open Data_encoding in
@@ -34,7 +37,11 @@ let per_block_votes_encoding =
   @@ conv
        (fun {liquidity_baking_escape_vote} -> liquidity_baking_escape_vote)
        (fun liquidity_baking_escape_vote -> {liquidity_baking_escape_vote})
-       (obj1 (opt "liquidity_baking_escape_vote" Data_encoding.bool))
+       (obj1
+          (opt
+             "liquidity_baking_escape_vote"
+             Protocol.Alpha_context.Block_header
+             .liquidity_baking_escape_vote_encoding))
 
 type error += Block_vote_file_not_found of string
 
@@ -92,8 +99,8 @@ let () =
         ppf
         "@[The provided block vote file \"%s\" is a valid JSON file but its \
          content is unexpected. Expecting a JSON file containing either \
-         '{\"liquidity_baking_escape_vote\": true}' or \
-         '{\"liquidity_baking_escape_vote\": false}'.@]"
+         '{\"liquidity_baking_escape_vote\": \"on\"}' or \
+         '{\"liquidity_baking_escape_vote\": \"off\"}'.@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function
@@ -115,7 +122,7 @@ let () =
         "@[In the provided block vote file \"%s\", the \
          \"liquidity_baking_escape_vote\" boolean field is missing. Expecting \
          a JSON file containing either '{\"liquidity_baking_escape_vote\": \
-         true}' or '{\"liquidity_baking_escape_vote\": false}'.@]"
+         \"on\"}' or '{\"liquidity_baking_escape_vote\": \"off\"}'.@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function

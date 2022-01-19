@@ -23,6 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Options available for the Liquidity Baking per-block vote *)
+
+type liquidity_baking_escape_vote = LB_on | LB_off
+
 (** Block header *)
 
 type contents = {
@@ -30,7 +34,7 @@ type contents = {
   payload_round : Round_repr.t;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
-  liquidity_baking_escape_vote : bool;
+  liquidity_baking_escape_vote : liquidity_baking_escape_vote;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -67,6 +71,20 @@ let of_watermark = function
       else None
   | _ -> None
 
+let liquidity_baking_escape_vote_encoding =
+  let of_int8 = function
+    | 0 -> Ok LB_on
+    | 1 -> Ok LB_off
+    | _ -> Error "liquidity_baking_escape_vote_of_int8"
+  in
+  let to_int8 = function LB_on -> 0 | LB_off -> 1 in
+  let open Data_encoding in
+  (* union *)
+  def "block_header.alpha.liquidity_baking_escape_vote"
+  @@ splitted
+       ~binary:(conv_with_guard to_int8 of_int8 int8)
+       ~json:(string_enum [("on", LB_on); ("off", LB_off)])
+
 let contents_encoding =
   let open Data_encoding in
   def "block_header.alpha.unsigned_contents"
@@ -102,7 +120,9 @@ let contents_encoding =
              "proof_of_work_nonce"
              (Fixed.bytes Constants_repr.proof_of_work_nonce_size))
           (opt "seed_nonce_hash" Nonce_hash.encoding)
-          (req "liquidity_baking_escape_vote" Data_encoding.bool))
+          (req
+             "liquidity_baking_escape_vote"
+             liquidity_baking_escape_vote_encoding))
 
 let protocol_data_encoding =
   let open Data_encoding in
@@ -161,7 +181,7 @@ let max_header_length =
       proof_of_work_nonce =
         Bytes.make Constants_repr.proof_of_work_nonce_size '0';
       seed_nonce_hash = Some Nonce_hash.zero;
-      liquidity_baking_escape_vote = false;
+      liquidity_baking_escape_vote = LB_on;
     }
   in
   Data_encoding.Binary.length

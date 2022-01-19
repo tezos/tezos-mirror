@@ -55,7 +55,11 @@ let update_escape_ema ctxt ~escape_vote =
   then
     let new_ema =
       Int32.(
-        add (div (mul 1999l old_ema) 2000l) (if escape_vote then 1000l else 0l))
+        add
+          (div (mul 1999l old_ema) 2000l)
+          (match escape_vote with
+          | Block_header_repr.LB_off -> 1000l
+          | LB_on -> 0l))
     in
     Storage.Liquidity_baking.Escape_ema.update ctxt new_ema >|=? fun ctxt ->
     (ctxt, new_ema, false)

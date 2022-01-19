@@ -147,22 +147,24 @@ let liquidity_baking_sunset_level n () =
     expected_credit
   >>=? fun () -> return_unit
 
-(* Test that subsidy shuts off at correct escape level alternating baking [n_vote_false] blocks with liquidity_baking_escape_vote = false and [n_vote_true] blocks with it true followed by [bake_after_escape] blocks with it false. *)
+(* Test that subsidy shuts off at correct escape level alternating baking [n_vote_on] blocks with liquidity_baking_escape_vote = LB_on and [n_vote_off] blocks with it LB_off followed by [bake_after_escape] blocks with it LB_on. *)
 (* Escape level is roughly 2*(log(1-1/(2*percent_flagging)) / log(0.999)) *)
-let liquidity_baking_escape_hatch n_vote_false n_vote_true escape_level
+let liquidity_baking_escape_hatch n_vote_on n_vote_off escape_level
     bake_after_escape () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   let rec bake_escaping blk i =
     if i < escape_level then
-      Block.bake_n n_vote_false blk >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
-      >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
+      Block.bake_n ~liquidity_baking_escape_vote:LB_on n_vote_on blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_escape_vote:LB_off n_vote_off blk
+      >>=? fun blk -> bake_escaping blk (i + n_vote_on + n_vote_off)
     else return blk
   in
   bake_escaping blk 0 >>=? fun blk ->
-  Block.bake_n bake_after_escape blk >>=? fun blk ->
+  Block.bake_n ~liquidity_baking_escape_vote:LB_on bake_after_escape blk
+  >>=? fun blk ->
   Context.get_liquidity_baking_subsidy (B blk)
   >>=? fun liquidity_baking_subsidy ->
   liquidity_baking_subsidy *? Int64.of_int escape_level
@@ -191,7 +193,7 @@ let liquidity_baking_escape_hatch_60 n () =
 let liquidity_baking_escape_hatch_40 n () =
   liquidity_baking_escape_hatch 3 2 3590 n ()
 
-(* 33% of blocks have liquidity_baking_escape_vote = true.
+(* 33% of blocks have liquidity_baking_escape_vote = LB_off.
    Escape hatch should not be activated. *)
 let liquidity_baking_escape_hatch_33 n () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
@@ -201,9 +203,9 @@ let liquidity_baking_escape_hatch_33 n () =
   Context.Contract.balance (B blk) liquidity_baking >>=? fun old_balance ->
   let rec bake_33_percent_escaping blk i =
     if i < Int32.to_int sunset + n then
-      Block.bake blk >>=? fun blk ->
-      Block.bake blk >>=? fun blk ->
-      Block.bake ~liquidity_baking_escape_vote:true blk >>=? fun blk ->
+      Block.bake ~liquidity_baking_escape_vote:LB_on blk >>=? fun blk ->
+      Block.bake ~liquidity_baking_escape_vote:LB_on blk >>=? fun blk ->
+      Block.bake ~liquidity_baking_escape_vote:LB_off blk >>=? fun blk ->
       bake_33_percent_escaping blk (i + 3)
     else return blk
   in
@@ -221,14 +223,15 @@ let liquidity_baking_escape_hatch_33 n () =
   >>=? fun () -> return_unit
 
 (* Test that the escape EMA in block metadata is correct. *)
-let liquidity_baking_escape_ema n_vote_false n_vote_true escape_level
+let liquidity_baking_escape_ema n_vote_on n_vote_off escape_level
     bake_after_escape expected_escape_ema () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
   let rec bake_escaping blk i =
     if i < escape_level then
-      Block.bake_n n_vote_false blk >>=? fun blk ->
-      Block.bake_n ~liquidity_baking_escape_vote:true n_vote_true blk
-      >>=? fun blk -> bake_escaping blk (i + n_vote_false + n_vote_true)
+      Block.bake_n ~liquidity_baking_escape_vote:LB_on n_vote_on blk
+      >>=? fun blk ->
+      Block.bake_n ~liquidity_baking_escape_vote:LB_off n_vote_off blk
+      >>=? fun blk -> bake_escaping blk (i + n_vote_on + n_vote_off)
     else return blk
   in
   bake_escaping blk 0 >>=? fun blk ->

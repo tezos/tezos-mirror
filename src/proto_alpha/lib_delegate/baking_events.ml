@@ -815,7 +815,9 @@ module Liquidity_baking = struct
       ~name:"liquidity_baking_escape_vote"
       ~level:Notice
       ~msg:"liquidity baking escape vote = {value}"
-      ("value", Data_encoding.bool)
+      ( "value",
+        Protocol.Alpha_context.Block_header
+        .liquidity_baking_escape_vote_encoding )
 
   let per_block_vote_file_fail =
     declare_1

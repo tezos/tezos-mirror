@@ -121,8 +121,8 @@ module Forge = struct
     Bytes.create Constants.proof_of_work_nonce_size
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ~payload_hash ~payload_round ?(liquidity_baking_escape_vote = false)
-      ~seed_nonce_hash () =
+      ~payload_hash ~payload_round
+      ?(liquidity_baking_escape_vote = Block_header.LB_on) ~seed_nonce_hash () =
     Block_header.
       {
         payload_hash;
@@ -238,8 +238,8 @@ module Forge = struct
 
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?seed_nonce_hash ?(liquidity_baking_escape_vote = false) ~payload_hash
-      ~payload_round () =
+      ?seed_nonce_hash ?(liquidity_baking_escape_vote = Block_header.LB_on)
+      ~payload_hash ~payload_round () =
     {
       Block_header.proof_of_work_nonce;
       seed_nonce_hash;

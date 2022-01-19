@@ -2991,7 +2991,11 @@ module RPC = struct
                   "proof_of_work_nonce"
                   (Fixed.bytes Alpha_context.Constants.proof_of_work_nonce_size)
                   empty_proof_of_work_nonce)
-               (dft "liquidity_baking_escape_vote" bool false))
+               Block_header.(
+                 dft
+                   "liquidity_baking_escape_vote"
+                   liquidity_baking_escape_vote_encoding
+                   LB_on))
           ~output:(obj1 (req "protocol_data" bytes))
           RPC_path.(path / "protocol_data")
     end

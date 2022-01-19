@@ -247,7 +247,7 @@ module Forge = struct
 
   let make_contents ~payload_hash ~payload_round
       ?(proof_of_work_nonce = default_proof_of_work_nonce)
-      ?(liquidity_baking_escape_vote = false) ~seed_nonce_hash () =
+      ?(liquidity_baking_escape_vote = Block_header.LB_on) ~seed_nonce_hash () =
     Block_header.
       {
         payload_hash;
