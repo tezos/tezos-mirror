@@ -267,12 +267,11 @@ let init_first_cycles ctxt pubkey =
     (fun ctxt c ->
       let cycle = Cycle_repr.of_int32_exn (Int32.of_int c) in
       snapshot ctxt >>=? fun ctxt ->
+      (* NB: we need to take several snapshots because
+         select_distribution_for_cycle deletes the snapshots *)
       select_distribution_for_cycle ctxt cycle pubkey)
     ctxt
     (0 --> preserved)
-  >>=? fun ctxt ->
-  (* Precompute a snapshot for cycle (preserved_cycles + 1) *)
-  snapshot ctxt
 
 let fold ctxt ~f ~order init =
   Storage.Stake.Active_delegate_with_one_roll.fold

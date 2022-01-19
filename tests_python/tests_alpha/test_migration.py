@@ -10,27 +10,9 @@ from . import protocol
 MIGRATION_LEVEL = 8
 BAKER = 'bootstrap1'
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
-PREV_DEPOSIT = protocol.PREV_PARAMETERS["block_security_deposit"]
 BAKER_BALANCE = next(
     bal for [BAKER_PKH, bal] in protocol.PARAMETERS["bootstrap_accounts"]
 )
-
-PREV_DEPOSIT_RECEIPTS = [
-    {
-        "kind": "contract",
-        "contract": BAKER_PKH,
-        "change": "-" + PREV_DEPOSIT,
-        "origin": "block",
-    },
-    {
-        "kind": "freezer",
-        "category": "deposits",
-        "delegate": BAKER_PKH,
-        "cycle": 0,
-        "change": PREV_DEPOSIT,
-        "origin": "block",
-    },
-]
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
 NODE_CONFIG = {
@@ -50,20 +32,6 @@ NODE_CONFIG = {
         ],
     }
 }
-
-
-def filter_out_rewards(balance_updates):
-    """Keep elements for BAKER_PKH which either have no category key
-    or are not labeled as rewards"""
-    return [
-        bu
-        for bu in balance_updates
-        if (
-            ("delegate" in bu and bu["delegate"] == BAKER_PKH)
-            or ("contract" in bu and bu["contract"] == BAKER_PKH)
-        )
-        and ("category" not in bu or bu["category"] != 'rewards')
-    ]
 
 
 @pytest.fixture(scope="class")
@@ -123,11 +91,6 @@ class TestMigration:
         utils.bake(client, BAKER)
         assert client.get_protocol() == protocol.PREV_HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 1
-        metadata = client.get_metadata()
-        assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
-        # PROTO_A is using env. V1+, metadata hashes should be present
-        _ops_metadata_hash = client.get_operations_metadata_hash()
-        _block_metadata_hash = client.get_block_metadata_hash()
 
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
@@ -135,101 +98,17 @@ class TestMigration:
             utils.bake(client, BAKER)
         metadata = client.get_metadata()
         assert metadata['next_protocol'] == protocol.HASH
-        assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
-        # PROTO_B is using env. V1+, metadata hashes should be present
-        _ops_metadata_hash = client.get_operations_metadata_hash()
-        _block_metadata_hash = client.get_block_metadata_hash()
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
     def test_new_proto(self, client, sandbox):
         # 4: first block of PROTO_B
         manual_bake(client, BAKER)
-        # client.multibake(args=["--minimal-timestamp"])
-        # utils.bake(client, "bootstrap1 bootstrap2")
         assert client.get_protocol() == protocol.HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 2
-        # check that migration balance update appears in receipts
-        _metadata = client.get_metadata()
-        constants = client.rpc(
-            'get', '/chains/main/blocks/head/context/constants'
-        )
-        # N.B.: after migration, the values being used are those set in
-        # raw_context
-        bond = str(
-            int(constants["frozen_deposits_percentage"])
-            * int(int(BAKER_BALANCE) / 100)
-        )
-        block_reward = str(constants["baking_reward_fixed_portion"])
-        deposit = str((MIGRATION_LEVEL - 1) * int(PREV_DEPOSIT))
-        # these receipts appear in the first block of TB
-        migration_receipts = [
-            {
-                "kind": "freezer",
-                "category": "deposits",
-                "delegate": BAKER_PKH,
-                "change": bond,
-                "origin": "migration",
-            },
-            {
-                "kind": "freezer",
-                "category": "legacy_deposits",
-                "delegate": BAKER_PKH,
-                "cycle": 0,
-                "change": "-" + deposit,
-                "origin": "migration",
-            },
-            {
-                "kind": "contract",
-                "contract": BAKER_PKH,
-                "change": "-" + str(int(bond) - int(deposit)),
-                "origin": "migration",
-            },
-            # BAKER has baked the first block of TB;
-            # hence, the reward for baking
-            {
-                "kind": "contract",
-                "contract": BAKER_PKH,
-                "change": block_reward,
-                "origin": "block",
-            },
-        ]
-        initial_balance_updates = migration_receipts
-        new_balance_updates = filter_out_rewards(_metadata['balance_updates'])
-        assert initial_balance_updates == new_balance_updates
-        _ops_metadata_hash = client.get_operations_metadata_hash()
-        _block_metadata_hash = client.get_block_metadata_hash()
 
     def test_new_proto_second(self, client):
         # 5: second block of PROTO_B
         manual_bake(client, BAKER)
-        metadata = client.get_metadata()
-        constants = client.rpc(
-            'get', '/chains/main/blocks/head/context/constants'
-        )
-        # N.B.: after migration, the values being used are those set
-        # in raw_context
-        # using protocol.PARAMETERS["consensus_threshold"] is wrong
-        bonus_per_slot = constants["baking_reward_bonus_per_slot"]
-        bonus = (
-            constants["consensus_committee_size"]
-            - constants["consensus_threshold"]
-        ) * int(bonus_per_slot)
-        block_reward = str(constants["baking_reward_fixed_portion"])
-        receipts = [
-            {
-                "kind": "contract",
-                "contract": BAKER_PKH,
-                "change": block_reward,
-                "origin": "block",
-            },
-            {
-                "kind": "contract",
-                "contract": BAKER_PKH,
-                "change": str(bonus),
-                "origin": "block",
-            },
-        ]
-        assert filter_out_rewards(metadata['balance_updates']) == receipts
 
     def test_terminate_node0(self, client, sandbox: Sandbox, session: dict):
         # to export rolling snapshot, we need to be at level > 60

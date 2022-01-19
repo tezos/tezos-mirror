@@ -911,6 +911,7 @@ let initial_context chain_id (header : Block_header.shell_header)
     add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
     add ctxt ["protocol_parameters"] proto_params)
   >>= fun ctxt ->
+  Protocol.Environment.Updater.activate ctxt Protocol.hash >>= fun ctxt ->
   Protocol.Main.init ctxt header >|= Protocol.Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let ({
@@ -1107,6 +1108,7 @@ let migrate :
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
+  Protocol.Environment.Updater.activate context Protocol.hash >>= fun context ->
   Protocol.Main.init context block_header >|= Protocol.Environment.wrap_tzresult
   >>=? fun {context; _} ->
   let rpc_context =
