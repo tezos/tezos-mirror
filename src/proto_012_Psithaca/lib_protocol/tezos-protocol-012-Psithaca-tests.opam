@@ -12,15 +12,15 @@ depends: [
   "astring" { with-test }
   "tezos-test-helpers" { with-test }
   "qcheck-alcotest" { with-test }
-  "tezos-012-PsiThaCa-test-helpers" { with-test }
+  "tezos-012-Psithaca-test-helpers" { with-test }
   "tezos-stdlib-unix" { with-test }
   "tezos-protocol-environment" { with-test }
   "tezos-client-base" { with-test }
-  "tezos-protocol-012-PsiThaCa-parameters" { with-test }
+  "tezos-protocol-012-Psithaca-parameters" { with-test }
   "tezos-shell-services" { with-test }
   "tezos-base-test-helpers" { with-test }
   "tezos-benchmark" { with-test }
-  "tezos-benchmark-012-PsiThaCa" { with-test }
+  "tezos-benchmark-012-Psithaca" { with-test }
 ]
 build: [
   [
@@ -28,7 +28,7 @@ build: [
     "%{tezos-protocol-compiler:lib}%/dune_protocol.template.v1"
     "dune"
     "%{tezos-protocol-compiler:lib}%/final_protocol_versions"
-    "012_PsiThaCa"
+    "012_Psithaca"
   ]
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}

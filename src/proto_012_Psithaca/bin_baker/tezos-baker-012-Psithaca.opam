@@ -8,9 +8,9 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
-  "tezos-client-012-PsiThaCa"
+  "tezos-client-012-Psithaca"
   "tezos-client-commands"
-  "tezos-baking-012-PsiThaCa-commands"
+  "tezos-baking-012-Psithaca-commands"
   "tezos-client-base-unix"
 ]
 build: [

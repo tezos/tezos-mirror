@@ -40,7 +40,7 @@ let protocols =
     ( "012",
       "012 Ithaca",
       Some "/include/rpc_introduction.rst.inc",
-      "PsiThaCaT47Zboaw71QWScM8sXeMM7bbQFncK9FLqYc6EKdpjVP" );
+      "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A" );
   ]
 
 let pp_name ppf = function

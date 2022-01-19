@@ -9,14 +9,14 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-protocol-environment"
-  "tezos-protocol-012-PsiThaCa"
+  "tezos-protocol-012-Psithaca"
   "tezos-shell-services"
   "tezos-client-base-unix"
   "tezos-mockup-registration"
   "tezos-proxy"
   "tezos-signer-backends"
-  "tezos-protocol-012-PsiThaCa-parameters"
-  "tezos-protocol-plugin-012-PsiThaCa"
+  "tezos-protocol-012-Psithaca-parameters"
+  "tezos-protocol-plugin-012-Psithaca"
   "alcotest-lwt" { with-test & >= "1.1.0" }
   "tezos-test-helpers" { with-test }
   "tezos-base-test-helpers" { with-test }

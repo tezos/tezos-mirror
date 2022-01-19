@@ -9,13 +9,13 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-protocol-environment"
-  "tezos-protocol-012-PsiThaCa"
+  "tezos-protocol-012-Psithaca"
   "tezos-shell-services"
   "tezos-shell-context"
   "tezos-client-base"
   "tezos-client-commands"
-  "tezos-client-012-PsiThaCa"
-  "tezos-baking-012-PsiThaCa"
+  "tezos-client-012-Psithaca"
+  "tezos-baking-012-Psithaca"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

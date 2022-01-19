@@ -45,7 +45,7 @@ end
 
 let () =
   Alcotest_lwt.run
-    "protocol_012_PsiThaCa unit tests"
+    "protocol_012_Psithaca unit tests"
     [
       Unit_test.spec "Alpha_context.ml" Test_alpha_context.tests;
       Unit_test.spec "Raw_level_repr.ml" Test_raw_level_repr.tests;

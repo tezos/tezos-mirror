@@ -87,7 +87,7 @@ let operations_arg =
          "When specified, the baker will try to fetch operations from this \
           file (or uri) and to include retrieved operations in the block. The \
           expected format of the contents is a list of operations [ \
-          012-PsiThaCa.operation ].  Environment variable '%s' may also be \
+          012-Psithaca.operation ].  Environment variable '%s' may also be \
           specified to add headers to the requests (only 'host'  headers are \
           supported). If the resource cannot be retrieved, e.g., if the file \
           is absent, unreadable, or the web service returns a 404 error, the \

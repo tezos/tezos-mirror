@@ -1,22 +1,22 @@
 (library
- (name tezos_012_PsiThaCa_mockup_simulator)
- (public_name tezos-baking-012-PsiThaCa.mockup-simulator)
+ (name tezos_012_Psithaca_mockup_simulator)
+ (public_name tezos-baking-012-Psithaca.mockup-simulator)
  (libraries tezos-client-base-unix
             tezos-client-commands
-            tezos-protocol-012-PsiThaCa
-            tezos-baking-012-PsiThaCa
+            tezos-protocol-012-Psithaca
+            tezos-baking-012-Psithaca
             tezos-mockup
             tezos-mockup-proxy
             tezos-mockup-commands)
  (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_012_PsiThaCa
-                   -open Tezos_client_012_PsiThaCa
+                   -open Tezos_protocol_012_Psithaca
+                   -open Tezos_client_012_Psithaca
                    -open Tezos_client_commands
-                   -open Tezos_baking_012_PsiThaCa
+                   -open Tezos_baking_012_Psithaca
                    -open Tezos_stdlib_unix
                    -open Tezos_client_base_unix
-                   -open Tezos_protocol_012_PsiThaCa_parameters
-                   -open Tezos_protocol_012_PsiThaCa.Protocol)))
+                   -open Tezos_protocol_012_Psithaca_parameters
+                   -open Tezos_protocol_012_Psithaca.Protocol)))
 
 (rule
  (alias runtest_lint)

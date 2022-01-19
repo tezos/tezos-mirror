@@ -11,14 +11,14 @@ depends: [
   "tezos-base"
   "tezos-benchmark"
   "tezos-protocol-environment"
-  "tezos-protocol-012-PsiThaCa"
-  "tezos-012-PsiThaCa-test-helpers"
-  "tezos-protocol-012-PsiThaCa-parameters"
+  "tezos-protocol-012-Psithaca"
+  "tezos-012-Psithaca-test-helpers"
+  "tezos-protocol-012-Psithaca-parameters"
   "tezos-micheline-rewriting"
-  "tezos-benchmark-type-inference-012-PsiThaCa"
+  "tezos-benchmark-type-inference-012-Psithaca"
   "hashcons"
   "benchmark-utils"
-  "tezos-012-PsiThaCa-test-helpers"
+  "tezos-012-Psithaca-test-helpers"
   "prbnmcn-stats" { = "0.0.2" }
   "tezos-micheline" { with-test }
   "tezos-error-monad" { with-test }

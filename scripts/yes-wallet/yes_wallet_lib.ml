@@ -219,7 +219,7 @@ let get_delegates (proto : protocol) context
         (fun (_, _, x) (_, _, y) -> Alpha_context.Tez.compare y x)
         delegates
   | Ithaca ->
-      let open Tezos_protocol_012_PsiThaCa.Protocol in
+      let open Tezos_protocol_012_Psithaca.Protocol in
       Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
       >|= Environment.wrap_tzresult
       >>=? fun (ctxt, _, _) ->
@@ -291,7 +291,7 @@ let protocol_of_hash protocol_hash =
     Protocol_hash.equal protocol_hash Tezos_protocol_011_PtHangz2.Protocol.hash
   then Some Hangzhou
   else if
-    Protocol_hash.equal protocol_hash Tezos_protocol_012_PsiThaCa.Protocol.hash
+    Protocol_hash.equal protocol_hash Tezos_protocol_012_Psithaca.Protocol.hash
   then Some Ithaca
   else if Protocol_hash.equal protocol_hash Tezos_protocol_alpha.Protocol.hash
   then Some Alpha
