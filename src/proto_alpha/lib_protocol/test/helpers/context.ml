@@ -330,7 +330,8 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
     ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?tx_rollup_enable ?sc_rollup_enable n =
+    ?blocks_per_cycle ?blocks_per_voting_period ?tx_rollup_enable
+    ?sc_rollup_enable n =
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -350,6 +351,7 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?baking_reward_fixed_portion
     ?origination_size
     ?blocks_per_cycle
+    ?blocks_per_voting_period
     ?tx_rollup_enable
     ?sc_rollup_enable
     accounts
@@ -358,7 +360,8 @@ let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
 let init1 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle () =
+    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
+    ?blocks_per_voting_period () =
   init
     ?rng_state
     ?commitments
@@ -373,6 +376,7 @@ let init1 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?baking_reward_fixed_portion
     ?origination_size
     ?blocks_per_cycle
+    ?blocks_per_voting_period
     1
   >|=? function
   | (_, []) -> assert false
@@ -381,7 +385,8 @@ let init1 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
 let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?min_proposal_quorum ?level ?cost_per_byte ?liquidity_baking_subsidy
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
-    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle () =
+    ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
+    ?blocks_per_voting_period () =
   init
     ?rng_state
     ?commitments
@@ -396,6 +401,7 @@ let init2 ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
     ?baking_reward_fixed_portion
     ?origination_size
     ?blocks_per_cycle
+    ?blocks_per_voting_period
     2
   >|=? function
   | (_, []) | (_, [_]) -> assert false

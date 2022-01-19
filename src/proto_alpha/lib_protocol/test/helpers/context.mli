@@ -188,6 +188,7 @@ val init :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
   ?sc_rollup_enable:bool ->
   int ->
@@ -209,6 +210,7 @@ val init1 :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   unit ->
   (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
 
@@ -228,6 +230,7 @@ val init2 :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   unit ->
   (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t
 
