@@ -23,17 +23,9 @@ be documented here either.
 Node
 ----
 
-- The RPC GET ``/chains/main/mempool/pending_operations`` does not
-  output unparsable operations anymore. Previously, they were in the
-  ``Refused`` field with a parsing error.
-
 - Added an optional parameter ``media-type``.
   It defines which format of data serialisation must be used for RPC requests to the node.
   The value can be  ``json``, ``binary`` or ``any``. By default, the value is set to ``any``.
-
-- The ``ithacanet`` network alias now denotes the configuration for
-  the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
-  instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
 
 - The output format for RPC ``/chains/<chain_id>/mempool/filter`` changed.
   The field ``backlog`` was removed. This change is similar to other RPC changes
@@ -61,6 +53,67 @@ Client
   context. If ``--balance`` wasn't specified, the script also
   inherits the given contract's balance.
 
+Baker / Endorser / Accuser
+--------------------------
+
+Proxy server
+------------
+
+Protocol Compiler And Environment
+---------------------------------
+
+Codec
+-----
+
+Docker Images
+-------------
+
+Miscellaneous
+-------------
+
+Version 12.0~rc2
+================
+
+- Replaced protocol Ithaca (``PsiThaCa``) with protocol Ithaca2 (``Psithaca2``).
+
+Node
+----
+
+- (backport from 11.1) Fixed an incorrect behaviour of the store which
+  could cause the node to freeze for a few seconds.
+
+- The ``ithacanet`` network alias now denotes the configuration for
+  the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
+  instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
+
+- The RPC GET ``/chains/main/mempool/pending_operations`` does not
+  output unparsable operations anymore. Previously, they were in the
+  ``Refused`` field with a parsing error.
+
+- The output format for RPC ``/chains/<chain_id>/mempool/filter`` changed.
+  The field ``backlog`` was removed. This change is similar to other RPC changes
+  introduced in 12.0~rc1.
+
+- Added two optional fields, ``now`` and ``level`` as input to the
+  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
+  fields can be used to override the values normally returned by the
+  ``NOW`` and ``LEVEL`` instructions.
+
+- Pending operations in the mempool are now sorted, and propagated with the following
+  priority in decreasing order (operations with the highest priority are
+  propagated first):
+  - consensus operations;
+  - anonymous and voting (governance) operations;
+  - manager operations where the priority is given by the ratio of the operation
+    fees over gas limit or operation size.
+
+- Fixed an issue where storage failed to restore its consistency after
+  corrupted metadata files.
+
+Client
+------
+
 - Renamed the ``--mempool`` option into ``--operations-pool``.
   The format of the file passed as parameter has changed from the one of RPC
   ``pending_operations`` (that is, a key-value dictionary whose values are list
@@ -81,20 +134,10 @@ Baker / Endorser / Accuser
 - Ported the ``--operations-pool`` option of the ``bake for`` command of the client
   to the baker daemon.
 
-Proxy server
-------------
-
-Protocol Compiler And Environment
----------------------------------
-
-Codec
------
-
-Docker Images
--------------
-
-Miscellaneous
--------------
+- Fixed the Ithaca baker to allow it to fallback to an RPC (instead of
+  relying on direct access to the local context) when baking the
+  migration block to its successor. This necessary mechanism was
+  present in all bakers except for the Ithaca baker of Octez 12.0~rc1.
 
 Version 12.0~rc1
 ================
