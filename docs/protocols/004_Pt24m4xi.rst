@@ -1,5 +1,8 @@
-Protocol 004_Pt24m4xi Athens
-============================
+Protocol Athens
+===============
+
+This page contains all the relevant information for protocol 004 Athens
+(004_Pt24m4xi).
 
 The main changes in this protocol are:
 

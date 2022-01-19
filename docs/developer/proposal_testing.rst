@@ -210,10 +210,9 @@ which is done by performing the following three steps:
 If so wished, these three steps can be performed by the script
 ``scripts/snapshot_alpha.sh``, which receives a parameter with the name of the
 Alpha protocol. This name parameter follows the convention
-``<tag_starting_with_version_letter>_<version_number>``. For historical reasons
-version ``004`` corresponds to letter ``a``. A valid name for the Alpha protocol
-in our example would be ``d_012``, since version ``012`` corresponds to letter
-``d``. We can snapshot the protocol by invoking the following::
+``<tag_starting_with_version_letter>_<version_number>``. A valid name for the Alpha protocol
+in our example could be ``d_012`` (we might also have used ``dummy_12``).
+We can snapshot the protocol by invoking the following::
 
   $ ./scripts/snapshot_alpha.sh d_012
 
@@ -252,7 +251,7 @@ to pass it to ``link_protocol.sh``. Finally, this script also updates ``.gitlab-
 to add unit tests, integration tests and opam tests for the new protocol.
 To run it, pass the protocol version number and name as follows::
 
-  $ ./scripts/snapshot_alpha_and_link.sh 012 ithaca
+  $ ./scripts/snapshot_alpha_and_link.sh 012 d
 
 
 3. Set User-Activated Upgrade

@@ -1,10 +1,10 @@
-Protocol 005_PsBabyM1 Babylon
-=============================
+Protocol Babylon
+================
 
 **Important: revision 005_PsBABY5H of protocol Babylon contains a bug that is corrected in the latest version 005_PsBabyM1**
 more details can be found in section `Bug affecting Bigmaps in 005_PsBABY5H`_.
 
-This page contains all the relevant information for protocol 005 Babylon.
+This page contains all the relevant information for protocol 005 Babylon (005_PsBabyM1).
 Each of the main changes is briefly described with links to relevant
 external documentation and merge requests.
 There are two sections dedicated to all the changes to RPCs and

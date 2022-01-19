@@ -32,16 +32,15 @@ manuals: main
 	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
-    # 012 (Ithaca) protocol
-	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-client.html
-	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-baker.html
-	@../tezos-endorser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-endorser.html
-	@../tezos-accuser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-accuser.html
-    # 011 (Hangzhou) protocol
-	@../tezos-client -protocol $(HANGZHOU_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-client.html
-	@../tezos-baker-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-baker.html
-	@../tezos-endorser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-endorser.html
-	@../tezos-accuser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-accuser.html
+    # Ithaca protocol
+	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-client.html
+	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-baker.html
+	@../tezos-accuser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > ithaca/tezos-accuser.html
+    # Hangzhou protocol
+	@../tezos-client -protocol $(HANGZHOU_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > hangzhou/tezos-client.html
+	@../tezos-baker-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > hangzhou/tezos-baker.html
+	@../tezos-endorser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > hangzhou/tezos-endorser.html
+	@../tezos-accuser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > hangzhou/tezos-accuser.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
@@ -71,8 +70,8 @@ redirectcheck:
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) 011
-	$(CHECKXREFS) -l 012
+	$(CHECKXREFS) hangzhou
+	$(CHECKXREFS) -l ithaca
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -104,7 +103,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index "012" > 012/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index "ithaca" > ithaca/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json
@@ -126,7 +125,7 @@ install-dependencies:
 html: Makefile api/errors.rst rpc p2p install-dependencies
 	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
-	@ln -s active "$(BUILDDIR)/011" || true
+	@ln -s active "$(BUILDDIR)/hangzhou" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
@@ -169,5 +168,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 011/tezos-*.html 012/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst active/rpc.rst hangzhou/rpc.rst ithaca/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json CHANGES.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html hangzhou/tezos-*.html ithaca/tezos-*.html alpha/tezos-*.html
