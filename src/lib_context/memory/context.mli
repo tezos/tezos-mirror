@@ -26,9 +26,9 @@
 
 (** Implementation of Tezos context fully in memory. *)
 
-include Tezos_context_sigs.Context.S
-
 type index
+
+include Tezos_context_sigs.Context.S with type index := index
 
 val index : t -> index
 

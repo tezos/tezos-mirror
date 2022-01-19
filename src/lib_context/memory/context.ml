@@ -29,8 +29,11 @@ module Store =
   Irmin_pack_mem.Make (Node) (Commit) (Conf) (Metadata) (Contents) (Path)
     (Branch)
     (Hash)
+module Tree = Tezos_context_helpers.Context.Make_tree (Store)
+include Tree
+include Tezos_context_helpers.Context.Make_proof (Store)
 
-type index = Store.Repo.t
+type index = Store.repo
 
 type context = {repo : index; parents : Store.Commit.t list; tree : Store.tree}
 
@@ -41,9 +44,6 @@ type tree = Store.tree
 type key = string list
 
 type value = bytes
-
-module Tree = Tezos_context_helpers.Context.Make_tree (Store)
-include Tree
 
 let index {repo; _} = repo
 

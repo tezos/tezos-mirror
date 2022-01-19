@@ -196,6 +196,8 @@ and context = {
 
 type t = context
 
+let index {index; _} = index
+
 module type S = Tezos_context_sigs.Context.S
 
 (*-- Version Access and Update -----------------------------------------------*)
@@ -299,7 +301,7 @@ type value = bytes
 type tree = Store.tree
 
 module Tree = Tezos_context_helpers.Context.Make_tree (Store)
-module Proof = Tree.Proof
+include Tezos_context_helpers.Context.Make_proof (Store)
 
 let mem ctxt key = Tree.mem ctxt.tree (data_key key)
 
@@ -455,6 +457,10 @@ let merkle_tree t leaf_kind key =
                     (key_to_string key)))
       in
       key_to_merkle_tree subtree key
+
+let produce_tree_proof index = produce_tree_proof index.repo
+
+let produce_stream_proof index = produce_stream_proof index.repo
 
 (*-- Predefined Fields -------------------------------------------------------*)
 

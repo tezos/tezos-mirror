@@ -41,12 +41,14 @@ module type S = sig
   include Tezos_context_sigs.Context.S
 end
 
-include S
+(** A block-indexed (key x value) store directory.  *)
+type index
+
+include S with type index := index
 
 type context = t
 
-(** A block-indexed (key x value) store directory.  *)
-type index
+val index : context -> index
 
 (** Open or initialize a versioned store at a given path. *)
 val init :
