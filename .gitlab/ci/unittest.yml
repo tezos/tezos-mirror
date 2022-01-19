@@ -66,18 +66,18 @@ unit:011_PtHangz2:
       src/proto_011_PtHangz2/lib_client.test_proto
       src/proto_011_PtHangz2/lib_protocol.test_proto
 
-unit:012_PsiThaCa:
+unit:012_Psithaca:
   extends:
   - .unit_test_template_x86_64
   - .template__coverage_files
   variables:
     MAKE_TARGETS: >
-      src/proto_012_PsiThaCa/lib_benchmark/lib_benchmark_type_inference.test_proto
-      src/proto_012_PsiThaCa/lib_benchmark.test_proto
-      src/proto_012_PsiThaCa/lib_client.test_proto
-      src/proto_012_PsiThaCa/lib_plugin.test_proto
-      src/proto_012_PsiThaCa/lib_protocol.test_proto
-      src/proto_012_PsiThaCa/lib_delegate.test_proto
+      src/proto_012_Psithaca/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_012_Psithaca/lib_benchmark.test_proto
+      src/proto_012_Psithaca/lib_client.test_proto
+      src/proto_012_Psithaca/lib_plugin.test_proto
+      src/proto_012_Psithaca/lib_protocol.test_proto
+      src/proto_012_Psithaca/lib_delegate.test_proto
 
 unit:alpha:
   extends:

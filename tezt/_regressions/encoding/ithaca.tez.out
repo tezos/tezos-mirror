@@ -1,13 +1,13 @@
 tezt/_regressions/encoding/ithaca.tez.out
 
-./tezos-codec encode 012-PsiThaCa.tez from '"7322135"'
+./tezos-codec encode 012-Psithaca.tez from '"7322135"'
 97f4be03
 
-./tezos-codec decode 012-PsiThaCa.tez from 97f4be03
+./tezos-codec decode 012-Psithaca.tez from 97f4be03
 "7322135"
 
-./tezos-codec encode 012-PsiThaCa.tez from '"0"'
+./tezos-codec encode 012-Psithaca.tez from '"0"'
 00
 
-./tezos-codec decode 012-PsiThaCa.tez from 00
+./tezos-codec decode 012-Psithaca.tez from 00
 "0"

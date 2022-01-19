@@ -1,0 +1,255 @@
+{
+  "alias_barrier_modules": [
+    "Tezos_protocol_environment_alpha__Environment"
+  ],
+  "constant_warning": false,
+  "constructor_map": [
+    ["public_key_hash", "Ed25519", "Ed25519Hash"],
+    ["public_key_hash", "P256", "P256Hash"],
+    ["public_key_hash", "Secp256k1", "Secp256k1Hash"]
+  ],
+  "error_category_blacklist": [
+    "side_effect"
+  ],
+  "error_filename_blacklist": [
+  ],
+  "error_message_blacklist": [
+    "Unbound module Tezos_protocol_012_Psithaca_functor",
+    "The placeholders `_` in types are not handled",
+    "No type known for the following variants: `Ge, `Lt, `Eq, `Le, `Gt",
+    "No type known for the following variants: `Eq, `Ge, `Gt, `Le, `Lt",
+    "No type known for the following variants: `Eq",
+    "Constructor of the variant `Eq unknown",
+    "No type known for the following variants: `Tree, `Value",
+    "Constructor of the variant `Tree unknown",
+    "Constructor of the variant `Value unknown",
+    "Anonymous definition of signatures is not handled",
+    "A variable name instead of a pattern was expected",
+    "We only support extensible types in patterns at the head",
+    "This kind of signature is not handled",
+    "Tezos_raw_protocol_012_Psithaca.Raw_context_intf.T",
+    "No type known for the following variants:",
+    "Constructor of the variant",
+    "Polymorphic variant types are defined as standard algebraic types"
+  ],
+  "escape_value": [
+    "a",
+    "acc",
+    "alloc",
+    "b",
+    "baking_rights_query",
+    "case",
+    "cons",
+    "context",
+    "descr",
+    "diff",
+    "elt",
+    "endorsing_rights_query",
+    "eq",
+    "error",
+    "field",
+    "fixed",
+    "fp",
+    "frozen_balance",
+    "gas_counter_status",
+    "handler",
+    "has_big_map",
+    "has_lazy_storage",
+    "hash",
+    "info",
+    "init",
+    "integral",
+    "internal_gas",
+    "json",
+    "json_schema",
+    "judgement",
+    "key",
+    "kind",
+    "l",
+    "lazy_expr",
+    "level_query",
+    "list_query",
+    "may_saturate",
+    "mul_safe",
+    "namespace",
+    "nonce",
+    "query",
+    "p",
+    "parametric",
+    "r",
+    "raw",
+    "seed",
+    "sequence",
+    "snapshot",
+    "stack",
+    "storage",
+    "storage_error",
+    "t",
+    "tc_context",
+    "toplevel",
+    "trace",
+    "type_logger"
+  ],
+  "first_class_module_path_blacklist": [
+    "Tezos_raw_protocol_012_Psithaca",
+    "Tezos_protocol_environment_alpha.Environment",
+    "Tezos_protocol_environment_alpha.Environment.Sapling"
+  ],
+  "first_class_module_signature_blacklist": [
+    "Environment_context.TREE",
+    "Tezos_protocol_environment_alpha__Environment.Map.OrderedType",
+    "Tezos_protocol_environment_alpha__Environment.Set.OrderedType",
+    "Tezos_raw_protocol_012_Psithaca__Raw_context.T",
+    "Tezos_raw_protocol_012_Psithaca.Alpha_context.Cache.CLIENT",
+    "Tezos_raw_protocol_012_Psithaca.Alpha_context.Cache.INTERFACE",
+    "Tezos_sapling__Core_sig.T_encoding"
+  ],
+  "merge_returns": [
+    ["return=", "return?", "return=?"]
+  ],
+  "merge_types": [
+    ["M=", "M?", "M=?"]
+  ],
+  "monadic_lets": [
+    ["Error_monad.op_gtgteq", "let="],
+    ["Error_monad.op_gtgteqquestion", "let=?"],
+    ["Error_monad.op_gtgtquestion", "let?"]
+  ],
+  "monadic_let_returns": [
+    ["Error_monad.op_gtpipeeq", "let=", "return="],
+    ["Error_monad.op_gtpipeeqquestion", "let=?", "return=?"],
+    ["Error_monad.op_gtpipequestion", "let?", "return?"]
+  ],
+  "monadic_returns": [
+    ["Lwt.__return", "return="],
+    ["Error_monad.__return", "return=?"],
+    ["Error_monad.ok", "return?"]
+  ],
+  "monadic_return_lets": [
+    ["Error_monad.op_gtgtquestioneq", "return=", "let=?"]
+  ],
+  "operator_infix": [
+    ["Compare.Int.(Compare.S.op_eq)", "=i"],
+    ["Compare.Int.(Compare.S.op_ltgt)", "<>i"],
+    ["Compare.Int.(Compare.S.op_lteq)", "<=i"],
+    ["Compare.Int.(Compare.S.op_lt)", "<i"],
+    ["Compare.Int.(Compare.S.op_gteq)", ">=i"],
+    ["Compare.Int.(Compare.S.op_gt)", ">i"],
+
+    ["Compare.Int32.(Compare.S.op_eq)", "=i32"],
+    ["Compare.Int32.(Compare.S.op_ltgt)", "<>i32"],
+    ["Compare.Int32.(Compare.S.op_lteq)", "<=i32"],
+    ["Compare.Int32.(Compare.S.op_lt)", "<i32"],
+    ["Compare.Int32.(Compare.S.op_gteq)", ">=i32"],
+    ["Compare.Int32.(Compare.S.op_gt)", ">i32"],
+
+    ["Compare.Int64.(Compare.S.op_eq)", "=i64"],
+    ["Compare.Int64.(Compare.S.op_ltgt)", "<>i64"],
+    ["Compare.Int64.(Compare.S.op_lteq)", "<=i64"],
+    ["Compare.Int64.(Compare.S.op_lt)", "<i64"],
+    ["Compare.Int64.(Compare.S.op_gteq)", ">=i64"],
+    ["Compare.Int64.(Compare.S.op_gt)", ">i64"],
+
+    ["Compare.Z.(Compare.S.op_eq)", "=Z"],
+    ["Compare.Z.(Compare.S.op_ltgt)", "<>Z"],
+    ["Compare.Z.(Compare.S.op_lteq)", "<=Z"],
+    ["Compare.Z.(Compare.S.op_lt)", "<Z"],
+    ["Compare.Z.(Compare.S.op_gteq)", ">=Z"],
+    ["Compare.Z.(Compare.S.op_gt)", ">Z"],
+
+    ["Int32.add", "+i32"],
+    ["Int32.sub", "-i32"],
+    ["Int32.mul", "*i32"],
+    ["Int32.div", "/i32"],
+
+    ["Int64.add", "+i64"],
+    ["Int64.sub", "-i64"],
+    ["Int64.mul", "*i64"],
+    ["Int64.div", "/i64"],
+
+    ["Pervasives.op_andand", "&&"],
+    ["Pervasives.op_pipepipe", "||"],
+
+    ["Pervasives.op_plus", "+i"],
+    ["Pervasives.op_minus", "-i"],
+    ["Pervasives.op_star", "*i"],
+    ["Pervasives.op_div", "/i"],
+
+    ["Z.add", "+Z"],
+    ["Z.sub", "-Z"],
+    ["Z.mul", "*Z"],
+    ["Z.div", "/Z"],
+
+    ["Z_syntax.op_plus", "+Z"],
+    ["Z_syntax.op_star", "*Z"]
+  ],
+  "renaming_rules": [
+    ["Error_monad.tzresult", "M?"],
+    ["Lwt.t", "M="],
+    ["Failure", "Failure"]
+  ],
+  "renaming_type_constructor": [
+    ["Compare.Char.(Compare.S.t)", "ascii"],
+    ["Compare.Int.(Compare.S.t)", "int"],
+    ["Compare.Int32.(Compare.S.t)", "int32"],
+    ["Compare.Int64.(Compare.S.t)", "int64"],
+    ["Compare.String.(Compare.S.t)", "string"],
+    ["Compare.Z.(Compare.S.t)", "Z.t"]
+  ],
+  "require": [
+    ["Tezos_raw_protocol_012_Psithaca", "TezosOfOCaml.Proto_alpha"]
+  ],
+  "require_import": [
+    ["Tezos_protocol_environment_alpha", "TezosOfOCaml.Proto_alpha"]
+  ],
+  "require_long_ident": [
+    ["Storage_description", "TezosOfOCaml.Proto_alpha"]
+  ],
+  "require_mli": [
+  ],
+  "variant_constructors": [
+    ["Dir", "Context.Dir"],
+    ["Key", "Context.Key"],
+    ["Uint16", "Data_encoding.Uint16"],
+    ["Uint8", "Data_encoding.Uint8"],
+    ["Hex", "Hex.Hex"],
+    ["Branch", "Error_monad.Branch"],
+    ["Permanent", "Error_monad.Permanent"],
+    ["Temporary", "Error_monad.Temporary"]
+  ],
+  "variant_types": [
+    ["Dir", "Context.key_or_dir"],
+    ["Key", "Context.key_or_dir"]
+  ],
+  "without_guard_checking": [
+    "apply.ml",
+    "apply_results.ml",
+    "baking.ml",
+    "contract_repr.ml",
+    "delegate_services.ml",
+    "fixed_point_repr.ml",
+    "helpers_services.ml",
+    "lazy_storage_kind.ml",
+    "legacy_script_support_repr.ml",
+    "level_storage.ml",
+    "michelson_v1_gas.ml",
+    "michelson_v1_primitives.ml",
+    "misc.ml",
+    "operation_repr.ml",
+    "raw_context.ml",
+    "roll_storage.ml",
+    "sapling_storage.ml",
+    "script_interpreter.ml",
+    "script_ir_annot.ml",
+    "script_ir_translator.ml",
+    "script_repr.ml",
+    "seed_repr.ml",
+    "storage_description.ml",
+    "storage_functors.ml",
+    "tez_repr.ml"
+  ],
+  "without_positivity_checking": [
+    "misc.ml",
+    "storage_description.ml"
+  ]
+}
