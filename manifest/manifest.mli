@@ -471,7 +471,7 @@ val public_exe : ?internal_name:string -> string maker
     public names. If not given, the list of internal names is derived from the
     list of names as for [public_lib].
 
-    @raise [Invalid_arg] if the list of names is empty or if the length of
+    @raise Invalid_arg if the list of names is empty or if the length of
     [internal_names] differs from the length of the list of public names. *)
 val public_exes : ?internal_names:string list -> string list maker
 
@@ -525,7 +525,7 @@ val external_lib : ?opam:string -> string -> Opam.version_constraints -> target
     [version_constraints], this is equivalent to:
     [external_lib ~opam: main_opam name version_constraints].
 
-    @raise [Invalid_arg] if [main_lib] was not built with [external_lib]. *)
+    @raise Invalid_arg if [main_lib] was not built with [external_lib]. *)
 val external_sublib : target -> string -> target
 
 (** Make an external library that is to only appear in [.opam] dependencies.

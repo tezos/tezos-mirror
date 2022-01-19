@@ -68,7 +68,7 @@ val to_bytes : t -> bytes option
 (** [to_bytes_exn t] is the binary string [s] such that [of_bytes s] is
     [t].
 
-    @raise [Invalid_argument] instead of returning [None]. *)
+    @raise Invalid_argument instead of returning [None]. *)
 val to_bytes_exn : t -> bytes
 
 (** {1 Debugging} *)

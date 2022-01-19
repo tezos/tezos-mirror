@@ -38,7 +38,7 @@ val create : unit -> 'a t
     already held an element, the old element is discarded and replaced by the
     new one.
 
-    @raise [Close] if [close t] has been called. *)
+    @raise Closed if [close t] has been called. *)
 val put : 'a t -> 'a -> unit
 
 (** [take t] is a promise that resolves as soon as an element is held by [t].
@@ -48,7 +48,7 @@ val put : 'a t -> 'a -> unit
     resolves immediately. Otherwise, the promise resolves when an element is
     [put] there.
 
-    @raise [Close] if [close t] has been called. *)
+    @raise Closed if [close t] has been called. *)
 val take : 'a t -> 'a Lwt.t
 
 (** [take_with_timeout timeout t] behaves like [take t] except that it returns
@@ -57,13 +57,13 @@ val take : 'a t -> 'a Lwt.t
     Note that [timeout] is canceled (i.e., fails with [Canceled]) if an element
     is [put] in time (or if one is already present).
 
-    @raise [Close] if [close t] has been called. *)
+    @raise Closed if [close t] has been called. *)
 val take_with_timeout : unit Lwt.t -> 'a t -> 'a option Lwt.t
 
 (** [peek t] is [Some e] if [t] holds [e] and [None] if [t] does not hold any
     element.
 
-    @raise [Close] if [close t] has been called. *)
+    @raise Closed if [close t] has been called. *)
 val peek : 'a t -> 'a option
 
 (** [close t] closes the dropbox [t]. It terminates all the waiting reader with

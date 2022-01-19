@@ -43,7 +43,7 @@ val zero : t
 
 (** Successor of the given round.
 
-    @raise [Invalid_arg] if applied to the upper bound of the round integer
+    @raise Invalid_arg if applied to the upper bound of the round integer
     representation.  *)
 val succ : t -> t
 

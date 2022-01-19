@@ -93,7 +93,7 @@ type dashboard = {
     If the dashboard already exists, it is deleted first.
     All version history is lost.
 
-    @raise [Invalid_arg] if the dashboard UID is invalid. *)
+    @raise Invalid_arg if the dashboard UID is invalid. *)
 val update_dashboard : config -> dashboard -> unit Lwt.t
 
 (** Make a simple SELECT query for a graph panel.

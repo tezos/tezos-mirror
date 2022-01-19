@@ -57,7 +57,7 @@ val number_of_frames : int
     [pp_print_step] must only write on a single-line with no carriage
     return.
 
-    @raise [Invalid_argument] if the given [every] is less than 1.*)
+    @raise Invalid_argument if the given [every] is less than 1.*)
 val display_progress :
   ?every:int ->
   ?out:Lwt_unix.file_descr ->

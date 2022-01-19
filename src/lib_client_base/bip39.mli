@@ -31,7 +31,7 @@ val to_words : t -> string list
 
 (** [of_entropy bytes] is the mnemonic derived from [bytes].
 
-    @raise [Invalid_argument] is [List.length bytes] is not in [ 16,
+    @raise Invalid_argument is [List.length bytes] is not in [ 16,
     20, 24, 28, 32 ]. *)
 val of_entropy : Bytes.t -> t
 

@@ -84,7 +84,7 @@ type data_point = private {
     - a UNIX [timestamp] (default value is now).
     See the documentation of InfluxDB for more information about those components.
 
-    @raise [Invalid_arg] if one of the tags, tag values, fields, field values,
+    @raise Invalid_arg if one of the tags, tag values, fields, field values,
     or measurement contains a newline character. *)
 val data_point :
   ?tags:(tag * string) list ->
@@ -96,7 +96,7 @@ val data_point :
 
 (** Add a tag to a data point.
 
-    @raise [Invalid_arg] if the tag or the value contains a newline character. *)
+    @raise Invalid_arg if the tag or the value contains a newline character. *)
 val add_tag : tag -> string -> data_point -> data_point
 
 (** Convert a data point to a string for display purposes. *)
@@ -220,7 +220,7 @@ val select :
     If [grafana] is [true], allow [Grafana_time_filter] and [Grafana_interval].
     Default is [false].
 
-    @raise [Invalid_arg] if [grafana] is [false] and the query contains
+    @raise Invalid_arg if [grafana] is [false] and the query contains
     [Grafana_time_filter] or [Grafana_interval]. *)
 val show_select : ?grafana:bool -> select -> string
 
@@ -237,7 +237,7 @@ val show_result_data_point : result_data_point -> string
 
 (** Perform a SELECT query.
 
-    @raise [Invalid_arg] if the query contains [Grafana_time_filter] or [Grafana_interval]. *)
+    @raise Invalid_arg if the query contains [Grafana_time_filter] or [Grafana_interval]. *)
 val query : config -> select -> result_data_point list list Lwt.t
 
 (** Get a value from a data point in a query result.

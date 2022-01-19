@@ -46,7 +46,7 @@ val register : unit Lwt.t -> unit
     which is not [Lwt.Canceled], [start] calls its argument.
     This may occur several times, including during [stop].
 
-    @raise [Invalid_arg] if calls to [register] are already allowed,
+    @raise Invalid_arg if calls to [register] are already allowed,
     i.e. if [start] has already been called without a corresponding [stop].
 
     Don't call this directly, it is called by {!Test.run}. *)

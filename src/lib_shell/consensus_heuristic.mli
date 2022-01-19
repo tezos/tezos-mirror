@@ -83,7 +83,7 @@ type 'a state =
     a total order over the type of data, but the specific of the order has no
     effect on the consensus.
 
-    @raise [Invalid_argument] if not
+    @raise Invalid_argument if not
     [0 <= threshold <= expected < 2 * threshold]
 *)
 val create :
