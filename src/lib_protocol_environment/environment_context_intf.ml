@@ -29,6 +29,67 @@ module Kind = struct
   type t = [`Value | `Tree]
 end
 
+module type VIEW = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.VIEW
+end
+
+module type TREE = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.TREE
+end
+
+module type PROOF = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.PROOF
+end
+
+module type HASH_VERSION = sig
+  (** @inline *)
+  include Tezos_context_sigs.Context.HASH_VERSION
+end
+
+(* Copy of sigs/v3/context.mli:CACHE *)
+module type CACHE = sig
+  type t
+
+  type size
+
+  type index
+
+  type identifier
+
+  type key
+
+  type value = ..
+
+  val key_of_identifier : cache_index:index -> identifier -> key
+
+  val identifier_of_key : key -> identifier
+
+  val pp : Format.formatter -> t -> unit
+
+  val find : t -> key -> value option Lwt.t
+
+  val set_cache_layout : t -> size list -> t Lwt.t
+
+  val update : t -> key -> (value * size) option -> t
+
+  val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
+
+  val clear : t -> t
+
+  val list_keys : t -> cache_index:index -> (key * size) list option
+
+  val key_rank : t -> key -> int option
+
+  val future_cache_expectation : t -> time_in_blocks:int -> t
+
+  val cache_size : t -> cache_index:index -> size option
+
+  val cache_size_limit : t -> cache_index:index -> size option
+end
+
 module type CORE = sig
   type t
 
@@ -185,83 +246,54 @@ module V4 = struct
     include CORE with type t := t
   end
 
-  (* Copy of sigs/v3/context.mli:CACHE *)
-  module type CACHE = sig
-    type t
-
-    type size
-
-    type index
-
-    type identifier
-
-    type key
-
-    type value = ..
-
-    val key_of_identifier : cache_index:index -> identifier -> key
-
-    val identifier_of_key : key -> identifier
-
-    val pp : Format.formatter -> t -> unit
-
-    val find : t -> key -> value option Lwt.t
-
-    val set_cache_layout : t -> size list -> t Lwt.t
-
-    val update : t -> key -> (value * size) option -> t
-
-    val sync : t -> cache_nonce:Bytes.t -> t Lwt.t
-
-    val clear : t -> t
-
-    val list_keys : t -> cache_index:index -> (key * size) list option
-
-    val key_rank : t -> key -> int option
-
-    val future_cache_expectation : t -> time_in_blocks:int -> t
-
-    val cache_size : t -> cache_index:index -> size option
-
-    val cache_size_limit : t -> cache_index:index -> size option
-  end
+  module type CACHE = CACHE
 end
 
-module V5 = V4
+module V5 = struct
+  type depth = V4.depth
 
-module type VIEW = sig
-  (** @inline *)
-  include Tezos_context_sigs.Context.VIEW
-end
+  module type VIEW = VIEW
 
-module type TREE = sig
-  (** @inline *)
-  include Tezos_context_sigs.Context.TREE
-end
+  module Kind = Kind
 
-module type HASH_VERSION = sig
-  (** @inline *)
-  include Tezos_context_sigs.Context.HASH_VERSION
-end
+  module type TREE = TREE
 
-module type S = sig
-  include VIEW with type key = string list and type value = bytes
+  module type S = sig
+    include VIEW with type key = string list and type value = bytes
 
-  module Tree : sig
-    include
-      TREE
-        with type t := t
-         and type key := key
-         and type value := value
-         and type tree := tree
+    module Tree : sig
+      include
+        TREE
+          with type t := t
+           and type key := key
+           and type value := value
+           and type tree := tree
 
-    val pp : Format.formatter -> tree -> unit
+      val pp : Format.formatter -> tree -> unit
+    end
+
+    include CORE with type t := t
+
+    module Proof : PROOF
+
+    type tree_proof := Proof.tree Proof.t
+
+    type stream_proof := Proof.stream Proof.t
+
+    type ('proof, 'result) verifier :=
+      'proof ->
+      (tree -> (tree * 'result) Lwt.t) ->
+      (tree * 'result, [`Msg of string]) result Lwt.t
+
+    val verify_tree_proof : (tree_proof, 'a) verifier
+
+    val verify_stream_proof : (stream_proof, 'a) verifier
   end
 
-  include CORE with type t := t
+  module type CACHE = CACHE
 end
 
-module type CACHE = V4.CACHE
+module type S = V5.S
 
 module type Sigs = sig
   module V2 = V2

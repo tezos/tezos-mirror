@@ -73,6 +73,7 @@ module M = struct
   end
 
   include Tree
+  module Proof = Memory_context.M.Proof
 
   let set_protocol _ _ = assert false
 
@@ -83,6 +84,10 @@ module M = struct
   let set_hash_version _ _ = assert false
 
   let get_hash_version _ = assert false
+
+  let verify_tree_proof _ _ = assert false
+
+  let verify_stream_proof _ _ = assert false
 end
 
 open Tezos_protocol_environment

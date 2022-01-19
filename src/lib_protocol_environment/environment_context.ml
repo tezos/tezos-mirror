@@ -253,6 +253,51 @@ module Context = struct
       Ops.Tree.clear ?depth tree
   end
 
+  (* Proof *)
+  module Proof = Tezos_context_sigs.Context.Proof_types
+
+  (* In-memory context for proof *)
+  module Proof_context = struct
+    module M = struct
+      include Tezos_context_memory.Context
+
+      let set_protocol = add_protocol
+
+      let fork_test_chain c ~protocol:_ ~expiration:_ = Lwt.return c
+    end
+
+    let equality_witness : (M.t, M.tree) equality_witness = equality_witness ()
+
+    let ops = (module M : S with type t = 'ctxt and type tree = 'tree)
+
+    let impl_name = "proof"
+
+    let inject : M.tree -> tree =
+     fun tree -> Tree {ops; tree; equality_witness; impl_name}
+
+    let project : tree -> M.tree =
+     fun (Tree t) ->
+      match equiv t.equality_witness equality_witness with
+      | (Some Refl, Some Refl) -> t.tree
+      | _ -> err_implementation_mismatch ~expected:impl_name ~got:t.impl_name
+  end
+
+  let verify_tree_proof proof (f : tree -> (tree * 'a) Lwt.t) =
+    Proof_context.M.verify_tree_proof proof (fun tree ->
+        let tree = Proof_context.inject tree in
+        f tree >|= fun (tree, r) -> (Proof_context.project tree, r))
+    >|= function
+    | Ok (tree, r) -> Ok (Proof_context.inject tree, r)
+    | Error e -> Error e
+
+  let verify_stream_proof proof (f : tree -> (tree * 'a) Lwt.t) =
+    Proof_context.M.verify_stream_proof proof (fun tree ->
+        let tree = Proof_context.inject tree in
+        f tree >|= fun (tree, r) -> (Proof_context.project tree, r))
+    >|= function
+    | Ok (tree, r) -> Ok (Proof_context.inject tree, r)
+    | Error e -> Error e
+
   type cache_key = Environment_cache.key
 
   type block_cache = {context_hash : Context_hash.t; cache : cache}
