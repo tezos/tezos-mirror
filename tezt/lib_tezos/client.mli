@@ -372,7 +372,8 @@ val spawn_propose_for :
   t ->
   Process.t
 
-(* TODO refactor this *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
+   refactor this *)
 
 (** [propose_for] *)
 val propose_for :
@@ -561,8 +562,10 @@ val submit_ballot :
 val spawn_submit_ballot :
   ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
-(* TODO: [amount] should be named [transferring] *)
-(* TODO: [src] should be named [from] and probably have type [Account.t] *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
+   [amount] should be named [transferring] *)
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
+   [src] should be named [from] and probably have type [Account.t] *)
 
 (** Run [tezos-client originate contract alias transferring amount from src
     running prg]. Returns the originated contract hash *)
@@ -660,7 +663,11 @@ val spawn_stresstest :
     Fails if the new storage cannot be extracted from the output. *)
 val run_script :
   ?hooks:Process.hooks ->
-  src:string ->
+  ?balance:Tez.t ->
+  ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
+  prg:string ->
   storage:string ->
   input:string ->
   t ->
@@ -669,7 +676,11 @@ val run_script :
 (** Same as [run_script] but do not wait for the process to exit. *)
 val spawn_run_script :
   ?hooks:Process.hooks ->
-  src:string ->
+  ?balance:Tez.t ->
+  ?self_address:string ->
+  ?source:string ->
+  ?payer:string ->
+  prg:string ->
   storage:string ->
   input:string ->
   t ->

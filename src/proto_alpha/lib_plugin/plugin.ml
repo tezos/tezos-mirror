@@ -1559,14 +1559,15 @@ module RPC = struct
              (req "storage" Script.expr_encoding)
              (req "input" Script.expr_encoding)
              (req "amount" Tez.encoding)
-             (req "balance" Tez.encoding)
+             (opt "balance" Tez.encoding)
              (req "chain_id" Chain_id.encoding)
              (opt "source" Contract.encoding)
              (opt "payer" Contract.encoding)
-             (opt "gas" Gas.Arith.z_integral_encoding)
+             (opt "self" Contract.encoding)
              (dft "entrypoint" Entrypoint.simple_encoding Entrypoint.default))
-          (obj3
+          (obj4
              (opt "unparsing_mode" unparsing_mode_encoding)
+             (opt "gas" Gas.Arith.z_integral_encoding)
              (opt "now" Script_timestamp.encoding)
              (opt "level" Script_int.n_encoding))
 
@@ -2127,6 +2128,21 @@ module RPC = struct
       let ctxt = Cache.Admin.future_cache_expectation ctxt ~time_in_blocks in
       run_operation_service ctxt () (op, chain_id)
 
+    let default_from_context ctxt get = function
+      | None -> get ctxt
+      | Some x -> return x
+
+    (* A convenience type for return values of [ensure_contracts_exist] below. *)
+    type run_code_config = {
+      balance : Tez.t;
+      self : Contract.t;
+      payer : Contract.t;
+      source : Contract.t;
+    }
+
+    (* 4_000_000 ꜩ *)
+    let default_balance = Tez.of_mutez_exn 4_000_000_000_000L
+
     let register () =
       let originate_dummy_contract ctxt script balance =
         let ctxt = Origination_nonce.init ctxt Operation_hash.zero in
@@ -2145,6 +2161,27 @@ module RPC = struct
           (`Contract dummy_contract)
           balance
         >>=? fun (ctxt, _) -> return (ctxt, dummy_contract)
+      in
+      let configure_contracts ctxt script balance ~src_opt ~pay_opt ~self_opt =
+        (match self_opt with
+        | None ->
+            let balance = Option.value ~default:default_balance balance in
+            originate_dummy_contract ctxt script balance
+            >>=? fun (ctxt, addr) -> return (ctxt, addr, balance)
+        | Some addr ->
+            default_from_context
+              ctxt
+              (fun c -> Contract.get_balance c addr)
+              balance
+            >>=? fun bal -> return (ctxt, addr, bal))
+        >>=? fun (ctxt, self, balance) ->
+        let (source, payer) =
+          match (src_opt, pay_opt) with
+          | (None, None) -> (self, self)
+          | (Some c, None) | (None, Some c) -> (c, c)
+          | (Some src, Some pay) -> (src, pay)
+        in
+        return (ctxt, {balance; self; source; payer})
       in
       let script_entrypoint_type ctxt expr entrypoint =
         let ctxt = Gas.set_unlimited ctxt in
@@ -2176,24 +2213,23 @@ module RPC = struct
               amount,
               balance,
               chain_id,
-              source,
-              payer,
-              gas,
+              src_opt,
+              pay_opt,
+              self_opt,
               entrypoint ),
-            (unparsing_mode, now, level) )
+            (unparsing_mode, gas, now, level) )
         ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
           let code = Script.lazy_expr code in
-          originate_dummy_contract ctxt {storage; code} balance
-          >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
-            match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
-          in
+          configure_contracts
+            ctxt
+            {storage; code}
+            balance
+            ~src_opt
+            ~pay_opt
+            ~self_opt
+          >>=? fun (ctxt, {self; source; payer; balance}) ->
           let gas =
             match gas with
             | Some gas -> gas
@@ -2212,16 +2248,7 @@ module RPC = struct
           in
           let step_constants =
             let open Script_interpreter in
-            {
-              source;
-              payer;
-              self = dummy_contract;
-              amount;
-              balance;
-              chain_id;
-              now;
-              level;
-            }
+            {source; payer; self; amount; balance; chain_id; now; level}
           in
           Script_interpreter.execute
             ctxt
@@ -2251,24 +2278,23 @@ module RPC = struct
               amount,
               balance,
               chain_id,
-              source,
-              payer,
-              gas,
+              src_opt,
+              pay_opt,
+              self_opt,
               entrypoint ),
-            (unparsing_mode, now, level) )
+            (unparsing_mode, gas, now, level) )
         ->
           let unparsing_mode = Option.value ~default:Readable unparsing_mode in
           let storage = Script.lazy_expr storage in
           let code = Script.lazy_expr code in
-          originate_dummy_contract ctxt {storage; code} balance
-          >>=? fun (ctxt, dummy_contract) ->
-          let (source, payer) =
-            match (source, payer) with
-            | (Some source, Some payer) -> (source, payer)
-            | (Some source, None) -> (source, source)
-            | (None, Some payer) -> (payer, payer)
-            | (None, None) -> (dummy_contract, dummy_contract)
-          in
+          configure_contracts
+            ctxt
+            {storage; code}
+            balance
+            ~src_opt
+            ~pay_opt
+            ~self_opt
+          >>=? fun (ctxt, {self; source; payer; balance}) ->
           let gas =
             match gas with
             | Some gas -> gas
@@ -2287,16 +2313,7 @@ module RPC = struct
           in
           let step_constants =
             let open Script_interpreter in
-            {
-              source;
-              payer;
-              self = dummy_contract;
-              amount;
-              balance;
-              chain_id;
-              now;
-              level;
-            }
+            {source; payer; self; amount; balance; chain_id; now; level}
           in
           let module Unparsing_mode = struct
             let unparsing_mode = unparsing_mode
@@ -2565,9 +2582,9 @@ module RPC = struct
                   map
                   [] ) ))
 
-    let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default) ~script
-        ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now ~level
-        ctxt block =
+    let run_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
+        ?balance ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self
+        ~now ~level ctxt block =
       RPC_context.make_call0
         S.run_code
         ctxt
@@ -2581,13 +2598,13 @@ module RPC = struct
             chain_id,
             source,
             payer,
-            gas,
+            self,
             entrypoint ),
-          (unparsing_mode, now, level) )
+          (unparsing_mode, gas, now, level) )
 
     let trace_code ?unparsing_mode ?gas ?(entrypoint = Entrypoint.default)
-        ~script ~storage ~input ~amount ~balance ~chain_id ~source ~payer ~now
-        ~level ctxt block =
+        ?balance ~script ~storage ~input ~amount ~chain_id ~source ~payer ~self
+        ~now ~level ctxt block =
       RPC_context.make_call0
         S.trace_code
         ctxt
@@ -2601,9 +2618,9 @@ module RPC = struct
             chain_id,
             source,
             payer,
-            gas,
+            self,
             entrypoint ),
-          (unparsing_mode, now, level) )
+          (unparsing_mode, gas, now, level) )
 
     let run_view ?gas ~contract ~entrypoint ~input ~chain_id ~now ~level ?source
         ?payer ~unparsing_mode ctxt block =
@@ -3207,8 +3224,9 @@ module RPC = struct
     | (levels, cycles) ->
         (* explicitly fail when requested levels or cycle are in the past...
            or too far in the future...
-           TODO-TB: this old comment (from version Alpha) conflicts with
-           the specification of the RPCs that use this code.
+           TODO: https://gitlab.com/tezos/tezos/-/issues/2335
+                 this old comment (from version Alpha) conflicts with
+                 the specification of the RPCs that use this code.
         *)
         List.sort_uniq
           Level.compare

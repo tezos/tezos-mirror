@@ -96,11 +96,16 @@ let commands () =
       ~doc:"name of the payer (i.e. SOURCE) contract for the transaction"
       ()
   in
+  let self_arg =
+    ContractAlias.destination_arg
+      ~name:"self-address"
+      ~doc:"address of the contract (i.e. SELF_ADDRESS) for the transaction"
+      ()
+  in
   let balance_arg =
-    Client_proto_args.tez_arg
+    Client_proto_args.tez_opt_arg
       ~parameter:"balance"
       ~doc:"balance of run contract in \xEA\x9C\xA9"
-      ~default:"4_000_000"
   in
   let now_arg = Client_proto_args.now_arg in
   let level_arg = Client_proto_args.level_arg in
@@ -235,12 +240,13 @@ let commands () =
     command
       ~group
       ~desc:"Ask the node to run a script."
-      (args11
+      (args12
          trace_stack_switch
          amount_arg
          balance_arg
          source_arg
          payer_arg
+         self_arg
          no_print_source_flag
          run_gas_limit_arg
          entrypoint_arg
@@ -259,6 +265,7 @@ let commands () =
              balance,
              source,
              payer,
+             self,
              no_print_source,
              gas,
              entrypoint,
@@ -271,6 +278,7 @@ let commands () =
            cctxt ->
         let source = Option.map snd source in
         let payer = Option.map snd payer in
+        let self = Option.map snd self in
         Lwt.return @@ Micheline_parser.no_parsing_error program
         >>=? fun program ->
         let show_source = not no_print_source in
@@ -287,6 +295,7 @@ let commands () =
               shared_params =
                 {input; unparsing_mode; now; level; source; payer; gas};
               entrypoint;
+              self;
             }
           >>= fun res ->
           print_trace_result cctxt ~show_source ~parsed:program res
@@ -303,6 +312,7 @@ let commands () =
               shared_params =
                 {input; unparsing_mode; now; level; source; payer; gas};
               entrypoint;
+              self;
             }
           >>= fun res -> print_run_result cctxt ~show_source ~parsed:program res);
     command

@@ -247,6 +247,13 @@ let tez_arg ~default ~parameter ~doc =
     ~default
     (tez_parameter ("--" ^ parameter))
 
+let tez_opt_arg ~parameter ~doc =
+  arg
+    ~long:parameter
+    ~placeholder:"amount"
+    ~doc
+    (tez_parameter ("--" ^ parameter))
+
 let tez_param ~name ~desc next =
   Clic.param
     ~name

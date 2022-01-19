@@ -78,6 +78,9 @@ let address ?(hostname = false) ?from peer =
   | Some endpoint ->
       Runner.address ~hostname ?from:(runner endpoint) (runner peer)
 
+let optional_arg ~name f =
+  Option.fold ~none:[] ~some:(fun x -> ["--" ^ name; f x])
+
 let create_with_mode ?(path = Constant.tezos_client)
     ?(admin_path = Constant.tezos_admin_client) ?name
     ?(color = Log.Color.FG.blue) ?base_dir mode =
@@ -890,15 +893,30 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     client
   |> Process.check
 
-let spawn_run_script ?hooks ~src ~storage ~input client =
+let spawn_run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage
+    ~input client =
   spawn_command
     ?hooks
     client
-    ["run"; "script"; src; "on"; "storage"; storage; "and"; "input"; input]
+    (["run"; "script"; prg; "on"; "storage"; storage; "and"; "input"; input]
+    @ optional_arg ~name:"payer" Fun.id payer
+    @ optional_arg ~name:"source" Fun.id source
+    @ optional_arg ~name:"balance" Tez.to_string balance
+    @ optional_arg ~name:"self-address" Fun.id self_address)
 
-let run_script ?hooks ~src ~storage ~input client =
+let run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage ~input
+    client =
   let* client_output =
-    spawn_run_script ?hooks ~src ~storage ~input client
+    spawn_run_script
+      ?hooks
+      ?balance
+      ?source
+      ?payer
+      ?self_address
+      ~prg
+      ~storage
+      ~input
+      client
     |> Process.check_and_read_stdout
   in
   match client_output =~* rex "storage\n(.*)" with
