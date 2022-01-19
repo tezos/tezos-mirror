@@ -204,6 +204,11 @@ module Context : sig
      reproducible. For this reason, an error in [builder] is fatal. *)
   val load_cache :
     Block_hash.t -> t -> source_of_cache -> builder -> t tzresult Lwt.t
+
+  (** This function is not documented on purpose. It can be removed if
+     a successor of Hangzhou contains a fix. *)
+  val reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing :
+    unit -> unit
 end
 
 module Register (C : S) : sig
