@@ -372,7 +372,12 @@ let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
           previously_baked_blocks)
       (fun () -> Store.close_store store')
 
-let make_tests speed patch_context =
+let make_tests speed parameters =
+  let patch_context ctxt =
+    Alpha_utils.patch_context
+      ctxt
+      ~json:(Default_parameters.json_of_parameters parameters)
+  in
   let history_modes =
     match speed with
     | `Slow ->
@@ -397,9 +402,12 @@ let make_tests speed patch_context =
           default_full;
           Rolling (Some {offset = 0});
           default_rolling;
+          Full (Some {offset = 5});
+          Rolling (Some {offset = 5});
         ]
   in
-  let nb_blocks_to_bake = [72; 72 * 2] in
+  let blocks_per_cycle = parameters.constants.blocks_per_cycle in
+  let nb_blocks_to_bake = [9 * Int32.to_int blocks_per_cycle] in
   let permutations =
     List.(product history_modes (product history_modes nb_blocks_to_bake))
     |> List.map (fun (a, (b, c)) -> (a, b, c))
@@ -408,12 +416,13 @@ let make_tests speed patch_context =
     (fun (from_hm, to_hm, nb_blocks_to_bake) ->
       let test_descr =
         Format.asprintf
-          "switching from %a to %a with %d blocks baked"
+          "switching from %a to %a with %d blocks baked and cycle length %ld"
           History_mode.pp
           from_hm
           History_mode.pp
           to_hm
           nb_blocks_to_bake
+          blocks_per_cycle
       in
       Some
         (wrap_simple_store_init_test
@@ -432,7 +441,41 @@ let make_tests speed patch_context =
                  store )))
     permutations
 
+let make_test_drag _speed parameters =
+  let patch_context ctxt =
+    Alpha_utils.patch_context
+      ctxt
+      ~json:(Default_parameters.json_of_parameters parameters)
+  in
+  let blocks_per_cycle = parameters.constants.blocks_per_cycle in
+  let nb_blocks_to_bake = 9 * Int32.to_int blocks_per_cycle in
+  let test_descr = "Check savepoint drag with cycles bigger that max_op_ttl" in
+  let from_hm = default_full in
+  wrap_simple_store_init_test
+    ~keep_dir:false
+    ~history_mode:from_hm
+    ~patch_context
+    ( test_descr,
+      fun store_path store ->
+        test
+          ~test_descr
+          ~from_hm
+          ~to_hm:default_rolling
+          ~nb_blocks_to_bake
+          ~patch_context
+          store_path
+          store )
+
 let tests speed =
-  let patch_context ctxt = Alpha_utils.default_patch_context ctxt in
-  let test_cases = make_tests speed patch_context in
-  ("history_mode_switch", test_cases)
+  let default_parameters = Alpha_utils.default_genesis_parameters in
+  let test_cases = make_tests speed default_parameters in
+  let big_cycles_parameters =
+    Alpha_utils.
+      {
+        default_genesis_parameters with
+        constants =
+          {default_genesis_parameters.constants with blocks_per_cycle = 256l};
+      }
+  in
+  let test_cases_big_cycles = [make_test_drag speed big_cycles_parameters] in
+  ("history_mode_switch", test_cases_big_cycles @ test_cases)
