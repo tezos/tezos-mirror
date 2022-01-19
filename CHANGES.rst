@@ -35,6 +35,19 @@ Node
   the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
   instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
 
+- The output format for RPC ``/chains/<chain_id>/mempool/filter`` changed.
+  The field ``backlog`` was removed. This change is similar to other RPC changes
+  introduced in 12.0~rc1.
+
+- Added two optional fields, ``now`` and ``level`` as input to the
+  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
+  fields can be used to override the values normally returned by the
+  ``NOW`` and ``LEVEL`` instructions.
+
+- Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
+  expose some metrics using the Prometheus format.
+
 Client
 ------
 
@@ -48,8 +61,25 @@ Client
   context. If ``--balance`` wasn't specified, the script also
   inherits the given contract's balance.
 
+- Renamed the ``--mempool`` option into ``--operations-pool``.
+  The format of the file passed as parameter has changed from the one of RPC
+  ``pending_operations`` (that is, a key-value dictionary whose values are list
+  of operations) to a single list of operations to be considered for inclusion.
+
+- ``--operations-pool`` option supports URL parameters to fetch remote mempools
+  through HTTP.  Environment variable `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`
+  may be set to specify custom HTTP headers. Only the Host header is supported
+  as of now (see description in `rfc2616, section 14.23
+  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_)
+
+- Added new option ``--ignore-node-mempool`` to the ``bake for`` command
+  to avoid querying the node's mempool when baking a block.
+
 Baker / Endorser / Accuser
 --------------------------
+
+- Ported the ``--operations-pool`` option of the ``bake for`` command of the client
+  to the baker daemon.
 
 Proxy server
 ------------
@@ -83,13 +113,12 @@ Node
 
 - The following RPCs output format changed:
 
-  1. ``/workers/block_validator``,
-  2. ``/workers/chain_validators``,
-  3. ``/workers/chain_validators/<chain_id>``,
-  4. ``/workers/chain_validator/<chain_id>/peer_validators``,
-  5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``,
-  6. ``/workers/prevalidators``,
-  7. ``/chains/<chain_id>/mempool/filter``.
+  1. ``/workers/block_validator``
+  2. ``/workers/chain_validators``
+  3. ``/workers/chain_validators/<chain_id>``
+  4. ``/workers/chain_validator/<chain_id>/peer_validators``
+  5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``
+  6. ``/workers/prevalidators``
 
   The field ``backlog`` is removed. Those logs can be obtained via the
   node itself. Logging can be redirected to a file via the option
@@ -149,12 +178,6 @@ Node
 - Added a new mempool's classification for the recently introduced
   outdated error category of protocols in environment v4.
 
-- Added two optional fields, ``now`` and ``level`` as input to the
-  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
-  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
-  fields can be used to override the values normally returned by the
-  ``NOW`` and ``LEVEL`` instructions.
-
 - Add a new CLI & config option ``advertised-net-port``.
 
 - Added an optional ``show_types`` field in the input of the
@@ -187,9 +210,6 @@ Node
 
 - Added the ``ithacanet`` built-in network alias.
 
-- Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
-  expose some metrics using the Prometheus format.
-
 - Added two optional fields, ``replace_by_fee_factor`` and
   ``max_prechecked_manager_operations`` to ``/chains/<chain_id>/mempool/filter``
   in order to control when the mempool accepts a manager operation replacement,
@@ -203,20 +223,6 @@ Client
 - Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be  ``json``, ``binary`` or ``any``.
-
-- Renamed the ``--mempool`` option into ``--operations-pool``.
-  The format of the file passed as parameter has changed from the one of RPC
-  ``pending_operations`` (that is, a key-value dictionary whose values are list
-  of operations) to a single list of operations to be considered for inclusion.
-
-- ``--operations-pool`` option supports URL parameters to fetch remote mempools
-  through HTTP.  Environment variable `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`
-  may be set to specify custom HTTP headers. Only the Host header is supported
-  as of now (see description in `rfc2616, section 14.23
-  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_)
-
-- Added new option ``--ignore-node-mempool`` to the ``bake for`` command
-  to avoid querying the node's mempool when baking a block.
 
 - Added two options, ``--now`` and ``--level`` to the ``run script``
   and ``run view`` commands simulating execution of Michelson
@@ -244,9 +250,6 @@ Baker / Endorser / Accuser
   The default ``media_type`` is ``binary`` for bakers.
   The media accept header indicates to the node which format of data serialisation is supported.
   The value can be ``json``, ``binary`` or ``any``.
-
-- Ported the ``--operations-pool`` option of the ``bake for`` command of the client
-  to the baker daemon.
 
 -  Removed baker, endorser and accuser for Granada.
 
