@@ -1110,11 +1110,17 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                               (step [@ocaml.tailcall])
                                 ( outdated ctxt,
                                   {
-                                    sc with
                                     source = sc.self;
                                     self = c;
                                     amount = Tez.zero;
                                     balance;
+                                    (* The following remain unchanged, but let's
+                                       list them anyway, so that we don't forget
+                                       to update something added later. *)
+                                    payer = sc.payer;
+                                    chain_id = sc.chain_id;
+                                    now = sc.now;
+                                    level = sc.level;
                                   } )
                                 (update_local_gas_counter ctxt)
                                 kinstr
