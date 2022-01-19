@@ -895,7 +895,8 @@ let lib_base_tests ?dep_files names =
     ~opens:["Tezos_base"; "Tezos_error_monad"]
     ~modules:names
 
-let _tezos_base_tests_1 = lib_base_tests ["test_time"; "test_protocol"]
+let _tezos_base_tests_1 =
+  lib_base_tests ["test_bounded"; "test_time"; "test_protocol"]
 
 let _tezos_base_tests_2 =
   lib_base_tests ["test_p2p_addr"] ~dep_files:["points.ok"; "points.ko"]
