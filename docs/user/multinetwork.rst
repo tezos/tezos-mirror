@@ -58,7 +58,9 @@ the following built-in networks:
 
 - ``hangzhounet`` (available from version 11.0~rc2)
 
-- ``ithacanet`` (available from version 12.0~rc1)
+- ``ithacanet`` (available from version 12.0~rc1 but 12.0~rc2 updated
+  it to refer to the second version of Ithacanet which runs
+  ``Psithaca2`` instead of ``PsiThaCa``)
 
 If you did not initialize your node configuration, or if your configuration
 file contains no ``network`` field, the node assumes you want to run Mainnet.
