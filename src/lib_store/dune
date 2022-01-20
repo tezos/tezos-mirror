@@ -18,7 +18,8 @@
   ringo-lwt
   camlzip
   tar
-  tar-unix)
+  tar-unix
+  prometheus)
  (flags
   (:standard
    -open Tezos_shell_services
