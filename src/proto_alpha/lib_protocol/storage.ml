@@ -1345,12 +1345,20 @@ module Vote = struct
       end)
       (Protocol_hash)
 
-  module Listings_size =
+  (* To be removed when removing migration from Ithaca *)
+  module Legacy_listings_size =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
         let name = ["listings_size"]
       end)
       (Encoding.Int32)
+
+  module Voting_power_in_listings =
+    Make_single_data_storage (Registered) (Raw_context)
+      (struct
+        let name = ["voting_power_in_listings"]
+      end)
+      (Encoding.Int64)
 
   module Listings =
     Make_indexed_data_storage
@@ -1359,7 +1367,7 @@ module Vote = struct
            let name = ["listings"]
          end))
          (Public_key_hash_index)
-      (Encoding.Int32)
+      (Encoding.Int64)
 
   module Proposals =
     Make_data_set_storage

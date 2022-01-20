@@ -296,7 +296,7 @@ module Delegate = struct
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
-    voting_power : int32;
+    voting_power : int64;
   }
 
   let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh

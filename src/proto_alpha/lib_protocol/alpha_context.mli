@@ -1694,7 +1694,7 @@ module Vote : sig
   val record_proposal :
     context -> Protocol_hash.t -> public_key_hash -> context tzresult Lwt.t
 
-  val get_proposals : context -> int32 Protocol_hash.Map.t tzresult Lwt.t
+  val get_proposals : context -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
   val clear_proposals : context -> context Lwt.t
 
@@ -1702,31 +1702,29 @@ module Vote : sig
     context -> public_key_hash -> int tzresult Lwt.t
 
   val listings_encoding :
-    (Signature.Public_key_hash.t * int32) list Data_encoding.t
+    (Signature.Public_key_hash.t * int64) list Data_encoding.t
 
   val update_listings : context -> context tzresult Lwt.t
 
-  val listing_size : context -> int32 tzresult Lwt.t
-
   val in_listings : context -> public_key_hash -> bool Lwt.t
 
-  val get_listings : context -> (public_key_hash * int32) list Lwt.t
+  val get_listings : context -> (public_key_hash * int64) list Lwt.t
 
   type ballot = Yay | Nay | Pass
 
   val get_voting_power_free :
-    context -> Signature.Public_key_hash.t -> int32 tzresult Lwt.t
+    context -> Signature.Public_key_hash.t -> int64 tzresult Lwt.t
 
   val get_voting_power :
-    context -> Signature.Public_key_hash.t -> (context * int32) tzresult Lwt.t
+    context -> Signature.Public_key_hash.t -> (context * int64) tzresult Lwt.t
 
-  val get_total_voting_power_free : context -> int32 tzresult Lwt.t
+  val get_total_voting_power_free : context -> int64 tzresult Lwt.t
 
-  val get_total_voting_power : context -> (context * int32) tzresult Lwt.t
+  val get_total_voting_power : context -> (context * int64) tzresult Lwt.t
 
   val ballot_encoding : ballot Data_encoding.t
 
-  type ballots = {yay : int32; nay : int32; pass : int32}
+  type ballots = {yay : int64; nay : int64; pass : int64}
 
   val ballots_encoding : ballots Data_encoding.t
 
@@ -1737,8 +1735,7 @@ module Vote : sig
 
   val get_ballots : context -> ballots tzresult Lwt.t
 
-  val get_ballot_list :
-    context -> (Signature.Public_key_hash.t * ballot) list Lwt.t
+  val get_ballot_list : context -> (public_key_hash * ballot) list Lwt.t
 
   val clear_ballots : context -> context Lwt.t
 

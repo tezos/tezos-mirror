@@ -644,7 +644,7 @@ type period_info = {
 type ballots_info = {
   current_quorum : Int32.t;
   participation : Int32.t;
-  supermajority : Int32.t;
+  supermajority : Int64.t;
   ballots : Vote.ballots;
 }
 
@@ -653,13 +653,17 @@ let get_ballots_info (cctxt : #full) ~chain ~block =
   let cb = (chain, block) in
   Alpha_services.Voting.ballots cctxt cb >>=? fun ballots ->
   Alpha_services.Voting.current_quorum cctxt cb >>=? fun current_quorum ->
-  Alpha_services.Voting.listings cctxt cb >>=? fun listings ->
-  let max_participation =
-    List.fold_left (fun acc (_, w) -> Int32.add w acc) 0l listings
+  Alpha_services.Voting.total_voting_power cctxt cb
+  >>=? fun max_participation ->
+  let all_votes = Int64.(add (add ballots.yay ballots.nay) ballots.pass) in
+  let participation =
+    Z.(
+      to_int32
+        (div
+           (mul (of_int64 all_votes) (of_int 100_00))
+           (of_int64 max_participation)))
   in
-  let all_votes = Int32.(add (add ballots.yay ballots.nay) ballots.pass) in
-  let participation = Int32.(div (mul all_votes 100_00l) max_participation) in
-  let supermajority = Int32.(div (mul 8l (add ballots.yay ballots.nay)) 10l) in
+  let supermajority = Int64.(div (mul 8L (add ballots.yay ballots.nay)) 10L) in
   return {current_quorum; participation; supermajority; ballots}
 
 let get_period_info ?(successor = false) (cctxt : #full) ~chain ~block =
