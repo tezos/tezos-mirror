@@ -1369,10 +1369,10 @@ let may_clean_cementing_artifacts block_store =
   match b with
   | true ->
       let* dir = Lwt_unix.opendir cemented_path in
-      Lwt.catch
+      Unit.catch_s
+        ~catch_only:(function End_of_file -> true | _ -> false)
         (fun () ->
           Lwt.finalize (fun () -> loop dir) (fun () -> Lwt_unix.closedir dir))
-        (function End_of_file -> Lwt.return_unit | err -> Lwt.fail err)
   | false -> Lwt.return_unit
 
 let may_recover_merge block_store =

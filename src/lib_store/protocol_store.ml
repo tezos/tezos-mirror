@@ -76,9 +76,9 @@ let init store_dir =
   in
   let* dir = Lwt_unix.opendir protocol_store_dir_path in
   let rec loop set =
-    Lwt.catch
-      (fun () ->
-        let* file = Lwt_unix.readdir dir in
+    Lwt.try_bind
+      (fun () -> Lwt_unix.readdir dir)
+      (fun file ->
         match Protocol_hash.of_b58check_opt file with
         | Some protocol_hash -> loop (Protocol_hash.Set.add protocol_hash set)
         | None -> loop set)

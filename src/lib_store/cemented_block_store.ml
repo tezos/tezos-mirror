@@ -144,11 +144,9 @@ let load_table cemented_blocks_dir =
       let*! dir_handle = Lwt_unix.opendir cemented_blocks_dir_path in
       let rec loop acc =
         let*! filename =
-          Lwt.catch
-            (fun () ->
-              let*! filename = Lwt_unix.readdir dir_handle in
-              Lwt.return_some filename)
-            (function End_of_file -> Lwt.return_none | exn -> raise exn)
+          Option.catch_s
+            ~catch_only:(function End_of_file -> true | _ -> false)
+            (fun () -> Lwt_unix.readdir dir_handle)
         in
         match filename with
         | Some filename -> (
@@ -193,11 +191,9 @@ let load_metadata_table cemented_blocks_dir =
       in
       let rec loop acc =
         let*! filename =
-          Lwt.catch
-            (fun () ->
-              let*! filename = Lwt_unix.readdir dir_handle in
-              Lwt.return_some filename)
-            (function End_of_file -> Lwt.return_none | exn -> raise exn)
+          Option.catch_s
+            ~catch_only:(function End_of_file -> true | _ -> false)
+            (fun () -> Lwt_unix.readdir dir_handle)
         in
         match filename with
         | Some filename -> (
@@ -388,10 +384,10 @@ let read_block_metadata ?location cemented_store block_level =
       let*! b = Lwt_unix.file_exists metadata_file in
       match b with
       | false -> return_none
-      | true ->
-          Lwt.catch
-            (fun () ->
-              let in_file = Zip.open_in metadata_file in
+      | true -> (
+          match Zip.open_in metadata_file with
+          | exception _ -> return_none
+          | in_file ->
               Lwt.catch
                 (fun () ->
                   let entry =
@@ -405,8 +401,7 @@ let read_block_metadata ?location cemented_store block_level =
                        metadata))
                 (fun _ ->
                   Zip.close_in in_file ;
-                  return_none))
-            (fun _ -> return_none))
+                  return_none)))
 
 let cement_blocks_metadata cemented_store blocks =
   let open Lwt_tzresult_syntax in

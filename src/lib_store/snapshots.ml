@@ -3609,26 +3609,22 @@ let snapshot_file_kind ~snapshot_path =
     let (module Loader) =
       (module Make_snapshot_loader (Tar_loader) : Snapshot_loader)
     in
-    Lwt.catch
-      (fun () ->
+    Error_monad.catch_es (fun () ->
         let* _header =
           Loader.load_snapshot_header ~snapshot_path:(Naming.file_path file)
         in
         return_unit)
-      (fun e -> fail_with_exn e)
   in
   let is_valid_raw_snapshot snapshot_dir =
     let (module Loader) =
       (module Make_snapshot_loader (Raw_loader) : Snapshot_loader)
     in
-    Lwt.catch
-      (fun () ->
+    Error_monad.catch_es (fun () ->
         let* _header =
           Loader.load_snapshot_header
             ~snapshot_path:(Naming.dir_path snapshot_dir)
         in
         return_unit)
-      fail_with_exn
   in
   protect (fun () ->
       let*! is_dir = Lwt_utils_unix.is_directory snapshot_path in
