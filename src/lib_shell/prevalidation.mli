@@ -39,6 +39,12 @@ type 'protocol_operation operation = private {
           unserialized representation of [raw.protocol_data]. For
           convenience, the type associated to this type may be [unit] if we
           do not have deserialized the operation yet. *)
+  count_successful_prechecks : int;
+      (** This field provides an under-approximation for the number of times
+          the operation has been successfully prechecked. It is an
+          under-approximation because if the operation is e.g., parsed more than
+          once, or is prechecked in other modes, this flag is not globally
+          updated. *)
 }
 
 module type T = sig
@@ -71,6 +77,14 @@ module type T = sig
       - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
   val parse :
     Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
+
+  (** [increment_successful_precheck op] increments the field
+      [count_successful_prechecks] of the given operation [op]. It is supposed
+      to be called after each successful precheck of a given operation [op],
+      and nowhere else. Overflow is unlikely to occur in practice, as the
+      counter grows very slowly and the number of prechecks is bounded. *)
+  val increment_successful_precheck :
+    protocol_operation operation -> protocol_operation operation
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
