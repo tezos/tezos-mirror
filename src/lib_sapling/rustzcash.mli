@@ -61,7 +61,7 @@ type parameter_files = {spend_path : string; output_path : string}
     module. You can use the corresponding optional arguments to override their
     behavior, for instance with a mock for testing purposes.
 
-    @raise [Params_not_found] if parameters could not be found
+    @raise Params_not_found if parameters could not be found
     at any of those locations. *)
 val find_params :
   ?getenv_opt:(string -> string option) ->
@@ -72,7 +72,7 @@ val find_params :
 
 (** Load parameter files.
 
-    @raise [Params_not_found] if parameters could not be found
+    @raise Params_not_found if parameters could not be found
     (see {!find_params} for information regarding how parameter files
     are looked up). *)
 val init_params : unit -> unit
@@ -91,7 +91,7 @@ val check_diversifier : diversifier -> bool
 
 (** Computes a diversified pk that the payee gives to the payer offline.
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -105,7 +105,7 @@ val generate_r : unit -> Bytes.t
     The rcm should be the same as the one to compute cm and the spend or output
     proof, and should be generated using generate_r.
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -123,7 +123,7 @@ val compute_nf :
     for the nullifier and output or spend proof. It should be generated at
     random using generate_r.
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -136,7 +136,7 @@ val compute_cm : diversifier -> pkd -> amount:int64 -> rcm -> commitment
     For the receiver the epk is the one published by the sender, and the secret is
     his ivk.
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -148,7 +148,7 @@ val ka_agree_receiver : epk -> ivk -> symkey
     exchange. This is used by the sender. The esk should be generated using
     generate_r
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -158,7 +158,7 @@ val ka_derivepublic : diversifier -> esk -> epk
     the input ie. cv,cm,...
     This has to be generated using [generate_r]
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -186,7 +186,7 @@ val with_proving_ctx : (proving_ctx -> 'a) -> 'a
     inputs and outputs. The proving context has to be freed after
     calling this function.
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -194,7 +194,7 @@ val make_binding_sig : proving_ctx -> balance:int64 -> sighash -> binding_sig
 
 (** Creates proof and sig for an output
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -212,7 +212,7 @@ val output_proof :
     The second one is the same as for the binding sig.
     This function can panic (e.g. if the arguments are not coherent).
 
-    @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+    @raise Assert_failure if the underlying binding in rust indicates a failure,
     which only happens if the arguments are not valid representations for their
     expected type, which can only happen if there's an error in the constructors
     for these abstract types. *)
@@ -276,7 +276,7 @@ val zip32_xfvk_address :
 val zip32_xsk_derive :
   zip32_expanded_spending_key -> Int32.t -> zip32_expanded_spending_key
 
-(* @raise [Assert_failure] if the underlying binding in rust indicates a failure,
+(* @raise Assert_failure if the underlying binding in rust indicates a failure,
    which only happens if the arguments are not valid representations for their
    expected type, which can only happen if there's an error in the constructors
    for these abstract types. *)

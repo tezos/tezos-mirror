@@ -2443,7 +2443,7 @@ fallback value as parameter.
 
 ::
 
-   (** @raise [Not_found] if argument is [None] *)
+   (** @raise Not_found if argument is [None] *)
    val get : 'a option -> 'a
 
    (** returns [default] if argument is [None] *)

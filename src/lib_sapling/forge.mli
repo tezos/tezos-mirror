@@ -50,7 +50,7 @@ type output
 
 val make_output : Core.Viewing_key.address -> int64 -> Bytes.t -> output
 
-(* @raise [Invalid_argument] if eitner of [number_dummy_inputs] or
+(* @raise Invalid_argument if eitner of [number_dummy_inputs] or
    [number_dummy_outputs] is strictly negative *)
 val forge_transaction :
   ?number_dummy_inputs:int ->
@@ -62,7 +62,7 @@ val forge_transaction :
   S.state ->
   Core.UTXO.transaction
 
-(* @raise [Invalid_argument] if eitner of [number_dummy_inputs] or
+(* @raise Invalid_argument if eitner of [number_dummy_inputs] or
    [number_dummy_outputs] is strictly negative *)
 val forge_shield_transaction :
   ?number_dummy_inputs:int ->

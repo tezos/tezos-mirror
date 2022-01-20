@@ -145,13 +145,13 @@ module Bounded : sig
       - adds [v] at the ends of [q] immediately and returns [true], or
       - if [q] is full, returns [false].
 
-      @raise [Closed] if [q] is closed. *)
+      @raise Closed if [q] is closed. *)
   val push_now : 'a t -> 'a -> bool
 
   (** [pop_now q] may remove and return the first element in [q] if
     [q] contains at least one element.
 
-    @raise [Closed] if [q] is closed. *)
+    @raise Closed if [q] is closed. *)
   val pop_now : 'a t -> 'a option
 
   (** [length q] is the number of elements in [q]. *)
@@ -268,7 +268,7 @@ module Unbounded : sig
   (** [pop_now q] may remove and return the first element in [q] if
     [q] contains at least one element.
 
-    @raise [Closed] if [q] is closed. *)
+    @raise Closed if [q] is closed. *)
   val pop_now : 'a t -> 'a option
 
   (** [length q] is the number of elements in [q]. *)
@@ -395,13 +395,13 @@ module Maybe_bounded : sig
       - adds [v] at the ends of [q] immediately and returns [true], or
       - if [q] is full, returns [false].
 
-      @raise [Closed] if [q] is closed. *)
+      @raise Closed if [q] is closed. *)
   val push_now : 'a t -> 'a -> bool
 
   (** [pop_now q] may remove and return the first element in [q] if
     [q] contains at least one element.
 
-    @raise [Closed] if [q] is closed. *)
+    @raise Closed if [q] is closed. *)
   val pop_now : 'a t -> 'a option
 
   (** [length q] is the number of elements in [q]. *)

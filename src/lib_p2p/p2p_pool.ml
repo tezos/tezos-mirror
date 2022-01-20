@@ -563,7 +563,7 @@ let add_to_id_points t point =
    Note that it might select fewer elements than [other] if it the same index
    close to the end of the list is picked multiple times.
 
-   @raise [Invalid_argument] if either [best] or [other] is strictly negative.
+   @raise Invalid_argument if either [best] or [other] is strictly negative.
    *)
 let sample best other points =
   if best < 0 || other < 0 then raise (Invalid_argument "P2p_pool.sample") ;

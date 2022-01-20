@@ -534,7 +534,7 @@ type error += Help : _ command option -> error
 type error += Version : error
 
 (** Find and call the applicable command on the series of arguments.
-    @raise [Failure] if the command list would be ambiguous. *)
+    @raise Failure if the command list would be ambiguous. *)
 val dispatch : 'ctx command list -> 'ctx -> string list -> unit tzresult Lwt.t
 
 (** Parse the global options, and return their value, with the rest of

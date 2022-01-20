@@ -91,7 +91,7 @@ val x86_executor2 : executor
     If [team] is not specified, or if [team] doesn't have a corresponding
     entry in the configuration file, the default Slack webhook is used.
 
-    @raise [Invalid_arg] if [title] contains a newline character. *)
+    @raise Invalid_arg if [title] contains a newline character. *)
 val register :
   __FILE__:string ->
   title:string ->
@@ -141,7 +141,7 @@ val alert_exn : exn -> ('a, unit, string, unit) format4 -> 'a
 
     If data points cannot be pushed at the end of the test, an alert is emitted.
 
-    @raise [Invalid_arg] if no test is currently running, or if it was not registered
+    @raise Invalid_arg if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
 val add_data_point : InfluxDB.data_point -> unit
 
@@ -211,7 +211,7 @@ end
     where [count] is the number of data points which were used
     (with [minimum_count <= count <= limit]).
 
-    @raise [Invalid_arg] if no test is currently running, or if it was not registered
+    @raise Invalid_arg if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
 val get_previous_stats :
   ?limit:int ->
@@ -232,7 +232,7 @@ val get_previous_stats :
     If [tags] is specified, only data points that are tagged
     with [tag] equal to [value] for all [tags] are returned.
 
-    @raise [Invalid_arg] if no test is currently running, or if it was not registered
+    @raise Invalid_arg if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
 val get_pending_data_points :
   ?tags:(InfluxDB.tag * string) list ->
@@ -283,7 +283,7 @@ type check = Mean | Median
     - [check = Mean]
     - [stddev = false]
 
-    @raise [Invalid_arg] if no test is currently running, or if it was not registered
+    @raise Invalid_arg if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
 val check_regression :
   ?previous_count:int ->
@@ -312,7 +312,7 @@ val check_regression :
 
     See {!check_regression} for documentation about other optional parameters.
 
-    @raise [Invalid_arg] if no test is currently running, or if it was not registered
+    @raise Invalid_arg if no test is currently running, or if it was not registered
     with [Long_test.register] or [Long_test.register_with_protocol]. *)
 val time :
   ?previous_count:int ->
@@ -351,7 +351,7 @@ val time_lwt :
 
     Does nothing if Grafana or InfluxDB are not configured.
 
-    @raise [Invalid_arg] if the dashboard UID is invalid. *)
+    @raise Invalid_arg if the dashboard UID is invalid. *)
 val update_grafana_dashboard : Grafana.dashboard -> unit
 
 (** {2 Configuration} *)

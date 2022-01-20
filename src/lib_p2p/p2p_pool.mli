@@ -361,7 +361,7 @@ val acl_clear : ('msg, 'peer, 'conn) t -> unit
     It returns at most [size] point ids (default is 50) based on a
     heuristic that selects a mix of 3/5 "good" and 2/5 random points.
 
-    @raise [Invalid_argument] if [size < 0] *)
+    @raise Invalid_argument if [size < 0] *)
 val list_known_points :
   ignore_private:bool ->
   ?size:int ->
