@@ -802,9 +802,7 @@ module Make
   let may_fetch_operation w (shell : 'operation_data types_state_shell) peer oph
       =
     let origin =
-      match peer with
-      | Some peer -> Format.asprintf "notified by %a" P2p_peer.Id.pp peer
-      | None -> "leftover from previous run"
+      match peer with Some peer -> Event.Peer peer | None -> Leftover
     in
     already_handled ~origin shell oph >>= fun already_handled ->
     if not already_handled then
@@ -823,7 +821,8 @@ module Make
       an event arrives. *)
   module Requests = struct
     let on_arrived (pv : state) oph op =
-      already_handled ~origin:"arrived" pv.shell oph >>= fun already_handled ->
+      already_handled ~origin:Event.Arrived pv.shell oph
+      >>= fun already_handled ->
       if already_handled then return_unit
       else
         match Prevalidation_t.parse oph op with
@@ -869,7 +868,8 @@ module Make
          But, this may change in the future
       *)
       let prio = `High in
-      already_handled ~origin:"injected" pv.shell oph >>= fun already_handled ->
+      already_handled ~origin:Event.Injected pv.shell oph
+      >>= fun already_handled ->
       if already_handled then
         (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1722
            Is this an error? *)
