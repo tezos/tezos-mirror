@@ -61,3 +61,24 @@ check_scripts_b58_prefix:
   script:
     - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
     - poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v
+
+ometrics-code-quality-default:
+  stage: test
+  extends:
+    - .template__code_quality
+  rules:
+    # See https://gitlab.com/gitlab-org/gitlab/-/issues/215279
+    # In short, GitLab requires a code quality report from the target branch.
+    # As ometrics tries to find code quality issues against the target branch
+    # (i.e. previously introduced issues will not be reported), we create a fake
+    # empty report on the default branch which is supposed to be the target branch
+    # in most cases.
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: always
+    - when: never
+  script:
+    - mkdir -p _reports/
+    - echo "[]" > $CODE_QUALITY_REPORT
+  artifacts:
+    paths:
+      - $CODE_QUALITY_REPORT
