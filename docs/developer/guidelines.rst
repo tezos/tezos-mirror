@@ -107,51 +107,85 @@ Interface (``.mli``) file comments:
 - Brief description of each module, type, function, data, as described for :ref:`comments in the code<in_code_comments>`
 - If applicable, external invariants (i.e., visible to the user).
 
+index.mld files
+---------------
+
+At the granularity of the library, you can optionally include an ``index.mld`` file.
+This file is used to generate the landing page for the online API of the library.
+If you do not include this file, the landing page is automatically generated and only includes a list of all top-level modules.
+
+An ``mld`` file is written in the `ocamldoc markup language <https://ocaml.org/manual/ocamldoc.html#s%3Aocamldoc-comments>`_.
+
+Because it is used for the online API of the library it should contain information that might be of interest to the users.
+This includes
+
+- A general introduction to the library.
+- Design decisions for the API.
+- Usage recommendations including the security model and assumptions.
+- Example uses.
+- Links to related documents (such as RFC and ISO standards).
+
+The file should also include a link to all of the modules that are intended entry-points for the users.
+You can include those with ``{!module:Foo}`` inline in an appropriate paragraph of the documentation.
+You can also include those with a dedicated block::
+
+  {!modules:
+  Foo
+  Bar
+  Blah
+  }
+
+.. warning::
+   When you add an ``index.mld`` file, don't forget to add a documentation stanza in the corresponding dune file.
+   Otherwise, your ``index.mld`` file will be ignored by ``odoc`` and the API page will be the default one!
+
+
 README files
 ------------
 
-At coarser levels, source file directories should be documented by Markdown files called ``README.md``. Such files are mandatory in top-level directories of the Tezos codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
+Also at the level of the library, you should include a ``README.md`` in `Markdown format <https://daringfireball.net/projects/markdown/>`_.
+Such files are mandatory in top-level directories of the Tezos codebase (such as ``src/`` and ``docs/``), and at least in immediate sub-directories of the source directory (``src/*/``).
+Because it is accessible only in the source tree, the file should contain information that might be of interest to the maintainers and contributors.
 
-Source directories must instantiate the following ``README.md`` template::
+You must instantiate the ``README.md`` file with the following template::
 
   # Component Name
   <!-- Summary line: One sentence about this component. -->
 
+  ## API Documentation
+  <!--
+  - Link to the external API.
+  -->
+
   ## Overview
   <!--
-  - Describe the purpose of this component and how the code in this directory
-    works. If needed, design rationale for its API.
+  - Describe the purpose of this component.
   - Describe the interaction of the code in this directory with the other
     components. This includes dependencies on other components, for instance.
-  - Describe the security model and assumptions about the crates in this
-    directory.
   -->
 
   ## Implementation Details
   <!--
-  - Describe how the component is modeled.
-  - Describe the code structure and implementation design rationale.
-  - Other relevant implementation details (e.g. global invariants).
-  - Testing specifics, if needed.
+  - Describe the file structure and the location of the main components.
+  - Other relevant implementation details (e.g., global invariants,
+    implementation design rationale, etc.).
+  - Testing specifics, build-system specifics, etc. as needed.
   -->
 
-  ## API Documentation
-  <!--
-  - Link to the external API.
-  - For the top-level source directory, link to the most important APIs within.
-  -->
-
-The rationale of this template is that a README file addresses two different kinds of developers:
-
-#. the users of the module, which are concerned only about the component
-   concepts and API, and not about its implementations details, and
-#. the developers and maintainers of the module, which are also concerned about
-   implementation details.
+The rationale of this template is that a README file addresses the developers
+that are not just using the library but also fixing or modifying it.
+To avoid duplication between the ``index.mld`` and ``README.md`` files, follow
+this simple rule-of-thumb: the ``index.mld`` contains information for the users
+(how to use the API) whereas the ``README.md`` file contains information for the
+maintainers (how are the files organised, are there any build-system quirks,
+etc.).
 
 When filling in the template, you should keep untouched the guidelines within
 HTML comments (which are visible to the document maintainers but invisible to
 end-users), so that any maintainer can check how well the README instantiates
 the template, and address any gap if needed.
+
+
 
 Logging Levels
 --------------

@@ -1,0 +1,14 @@
+{0 Workers: Local, Lwt-based event-loops}
+
+The Workers library provides helpers for a component akin to agents or actors.
+More concretely, you can use this library to instantiate a worker group, from
+which you can spawn one or more workers, to which you can send tasks. Each
+worker maintains a queue of tasks (called requests) and schedules them according
+to its internal event-loop.
+
+
+{1 [Worker]}
+
+{!modules:
+Tezos_workers.Worker
+}
