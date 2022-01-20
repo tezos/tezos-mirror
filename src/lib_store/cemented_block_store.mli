@@ -107,6 +107,12 @@ module Cemented_block_hash_index :
 (** The type of the cemented block store *)
 type t
 
+type cemented_metadata_file = {
+  start_level : int32;
+  end_level : int32;
+  metadata_file : [`Cemented_blocks_metadata] Naming.file;
+}
+
 (** The type for cemented block chunks file description *)
 type cemented_blocks_file = {
   start_level : int32;
@@ -130,7 +136,9 @@ val init :
 val close : t -> unit
 
 (** [cemented_blocks_files cemented_store] returns the {b current}
-    list of cemented blocks chunks files. *)
+   array of cemented blocks chunks files. The returned array is sorted
+   in ascending order such that the first element of the array is the
+   lowest known cycle of the store. *)
 val cemented_blocks_files : t -> cemented_blocks_file array option
 
 (** [cemented_block_level_index block_store] returns the hash to level
@@ -146,6 +154,12 @@ val cemented_block_hash_index : t -> Cemented_block_hash_index.t
 val load_table :
   [`Cemented_blocks_dir] Naming.directory ->
   cemented_blocks_file array option tzresult Lwt.t
+
+(** [load_metadata_table ~cemented_blocks_dir] similar to
+    [load_table], but for the cemented metadata files. *)
+val load_metadata_table :
+  [`Cemented_blocks_dir] Naming.directory ->
+  cemented_metadata_file array option tzresult Lwt.t
 
 (** [find_block_file cemented_store block_level] lookups the
    [cemented_store] to find the cemented block chunk file that
