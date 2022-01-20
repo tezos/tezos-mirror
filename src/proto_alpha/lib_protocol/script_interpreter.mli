@@ -141,29 +141,34 @@ val kstep :
 
 module Internals : sig
   (** Internally, the interpretation loop uses a local gas counter. *)
-  type local_gas_counter = int
-
-  (** During the evaluation, the gas level in the context is outdated.
-      See comments in the implementation file for more details. *)
-  type outdated_context = OutDatedContext of context [@@unboxed]
 
   (** [next logger (ctxt, step_constants) local_gas_counter ks accu
       stack] is an internal function which interprets the continuation
       [ks] to execute the interpreter on the current A-stack. *)
   val next :
     logger option ->
-    outdated_context * step_constants ->
-    local_gas_counter ->
+    Local_gas_counter.outdated_context * step_constants ->
+    Local_gas_counter.local_gas_counter ->
     ('a, 's, 'r, 'f) continuation ->
     'a ->
     's ->
-    ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+    ('r
+    * 'f
+    * Local_gas_counter.outdated_context
+    * Local_gas_counter.local_gas_counter)
+    tzresult
+    Lwt.t
 
   val step :
-    outdated_context * step_constants ->
-    local_gas_counter ->
+    Local_gas_counter.outdated_context * step_constants ->
+    Local_gas_counter.local_gas_counter ->
     ('a, 's, 'r, 'f) Script_typed_ir.kinstr ->
     'a ->
     's ->
-    ('r * 'f * outdated_context * local_gas_counter) tzresult Lwt.t
+    ('r
+    * 'f
+    * Local_gas_counter.outdated_context
+    * Local_gas_counter.local_gas_counter)
+    tzresult
+    Lwt.t
 end

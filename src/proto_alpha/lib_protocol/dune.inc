@@ -123,7 +123,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
-   local_gas_counter.ml
+   local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
@@ -266,7 +266,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
-   local_gas_counter.ml
+   local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
@@ -409,7 +409,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
-   local_gas_counter.ml
+   local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml
@@ -758,7 +758,7 @@ include Tezos_raw_protocol_alpha.Main
    alpha_context.mli alpha_context.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
-   local_gas_counter.ml
+   local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
    script_ir_annot.mli script_ir_annot.ml

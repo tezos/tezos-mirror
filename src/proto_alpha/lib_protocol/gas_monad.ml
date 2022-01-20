@@ -56,24 +56,21 @@ let ( >?$ ) m f = m >>$ fun x -> of_result (f x)
 let ( >??$ ) m f gas = m gas >>?? fun (x, gas) -> f x gas
 
 let consume_gas cost gas =
-  match Local_gas_counter.update_and_check gas cost with
+  match Local_gas_counter.consume_opt gas cost with
   | None -> None
   | Some gas -> Some (ok (), gas)
 
 let run ctxt m =
+  let open Local_gas_counter in
   match Gas.level ctxt with
   | Gas.Unaccounted -> (
-      match m (Saturation_repr.saturated :> int) with
+      match m (Local_gas_counter (Saturation_repr.saturated :> int)) with
       | Some (res, _new_gas_counter) -> ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
   | Limited {remaining} -> (
-      match m (remaining :> int) with
+      match m (Local_gas_counter (remaining :> int)) with
       | Some (res, new_gas_counter) ->
-          let ctxt =
-            Local_gas_counter.update_context
-              new_gas_counter
-              (Local_gas_counter.outdated ctxt)
-          in
+          let ctxt = update_context new_gas_counter (outdated_context ctxt) in
           ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
 

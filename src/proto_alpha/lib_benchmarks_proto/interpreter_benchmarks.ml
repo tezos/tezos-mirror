@@ -181,15 +181,13 @@ let benchmark_from_kinstr_and_stack :
                 kinstr
                 (bef_top, bef)
             in
-            let outdated_ctxt =
-              Script_interpreter.Internals.OutDatedContext ctxt
-            in
+            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
             let closure () =
               ignore
                 (* Lwt_main.run *)
                 (Script_interpreter.Internals.step
                    (outdated_ctxt, step_constants)
-                   9_999_999_999
+                   (Local_gas_counter 9_999_999_999)
                    kinstr
                    bef_top
                    bef)
@@ -207,16 +205,14 @@ let benchmark_from_kinstr_and_stack :
             let workload =
               List.repeat amplification_factor workload |> List.flatten
             in
-            let outdated_ctxt =
-              Script_interpreter.Internals.OutDatedContext ctxt
-            in
+            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
             let closure () =
               for _i = 1 to amplification_factor do
                 ignore
                   (* Lwt_main.run *)
                   (Script_interpreter.Internals.step
                      (outdated_ctxt, step_constants)
-                     9_999_999_999
+                     (Local_gas_counter 9_999_999_999)
                      kinstr
                      bef_top
                      bef)
@@ -430,16 +426,14 @@ let benchmark_from_continuation :
                 cont
                 (bef_top, bef)
             in
-            let outdated_ctxt =
-              Script_interpreter.Internals.OutDatedContext ctxt
-            in
+            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
             let closure () =
               ignore
                 (* Lwt_main.run *)
                 (Script_interpreter.Internals.next
                    None
                    (outdated_ctxt, step_constants)
-                   9_999_999_999
+                   (Local_gas_counter 9_999_999_999)
                    cont
                    bef_top
                    bef)
@@ -457,9 +451,7 @@ let benchmark_from_continuation :
             let workload =
               List.repeat amplification_factor workload |> List.flatten
             in
-            let outdated_ctxt =
-              Script_interpreter.Internals.OutDatedContext ctxt
-            in
+            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
             let closure () =
               for _i = 1 to amplification_factor do
                 ignore
@@ -467,7 +459,7 @@ let benchmark_from_continuation :
                   (Script_interpreter.Internals.next
                      None
                      (outdated_ctxt, step_constants)
-                     9_999_999_999
+                     (Local_gas_counter 9_999_999_999)
                      cont
                      bef_top
                      bef)
