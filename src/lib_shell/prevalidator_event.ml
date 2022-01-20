@@ -125,14 +125,55 @@ let request_completed_debug =
     ~pp1:Request.pp
     ~pp2:Worker_types.pp_status
 
+type origin = Peer of P2p_peer_id.t | Arrived | Injected | Leftover
+
+let origin_encoding : origin Data_encoding.t =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        ~title:"notified"
+        (Tag 0)
+        P2p_peer_id.encoding
+        (function Peer peer_id -> Some peer_id | _ -> None)
+        (fun peer_id -> Peer peer_id);
+      case
+        ~title:"leftover"
+        (Tag 1)
+        (constant "leftover")
+        (function Leftover -> Some () | _ -> None)
+        (fun () -> Leftover);
+      case
+        ~title:"arrived"
+        (Tag 2)
+        (constant "arrived")
+        (function Arrived -> Some () | _ -> None)
+        (fun () -> Arrived);
+      case
+        ~title:"injected"
+        (Tag 3)
+        (constant "injected")
+        (function Injected -> Some () | _ -> None)
+        (fun () -> Injected);
+    ]
+
+let pp_origin fmt = function
+  | Peer peer_id -> Format.fprintf fmt "notified by %a" P2p_peer_id.pp peer_id
+  | Leftover -> Format.fprintf fmt "leftover from previous run"
+  | Arrived -> Format.fprintf fmt "arrived"
+  | Injected -> Format.fprintf fmt "injected"
+
 let ban_operation_encountered =
   declare_2
     ~section
     ~name:"banned_operation_encountered"
     ~msg:"{origin}: banned {oph} encountered"
     ~level:Notice
-    ("origin", Data_encoding.string)
+    ("origin", origin_encoding)
+    ~pp1:pp_origin
     ("oph", Operation_hash.encoding)
+    ~pp2:Operation_hash.pp
 
 let operation_not_fetched =
   declare_1
@@ -141,3 +182,4 @@ let operation_not_fetched =
     ~msg:"Operation {oph} was not fetched"
     ~level:Debug
     ("oph", Operation_hash.encoding)
+    ~pp1:Operation_hash.pp
