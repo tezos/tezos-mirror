@@ -289,43 +289,42 @@ end)
     let type_of_atomic_type_name (at_tn : atomic_type_name) :
         Script_ir_translator.ex_ty =
       match at_tn with
-      | `TString -> Ex_ty (string_t ~annot:None)
-      | `TNat -> Ex_ty (nat_t ~annot:None)
-      | `TKey -> Ex_ty (key_t ~annot:None)
-      | `TBytes -> Ex_ty (bytes_t ~annot:None)
-      | `TBool -> Ex_ty (bool_t ~annot:None)
-      | `TAddress -> Ex_ty (address_t ~annot:None)
-      | `TTimestamp -> Ex_ty (timestamp_t ~annot:None)
-      | `TKey_hash -> Ex_ty (key_hash_t ~annot:None)
-      | `TMutez -> Ex_ty (mutez_t ~annot:None)
-      | `TSignature -> Ex_ty (signature_t ~annot:None)
-      | `TUnit -> Ex_ty (unit_t ~annot:None)
-      | `TInt -> Ex_ty (int_t ~annot:None)
-      | `TSapling_state -> Ex_ty (sapling_state_t ~memo_size ~annot:None)
-      | `TSapling_transaction ->
-          Ex_ty (sapling_transaction_t ~memo_size ~annot:None)
-      | `TChain_id -> Ex_ty (chain_id_t ~annot:None)
-      | `TBls12_381_g1 -> Ex_ty (bls12_381_g1_t ~annot:None)
-      | `TBls12_381_g2 -> Ex_ty (bls12_381_g2_t ~annot:None)
-      | `TBls12_381_fr -> Ex_ty (bls12_381_fr_t ~annot:None)
+      | `TString -> Ex_ty string_t
+      | `TNat -> Ex_ty nat_t
+      | `TKey -> Ex_ty key_t
+      | `TBytes -> Ex_ty bytes_t
+      | `TBool -> Ex_ty bool_t
+      | `TAddress -> Ex_ty address_t
+      | `TTimestamp -> Ex_ty timestamp_t
+      | `TKey_hash -> Ex_ty key_hash_t
+      | `TMutez -> Ex_ty mutez_t
+      | `TSignature -> Ex_ty signature_t
+      | `TUnit -> Ex_ty unit_t
+      | `TInt -> Ex_ty int_t
+      | `TSapling_state -> Ex_ty (sapling_state_t ~memo_size)
+      | `TSapling_transaction -> Ex_ty (sapling_transaction_t ~memo_size)
+      | `TChain_id -> Ex_ty chain_id_t
+      | `TBls12_381_g1 -> Ex_ty bls12_381_g1_t
+      | `TBls12_381_g2 -> Ex_ty bls12_381_g2_t
+      | `TBls12_381_fr -> Ex_ty bls12_381_fr_t
 
     let comparable_type_of_comparable_atomic_type_name
         (cmp_tn : 'a comparable_and_atomic) :
         Script_ir_translator.ex_comparable_ty =
       match cmp_tn with
-      | `TString -> Ex_comparable_ty (string_key ~annot:None)
-      | `TNat -> Ex_comparable_ty (nat_key ~annot:None)
-      | `TBytes -> Ex_comparable_ty (bytes_key ~annot:None)
-      | `TBool -> Ex_comparable_ty (bool_key ~annot:None)
-      | `TAddress -> Ex_comparable_ty (address_key ~annot:None)
-      | `TTimestamp -> Ex_comparable_ty (timestamp_key ~annot:None)
-      | `TKey_hash -> Ex_comparable_ty (key_hash_key ~annot:None)
-      | `TMutez -> Ex_comparable_ty (mutez_key ~annot:None)
-      | `TInt -> Ex_comparable_ty (int_key ~annot:None)
-      | `TUnit -> Ex_comparable_ty (unit_key ~annot:None)
-      | `TSignature -> Ex_comparable_ty (signature_key ~annot:None)
-      | `TKey -> Ex_comparable_ty (key_key ~annot:None)
-      | `TChain_id -> Ex_comparable_ty (chain_id_key ~annot:None)
+      | `TString -> Ex_comparable_ty string_key
+      | `TNat -> Ex_comparable_ty nat_key
+      | `TBytes -> Ex_comparable_ty bytes_key
+      | `TBool -> Ex_comparable_ty bool_key
+      | `TAddress -> Ex_comparable_ty address_key
+      | `TTimestamp -> Ex_comparable_ty timestamp_key
+      | `TKey_hash -> Ex_comparable_ty key_hash_key
+      | `TMutez -> Ex_comparable_ty mutez_key
+      | `TInt -> Ex_comparable_ty int_key
+      | `TUnit -> Ex_comparable_ty unit_key
+      | `TSignature -> Ex_comparable_ty signature_key
+      | `TKey -> Ex_comparable_ty key_key
+      | `TChain_id -> Ex_comparable_ty chain_id_key
 
     let rec m_type ~size : Script_ir_translator.ex_ty sampler =
       let open Script_ir_translator in
@@ -340,27 +339,27 @@ end)
         @@ function
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:1 in
-            match option_t (-1) t ~annot:None with
+            match option_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TList -> (
             let* (Ex_ty t) = m_type ~size:1 in
-            match list_t (-1) t ~annot:None with
+            match list_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TSet -> (
             let* (Ex_comparable_ty t) = m_comparable_type ~size:1 in
-            match set_t (-1) t ~annot:None with
+            match set_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TTicket -> (
             let* (Ex_comparable_ty contents) = m_comparable_type ~size:1 in
-            match ticket_t (-1) contents ~annot:None with
+            match ticket_t (-1) contents with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
             let* (Ex_ty t) = m_type ~size:1 in
-            match contract_t (-1) t ~annot:None with
+            match contract_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
       else
@@ -369,57 +368,57 @@ end)
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match pair_t (-1) (left, None) (right, None) ~annot:None with
+            match pair_t (-1) (left, None) (right, None) with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TLambda -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty domain) = m_type ~size:lsize in
             let* (Ex_ty range) = m_type ~size:rsize in
-            match lambda_t (-1) domain range ~annot:None with
+            match lambda_t (-1) domain range with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TUnion -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_ty left) = m_type ~size:lsize in
             let* (Ex_ty right) = m_type ~size:rsize in
-            match union_t (-1) (left, None) (right, None) ~annot:None with
+            match union_t (-1) (left, None) (right, None) with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TOption -> (
             let* (Ex_ty t) = m_type ~size:(size - 1) in
-            match option_t (-1) t ~annot:None with
+            match option_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TMap -> (
             let* (lsize, rsize) = pick_split (size - 1) in
             let* (Ex_comparable_ty key) = m_comparable_type ~size:lsize in
             let* (Ex_ty elt) = m_type ~size:rsize in
-            match map_t (-1) key elt ~annot:None with
+            match map_t (-1) key elt with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TSet -> (
             let* (Ex_comparable_ty key_ty) =
               m_comparable_type ~size:(size - 1)
             in
-            match set_t (-1) key_ty ~annot:None with
+            match set_t (-1) key_ty with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TList -> (
             let* (Ex_ty elt) = m_type ~size:(size - 1) in
-            match list_t (-1) elt ~annot:None with
+            match list_t (-1) elt with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TTicket -> (
             let* (Ex_comparable_ty contents) =
               m_comparable_type ~size:(size - 1)
             in
-            match ticket_t (-1) contents ~annot:None with
+            match ticket_t (-1) contents with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TContract -> (
             let* (Ex_ty t) = m_type ~size:(size - 1) in
-            match contract_t (-1) t ~annot:None with
+            match contract_t (-1) t with
             | Error _ -> assert false
             | Ok res_ty -> return @@ Ex_ty res_ty)
         | `TBig_map ->
@@ -437,7 +436,7 @@ end)
       let option_case size =
         let size = size - 1 in
         let* (Ex_comparable_ty t) = m_comparable_type ~size in
-        match option_key (-1) t ~annot:None with
+        match option_key (-1) t with
         | Error _ -> (* what should be done here? *) assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -449,7 +448,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match pair_key (-1) (l, None) (r, None) ~annot:None with
+        match pair_key (-1) (l, None) (r, None) with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -461,7 +460,7 @@ end)
         let size_right = size - size_left in
         let* (Ex_comparable_ty l) = m_comparable_type ~size:size_left in
         let* (Ex_comparable_ty r) = m_comparable_type ~size:size_right in
-        match union_key (-1) (l, None) (r, None) ~annot:None with
+        match union_key (-1) (l, None) (r, None) with
         | Error _ -> assert false
         | Ok res_ty -> return @@ Ex_comparable_ty res_ty
       in
@@ -640,7 +639,7 @@ end)
             ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
               let big_map = Script_ir_translator.empty_big_map key_ty elt_ty in
               (* Cannot have big maps under big maps *)
-              option_t (-1) elt_ty ~annot:None |> Environment.wrap_tzresult
+              option_t (-1) elt_ty |> Environment.wrap_tzresult
               >>?= fun opt_elt_ty ->
               let map = generate_map key_ty opt_elt_ty rng_state in
               Script_map.fold
@@ -666,7 +665,7 @@ end)
         arg Script_typed_ir.ty -> arg Script_typed_ir.typed_contract sampler =
      fun arg_ty ->
       let open M in
-      let* address = value (address_t ~annot:None) in
+      let* address = value address_t in
       return {arg_ty; address}
 
     and generate_operation : Script_typed_ir.operation sampler =

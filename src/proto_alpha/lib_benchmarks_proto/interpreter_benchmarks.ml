@@ -1421,7 +1421,7 @@ module Registration_section = struct
           (Lwt_main.run
              ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
                let big_map =
-                 Script_ir_translator.empty_big_map int_cmp (unit_t ~annot:None)
+                 Script_ir_translator.empty_big_map int_cmp unit_t
                in
                Script_map.fold
                  (fun k v acc ->
@@ -1558,9 +1558,7 @@ module Registration_section = struct
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
           fun () ->
             let string =
-              Samplers.Random_value.value
-                Script_typed_ir.(string_t ~annot:None)
-                rng_state
+              Samplers.Random_value.value Script_typed_ir.string_t rng_state
             in
             let len = nat_of_positive_int (length string) in
             (* worst case: offset = 0 *)
@@ -1606,9 +1604,7 @@ module Registration_section = struct
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
           fun () ->
             let bytes =
-              Samplers.Random_value.value
-                Script_typed_ir.(bytes_t ~annot:None)
-                rng_state
+              Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
             in
             let len = nat_of_positive_int (Bytes.length bytes) in
             (* worst case: offset = 0 *)
@@ -2279,10 +2275,7 @@ module Registration_section = struct
             let (_pkh, pk, sk) = Crypto_samplers.all rng_state in
             let unsigned_message =
               if for_intercept then Environment.Bytes.empty
-              else
-                Samplers.Random_value.value
-                  Script_typed_ir.(bytes_t ~annot:None)
-                  rng_state
+              else Samplers.Random_value.value Script_typed_ir.bytes_t rng_state
             in
             let signed_message = Signature.sign sk unsigned_message in
             let signed_message = Script_signature.make signed_message in

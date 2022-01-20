@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -619,13 +619,13 @@ let () = Registration_helpers.register (module Merge_types)
 let rec dummy_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if size <= 1 then Ex_ty (unit_t ~annot:None)
+  if size <= 1 then Ex_ty unit_t
   else
     match dummy_type_generator (size - 2) with
     | Ex_ty r ->
-        let l = unit_t ~annot:None in
+        let l = unit_t in
         Ex_ty
-          (match pair_t (-1) (l, None) (r, None) ~annot:None with
+          (match pair_t (-1) (l, None) (r, None) with
           | Error _ -> assert false
           | Ok t -> t)
 
@@ -633,13 +633,13 @@ let rec dummy_type_generator size =
 let rec dummy_comparable_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if size <= 0 then Ex_comparable_ty (unit_key ~annot:None)
+  if size <= 0 then Ex_comparable_ty unit_key
   else
     match dummy_comparable_type_generator (size - 2) with
     | Ex_comparable_ty r ->
-        let l = unit_key ~annot:None in
+        let l = unit_key in
         Ex_comparable_ty
-          (match pair_key (-1) (l, None) (r, None) ~annot:None with
+          (match pair_key (-1) (l, None) (r, None) with
           | Error _ -> assert false
           | Ok t -> t)
 

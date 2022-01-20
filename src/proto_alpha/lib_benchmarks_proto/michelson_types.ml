@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -32,107 +32,99 @@ let ( @$ ) x y = Item_t (x, y)
 
 let bot = Bot_t
 
-let unit = unit_t ~annot:None
+let unit = unit_t
 
-let unit_cmp = unit_key ~annot:None
+let unit_cmp = unit_key
 
-let int_cmp = int_key ~annot:None
+let int_cmp = int_key
 
-let string_cmp = string_key ~annot:None
+let string_cmp = string_key
 
 (* the type of integers *)
-let int = int_t ~annot:None
+let int = int_t
 
 (* the type of naturals *)
-let nat = nat_t ~annot:None
+let nat = nat_t
 
 (* the type of strings *)
-let string = string_t ~annot:None
+let string = string_t
 
 (* the type of bytes *)
-let bytes = bytes_t ~annot:None
+let bytes = bytes_t
 
 (* the type of booleans *)
-let bool = bool_t ~annot:None
+let bool = bool_t
 
 (* the type of mutez *)
-let mutez = mutez_t ~annot:None
+let mutez = mutez_t
 
 (* the type of public key *)
-let public_key = key_t ~annot:None
+let public_key = key_t
 
 (* the type of key hashes *)
-let key_hash = key_hash_t ~annot:None
+let key_hash = key_hash_t
 
 (* the type of signatures *)
-let signature = signature_t ~annot:None
+let signature = signature_t
 
 (* the type of addresses *)
-let address = address_t ~annot:None
+let address = address_t
 
 (* the type of chain ids *)
-let chain_id = chain_id_t ~annot:None
+let chain_id = chain_id_t
 
 (* the type of timestamps *)
-let timestamp = timestamp_t ~annot:None
+let timestamp = timestamp_t
 
 (* list type constructor *)
-let list x =
-  match list_t (-1) x ~annot:None with Error _ -> assert false | Ok t -> t
+let list x = match list_t (-1) x with Error _ -> assert false | Ok t -> t
 
 (* option type constructor *)
-let option x =
-  match option_t (-1) x ~annot:None with Error _ -> assert false | Ok t -> t
+let option x = match option_t (-1) x with Error _ -> assert false | Ok t -> t
 
 (* map type constructor*)
-let map k v =
-  match map_t (-1) k v ~annot:None with Error _ -> assert false | Ok t -> t
+let map k v = match map_t (-1) k v with Error _ -> assert false | Ok t -> t
 
 (* map type constructor*)
 let big_map k v =
-  match big_map_t (-1) k v ~annot:None with
-  | Error _ -> assert false
-  | Ok t -> t
+  match big_map_t (-1) k v with Error _ -> assert false | Ok t -> t
 
 (* set type constructor*)
-let set k =
-  match set_t (-1) k ~annot:None with Error _ -> assert false | Ok t -> t
+let set k = match set_t (-1) k with Error _ -> assert false | Ok t -> t
 
 (* pair type constructor*)
 let pair k1 k2 =
-  match pair_t (-1) (k1, None) (k2, None) ~annot:None with
+  match pair_t (-1) (k1, None) (k2, None) with
   | Error _ -> assert false
   | Ok t -> t
 
 (* union type constructor*)
 let union k1 k2 =
-  match union_t (-1) (k1, None) (k2, None) ~annot:None with
+  match union_t (-1) (k1, None) (k2, None) with
   | Error _ -> assert false
   | Ok t -> t
 
 let lambda x y =
-  match lambda_t (-1) x y ~annot:None with Error _ -> assert false | Ok t -> t
+  match lambda_t (-1) x y with Error _ -> assert false | Ok t -> t
 
 let contract arg_ty =
-  match contract_t (-1) arg_ty ~annot:None with
-  | Error _ -> assert false
-  | Ok t -> t
+  match contract_t (-1) arg_ty with Error _ -> assert false | Ok t -> t
 
-let operation = operation_t ~annot:None
+let operation = operation_t
 
-let sapling_state memo_size = sapling_state_t ~memo_size ~annot:None
+let sapling_state memo_size = sapling_state_t ~memo_size
 
-let sapling_transaction memo_size = sapling_transaction_t ~memo_size ~annot:None
+let sapling_transaction memo_size = sapling_transaction_t ~memo_size
 
-let bls12_381_g1 = bls12_381_g1_t ~annot:None
+let bls12_381_g1 = bls12_381_g1_t
 
-let bls12_381_g2 = bls12_381_g2_t ~annot:None
+let bls12_381_g2 = bls12_381_g2_t
 
-let bls12_381_fr = bls12_381_fr_t ~annot:None
+let bls12_381_fr = bls12_381_fr_t
 
 let ticket ty =
-  match ticket_t (-1) ty ~annot:None with Error _ -> assert false | Ok t -> t
+  match ticket_t (-1) ty with Error _ -> assert false | Ok t -> t
 
-let chest_key = chest_key_t ~annot:None
+let chest_key = chest_key_t
 
-let chest = chest_t ~annot:None
+let chest = chest_t

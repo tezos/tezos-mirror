@@ -50,11 +50,10 @@ let ticket_balance_key ctxt ~owner
   let owner_address =
     Script_typed_ir.{contract = owner; entrypoint = Entrypoint.default}
   in
-  let address_t = Script_typed_ir.address_t ~annot:None in
   Script_ir_translator.unparse_data
     ctxt
     Script_ir_translator.Optimized_legacy
-    address_t
+    Script_typed_ir.address_t
     ticketer_address
   >>=? fun (ticketer, ctxt) ->
   Script_ir_translator.unparse_comparable_data
@@ -67,7 +66,7 @@ let ticket_balance_key ctxt ~owner
   Script_ir_translator.unparse_data
     ctxt
     Script_ir_translator.Optimized_legacy
-    address_t
+    Script_typed_ir.address_t
     owner_address
   >>=? fun (owner, ctxt) ->
   Lwt.return (Ticket_hash.make ctxt ~ticketer ~typ ~contents ~owner)

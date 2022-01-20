@@ -1015,7 +1015,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
           let key = accu in
-          let arg_ty = unit_t ~annot:None in
+          let arg_ty = unit_t in
           let contract = Contract.implicit_contract key in
           let address = {contract; entrypoint = Entrypoint.default} in
           let res = {arg_ty; address} in
@@ -1071,11 +1071,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           kinstr;
                         },
                         _script_view ) -> (
-                      pair_t
-                        kloc
-                        (input_ty, None)
-                        (storage_type, None)
-                        ~annot:None
+                      pair_t kloc (input_ty, None) (storage_type, None)
                       >>?= fun pair_ty ->
                       let open Gas_monad in
                       let io_ty =

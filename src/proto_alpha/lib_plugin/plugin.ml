@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Nomadic Development. <contact@tezcore.com>             *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2021-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1914,50 +1914,36 @@ module RPC = struct
       open Script_ir_translator
       open Micheline
       open Michelson_v1_primitives
-      open Script_ir_annot
       open Script_typed_ir
 
       let rec unparse_comparable_ty :
           type a loc.
           loc:loc -> a comparable_ty -> (loc, Script.prim) Micheline.node =
        fun ~loc -> function
-        | Unit_key meta -> Prim (loc, T_unit, [], unparse_type_annot meta.annot)
-        | Never_key meta ->
-            Prim (loc, T_never, [], unparse_type_annot meta.annot)
-        | Int_key meta -> Prim (loc, T_int, [], unparse_type_annot meta.annot)
-        | Nat_key meta -> Prim (loc, T_nat, [], unparse_type_annot meta.annot)
-        | Signature_key meta ->
-            Prim (loc, T_signature, [], unparse_type_annot meta.annot)
-        | String_key meta ->
-            Prim (loc, T_string, [], unparse_type_annot meta.annot)
-        | Bytes_key meta ->
-            Prim (loc, T_bytes, [], unparse_type_annot meta.annot)
-        | Mutez_key meta ->
-            Prim (loc, T_mutez, [], unparse_type_annot meta.annot)
-        | Bool_key meta -> Prim (loc, T_bool, [], unparse_type_annot meta.annot)
-        | Key_hash_key meta ->
-            Prim (loc, T_key_hash, [], unparse_type_annot meta.annot)
-        | Key_key meta -> Prim (loc, T_key, [], unparse_type_annot meta.annot)
-        | Timestamp_key meta ->
-            Prim (loc, T_timestamp, [], unparse_type_annot meta.annot)
-        | Address_key meta ->
-            Prim (loc, T_address, [], unparse_type_annot meta.annot)
-        | Chain_id_key meta ->
-            Prim (loc, T_chain_id, [], unparse_type_annot meta.annot)
-        | Pair_key ((l, al), (r, ar), meta) ->
+        | Unit_key _meta -> Prim (loc, T_unit, [], [])
+        | Never_key _meta -> Prim (loc, T_never, [], [])
+        | Int_key _meta -> Prim (loc, T_int, [], [])
+        | Nat_key _meta -> Prim (loc, T_nat, [], [])
+        | Signature_key _meta -> Prim (loc, T_signature, [], [])
+        | String_key _meta -> Prim (loc, T_string, [], [])
+        | Bytes_key _meta -> Prim (loc, T_bytes, [], [])
+        | Mutez_key _meta -> Prim (loc, T_mutez, [], [])
+        | Bool_key _meta -> Prim (loc, T_bool, [], [])
+        | Key_hash_key _meta -> Prim (loc, T_key_hash, [], [])
+        | Key_key _meta -> Prim (loc, T_key, [], [])
+        | Timestamp_key _meta -> Prim (loc, T_timestamp, [], [])
+        | Address_key _meta -> Prim (loc, T_address, [], [])
+        | Chain_id_key _meta -> Prim (loc, T_chain_id, [], [])
+        | Pair_key ((l, al), (r, ar), _meta) ->
             let tl = add_field_annot al (unparse_comparable_ty ~loc l) in
             let tr = add_field_annot ar (unparse_comparable_ty ~loc r) in
-            Prim (loc, T_pair, [tl; tr], unparse_type_annot meta.annot)
-        | Union_key ((l, al), (r, ar), meta) ->
+            Prim (loc, T_pair, [tl; tr], [])
+        | Union_key ((l, al), (r, ar), _meta) ->
             let tl = add_field_annot al (unparse_comparable_ty ~loc l) in
             let tr = add_field_annot ar (unparse_comparable_ty ~loc r) in
-            Prim (loc, T_or, [tl; tr], unparse_type_annot meta.annot)
-        | Option_key (t, meta) ->
-            Prim
-              ( loc,
-                T_option,
-                [unparse_comparable_ty ~loc t],
-                unparse_type_annot meta.annot )
+            Prim (loc, T_or, [tl; tr], [])
+        | Option_key (t, _meta) ->
+            Prim (loc, T_option, [unparse_comparable_ty ~loc t], [])
 
       let unparse_memo_size ~loc memo_size =
         let z = Alpha_context.Sapling.Memo_size.unparse_to_z memo_size in
@@ -1968,87 +1954,73 @@ module RPC = struct
        fun ~loc ty ->
         let return (name, args, annot) = Prim (loc, name, args, annot) in
         match ty with
-        | Unit_t meta -> return (T_unit, [], unparse_type_annot meta.annot)
-        | Int_t meta -> return (T_int, [], unparse_type_annot meta.annot)
-        | Nat_t meta -> return (T_nat, [], unparse_type_annot meta.annot)
-        | Signature_t meta ->
-            return (T_signature, [], unparse_type_annot meta.annot)
-        | String_t meta -> return (T_string, [], unparse_type_annot meta.annot)
-        | Bytes_t meta -> return (T_bytes, [], unparse_type_annot meta.annot)
-        | Mutez_t meta -> return (T_mutez, [], unparse_type_annot meta.annot)
-        | Bool_t meta -> return (T_bool, [], unparse_type_annot meta.annot)
-        | Key_hash_t meta ->
-            return (T_key_hash, [], unparse_type_annot meta.annot)
-        | Key_t meta -> return (T_key, [], unparse_type_annot meta.annot)
-        | Timestamp_t meta ->
-            return (T_timestamp, [], unparse_type_annot meta.annot)
-        | Address_t meta -> return (T_address, [], unparse_type_annot meta.annot)
-        | Operation_t meta ->
-            return (T_operation, [], unparse_type_annot meta.annot)
-        | Chain_id_t meta ->
-            return (T_chain_id, [], unparse_type_annot meta.annot)
-        | Never_t meta -> return (T_never, [], unparse_type_annot meta.annot)
-        | Bls12_381_g1_t meta ->
-            return (T_bls12_381_g1, [], unparse_type_annot meta.annot)
-        | Bls12_381_g2_t meta ->
-            return (T_bls12_381_g2, [], unparse_type_annot meta.annot)
-        | Bls12_381_fr_t meta ->
-            return (T_bls12_381_fr, [], unparse_type_annot meta.annot)
-        | Contract_t (ut, meta) ->
+        | Unit_t _meta -> return (T_unit, [], [])
+        | Int_t _meta -> return (T_int, [], [])
+        | Nat_t _meta -> return (T_nat, [], [])
+        | Signature_t _meta -> return (T_signature, [], [])
+        | String_t _meta -> return (T_string, [], [])
+        | Bytes_t _meta -> return (T_bytes, [], [])
+        | Mutez_t _meta -> return (T_mutez, [], [])
+        | Bool_t _meta -> return (T_bool, [], [])
+        | Key_hash_t _meta -> return (T_key_hash, [], [])
+        | Key_t _meta -> return (T_key, [], [])
+        | Timestamp_t _meta -> return (T_timestamp, [], [])
+        | Address_t _meta -> return (T_address, [], [])
+        | Operation_t _meta -> return (T_operation, [], [])
+        | Chain_id_t _meta -> return (T_chain_id, [], [])
+        | Never_t _meta -> return (T_never, [], [])
+        | Bls12_381_g1_t _meta -> return (T_bls12_381_g1, [], [])
+        | Bls12_381_g2_t _meta -> return (T_bls12_381_g2, [], [])
+        | Bls12_381_fr_t _meta -> return (T_bls12_381_fr, [], [])
+        | Contract_t (ut, _meta) ->
             let t = unparse_ty ~loc ut in
-            return (T_contract, [t], unparse_type_annot meta.annot)
-        | Pair_t ((utl, l_field), (utr, r_field), meta) ->
-            let annot = unparse_type_annot meta.annot in
+            return (T_contract, [t], [])
+        | Pair_t ((utl, l_field), (utr, r_field), _meta) ->
+            let annot = [] in
             let utl = unparse_ty ~loc utl in
             let tl = add_field_annot l_field utl in
             let utr = unparse_ty ~loc utr in
             let tr = add_field_annot r_field utr in
             return (T_pair, [tl; tr], annot)
-        | Union_t ((utl, l_field), (utr, r_field), meta) ->
-            let annot = unparse_type_annot meta.annot in
+        | Union_t ((utl, l_field), (utr, r_field), _meta) ->
+            let annot = [] in
             let utl = unparse_ty ~loc utl in
             let tl = add_field_annot l_field utl in
             let utr = unparse_ty ~loc utr in
             let tr = add_field_annot r_field utr in
             return (T_or, [tl; tr], annot)
-        | Lambda_t (uta, utr, meta) ->
+        | Lambda_t (uta, utr, _meta) ->
             let ta = unparse_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
-            return (T_lambda, [ta; tr], unparse_type_annot meta.annot)
-        | Option_t (ut, meta) ->
-            let annot = unparse_type_annot meta.annot in
+            return (T_lambda, [ta; tr], [])
+        | Option_t (ut, _meta) ->
+            let annot = [] in
             let ut = unparse_ty ~loc ut in
             return (T_option, [ut], annot)
-        | List_t (ut, meta) ->
+        | List_t (ut, _meta) ->
             let t = unparse_ty ~loc ut in
-            return (T_list, [t], unparse_type_annot meta.annot)
-        | Ticket_t (ut, meta) ->
+            return (T_list, [t], [])
+        | Ticket_t (ut, _meta) ->
             let t = unparse_comparable_ty ~loc ut in
-            return (T_ticket, [t], unparse_type_annot meta.annot)
-        | Set_t (ut, meta) ->
+            return (T_ticket, [t], [])
+        | Set_t (ut, _meta) ->
             let t = unparse_comparable_ty ~loc ut in
-            return (T_set, [t], unparse_type_annot meta.annot)
-        | Map_t (uta, utr, meta) ->
+            return (T_set, [t], [])
+        | Map_t (uta, utr, _meta) ->
             let ta = unparse_comparable_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
-            return (T_map, [ta; tr], unparse_type_annot meta.annot)
-        | Big_map_t (uta, utr, meta) ->
+            return (T_map, [ta; tr], [])
+        | Big_map_t (uta, utr, _meta) ->
             let ta = unparse_comparable_ty ~loc uta in
             let tr = unparse_ty ~loc utr in
-            return (T_big_map, [ta; tr], unparse_type_annot meta.annot)
-        | Sapling_transaction_t (memo_size, meta) ->
+            return (T_big_map, [ta; tr], [])
+        | Sapling_transaction_t (memo_size, _meta) ->
             return
-              ( T_sapling_transaction,
-                [unparse_memo_size ~loc memo_size],
-                unparse_type_annot meta.annot )
-        | Sapling_state_t (memo_size, meta) ->
-            return
-              ( T_sapling_state,
-                [unparse_memo_size ~loc memo_size],
-                unparse_type_annot meta.annot )
-        | Chest_t meta -> return (T_chest, [], unparse_type_annot meta.annot)
-        | Chest_key_t meta ->
-            return (T_chest_key, [], unparse_type_annot meta.annot)
+              (T_sapling_transaction, [unparse_memo_size ~loc memo_size], [])
+        | Sapling_state_t (memo_size, _meta) ->
+            return (T_sapling_state, [unparse_memo_size ~loc memo_size], [])
+        | Chest_t _meta -> return (T_chest, [], [])
+        | Chest_key_t _meta -> return (T_chest_key, [], [])
     end
 
     let run_operation_service ctxt ()

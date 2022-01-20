@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -34,16 +35,9 @@ type type_annot = Type_annot of Non_empty_string.t [@@ocaml.unboxed]
 type field_annot = Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 module FOR_TESTS = struct
-  let unsafe_type_annot_of_string s =
-    Type_annot (Non_empty_string.of_string_exn s)
-
   let unsafe_field_annot_of_string s =
     Field_annot (Non_empty_string.of_string_exn s)
 end
-
-let unparse_type_annot : type_annot option -> string list = function
-  | None -> []
-  | Some (Type_annot a) -> [":" ^ (a :> string)]
 
 let unparse_field_annot : field_annot option -> string list = function
   | None -> []
@@ -60,27 +54,6 @@ let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
       match Entrypoint.of_annot_lax_opt a with
       | None -> false
       | Some a' -> Entrypoint.(a' = entrypoint))
-
-let merge_type_annot :
-    type error_trace.
-    legacy:bool ->
-    error_details:error_trace error_details ->
-    type_annot option ->
-    type_annot option ->
-    (type_annot option, error_trace) result =
- fun ~legacy ~error_details annot1 annot2 ->
-  match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
-  | (Some (Type_annot a1), Some (Type_annot a2)) ->
-      if legacy || Non_empty_string.(a1 = a2) then ok annot1
-      else
-        Error
-          (match error_details with
-          | Fast -> Inconsistent_types_fast
-          | Informative ->
-              trace_of_error
-              @@ Inconsistent_annotations
-                   (":" ^ (a1 :> string), ":" ^ (a2 :> string)))
 
 let merge_field_annot :
     type error_trace.
@@ -219,22 +192,22 @@ let get_two_annot loc = function
   | [a; b] -> ok (a, b)
   | _ -> error (Unexpected_annotation loc)
 
-let parse_type_annot :
-    Script.location -> string list -> type_annot option tzresult =
+let check_type_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
-  error_unexpected_annot loc fields >>? fun () -> get_one_annot loc types
+  error_unexpected_annot loc fields >>? fun () ->
+  get_one_annot loc types >|? fun _a -> ()
 
 let parse_composed_type_annot :
     Script.location ->
     string list ->
-    (type_annot option * field_annot option * field_annot option) tzresult =
+    (field_annot option * field_annot option) tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
-  get_one_annot loc types >>? fun t ->
-  get_two_annot loc fields >|? fun (f1, f2) -> (t, f1, f2)
+  get_one_annot loc types >>? fun _t ->
+  get_two_annot loc fields >|? fun (f1, f2) -> (f1, f2)
 
 let parse_field_annot :
     Script.location -> string list -> field_annot option tzresult =
@@ -287,15 +260,15 @@ let ignore_special f =
 let parse_constr_annot :
     Script.location ->
     string list ->
-    (type_annot option * field_annot option * field_annot option) tzresult =
+    (field_annot option * field_annot option) tzresult =
  fun loc annot ->
   parse_annots ~allow_special_field:true loc annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
-  get_one_annot loc types >>? fun t ->
+  get_one_annot loc types >>? fun (_t : type_annot option) ->
   get_two_annot loc fields >>? fun (f1, f2) ->
   ignore_special f1 >>? fun f1 ->
-  ignore_special f2 >|? fun f2 -> (t, f1, f2)
+  ignore_special f2 >|? fun f2 -> (f1, f2)
 
 let check_two_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
@@ -331,10 +304,9 @@ let parse_entrypoint_annot :
   get_one_annot loc fields >>? fun f ->
   get_one_annot loc vars >|? fun (_v : var_annot option) -> f
 
-let parse_var_type_annot :
-    Script.location -> string list -> type_annot option tzresult =
+let check_var_type_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
-  get_one_annot loc types
+  get_one_annot loc types >|? fun (_t : type_annot option) -> ()

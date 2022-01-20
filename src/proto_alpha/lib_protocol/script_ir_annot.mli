@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2019-2022 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,19 +26,13 @@
 
 open Alpha_context
 
-type type_annot = private Type_annot of Non_empty_string.t [@@ocaml.unboxed]
-
 type field_annot = private Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
 module FOR_TESTS : sig
-  val unsafe_type_annot_of_string : string -> type_annot
-
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
 (** Unparse annotations to their string representation *)
-
-val unparse_type_annot : type_annot option -> string list
 
 val unparse_field_annot : field_annot option -> string list
 
@@ -53,16 +48,6 @@ val field_annot_opt_to_entrypoint_strict :
 val field_annot_opt_eq_entrypoint_lax :
   field_annot option -> Entrypoint.t -> bool
 
-(** Merge type annotations.
-    @return an error {!Inconsistent_type_annotations} if they are both present
-    and different, unless [legacy] *)
-val merge_type_annot :
-  legacy:bool ->
-  error_details:'error_trace Script_tc_errors.error_details ->
-  type_annot option ->
-  type_annot option ->
-  (type_annot option, 'error_trace) result
-
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)
@@ -77,8 +62,7 @@ val merge_field_annot :
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
 (** Parse a type annotation only. *)
-val parse_type_annot :
-  Script.location -> string list -> type_annot option tzresult
+val check_type_annot : Script.location -> string list -> unit tzresult
 
 (** Parse a field annotation only. *)
 val parse_field_annot :
@@ -89,7 +73,7 @@ val parse_field_annot :
 val parse_composed_type_annot :
   Script.location ->
   string list ->
-  (type_annot option * field_annot option * field_annot option) tzresult
+  (field_annot option * field_annot option) tzresult
 
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :
@@ -109,7 +93,7 @@ val is_allowed_char : char -> bool
 val parse_constr_annot :
   Script.location ->
   string list ->
-  (type_annot option * field_annot option * field_annot option) tzresult
+  (field_annot option * field_annot option) tzresult
 
 val check_two_var_annot : Script.location -> string list -> unit tzresult
 
@@ -124,5 +108,4 @@ val parse_unpair_annot :
 val parse_entrypoint_annot :
   Script.location -> string list -> field_annot option tzresult
 
-val parse_var_type_annot :
-  Script.location -> string list -> type_annot option tzresult
+val check_var_type_annot : Script.location -> string list -> unit tzresult

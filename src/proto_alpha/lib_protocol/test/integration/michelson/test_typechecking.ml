@@ -78,7 +78,7 @@ let test_context_with_nat_nat_big_map () =
   Incremental.begin_construction b >>=? fun v ->
   let ctxt = Incremental.alpha_ctxt v in
   wrap_error_lwt @@ Big_map.fresh ~temporary:false ctxt >>=? fun (ctxt, id) ->
-  let nat_ty = Script_typed_ir.nat_t ~annot:None in
+  let nat_ty = Script_typed_ir.nat_t in
   wrap_error_lwt @@ Lwt.return
   @@ Script_ir_translator.unparse_ty ~loc:() ctxt nat_ty
   >>=? fun (nat_ty_node, ctxt) ->
@@ -179,8 +179,6 @@ let test_parse_ty ctxt node expected =
       Script_ir_translator.ty_eq ctxt (location node) actual expected
       >|? fun (_, ctxt) -> ctxt )
 
-let type_annot = Script_ir_annot.FOR_TESTS.unsafe_type_annot_of_string
-
 let field_annot = Script_ir_annot.FOR_TESTS.unsafe_field_annot_of_string
 
 let test_parse_comb_type () =
@@ -190,9 +188,9 @@ let test_parse_comb_type () =
   let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
   let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
   let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
-  let nat_ty = nat_t ~annot:None in
+  let nat_ty = nat_t in
   let pair_prim l = Prim (-1, T_pair, l, []) in
-  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) ~annot:None in
+  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   pair_ty nat_ty nat_ty >>??= fun pair_nat_nat_ty ->
@@ -221,36 +219,24 @@ let test_parse_comb_type () =
     pair_nat_nat_nat_ty
   >>?= fun ctxt ->
   (* pair (nat %a) nat *)
-  pair_t (-1) (nat_ty, Some (field_annot "a")) (nat_ty, None) ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "a")) (nat_ty, None)
   >>??= fun pair_nat_a_nat_ty ->
   test_parse_ty ctxt (pair_prim2 nat_prim_a nat_prim) pair_nat_a_nat_ty
   >>?= fun ctxt ->
   (* pair nat (nat %b) *)
-  pair_t (-1) (nat_ty, None) (nat_ty, Some (field_annot "b")) ~annot:None
+  pair_t (-1) (nat_ty, None) (nat_ty, Some (field_annot "b"))
   >>??= fun pair_nat_nat_b_ty ->
   test_parse_ty ctxt (pair_prim2 nat_prim nat_prim_b) pair_nat_nat_b_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) *)
-  pair_t
-    (-1)
-    (nat_ty, Some (field_annot "a"))
-    (nat_ty, Some (field_annot "b"))
-    ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "a")) (nat_ty, Some (field_annot "b"))
   >>??= fun pair_nat_a_nat_b_ty ->
   test_parse_ty ctxt (pair_prim2 nat_prim_a nat_prim_b) pair_nat_a_nat_b_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) (nat %c) *)
-  pair_t
-    (-1)
-    (nat_ty, Some (field_annot "b"))
-    (nat_ty, Some (field_annot "c"))
-    ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "b")) (nat_ty, Some (field_annot "c"))
   >>??= fun pair_nat_b_nat_c_ty ->
-  pair_t
-    (-1)
-    (nat_ty, Some (field_annot "a"))
-    (pair_nat_b_nat_c_ty, None)
-    ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "a")) (pair_nat_b_nat_c_ty, None)
   >>??= fun pair_nat_a_nat_b_nat_c_ty ->
   test_parse_ty
     ctxt
@@ -258,13 +244,11 @@ let test_parse_comb_type () =
     pair_nat_a_nat_b_nat_c_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (pair %b nat nat) *)
-  pair_t (-1) (nat_ty, None) (nat_ty, None) ~annot:None
-  >>??= fun pair_b_nat_nat_ty ->
+  pair_t (-1) (nat_ty, None) (nat_ty, None) >>??= fun pair_b_nat_nat_ty ->
   pair_t
     (-1)
     (nat_ty, Some (field_annot "a"))
     (pair_b_nat_nat_ty, Some (field_annot "b"))
-    ~annot:None
   >>??= fun pair_nat_a_pair_b_nat_nat_ty ->
   test_parse_ty
     ctxt
@@ -285,9 +269,9 @@ let test_unparse_comb_type () =
   let nat_prim_a = Prim ((), T_nat, [], ["%a"]) in
   let nat_prim_b = Prim ((), T_nat, [], ["%b"]) in
   let nat_prim_c = Prim ((), T_nat, [], ["%c"]) in
-  let nat_ty = nat_t ~annot:None in
+  let nat_ty = nat_t in
   let pair_prim l = Prim ((), T_pair, l, []) in
-  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) ~annot:None in
+  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   pair_ty nat_ty nat_ty >>??= fun pair_nat_nat_ty ->
@@ -312,7 +296,7 @@ let test_unparse_comb_type () =
     pair_nat_nat_nat_ty
   >>?= fun ctxt ->
   (* pair (nat %a) nat *)
-  pair_t (-1) (nat_ty, Some (field_annot "a")) (nat_ty, None) ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "a")) (nat_ty, None)
   >>??= fun pair_nat_a_nat_ty ->
   test_unparse_ty
     __LOC__
@@ -321,7 +305,7 @@ let test_unparse_comb_type () =
     pair_nat_a_nat_ty
   >>?= fun ctxt ->
   (* pair nat (nat %b) *)
-  pair_t (-1) (nat_ty, None) (nat_ty, Some (field_annot "b")) ~annot:None
+  pair_t (-1) (nat_ty, None) (nat_ty, Some (field_annot "b"))
   >>??= fun pair_nat_nat_b_ty ->
   test_unparse_ty
     __LOC__
@@ -330,11 +314,7 @@ let test_unparse_comb_type () =
     pair_nat_nat_b_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) *)
-  pair_t
-    (-1)
-    (nat_ty, Some (field_annot "a"))
-    (nat_ty, Some (field_annot "b"))
-    ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "a")) (nat_ty, Some (field_annot "b"))
   >>??= fun pair_nat_a_nat_b_ty ->
   test_unparse_ty
     __LOC__
@@ -343,17 +323,9 @@ let test_unparse_comb_type () =
     pair_nat_a_nat_b_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) (nat %c) *)
-  pair_t
-    (-1)
-    (nat_ty, Some (field_annot "b"))
-    (nat_ty, Some (field_annot "c"))
-    ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "b")) (nat_ty, Some (field_annot "c"))
   >>??= fun pair_nat_b_nat_c_ty ->
-  pair_t
-    (-1)
-    (nat_ty, Some (field_annot "a"))
-    (pair_nat_b_nat_c_ty, None)
-    ~annot:None
+  pair_t (-1) (nat_ty, Some (field_annot "a")) (pair_nat_b_nat_c_ty, None)
   >>??= fun pair_nat_a_nat_b_nat_c_ty ->
   test_unparse_ty
     __LOC__
@@ -362,30 +334,17 @@ let test_unparse_comb_type () =
     pair_nat_a_nat_b_nat_c_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (pair %b nat nat) *)
-  pair_t (-1) (nat_ty, None) (nat_ty, None) ~annot:None
-  >>??= fun pair_nat_nat_ty ->
+  pair_t (-1) (nat_ty, None) (nat_ty, None) >>??= fun pair_nat_nat_ty ->
   pair_t
     (-1)
     (nat_ty, Some (field_annot "a"))
     (pair_nat_nat_ty, Some (field_annot "b"))
-    ~annot:None
   >>??= fun pair_nat_a_pair_b_nat_nat_ty ->
   test_unparse_ty
     __LOC__
     ctxt
     (pair_prim2 nat_prim_a (Prim ((), T_pair, [nat_prim; nat_prim], ["%b"])))
     pair_nat_a_pair_b_nat_nat_ty
-  >>?= fun ctxt ->
-  (* pair nat (pair :b nat nat) *)
-  pair_t (-1) (nat_ty, None) (nat_ty, None) ~annot:(Some (type_annot "b"))
-  >>??= fun pair_b_nat_nat_ty ->
-  pair_t (-1) (nat_ty, None) (pair_b_nat_nat_ty, None) ~annot:None
-  >>??= fun pair_nat_pair_b_nat_nat_ty ->
-  test_unparse_ty
-    __LOC__
-    ctxt
-    (pair_prim2 nat_prim (Prim ((), T_pair, [nat_prim; nat_prim], [":b"])))
-    pair_nat_pair_b_nat_nat_ty
   >>?= fun _ -> return_unit
 
 let test_unparse_comparable_ty loc ctxt expected ty =
@@ -393,7 +352,7 @@ let test_unparse_comparable_ty loc ctxt expected ty =
      call parse_ty on a set type *)
   let open Script_typed_ir in
   Environment.wrap_tzresult
-    ( set_t (-1) ty ~annot:None >>? fun set_ty_ty ->
+    ( set_t (-1) ty >>? fun set_ty_ty ->
       Script_ir_translator.unparse_ty ~loc:() ctxt set_ty_ty
       >>? fun (actual, ctxt) ->
       if actual = Prim ((), T_set, [expected], []) then ok ctxt
@@ -406,9 +365,9 @@ let test_unparse_comb_comparable_type () =
   let nat_prim_a = Prim ((), T_nat, [], ["%a"]) in
   let nat_prim_b = Prim ((), T_nat, [], ["%b"]) in
   let nat_prim_c = Prim ((), T_nat, [], ["%c"]) in
-  let nat_ty = nat_key ~annot:None in
+  let nat_ty = nat_key in
   let pair_prim l = Prim ((), T_pair, l, []) in
-  let pair_ty ty1 ty2 = pair_key (-1) (ty1, None) (ty2, None) ~annot:None in
+  let pair_ty ty1 ty2 = pair_key (-1) (ty1, None) (ty2, None) in
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_nat_nat_prim = pair_prim2 nat_prim nat_prim in
   pair_ty nat_ty nat_ty >>??= fun pair_nat_nat_ty ->
@@ -433,7 +392,7 @@ let test_unparse_comb_comparable_type () =
     pair_nat_nat_nat_ty
   >>?= fun ctxt ->
   (* pair (nat %a) nat *)
-  pair_key (-1) (nat_ty, Some (field_annot "a")) (nat_ty, None) ~annot:None
+  pair_key (-1) (nat_ty, Some (field_annot "a")) (nat_ty, None)
   >>??= fun pair_nat_a_nat_ty ->
   test_unparse_comparable_ty
     __LOC__
@@ -442,7 +401,7 @@ let test_unparse_comb_comparable_type () =
     pair_nat_a_nat_ty
   >>?= fun ctxt ->
   (* pair nat (nat %b) *)
-  pair_key (-1) (nat_ty, None) (nat_ty, Some (field_annot "b")) ~annot:None
+  pair_key (-1) (nat_ty, None) (nat_ty, Some (field_annot "b"))
   >>??= fun pair_nat_nat_b_ty ->
   test_unparse_comparable_ty
     __LOC__
@@ -451,11 +410,7 @@ let test_unparse_comb_comparable_type () =
     pair_nat_nat_b_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) *)
-  pair_key
-    (-1)
-    (nat_ty, Some (field_annot "a"))
-    (nat_ty, Some (field_annot "b"))
-    ~annot:None
+  pair_key (-1) (nat_ty, Some (field_annot "a")) (nat_ty, Some (field_annot "b"))
   >>??= fun pair_nat_a_nat_b_ty ->
   test_unparse_comparable_ty
     __LOC__
@@ -464,17 +419,9 @@ let test_unparse_comb_comparable_type () =
     pair_nat_a_nat_b_ty
   >>?= fun ctxt ->
   (* pair (nat %a) (nat %b) (nat %c) *)
-  pair_key
-    (-1)
-    (nat_ty, Some (field_annot "b"))
-    (nat_ty, Some (field_annot "c"))
-    ~annot:None
+  pair_key (-1) (nat_ty, Some (field_annot "b")) (nat_ty, Some (field_annot "c"))
   >>??= fun pair_nat_b_nat_c_ty ->
-  pair_key
-    (-1)
-    (nat_ty, Some (field_annot "a"))
-    (pair_nat_b_nat_c_ty, None)
-    ~annot:None
+  pair_key (-1) (nat_ty, Some (field_annot "a")) (pair_nat_b_nat_c_ty, None)
   >>??= fun pair_nat_a_nat_b_nat_c_ty ->
   test_unparse_comparable_ty
     __LOC__
@@ -487,24 +434,12 @@ let test_unparse_comb_comparable_type () =
     (-1)
     (nat_ty, Some (field_annot "a"))
     (pair_nat_nat_ty, Some (field_annot "b"))
-    ~annot:None
   >>??= fun pair_nat_a_pair_b_nat_nat_ty ->
   test_unparse_comparable_ty
     __LOC__
     ctxt
     (pair_prim2 nat_prim_a (Prim ((), T_pair, [nat_prim; nat_prim], ["%b"])))
     pair_nat_a_pair_b_nat_nat_ty
-  >>?= fun ctxt ->
-  (* pair nat (pair :b nat nat) *)
-  pair_key (-1) (nat_ty, None) (nat_ty, None) ~annot:(Some (type_annot "b"))
-  >>??= fun pair_b_nat_nat_ty ->
-  pair_key (-1) (nat_ty, None) (pair_b_nat_nat_ty, None) ~annot:None
-  >>??= fun pair_nat_pair_b_nat_nat_ty ->
-  test_unparse_comparable_ty
-    __LOC__
-    ctxt
-    (pair_prim2 nat_prim (Prim ((), T_pair, [nat_prim; nat_prim], [":b"])))
-    pair_nat_pair_b_nat_nat_ty
   >>?= fun _ -> return_unit
 
 let test_parse_data ?(equal = Stdlib.( = )) loc ctxt ty node expected =
@@ -547,15 +482,14 @@ let test_parse_comb_data () =
   let open Script_typed_ir in
   let z = Script_int.zero_n in
   let z_prim = Micheline.Int (-1, Z.zero) in
-  let nat_ty = nat_t ~annot:None in
+  let nat_ty = nat_t in
   let pair_prim l = Prim (-1, D_Pair, l, []) in
-  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) ~annot:None in
+  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) in
   pair_ty nat_ty nat_ty >>??= fun pair_nat_nat_ty ->
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
-  list_t (-1) nat_ty ~annot:None >>??= fun list_nat_ty ->
-  big_map_t (-1) (nat_key ~annot:None) nat_ty ~annot:None
-  >>??= fun big_map_nat_nat_ty ->
+  list_t (-1) nat_ty >>??= fun list_nat_ty ->
+  big_map_t (-1) nat_key nat_ty >>??= fun big_map_nat_nat_ty ->
   test_context_with_nat_nat_big_map () >>=? fun (ctxt, big_map_id) ->
   (* Pair 0 0 *)
   test_parse_data __LOC__ ctxt pair_nat_nat_ty pair_z_z_prim (z, z)
@@ -626,7 +560,7 @@ let test_parse_comb_data () =
   let expected_big_map =
     let open Script_typed_ir in
     let diff = {map = Big_map_overlay.empty; size = 0} in
-    let nat_key_ty = nat_key ~annot:None in
+    let nat_key_ty = nat_key in
     {id = Some big_map_id; diff; key_type = nat_key_ty; value_type = nat_ty}
   in
   let equal (nat1, big_map1) (nat2, big_map2) =
@@ -664,7 +598,7 @@ let test_parse_address () =
   test_parse_data
     __LOC__
     ctxt
-    (address_t ~annot:None)
+    address_t
     (String (-1, "KT1FAKEFAKEFAKEFAKEFAKEFAKEFAKGGSE2x%"))
     {contract = kt1fake; entrypoint = Entrypoint.default}
   >>=? fun ctxt ->
@@ -675,7 +609,7 @@ let test_parse_address () =
   test_parse_data
     __LOC__
     ctxt
-    (address_t ~annot:None)
+    address_t
     (String (-1, "tz1fakefakefakefakefakefakefakcphLA5%"))
     {contract = tz1fake; entrypoint = Entrypoint.default}
   >|=? fun _ctxt -> ()
@@ -697,9 +631,9 @@ let test_unparse_comb_data () =
   let open Script_typed_ir in
   let z = Script_int.zero_n in
   let z_prim = Micheline.Int (-1, Z.zero) in
-  let nat_ty = nat_t ~annot:None in
+  let nat_ty = nat_t in
   let pair_prim l = Prim (-1, D_Pair, l, []) in
-  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) ~annot:None in
+  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) in
   pair_ty nat_ty nat_ty >>??= fun pair_nat_nat_ty ->
   let pair_prim2 a b = pair_prim [a; b] in
   let pair_z_z_prim = pair_prim2 z_prim z_prim in
@@ -767,7 +701,7 @@ let rec gen_combs leaf arity =
 (* Checks the optimality of the Optimized Micheline representation for combs *)
 let test_optimal_comb () =
   let open Script_typed_ir in
-  let leaf_ty = nat_t ~annot:None in
+  let leaf_ty = nat_t in
   let leaf_mich = Int ((), Z.zero) in
   let leaf_v = Script_int.zero_n in
   let size_of_micheline mich =
@@ -806,7 +740,7 @@ let test_optimal_comb () =
         @@ gen_combs leaf_mich arity
         >>=? fun () -> return ctxt )
   in
-  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) ~annot:None in
+  let pair_ty ty1 ty2 = pair_t (-1) (ty1, None) (ty2, None) in
   test_context () >>=? fun ctxt ->
   pair_ty leaf_ty leaf_ty >>??= fun comb2_ty ->
   let comb2_v = (leaf_v, leaf_v) in
@@ -852,7 +786,7 @@ let test_contract_not_packable () =
      ctxt
      ~legacy:false
      (Prim (0, I_UNPACK, [Prim (0, T_unit, [], [])], []))
-     (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t))
+     (Item_t (Script_typed_ir.bytes_t, Bot_t))
    >>= function
    | Ok _ -> return_unit
    | Error _ -> Alcotest.failf "Could not parse UNPACK unit")
@@ -863,7 +797,7 @@ let test_contract_not_packable () =
     ctxt
     ~legacy:false
     (Prim (0, I_UNPACK, [contract_unit], []))
-    (Item_t (Script_typed_ir.bytes_t ~annot:None, Bot_t))
+    (Item_t (Script_typed_ir.bytes_t, Bot_t))
   >>= function
   | Ok _ ->
       Alcotest.failf

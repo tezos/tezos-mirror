@@ -5,34 +5,34 @@ Gas remaining: 1039985.509 units remaining
 { parameter (map (int :k) (int :e)) ;
   storage (pair (int :k) (int :e)) ;
   code { CAR
-         /* [ map (int :k) (int :e) ] */ ;
+         /* [ map int int ] */ ;
          PUSH @acc_e (int :e) 0
-         /* [ int :e : map (int :k) (int :e) ] */ ;
+         /* [ int : map int int ] */ ;
          PUSH @acc_k (int :k) 0
-         /* [ int :k : int :e : map (int :k) (int :e) ] */ ;
+         /* [ int : int : map int int ] */ ;
          PAIR % %r
-         /* [ pair (int :k) (int :e %r) : map (int :k) (int :e) ] */ ;
+         /* [ pair int (int %r) : map int int ] */ ;
          SWAP
-         /* [ map (int :k) (int :e) : pair (int :k) (int :e %r) ] */ ;
+         /* [ map int int : pair int (int %r) ] */ ;
          ITER { DIP { DUP
-                      /* [ pair (int :k) (int :e %r) : pair (int :k) (int :e %r) ] */ ;
+                      /* [ pair int (int %r) : pair int (int %r) ] */ ;
                       CAR
-                      /* [ int :k : pair (int :k) (int :e %r) ] */ ;
-                      DIP { CDR /* [ int :e ] */ }
-                      /* [ int :k : int :e ] */ }
-                /* [ pair (int :k) (int :e) : int :k : int :e ] */ ;
+                      /* [ int : pair int (int %r) ] */ ;
+                      DIP { CDR /* [ int ] */ }
+                      /* [ int : int ] */ }
+                /* [ pair int int : int : int ] */ ;
                 DUP
-                /* [ pair (int :k) (int :e) : pair (int :k) (int :e) : int :k : int :e ] */ ;
-                DIP { CAR /* [ int :k : int :k : int :e ] */ ; ADD /* [ int :k : int :e ] */ }
-                /* [ pair (int :k) (int :e) : int :k : int :e ] */ ;
+                /* [ pair int int : pair int int : int : int ] */ ;
+                DIP { CAR /* [ int : int : int ] */ ; ADD /* [ int : int ] */ }
+                /* [ pair int int : int : int ] */ ;
                 SWAP
-                /* [ int :k : pair (int :k) (int :e) : int :e ] */ ;
-                DIP { CDR /* [ int :e : int :e ] */ ; ADD /* [ int :e ] */ }
-                /* [ int :k : int :e ] */ ;
+                /* [ int : pair int int : int ] */ ;
+                DIP { CDR /* [ int : int ] */ ; ADD /* [ int ] */ }
+                /* [ int : int ] */ ;
                 PAIR % %r
-                /* [ pair (int :k) (int :e %r) ] */ }
-         /* [ pair (int :k) (int :e %r) ] */ ;
+                /* [ pair int (int %r) ] */ }
+         /* [ pair int (int %r) ] */ ;
          NIL operation
-         /* [ list operation : pair (int :k) (int :e %r) ] */ ;
+         /* [ list operation : pair int (int %r) ] */ ;
          PAIR
-         /* [ pair (list operation) (int :k) (int :e %r) ] */ } }
+         /* [ pair (list operation) int (int %r) ] */ } }

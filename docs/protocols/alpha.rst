@@ -53,6 +53,9 @@ Michelson
 - Variable annotations in pairs are ignored and not propagated.
   (MR :gl:`!4140`)
 
+- Type annotations are ignored and not propagated.
+  (MR :gl:`!4141`)
+
 Internal
 --------
 
