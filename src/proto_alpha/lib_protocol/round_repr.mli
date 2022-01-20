@@ -211,7 +211,9 @@ val timestamp_of_another_round_same_level :
       [round_and_offset round_durations ~level_offset:diff] where
     [diff = ts - (predecessor_timestamp + round_duration(predecessor_round)].
 
-    Returns an error when the timestamp is before the level start.*)
+    Returns an error when the timestamp is before the level start. Also
+    returns an error when the timestamp is so high that it would lead
+    to an integer overflow when computing the round. *)
 val round_of_timestamp :
   Durations.t ->
   predecessor_timestamp:Time_repr.t ->
