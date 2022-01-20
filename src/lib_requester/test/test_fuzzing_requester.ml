@@ -43,10 +43,12 @@ let value_gen = Gen.int
 (** Creates a requester filled with arbitrary content.
  *  The requester's keys are also returned. *)
 let domain_and_requester_gen : (string list * Test_Requester.t) Gen.t =
+  let open Lwt_syntax in
   let create sets =
     let requester = init_full_requester () in
     let set_one (key, value) =
-      Test_Requester.inject requester key value >|= ignore
+      let* _ = Test_Requester.inject requester key value in
+      Lwt.return_unit
     in
     Lwt_main.run @@ Lwt_list.iter_s set_one sets ;
     (List.map fst sets, requester)
@@ -81,11 +83,16 @@ let test_read_read_opt =
     ~print
     requester_and_keys_gen
   @@ fun (t, key, _) ->
+  let open Lwt_syntax in
   let found_by_read =
-    Lwt_main.run @@ (Test_Requester.read t key >|= Result.is_ok)
+    Lwt_main.run
+    @@ let+ r = Test_Requester.read t key in
+       Result.is_ok r
   in
   let found_by_read_opt =
-    Lwt_main.run @@ (Test_Requester.read_opt t key >|= Option.is_some)
+    Lwt_main.run
+    @@ let+ o = Test_Requester.read_opt t key in
+       Option.is_some o
   in
   qcheck_eq ~pp:Format.pp_print_bool found_by_read found_by_read_opt
 
@@ -95,9 +102,12 @@ let test_read_opt_known =
     ~print
     requester_and_keys_gen
   @@ fun (t, key, _) ->
+  let open Lwt_syntax in
   let known = Lwt_main.run @@ Test_Requester.known t key in
   let found_by_read_opt =
-    Lwt_main.run @@ (Test_Requester.read_opt t key >|= Option.is_some)
+    Lwt_main.run
+    @@ let+ o = Test_Requester.read_opt t key in
+       Option.is_some o
   in
   qcheck_eq ~pp:Format.pp_print_bool known found_by_read_opt
 
