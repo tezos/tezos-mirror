@@ -32,6 +32,8 @@ module type S = sig
 
   val empty : 'a t
 
+  val singleton : key -> 'a -> 'a t
+
   val size : 'a t -> int
 
   val find : context -> key -> 'a t -> ('a option * context) tzresult
@@ -84,6 +86,8 @@ module Make (C : COMPARABLE) = struct
   type 'a t = {map : 'a M.t; size : int}
 
   let empty = {map = M.empty; size = 0}
+
+  let singleton key value = {map = M.singleton key value; size = 1}
 
   let size {size; _} = size
 
