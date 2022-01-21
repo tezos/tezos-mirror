@@ -644,43 +644,42 @@ let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
   | Union_key _ | Option_key _ ->
       ()
 
-let rec check_dupable_ty :
-    type a. context -> location -> a ty -> context tzresult =
- fun ctxt loc ty ->
-  Gas.consume ctxt Typecheck_costs.check_dupable_cycle >>? fun ctxt ->
-  match ty with
-  | Unit_t _ -> ok ctxt
-  | Int_t _ -> ok ctxt
-  | Nat_t _ -> ok ctxt
-  | Signature_t _ -> ok ctxt
-  | String_t _ -> ok ctxt
-  | Bytes_t _ -> ok ctxt
-  | Mutez_t _ -> ok ctxt
-  | Key_hash_t _ -> ok ctxt
-  | Key_t _ -> ok ctxt
-  | Timestamp_t _ -> ok ctxt
-  | Address_t _ -> ok ctxt
-  | Bool_t _ -> ok ctxt
-  | Contract_t (_, _) -> ok ctxt
-  | Operation_t _ -> ok ctxt
-  | Chain_id_t _ -> ok ctxt
-  | Never_t _ -> ok ctxt
-  | Bls12_381_g1_t _ -> ok ctxt
-  | Bls12_381_g2_t _ -> ok ctxt
-  | Bls12_381_fr_t _ -> ok ctxt
-  | Sapling_state_t _ -> ok ctxt
-  | Sapling_transaction_t _ -> ok ctxt
-  | Chest_t _ -> ok ctxt
-  | Chest_key_t _ -> ok ctxt
-  | Ticket_t _ -> error (Unexpected_ticket loc)
-  | Pair_t ((ty_a, _), (ty_b, _), _) ->
-      check_dupable_ty ctxt loc ty_a >>? fun ctxt ->
-      check_dupable_ty ctxt loc ty_b
-  | Union_t ((ty_a, _), (ty_b, _), _) ->
-      check_dupable_ty ctxt loc ty_a >>? fun ctxt ->
-      check_dupable_ty ctxt loc ty_b
-  | Lambda_t (_, _, _) ->
-      (*
+let check_dupable_ty ctxt loc ty =
+  let rec aux : type a. location -> a ty -> (unit, error trace) Gas_monad.t =
+   fun loc ty ->
+    let open Gas_monad in
+    consume_gas Typecheck_costs.check_dupable_cycle >>$ fun () ->
+    match ty with
+    | Unit_t _ -> return_unit
+    | Int_t _ -> return_unit
+    | Nat_t _ -> return_unit
+    | Signature_t _ -> return_unit
+    | String_t _ -> return_unit
+    | Bytes_t _ -> return_unit
+    | Mutez_t _ -> return_unit
+    | Key_hash_t _ -> return_unit
+    | Key_t _ -> return_unit
+    | Timestamp_t _ -> return_unit
+    | Address_t _ -> return_unit
+    | Bool_t _ -> return_unit
+    | Contract_t (_, _) -> return_unit
+    | Operation_t _ -> return_unit
+    | Chain_id_t _ -> return_unit
+    | Never_t _ -> return_unit
+    | Bls12_381_g1_t _ -> return_unit
+    | Bls12_381_g2_t _ -> return_unit
+    | Bls12_381_fr_t _ -> return_unit
+    | Sapling_state_t _ -> return_unit
+    | Sapling_transaction_t _ -> return_unit
+    | Chest_t _ -> return_unit
+    | Chest_key_t _ -> return_unit
+    | Ticket_t _ -> of_result (error (Unexpected_ticket loc))
+    | Pair_t ((ty_a, _), (ty_b, _), _) ->
+        aux loc ty_a >>$ fun () -> aux loc ty_b
+    | Union_t ((ty_a, _), (ty_b, _), _) ->
+        aux loc ty_a >>$ fun () -> aux loc ty_b
+    | Lambda_t (_, _, _) ->
+        (*
         Lambda are dupable as long as:
           - they don't contain non-dupable values, e.g. in `PUSH`
             (mostly non-dupable values should probably be considered forged)
@@ -688,18 +687,22 @@ let rec check_dupable_ty :
             value. `APPLY` rejects non-packable types (because of `PUSH`).
             Hence non-dupable should imply non-packable.
       *)
-      ok ctxt
-  | Option_t (ty, _) -> check_dupable_ty ctxt loc ty
-  | List_t (ty, _) -> check_dupable_ty ctxt loc ty
-  | Set_t (key_ty, _) ->
-      let () = check_dupable_comparable_ty key_ty in
-      ok ctxt
-  | Map_t (key_ty, val_ty, _) ->
-      let () = check_dupable_comparable_ty key_ty in
-      check_dupable_ty ctxt loc val_ty
-  | Big_map_t (key_ty, val_ty, _) ->
-      let () = check_dupable_comparable_ty key_ty in
-      check_dupable_ty ctxt loc val_ty
+        return_unit
+    | Option_t (ty, _) -> aux loc ty
+    | List_t (ty, _) -> aux loc ty
+    | Set_t (key_ty, _) ->
+        let () = check_dupable_comparable_ty key_ty in
+        return_unit
+    | Map_t (key_ty, val_ty, _) ->
+        let () = check_dupable_comparable_ty key_ty in
+        aux loc val_ty
+    | Big_map_t (key_ty, val_ty, _) ->
+        let () = check_dupable_comparable_ty key_ty in
+        aux loc val_ty
+  in
+  let gas = aux loc ty in
+  Gas_monad.run ctxt gas >>? fun (res, ctxt) ->
+  res >|? fun () -> ctxt
 
 (* ---- Equality witnesses --------------------------------------------------*)
 
