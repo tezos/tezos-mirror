@@ -418,3 +418,40 @@ let init_with_constants constants n =
     Default_parameters.parameters_of_constants ~bootstrap_accounts constants
   in
   Block.genesis_with_parameters parameters >|=? fun blk -> (blk, contracts)
+
+let default_raw_context () =
+  let initial_accounts =
+    Account.generate_accounts ~initial_balances:[100_000_000_000L] 1
+  in
+  let open Tezos_protocol_alpha_parameters in
+  let bootstrap_accounts =
+    List.map
+      (fun (Account.{pk; pkh; _}, amount) ->
+        Default_parameters.make_bootstrap_account (pkh, pk, amount))
+      initial_accounts
+  in
+  Block.prepare_initial_context_params initial_accounts
+  >>=? fun (constants, _, _) ->
+  let parameters =
+    Default_parameters.parameters_of_constants
+      ~bootstrap_accounts
+      ~commitments:[]
+      constants
+  in
+  let json = Default_parameters.json_of_parameters parameters in
+  let proto_params =
+    Data_encoding.Binary.to_bytes_exn Data_encoding.json json
+  in
+  let protocol_param_key = ["protocol_parameters"] in
+  Tezos_protocol_environment.Context.(
+    let empty = Memory_context.empty in
+    add empty ["version"] (Bytes.of_string "genesis") >>= fun ctxt ->
+    add ctxt protocol_param_key proto_params)
+  >>= fun context ->
+  let typecheck ctxt script_repr = return ((script_repr, None), ctxt) in
+  Init_storage.prepare_first_block
+    context
+    ~level:0l
+    ~timestamp:(Time.Protocol.of_seconds 1643125688L)
+    ~typecheck
+  >>= fun e -> Lwt.return @@ Environment.wrap_tzresult e

@@ -37,6 +37,7 @@ let () =
       ("constants", Test_constants.tests);
       ("liquidity baking", Test_liquidity_baking.tests);
       ("storage description", Test_storage.tests);
+      ("storage tests", Test_storage_functions.tests);
       ("token movements", Test_token.tests);
     ]
   |> Lwt_main.run
