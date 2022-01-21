@@ -47,7 +47,7 @@ module Term = struct
   let process args sandbox_file =
     let run =
       let open Lwt_tzresult_syntax in
-      let*! () = Internal_event_unix.init () in
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
       let* node_config = Node_shared_arg.read_and_patch_config_file args in
       let data_dir = node_config.data_dir in
       let ({genesis; _} : Node_config_file.blockchain_network) =

@@ -131,7 +131,7 @@ let _test_gc _ =
   Lwt.return_unit
 
 let () =
-  let init_logs = lazy (Internal_event_unix.init ()) in
+  let init_logs = lazy (Tezos_base_unix.Internal_event_unix.init ()) in
   let wrap (n, f) =
     Alcotest_lwt.test_case n `Quick (fun _ () ->
         let open Lwt_syntax in

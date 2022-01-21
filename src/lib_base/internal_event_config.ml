@@ -23,50 +23,49 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Configure the event-logging framework for UNIx-based applications. *)
-
-(** The JSON-file-friendly definition of the configuration of the
-    internal-events framework. It allows one to activate registered
-    event sinks.  *)
-
 open Error_monad
 
-module Configuration : sig
-  type t
+type t = {active_sinks : Uri.t list}
 
-  (** The default configuration is empty (it doesn't activate any sink). *)
-  val default : t
+let default =
+  {active_sinks = [Uri.make ~scheme:Internal_event.Lwt_log_sink.uri_scheme ()]}
 
-  (** The serialization format. *)
-  val encoding : t Data_encoding.t
+let encoding =
+  let open Data_encoding in
+  let object_1 key_name =
+    obj1
+      (dft
+         key_name
+         ~description:"List of URIs to activate/configure sinks."
+         (list string)
+         [])
+  in
+  union
+    [
+      case
+        ~title:"Active-Sinks"
+        ~description:"List of sinks to make sure are activated."
+        (Tag 0)
+        (object_1 "active_sinks")
+        (fun {active_sinks} -> Some (List.map Uri.to_string active_sinks))
+        (fun active_sinks ->
+          {active_sinks = List.map Uri.of_string active_sinks});
+      case
+        ~title:"Active-Sinks-Deprecated"
+        ~description:
+          "List of sinks to make sure are activated, deprecated \
+           backwards-compatibility encoding."
+        (Tag 1)
+        (object_1 "activate")
+        (fun {active_sinks = _} -> None)
+        (* (fun {active_sinks} -> Some (List.map Uri.to_string active_sinks)) *)
+          (fun active_sinks ->
+          {active_sinks = List.map Uri.of_string active_sinks});
+    ]
 
-  (** Parse a json file at [path] into a configuration. *)
-  val of_file : string -> t tzresult Lwt.t
+let apply {active_sinks} =
+  List.iter_es Internal_event.All_sinks.activate active_sinks
 
-  (** Run {!Tezos_base.Internal_event.All_sinks.activate} for every
-      URI in the configuration. *)
-  val apply : t -> unit tzresult Lwt.t
-
-  (** Close all the sinks except ["lwt-log://"] and call {!apply}. *)
-  val reapply : t -> unit tzresult Lwt.t
-end
-
-(** Initialize the internal-event sinks by looking at the
-    [?configuration] argument and then at the (whitespace separated) list
-    of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI
-    does not have a scheme it is expected to be a path to a configuration
-    JSON file (cf. {!Configuration.of_file}), e.g.:
-    [export TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or
-    [export TEZOS_EVENTS_CONFIG="debug://  /path/to/config.json"].
-
-    The function also initializes the {!Lwt_log_sink_unix} module
-    (corresponding to the ["TEZOS_LOG"] environment variable).
-*)
-val init :
-  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
-  ?configuration:Configuration.t ->
-  unit ->
-  unit Lwt.t
-
-(** Call [close] on all the sinks. *)
-val close : unit -> unit Lwt.t
+let reapply config =
+  let except u = Uri.scheme u = Some "lwt-log" in
+  Internal_event.All_sinks.close ~except () >>=? fun () -> apply config

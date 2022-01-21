@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,22 +23,39 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(* For the moment, the daemon does nothing. *)
-let daemonize () = Lwt_utils.never_ending ()
+(** Configure the event-logging framework for UNIx-based applications. *)
 
-let install_finalizer rpc_server =
-  Lwt_exit.register_clean_up_callback ~loc:__LOC__ @@ fun exit_status ->
-  RPC_server.shutdown rpc_server >>= fun () ->
-  Event.shutdown_node exit_status >>= Tezos_base_unix.Internal_event_unix.close
+(** The JSON-file-friendly definition of the configuration of the
+    internal-events framework. It allows one to activate registered
+    event sinks.  *)
 
-let run ~data_dir (cctxt : Protocol_client_context.full) =
-  let start () =
-    Event.starting_node () >>= fun () ->
-    Configuration.load ~data_dir >>=? fun configuration ->
-    let Configuration.{rpc_addr; rpc_port; _} = configuration in
-    Layer1.start configuration cctxt >>=? fun () ->
-    RPC_server.start configuration >>=? fun rpc_server ->
-    let _ = install_finalizer rpc_server in
-    Event.node_is_ready ~rpc_addr ~rpc_port >>= daemonize
-  in
-  Lwt.catch start fail_with_exn
+open Error_monad
+
+module Configuration : sig
+  include module type of struct
+    include Tezos_base.Internal_event_config
+  end
+
+  (** Parse a json file at [path] into a configuration. *)
+  val of_file : string -> t tzresult Lwt.t
+end
+
+(** Initialize the internal-event sinks by looking at the
+    [?configuration] argument and then at the (whitespace separated) list
+    of URIs in the ["TEZOS_EVENTS_CONFIG"] environment variable, if an URI
+    does not have a scheme it is expected to be a path to a configuration
+    JSON file (cf. {!Configuration.of_file}), e.g.:
+    [export TEZOS_EVENTS_CONFIG="unix-files:///tmp/events-unix debug://"], or
+    [export TEZOS_EVENTS_CONFIG="debug://  /path/to/config.json"].
+
+    The function also initializes the {!Lwt_log_sink_unix} module
+    (corresponding to the ["TEZOS_LOG"] environment variable).
+*)
+val init :
+  ?lwt_log_sink:Lwt_log_sink_unix.cfg ->
+  ?configuration:Configuration.t ->
+  unit ->
+  unit Lwt.t
+
+(** Call [close] on all the sinks. *)
+val close : unit -> unit Lwt.t

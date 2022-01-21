@@ -567,7 +567,8 @@ let spec =
         " Log up to debug msgs even in io_scheduler" );
     ]
 
-let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
+let init_logs =
+  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
   Alcotest_lwt.test_case n `Quick (fun _ () ->

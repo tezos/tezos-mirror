@@ -46,7 +46,7 @@ module Logging : sig
       unit,
       unit,
       unit,
-      Tezos_stdlib_unix.Internal_event_unix.Configuration.t,
+      Tezos_base.Internal_event_config.t,
       unit )
     RPC_service.service
 end

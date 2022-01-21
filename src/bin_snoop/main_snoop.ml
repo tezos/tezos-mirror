@@ -399,7 +399,7 @@ let codegen_all_cmd solution regexp codegen_options =
 (* Activate logging system. *)
 let () =
   Lwt_main.run
-  @@ Internal_event_unix.(
+  @@ Tezos_base_unix.Internal_event_unix.(
        init
          ~lwt_log_sink:Lwt_log_sink_unix.default_cfg
          ~configuration:Configuration.default)

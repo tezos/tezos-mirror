@@ -41,7 +41,7 @@ let tztest (name : string) (speed : Alcotest.speed_level) (f : unit -> 'a Lwt.t)
       match r with
       | Ok () -> Lwt.return_unit
       | Error err ->
-          let* () = Tezos_stdlib_unix.Internal_event_unix.close () in
+          let* () = Tezos_base_unix.Internal_event_unix.close () in
           Format.printf "@\n%a@." pp_print_trace err ;
           Lwt.fail Alcotest.Test_error)
 

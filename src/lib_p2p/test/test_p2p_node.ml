@@ -110,7 +110,7 @@ let main () =
     let lwt_log_sink =
       Lwt_log_sink_unix.create_cfg ~rules:"test.p2p.node -> debug;" ()
     in
-    Lwt_main.run (Internal_event_unix.init ~lwt_log_sink ())
+    Lwt_main.run (Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink ())
   in
   gen_points () ;
   Lwt_main.run

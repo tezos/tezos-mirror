@@ -344,7 +344,7 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_unix.Configuration.t;
+  internal_events : Internal_event_config.t;
   shell : shell;
   blockchain_network : blockchain_network;
 }
@@ -453,7 +453,7 @@ let default_config =
     p2p = default_p2p;
     rpc = default_rpc;
     log = Lwt_log_sink_unix.default_cfg;
-    internal_events = Internal_event_unix.Configuration.default;
+    internal_events = Internal_event_config.default;
     shell = default_shell;
     blockchain_network = blockchain_network_mainnet;
     disable_config_validation = default_disable_config_validation;
@@ -1145,8 +1145,8 @@ let encoding =
        (dft
           "internal-events"
           ~description:"Configuration of the structured logging framework"
-          Internal_event_unix.Configuration.encoding
-          Internal_event_unix.Configuration.default)
+          Internal_event_config.encoding
+          Internal_event_config.default)
        (dft
           "shell"
           ~description:"Configuration of network parameters"

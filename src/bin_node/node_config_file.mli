@@ -52,7 +52,7 @@ type t = {
   p2p : p2p;
   rpc : rpc;
   log : Lwt_log_sink_unix.cfg;
-  internal_events : Internal_event_unix.Configuration.t;
+  internal_events : Internal_event_config.t;
   shell : shell;
   blockchain_network : blockchain_network;
 }

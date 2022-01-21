@@ -102,7 +102,7 @@ let main commands =
           Format.err_formatter
           (if Unix.isatty Unix.stderr then Ansi else Plain)
           Short) ;
-    let*! () = Internal_event_unix.init () in
+    let*! () = Tezos_base_unix.Internal_event_unix.init () in
     let* (base_dir, argv) = parse_config_args argv in
     let ctxt = new Client_context_unix.unix_logger ~base_dir in
     let commands =

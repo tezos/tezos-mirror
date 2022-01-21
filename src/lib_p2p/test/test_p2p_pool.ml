@@ -774,7 +774,8 @@ let spec =
         " Log up to debug msgs, socket included" );
     ]
 
-let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
+let init_logs =
+  lazy (Tezos_base_unix.Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let points = ref []
 

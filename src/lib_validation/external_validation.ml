@@ -73,7 +73,8 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
-  | Reconfigure_event_logging of Internal_event_unix.Configuration.t
+  | Reconfigure_event_logging of
+      Tezos_base_unix.Internal_event_unix.Configuration.t
 
 let request_pp ppf = function
   | Init -> Format.fprintf ppf "process handshake"
@@ -364,7 +365,7 @@ let request_encoding =
       case
         (Tag 6)
         ~title:"reconfigure_event_logging"
-        Internal_event_unix.Configuration.encoding
+        Tezos_base_unix.Internal_event_unix.Configuration.encoding
         (function Reconfigure_event_logging c -> Some c | _ -> None)
         (fun c -> Reconfigure_event_logging c);
       case_preapply (Tag 7);
