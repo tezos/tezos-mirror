@@ -1605,9 +1605,9 @@ and klog :
 *)
 
 let step_descr ~log_now logger (ctxt, sc) descr accu stack =
-  let gas = Local_gas_counter (Gas.remaining_operation_gas ctxt :> int) in
+  let (gas, outdated_ctxt) = local_gas_counter_and_outdated_context ctxt in
   (match logger with
-  | None -> step (outdated_context ctxt, sc) gas descr.kinstr KNil accu stack
+  | None -> step (outdated_ctxt, sc) gas descr.kinstr KNil accu stack
   | Some logger ->
       (if log_now then
        let kinfo = kinfo_of_kinstr descr.kinstr in
@@ -1615,7 +1615,7 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
       let log =
         ILog (kinfo_of_kinstr descr.kinstr, LogEntry, logger, descr.kinstr)
       in
-      step (outdated_context ctxt, sc) gas log KNil accu stack)
+      step (outdated_ctxt, sc) gas log KNil accu stack)
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
@@ -1624,13 +1624,13 @@ let interp logger g (Lam (code, _)) arg =
   >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
 
 let kstep logger ctxt step_constants kinstr accu stack =
-  let gas = Local_gas_counter (Gas.remaining_operation_gas ctxt :> int) in
   let kinstr =
     match logger with
     | None -> kinstr
     | Some logger -> ILog (kinfo_of_kinstr kinstr, LogEntry, logger, kinstr)
   in
-  step (outdated_context ctxt, step_constants) gas kinstr KNil accu stack
+  let (gas, outdated_ctxt) = local_gas_counter_and_outdated_context ctxt in
+  step (outdated_ctxt, step_constants) gas kinstr KNil accu stack
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
