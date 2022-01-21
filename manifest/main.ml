@@ -787,6 +787,7 @@ let tezos_clic =
         tezos_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_lwt_result_stdlib;
       ]
+    ~js_compatible:true
 
 let tezos_clic_unix =
   public_lib
@@ -865,6 +866,7 @@ let tezos_base =
         lwt;
         ipaddr;
       ]
+    ~js_compatible:true
     ~dune:Dune.[ocamllex "point_parser"]
 
 let tezos_base_unix =
@@ -957,6 +959,7 @@ let tezos_version =
     ~opam:"src/lib_version/tezos-version"
     ~synopsis:"Tezos: version information generated from Git"
     ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_version_parser]
+    ~js_compatible:true
     ~dune:
       Dune.
         [
@@ -1003,6 +1006,7 @@ let tezos_p2p_services =
     ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-p2p`"
     ~deps:[tezos_base |> open_ ~m:"TzPervasives"]
     ~linkall:true
+    ~js_compatible:true
 
 let tezos_workers =
   public_lib
@@ -1029,6 +1033,7 @@ let tezos_shell_services =
         tezos_version |> open_;
       ]
     ~linkall:true
+    ~js_compatible:true
 
 let _tezos_shell_services_tests =
   test
@@ -1940,6 +1945,7 @@ let tezos_client_base =
       ]
     ~modules:[":standard"; "bip39_english"]
     ~linkall:true
+    ~js_compatible:true
     ~dune:
       Dune.
         [
@@ -1981,6 +1987,7 @@ let tezos_signer_services =
         tezos_client_base |> open_;
       ]
     ~linkall:true
+    ~js_compatible:true
 
 let tezos_signer_backends =
   public_lib

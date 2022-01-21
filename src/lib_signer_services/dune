@@ -9,6 +9,7 @@
   tezos-base
   tezos-rpc
   tezos-client-base)
+ (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard

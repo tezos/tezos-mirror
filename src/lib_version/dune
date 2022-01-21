@@ -8,6 +8,7 @@
  (libraries
   tezos-base
   tezos-version.parser)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_base.TzPervasives)))
 
 (rule
