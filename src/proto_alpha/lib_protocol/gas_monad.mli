@@ -40,6 +40,10 @@ type ('a, 'trace) gas_monad = ('a, 'trace) t
 (** monadic return operator of the gas monad *)
 val return : 'a -> ('a, 'trace) t
 
+(** Specialized monadic return operator for unit value, strictly equivalent to
+    [return ()]. *)
+val return_unit : (unit, 'trace) t
+
 (** Binding operator for the gas monad *)
 val ( >>$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
 

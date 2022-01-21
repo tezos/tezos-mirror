@@ -38,6 +38,8 @@ let of_result x gas = Some (x, gas)
 
 let return x = of_result (ok x)
 
+let return_unit = return ()
+
 (* Inlined [Option.bind] for performance. *)
 let ( >>?? ) m f =
   match m with None -> None | Some x -> f x
