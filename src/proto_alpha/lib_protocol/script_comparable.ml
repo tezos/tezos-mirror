@@ -45,24 +45,24 @@ let compare_comparable : type a. a comparable_ty -> a -> a -> int =
       type a. a comparable_ty -> compare_comparable_cont -> a -> a -> int =
    fun kind k x y ->
     match (kind, x, y) with
-    | (Unit_key _, (), ()) -> (apply [@tailcall]) 0 k
-    | (Never_key _, _, _) -> .
-    | (Signature_key _, x, y) ->
+    | (Unit_key, (), ()) -> (apply [@tailcall]) 0 k
+    | (Never_key, _, _) -> .
+    | (Signature_key, x, y) ->
         (apply [@tailcall]) (Script_signature.compare x y) k
-    | (String_key _, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
-    | (Bool_key _, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
-    | (Mutez_key _, x, y) -> (apply [@tailcall]) (Tez.compare x y) k
-    | (Key_hash_key _, x, y) ->
+    | (String_key, x, y) -> (apply [@tailcall]) (Script_string.compare x y) k
+    | (Bool_key, x, y) -> (apply [@tailcall]) (Compare.Bool.compare x y) k
+    | (Mutez_key, x, y) -> (apply [@tailcall]) (Tez.compare x y) k
+    | (Key_hash_key, x, y) ->
         (apply [@tailcall]) (Signature.Public_key_hash.compare x y) k
-    | (Key_key _, x, y) ->
+    | (Key_key, x, y) ->
         (apply [@tailcall]) (Signature.Public_key.compare x y) k
-    | (Int_key _, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
-    | (Nat_key _, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
-    | (Timestamp_key _, x, y) ->
+    | (Int_key, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
+    | (Nat_key, x, y) -> (apply [@tailcall]) (Script_int.compare x y) k
+    | (Timestamp_key, x, y) ->
         (apply [@tailcall]) (Script_timestamp.compare x y) k
-    | (Address_key _, x, y) -> (apply [@tailcall]) (compare_address x y) k
-    | (Bytes_key _, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
-    | (Chain_id_key _, x, y) ->
+    | (Address_key, x, y) -> (apply [@tailcall]) (compare_address x y) k
+    | (Bytes_key, x, y) -> (apply [@tailcall]) (Compare.Bytes.compare x y) k
+    | (Chain_id_key, x, y) ->
         (apply [@tailcall]) (Script_chain_id.compare x y) k
     | (Pair_key (tl, tr, _), (lx, rx), (ly, ry)) ->
         (compare_comparable [@tailcall])

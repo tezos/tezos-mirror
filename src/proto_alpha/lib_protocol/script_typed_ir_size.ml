@@ -32,32 +32,33 @@ let script_string_size s = Script_string.to_string s |> string_size
 (* Memo-sizes are 16-bit integers *)
 let sapling_memo_size_size = !!0
 
-let (comparable_ty_size, ty_size) =
-  let base_basic _meta =
+let ty_traverse_f =
+  let base_basic =
     !!0
     (* Basic types count for 0 because they are all static values, hence shared
        and not counted by `reachable_words`.
        On the other hand compound types are functions, hence not shared. *)
   in
+  let base_compound_no_meta = header_size in
   let base_compound _meta = h1w in
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> nodes_and_size =
    fun accu cty ->
     match cty with
-    | Unit_key a -> ret_succ_adding accu (base_basic a)
-    | Int_key a -> ret_succ_adding accu (base_basic a)
-    | Nat_key a -> ret_succ_adding accu (base_basic a)
-    | Signature_key a -> ret_succ_adding accu (base_basic a)
-    | String_key a -> ret_succ_adding accu (base_basic a)
-    | Bytes_key a -> ret_succ_adding accu (base_basic a)
-    | Mutez_key a -> ret_succ_adding accu (base_basic a)
-    | Key_hash_key a -> ret_succ_adding accu (base_basic a)
-    | Key_key a -> ret_succ_adding accu (base_basic a)
-    | Timestamp_key a -> ret_succ_adding accu (base_basic a)
-    | Address_key a -> ret_succ_adding accu (base_basic a)
-    | Bool_key a -> ret_succ_adding accu (base_basic a)
-    | Chain_id_key a -> ret_succ_adding accu (base_basic a)
-    | Never_key a -> ret_succ_adding accu (base_basic a)
+    | Unit_key -> ret_succ_adding accu base_basic
+    | Int_key -> ret_succ_adding accu base_basic
+    | Nat_key -> ret_succ_adding accu base_basic
+    | Signature_key -> ret_succ_adding accu base_basic
+    | String_key -> ret_succ_adding accu base_basic
+    | Bytes_key -> ret_succ_adding accu base_basic
+    | Mutez_key -> ret_succ_adding accu base_basic
+    | Key_hash_key -> ret_succ_adding accu base_basic
+    | Key_key -> ret_succ_adding accu base_basic
+    | Timestamp_key -> ret_succ_adding accu base_basic
+    | Address_key -> ret_succ_adding accu base_basic
+    | Bool_key -> ret_succ_adding accu base_basic
+    | Chain_id_key -> ret_succ_adding accu base_basic
+    | Never_key -> ret_succ_adding accu base_basic
     | Pair_key (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Union_key (_ty1, _ty2, a) ->
@@ -67,26 +68,26 @@ let (comparable_ty_size, ty_size) =
   and apply : type a. nodes_and_size -> a ty -> nodes_and_size =
    fun accu ty ->
     match ty with
-    | Unit_t a -> ret_succ_adding accu @@ base_basic a
-    | Int_t a -> ret_succ_adding accu @@ base_basic a
-    | Nat_t a -> ret_succ_adding accu @@ base_basic a
-    | Signature_t a -> ret_succ_adding accu @@ base_basic a
-    | String_t a -> ret_succ_adding accu @@ base_basic a
-    | Bytes_t a -> ret_succ_adding accu @@ base_basic a
-    | Mutez_t a -> ret_succ_adding accu @@ base_basic a
-    | Key_hash_t a -> ret_succ_adding accu @@ base_basic a
-    | Key_t a -> ret_succ_adding accu @@ base_basic a
-    | Timestamp_t a -> ret_succ_adding accu @@ base_basic a
-    | Address_t a -> ret_succ_adding accu @@ base_basic a
-    | Bool_t a -> ret_succ_adding accu @@ base_basic a
-    | Operation_t a -> ret_succ_adding accu @@ base_basic a
-    | Chain_id_t a -> ret_succ_adding accu @@ base_basic a
-    | Never_t a -> ret_succ_adding accu @@ base_basic a
-    | Bls12_381_g1_t a -> ret_succ_adding accu @@ base_basic a
-    | Bls12_381_g2_t a -> ret_succ_adding accu @@ base_basic a
-    | Bls12_381_fr_t a -> ret_succ_adding accu @@ base_basic a
-    | Chest_key_t a -> ret_succ_adding accu @@ base_basic a
-    | Chest_t a -> ret_succ_adding accu @@ base_basic a
+    | Unit_t -> ret_succ_adding accu base_basic
+    | Int_t -> ret_succ_adding accu base_basic
+    | Nat_t -> ret_succ_adding accu base_basic
+    | Signature_t -> ret_succ_adding accu base_basic
+    | String_t -> ret_succ_adding accu base_basic
+    | Bytes_t -> ret_succ_adding accu base_basic
+    | Mutez_t -> ret_succ_adding accu base_basic
+    | Key_hash_t -> ret_succ_adding accu base_basic
+    | Key_t -> ret_succ_adding accu base_basic
+    | Timestamp_t -> ret_succ_adding accu base_basic
+    | Address_t -> ret_succ_adding accu base_basic
+    | Bool_t -> ret_succ_adding accu base_basic
+    | Operation_t -> ret_succ_adding accu base_basic
+    | Chain_id_t -> ret_succ_adding accu base_basic
+    | Never_t -> ret_succ_adding accu base_basic
+    | Bls12_381_g1_t -> ret_succ_adding accu base_basic
+    | Bls12_381_g2_t -> ret_succ_adding accu base_basic
+    | Bls12_381_fr_t -> ret_succ_adding accu base_basic
+    | Chest_key_t -> ret_succ_adding accu base_basic
+    | Chest_t -> ret_succ_adding accu base_basic
     | Pair_t (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Union_t (_ty1, _ty2, a) ->
@@ -102,18 +103,22 @@ let (comparable_ty_size, ty_size) =
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Contract_t (_ty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
-    | Sapling_transaction_t (_m, a) ->
+    | Sapling_transaction_t _m ->
         ret_succ_adding accu
-        @@ (base_compound a +! sapling_memo_size_size +! word_size)
-    | Sapling_state_t (_m, a) ->
+        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
+    | Sapling_state_t _m ->
         ret_succ_adding accu
-        @@ (base_compound a +! sapling_memo_size_size +! word_size)
+        @@ (base_compound_no_meta +! sapling_memo_size_size +! word_size)
     | Ticket_t (_cty, a) ->
         ret_succ_adding accu @@ (base_compound a +! word_size)
   in
-  let f = ({apply; apply_comparable} : nodes_and_size ty_traverse) in
-  ( (fun cty -> comparable_ty_traverse cty zero f),
-    fun ty -> ty_traverse ty zero f )
+  ({apply; apply_comparable} : nodes_and_size ty_traverse)
+
+let comparable_ty_size : type a. a comparable_ty -> nodes_and_size =
+ fun cty -> comparable_ty_traverse cty zero ty_traverse_f
+
+let ty_size : type a. a ty -> nodes_and_size =
+ fun ty -> ty_traverse ty zero ty_traverse_f
 
 let stack_ty_size s =
   let apply : type a s. nodes_and_size -> (a, s) stack_ty -> nodes_and_size =
@@ -264,18 +269,18 @@ let rec value_size :
   let apply : type a. nodes_and_size -> a ty -> a -> nodes_and_size =
    fun accu ty x ->
     match ty with
-    | Unit_t _ -> ret_succ accu
-    | Int_t _ -> ret_succ_adding accu (script_int_size x)
-    | Nat_t _ -> ret_succ_adding accu (script_nat_size x)
-    | Signature_t _ -> ret_succ_adding accu signature_size
-    | String_t _ -> ret_succ_adding accu (script_string_size x)
-    | Bytes_t _ -> ret_succ_adding accu (bytes_size x)
-    | Mutez_t _ -> ret_succ_adding accu mutez_size
-    | Key_hash_t _ -> ret_succ_adding accu (key_hash_size x)
-    | Key_t _ -> ret_succ_adding accu (public_key_size x)
-    | Timestamp_t _ -> ret_succ_adding accu (timestamp_size x)
-    | Address_t _ -> ret_succ_adding accu (address_size x)
-    | Bool_t _ -> ret_succ accu
+    | Unit_t -> ret_succ accu
+    | Int_t -> ret_succ_adding accu (script_int_size x)
+    | Nat_t -> ret_succ_adding accu (script_nat_size x)
+    | Signature_t -> ret_succ_adding accu signature_size
+    | String_t -> ret_succ_adding accu (script_string_size x)
+    | Bytes_t -> ret_succ_adding accu (bytes_size x)
+    | Mutez_t -> ret_succ_adding accu mutez_size
+    | Key_hash_t -> ret_succ_adding accu (key_hash_size x)
+    | Key_t -> ret_succ_adding accu (public_key_size x)
+    | Timestamp_t -> ret_succ_adding accu (timestamp_size x)
+    | Address_t -> ret_succ_adding accu (address_size x)
+    | Bool_t -> ret_succ accu
     | Pair_t (_, _, _) -> ret_succ_adding accu h2w
     | Union_t (_, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
@@ -298,12 +303,12 @@ let rec value_size :
           ty'
           x
     | Contract_t (_, _) -> ret_succ (accu ++ contract_size x)
-    | Sapling_transaction_t (_, _) ->
+    | Sapling_transaction_t _ ->
         ret_succ_adding accu (Sapling.transaction_in_memory_size x)
-    | Sapling_state_t (_, _) -> ret_succ_adding accu (sapling_state_size x)
-    | Operation_t _ -> ret_succ (accu ++ operation_size x)
-    | Chain_id_t _ -> ret_succ_adding accu chain_id_size
-    | Never_t _ -> ( match x with _ -> .)
+    | Sapling_state_t _ -> ret_succ_adding accu (sapling_state_size x)
+    | Operation_t -> ret_succ (accu ++ operation_size x)
+    | Chain_id_t -> ret_succ_adding accu chain_id_size
+    | Never_t -> ( match x with _ -> .)
     (* Related to https://gitlab.com/dannywillems/ocaml-bls12-381/-/issues/56.
        Since the update to blst as a backend for bls12-381, size_in_bytes is not
        the correct value for the allocated memory.
@@ -314,34 +319,34 @@ let rec value_size :
        For G2, it allocates 3 C values of type blst_fp2 which is 48 * 2 bytes.
        For Fr, it allocates 1 C value of type blst_fr which is 32 bytes.
     *)
-    | Bls12_381_g1_t _ -> ret_succ_adding accu !!((2 * 8) + (3 * 48))
-    | Bls12_381_g2_t _ -> ret_succ_adding accu !!((2 * 8) + (3 * 48 * 2))
-    | Bls12_381_fr_t _ -> ret_succ_adding accu !!((2 * 8) + 32)
+    | Bls12_381_g1_t -> ret_succ_adding accu !!((2 * 8) + (3 * 48))
+    | Bls12_381_g2_t -> ret_succ_adding accu !!((2 * 8) + (3 * 48 * 2))
+    | Bls12_381_fr_t -> ret_succ_adding accu !!((2 * 8) + 32)
     | Ticket_t (_, _) -> ret_succ_adding accu (ticket_size x)
-    | Chest_key_t _ -> ret_succ_adding accu (chest_key_size x)
-    | Chest_t _ -> ret_succ_adding accu (chest_size x)
+    | Chest_key_t -> ret_succ_adding accu (chest_key_size x)
+    | Chest_t -> ret_succ_adding accu (chest_size x)
   in
   let apply_comparable :
       type a. nodes_and_size -> a comparable_ty -> a -> nodes_and_size =
    fun accu ty x ->
     match ty with
-    | Unit_key _ -> ret_succ accu
-    | Int_key _ -> ret_succ_adding accu (script_int_size x)
-    | Nat_key _ -> ret_succ_adding accu (script_nat_size x)
-    | Signature_key _ -> ret_succ_adding accu signature_size
-    | String_key _ -> ret_succ_adding accu (script_string_size x)
-    | Bytes_key _ -> ret_succ_adding accu (bytes_size x)
-    | Mutez_key _ -> ret_succ_adding accu mutez_size
-    | Key_hash_key _ -> ret_succ_adding accu (key_hash_size x)
-    | Key_key _ -> ret_succ_adding accu (public_key_size x)
-    | Timestamp_key _ -> ret_succ_adding accu (timestamp_size x)
-    | Address_key _ -> ret_succ_adding accu (address_size x)
-    | Bool_key _ -> ret_succ accu
+    | Unit_key -> ret_succ accu
+    | Int_key -> ret_succ_adding accu (script_int_size x)
+    | Nat_key -> ret_succ_adding accu (script_nat_size x)
+    | Signature_key -> ret_succ_adding accu signature_size
+    | String_key -> ret_succ_adding accu (script_string_size x)
+    | Bytes_key -> ret_succ_adding accu (bytes_size x)
+    | Mutez_key -> ret_succ_adding accu mutez_size
+    | Key_hash_key -> ret_succ_adding accu (key_hash_size x)
+    | Key_key -> ret_succ_adding accu (public_key_size x)
+    | Timestamp_key -> ret_succ_adding accu (timestamp_size x)
+    | Address_key -> ret_succ_adding accu (address_size x)
+    | Bool_key -> ret_succ accu
     | Pair_key (_, _, _) -> ret_succ_adding accu h2w
     | Union_key (_, _, _) -> ret_succ_adding accu h1w
     | Option_key (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)
-    | Chain_id_key _ -> ret_succ_adding accu chain_id_size
-    | Never_key _ -> ( match x with _ -> .)
+    | Chain_id_key -> ret_succ_adding accu chain_id_size
+    | Never_key -> ( match x with _ -> .)
   in
   value_traverse ty x accu {apply; apply_comparable}
  [@@coq_axiom_with_reason "unreachable expressions '.' not handled for now"]

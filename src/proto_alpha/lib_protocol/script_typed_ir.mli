@@ -190,24 +190,20 @@ end
 type 'a ty_metadata = {size : 'a Type_size.t} [@@unboxed]
 
 type _ comparable_ty =
-  | Unit_key : unit ty_metadata -> unit comparable_ty
-  | Never_key : never ty_metadata -> never comparable_ty
-  | Int_key : z num ty_metadata -> z num comparable_ty
-  | Nat_key : n num ty_metadata -> n num comparable_ty
-  | Signature_key : signature ty_metadata -> signature comparable_ty
-  | String_key : Script_string.t ty_metadata -> Script_string.t comparable_ty
-  | Bytes_key : Bytes.t ty_metadata -> Bytes.t comparable_ty
-  | Mutez_key : Tez.t ty_metadata -> Tez.t comparable_ty
-  | Bool_key : bool ty_metadata -> bool comparable_ty
-  | Key_hash_key : public_key_hash ty_metadata -> public_key_hash comparable_ty
-  | Key_key : public_key ty_metadata -> public_key comparable_ty
-  | Timestamp_key :
-      Script_timestamp.t ty_metadata
-      -> Script_timestamp.t comparable_ty
-  | Chain_id_key :
-      Script_chain_id.t ty_metadata
-      -> Script_chain_id.t comparable_ty
-  | Address_key : address ty_metadata -> address comparable_ty
+  | Unit_key : unit comparable_ty
+  | Never_key : never comparable_ty
+  | Int_key : z num comparable_ty
+  | Nat_key : n num comparable_ty
+  | Signature_key : signature comparable_ty
+  | String_key : Script_string.t comparable_ty
+  | Bytes_key : Bytes.t comparable_ty
+  | Mutez_key : Tez.t comparable_ty
+  | Bool_key : bool comparable_ty
+  | Key_hash_key : public_key_hash comparable_ty
+  | Key_key : public_key comparable_ty
+  | Timestamp_key : Script_timestamp.t comparable_ty
+  | Chain_id_key : Script_chain_id.t comparable_ty
+  | Address_key : address comparable_ty
   | Pair_key :
       'a comparable_ty * 'b comparable_ty * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair comparable_ty
@@ -1378,18 +1374,18 @@ and logger = {
 
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
-  | Unit_t : unit ty_metadata -> unit ty
-  | Int_t : z num ty_metadata -> z num ty
-  | Nat_t : n num ty_metadata -> n num ty
-  | Signature_t : signature ty_metadata -> signature ty
-  | String_t : Script_string.t ty_metadata -> Script_string.t ty
-  | Bytes_t : Bytes.t ty_metadata -> bytes ty
-  | Mutez_t : Tez.t ty_metadata -> Tez.t ty
-  | Key_hash_t : public_key_hash ty_metadata -> public_key_hash ty
-  | Key_t : public_key ty_metadata -> public_key ty
-  | Timestamp_t : Script_timestamp.t ty_metadata -> Script_timestamp.t ty
-  | Address_t : address ty_metadata -> address ty
-  | Bool_t : bool ty_metadata -> bool ty
+  | Unit_t : unit ty
+  | Int_t : z num ty
+  | Nat_t : n num ty
+  | Signature_t : signature ty
+  | String_t : Script_string.t ty
+  | Bytes_t : bytes ty
+  | Mutez_t : Tez.t ty
+  | Key_hash_t : public_key_hash ty
+  | Key_t : public_key ty
+  | Timestamp_t : Script_timestamp.t ty
+  | Address_t : address ty
+  | Bool_t : bool ty
   | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
   | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
   | Lambda_t :
@@ -1407,23 +1403,17 @@ and 'ty ty =
   | Contract_t :
       'arg ty * 'arg typed_contract ty_metadata
       -> 'arg typed_contract ty
-  | Sapling_transaction_t :
-      Sapling.Memo_size.t * Sapling.transaction ty_metadata
-      -> Sapling.transaction ty
-  | Sapling_state_t :
-      Sapling.Memo_size.t * Sapling.state ty_metadata
-      -> Sapling.state ty
-  | Operation_t : operation ty_metadata -> operation ty
-  | Chain_id_t : Script_chain_id.t ty_metadata -> Script_chain_id.t ty
-  | Never_t : never ty_metadata -> never ty
-  | Bls12_381_g1_t : Script_bls.G1.t ty_metadata -> Script_bls.G1.t ty
-  | Bls12_381_g2_t : Script_bls.G2.t ty_metadata -> Script_bls.G2.t ty
-  | Bls12_381_fr_t : Script_bls.Fr.t ty_metadata -> Script_bls.Fr.t ty
+  | Sapling_transaction_t : Sapling.Memo_size.t -> Sapling.transaction ty
+  | Sapling_state_t : Sapling.Memo_size.t -> Sapling.state ty
+  | Operation_t : operation ty
+  | Chain_id_t : Script_chain_id.t ty
+  | Never_t : never ty
+  | Bls12_381_g1_t : Script_bls.G1.t ty
+  | Bls12_381_g2_t : Script_bls.G2.t ty
+  | Bls12_381_fr_t : Script_bls.Fr.t ty
   | Ticket_t : 'a comparable_ty * 'a ticket ty_metadata -> 'a ticket ty
-  | Chest_key_t :
-      Script_timelock.chest_key ty_metadata
-      -> Script_timelock.chest_key ty
-  | Chest_t : Script_timelock.chest ty_metadata -> Script_timelock.chest ty
+  | Chest_key_t : Script_timelock.chest_key ty
+  | Chest_t : Script_timelock.chest ty
 
 and ('top_ty, 'resty) stack_ty =
   | Item_t : 'ty ty * ('ty2, 'rest) stack_ty -> ('ty, 'ty2 * 'rest) stack_ty

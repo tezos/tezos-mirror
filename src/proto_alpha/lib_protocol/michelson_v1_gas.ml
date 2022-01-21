@@ -1377,22 +1377,21 @@ module Cost_of = struct
           a Script_typed_ir.comparable_ty -> a -> a -> cost -> cont -> cost =
        fun ty x y acc k ->
         match ty with
-        | Unit_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
-        | Never_key _ -> ( match x with _ -> .)
-        | Bool_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
-        | String_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
-        | Signature_key _ ->
-            (apply [@tailcall]) Gas.(acc +@ compare_signature) k
-        | Bytes_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
-        | Mutez_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
-        | Int_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
-        | Nat_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
-        | Key_hash_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
-        | Key_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
-        | Timestamp_key _ ->
+        | Unit_key -> (apply [@tailcall]) Gas.(acc +@ compare_unit) k
+        | Never_key -> ( match x with _ -> .)
+        | Bool_key -> (apply [@tailcall]) Gas.(acc +@ compare_bool) k
+        | String_key -> (apply [@tailcall]) Gas.(acc +@ compare_string x y) k
+        | Signature_key -> (apply [@tailcall]) Gas.(acc +@ compare_signature) k
+        | Bytes_key -> (apply [@tailcall]) Gas.(acc +@ compare_bytes x y) k
+        | Mutez_key -> (apply [@tailcall]) Gas.(acc +@ compare_mutez) k
+        | Int_key -> (apply [@tailcall]) Gas.(acc +@ compare_int x y) k
+        | Nat_key -> (apply [@tailcall]) Gas.(acc +@ compare_nat x y) k
+        | Key_hash_key -> (apply [@tailcall]) Gas.(acc +@ compare_key_hash) k
+        | Key_key -> (apply [@tailcall]) Gas.(acc +@ compare_key) k
+        | Timestamp_key ->
             (apply [@tailcall]) Gas.(acc +@ compare_timestamp x y) k
-        | Address_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
-        | Chain_id_key _ -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
+        | Address_key -> (apply [@tailcall]) Gas.(acc +@ compare_address) k
+        | Chain_id_key -> (apply [@tailcall]) Gas.(acc +@ compare_chain_id) k
         | Pair_key (tl, tr, _) ->
             (* Reasonable over-approximation of the cost of lexicographic comparison. *)
             let (xl, xr) = x in
