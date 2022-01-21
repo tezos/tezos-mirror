@@ -666,11 +666,20 @@ module Handle_operations = struct
       Tree.find_ancestor ~equal tree from_branch to_branch
       |> force_opt ~loc:__LOC__
     in
-    let expected =
+    (* Operations from [start] (included) to [ancestor] (excluded).
+       [ancestor] should be the ancestor of [start]. *)
+    let operations_on_path start ancestor =
       List.map
         Block.tools.all_operation_hashes
-        (values_from_to ~equal tree from_branch ancestor)
+        (values_from_to ~equal tree start ancestor)
       |> blocks_to_oph_set
+    in
+    let expected_superset = operations_on_path from_branch ancestor in
+    let from_ancestor_to_to_branch = operations_on_path to_branch ancestor in
+    (* Expected operations are the ones from [ancestor] to [from_branch],
+       minus the ones from ancestor to [to_branch]. *)
+    let expected =
+      Operation_hash.Set.diff expected_superset from_ancestor_to_to_branch
     in
     let actual =
       Classification.Internal_for_tests.handle_live_operations
