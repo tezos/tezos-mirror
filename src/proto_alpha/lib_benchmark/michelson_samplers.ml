@@ -521,19 +521,19 @@ end)
       let open Script_typed_ir in
       fun typ ->
         match typ with
-        | Never_t _ -> assert false
-        | Unit_t _ -> M.return ()
-        | Int_t _ -> Michelson_base.int
-        | Nat_t _ -> Michelson_base.nat
-        | Signature_t _ -> signature
-        | String_t _ -> Michelson_base.string
-        | Bytes_t _ -> Michelson_base.bytes
-        | Mutez_t _ -> Michelson_base.tez
-        | Key_hash_t _ -> Crypto_samplers.pkh
-        | Key_t _ -> Crypto_samplers.pk
-        | Timestamp_t _ -> Michelson_base.timestamp
-        | Bool_t _ -> Base_samplers.uniform_bool
-        | Address_t _ -> address
+        | Never_t -> assert false
+        | Unit_t -> M.return ()
+        | Int_t -> Michelson_base.int
+        | Nat_t -> Michelson_base.nat
+        | Signature_t -> signature
+        | String_t -> Michelson_base.string
+        | Bytes_t -> Michelson_base.bytes
+        | Mutez_t -> Michelson_base.tez
+        | Key_hash_t -> Crypto_samplers.pkh
+        | Key_t -> Crypto_samplers.pk
+        | Timestamp_t -> Michelson_base.timestamp
+        | Bool_t -> Base_samplers.uniform_bool
+        | Address_t -> address
         | Pair_t (left_t, right_t, _) ->
             M.(
               let* left_v = value left_t in
@@ -553,12 +553,12 @@ end)
         | Set_t (elt_ty, _) -> generate_set elt_ty
         | Map_t (key_ty, val_ty, _) -> generate_map key_ty val_ty
         | Contract_t (arg_ty, _) -> generate_contract arg_ty
-        | Operation_t _ -> generate_operation
+        | Operation_t -> generate_operation
         | Big_map_t (key_ty, val_ty, _) -> generate_big_map key_ty val_ty
-        | Chain_id_t _ -> chain_id
-        | Bls12_381_g1_t _ -> generate_bls12_381_g1
-        | Bls12_381_g2_t _ -> generate_bls12_381_g2
-        | Bls12_381_fr_t _ -> generate_bls12_381_fr
+        | Chain_id_t -> chain_id
+        | Bls12_381_g1_t -> generate_bls12_381_g1
+        | Bls12_381_g2_t -> generate_bls12_381_g2
+        | Bls12_381_fr_t -> generate_bls12_381_fr
         | Ticket_t (contents_ty, _) ->
             let ty = comparable_downcast contents_ty in
             generate_ticket ty
@@ -567,9 +567,9 @@ end)
               "Michelson_samplers: sapling transactions not handled yet"
         | Sapling_state_t _ ->
             fail_sampling "Michelson_samplers: sapling state not handled yet"
-        | Chest_key_t _ ->
+        | Chest_key_t ->
             fail_sampling "Michelson_samplers: chest key not handled yet"
-        | Chest_t _ -> fail_sampling "Michelson_samplers: chest not handled yet"
+        | Chest_t -> fail_sampling "Michelson_samplers: chest not handled yet"
 
     and generate_lambda :
         type arg ret.
