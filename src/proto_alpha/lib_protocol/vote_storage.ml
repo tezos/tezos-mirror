@@ -106,9 +106,99 @@ let update_listings ctxt =
   Storage.Vote.Voting_power_in_listings.add ctxt total >>= fun ctxt ->
   return ctxt
 
+type delegate_info = {
+  voting_power : Int64.t option;
+  current_ballot : Vote_repr.ballot option;
+  current_proposals : Protocol_hash.t list;
+  remaining_proposals : int;
+}
+
+let pp_delegate_info ppf info =
+  match info.voting_power with
+  | None -> Format.fprintf ppf "Voting power: none"
+  | Some p -> (
+      Format.fprintf
+        ppf
+        "Voting power: %a"
+        Tez_repr.pp
+        (Tez_repr.of_mutez_exn p) ;
+      (match info.current_ballot with
+      | None -> ()
+      | Some ballot ->
+          Format.fprintf ppf "@,Current ballot: %a" Vote_repr.pp_ballot ballot) ;
+      match info.current_proposals with
+      | [] ->
+          if Compare.Int.(info.remaining_proposals <> 0) then
+            Format.fprintf
+              ppf
+              "@,Remaining proposals: %d"
+              info.remaining_proposals
+      | proposals ->
+          Format.fprintf ppf "@,@[<v 2>Current proposals:" ;
+          List.iter
+            (fun p -> Format.fprintf ppf "@,- %a" Protocol_hash.pp p)
+            proposals ;
+          Format.fprintf ppf "@]" ;
+          Format.fprintf
+            ppf
+            "@,Remaining proposals: %d"
+            info.remaining_proposals)
+
+let delegate_info_encoding =
+  let open Data_encoding in
+  conv
+    (fun {voting_power; current_ballot; current_proposals; remaining_proposals} ->
+      (voting_power, current_ballot, current_proposals, remaining_proposals))
+    (fun (voting_power, current_ballot, current_proposals, remaining_proposals) ->
+      {voting_power; current_ballot; current_proposals; remaining_proposals})
+    (obj4
+       (opt "voting_power" int64)
+       (opt "current_ballot" Vote_repr.ballot_encoding)
+       (dft "current_proposals" (list Protocol_hash.encoding) [])
+       (dft "remaining_proposals" int31 0))
+
 let in_listings = Storage.Vote.Listings.mem
 
 let get_listings = Storage.Vote.Listings.bindings
+
+let get_delegate_info ctxt delegate =
+  Storage.Vote.Listings.find ctxt delegate >>=? fun voting_power ->
+  match voting_power with
+  | None ->
+      return
+        {
+          voting_power;
+          current_proposals = [];
+          current_ballot = None;
+          remaining_proposals = 0;
+        }
+  | Some _ ->
+      Voting_period_storage.get_current_kind ctxt >>=? fun period ->
+      (match period with
+      | Exploration | Promotion -> Storage.Vote.Ballots.find ctxt delegate
+      | Proposal | Cooldown | Adoption -> return None)
+      >>=? fun current_ballot ->
+      (match period with
+      | Exploration | Promotion | Cooldown | Adoption -> Lwt.return []
+      | Proposal ->
+          Storage.Vote.Proposals.fold
+            ctxt
+            ~order:`Undefined
+            ~init:[]
+            ~f:(fun (h, d) acc ->
+              if Signature.Public_key_hash.equal d delegate then
+                Lwt.return (h :: acc)
+              else Lwt.return acc))
+      >>= fun current_proposals ->
+      let remaining_proposals =
+        match period with
+        | Proposal ->
+            Constants_repr.max_proposals_per_delegate
+            - List.length current_proposals
+        | _ -> 0
+      in
+      return
+        {voting_power; current_ballot; current_proposals; remaining_proposals}
 
 let get_voting_power_free ctxt owner =
   Storage.Vote.Listings.find ctxt owner >|=? Option.value ~default:0L

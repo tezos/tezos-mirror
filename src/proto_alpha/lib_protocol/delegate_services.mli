@@ -51,7 +51,7 @@ type info = {
   delegated_balance : Tez.t;
   deactivated : bool;
   grace_period : Cycle.t;
-  voting_power : int64;
+  voting_info : Vote.delegate_info;
 }
 
 val info_encoding : info Data_encoding.t
@@ -118,6 +118,12 @@ val grace_period :
 
 val voting_power :
   'a #RPC_context.simple -> 'a -> public_key_hash -> int64 shell_tzresult Lwt.t
+
+val voting_info :
+  'a #RPC_context.simple ->
+  'a ->
+  public_key_hash ->
+  Vote.delegate_info shell_tzresult Lwt.t
 
 val participation :
   'a #RPC_context.simple ->
