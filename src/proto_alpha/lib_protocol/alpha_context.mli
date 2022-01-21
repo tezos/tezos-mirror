@@ -2024,9 +2024,15 @@ module Tx_rollup_state : sig
     | Tx_rollup_does_not_exist of Tx_rollup.t
 
   module Internal_for_tests : sig
-    val initial_state_with_fees_per_byte : Tez.t -> t
+    val make :
+      fees_per_byte:Tez.t ->
+      inbox_ema:int ->
+      last_inbox_level:Raw_level.t option ->
+      t
 
     val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+
+    val get_inbox_ema : t -> int
   end
 end
 
