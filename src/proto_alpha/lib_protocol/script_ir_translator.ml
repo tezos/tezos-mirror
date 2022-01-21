@@ -158,25 +158,25 @@ let check_kind kinds expr =
    the end of the file. *)
 
 let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
-  | Unit_key tname -> Unit_t tname
-  | Never_key tname -> Never_t tname
-  | Int_key tname -> Int_t tname
-  | Nat_key tname -> Nat_t tname
-  | Signature_key tname -> Signature_t tname
-  | String_key tname -> String_t tname
-  | Bytes_key tname -> Bytes_t tname
-  | Mutez_key tname -> Mutez_t tname
-  | Bool_key tname -> Bool_t tname
-  | Key_hash_key tname -> Key_hash_t tname
-  | Key_key tname -> Key_t tname
-  | Timestamp_key tname -> Timestamp_t tname
-  | Address_key tname -> Address_t tname
-  | Chain_id_key tname -> Chain_id_t tname
-  | Pair_key (l, r, tname) ->
-      Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, tname)
-  | Union_key (l, r, tname) ->
-      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, tname)
-  | Option_key (t, tname) -> Option_t (ty_of_comparable_ty t, tname)
+  | Unit_key meta -> Unit_t meta
+  | Never_key meta -> Never_t meta
+  | Int_key meta -> Int_t meta
+  | Nat_key meta -> Nat_t meta
+  | Signature_key meta -> Signature_t meta
+  | String_key meta -> String_t meta
+  | Bytes_key meta -> Bytes_t meta
+  | Mutez_key meta -> Mutez_t meta
+  | Bool_key meta -> Bool_t meta
+  | Key_hash_key meta -> Key_hash_t meta
+  | Key_key meta -> Key_t meta
+  | Timestamp_key meta -> Timestamp_t meta
+  | Address_key meta -> Address_t meta
+  | Chain_id_key meta -> Chain_id_t meta
+  | Pair_key (l, r, meta) ->
+      Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta)
+  | Union_key (l, r, meta) ->
+      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta)
+  | Option_key (t, meta) -> Option_t (ty_of_comparable_ty t, meta)
 
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
@@ -338,31 +338,31 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
  fun ctxt loc ty ->
   Gas.consume ctxt Typecheck_costs.comparable_ty_of_ty_cycle >>? fun ctxt ->
   match ty with
-  | Unit_t tname -> ok ((Unit_key tname : a comparable_ty), ctxt)
-  | Never_t tname -> ok (Never_key tname, ctxt)
-  | Int_t tname -> ok (Int_key tname, ctxt)
-  | Nat_t tname -> ok (Nat_key tname, ctxt)
-  | Signature_t tname -> ok (Signature_key tname, ctxt)
-  | String_t tname -> ok (String_key tname, ctxt)
-  | Bytes_t tname -> ok (Bytes_key tname, ctxt)
-  | Mutez_t tname -> ok (Mutez_key tname, ctxt)
-  | Bool_t tname -> ok (Bool_key tname, ctxt)
-  | Key_hash_t tname -> ok (Key_hash_key tname, ctxt)
-  | Key_t tname -> ok (Key_key tname, ctxt)
-  | Timestamp_t tname -> ok (Timestamp_key tname, ctxt)
-  | Address_t tname -> ok (Address_key tname, ctxt)
-  | Chain_id_t tname -> ok (Chain_id_key tname, ctxt)
+  | Unit_t meta -> ok ((Unit_key meta : a comparable_ty), ctxt)
+  | Never_t meta -> ok (Never_key meta, ctxt)
+  | Int_t meta -> ok (Int_key meta, ctxt)
+  | Nat_t meta -> ok (Nat_key meta, ctxt)
+  | Signature_t meta -> ok (Signature_key meta, ctxt)
+  | String_t meta -> ok (String_key meta, ctxt)
+  | Bytes_t meta -> ok (Bytes_key meta, ctxt)
+  | Mutez_t meta -> ok (Mutez_key meta, ctxt)
+  | Bool_t meta -> ok (Bool_key meta, ctxt)
+  | Key_hash_t meta -> ok (Key_hash_key meta, ctxt)
+  | Key_t meta -> ok (Key_key meta, ctxt)
+  | Timestamp_t meta -> ok (Timestamp_key meta, ctxt)
+  | Address_t meta -> ok (Address_key meta, ctxt)
+  | Chain_id_t meta -> ok (Chain_id_key meta, ctxt)
   | Pair_t (l, r, pname) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
       (Pair_key (lty, rty, pname), ctxt)
-  | Union_t (l, r, tname) ->
+  | Union_t (l, r, meta) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
-      (Union_key (lty, rty, tname), ctxt)
-  | Option_t (tt, tname) ->
+      (Union_key (lty, rty, meta), ctxt)
+  | Option_t (tt, meta) ->
       comparable_ty_of_ty ctxt loc tt >|? fun (ty, ctxt) ->
-      (Option_key (ty, tname), ctxt)
+      (Option_key (ty, meta), ctxt)
   | Lambda_t _ | List_t _ | Ticket_t _ | Set_t _ | Map_t _ | Big_map_t _
   | Contract_t _ | Operation_t _ | Bls12_381_fr_t _ | Bls12_381_g1_t _
   | Bls12_381_g2_t _ | Sapling_state_t _ | Sapling_transaction_t _
@@ -756,63 +756,63 @@ let rec merge_comparable_types :
     let merge_type_metadata meta_a meta_b =
       of_result @@ merge_type_metadata ~error_details meta_a meta_b
     in
-    let return f eq annot_a annot_b :
+    let return f eq meta_a meta_b :
         ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
           error_trace )
         gas_monad =
-      merge_type_metadata annot_a annot_b >>$ fun annot -> return (eq, f annot)
+      merge_type_metadata meta_a meta_b >>$ fun meta -> return (eq, f meta)
     in
     match (ta, tb) with
-    | (Unit_key annot_a, Unit_key annot_b) ->
-        return (fun annot -> Unit_key annot) Eq annot_a annot_b
-    | (Never_key annot_a, Never_key annot_b) ->
-        return (fun annot -> Never_key annot) Eq annot_a annot_b
-    | (Int_key annot_a, Int_key annot_b) ->
-        return (fun annot -> Int_key annot) Eq annot_a annot_b
-    | (Nat_key annot_a, Nat_key annot_b) ->
-        return (fun annot -> Nat_key annot) Eq annot_a annot_b
-    | (Signature_key annot_a, Signature_key annot_b) ->
-        return (fun annot -> Signature_key annot) Eq annot_a annot_b
-    | (String_key annot_a, String_key annot_b) ->
-        return (fun annot -> String_key annot) Eq annot_a annot_b
-    | (Bytes_key annot_a, Bytes_key annot_b) ->
-        return (fun annot -> Bytes_key annot) Eq annot_a annot_b
-    | (Mutez_key annot_a, Mutez_key annot_b) ->
-        return (fun annot -> Mutez_key annot) Eq annot_a annot_b
-    | (Bool_key annot_a, Bool_key annot_b) ->
-        return (fun annot -> Bool_key annot) Eq annot_a annot_b
-    | (Key_hash_key annot_a, Key_hash_key annot_b) ->
-        return (fun annot -> Key_hash_key annot) Eq annot_a annot_b
-    | (Key_key annot_a, Key_key annot_b) ->
-        return (fun annot -> Key_key annot) Eq annot_a annot_b
-    | (Timestamp_key annot_a, Timestamp_key annot_b) ->
-        return (fun annot -> Timestamp_key annot) Eq annot_a annot_b
-    | (Chain_id_key annot_a, Chain_id_key annot_b) ->
-        return (fun annot -> Chain_id_key annot) Eq annot_a annot_b
-    | (Address_key annot_a, Address_key annot_b) ->
-        return (fun annot -> Address_key annot) Eq annot_a annot_b
-    | (Pair_key (left_a, right_a, annot_a), Pair_key (left_b, right_b, annot_b))
+    | (Unit_key meta_a, Unit_key meta_b) ->
+        return (fun meta -> Unit_key meta) Eq meta_a meta_b
+    | (Never_key meta_a, Never_key meta_b) ->
+        return (fun meta -> Never_key meta) Eq meta_a meta_b
+    | (Int_key meta_a, Int_key meta_b) ->
+        return (fun meta -> Int_key meta) Eq meta_a meta_b
+    | (Nat_key meta_a, Nat_key meta_b) ->
+        return (fun meta -> Nat_key meta) Eq meta_a meta_b
+    | (Signature_key meta_a, Signature_key meta_b) ->
+        return (fun meta -> Signature_key meta) Eq meta_a meta_b
+    | (String_key meta_a, String_key meta_b) ->
+        return (fun meta -> String_key meta) Eq meta_a meta_b
+    | (Bytes_key meta_a, Bytes_key meta_b) ->
+        return (fun meta -> Bytes_key meta) Eq meta_a meta_b
+    | (Mutez_key meta_a, Mutez_key meta_b) ->
+        return (fun meta -> Mutez_key meta) Eq meta_a meta_b
+    | (Bool_key meta_a, Bool_key meta_b) ->
+        return (fun meta -> Bool_key meta) Eq meta_a meta_b
+    | (Key_hash_key meta_a, Key_hash_key meta_b) ->
+        return (fun meta -> Key_hash_key meta) Eq meta_a meta_b
+    | (Key_key meta_a, Key_key meta_b) ->
+        return (fun meta -> Key_key meta) Eq meta_a meta_b
+    | (Timestamp_key meta_a, Timestamp_key meta_b) ->
+        return (fun meta -> Timestamp_key meta) Eq meta_a meta_b
+    | (Chain_id_key meta_a, Chain_id_key meta_b) ->
+        return (fun meta -> Chain_id_key meta) Eq meta_a meta_b
+    | (Address_key meta_a, Address_key meta_b) ->
+        return (fun meta -> Address_key meta) Eq meta_a meta_b
+    | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
-        merge_type_metadata annot_a annot_b >>$ fun annot ->
+        merge_type_metadata meta_a meta_b >>$ fun meta ->
         merge_comparable_types ~error_details left_a left_b
         >>$ fun (Eq, left) ->
         merge_comparable_types ~error_details right_a right_b
         >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Pair_key (left, right, annot) )
-    | ( Union_key (left_a, right_a, annot_a),
-        Union_key (left_b, right_b, annot_b) ) ->
-        merge_type_metadata annot_a annot_b >>$ fun annot ->
+          Pair_key (left, right, meta) )
+    | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
+      ->
+        merge_type_metadata meta_a meta_b >>$ fun meta ->
         merge_comparable_types ~error_details left_a left_b
         >>$ fun (Eq, left) ->
         merge_comparable_types ~error_details right_a right_b
         >|$ fun (Eq, right) ->
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Union_key (left, right, annot) )
-    | (Option_key (ta, annot_a), Option_key (tb, annot_b)) ->
-        merge_type_metadata annot_a annot_b >>$ fun annot ->
+          Union_key (left, right, meta) )
+    | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
+        merge_type_metadata meta_a meta_b >>$ fun meta ->
         merge_comparable_types ~error_details ta tb >|$ fun (Eq, t) ->
-        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, annot))
+        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, meta))
     | (_, _) ->
         of_result
         @@ Error
@@ -863,8 +863,8 @@ let merge_types :
     ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
   let open Gas_monad in
   fun ~error_details loc ty1 ty2 ->
-    let merge_type_metadata tn1 tn2 =
-      of_result @@ merge_type_metadata ~error_details tn1 tn2
+    let merge_type_metadata meta1 meta2 =
+      of_result @@ merge_type_metadata ~error_details meta1 meta2
       |> Gas_monad.record_trace_eval ~error_details (fun () ->
              let ty1 = serialize_ty_for_error ty1 in
              let ty2 = serialize_ty_for_error ty2 in
@@ -885,101 +885,104 @@ let merge_types :
         ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
      fun ty1 ty2 ->
       consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
-      let return f eq annot_a annot_b :
+      let return f eq meta_a meta_b :
           ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
-        merge_type_metadata annot_a annot_b >>$ fun annot -> return (eq, f annot)
+        merge_type_metadata meta_a meta_b >>$ fun meta -> return (eq, f meta)
       in
       match (ty1, ty2) with
-      | (Unit_t tn1, Unit_t tn2) ->
-          return (fun tname -> Unit_t tname) Eq tn1 tn2
-      | (Int_t tn1, Int_t tn2) -> return (fun tname -> Int_t tname) Eq tn1 tn2
-      | (Nat_t tn1, Nat_t tn2) -> return (fun tname -> Nat_t tname) Eq tn1 tn2
-      | (Key_t tn1, Key_t tn2) -> return (fun tname -> Key_t tname) Eq tn1 tn2
-      | (Key_hash_t tn1, Key_hash_t tn2) ->
-          return (fun tname -> Key_hash_t tname) Eq tn1 tn2
-      | (String_t tn1, String_t tn2) ->
-          return (fun tname -> String_t tname) Eq tn1 tn2
-      | (Bytes_t tn1, Bytes_t tn2) ->
-          return (fun tname -> Bytes_t tname) Eq tn1 tn2
-      | (Signature_t tn1, Signature_t tn2) ->
-          return (fun tname -> Signature_t tname) Eq tn1 tn2
-      | (Mutez_t tn1, Mutez_t tn2) ->
-          return (fun tname -> Mutez_t tname) Eq tn1 tn2
-      | (Timestamp_t tn1, Timestamp_t tn2) ->
-          return (fun tname -> Timestamp_t tname) Eq tn1 tn2
-      | (Address_t tn1, Address_t tn2) ->
-          return (fun tname -> Address_t tname) Eq tn1 tn2
-      | (Bool_t tn1, Bool_t tn2) ->
-          return (fun tname -> Bool_t tname) Eq tn1 tn2
-      | (Chain_id_t tn1, Chain_id_t tn2) ->
-          return (fun tname -> Chain_id_t tname) Eq tn1 tn2
-      | (Never_t tn1, Never_t tn2) ->
-          return (fun tname -> Never_t tname) Eq tn1 tn2
-      | (Operation_t tn1, Operation_t tn2) ->
-          return (fun tname -> Operation_t tname) Eq tn1 tn2
-      | (Bls12_381_g1_t tn1, Bls12_381_g1_t tn2) ->
-          return (fun tname -> Bls12_381_g1_t tname) Eq tn1 tn2
-      | (Bls12_381_g2_t tn1, Bls12_381_g2_t tn2) ->
-          return (fun tname -> Bls12_381_g2_t tname) Eq tn1 tn2
-      | (Bls12_381_fr_t tn1, Bls12_381_fr_t tn2) ->
-          return (fun tname -> Bls12_381_fr_t tname) Eq tn1 tn2
-      | (Map_t (tal, tar, tn1), Map_t (tbl, tbr, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+      | (Unit_t meta1, Unit_t meta2) ->
+          return (fun meta -> Unit_t meta) Eq meta1 meta2
+      | (Int_t meta1, Int_t meta2) ->
+          return (fun meta -> Int_t meta) Eq meta1 meta2
+      | (Nat_t meta1, Nat_t meta2) ->
+          return (fun meta -> Nat_t meta) Eq meta1 meta2
+      | (Key_t meta1, Key_t meta2) ->
+          return (fun meta -> Key_t meta) Eq meta1 meta2
+      | (Key_hash_t meta1, Key_hash_t meta2) ->
+          return (fun meta -> Key_hash_t meta) Eq meta1 meta2
+      | (String_t meta1, String_t meta2) ->
+          return (fun meta -> String_t meta) Eq meta1 meta2
+      | (Bytes_t meta1, Bytes_t meta2) ->
+          return (fun meta -> Bytes_t meta) Eq meta1 meta2
+      | (Signature_t meta1, Signature_t meta2) ->
+          return (fun meta -> Signature_t meta) Eq meta1 meta2
+      | (Mutez_t meta1, Mutez_t meta2) ->
+          return (fun meta -> Mutez_t meta) Eq meta1 meta2
+      | (Timestamp_t meta1, Timestamp_t meta2) ->
+          return (fun meta -> Timestamp_t meta) Eq meta1 meta2
+      | (Address_t meta1, Address_t meta2) ->
+          return (fun meta -> Address_t meta) Eq meta1 meta2
+      | (Bool_t meta1, Bool_t meta2) ->
+          return (fun meta -> Bool_t meta) Eq meta1 meta2
+      | (Chain_id_t meta1, Chain_id_t meta2) ->
+          return (fun meta -> Chain_id_t meta) Eq meta1 meta2
+      | (Never_t meta1, Never_t meta2) ->
+          return (fun meta -> Never_t meta) Eq meta1 meta2
+      | (Operation_t meta1, Operation_t meta2) ->
+          return (fun meta -> Operation_t meta) Eq meta1 meta2
+      | (Bls12_381_g1_t meta1, Bls12_381_g1_t meta2) ->
+          return (fun meta -> Bls12_381_g1_t meta) Eq meta1 meta2
+      | (Bls12_381_g2_t meta1, Bls12_381_g2_t meta2) ->
+          return (fun meta -> Bls12_381_g2_t meta) Eq meta1 meta2
+      | (Bls12_381_fr_t meta1, Bls12_381_fr_t meta2) ->
+          return (fun meta -> Bls12_381_fr_t meta) Eq meta1 meta2
+      | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tar tbr >>$ fun (Eq, value) ->
           merge_comparable_types ~error_details tal tbl >|$ fun (Eq, tk) ->
-          ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, tname))
-      | (Big_map_t (tal, tar, tn1), Big_map_t (tbl, tbr, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta))
+      | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tar tbr >>$ fun (Eq, value) ->
           merge_comparable_types ~error_details tal tbl >|$ fun (Eq, tk) ->
-          ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, tname))
-      | (Set_t (ea, tn1), Set_t (eb, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta))
+      | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           merge_comparable_types ~error_details ea eb >|$ fun (Eq, e) ->
-          ((Eq : (ta ty, tb ty) eq), Set_t (e, tname))
-      | (Ticket_t (ea, tn1), Ticket_t (eb, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Set_t (e, meta))
+      | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           merge_comparable_types ~error_details ea eb >|$ fun (Eq, e) ->
-          ((Eq : (ta ty, tb ty) eq), Ticket_t (e, tname))
-      | (Pair_t (tal, tar, tn1), Pair_t (tbl, tbr, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta))
+      | (Pair_t (tal, tar, meta1), Pair_t (tbl, tbr, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, tname))
-      | (Union_t (tal, tar, tn1), Union_t (tbl, tbr, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, meta))
+      | (Union_t (tal, tar, meta1), Union_t (tbl, tbr, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, tname))
-      | (Lambda_t (tal, tar, tn1), Lambda_t (tbl, tbr, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, meta))
+      | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tal tbl >>$ fun (Eq, left_ty) ->
           help tar tbr >|$ fun (Eq, right_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, tname))
-      | (Contract_t (tal, tn1), Contract_t (tbl, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, meta))
+      | (Contract_t (tal, meta1), Contract_t (tbl, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tal tbl >|$ fun (Eq, arg_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, tname))
-      | (Option_t (tva, tn1), Option_t (tvb, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, meta))
+      | (Option_t (tva, meta1), Option_t (tvb, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tva tvb >|$ fun (Eq, ty) ->
-          ((Eq : (ta ty, tb ty) eq), Option_t (ty, tname))
-      | (List_t (tva, tn1), List_t (tvb, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), Option_t (ty, meta))
+      | (List_t (tva, meta1), List_t (tvb, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           help tva tvb >|$ fun (Eq, ty) ->
-          ((Eq : (ta ty, tb ty) eq), List_t (ty, tname))
-      | (Sapling_state_t (ms1, tn1), Sapling_state_t (ms2, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
+          ((Eq : (ta ty, tb ty) eq), List_t (ty, meta))
+      | (Sapling_state_t (ms1, meta1), Sapling_state_t (ms2, meta2)) ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
+          merge_memo_sizes ms1 ms2 >|$ fun ms -> (Eq, Sapling_state_t (ms, meta))
+      | (Sapling_transaction_t (ms1, meta1), Sapling_transaction_t (ms2, meta2))
+        ->
+          merge_type_metadata meta1 meta2 >>$ fun meta ->
           merge_memo_sizes ms1 ms2 >|$ fun ms ->
-          (Eq, Sapling_state_t (ms, tname))
-      | (Sapling_transaction_t (ms1, tn1), Sapling_transaction_t (ms2, tn2)) ->
-          merge_type_metadata tn1 tn2 >>$ fun tname ->
-          merge_memo_sizes ms1 ms2 >|$ fun ms ->
-          (Eq, Sapling_transaction_t (ms, tname))
-      | (Chest_t tn1, Chest_t tn2) ->
-          return (fun tname -> Chest_t tname) Eq tn1 tn2
-      | (Chest_key_t tn1, Chest_key_t tn2) ->
-          return (fun tname -> Chest_key_t tname) Eq tn1 tn2
+          (Eq, Sapling_transaction_t (ms, meta))
+      | (Chest_t meta1, Chest_t meta2) ->
+          return (fun meta -> Chest_t meta) Eq meta1 meta2
+      | (Chest_key_t meta1, Chest_key_t meta2) ->
+          return (fun meta -> Chest_key_t meta) Eq meta1 meta2
       | (_, _) ->
           of_result
           @@ Error
@@ -3533,12 +3536,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       (typed ctxt loc instr (Item_t (bool_t, rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_UPDATE, [], annot),
-      Item_t (v, Item_t (Bool_t _, Item_t (Set_t (elt, tname), rest))) ) ->
+      Item_t (v, Item_t (Bool_t _, Item_t (Set_t (elt, meta), rest))) ) ->
       check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
       >>?= fun (Eq, _, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_update (kinfo, k))} in
-      (typed ctxt loc instr (Item_t (Set_t (elt, tname), rest))
+      (typed ctxt loc instr (Item_t (Set_t (elt, meta), rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
   | (Prim (loc, I_SIZE, [], annot), Item_t (Set_t _, rest)) ->
       check_var_annot loc annot >>?= fun () ->
@@ -4047,26 +4050,26 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           (Failed {descr}, ctxt) )
   (* timestamp operations *)
   | ( Prim (loc, I_ADD, [], annot),
-      Item_t (Timestamp_t tname, Item_t (Int_t _, rest)) ) ->
+      Item_t (Timestamp_t meta, Item_t (Int_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IAdd_timestamp_to_seconds (kinfo, k))}
       in
-      typed ctxt loc instr (Item_t (Timestamp_t tname, rest))
+      typed ctxt loc instr (Item_t (Timestamp_t meta, rest))
   | ( Prim (loc, I_ADD, [], annot),
-      Item_t (Int_t _, Item_t (Timestamp_t tname, rest)) ) ->
+      Item_t (Int_t _, Item_t (Timestamp_t meta, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IAdd_seconds_to_timestamp (kinfo, k))}
       in
-      typed ctxt loc instr (Item_t (Timestamp_t tname, rest))
+      typed ctxt loc instr (Item_t (Timestamp_t meta, rest))
   | ( Prim (loc, I_SUB, [], annot),
-      Item_t (Timestamp_t tname, Item_t (Int_t _, rest)) ) ->
+      Item_t (Timestamp_t meta, Item_t (Int_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> ISub_timestamp_seconds (kinfo, k))}
       in
-      let stack = Item_t (Timestamp_t tname, rest) in
+      let stack = Item_t (Timestamp_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
       Item_t (Timestamp_t _, Item_t (Timestamp_t _, rest)) ) ->
@@ -4076,16 +4079,17 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* string operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
-      Item_t (String_t tn1, Item_t (String_t tn2, rest)) ) ->
+      Item_t (String_t meta1, Item_t (String_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IConcat_string_pair (kinfo, k))} in
-      typed ctxt loc instr (Item_t (String_t tname, rest))
-  | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (String_t tname, _), rest))
+      typed ctxt loc instr (Item_t (String_t meta, rest))
+  | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (String_t meta, _), rest))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IConcat_string (kinfo, k))} in
-      typed ctxt loc instr (Item_t (String_t tname, rest))
+      typed ctxt loc instr (Item_t (String_t meta, rest))
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (String_t _, rest))) ) ->
       check_var_annot loc annot >>?= fun () ->
@@ -4099,17 +4103,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* bytes operations *)
   | ( Prim (loc, I_CONCAT, [], annot),
-      Item_t (Bytes_t tn1, Item_t (Bytes_t tn2, rest)) ) ->
+      Item_t (Bytes_t meta1, Item_t (Bytes_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes_pair (kinfo, k))} in
-      let stack = Item_t (Bytes_t tname, rest) in
+      let stack = Item_t (Bytes_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (Bytes_t tname, _), rest))
+  | (Prim (loc, I_CONCAT, [], annot), Item_t (List_t (Bytes_t meta, _), rest))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IConcat_bytes (kinfo, k))} in
-      let stack = Item_t (Bytes_t tname, rest) in
+      let stack = Item_t (Bytes_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SLICE, [], annot),
       Item_t (Nat_t _, Item_t (Nat_t _, Item_t (Bytes_t _, rest))) ) ->
@@ -4124,19 +4129,21 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   (* currency operations *)
   | ( Prim (loc, I_ADD, [], annot),
-      Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
+      Item_t (Mutez_t meta1, Item_t (Mutez_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAdd_tez (kinfo, k))} in
-      let stack = Item_t (Mutez_t tname, rest) in
+      let stack = Item_t (Mutez_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_SUB, [], annot),
-      Item_t (Mutez_t tn1, Item_t (Mutez_t tn2, rest)) ) ->
+      Item_t (Mutez_t meta1, Item_t (Mutez_t meta2, rest)) ) ->
       if legacy then
         check_var_annot loc annot >>?= fun () ->
-        merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+        merge_type_metadata ~error_details:Informative meta1 meta2
+        >>?= fun meta ->
         let instr = {apply = (fun kinfo k -> ISub_tez_legacy (kinfo, k))} in
-        let stack = Item_t (Mutez_t tname, rest) in
+        let stack = Item_t (Mutez_t meta, rest) in
         typed ctxt loc instr stack
       else fail (Deprecated_instruction I_SUB)
   | ( Prim (loc, I_SUB_MUTEZ, [], annot),
@@ -4145,46 +4152,49 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> ISub_tez (kinfo, k))} in
       let stack = Item_t (option_mutez_t, rest) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Mutez_t tname, Item_t (Nat_t _, rest)) ) ->
+  | (Prim (loc, I_MUL, [], annot), Item_t (Mutez_t meta, Item_t (Nat_t _, rest)))
+    ->
       (* no type name check *)
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_teznat (kinfo, k))} in
-      let stack = Item_t (Mutez_t tname, rest) in
+      let stack = Item_t (Mutez_t meta, rest) in
       typed ctxt loc instr stack
-  | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Nat_t _, Item_t (Mutez_t tname, rest)) ) ->
+  | (Prim (loc, I_MUL, [], annot), Item_t (Nat_t _, Item_t (Mutez_t meta, rest)))
+    ->
       (* no type name check *)
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_nattez (kinfo, k))} in
-      let stack = Item_t (Mutez_t tname, rest) in
+      let stack = Item_t (Mutez_t meta, rest) in
       typed ctxt loc instr stack
   (* boolean operations *)
-  | (Prim (loc, I_OR, [], annot), Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_OR, [], annot),
+      Item_t (Bool_t meta1, Item_t (Bool_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IOr (kinfo, k))} in
-      let stack = Item_t (Bool_t tname, rest) in
+      let stack = Item_t (Bool_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_AND, [], annot),
-      Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest)) ) ->
+      Item_t (Bool_t meta1, Item_t (Bool_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAnd (kinfo, k))} in
-      let stack = Item_t (Bool_t tname, rest) in
+      let stack = Item_t (Bool_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_XOR, [], annot),
-      Item_t (Bool_t tn1, Item_t (Bool_t tn2, rest)) ) ->
+      Item_t (Bool_t meta1, Item_t (Bool_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IXor (kinfo, k))} in
-      let stack = Item_t (Bool_t tname, rest) in
+      let stack = Item_t (Bool_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_NOT, [], annot), Item_t (Bool_t tname, rest)) ->
+  | (Prim (loc, I_NOT, [], annot), Item_t (Bool_t meta, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INot (kinfo, k))} in
-      let stack = Item_t (Bool_t tname, rest) in
+      let stack = Item_t (Bool_t meta, rest) in
       typed ctxt loc instr stack
   (* integer operations *)
   | (Prim (loc, I_ABS, [], annot), Item_t (Int_t _, rest)) ->
@@ -4202,91 +4212,96 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> IInt_nat (kinfo, k))} in
       let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_NEG, [], annot), Item_t (Int_t tname, rest)) ->
+  | (Prim (loc, I_NEG, [], annot), Item_t (Int_t meta, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NEG, [], annot), Item_t (Nat_t _, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg (kinfo, k))} in
       let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_ADD, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_ADD, [], annot),
+      Item_t (Int_t meta1, Item_t (Int_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_ADD, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
-    ->
-      check_var_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
-      typed ctxt loc instr stack
-  | (Prim (loc, I_ADD, [], annot), Item_t (Nat_t _, Item_t (Int_t tname, rest)))
+  | (Prim (loc, I_ADD, [], annot), Item_t (Int_t meta, Item_t (Nat_t _, rest)))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_ADD, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
+  | (Prim (loc, I_ADD, [], annot), Item_t (Nat_t _, Item_t (Int_t meta, rest)))
     ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      let instr = {apply = (fun kinfo k -> IAdd_int (kinfo, k))} in
+      let stack = Item_t (Int_t meta, rest) in
+      typed ctxt loc instr stack
+  | ( Prim (loc, I_ADD, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
+      check_var_annot loc annot >>?= fun () ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAdd_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_SUB, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_SUB, [], annot),
+      Item_t (Int_t meta1, Item_t (Int_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_SUB, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
-    ->
-      check_var_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
-      typed ctxt loc instr stack
-  | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t _, Item_t (Int_t tname, rest)))
+  | (Prim (loc, I_SUB, [], annot), Item_t (Int_t meta, Item_t (Nat_t _, rest)))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
+      typed ctxt loc instr stack
+  | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t _, Item_t (Int_t meta, rest)))
+    ->
+      check_var_annot loc annot >>?= fun () ->
+      let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_SUB, [], annot), Item_t (Nat_t _, Item_t (Nat_t _, rest))) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISub_int (kinfo, k))} in
       let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_MUL, [], annot), Item_t (Int_t tn1, Item_t (Int_t tn2, rest)))
+  | ( Prim (loc, I_MUL, [], annot),
+      Item_t (Int_t meta1, Item_t (Int_t meta2, rest)) ) ->
+      check_var_annot loc annot >>?= fun () ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
+      let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
+      let stack = Item_t (Int_t meta, rest) in
+      typed ctxt loc instr stack
+  | (Prim (loc, I_MUL, [], annot), Item_t (Int_t meta, Item_t (Nat_t _, rest)))
     ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
       let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_MUL, [], annot), Item_t (Int_t tname, Item_t (Nat_t _, rest)))
-    ->
-      check_var_annot loc annot >>?= fun () ->
-      let instr = {apply = (fun kinfo k -> IMul_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
-      typed ctxt loc instr stack
-  | (Prim (loc, I_MUL, [], annot), Item_t (Nat_t _, Item_t (Int_t tname, rest)))
+  | (Prim (loc, I_MUL, [], annot), Item_t (Nat_t _, Item_t (Int_t meta, rest)))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_MUL, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_MUL, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IMul_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_EDIV, [], annot), Item_t (Mutez_t _, Item_t (Nat_t _, rest)))
     ->
@@ -4320,51 +4335,56 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> IEdiv_nat (kinfo, k))} in
       let stack = Item_t (option_pair_nat_nat_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_LSL, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_LSL, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> ILsl_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_LSR, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_LSR, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> ILsr_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_OR, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_OR, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IOr_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_AND, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_AND, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAnd_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_AND, [], annot), Item_t (Int_t _, Item_t (Nat_t tname, rest)))
+  | (Prim (loc, I_AND, [], annot), Item_t (Int_t _, Item_t (Nat_t meta, rest)))
     ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAnd_int_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_XOR, [], annot), Item_t (Nat_t tn1, Item_t (Nat_t tn2, rest)))
-    ->
+  | ( Prim (loc, I_XOR, [], annot),
+      Item_t (Nat_t meta1, Item_t (Nat_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IXor_nat (kinfo, k))} in
-      let stack = Item_t (Nat_t tname, rest) in
+      let stack = Item_t (Nat_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_NOT, [], annot), Item_t (Int_t tname, rest)) ->
+  | (Prim (loc, I_NOT, [], annot), Item_t (Int_t meta, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INot_int (kinfo, k))} in
-      let stack = Item_t (Int_t tname, rest) in
+      let stack = Item_t (Int_t meta, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_NOT, [], annot), Item_t (Nat_t _, rest)) ->
       check_var_annot loc annot >>?= fun () ->
@@ -4684,43 +4704,46 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (bytes_t, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
-      Item_t (Bls12_381_g1_t tn1, Item_t (Bls12_381_g1_t tn2, rest)) ) ->
+      Item_t (Bls12_381_g1_t meta1, Item_t (Bls12_381_g1_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g1 (kinfo, k))} in
-      let stack = Item_t (Bls12_381_g1_t tname, rest) in
+      let stack = Item_t (Bls12_381_g1_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
-      Item_t (Bls12_381_g2_t tn1, Item_t (Bls12_381_g2_t tn2, rest)) ) ->
+      Item_t (Bls12_381_g2_t meta1, Item_t (Bls12_381_g2_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_g2 (kinfo, k))} in
-      let stack = Item_t (Bls12_381_g2_t tname, rest) in
+      let stack = Item_t (Bls12_381_g2_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_ADD, [], annot),
-      Item_t (Bls12_381_fr_t tn1, Item_t (Bls12_381_fr_t tn2, rest)) ) ->
+      Item_t (Bls12_381_fr_t meta1, Item_t (Bls12_381_fr_t meta2, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
-      merge_type_metadata ~error_details:Informative tn1 tn2 >>?= fun tname ->
+      merge_type_metadata ~error_details:Informative meta1 meta2
+      >>?= fun meta ->
       let instr = {apply = (fun kinfo k -> IAdd_bls12_381_fr (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest) in
+      let stack = Item_t (Bls12_381_fr_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Bls12_381_g1_t tname, Item_t (Bls12_381_fr_t _, rest)) ) ->
+      Item_t (Bls12_381_g1_t meta, Item_t (Bls12_381_fr_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_g1 (kinfo, k))} in
-      let stack = Item_t (Bls12_381_g1_t tname, rest) in
+      let stack = Item_t (Bls12_381_g1_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Bls12_381_g2_t tname, Item_t (Bls12_381_fr_t _, rest)) ) ->
+      Item_t (Bls12_381_g2_t meta, Item_t (Bls12_381_fr_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_g2 (kinfo, k))} in
-      let stack = Item_t (Bls12_381_g2_t tname, rest) in
+      let stack = Item_t (Bls12_381_g2_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Bls12_381_fr_t tname, Item_t (Bls12_381_fr_t _, rest)) ) ->
+      Item_t (Bls12_381_fr_t meta, Item_t (Bls12_381_fr_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_fr (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest) in
+      let stack = Item_t (Bls12_381_fr_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
       Item_t (Nat_t _, Item_t (Bls12_381_fr_t _, rest)) ) ->
@@ -4735,36 +4758,36 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (bls12_381_fr_t, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Bls12_381_fr_t tname, Item_t (Int_t _, rest)) ) ->
+      Item_t (Bls12_381_fr_t meta, Item_t (Int_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_z_fr (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest) in
+      let stack = Item_t (Bls12_381_fr_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_MUL, [], annot),
-      Item_t (Bls12_381_fr_t tname, Item_t (Nat_t _, rest)) ) ->
+      Item_t (Bls12_381_fr_t meta, Item_t (Nat_t _, rest)) ) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMul_bls12_381_z_fr (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest) in
+      let stack = Item_t (Bls12_381_fr_t meta, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_INT, [], annot), Item_t (Bls12_381_fr_t _, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IInt_bls12_381_fr (kinfo, k))} in
       let stack = Item_t (int_t, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g1_t tname, rest)) ->
+  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g1_t meta, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg_bls12_381_g1 (kinfo, k))} in
-      let stack = Item_t (Bls12_381_g1_t tname, rest) in
+      let stack = Item_t (Bls12_381_g1_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g2_t tname, rest)) ->
+  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_g2_t meta, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg_bls12_381_g2 (kinfo, k))} in
-      let stack = Item_t (Bls12_381_g2_t tname, rest) in
+      let stack = Item_t (Bls12_381_g2_t meta, rest) in
       typed ctxt loc instr stack
-  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_fr_t tname, rest)) ->
+  | (Prim (loc, I_NEG, [], annot), Item_t (Bls12_381_fr_t meta, rest)) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> INeg_bls12_381_fr (kinfo, k))} in
-      let stack = Item_t (Bls12_381_fr_t tname, rest) in
+      let stack = Item_t (Bls12_381_fr_t meta, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_PAIRING_CHECK, [], annot),
       Item_t (List_t (Pair_t (Bls12_381_g1_t _, Bls12_381_g2_t _, _), _), rest)
