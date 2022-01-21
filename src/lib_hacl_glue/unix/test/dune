@@ -15,7 +15,6 @@
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
- (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib

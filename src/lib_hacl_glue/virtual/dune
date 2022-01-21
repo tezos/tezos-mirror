@@ -5,4 +5,5 @@
  (name tezos_hacl_glue)
  (public_name tezos-hacl-glue)
  (instrumentation (backend bisect_ppx))
+ (js_of_ocaml)
  (virtual_modules hacl))
