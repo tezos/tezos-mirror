@@ -61,7 +61,15 @@ val merge_field_annot :
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
-(** Parse a type annotation only. *)
+(** check_xxx_annot functions below are remains from the past (they were called
+    parse_xxx_annot before).
+    They check that annotations are well-formed and, depending on different
+    contexts, that only the annotations that are expected to be found are
+    present.
+    Hopefully we will relax this property soon.
+*)
+
+(** Check a type annotation only. *)
 val check_type_annot : Script.location -> string list -> unit tzresult
 
 (** Parse a field annotation only. *)
