@@ -645,6 +645,7 @@ module Make_s
         filter_config
         ~filter_state
         ~validation_state
+        ~nb_successful_prechecks:op.count_successful_prechecks
         op.hash
         op.protocol
       >|= function
