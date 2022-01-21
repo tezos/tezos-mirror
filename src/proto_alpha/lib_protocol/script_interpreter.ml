@@ -999,8 +999,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 addr.destination
                 ~entrypoint
               >>=? fun (ctxt, maybe_contract) ->
-              let gas = local_gas_counter ctxt in
-              let ctxt = outdated_context ctxt in
+              let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
               let accu = maybe_contract in
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
@@ -1031,13 +1030,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ctxt = update_context gas ctxt in
           Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
           let return_none ctxt =
-            (step [@ocaml.tailcall])
-              (outdated_context ctxt, sc)
-              (local_gas_counter ctxt)
-              k
-              ks
-              None
-              stack
+            let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+            (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack
           in
           match script_opt with
           | None -> (return_none [@ocaml.tailcall]) ctxt
@@ -1085,8 +1079,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                               let ks = KCons (ICons_some (kkinfo, k), ks) in
                               Contract.get_balance_carbonated ctxt c
                               >>=? fun (ctxt, balance) ->
+                              let (gas, ctxt) =
+                                local_gas_counter_and_outdated_context ctxt
+                              in
                               (step [@ocaml.tailcall])
-                                ( outdated_context ctxt,
+                                ( ctxt,
                                   {
                                     source = sc.self;
                                     self = c;
@@ -1100,7 +1097,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                     now = sc.now;
                                     level = sc.level;
                                   } )
-                                (local_gas_counter ctxt)
+                                gas
                                 kinstr
                                 (KView_exit (sc, KReturn (stack, ks)))
                                 (input, storage)
@@ -1142,13 +1139,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
           let piop = Internal_operation {source = sc.self; operation; nonce} in
           let res = {piop; lazy_storage_diff = None} in
-          let gas = local_gas_counter ctxt in
-          let ctxt = outdated_context ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBalance (_, k) ->
           let ctxt = update_context gas ctxt in
-          let gas = local_gas_counter ctxt in
-          let ctxt = outdated_context ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks sc.balance (accu, stack)
       | ILevel (_, k) ->
@@ -1250,8 +1245,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ctxt = update_context gas ctxt in
           Sapling.verify_update ctxt state transaction anti_replay
           >>=? fun (ctxt, balance_state_opt) ->
-          let gas = local_gas_counter ctxt in
-          let ctxt = outdated_context ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           match balance_state_opt with
           | Some (balance, state) ->
               let state = Some (Script_int.of_int64 balance, state) in
@@ -1267,15 +1261,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ctxt = update_context gas ctxt in
           Vote.get_voting_power ctxt key_hash >>=? fun (ctxt, rolls) ->
           let power = Script_int.(abs (of_int32 rolls)) in
-          let gas = local_gas_counter ctxt in
-          let ctxt = outdated_context ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks power stack
       | ITotal_voting_power (_, k) ->
           let ctxt = update_context gas ctxt in
           Vote.get_total_voting_power ctxt >>=? fun (ctxt, rolls) ->
           let power = Script_int.(abs (of_int32 rolls)) in
-          let gas = local_gas_counter ctxt in
-          let ctxt = outdated_context ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks power (accu, stack)
       | IKeccak (_, k) ->

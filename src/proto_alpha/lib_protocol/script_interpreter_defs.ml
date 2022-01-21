@@ -490,8 +490,8 @@ let apply ctxt gas capture_ty capture lam =
             ] )
       in
       let lam' = Lam (full_descr, full_expr) in
-      let gas = local_gas_counter ctxt in
-      return (lam', outdated_context ctxt, gas)
+      let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+      return (lam', ctxt, gas)
 
 (* [transfer (ctxt, sc) gas tez tp p destination entrypoint]
    creates an operation that transfers an amount of [tez] to
@@ -524,8 +524,7 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
-  let gas = local_gas_counter ctxt in
-  let ctxt = outdated_context ctxt in
+  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
 (* [create_contract (ctxt, sc) gas storage_ty param_ty code root_name
@@ -600,8 +599,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let piop = Internal_operation {source = sc.self; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
-  let gas = local_gas_counter ctxt in
-  let ctxt = outdated_context ctxt in
+  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
   return (res, contract, ctxt, gas)
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)

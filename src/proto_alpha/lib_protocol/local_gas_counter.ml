@@ -73,6 +73,10 @@ let local_gas_counter ctxt =
   Local_gas_counter (Gas.remaining_operation_gas ctxt :> int)
   [@@ocaml.inline always]
 
+let local_gas_counter_and_outdated_context ctxt =
+  (local_gas_counter ctxt, outdated_context ctxt)
+  [@@ocaml.inline always]
+
 let use_gas_counter_in_context ctxt gas_counter f =
   let ctxt = update_context gas_counter ctxt in
   f ctxt >|=? fun (y, ctxt) -> (y, outdated_context ctxt, local_gas_counter ctxt)

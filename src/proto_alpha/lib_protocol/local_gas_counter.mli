@@ -39,9 +39,11 @@ type outdated_context
 val update_context :
   local_gas_counter -> outdated_context -> Alpha_context.context
 
-(** [local_gas_counter ctxt] returns the gas counter value corresponding to the
-    remaining gas in the given context [ctxt]. *)
-val local_gas_counter : Alpha_context.context -> local_gas_counter
+(** [local_gas_counter_and_outdated_context ctxt] returns the gas counter value
+    corresponding to the remaining gas in the given context [ctxt] along with
+    an [outdated_context] value. *)
+val local_gas_counter_and_outdated_context :
+  Alpha_context.context -> local_gas_counter * outdated_context
 
 (** [outdated_context ctxt] returns an outdated context value from the given
     context [ctxt]. *)
