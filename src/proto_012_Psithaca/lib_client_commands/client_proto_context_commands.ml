@@ -1642,7 +1642,7 @@ let commands_rw () =
          (switch
             ~doc:
               "Do not fail when the checks that try to prevent the user from \
-               shooting themselves in the foot do."
+               shooting themselves in the foot do fail."
             ~long:"force"
             ()))
       (prefixes ["submit"; "proposals"; "for"]
@@ -1676,9 +1676,11 @@ let commands_rw () =
               cctxt
             >>=? fun info ->
             (match info.current_period_kind with
-            | Proposal -> return_unit
-            | _ -> cctxt#error "Not in a proposal period")
-            >>=? fun () ->
+            | Proposal -> Lwt.return_unit
+            | _ ->
+                (if force then cctxt#warning else cctxt#error)
+                  "Not in a proposal period")
+            >>= fun () ->
             Shell_services.Protocol.list cctxt >>=? fun known_protos ->
             get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
             >>=? fun known_proposals ->
@@ -1801,7 +1803,15 @@ let commands_rw () =
     command
       ~group
       ~desc:"Submit a ballot"
-      (args2 verbose_signing_switch dry_run_switch)
+      (args3
+         verbose_signing_switch
+         dry_run_switch
+         (switch
+            ~doc:
+              "Do not fail when the checks that try to prevent the user from \
+               shooting themselves in the foot do fail."
+            ~long:"force"
+            ()))
       (prefixes ["submit"; "ballot"; "for"]
       @@ ContractAlias.destination_param
            ~name:"delegate"
@@ -1826,7 +1836,7 @@ let commands_rw () =
                 | "pass" -> return Vote.Pass
                 | s -> failwith "Invalid ballot: '%s'" s))
       @@ stop)
-      (fun (verbose_signing, dry_run)
+      (fun (verbose_signing, dry_run, force)
            (_name, source)
            proposal
            ballot
@@ -1844,9 +1854,24 @@ let commands_rw () =
               ~block:cctxt#block
               cctxt
             >>=? fun info ->
-            (match info.current_period_kind with
-            | Exploration | Promotion -> return_unit
-            | _ -> cctxt#error "Not in Exploration or Promotion period")
+            Alpha_services.Voting.current_proposal
+              cctxt
+              (cctxt#chain, cctxt#block)
+            >>=? fun current_proposal ->
+            (match (info.current_period_kind, current_proposal) with
+            | ((Exploration | Promotion), Some current_proposal) ->
+                if Protocol_hash.equal proposal current_proposal then
+                  return_unit
+                else
+                  (if force then cctxt#warning else cctxt#error)
+                    "Unexpected proposal, expected: %a"
+                    Protocol_hash.pp
+                    current_proposal
+                  >>= fun () -> return_unit
+            | _ ->
+                (if force then cctxt#warning else cctxt#error)
+                  "Not in Exploration or Promotion period"
+                >>= fun () -> return_unit)
             >>=? fun () ->
             submit_ballot
               cctxt

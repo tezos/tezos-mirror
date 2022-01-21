@@ -109,6 +109,11 @@ Client
   Also like with script, the ``file:`` prefix can be added for
   disambiguation.
 
+- Add option ``--force`` to the command ``submit ballots``. This is
+  mostly for testing purposes: it disables all checks and allows to
+  cast invalid ballots (unexpected voting period, missing voting
+  rights, ...)
+
 Baker / Endorser / Accuser
 --------------------------
 
