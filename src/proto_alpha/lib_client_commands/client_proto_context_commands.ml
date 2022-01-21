@@ -1789,8 +1789,18 @@ let commands_rw () =
             Shell_services.Protocol.list cctxt >>=? fun known_protos ->
             get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
             >>=? fun known_proposals ->
-            Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
-            >>=? fun listings ->
+            (Alpha_services.Delegate.voting_power
+               cctxt
+               (cctxt#chain, cctxt#block)
+               src_pkh
+             >>= function
+             | Ok voting_power -> return (voting_power <> 0L)
+             | Error
+                 (Environment.Ecoproto_error (Delegate_storage.Not_registered _)
+                 :: _) ->
+                 return false
+             | Error _ as err -> Lwt.return err)
+            >>=? fun has_voting_power ->
             (* for a proposal to be valid it must either a protocol that was already
                proposed by somebody else or a protocol known by the node, because
                the user is the first proposer and just injected it with
@@ -1838,13 +1848,7 @@ let commands_rw () =
                       Protocol_hash.pp
                       p)
                 proposals ;
-              if
-                not
-                  (List.exists
-                     (fun (pkh, _) ->
-                       Signature.Public_key_hash.equal pkh src_pkh)
-                     listings)
-              then
+              if not has_voting_power then
                 error
                   "Public-key-hash `%a` from account `%s` does not appear to \
                    have voting rights."
@@ -1942,7 +1946,7 @@ let commands_rw () =
         | None -> failwith "only implicit accounts can submit ballot"
         | Some src_pkh ->
             Client_keys.get_key cctxt src_pkh
-            >>=? fun (_src_name, _src_pk, src_sk) ->
+            >>=? fun (src_name, _src_pk, src_sk) ->
             get_period_info
             (* Find period info of the successor, because the operation will
                be injected on the next block at the earliest *)
@@ -1955,6 +1959,20 @@ let commands_rw () =
             | Exploration | Promotion -> return_unit
             | _ -> cctxt#error "Not in Exploration or Promotion period")
             >>=? fun () ->
+            Alpha_services.Delegate.voting_info
+              cctxt
+              (cctxt#chain, cctxt#block)
+              src_pkh
+            >>=? fun delegate_info ->
+            (if delegate_info.voting_power <> None then Lwt.return_unit
+            else
+              cctxt#error
+                "Public-key-hash `%a` from account `%s` does not appear to \
+                 have voting rights."
+                Signature.Public_key_hash.pp
+                src_pkh
+                src_name)
+            >>= fun () ->
             submit_ballot
               cctxt
               ~chain:cctxt#chain
