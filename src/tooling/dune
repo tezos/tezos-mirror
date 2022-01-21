@@ -5,6 +5,7 @@
  (name tezos_tooling)
  (public_name tezos-tooling)
  (instrumentation (backend bisect_ppx))
+ (libraries)
  (modules))
 
 (install

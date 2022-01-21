@@ -9,11 +9,11 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "parsexp" {with-test}
-  "base-unix" {with-test}
   "coq-of-ocaml" { = "2.5.0" }
   "ocamlformat" { = "0.18.0" }
   "bisect_ppx" { >= "2.7.0" }
+  "parsexp" {with-test}
+  "base-unix" {with-test}
   "tezos-protocol-compiler"
   "tezos-base"
 ]

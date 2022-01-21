@@ -1077,6 +1077,7 @@ let tezos_tooling =
     ~path:"src/tooling"
     ~synopsis:"Tezos: tooling for the project"
     ~modules:[]
+    ~deps:[coq_of_ocaml; ocamlformat; bisect_ppx]
     ~dune:
       Dune.
         [
@@ -3181,9 +3182,6 @@ let _tztop =
     ~static:false
     ~deps:
       [
-        coq_of_ocaml;
-        ocamlformat;
-        bisect_ppx;
         (* The following deps come from the original dune file. *)
         tezos_protocol_compiler_lib;
         tezos_base;
