@@ -40,6 +40,12 @@ module Cemented_block_level_index =
 module Cemented_block_hash_index =
   Index_unix.Make (Block_level) (Block_key) (Index.Cache.Unbounded)
 
+type cemented_metadata_file = {
+  start_level : int32;
+  end_level : int32;
+  metadata_file : [`Cemented_blocks_metadata] Naming.file;
+}
+
 type cemented_blocks_file = {
   start_level : int32;
   end_level : int32;
@@ -120,7 +126,11 @@ let create ~log_size cemented_blocks_dir =
       in
       return cemented_store)
 
-let compare_files {start_level; _} {start_level = start_level'; _} =
+let compare_cemented_files {start_level; _} {start_level = start_level'; _} =
+  Compare.Int32.compare start_level start_level'
+
+let compare_cemented_metadata ({start_level; _} : cemented_metadata_file)
+    ({start_level = start_level'; _} : cemented_metadata_file) =
   Compare.Int32.compare start_level start_level'
 
 let load_table cemented_blocks_dir =
@@ -129,8 +139,10 @@ let load_table cemented_blocks_dir =
       Lwt_unix.opendir cemented_blocks_dir_path >>= fun dir_handle ->
       let rec loop acc =
         Lwt.catch
-          (fun () ->
-            Lwt_unix.readdir dir_handle >>= fun filename ->
+          (fun () -> Lwt_unix.readdir dir_handle >>= Lwt.return_some)
+          (function End_of_file -> Lwt.return_none | exn -> raise exn)
+        >>= function
+        | Some filename -> (
             let levels = String.split_on_char '_' filename in
             match levels with
             | [start_level; end_level] -> (
@@ -147,14 +159,60 @@ let load_table cemented_blocks_dir =
                     loop ({start_level; end_level; file} :: acc)
                 | _ -> loop acc)
             | _ -> loop acc)
-          (function End_of_file -> Lwt.return acc | _exn -> loop acc)
+        | None -> Lwt.return acc
       in
       Lwt.finalize (fun () -> loop []) (fun () -> Lwt_unix.closedir dir_handle)
       >>= function
       | [] -> return_none
       | cemented_files_list ->
           let cemented_files_array = Array.of_list cemented_files_list in
-          Array.sort compare_files cemented_files_array ;
+          Array.sort compare_cemented_files cemented_files_array ;
+          return_some cemented_files_array)
+
+let load_metadata_table cemented_blocks_dir =
+  protect (fun () ->
+      let cemented_metadata_dir =
+        Naming.cemented_blocks_metadata_dir cemented_blocks_dir
+      in
+      Lwt_unix.opendir (Naming.dir_path cemented_metadata_dir)
+      >>= fun dir_handle ->
+      let rec loop acc =
+        Lwt.catch
+          (fun () -> Lwt_unix.readdir dir_handle >>= Lwt.return_some)
+          (function End_of_file -> Lwt.return_none | exn -> raise exn)
+        >>= function
+        | Some filename -> (
+            let levels =
+              String.split_on_char '_' (Filename.remove_extension filename)
+            in
+            match levels with
+            | [start_level; end_level] -> (
+                let start_level_opt = Int32.of_string_opt start_level in
+                let end_level_opt = Int32.of_string_opt end_level in
+                match (start_level_opt, end_level_opt) with
+                | (Some start_level, Some end_level) ->
+                    let file =
+                      Naming.cemented_blocks_file
+                        cemented_blocks_dir
+                        ~start_level
+                        ~end_level
+                    in
+                    let metadata_file =
+                      Naming.cemented_blocks_metadata_file
+                        cemented_metadata_dir
+                        file
+                    in
+                    loop ({start_level; end_level; metadata_file} :: acc)
+                | _ -> loop acc)
+            | _ -> loop acc)
+        | None -> Lwt.return acc
+      in
+      Lwt.finalize (fun () -> loop []) (fun () -> Lwt_unix.closedir dir_handle)
+      >>= function
+      | [] -> return_none
+      | cemented_files_list ->
+          let cemented_files_array = Array.of_list cemented_files_list in
+          Array.sort compare_cemented_metadata cemented_files_array ;
           return_some cemented_files_array)
 
 let load ~readonly ~log_size cemented_blocks_dir =
@@ -539,7 +597,7 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   in
   (* If the cementing is done arbitrarily, we need to make sure the
      files remain sorted. *)
-  if not check_consistency then Array.sort compare_files new_array ;
+  if not check_consistency then Array.sort compare_cemented_files new_array ;
   cemented_store.cemented_blocks_files <- Some new_array ;
   (* Compress and write the metadatas *)
   if write_metadata then cement_blocks_metadata cemented_store blocks

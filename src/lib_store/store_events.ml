@@ -340,6 +340,18 @@ let warning_incomplete_storage =
        will be unavailable"
     ("protocol_level", Data_encoding.int31)
 
+let warning_missing_metadata =
+  declare_2
+    ~level:Internal_event.Warning
+    ~section
+    ~name:"missing_metadata"
+    ~msg:
+      "the storage is missing some metadata for cycle \
+       {start_level}-{end_level}. Please consider restoring a consistent \
+       storage"
+    ("start_level", Data_encoding.int32)
+    ("end_level", Data_encoding.int32)
+
 (* Error *)
 let merge_error =
   declare_3
