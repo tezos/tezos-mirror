@@ -94,8 +94,8 @@ Michelson
 - Type annotations are ignored and not propagated.
   (MR :gl:`!4141`)
 
-- Field annotations are ignored and not propagated on comparable types and on
-  regular pairs (MR :gl:`!4175`)
+- Field annotations are ignored and not propagated.
+  (MR :gl:`!4175`, :gl:`!4311`, :gl:`!4259`)
 
 - Annotating the parameter toplevel constructor to designate the root entrypoint
   is now forbidden. Put the annotation on the parameter type instead.
