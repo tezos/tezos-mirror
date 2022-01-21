@@ -51,9 +51,9 @@ let sync ch =
   return_unit
 
 (** [connect ?target_id ?proof_of_work_target sched addr port] connect
-   and performs [P2p_socket.authenticate] with the given
-   [proof_of_work_target] (also checking that the remote point is the
-   expected [target_id]). *)
+    and performs [P2p_socket.authenticate] with the given
+    [proof_of_work_target] (also checking that the remote point is the
+    expected [target_id]). *)
 let connect ?proof_of_work_target ?(target_id = id1) sched addr port id =
   let open Lwt_result_syntax in
   let* (info, auth_fd) =
@@ -168,22 +168,21 @@ module Crypto_test = struct
   let data = {channel_key; local_nonce = zero_nonce; remote_nonce = zero_nonce}
 
   let wrap () =
-    Alcotest.test_case "ACK" `Quick (fun () ->
-        Lwt_main.run
-          (let open Lwt_syntax in
-          let msg = Bytes.of_string "test" in
-          let* _ = write_chunk out_fd data msg in
-          let* r = read_chunk in_fd data in
-          match r with
-          | Ok res when Bytes.equal msg res -> Lwt.return_unit
-          | Ok res ->
-              Format.kasprintf
-                Stdlib.failwith
-                "Error : %s <> %s"
-                (Bytes.to_string res)
-                (Bytes.to_string msg)
-          | Error error ->
-              Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
+    Alcotest_lwt.test_case "ACK" `Quick (fun _ () ->
+        let open Lwt_syntax in
+        let msg = Bytes.of_string "test" in
+        let* _ = write_chunk out_fd data msg in
+        let* r = read_chunk in_fd data in
+        match r with
+        | Ok res when Bytes.equal msg res -> Lwt.return_unit
+        | Ok res ->
+            Format.kasprintf
+              Stdlib.failwith
+              "Error : %s <> %s"
+              (Bytes.to_string res)
+              (Bytes.to_string msg)
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 end
 
 (** Spawns a client and a server. The client connects to the server
@@ -571,39 +570,39 @@ let spec =
 let init_logs = lazy (Internal_event_unix.init ?lwt_log_sink:!log_config ())
 
 let wrap n f =
-  Alcotest.test_case n `Quick (fun () ->
-      Lwt_main.run
-        (let open Lwt_syntax in
-        let* () = Lazy.force init_logs in
-        let* r = f () in
-        match r with
-        | Ok () -> Lwt.return_unit
-        | Error error ->
-            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
+  Alcotest_lwt.test_case n `Quick (fun _ () ->
+      let open Lwt_syntax in
+      let* () = Lazy.force init_logs in
+      let* r = f () in
+      match r with
+      | Ok () -> Lwt.return_unit
+      | Error error ->
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
-  Alcotest.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p-connection.",
-        [
-          wrap "low-level" Low_level.run;
-          wrap "pow" Pow_check.run;
-          wrap "nack" Nack.run;
-          wrap "nacked" Nacked.run;
-          wrap "simple-message" Simple_message.run;
-          wrap "chunked-message" Chunked_message.run;
-          wrap "oversized-message" Oversized_message.run;
-          wrap "close-on-read" Close_on_read.run;
-          wrap "close-on-write" Close_on_write.run;
-          wrap "garbled-data" Garbled_data.run;
-          Crypto_test.wrap ();
-        ] );
-    ]
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p-connection.",
+           [
+             wrap "low-level" Low_level.run;
+             wrap "pow" Pow_check.run;
+             wrap "nack" Nack.run;
+             wrap "nacked" Nacked.run;
+             wrap "simple-message" Simple_message.run;
+             wrap "chunked-message" Chunked_message.run;
+             wrap "oversized-message" Oversized_message.run;
+             wrap "close-on-read" Close_on_read.run;
+             wrap "close-on-write" Close_on_write.run;
+             wrap "garbled-data" Garbled_data.run;
+             Crypto_test.wrap ();
+           ] );
+       ]
 
 let () =
   Sys.catch_break true ;

@@ -788,47 +788,46 @@ let gen_points () =
   points := List.map (fun port -> (addr, port)) ports
 
 let wrap n f =
-  Alcotest.test_case n `Quick (fun () ->
-      Lwt_main.run
-        (let open Lwt_syntax in
-        let* () = Lazy.force init_logs in
-        let rec aux n f =
-          let* r = f () in
-          match r with
-          | Ok () -> Lwt.return_unit
-          | Error
-              (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
-            ->
-              warn "Conflict on ports, retry the test." ;
-              gen_points () ;
-              aux n f
-          | Error error ->
-              Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
-        in
-        aux n f))
+  Alcotest_lwt.test_case n `Quick (fun _ () ->
+      let open Lwt_syntax in
+      let* () = Lazy.force init_logs in
+      let rec aux n f =
+        let* r = f () in
+        match r with
+        | Ok () -> Lwt.return_unit
+        | Error
+            (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _) ->
+            warn "Conflict on ports, retry the test." ;
+            gen_points () ;
+            aux n f
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
+      in
+      aux n f)
 
 let main () =
   let anon_fun _num_peers = raise (Arg.Bad "No anonymous argument.") in
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg ;
   gen_points () ;
-  Alcotest.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p-connection-pool",
-        [
-          wrap "simple" (fun _ -> Simple.run !points);
-          wrap "random" (fun _ ->
-              Random_connections.run !points !repeat_connections);
-          wrap "garbled" (fun _ -> Garbled.run !points);
-          wrap "overcrowded" (fun _ -> Overcrowded.run !points);
-          wrap "overcrowded-mixed" (fun _ ->
-              Overcrowded.run_mixed_versions !points);
-          wrap "no-common-network-protocol" (fun _ ->
-              No_common_network.run !points);
-        ] );
-    ]
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p-connection-pool",
+           [
+             wrap "simple" (fun _ -> Simple.run !points);
+             wrap "random" (fun _ ->
+                 Random_connections.run !points !repeat_connections);
+             wrap "garbled" (fun _ -> Garbled.run !points);
+             wrap "overcrowded" (fun _ -> Overcrowded.run !points);
+             wrap "overcrowded-mixed" (fun _ ->
+                 Overcrowded.run_mixed_versions !points);
+             wrap "no-common-network-protocol" (fun _ ->
+                 No_common_network.run !points);
+           ] );
+       ]
 
 let () =
   Sys.catch_break true ;

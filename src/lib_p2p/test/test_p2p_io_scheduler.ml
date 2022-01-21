@@ -278,34 +278,34 @@ let () =
 let init_logs = lazy (Internal_event_unix.init ())
 
 let wrap n f =
-  Alcotest.test_case n `Quick (fun () ->
-      Lwt_main.run
-        (let open Lwt_syntax in
-        let* () = Lazy.force init_logs in
-        let* r = f () in
-        match r with
-        | Ok () -> return_unit
-        | Error error ->
-            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error))
+  Alcotest_lwt.test_case n `Quick (fun _lwt_switch () ->
+      let open Lwt_syntax in
+      let* () = Lazy.force init_logs in
+      let* r = f () in
+      match r with
+      | Ok () -> return_unit
+      | Error error ->
+          Format.kasprintf Stdlib.failwith "%a" pp_print_trace error)
 
 let () =
-  Alcotest.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p.io-scheduler",
-        [
-          wrap "trivial-quota" (fun () ->
-              run
-                ?display_client_stat:!display_client_stat
-                ?max_download_speed:!max_download_speed
-                ?max_upload_speed:!max_upload_speed
-                ~read_buffer_size:!read_buffer_size
-                ?read_queue_size:!read_queue_size
-                ?write_queue_size:!write_queue_size
-                !addr
-                !port
-                !delay
-                !clients);
-        ] );
-    ]
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p.io-scheduler",
+           [
+             wrap "trivial-quota" (fun () ->
+                 run
+                   ?display_client_stat:!display_client_stat
+                   ?max_download_speed:!max_download_speed
+                   ?max_upload_speed:!max_upload_speed
+                   ~read_buffer_size:!read_buffer_size
+                   ?read_queue_size:!read_queue_size
+                   ?write_queue_size:!write_queue_size
+                   !addr
+                   !port
+                   !delay
+                   !clients);
+           ] );
+       ]

@@ -89,23 +89,21 @@ let gen_points () =
   points := List.map (fun port -> (addr, port)) ports
 
 let wrap n f =
-  Alcotest.test_case n `Quick (fun () ->
-      Lwt_main.run
-        (let rec aux n f =
-           let open Lwt_syntax in
-           let* r = f () in
-           match r with
-           | Ok () -> Lwt.return_unit
-           | Error
-               (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _)
-             ->
-               let* () = Event.(emit port_conflicts) () in
-               gen_points () ;
-               aux n f
-           | Error error ->
-               Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
-         in
-         aux n f))
+  Alcotest_lwt.test_case n `Quick (fun _ () ->
+      let rec aux n f =
+        let open Lwt_syntax in
+        let* r = f () in
+        match r with
+        | Ok () -> Lwt.return_unit
+        | Error
+            (Exn (Unix.Unix_error ((EADDRINUSE | EADDRNOTAVAIL), _, _)) :: _) ->
+            let* () = Event.(emit port_conflicts) () in
+            gen_points () ;
+            aux n f
+        | Error error ->
+            Format.kasprintf Stdlib.failwith "%a" pp_print_trace error
+      in
+      aux n f)
 
 let main () =
   let () =
@@ -115,13 +113,15 @@ let main () =
     Lwt_main.run (Internal_event_unix.init ~lwt_log_sink ())
   in
   gen_points () ;
-  Alcotest.run
-    ~argv:[|""|]
-    "tezos-p2p"
-    [
-      ( "p2p-node",
-        [wrap "propagation-tzresult" (fun _ -> propagation_tzresult !points)] );
-    ]
+  Lwt_main.run
+  @@ Alcotest_lwt.run
+       ~argv:[|""|]
+       "tezos-p2p"
+       [
+         ( "p2p-node",
+           [wrap "propagation-tzresult" (fun _ -> propagation_tzresult !points)]
+         );
+       ]
 
 let () =
   Sys.catch_break true ;
