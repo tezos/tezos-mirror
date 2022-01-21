@@ -745,14 +745,14 @@ let check_dupable_ty ctxt loc ty =
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let merge_type_metadata :
+let type_metadata_eq :
     type error_trace.
     error_details:error_trace error_details ->
     'a ty_metadata ->
     'b ty_metadata ->
-    ('a ty_metadata, error_trace) result =
+    (unit, error_trace) result =
  fun ~error_details {size = size_a} {size = size_b} ->
-  Type_size.merge ~error_details size_a size_b >|? fun size -> {size}
+  Type_size.check_eq ~error_details size_a size_b
 
 let default_merge_type_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
@@ -786,8 +786,8 @@ let rec merge_comparable_types :
   fun ~error_details ta tb ->
     let open Gas_monad.Syntax in
     let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
-    let merge_type_metadata meta_a meta_b =
-      of_result @@ merge_type_metadata ~error_details meta_a meta_b
+    let type_metadata_eq meta_a meta_b =
+      of_result @@ type_metadata_eq ~error_details meta_a meta_b
     in
     match (ta, tb) with
     | (Unit_key, Unit_key) ->
@@ -811,26 +811,26 @@ let rec merge_comparable_types :
         return (Eq, Tx_rollup_l2_address_key)
     | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
-        let* meta = merge_type_metadata meta_a meta_b in
+        let* () = type_metadata_eq meta_a meta_b in
         let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
         let+ (Eq, right) =
           merge_comparable_types ~error_details right_a right_b
         in
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Pair_key (left, right, meta) )
+          Pair_key (left, right, meta_a) )
     | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
       ->
-        let* meta = merge_type_metadata meta_a meta_b in
+        let* () = type_metadata_eq meta_a meta_b in
         let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
         let+ (Eq, right) =
           merge_comparable_types ~error_details right_a right_b
         in
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Union_key (left, right, meta) )
+          Union_key (left, right, meta_a) )
     | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
-        let* meta = merge_type_metadata meta_a meta_b in
+        let* () = type_metadata_eq meta_a meta_b in
         let+ (Eq, t) = merge_comparable_types ~error_details ta tb in
-        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, meta))
+        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, meta_a))
     | (_, _) ->
         of_result
         @@ Error
@@ -880,8 +880,8 @@ let merge_types :
     b ty ->
     ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
  fun ~error_details loc ty1 ty2 ->
-  let merge_type_metadata meta1 meta2 =
-    Gas_monad.of_result (merge_type_metadata ~error_details meta1 meta2)
+  let type_metadata_eq meta1 meta2 =
+    Gas_monad.of_result (type_metadata_eq ~error_details meta1 meta2)
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
            let ty1 = serialize_ty_for_error ty1 in
            let ty2 = serialize_ty_for_error ty2 in
@@ -925,50 +925,50 @@ let merge_types :
     | (Bls12_381_g2_t, Bls12_381_g2_t) -> return (Eq, Bls12_381_g2_t)
     | (Bls12_381_fr_t, Bls12_381_fr_t) -> return (Eq, Bls12_381_fr_t)
     | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, value) = help tar tbr in
         let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta))
+        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta1))
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, value) = help tar tbr in
         let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta))
+        ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta1))
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
-        ((Eq : (ta ty, tb ty) eq), Set_t (e, meta))
+        ((Eq : (ta ty, tb ty) eq), Set_t (e, meta1))
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
-        ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta))
+        ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta1))
     | (Pair_t (tal, tar, meta1), Pair_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, left_ty) = help tal tbl in
         let+ (Eq, right_ty) = help tar tbr in
-        ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, meta))
+        ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, meta1))
     | (Union_t (tal, tar, meta1), Union_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, left_ty) = help tal tbl in
         let+ (Eq, right_ty) = help tar tbr in
-        ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, meta))
+        ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, meta1))
     | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let* (Eq, left_ty) = help tal tbl in
         let+ (Eq, right_ty) = help tar tbr in
-        ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, meta))
+        ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, meta1))
     | (Contract_t (tal, meta1), Contract_t (tbl, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let+ (Eq, arg_ty) = help tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, meta))
+        ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, meta1))
     | (Option_t (tva, meta1), Option_t (tvb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let+ (Eq, ty) = help tva tvb in
-        ((Eq : (ta ty, tb ty) eq), Option_t (ty, meta))
+        ((Eq : (ta ty, tb ty) eq), Option_t (ty, meta1))
     | (List_t (tva, meta1), List_t (tvb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
+        let* () = type_metadata_eq meta1 meta2 in
         let+ (Eq, ty) = help tva tvb in
-        ((Eq : (ta ty, tb ty) eq), List_t (ty, meta))
+        ((Eq : (ta ty, tb ty) eq), List_t (ty, meta1))
     | (Sapling_state_t ms1, Sapling_state_t ms2) ->
         let+ ms = merge_memo_sizes ms1 ms2 in
         (Eq, Sapling_state_t ms)
