@@ -67,10 +67,13 @@ let run ctxt m =
       match m (Local_gas_counter (Saturation_repr.saturated :> int)) with
       | Some (res, _new_gas_counter) -> ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
-  | Limited {remaining} -> (
-      match m (Local_gas_counter (remaining :> int)) with
+  | Limited {remaining = _} -> (
+      let (gas_counter, outdated_ctxt) =
+        local_gas_counter_and_outdated_context ctxt
+      in
+      match m gas_counter with
       | Some (res, new_gas_counter) ->
-          let ctxt = update_context new_gas_counter (outdated_context ctxt) in
+          let ctxt = update_context new_gas_counter outdated_ctxt in
           ok (res, ctxt)
       | None -> error Gas.Operation_quota_exceeded)
 

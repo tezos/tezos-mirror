@@ -45,10 +45,6 @@ val update_context :
 val local_gas_counter_and_outdated_context :
   Alpha_context.context -> local_gas_counter * outdated_context
 
-(** [outdated_context ctxt] returns an outdated context value from the given
-    context [ctxt]. *)
-val outdated_context : Alpha_context.context -> outdated_context
-
 (** [use_gas_counter_in_context outdated_ctxt gas_counter f] first applies the
     [gas_counter] on the outdated context [outdated_ctxt], then invokes [f] on
     the resulting context, and returns a new [outdated_context] and a

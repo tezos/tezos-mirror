@@ -181,7 +181,9 @@ let benchmark_from_kinstr_and_stack :
                 kinstr
                 (bef_top, bef)
             in
-            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
+            let (_gas_counter, outdated_ctxt) =
+              Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+            in
             let closure () =
               ignore
                 (* Lwt_main.run *)
@@ -205,7 +207,9 @@ let benchmark_from_kinstr_and_stack :
             let workload =
               List.repeat amplification_factor workload |> List.flatten
             in
-            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
+            let (_gas_counter, outdated_ctxt) =
+              Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+            in
             let closure () =
               for _i = 1 to amplification_factor do
                 ignore
@@ -426,7 +430,9 @@ let benchmark_from_continuation :
                 cont
                 (bef_top, bef)
             in
-            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
+            let (_gas_counter, outdated_ctxt) =
+              Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+            in
             let closure () =
               ignore
                 (* Lwt_main.run *)
@@ -451,7 +457,9 @@ let benchmark_from_continuation :
             let workload =
               List.repeat amplification_factor workload |> List.flatten
             in
-            let outdated_ctxt = Local_gas_counter.outdated_context ctxt in
+            let (_gas_counter, outdated_ctxt) =
+              Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+            in
             let closure () =
               for _i = 1 to amplification_factor do
                 ignore
