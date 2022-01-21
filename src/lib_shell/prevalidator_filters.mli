@@ -61,7 +61,8 @@ module type FILTER = sig
         [oph] from the state of the filter *)
     val remove : filter_state:state -> Operation_hash.t -> state
 
-    (** [precheck config ~filter_state ~validation_state oph op]
+    (** [precheck config ~filter_state ~validation_state oph op
+        ~nb_successful_prechecks]
         should be used to decide whether an operation can be gossiped to the
         network without executing it. This is a wrapper around
         [Proto.precheck_manager] and [Proto.check_signature]. This
@@ -76,13 +77,16 @@ module type FILTER = sig
         [apply_operation] should be called.
 
         This function takes a [state] as parameter and returns it updated if the
-        operation has been [prechecked]. *)
+        operation has been [prechecked]. It also takes an under-approximation
+        [nb_successful_prechecks] of the number of times the given operation
+        has been successfully prechecked. *)
     val precheck :
       config ->
       filter_state:state ->
       validation_state:Proto.validation_state ->
       Operation_hash.t ->
       Proto.operation ->
+      nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
         * [ `No_replace
