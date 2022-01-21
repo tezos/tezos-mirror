@@ -171,7 +171,14 @@ module Fake_operation_storage = struct
 end
 
 module Raw_operation =
-  Make_raw (Operation_hash) (Fake_operation_storage) (Operation_hash.Table)
+  Make_raw
+    (struct
+      include Operation_hash
+
+      let name = "operation"
+    end)
+    (Fake_operation_storage)
+    (Operation_hash.Table)
     (struct
       type param = unit
 
@@ -213,7 +220,14 @@ module Block_header_storage = struct
 end
 
 module Raw_block_header =
-  Make_raw (Block_hash) (Block_header_storage) (Block_hash.Table)
+  Make_raw
+    (struct
+      include Block_hash
+
+      let name = "block_header"
+    end)
+    (Block_header_storage)
+    (Block_hash.Table)
     (struct
       type param = unit
 
@@ -323,7 +337,14 @@ module Protocol_storage = struct
 end
 
 module Raw_protocol =
-  Make_raw (Protocol_hash) (Protocol_storage) (Protocol_hash.Table)
+  Make_raw
+    (struct
+      include Protocol_hash
+
+      let name = "protocol"
+    end)
+    (Protocol_storage)
+    (Protocol_hash.Table)
     (struct
       type param = unit
 
