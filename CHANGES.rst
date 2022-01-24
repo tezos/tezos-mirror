@@ -59,6 +59,9 @@ Node
   snapshot history mode and the one stored in the targeted data
   directory configuration file.
 
+- Fixed a wrong behavior that could cause the savepoint to be dragged
+  too early.
+
 Client
 ------
 
