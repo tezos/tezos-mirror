@@ -1302,6 +1302,25 @@ module Chain = struct
           new_cementing_highwatermark
     | _ -> return_ok_unit
 
+  let write_checkpoint chain_state new_checkpoint =
+    let open Lwt_result_syntax in
+    let* () = Stored_data.write chain_state.checkpoint_data new_checkpoint in
+    let*! () = Store_events.(emit set_checkpoint) new_checkpoint in
+    Prometheus.Gauge.set
+      Store_metrics.metrics.checkpoint_level
+      (Int32.to_float (snd new_checkpoint)) ;
+    return_unit
+
+  let write_alternate_heads chain_state new_alternate_heads =
+    let open Lwt_result_syntax in
+    let* () =
+      Stored_data.write chain_state.alternate_heads_data new_alternate_heads
+    in
+    Prometheus.Gauge.set
+      Store_metrics.metrics.alternate_heads_count
+      (Int.to_float (List.length new_alternate_heads)) ;
+    return_unit
+
   let set_head chain_store new_head =
     let open Lwt_tzresult_syntax in
     Shared.update_with chain_store.chain_state (fun chain_state ->
@@ -1498,23 +1517,11 @@ module Chain = struct
           in
           (* Update values on disk but not the cementing highwatermark
              which will be updated by the merge finalizer. *)
-          let* () =
-            Stored_data.write chain_state.checkpoint_data new_checkpoint
-          in
-          Prometheus.Gauge.set
-            Store_metrics.metrics.checkpoint_level
-            (Int32.to_float (snd new_checkpoint)) ;
+          let* () = write_checkpoint chain_state new_checkpoint in
           let* () =
             Stored_data.write chain_state.current_head_data new_head_descr
           in
-          let* () =
-            Stored_data.write
-              chain_state.alternate_heads_data
-              new_alternate_heads
-          in
-          Prometheus.Gauge.set
-            Store_metrics.metrics.alternate_heads_count
-            (Int.to_float (List.length new_alternate_heads)) ;
+          let* () = write_alternate_heads chain_state new_alternate_heads in
           let* () = Stored_data.write chain_state.target_data new_target in
           (* Update live_data *)
           let*! (live_blocks, live_operations) =

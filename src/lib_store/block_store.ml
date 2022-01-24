@@ -78,6 +78,7 @@ let status {status_data; _} = Stored_data.get status_data
 let write_savepoint {savepoint; _} v =
   let open Lwt_result_syntax in
   let* () = Stored_data.write savepoint v in
+  let*! () = Store_events.(emit set_savepoint v) in
   Prometheus.Gauge.set
     Store_metrics.metrics.savepoint_level
     (Int32.to_float (snd v)) ;
@@ -86,6 +87,7 @@ let write_savepoint {savepoint; _} v =
 let write_caboose {caboose; _} v =
   let open Lwt_result_syntax in
   let* () = Stored_data.write caboose v in
+  let*! () = Store_events.(emit set_caboose v) in
   Prometheus.Gauge.set
     Store_metrics.metrics.caboose_level
     (Int32.to_float (snd v)) ;
