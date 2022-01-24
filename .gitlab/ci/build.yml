@@ -95,7 +95,7 @@ build:static-arm64-linux-binaries:
   extends:
       - .build_static_binaries_template
       - .rules_template__master_and_releases
-  stage: build_release
+  stage: build
   script:
     - echo "No compression for now"
   tags:
