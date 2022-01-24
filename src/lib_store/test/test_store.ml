@@ -150,19 +150,18 @@ let test_locator chain_store tbl =
       ~max_size:length
       (vblock tbl h1)
       seed
-    >>= fun l ->
-    let (_, l) = (l : Block_locator.t :> _ * _) in
-    if Compare.List_lengths.(l <> expected) then
+    >>= fun {Block_locator.history; _} ->
+    if Compare.List_lengths.(history <> expected) then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
         h1
-        (List.length l)
+        (List.length history)
         (List.length expected) ;
     iter2_exn
       (fun h h2 ->
         if not (Block_hash.equal h (Store.Block.hash @@ vblock tbl h2)) then
           Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
-      l
+      history
       expected ;
     Lwt.return_unit
   in

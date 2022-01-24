@@ -53,7 +53,11 @@
       (almost) anywhere. *)
 
 (** Type for sparse block locators (/à la/ Bitcoin). *)
-type t = private Block_header.t * Block_hash.t list
+type t = {
+  head_hash : Block_hash.t;
+  head_header : Block_header.t;
+  history : Block_hash.t list;
+}
 
 val pp : Format.formatter -> t -> unit
 

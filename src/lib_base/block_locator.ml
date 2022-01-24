@@ -26,9 +26,13 @@
 
 open Lwt.Infix
 
-type t = Block_header.t * Block_hash.t list
+type t = {
+  head_hash : Block_hash.t;
+  head_header : Block_header.t;
+  history : Block_hash.t list;
+}
 
-let pp ppf (hd, h_lst) =
+let pp ppf {head_hash; history; _} =
   let repeats = 10 in
   let coef = 2 in
   (* list of hashes *)
@@ -51,33 +55,44 @@ let pp ppf (hd, h_lst) =
     ppf
     "%a (head)\n%a"
     Block_hash.pp
-    (Block_header.hash hd)
+    head_hash
     pp_hash_list
-    (h_lst, -1, 1, repeats - 1)
+    (history, -1, 1, repeats - 1)
 
-let pp_short ppf (hd, h_lst) =
+let pp_short ppf {head_hash; history; _} =
   Format.fprintf
     ppf
     "head: %a, %d predecessors"
     Block_hash.pp
-    (Block_header.hash hd)
-    (List.length h_lst)
+    head_hash
+    (List.length history)
+
+let encoding_proj {head_header; history; _} = (head_header, history)
+
+let encoding_inj (head_header, history) =
+  {head_hash = Block_header.hash head_header; head_header; history}
 
 let encoding =
   let open Data_encoding in
   def "block_locator" ~description:"A sparse block locator à la Bitcoin"
-  @@ obj2
-       (req "current_head" (dynamic_size Block_header.encoding))
-       (req "history" (Variable.list Block_hash.encoding))
+  @@ conv
+       encoding_proj
+       encoding_inj
+       (obj2
+          (req "current_head" (dynamic_size Block_header.encoding))
+          (req "history" (Variable.list Block_hash.encoding)))
 
 let bounded_encoding ~max_header_size ~max_length () =
   let open Data_encoding in
-  obj2
-    (req
-       "current_head"
-       (dynamic_size
-          (Block_header.bounded_encoding ~max_size:max_header_size ())))
-    (req "history" (Variable.list ~max_length Block_hash.encoding))
+  conv
+    encoding_proj
+    encoding_inj
+    (obj2
+       (req
+          "current_head"
+          (dynamic_size
+             (Block_header.bounded_encoding ~max_size:max_header_size ())))
+       (req "history" (Variable.list ~max_length Block_hash.encoding)))
 
 type seed = {sender_id : P2p_peer.Id.t; receiver_id : P2p_peer.Id.t}
 
@@ -130,18 +145,18 @@ end = struct
     (Int32.to_int (Int32.sub step random_gap), new_state)
 end
 
-let estimated_length seed (head, hist) =
+let estimated_length seed {head_hash; history; _} =
   let rec loop acc state = function
     | [] -> acc
     | _ :: hist ->
         let (step, state) = Step.next state in
         loop (acc + step) state hist
   in
-  let state = Step.init seed (Block_header.hash head) in
+  let state = Step.init seed head_hash in
   let (step, state) = Step.next state in
-  loop step state hist
+  loop step state history
 
-let fold ~f ~init (head, hist) seed =
+let fold ~f ~init {head_hash; history; _} seed =
   let rec loop state acc = function
     | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
@@ -149,9 +164,8 @@ let fold ~f ~init (head, hist) seed =
         let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
         loop state acc hist
   in
-  let head = Block_header.hash head in
-  let state = Step.init seed head in
-  loop state init (head :: hist)
+  let state = Step.init seed head_hash in
+  loop state init (head_hash :: history)
 
 type step = {
   block : Block_hash.t;
@@ -167,7 +181,7 @@ let to_steps seed locator =
   fold locator seed ~init:[] ~f:(fun acc ~block ~pred ~step ~strict_step ->
       {block; predecessor = pred; step; strict_step} :: acc)
 
-let fold_truncate ~f ~init ~save_point ~limit (head, hist) seed =
+let fold_truncate ~f ~init ~save_point ~limit {head_hash; history; _} seed =
   let rec loop state step_sum acc = function
     | [] | [_] -> acc
     | block :: (pred :: rem as hist) ->
@@ -179,9 +193,8 @@ let fold_truncate ~f ~init ~save_point ~limit (head, hist) seed =
           let acc = f acc ~block ~pred ~step ~strict_step:(rem <> []) in
           loop state new_step_sum acc hist
   in
-  let hash = Block_header.hash head in
-  let initial_state = Step.init seed hash in
-  loop initial_state 0 init (hash :: hist)
+  let initial_state = Step.init seed head_hash in
+  loop initial_state 0 init (head_hash :: history)
 
 let to_steps_truncate ~limit ~save_point seed locator =
   fold_truncate
@@ -193,7 +206,7 @@ let to_steps_truncate ~limit ~save_point seed locator =
     ~f:(fun acc ~block ~pred ~step ~strict_step ->
       {block; predecessor = pred; step; strict_step} :: acc)
 
-let compute ~get_predecessor ~caboose ~size block_hash header seed =
+let compute ~get_predecessor ~caboose ~size head_hash head_header seed =
   let rec loop acc size state current_block_hash =
     if size = 0 then Lwt.return acc
     else
@@ -208,29 +221,33 @@ let compute ~get_predecessor ~caboose ~size block_hash header seed =
             Lwt.return acc
           else loop (predecessor :: acc) (pred size) state predecessor
   in
-  if size <= 0 then Lwt.return (header, [])
+  if size <= 0 then Lwt.return {head_hash; head_header; history = []}
   else
-    let initial_state = Step.init seed block_hash in
-    loop [] size initial_state block_hash >>= fun hist ->
-    Lwt.return (header, List.rev hist)
+    let initial_state = Step.init seed head_hash in
+    loop [] size initial_state head_hash >>= fun history ->
+    let history = List.rev history in
+    Lwt.return {head_hash; head_header; history}
 
 type validity = Unknown | Known_valid | Known_invalid
 
 let unknown_prefix ~is_known locator =
-  let (head, history) = locator in
+  let {head_hash; history; _} = locator in
   let rec loop hist acc =
     match hist with
     | [] -> Lwt.return (Unknown, locator)
     | h :: t -> (
         is_known h >>= function
-        | Known_valid -> Lwt.return (Known_valid, (head, List.rev (h :: acc)))
+        | Known_valid ->
+            Lwt.return
+              (Known_valid, {locator with history = List.rev (h :: acc)})
         | Known_invalid ->
-            Lwt.return (Known_invalid, (head, List.rev (h :: acc)))
+            Lwt.return
+              (Known_invalid, {locator with history = List.rev (h :: acc)})
         | Unknown -> loop t (h :: acc))
   in
-  is_known (Block_header.hash head) >>= function
-  | Known_valid -> Lwt.return (Known_valid, (head, []))
-  | Known_invalid -> Lwt.return (Known_invalid, (head, []))
+  is_known head_hash >>= function
+  | Known_valid -> Lwt.return (Known_valid, {locator with history = []})
+  | Known_invalid -> Lwt.return (Known_invalid, {locator with history = []})
   | Unknown -> loop history []
 
 let () = Data_encoding.Registration.register ~pp:pp_short encoding
