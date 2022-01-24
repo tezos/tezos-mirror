@@ -282,6 +282,11 @@ end
 module Tx_rollup_commitment = struct
   include Tx_rollup_commitment_repr
   include Tx_rollup_commitment_storage
+
+  module Internal_for_tests = struct
+    include Tx_rollup_commitment_repr
+    include Tx_rollup_commitment_storage
+  end
 end
 
 module Global_constants_storage = Global_constants_storage

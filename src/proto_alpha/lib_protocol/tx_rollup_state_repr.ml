@@ -48,30 +48,71 @@ type error +=
     spurious spikes of [burn_per_byte].
 *)
 type t = {
+  first_unfinalized_level : Raw_level_repr.t option;
+  unfinalized_level_count : int;
   burn_per_byte : Tez_repr.t;
   inbox_ema : int;
   last_inbox_level : Raw_level_repr.t option;
 }
 
 let initial_state =
-  {burn_per_byte = Tez_repr.zero; inbox_ema = 0; last_inbox_level = None}
+  {
+    first_unfinalized_level = None;
+    unfinalized_level_count = 0;
+    burn_per_byte = Tez_repr.zero;
+    inbox_ema = 0;
+    last_inbox_level = None;
+  }
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {last_inbox_level; burn_per_byte; inbox_ema} ->
-      (last_inbox_level, burn_per_byte, inbox_ema))
-    (fun (last_inbox_level, burn_per_byte, inbox_ema) ->
-      {last_inbox_level; burn_per_byte; inbox_ema})
-    (obj3
-       (req "last_inbox_level" (option Raw_level_repr.encoding))
+    (fun {
+           first_unfinalized_level;
+           unfinalized_level_count;
+           burn_per_byte;
+           inbox_ema;
+           last_inbox_level;
+         } ->
+      ( first_unfinalized_level,
+        unfinalized_level_count,
+        burn_per_byte,
+        inbox_ema,
+        last_inbox_level ))
+    (fun ( first_unfinalized_level,
+           unfinalized_level_count,
+           burn_per_byte,
+           inbox_ema,
+           last_inbox_level ) ->
+      {
+        first_unfinalized_level;
+        unfinalized_level_count;
+        burn_per_byte;
+        inbox_ema;
+        last_inbox_level;
+      })
+    (obj5
+       (req "first_unfinalized_level" (option Raw_level_repr.encoding))
+       (req "unfinalized_level_count" int16)
        (req "burn_per_byte" Tez_repr.encoding)
-       (req "inbox_ema" int31))
+       (req "inbox_ema" int31)
+       (req "last_inbox_level" (option Raw_level_repr.encoding)))
 
-let pp fmt {burn_per_byte; last_inbox_level; inbox_ema} =
+let pp fmt
+    {
+      first_unfinalized_level;
+      unfinalized_level_count;
+      burn_per_byte;
+      inbox_ema;
+      last_inbox_level;
+    } =
   Format.fprintf
     fmt
-    "Tx_rollup: burn_per_byte = %a; inbox_ema %d; last_inbox_level = %a"
+    "first_unfinalized_level: %a unfinalized_level_count: %d cost_per_byte: %a \
+     inbox_ema: %d newest inbox: %a"
+    (Format.pp_print_option Raw_level_repr.pp)
+    first_unfinalized_level
+    unfinalized_level_count
     Tez_repr.pp
     burn_per_byte
     inbox_ema
@@ -131,7 +172,27 @@ let burn {burn_per_byte; _} size = Tez_repr.(burn_per_byte *? Int64.of_int size)
 
 let last_inbox_level {last_inbox_level; _} = last_inbox_level
 
-let append_inbox t level = {t with last_inbox_level = Some level}
+let append_inbox t level =
+  {
+    t with
+    last_inbox_level = Some level;
+    first_unfinalized_level =
+      Some (Option.value ~default:level t.first_unfinalized_level);
+    unfinalized_level_count = t.unfinalized_level_count + 1;
+  }
+
+let unfinalized_level_count {unfinalized_level_count; _} =
+  unfinalized_level_count
+
+let first_unfinalized_level {first_unfinalized_level; _} =
+  first_unfinalized_level
+
+let update_after_finalize state level count =
+  {
+    state with
+    first_unfinalized_level = level;
+    unfinalized_level_count = state.unfinalized_level_count - count;
+  }
 
 let burn ~limit state size =
   burn state size >>? fun burn ->
@@ -173,7 +234,13 @@ module Internal_for_tests = struct
       last_inbox_level:Raw_level_repr.t option ->
       t =
    fun ~burn_per_byte ~inbox_ema ~last_inbox_level ->
-    {burn_per_byte; inbox_ema; last_inbox_level}
+    {
+      burn_per_byte;
+      inbox_ema;
+      last_inbox_level;
+      first_unfinalized_level = None;
+      unfinalized_level_count = 0;
+    }
 
   let get_inbox_ema : t -> int = fun {inbox_ema; _} -> inbox_ema
 end

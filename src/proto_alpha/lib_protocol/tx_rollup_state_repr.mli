@@ -73,6 +73,20 @@ val last_inbox_level : t -> Raw_level_repr.t option
     [state] when messages have been added at a level. *)
 val append_inbox : t -> Raw_level_repr.t -> t
 
+(** [unfinalized_level_count state] returns the number of unfinalized
+    levels of the rollup.  If this is too high, we stop appending
+    messages until commitments catch up. *)
+val unfinalized_level_count : t -> int
+
+(** [first_unfinalized_level state] returns the first unfinalized
+    level of the rollup.  Note that this level might be empty.*)
+val first_unfinalized_level : t -> Raw_level_repr.t option
+
+(* [update_after_finalize state level count] updates a state
+   after some levels have been finalized.  [count] is the number of
+   finalized levels. *)
+val update_after_finalize : t -> Raw_level_repr.t option -> int -> t
+
 module Internal_for_tests : sig
   (** [make] returns a state for tests *)
   val make :

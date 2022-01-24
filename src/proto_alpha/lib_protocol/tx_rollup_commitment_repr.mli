@@ -31,11 +31,22 @@ type error += (* `Temporary *) Missing_commitment_predecessor
 
 type error += (* `Branch *) Wrong_batch_count
 
-type error += (* `Temporary *) Commitment_too_early
+type error +=
+  | (* `Temporary *) Commitment_too_early of Raw_level_repr.t * Raw_level_repr.t
 
 type error += (* `Temporary *) Level_already_has_commitment of Raw_level_repr.t
 
 type error += (* `Temporary *) Wrong_inbox_hash
+
+type error += (* `Branch *)
+              Retire_uncommitted_level of Raw_level_repr.t
+
+type error += (* `Temporary *)
+              Bond_does_not_exist of Signature.public_key_hash
+
+type error += (* `Temporary *) Bond_in_use of Signature.public_key_hash
+
+type error += (* `Temporary *) Too_many_unfinalized_levels
 
 (** A specialized Blake2B implementation for hashing commitments with
     "toc1" as a base58 prefix *)

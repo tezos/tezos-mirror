@@ -652,6 +652,16 @@ module Tx_rollup : sig
       with type key = Raw_level_repr.t * Tx_rollup_repr.t
        and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
        and type t := Raw_context.t
+
+  (* This stores information about which contracts have bonds
+     for each rollup, and how many commitments those bonds
+     stake. *)
+  module Commitment_bond :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Tx_rollup_repr.t * Signature.public_key_hash
+      (* The value here is the number of unfinalized commitments *)
+       and type value = int
+       and type t := Raw_context.t
 end
 
 module Sc_rollup : sig

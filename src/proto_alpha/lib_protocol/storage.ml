@@ -841,16 +841,16 @@ module Public_key_hash = struct
     match key with
     | Ed25519 h -> (
         match Path_Ed25519.to_path h l with
-        | [s] -> ["ed25519"; s]
-        | _ -> assert false)
+        | s :: t -> "ed25519" :: s :: t
+        | _ -> raise (Invalid_argument "Error: No path in ed25519"))
     | Secp256k1 h -> (
         match Path_Secp256k1.to_path h l with
-        | [s] -> ["secp256k1"; s]
-        | _ -> assert false)
+        | s :: t -> "secp256k1" :: s :: t
+        | _ -> raise (Invalid_argument "Error: No path in secp256k1"))
     | P256 h -> (
         match Path_P256.to_path h l with
-        | [s] -> ["p256"; s]
-        | _ -> assert false)
+        | s :: t -> "p256" :: s :: t
+        | _ -> raise (Invalid_argument "Error: No path in p256"))
 
   let of_path : _ -> public_key_hash option = function
     | "ed25519" :: rest -> (
@@ -1474,6 +1474,25 @@ module Tx_rollup = struct
         let name = ["commitment"]
       end)
       (Tx_rollup_commitment_repr.Submitted_commitment)
+
+  module Bond_indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["tx_rollup_bond"]
+         end))
+         (Pair (Make_index (Tx_rollup_repr.Index)) (Public_key_hash_index))
+
+  module Commitment_bond =
+    Bond_indexed_context.Make_carbonated_map
+      (struct
+        let name = ["commitment_bond"]
+      end)
+      (struct
+        type t = int
+
+        let encoding = Data_encoding.int31
+      end)
 end
 
 module Sc_rollup = struct
