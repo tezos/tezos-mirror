@@ -103,8 +103,11 @@ Node
 - Pending operations in the mempool are now sorted, and propagated with the following
   priority in decreasing order (operations with the highest priority are
   propagated first):
+
   - consensus operations;
+
   - anonymous and voting (governance) operations;
+
   - manager operations where the priority is given by the ratio of the operation
     fees over gas limit or operation size.
 
