@@ -3042,13 +3042,21 @@ end
 module Liquidity_baking : sig
   val get_cpmm_address : context -> Contract.t tzresult Lwt.t
 
-  type escape_ema = Int32.t
+  module Escape_EMA : sig
+    type t
+
+    val zero : t
+
+    val to_int32 : t -> Int32.t
+
+    val encoding : t Data_encoding.t
+  end
 
   val on_subsidy_allowed :
     context ->
     escape_vote:Block_header.liquidity_baking_escape_vote ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
-    (context * 'a list * escape_ema) tzresult Lwt.t
+    (context * 'a list * Escape_EMA.t) tzresult Lwt.t
 end
 
 (** This module re-exports functions from [Ticket_storage]. See

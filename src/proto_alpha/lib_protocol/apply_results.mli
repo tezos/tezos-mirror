@@ -331,7 +331,7 @@ type block_metadata = {
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
-  liquidity_baking_escape_ema : Liquidity_baking.escape_ema;
+  liquidity_baking_escape_ema : Liquidity_baking.Escape_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
 }
 

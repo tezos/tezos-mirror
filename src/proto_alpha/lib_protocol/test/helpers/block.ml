@@ -760,11 +760,12 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
 
 let bake_n_with_liquidity_baking_escape_ema ?(baking_mode = Application) ?policy
     ?liquidity_baking_escape_vote n b =
+  let initial_ema = Liquidity_baking.Escape_EMA.zero in
   List.fold_left_es
     (fun (b, _escape_ema) _ ->
       bake_with_metadata ~baking_mode ?policy ?liquidity_baking_escape_vote b
       >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_escape_ema))
-    (b, 0l)
+    (b, initial_ema)
     (1 -- n)
 
 let bake_until_cycle_end ?policy b =

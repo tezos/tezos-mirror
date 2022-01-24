@@ -58,7 +58,7 @@ val begin_partial_construction :
   escape_vote:Block_header.liquidity_baking_escape_vote ->
   (t
   * packed_successful_manager_operation_result list
-  * Liquidity_baking.escape_ema)
+  * Liquidity_baking.Escape_EMA.t)
   tzresult
   Lwt.t
 
@@ -69,7 +69,7 @@ type 'a full_construction = {
   block_producer : Signature.public_key_hash;
   round : Round.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  liquidity_baking_escape_ema : Liquidity_baking.escape_ema;
+  liquidity_baking_escape_ema : Liquidity_baking.Escape_EMA.t;
 }
 
 val begin_full_construction :
@@ -93,7 +93,7 @@ val begin_application :
   * Signature.public_key
   * Signature.public_key_hash
   * packed_successful_manager_operation_result list
-  * Liquidity_baking.escape_ema)
+  * Liquidity_baking.Escape_EMA.t)
   tzresult
   Lwt.t
 
@@ -142,7 +142,7 @@ val finalize_application :
   Alpha_context.Block_header.contents ->
   payload_producer:public_key_hash ->
   block_producer:public_key_hash ->
-  Liquidity_baking.escape_ema ->
+  Liquidity_baking.Escape_EMA.t ->
   packed_successful_manager_operation_result list ->
   round:Round.t ->
   predecessor:Block_hash.t ->

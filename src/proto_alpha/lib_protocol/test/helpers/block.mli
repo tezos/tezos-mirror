@@ -228,7 +228,7 @@ val bake_n_with_liquidity_baking_escape_ema :
   ?liquidity_baking_escape_vote:Block_header.liquidity_baking_escape_vote ->
   int ->
   t ->
-  (block * Alpha_context.Liquidity_baking.escape_ema) tzresult Lwt.t
+  (block * Alpha_context.Liquidity_baking.Escape_EMA.t) tzresult Lwt.t
 
 val current_cycle : t -> Cycle.t tzresult Lwt.t
 

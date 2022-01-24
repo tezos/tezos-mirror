@@ -2866,7 +2866,7 @@ type 'a full_construction = {
   block_producer : Signature.public_key_hash;
   round : Round.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
-  liquidity_baking_escape_ema : Liquidity_baking.escape_ema;
+  liquidity_baking_escape_ema : Liquidity_baking.Escape_EMA.t;
 }
 
 let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
