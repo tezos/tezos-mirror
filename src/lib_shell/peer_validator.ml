@@ -182,10 +182,9 @@ let validate_new_head w hash (header : Block_header.t) =
       Peer_metadata.incr meta Valid_blocks ;
       return_unit
 
-let only_if_fitness_increases w distant_header cont =
+let only_if_fitness_increases w distant_header hash cont =
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
-  let hash = Block_header.hash distant_header in
   Store.Block.is_known_valid chain_store hash >>= fun known_valid ->
   if known_valid then (
     pv.last_validated_head <- distant_header ;
@@ -249,7 +248,7 @@ let may_validate_new_head w hash (header : Block_header.t) =
       () ;
     return_unit)
   else
-    only_if_fitness_increases w header @@ fun () ->
+    only_if_fitness_increases w header hash @@ fun () ->
     assert_acceptable_head w hash header >>=? fun () ->
     validate_new_head w hash header
 
@@ -474,8 +473,7 @@ let notify_branch w locator =
   let seed = {Block_locator.sender_id = pv.peer_id; receiver_id = sender_id} in
   Worker.Dropbox.put_request w (New_branch (locator, seed))
 
-let notify_head w header =
-  let hash = Block_header.hash header in
+let notify_head w hash header =
   Worker.Dropbox.put_request w (New_head (hash, header))
 
 let shutdown w = Worker.shutdown w
