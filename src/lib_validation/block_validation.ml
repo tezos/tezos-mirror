@@ -1113,14 +1113,25 @@ let apply ?cached_result c ~cache block_header operations =
     in
     match r with
     | Error (Validation_errors.Inconsistent_hash _ :: _) ->
-        let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
-        apply
-          ?cached_result
-          c
-          ~cache:`Force_load
-          block_hash
-          block_header
-          operations
+        let*! protocol_hash = Context.get_protocol c.predecessor_context in
+        let hanghzhou_hash =
+          Protocol_hash.of_b58check_exn
+            "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+        in
+        if protocol_hash = hanghzhou_hash then (
+          Environment_context.Context
+          .reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing
+            () ;
+          Lwt.return r)
+        else
+          let*! () = Event.(emit inherited_inconsistent_cache) block_hash in
+          apply
+            ?cached_result
+            c
+            ~cache:`Force_load
+            block_hash
+            block_header
+            operations
     | (Ok _ | Error _) as res -> Lwt.return res
   in
   match r with
