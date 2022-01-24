@@ -164,7 +164,7 @@ let blockchain_network_ithacanet =
   make_blockchain_network
     ~alias:"ithacanet"
     {
-      time = Time.Protocol.of_notation_exn "2022-01-20T15:00:00Z";
+      time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
       block =
         Block_hash.of_b58check_exn
           "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9";
@@ -183,7 +183,7 @@ let blockchain_network_ithacanet =
               );
             ];
       }
-    ~chain_name:"TEZOS_ITHACANET_2022-01-20T15:00:00Z"
+    ~chain_name:"TEZOS_ITHACANET_2022-01-25T15:00:00Z"
     ~sandboxed_chain_name:"SANDBOXED_TEZOS"
     ~user_activated_upgrades:
       [(8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A")]
