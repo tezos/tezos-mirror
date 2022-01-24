@@ -1,4 +1,5 @@
 (tests
  (names test test_generated test_legacy_compatibility test_json_stream
-   test_json_stream_sizes test_classifiers test_sub_string)
+   test_json_stream_sizes test_classifiers test_sub_string
+   json_roundtrip_in_binary)
  (libraries data_encoding zarith alcotest crowbar))
