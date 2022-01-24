@@ -242,6 +242,34 @@ let liquidity_baking_escape_hatch_50 n () =
     expected_balance
   >>=? fun () -> return_unit
 
+(* Test that the subsidy can restart if LB_on votes regain majority.
+   Bake n_votes with LB_off, check that the subsidy is paused, bake
+   n_votes with LB_on, check that the subsidy flows.
+ *)
+let liquidity_baking_unescape n_votes n () =
+  Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->
+  Context.get_liquidity_baking_cpmm_address (B blk) >>=? fun liquidity_baking ->
+  Block.bake_n ~liquidity_baking_escape_vote:LB_off n_votes blk >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun balance_when_paused ->
+  Block.bake_n ~liquidity_baking_escape_vote:LB_pass n blk >>=? fun blk ->
+  Assert.balance_is ~loc:__LOC__ (B blk) liquidity_baking balance_when_paused
+  >>=? fun () ->
+  Block.bake_n ~liquidity_baking_escape_vote:LB_on n_votes blk >>=? fun blk ->
+  Context.Contract.balance (B blk) liquidity_baking
+  >>=? fun balance_when_restarted ->
+  Block.bake_n ~liquidity_baking_escape_vote:LB_pass n blk >>=? fun blk ->
+  Context.get_liquidity_baking_subsidy (B blk)
+  >>=? fun liquidity_baking_subsidy ->
+  liquidity_baking_subsidy *? Int64.of_int n >>?= fun expected_balance ->
+  Assert.balance_was_credited
+    ~loc:__LOC__
+    (B blk)
+    liquidity_baking
+    balance_when_restarted
+    expected_balance
+  >>=? fun () -> return_unit
+
 (* Test that the escape EMA in block metadata is correct. *)
 let liquidity_baking_escape_ema n_vote_on n_vote_off escape_level
     bake_after_escape expected_escape_ema () =
@@ -258,7 +286,11 @@ let liquidity_baking_escape_ema n_vote_on n_vote_off escape_level
   (* We only need to return the escape EMA at the end. *)
   Block.bake_n_with_liquidity_baking_escape_ema bake_after_escape blk
   >>=? fun (_blk, escape_ema) ->
-  Assert.leq_int ~loc:__LOC__ (Int32.to_int escape_ema) expected_escape_ema
+  Assert.leq_int
+    ~loc:__LOC__
+    (escape_ema |> Alpha_context.Liquidity_baking.Escape_EMA.to_int32
+   |> Int32.to_int)
+    expected_escape_ema
   >>=? fun () -> return_unit
 
 (* With no bakers setting the escape vote, EMA should be zero. *)
@@ -524,6 +556,11 @@ let tests =
        50% and baking 100 blocks longer"
       `Quick
       (liquidity_baking_escape_hatch_50 100);
+    Tztest.tztest
+      "test a liquidity baking restart with 100% of bakers voting off, then \
+       pass, then on"
+      `Quick
+      (liquidity_baking_unescape 2000 1);
     Tztest.tztest
       "test liquidity baking escape ema in block metadata is zero with no \
        bakers flagging."
