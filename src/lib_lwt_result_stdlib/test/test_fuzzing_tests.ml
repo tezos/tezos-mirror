@@ -126,7 +126,10 @@ end) : Test = struct
       (fun (Fun (_, fn), const, input) ->
         let input = M.of_list input in
         let fn = MapOf.fn const fn in
-        eq (M.map fn input |> M.rev) (M.rev_map fn input))
+        eq
+          (let r = M.map fn input in
+           M.rev r)
+          (M.rev_map fn input))
 
   let rev_map_e =
     Test.make
@@ -344,11 +347,14 @@ end) : Test = struct
       (fun (init, Fun (_, fn), const, input) ->
         eq
           (let acc = ref init in
-           M.iter
-             (fun elt ->
-               MapOf.fn const fn elt |> fun delta -> acc := !acc + delta)
-             (M.of_list input)
-           |> fun () -> !acc)
+           let () =
+             M.iter
+               (fun elt ->
+                 let delta = MapOf.fn const fn elt in
+                 acc := !acc + delta)
+               (M.of_list input)
+           in
+           !acc)
           (with_stdlib_iter init (fn, const, input)))
 
   let iter_s =
@@ -639,7 +645,9 @@ end) : Test = struct
       (fun (const, Fun (_, fn), init, input) ->
         eq
           (M.fold
-             (fun x acc -> FoldOf.fn fn const x |> fun delta -> acc + delta)
+             (fun x acc ->
+               let delta = FoldOf.fn fn const x in
+               acc + delta)
              (M.of_list input)
              init)
           (with_stdlib_fold_left const (fn, init, input)))
@@ -888,7 +896,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
         eq
-          (M.filter (CondOf.fn fn const) (M.of_list input) |> M.to_list)
+          (let r = M.filter (CondOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (with_stdlib_filter (fn, const, input)))
 
   let filter_e =
@@ -977,7 +986,8 @@ end) : Test = struct
       (pair Test_fuzzing_helpers.Fn.pred many)
       (fun (fn, input) ->
         eq
-          (M.filteri (CondOf.fn fn) (M.of_list input) |> M.to_list)
+          (let r = M.filteri (CondOf.fn fn) (M.of_list input) in
+           M.to_list r)
           (with_stdlib_filteri (fn, input)))
 
   let filteri_e =
@@ -1066,8 +1076,10 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq
-          (M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
-          |> M.to_list)
+          (let r =
+             M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
+           in
+           M.to_list r)
           (with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_e =
@@ -1177,10 +1189,12 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.arith one one many)
       (fun (Fun (_, arith), consta, constb, input) ->
         eq
-          (M.concat_map
-             (ConcatMapOf.fns M.of_list arith consta constb)
-             (M.of_list input)
-          |> M.to_list)
+          (let r =
+             M.concat_map
+               (ConcatMapOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
           (with_stdlib_concat_map (arith, consta, constb, input)))
 
   let concat_map_e =
@@ -1462,7 +1476,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq
-          (M.partition (CondOf.fn pred const) (M.of_list input) |> to_list_pair)
+          (let r = M.partition (CondOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (with_stdlib_partition (pred, const, input)))
 
   let partition_e =
