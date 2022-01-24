@@ -699,6 +699,20 @@ let compute_new_savepoint block_store history_mode ~new_store
                    (start_level, end_level)))
             @ cycles_to_cement
       in
+      let* cemented_metadata_table =
+        Cemented_block_store.cemented_metadata_files block_store.cemented_store
+      in
+      let cemented_metadata_cycles =
+        match cemented_metadata_table with
+        | None -> []
+        | Some table ->
+            Array.to_list table
+            |> List.map
+                 (fun
+                   ({Cemented_block_store.start_level; end_level; _} :
+                     Cemented_block_store.cemented_metadata_file)
+                 -> (start_level, end_level))
+      in
       if Compare.Int32.(snd savepoint >= min_block_level) then return savepoint
       else
         let cemented_cycles_len = List.length cemented_cycles in
@@ -714,12 +728,13 @@ let compute_new_savepoint block_store history_mode ~new_store
              drag the savepoint if it was not set on a cycle
              start. Otherwise, the savepoint would be missing from the
              store. We drag the savepoint only if it is not in the new
-             floating store nor in the cycles to cements. *)
+             floating store nor in the cycles to cements U cemented
+             cycles. *)
           let (savepoint_hash, savepoint_level) = savepoint in
           let is_savepoint_in_cemented =
             List.exists
               (fun (l, h) -> l <= savepoint_level && savepoint_level <= h)
-              cycles_to_cement
+              (cycles_to_cement @ cemented_metadata_cycles)
           in
           if not is_savepoint_in_cemented then
             let*! is_savepoint_in_new_store =
