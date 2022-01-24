@@ -116,7 +116,7 @@ Client
 
 - Renamed the ``--mempool`` option into ``--operations-pool``.
   The format of the file passed as parameter has changed from the one of RPC
-  ``pending_operations`` (that is, a key-value dictionary whose values are list
+  ``pending_operations`` (that is, a key-value dictionary whose values are lists
   of operations) to a single list of operations to be considered for inclusion.
 
 - ``--operations-pool`` option supports URL parameters to fetch remote mempools
