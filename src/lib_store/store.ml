@@ -1506,18 +1506,20 @@ module Chain = struct
             if Compare.Int32.(snd new_checkpoint > snd checkpoint) then
               (* Remove potentially outdated invalid blocks if the
                  checkpoint changed *)
-              Stored_data.update_with
-                chain_state.invalid_blocks_data
-                (fun invalid_blocks ->
-                  Lwt.return
-                    (Block_hash.Map.filter
-                       (fun _k {level; _} -> level > snd new_checkpoint)
-                       invalid_blocks))
+              let* () =
+                Stored_data.update_with
+                  chain_state.invalid_blocks_data
+                  (fun invalid_blocks ->
+                    Lwt.return
+                      (Block_hash.Map.filter
+                         (fun _k {level; _} -> level > snd new_checkpoint)
+                         invalid_blocks))
+              in
+              write_checkpoint chain_state new_checkpoint
             else return_unit
           in
           (* Update values on disk but not the cementing highwatermark
              which will be updated by the merge finalizer. *)
-          let* () = write_checkpoint chain_state new_checkpoint in
           let* () =
             Stored_data.write chain_state.current_head_data new_head_descr
           in
