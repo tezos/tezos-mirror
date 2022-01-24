@@ -164,6 +164,14 @@ let start_retreiving_cycles =
     ~msg:"retrieving cycles from floating store"
     ()
 
+let store_is_consistent =
+  declare_0
+    ~section
+    ~level:Info
+    ~name:"store_is_consistent"
+    ~msg:"the store is consistent"
+    ()
+
 (* Notice *)
 let fork_testchain =
   declare_4
@@ -221,14 +229,6 @@ let switch_history_mode =
     ("old", History_mode.encoding)
     ~pp2:History_mode.pp
     ("new", History_mode.encoding)
-
-let store_is_consistent =
-  declare_0
-    ~section
-    ~level:Info
-    ~name:"store_is_consistent"
-    ~msg:"the store is consistent"
-    ()
 
 let inconsistent_store =
   declare_1
