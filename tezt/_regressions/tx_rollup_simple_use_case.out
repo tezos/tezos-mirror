@@ -9,10 +9,10 @@ Node is bootstrapped.
 Estimated gas: 2240.162 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
-Operation hash is 'ooBHjsxYb1sGbZC6wEUwjSwBs3GTQgg2knFv2qWYWgzRpPpCDrJ'
+Operation hash is '[OPERATION_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for ooBHjsxYb1sGbZC6wEUwjSwBs3GTQgg2knFv2qWYWgzRpPpCDrJ to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
