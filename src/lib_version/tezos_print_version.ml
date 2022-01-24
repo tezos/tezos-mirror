@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,12 +23,28 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val commit_hash : string
+(* this is a script run at build time to print out the current version of the
+   node *)
 
-val abbreviated_commit_hash : string
+open Version
+open Current_git_info
 
-val committer_date : string
+let help_string =
+  "This script prints out the current version of the  \n\
+  \   node as it is deduced from the git tag of the current branch.\n\n\
+  \   print_version [--major|--minor|--additional-info|--full]\n\
+  \   "
 
-(** current_version : is the version of the node.
-    it uses either the git tag or a default version *)
-val version : Version.t
+let () =
+  match Sys.argv with
+  | [|_; "--major"|] -> print_endline (string_of_int version.major)
+  | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
+  | [|_; "--additional-info"|] ->
+      print_endline (string_of_additional_info version.additional_info)
+  | [|_; "--full"|] | [|_|] -> print_endline (Version.to_string version)
+  | [|_; "--help"|] -> print_endline help_string
+  | _ ->
+      print_endline help_string ;
+      prerr_endline
+        ("invalid argument: " ^ String.concat " " (Array.to_list Sys.argv)) ;
+      exit 1

@@ -35,14 +35,22 @@
     [RC] means "Release Candidate".
     For each release, the first release candidate has number 1.
 
+    [RC_dev] means "Release Candidate in development".
+    This is a release branch where the release candidate tag is
+    not associated to the HEAD of the branch.
+
     [Release] means "no additional information".
     This is an actual released version.
     No additional info is printed. *)
-type additional_info = Dev | RC of int | Release
+type additional_info = Tezos_version_parser.additional_info =
+  | Dev
+  | RC of int
+  | RC_dev of int
+  | Release
 
 (** Convert additional version information to a string.
 
-    The result is a string of the form ["+dev"], ["~rcX"] or [""]. *)
+    The result is a string of the form ["+dev"], ["~rcX"], ["~rcX+dev"] or [""]. *)
 val string_of_additional_info : additional_info -> string
 
 (** Version information.
@@ -53,14 +61,19 @@ val string_of_additional_info : additional_info -> string
     Minor versions include mostly bug fixes and are usually released in
     branches which start from the previous release.
     When the major version is incremented, the minor version is reset to 0. *)
-type t = {major : int; minor : int; additional_info : additional_info}
+type t = Tezos_version_parser.t = {
+  major : int;
+  minor : int;
+  additional_info : additional_info;
+}
 
 (** Convert a version to a string.
 
     Examples:
     - [to_string { major = 7; minor = 0; additional_info = Release } = "7.0"]
     - [to_string { major = 7; minor = 0; additional_info = Dev } = "7.0+dev"]
-    - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"] *)
+    - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"]
+    - [to_string { major = 7; minor = 0; additional_info = RC_dev 1 } = "7.0~rc1+dev"] *)
 val to_string : t -> string
 
 (** Version printer.
@@ -68,8 +81,7 @@ val to_string : t -> string
     [pp f x] prints [to_string x] in [f] *)
 val pp : Format.formatter -> t -> unit
 
-(** Current version. *)
-val current : t
+(* Parse an Octez version.
 
-(** Same as [to_string current]. *)
-val current_string : string
+   Returns None if the version cannot be parsed. *)
+val parse_version : string -> t option
