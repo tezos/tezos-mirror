@@ -957,22 +957,6 @@ let merge_types :
   help ty1 ty2
  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
-(* This function does not distinguish gas errors from merge errors. If you need
-   to recover from a type mismatch and consume the exact gas for the failed
-   comparison, use [merge_types] instead.
-*)
-let ty_eq :
-    type ta tb.
-    context ->
-    Script.location ->
-    ta ty ->
-    tb ty ->
-    ((ta ty, tb ty) eq * context) tzresult =
- fun ctxt loc ta tb ->
-  Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ta tb
-  >>? fun (eq_ty, ctxt) ->
-  eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
-
 (* Same as merge_types but for stacks.
    A single error monad is used here because there is no need to
    recover from stack merging errors.  *)
@@ -2686,13 +2670,15 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                       ~legacy
                       (Micheline.root btv)
                     >>? fun (Ex_ty btv, ctxt) ->
-                    Gas_monad.run
-                      ctxt
-                      (comparable_ty_eq ~error_details:Informative tk btk)
-                    >>? fun (eq, ctxt) ->
-                    eq >>? fun Eq ->
-                    ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) ->
-                    ok (Some id, ctxt) )
+                    (Gas_monad.run ctxt
+                    @@
+                    let open Gas_monad.Syntax in
+                    let* Eq =
+                      comparable_ty_eq ~error_details:Informative tk btk
+                    in
+                    merge_types ~error_details:Informative loc tv btv)
+                    >>? fun (eq_tv, ctxt) ->
+                    eq_tv >|? fun (Eq, _tv) -> (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
       >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
   | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
@@ -2836,11 +2822,14 @@ and parse_view_returning :
       in
       match aft with
       | Item_t (ty, Bot_t) ->
-          record_trace_eval
-            (ill_type_view loc aft : unit -> _)
-            ( ty_eq ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
-              let view' = Ex_view (Lam (close_descr descr, view_code)) in
-              (view', ctxt) )
+          Gas_monad.run ctxt
+          @@ Gas_monad.record_trace_eval
+               ~error_details:Informative
+               (ill_type_view loc aft : unit -> _)
+          @@ merge_types ~error_details:Informative loc ty output_ty'
+          >>? fun (eq_ty, ctxt) ->
+          eq_ty >|? fun (Eq, _ty) ->
+          (Ex_view (Lam (close_descr descr, view_code)), ctxt)
       | _ -> error (ill_type_view loc aft ()))
 
 and typecheck_views :
@@ -2881,14 +2870,15 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
   >>=? function
   | (Typed ({loc; aft = Item_t (ty, Bot_t) as stack_ty; _} as descr), ctxt) ->
       Lwt.return
-      @@ record_trace_eval
-           (fun () ->
-             let ret = serialize_ty_for_error ret in
-             let stack_ty = serialize_stack_for_error ctxt stack_ty in
-             Bad_return (loc, stack_ty, ret))
-           ( ty_eq ctxt loc ty ret >|? fun (Eq, ctxt) ->
-             ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt)
-           )
+        ( Gas_monad.run ctxt
+        @@ Gas_monad.record_trace_eval ~error_details:Informative (fun () ->
+               let ret = serialize_ty_for_error ret in
+               let stack_ty = serialize_stack_for_error ctxt stack_ty in
+               Bad_return (loc, stack_ty, ret))
+        @@ merge_types ~error_details:Informative loc ty ret
+        >>? fun (eq_ty, ctxt) ->
+          eq_ty >|? fun (Eq, _ty) ->
+          ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt) )
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
@@ -4380,7 +4370,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_annot loc annot >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       >>?= fun (Ex_ty cast_t, ctxt) ->
-      ty_eq ctxt loc cast_t t >>?= fun (Eq, ctxt) ->
+      Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc cast_t t
+      >>?= fun (eq_ty, ctxt) ->
+      eq_ty >>?= fun (Eq, _ty) ->
       let instr = {apply = (fun _ k -> k)} in
       let stack = Item_t (cast_t, stack) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -4512,9 +4504,18 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       trace (Ill_typed_contract (canonical_code, [])) views_result
       >>=? fun ctxt ->
-      ty_eq ctxt loc arg arg_type_full >>?= fun (Eq, ctxt) ->
-      ty_eq ctxt loc ret ret_type_full >>?= fun (Eq, ctxt) ->
-      ty_eq ctxt loc storage_type ginit >>?= fun (Eq, ctxt) ->
+      (Gas_monad.run ctxt
+      @@
+      let open Gas_monad.Syntax in
+      let* (Eq, _tya) =
+        merge_types ~error_details:Informative loc arg arg_type_full
+      in
+      let* (Eq, _tyr) =
+        merge_types ~error_details:Informative loc ret ret_type_full
+      in
+      merge_types ~error_details:Informative loc storage_type ginit)
+      >>?= fun (storage_eq_ty, ctxt) ->
+      storage_eq_ty >>?= fun (Eq, _storage_ty) ->
       let instr =
         {
           apply =
@@ -4999,7 +5000,10 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
-              ( ty_eq ctxt loc arg unit_t >|? fun (Eq, ctxt) ->
+              ( Gas_monad.run ctxt
+              @@ merge_types ~error_details:Informative loc arg unit_t
+              >>? fun (eq_ty, ctxt) ->
+                eq_ty >|? fun (Eq, _ty) ->
                 let destination : Destination.t = Contract contract in
                 (ctxt, {arg_ty = arg; address = {destination; entrypoint}}) )
           else fail (No_such_entrypoint entrypoint)

@@ -199,13 +199,6 @@ val big_map_get_and_update :
   (('value option * ('key, 'value) Script_typed_ir.big_map) * context) tzresult
   Lwt.t
 
-val ty_eq :
-  context ->
-  Script.location ->
-  'ta Script_typed_ir.ty ->
-  'tb Script_typed_ir.ty ->
-  (('ta Script_typed_ir.ty, 'tb Script_typed_ir.ty) eq * context) tzresult
-
 val merge_types :
   error_details:'error_trace error_details ->
   Script.location ->

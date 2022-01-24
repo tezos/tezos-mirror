@@ -176,8 +176,14 @@ let test_parse_ty ctxt node expected =
         ~allow_ticket
         node
     >>? fun (Script_ir_translator.Ex_ty actual, ctxt) ->
-      Script_ir_translator.ty_eq ctxt (location node) actual expected
-      >|? fun (_, ctxt) -> ctxt )
+      Gas_monad.run ctxt
+      @@ Script_ir_translator.merge_types
+           ~error_details:Informative
+           (location node)
+           actual
+           expected
+      >>? fun (eq_ty, ctxt) ->
+      eq_ty >|? fun (_eq, _ty) -> ctxt )
 
 let field_annot = Script_ir_annot.FOR_TESTS.unsafe_field_annot_of_string
 

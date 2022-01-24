@@ -576,7 +576,13 @@ module Merge_types : Benchmark.S = struct
         match ty with
         | Ex_ty ty ->
             let dummy_loc = 0 in
-            Lwt.return (Script_ir_translator.ty_eq ctxt dummy_loc ty ty)
+            Lwt.return
+              (Gas_monad.run ctxt
+              @@ Script_ir_translator.merge_types
+                   ~error_details:Informative
+                   dummy_loc
+                   ty
+                   ty)
             >|= Environment.wrap_tzresult
             >>=? fun (_, ctxt') ->
             let consumed =
@@ -586,7 +592,15 @@ module Merge_types : Benchmark.S = struct
               Merge_types_workload
                 {nodes; consumed = Z.to_int (Gas_helpers.fp_to_z consumed)}
             in
-            let closure () = ignore (Script_ir_translator.ty_eq ctxt 0 ty ty) in
+            let closure () =
+              ignore
+                (Gas_monad.run ctxt
+                @@ Script_ir_translator.merge_types
+                     ~error_details:Informative
+                     dummy_loc
+                     ty
+                     ty)
+            in
             return (Generator.Plain {workload; closure}) )
     |> function
     | Ok closure -> closure
