@@ -23,17 +23,13 @@ be documented here either.
 Node
 ----
 
-- The RPC GET `/chains/main/mempool/pending_operations` does not
-  output unparsable operations anymore. Previously, they were in the
-  ``Refused`` field with a parsing error.
+- Added optional parameter ``--media-type`` and its corresponding field
+  in the configuration file. It defines which format of data serialisation
+  must be used for RPC requests to the node. The value can be  ``json``,
+  ``binary`` or ``any``. By default, the value is set to ``any``.
 
-- Added an optional parameter ``media-type``.
-  It defines which format of data serialisation must be used for RPC requests to the node.
-  The value can be  ``json``, ``binary`` or ``any``. By default, the value is set to ``any``.
-
-- The ``ithacanet`` network alias now denotes the configuration for
-  the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
-  instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
+- Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
+  expose some metrics using the Prometheus format.
 
 Client
 ------
@@ -66,6 +62,77 @@ Docker Images
 Miscellaneous
 -------------
 
+Version 12.0~rc2
+================
+
+- Replaced protocol Ithaca (``PsiThaCa``) with protocol Ithaca2 (``Psithaca2``).
+
+Node
+----
+
+- (backport from 11.1) Fixed an incorrect behaviour of the store which
+  could cause the node to freeze for a few seconds.
+
+- The ``ithacanet`` network alias now denotes the configuration for
+  the Ithacanet test network that uses Ithaca2 (``Psithaca2``)
+  instead of the initial Ithacanet test network that used Ithaca (``PsiThaCa``).
+
+- The RPC GET ``/chains/main/mempool/pending_operations`` does not
+  output unparsable operations anymore. Previously, they were in the
+  ``Refused`` field with a parsing error.
+
+- The output format for RPC ``/chains/<chain_id>/mempool/filter`` changed.
+  The field ``backlog`` was removed. This change is similar to other RPC changes
+  introduced in 12.0~rc1.
+
+- Added two optional fields, ``now`` and ``level`` as input to the
+  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
+  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
+  fields can be used to override the values normally returned by the
+  ``NOW`` and ``LEVEL`` instructions.
+
+- Pending operations in the mempool are now sorted, and propagated with the following
+  priority in decreasing order (operations with the highest priority are
+  propagated first):
+
+  - consensus operations;
+
+  - anonymous and voting (governance) operations;
+
+  - manager operations where the priority is given by the ratio of the operation
+    fees over gas limit or operation size.
+
+- Fixed an issue where storage failed to restore its consistency after
+  corrupted metadata files.
+
+Client
+------
+
+- Renamed the ``--mempool`` option into ``--operations-pool``.
+  The format of the file passed as parameter has changed from the one of RPC
+  ``pending_operations`` (that is, a key-value dictionary whose values are lists
+  of operations) to a single list of operations to be considered for inclusion.
+
+- ``--operations-pool`` option supports URL parameters to fetch remote mempools
+  through HTTP.  Environment variable ``TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS``
+  may be set to specify custom HTTP headers. Only the Host header is supported
+  as of now (see description in `rfc2616, section 14.23
+  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_)
+
+- Added new option ``--ignore-node-mempool`` to the ``bake for`` command
+  to avoid querying the node's mempool when baking a block.
+
+Baker / Endorser / Accuser
+--------------------------
+
+- Ported the ``--operations-pool`` option of the ``bake for`` command of the client
+  to the baker daemon.
+
+- Fixed the Ithaca baker to allow it to fallback to an RPC (instead of
+  relying on direct access to the local context) when baking the
+  migration block to its successor. This necessary mechanism was
+  present in all bakers except for the Ithaca baker of Octez 12.0~rc1.
+
 Version 12.0~rc1
 ================
 
@@ -83,13 +150,12 @@ Node
 
 - The following RPCs output format changed:
 
-  1. ``/workers/block_validator``,
-  2. ``/workers/chain_validators``,
-  3. ``/workers/chain_validators/<chain_id>``,
-  4. ``/workers/chain_validator/<chain_id>/peer_validators``,
-  5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``,
-  6. ``/workers/prevalidators``,
-  7. ``/chains/<chain_id>/mempool/filter``.
+  1. ``/workers/block_validator``
+  2. ``/workers/chain_validators``
+  3. ``/workers/chain_validators/<chain_id>``
+  4. ``/workers/chain_validator/<chain_id>/peer_validators``
+  5. ``/workers/chain_validator/<chain_id>/peer_validators/<peer_id>``
+  6. ``/workers/prevalidators``
 
   The field ``backlog`` is removed. Those logs can be obtained via the
   node itself. Logging can be redirected to a file via the option
@@ -149,12 +215,6 @@ Node
 - Added a new mempool's classification for the recently introduced
   outdated error category of protocols in environment v4.
 
-- Added two optional fields, ``now`` and ``level`` as input to the
-  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
-  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
-  fields can be used to override the values normally returned by the
-  ``NOW`` and ``LEVEL`` instructions.
-
 - Add a new CLI & config option ``advertised-net-port``.
 
 - Added an optional ``show_types`` field in the input of the
@@ -169,9 +229,9 @@ Node
 - The prevalidator (which handles operations which have been received but not
   yet included in a block) was made more restrictive: it now accepts a single
   manager operation from a given manager for a given block. This limitation
-  was already present implicitly if you were using the `tezos-client` commands.
+  was already present implicitly if you were using the ``tezos-client`` commands.
   Batches of operations can be used to get around this restriction, see the
-  `multiple transfers` command to learn more. In addition, operations
+  ``multiple transfers`` command to learn more. In addition, operations
   rejected because of this limitation are solely delayed to a future block.
 
 - Removed support for store versions 0.0.4 (used by Octez 9.7) or below.
@@ -187,9 +247,6 @@ Node
 
 - Added the ``ithacanet`` built-in network alias.
 
-- Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
-  expose some metrics using the Prometheus format.
-
 - Added two optional fields, ``replace_by_fee_factor`` and
   ``max_prechecked_manager_operations`` to ``/chains/<chain_id>/mempool/filter``
   in order to control when the mempool accepts a manager operation replacement,
@@ -198,32 +255,18 @@ Node
 Client
 ------
 
-- Expanded the number of product ids searched with the HID API when looking for a ledger device.
+- Expanded the number of product ids searched with the HID API when
+  looking for a ledger device.
 
-- Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
-  The media accept header indicates to the node which format of data serialisation is supported.
-  The value can be  ``json``, ``binary`` or ``any``.
-
-- Renamed the ``--mempool`` option into ``--operations-pool``.
-  The format of the file passed as parameter has changed from the one of RPC
-  ``pending_operations`` (that is, a key-value dictionary whose values are list
-  of operations) to a single list of operations to be considered for inclusion.
-
-- ``--operations-pool`` option supports URL parameters to fetch remote mempools
-  through HTTP.  Environment variable `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`
-  may be set to specify custom HTTP headers. Only the Host header is supported
-  as of now (see description in `rfc2616, section 14.23
-  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_)
-
-- Added new option ``--ignore-node-mempool`` to the ``bake for`` command
-  to avoid querying the node's mempool when baking a block.
+- Added an optional parameter ``--media-type`` to control the
+  ``Accept`` header for RPC requests to the node. This header
+  indicates to the node which format of data serialisation is
+  supported. Possible values are ``json``, ``binary`` and ``any``.
 
 - Added two options, ``--now`` and ``--level`` to the ``run script``
   and ``run view`` commands simulating execution of Michelson
   code. These options can be used to override the values normally
   returned by the ``NOW`` and ``LEVEL`` instructions.
-
-- The output of ``tezos-client``'s RPC commands now uses the format specified by the ``--media-type``.
 
 - Added new option ``--replace`` to ``transfer`` and ``multiple transfers`` commands.
   This option allows a manager to inject a transfer or a smart contract call
@@ -240,13 +283,10 @@ Client
 Baker / Endorser / Accuser
 --------------------------
 
-- Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
-  The default ``media_type`` is ``binary`` for bakers.
-  The media accept header indicates to the node which format of data serialisation is supported.
-  The value can be ``json``, ``binary`` or ``any``.
-
-- Ported the ``--operations-pool`` option of the ``bake for`` command of the client
-  to the baker daemon.
+- Added an optional parameter ``--media-type`` to control the
+  ``Accept`` header for RPC requests to the node. This header
+  indicates to the node which format of data serialisation is
+  supported. Possible values are ``json``, ``binary`` and ``any``.
 
 -  Removed baker, endorser and accuser for Granada.
 
@@ -594,7 +634,7 @@ Node
    using store version 0.0.4. In both cases, use command
    ``tezos-node upgrade storage`` to upgrade to 0.0.6.
 
--  Added an upgrade procedure to upgrade from `v0.0.5` to `v0.0.6`. The
+-  Added an upgrade procedure to upgrade from ``v0.0.5`` to ``v0.0.6``. The
    procedure is implemented through the ``tezos-node upgrade storage``
    command.
 
@@ -714,8 +754,8 @@ Node
    number of additional cycles to keep is set to 5.
 
 -  Updated the RPC ``chains/main/checkpoint`` by renaming the
-   `save_point` field into `savepoint` to be consistent to the
-   `v0.0.5` store naming.
+   ``save_point`` field into ``savepoint`` to be consistent to the
+   ``v0.0.5`` store naming.
 
 -  Improved the shutdown procedure for external validator process.
 
