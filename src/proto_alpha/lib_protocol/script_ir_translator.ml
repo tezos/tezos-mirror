@@ -842,21 +842,6 @@ let rec merge_comparable_types :
                       (ty_of_comparable_ty ta)
                       (ty_of_comparable_ty tb))
 
-(* This function does not distinguish gas errors from merge errors. If you need
-   to recover from a type mismatch and consume the exact gas for the failed
-   comparison, use [merge_comparable_types] instead.
-*)
-let comparable_ty_eq :
-    type ta tb.
-    context ->
-    ta comparable_ty ->
-    tb comparable_ty ->
-    ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
- fun ctxt ta tb ->
-  Gas_monad.run ctxt (merge_comparable_types ~error_details:Informative ta tb)
-  >>? fun (eq_ty, ctxt) ->
-  eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
-
 let merge_memo_sizes :
     type error_trace.
     error_details:error_trace error_details ->
@@ -2716,7 +2701,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                       ~legacy
                       (Micheline.root btv)
                     >>? fun (Ex_ty btv, ctxt) ->
-                    comparable_ty_eq ctxt tk btk >>? fun (Eq, ctxt) ->
+                    Gas_monad.run
+                      ctxt
+                      (merge_comparable_types ~error_details:Informative tk btk)
+                    >>? fun (eq_ty, ctxt) ->
+                    eq_ty >>? fun (Eq, _ty) ->
                     ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) ->
                     ok (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
