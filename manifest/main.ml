@@ -2034,7 +2034,7 @@ let tezos_protocol_compiler_lib =
     ~ocaml:
       [
         (* Should be in sync with scripts/version.sh *)
-        At_least "4.12.0";
+        At_least "4.12.1";
         Less_than "4.13";
       ]
     ~deps:
