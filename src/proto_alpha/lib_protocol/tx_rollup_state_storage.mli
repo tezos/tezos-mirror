@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,25 +25,44 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** A collection of functions to manipulate the state of a transaction
+    rollup.
 
-let custom_root =
-  (RPC_path.(open_root / "context" / "tx_rollup")
-    : RPC_context.t RPC_path.context)
+    Except if the contrary is explicitly stated, the functions of this
+    module are carbonated. *)
 
-module S = struct
-  let state =
-    RPC_service.get_service
-      ~description:"Access the state of a rollup."
-      ~query:RPC_query.empty
-      ~output:Tx_rollup_state.encoding
-      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "state")
-end
+type error +=
+  | Tx_rollup_already_exists of Tx_rollup_repr.t
+  | Tx_rollup_does_not_exist of Tx_rollup_repr.t
 
-let register () =
-  let open Services_registration in
-  opt_register1 ~chunked:false S.state (fun ctxt tx_rollup () () ->
-      Tx_rollup_state.find ctxt tx_rollup >|=? snd)
+(** [init ctxt tx_rollup] initializes the state of [tx_rollup].
 
-let state ctxt block tx_rollup =
-  RPC_context.make_call1 S.state ctxt block tx_rollup () ()
+    Returns the error [Tx_rollup_already_exists] iff this function has
+    already been called for [tx_rollup], which is definitely something
+    that should not happen, because the protocol is expected to pick
+    fresh addresses when it originates new transaction rollups (and
+    does so by relying on the “origination nonce” derived from the
+    hash of the operation responsible for the origination, using the
+    same procedure as smart contracts).
+
+    Raising this error would therefore indicate a bug in the
+    protocol. *)
+val init : Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [find ctxt tx_rollup] returns the current state of [tx_rollup]. If
+    [tx_rollup] is not the address of an existing transaction rollup,
+    [None] is returned instead. *)
+val find :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t option) tzresult Lwt.t
+
+(** [get ctxt tx_rollup] returns the current state of [tx_rollup] in
+    the context.
+
+    Returns the [Tx_rollup_does_not_exist] error iff [tx_rollup] is
+    not the address of an existing transaction rollup. *)
+val get :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t

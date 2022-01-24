@@ -29,10 +29,3 @@
     [origination_nonce]. *)
 val originate :
   Raw_context.t -> (Raw_context.t * Tx_rollup_repr.t) tzresult Lwt.t
-
-(** [state context tx_rollup] is the current state of [tx_rollup] in the
-    context. *)
-val state :
-  Raw_context.t ->
-  Tx_rollup_repr.t ->
-  Tx_rollup_repr.state option tzresult Lwt.t

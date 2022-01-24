@@ -25,15 +25,26 @@
 
 (*                               utils                                       *)
 
-let get_state tx_rollup client =
-  let* json = RPC.Tx_rollup.get_state ~tx_rollup client in
-  JSON.(json |-> "state" |> as_opt |> Option.map (fun _ -> ())) |> Lwt.return
+(** To be attached to process whose output needs to be captured by the
+    regression framework. *)
+let hooks = Tezos_regression.hooks
+
+let get_state ?hooks tx_rollup client =
+  (* The state is currently empty, but the RPC can fail if [tx_rollup]
+     does not exist. *)
+  let* _json = RPC.Tx_rollup.get_state ?hooks ~tx_rollup client in
+  return ()
 
 (*                               test                                        *)
 
-let test_simple_use_case =
+let test_simple_use_case ~protocols =
   let open Tezt_tezos in
-  Protocol.register_test ~__FILE__ ~title:"Simple use case" ~tags:["rollup"]
+  Protocol.register_regression_test
+    ~__FILE__
+    ~output_file:"tx_rollup_simple_use_case"
+    ~title:"Simple use case"
+    ~tags:["tx_rollup"]
+    ~protocols
   @@ fun protocol ->
   let* parameter_file =
     Protocol.write_parameter_file
@@ -50,14 +61,16 @@ let test_simple_use_case =
       ~src:Constant.bootstrap1.public_key_hash
       client
   in
+
+  Regression.capture tx_rollup ;
+
   let* () = Client.bake_for client in
-  let* state = get_state tx_rollup client in
-  match state with
-  | Some _ -> unit
-  | None ->
-      Test.fail
-        "The tx rollups was not correctly originated and no state exists for \
-         %s."
-        tx_rollup
+
+  (* We check the rollup exists by trying to fetch its state. Since it
+     is a regression test, we can detect changes to this default
+     state. *)
+  let* _state = get_state ~hooks tx_rollup client in
+
+  unit
 
 let register ~protocols = test_simple_use_case ~protocols

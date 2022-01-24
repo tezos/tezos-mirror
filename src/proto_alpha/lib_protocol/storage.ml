@@ -1631,15 +1631,11 @@ module Tx_rollup = struct
          (Make_index (Tx_rollup_repr.Index))
 
   module State =
-    Indexed_context.Make_map
+    Indexed_context.Make_carbonated_map
       (struct
         let name = ["state"]
       end)
-      (struct
-        type t = Tx_rollup_repr.state
-
-        let encoding = Tx_rollup_repr.state_encoding
-      end)
+      (Tx_rollup_state_repr)
 end
 
 module Sc_rollup = struct

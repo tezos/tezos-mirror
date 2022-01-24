@@ -37,8 +37,10 @@ open Protocol
 open Alpha_context
 open Test_tez
 
+(** [check_tx_rollup_exists ctxt tx_rollup] returns [()] iff [tx_rollup]
+    is a valid address for a transaction rollup. Otherwise, it fails. *)
 let check_tx_rollup_exists ctxt tx_rollup =
-  Context.Tx_rollup.state ctxt tx_rollup >|=? Option.is_some
+  Context.Tx_rollup.state ctxt tx_rollup >|=? fun _ -> ()
 
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
@@ -57,8 +59,8 @@ let test_disable_feature_flag () =
   in
   Incremental.add_operation ~expect_failure i op >>= fun _i -> return_unit
 
-(** [test_origination] originate a tx rollup and check that it burns the
-    correct amount of the origination source contract. *)
+(** [test_origination] originates a transaction rollup and checks that
+    it burns the expected quantity of xtz. *)
 let test_origination () =
   Context.init ~tx_rollup_enable:true 1 >>=? fun (b, contracts) ->
   let contract =
@@ -70,21 +72,19 @@ let test_origination () =
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, tx_rollup) ->
   Incremental.add_operation i op >>=? fun i ->
-  check_tx_rollup_exists (I i) tx_rollup >>=? fun exists ->
-  if exists then
-    cost_per_byte *? Int64.of_int tx_rollup_origination_size
-    >>?= fun tx_rollup_origination_burn ->
-    Assert.balance_was_debited
-      ~loc:__LOC__
-      (I i)
-      contract
-      balance
-      tx_rollup_origination_burn
-  else failwith "tx rollup was not correctly originated"
+  check_tx_rollup_exists (I i) tx_rollup >>=? fun () ->
+  cost_per_byte *? Int64.of_int tx_rollup_origination_size
+  >>?= fun tx_rollup_origination_burn ->
+  Assert.balance_was_debited
+    ~loc:__LOC__
+    (I i)
+    contract
+    balance
+    tx_rollup_origination_burn
 
-(** [test_two_origination] originate two tx rollups in the same operation and
-    check that each has a different address. *)
-let test_two_origination () =
+(** [test_two_originations] originates two transaction rollups in the
+    same operation and checks that they have a different address. *)
+let test_two_originations () =
   Context.init ~tx_rollup_enable:true 1 >>=? fun (b, contracts) ->
   let contract =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
@@ -111,15 +111,14 @@ let test_two_origination () =
   Assert.not_equal
     ~loc:__LOC__
     Tx_rollup.equal
-    "Origination of two tx rollups in one operation have different addresses"
+    "Two transaction rollups originated in one operation have different \
+     addresses"
     Tx_rollup.pp
     txo1
     txo2
   >>=? fun () ->
-  check_tx_rollup_exists (I i) txo1 >>=? fun txo1_exists ->
-  Assert.equal_bool ~loc:__LOC__ txo1_exists true >>=? fun () ->
-  check_tx_rollup_exists (I i) txo2 >>=? fun txo2_exists ->
-  Assert.equal_bool ~loc:__LOC__ txo2_exists true
+  check_tx_rollup_exists (I i) txo1 >>=? fun () ->
+  check_tx_rollup_exists (I i) txo2 >>=? fun () -> return_unit
 
 let tests =
   [
@@ -131,5 +130,5 @@ let tests =
     Tztest.tztest
       "check two originated tx rollup in one operation have different address"
       `Quick
-      test_two_origination;
+      test_two_originations;
   ]
