@@ -131,3 +131,10 @@ let iter_p f seq =
 
 let rec unfold f a () =
   match f a with None -> Nil | Some (item, a) -> Cons (item, unfold f a)
+
+let concat_map = flat_map
+
+let rec concat seq () =
+  match seq () with
+  | Nil -> Nil
+  | Cons (subseq, restseq) -> append subseq (concat restseq) ()
