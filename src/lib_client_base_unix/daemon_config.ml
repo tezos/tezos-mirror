@@ -29,4 +29,4 @@ include Client_config
 
 (* The daemons RPC communications defaults to binary. This may be
    overriden using the --media-type command-line argument. *)
-let default_media_type = Media_type.Command_line.Json
+let default_media_type = Media_type.Command_line.Binary
