@@ -953,7 +953,7 @@ let ty_eq :
 (* Same as merge_types but for stacks.
    A single error monad is used here because there is no need to
    recover from stack merging errors.  *)
-let merge_stacks :
+let rec merge_stacks :
     type ta tb ts tu.
     Script.location ->
     context ->
@@ -962,30 +962,19 @@ let merge_stacks :
     (tb, tu) stack_ty ->
     (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * (ta, ts) stack_ty * context)
     tzresult =
- fun loc ->
-  let rec help :
-      type ta tb ts tu.
-      context ->
-      int ->
-      (ta, ts) stack_ty ->
-      (tb, tu) stack_ty ->
-      (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * (ta, ts) stack_ty * context)
-      tzresult =
-   fun ctxt lvl stack1 stack2 ->
-    match (stack1, stack2) with
-    | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
-    | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
-        Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc ty1 ty2
-        |> record_trace (Bad_stack_item lvl)
-        >>? fun (eq, ctxt) ->
-        eq >>? fun Eq ->
-        help ctxt (lvl + 1) rest1 rest2 >|? fun (Eq, rest, ctxt) ->
-        ( (Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq),
-          Item_t (ty1, rest),
-          ctxt )
-    | (_, _) -> error Bad_stack_length
-  in
-  help
+ fun loc ctxt lvl stack1 stack2 ->
+  match (stack1, stack2) with
+  | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
+  | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
+      Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc ty1 ty2
+      |> record_trace (Bad_stack_item lvl)
+      >>? fun (eq, ctxt) ->
+      eq >>? fun Eq ->
+      merge_stacks loc ctxt (lvl + 1) rest1 rest2 >|? fun (Eq, rest, ctxt) ->
+      ( (Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq),
+        Item_t (ty1, rest),
+        ctxt )
+  | (_, _) -> error Bad_stack_length
 
 (* ---- Type checker results -------------------------------------------------*)
 
