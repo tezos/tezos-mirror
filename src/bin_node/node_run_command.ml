@@ -439,7 +439,7 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
   let*! () =
     Event.(emit starting_node)
       ( config.blockchain_network.chain_name,
-        Tezos_version.Version.current,
+        Tezos_version.Current_git_info.version,
         Tezos_version.Current_git_info.abbreviated_commit_hash )
   in
   let*! node =
