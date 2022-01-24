@@ -476,8 +476,7 @@ let notify_branch w locator =
   let seed = {Block_locator.sender_id = pv.peer_id; receiver_id = sender_id} in
   Worker.Dropbox.put_request w (New_branch (locator, seed))
 
-let notify_head w header =
-  let hash = Block_header.hash header in
+let notify_head w hash header =
   Worker.Dropbox.put_request w (New_head (hash, header))
 
 let shutdown w = Worker.shutdown w
