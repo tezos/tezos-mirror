@@ -38,8 +38,10 @@ let invalid_history_mode_switch ~previous_mode ~target_mode =
 
 let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
     ~target_mode =
-  Store.Block.get_block_metadata chain_store current_head
-  >>=? fun current_head_metadata ->
+  let open Lwt_result_syntax in
+  let* current_head_metadata =
+    Store.Block.get_block_metadata chain_store current_head
+  in
   let head_lafl = Store.Block.last_allowed_fork_level current_head_metadata in
   let max_op_ttl = Store.Block.max_operations_ttl current_head_metadata in
   match target_mode with
@@ -176,6 +178,7 @@ let expected_savepoint chain_store current_head blocks_per_cycle ~previous_mode
 
 let expected_caboose chain_store current_head blocks_per_cycle ~previous_mode
     ~target_mode savepoint =
+  let open Lwt_result_syntax in
   match target_mode with
   | Archive -> return 0l
   | Full _ -> return 0l
@@ -188,8 +191,9 @@ let expected_caboose chain_store current_head blocks_per_cycle ~previous_mode
       | Archive -> return savepoint
       | Full _ ->
           (* We can get everything *)
-          Store.Block.get_block_metadata chain_store current_head
-          >>=? fun current_head_metadata ->
+          let* current_head_metadata =
+            Store.Block.get_block_metadata chain_store current_head
+          in
           let head_lafl =
             Store.Block.last_allowed_fork_level current_head_metadata
           in
@@ -210,64 +214,78 @@ let expected_caboose chain_store current_head blocks_per_cycle ~previous_mode
 
 let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
     blocks =
+  let open Lwt_result_syntax in
   let current_head =
     List.(hd (rev blocks)) |> WithExceptions.Option.get ~loc:__LOC__
   in
-  Alpha_utils.get_constants chain_store current_head
-  >>=? fun Tezos_protocol_alpha.Protocol.Alpha_context.Constants.
-             {parametric = {blocks_per_cycle; _}; _} ->
+  let* Tezos_protocol_alpha.Protocol.Alpha_context.Constants.
+         {parametric = {blocks_per_cycle; _}; _} =
+    Alpha_utils.get_constants chain_store current_head
+  in
   let stored_history_mode = Store.Chain.history_mode chain_store in
   Assert.equal
     ~prn:(Format.asprintf "%a" History_mode.pp)
     ~msg:("expected history mode: " ^ descr)
     stored_history_mode
     target_mode ;
-  Store.Chain.savepoint chain_store >>= fun (_, savepoint_level) ->
-  Store.Chain.caboose chain_store >>= fun (_, caboose_level) ->
-  (match (previous_mode, target_mode) with
-  | (Archive, Archive)
-  | (Archive, Rolling _)
-  | (Archive, Full _)
-  | (Full _, Full _)
-  | (Full _, Rolling _)
-  | (Rolling _, Rolling _) ->
-      expected_savepoint
-        chain_store
-        current_head
-        blocks_per_cycle
-        ~previous_mode
-        ~target_mode
-      >>=? fun expected_savepoint_level ->
-      Assert.equal
-        ~prn:(Format.sprintf "%ld")
-        ~msg:"savepoint consistency: "
-        expected_savepoint_level
-        savepoint_level ;
-      expected_caboose
-        chain_store
-        current_head
-        blocks_per_cycle
-        ~previous_mode
-        ~target_mode
-        expected_savepoint_level
-      >>=? fun expected_caboose_level ->
-      Assert.equal
-        ~prn:(Format.sprintf "%ld")
-        ~msg:"caboose consistency: "
-        expected_caboose_level
-        caboose_level ;
-      return_unit
-  | _ -> Alcotest.fail "Should not happen in test")
-  >>=? fun () ->
+  let*! (_, savepoint_level) = Store.Chain.savepoint chain_store in
+  let*! (_, caboose_level) = Store.Chain.caboose chain_store in
+  let* () =
+    match (previous_mode, target_mode) with
+    | (Archive, Archive)
+    | (Archive, Rolling _)
+    | (Archive, Full _)
+    | (Full _, Full _)
+    | (Full _, Rolling _)
+    | (Rolling _, Rolling _) ->
+        let* expected_savepoint_level =
+          expected_savepoint
+            chain_store
+            current_head
+            blocks_per_cycle
+            ~previous_mode
+            ~target_mode
+        in
+        Assert.equal
+          ~prn:(Format.sprintf "%ld")
+          ~msg:"savepoint consistency: "
+          expected_savepoint_level
+          savepoint_level ;
+        let* expected_caboose_level =
+          expected_caboose
+            chain_store
+            current_head
+            blocks_per_cycle
+            ~previous_mode
+            ~target_mode
+            expected_savepoint_level
+        in
+        Assert.equal
+          ~prn:(Format.sprintf "%ld")
+          ~msg:"caboose consistency: "
+          expected_caboose_level
+          caboose_level ;
+        return_unit
+    | _ -> Alcotest.fail "Should not happen in test"
+  in
   match (previous_mode, target_mode) with
   | (Archive, Full _) | (Full _, Full _) ->
       let (below_savepoint, above_savepoint) =
         List.split_n (Int32.to_int savepoint_level) blocks
       in
-      assert_presence_in_store ~with_metadata:false chain_store below_savepoint
-      >>=? fun () ->
-      assert_presence_in_store ~with_metadata:false chain_store above_savepoint
-      >>=? fun () -> return_unit
+      let* () =
+        assert_presence_in_store
+          ~with_metadata:false
+          chain_store
+          below_savepoint
+      in
+      let* () =
+        assert_presence_in_store
+          ~with_metadata:false
+          chain_store
+          above_savepoint
+      in
+      return_unit
   | (Archive, Rolling _) | (Full _, Rolling _) | (Rolling _, Rolling _) ->
       let (below_caboose, above_caboose) =
         List.split_n Int32.(to_int (pred caboose_level)) blocks
@@ -275,54 +293,73 @@ let check_consistency_after_switch descr chain_store ~previous_mode ~target_mode
       let (below_savepoint, above_savepoint) =
         List.split_n (Int32.to_int savepoint_level) above_caboose
       in
-      assert_absence_in_store chain_store below_caboose >>=? fun () ->
-      assert_presence_in_store ~with_metadata:false chain_store below_savepoint
-      >>=? fun () ->
-      assert_presence_in_store ~with_metadata:false chain_store above_savepoint
-      >>=? fun () -> return_unit
+      let* () = assert_absence_in_store chain_store below_caboose in
+      let* () =
+        assert_presence_in_store
+          ~with_metadata:false
+          chain_store
+          below_savepoint
+      in
+      let* () =
+        assert_presence_in_store
+          ~with_metadata:false
+          chain_store
+          above_savepoint
+      in
+      return_unit
   | (p, n) when History_mode.equal p n -> return_unit
   | _ -> assert false
 
 let test ~test_descr ~from_hm ~to_hm ~nb_blocks_to_bake (store_dir, context_dir)
     store ~patch_context =
+  let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
-  Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
-  >>=? fun (previously_baked_blocks, _current_head) ->
-  Block_store.await_merging (Store.Unsafe.get_block_store chain_store)
-  >>= fun () ->
-  Error_monad.protect
-    (fun () ->
-      let genesis = Store.Chain.genesis chain_store in
-      Store.close_store store >>= fun () ->
-      Store.may_switch_history_mode
-        ~store_dir
-        ~context_dir
-        genesis
-        ~new_history_mode:to_hm
-      >>=? fun () -> return_false)
-    ~on_error:(function
-      | [Store_errors.Cannot_switch_history_mode _] ->
-          return
-            (match (from_hm, to_hm) with
-            | (_, Archive) -> true
-            | (Rolling _, Full _) -> true
-            | _ -> false)
-      | err ->
-          Format.printf "@\nTest failed:@\n%a@." Error_monad.pp_print_trace err ;
-          Alcotest.fail "Should not fail")
-  >>=? fun expected_to_fail ->
+  let*! genesis_block = Store.Chain.genesis_block chain_store in
+  let* (previously_baked_blocks, _current_head) =
+    Alpha_utils.bake_n chain_store nb_blocks_to_bake genesis_block
+  in
+  let*! () =
+    Block_store.await_merging (Store.Unsafe.get_block_store chain_store)
+  in
+  let* expected_to_fail =
+    Error_monad.protect
+      (fun () ->
+        let genesis = Store.Chain.genesis chain_store in
+        let*! () = Store.close_store store in
+        let* () =
+          Store.may_switch_history_mode
+            ~store_dir
+            ~context_dir
+            genesis
+            ~new_history_mode:to_hm
+        in
+        return_false)
+      ~on_error:(function
+        | [Store_errors.Cannot_switch_history_mode _] ->
+            return
+              (match (from_hm, to_hm) with
+              | (_, Archive) -> true
+              | (Rolling _, Full _) -> true
+              | _ -> false)
+        | err ->
+            Format.printf
+              "@\nTest failed:@\n%a@."
+              Error_monad.pp_print_trace
+              err ;
+            Alcotest.fail "Should not fail")
+  in
   if expected_to_fail then return_unit
   else
     (* TODO: avoid reloading the store *)
-    Store.init
-      ~history_mode:to_hm
-      ~patch_context
-      ~store_dir
-      ~context_dir
-      ~allow_testchains:false
-      genesis
-    >>=? fun store' ->
+    let* store' =
+      Store.init
+        ~history_mode:to_hm
+        ~patch_context
+        ~store_dir
+        ~context_dir
+        ~allow_testchains:false
+        genesis
+    in
     Lwt.finalize
       (fun () ->
         let chain_store' = Store.main_chain_store store' in

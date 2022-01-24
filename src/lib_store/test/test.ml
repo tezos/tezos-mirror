@@ -32,17 +32,18 @@ let () =
       | _ -> `Quick
     with Not_found -> `Quick
   in
+  let open Lwt_syntax in
   Lwt_main.run
-    ( Internal_event_unix.init () >>= fun () ->
-      Alcotest_lwt.run
-        "tezos-store"
-        [
-          Test_cemented_store.tests;
-          Test_block_store.tests;
-          Test_store.tests;
-          Test_protocol_store.tests;
-          Test_testchain.tests;
-          Test_snapshots.tests speed;
-          Test_reconstruct.tests speed;
-          Test_history_mode_switch.tests speed;
-        ] )
+    (let* () = Internal_event_unix.init () in
+     Alcotest_lwt.run
+       "tezos-store"
+       [
+         Test_cemented_store.tests;
+         Test_block_store.tests;
+         Test_store.tests;
+         Test_protocol_store.tests;
+         Test_testchain.tests;
+         Test_snapshots.tests speed;
+         Test_reconstruct.tests speed;
+         Test_history_mode_switch.tests speed;
+       ])

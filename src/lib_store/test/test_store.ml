@@ -29,14 +29,17 @@ open Test_utils
 let test_init _ = return_unit
 
 let test_cycles store =
+  let open Lwt_result_syntax in
   let chain_store = Store.main_chain_store store in
-  List.fold_left_es
-    (fun acc _ ->
-      append_cycle ~should_set_head:true chain_store >>=? fun (blocks, _head) ->
-      return (blocks @ acc))
-    []
-    (1 -- 10)
-  >>=? fun blocks -> assert_presence_in_store chain_store blocks
+  let* blocks =
+    List.fold_left_es
+      (fun acc _ ->
+        let* (blocks, _head) = append_cycle ~should_set_head:true chain_store in
+        return (blocks @ acc))
+      []
+      (1 -- 10)
+  in
+  assert_presence_in_store chain_store blocks
 
 let test_cases =
   let wrap_test (s, f) =
@@ -70,12 +73,15 @@ let pp_print_list fmt l =
     (List.map Store.Block.hash l)
 
 let test_path chain_store tbl =
+  let open Lwt_syntax in
   let check_path h1 h2 p2 =
-    Store.Chain_traversal.path
-      chain_store
-      ~from_block:(vblock tbl h1)
-      ~to_block:(vblock tbl h2)
-    >>= function
+    let* o =
+      Store.Chain_traversal.path
+        chain_store
+        ~from_block:(vblock tbl h1)
+        ~to_block:(vblock tbl h2)
+    in
+    match o with
     | None -> Assert.fail_msg "cannot compute path %s -> %s" h1 h2
     | Some (p : Store.Block.t list) ->
         let p2 = List.map (fun b -> vblock tbl b) p2 in
@@ -85,23 +91,27 @@ let test_path chain_store tbl =
           Assert.fail_msg "bad path %s -> %s" h1 h2) ;
         Lwt.return_unit
   in
-  check_path "Genesis" "Genesis" [] >>= fun () ->
-  check_path "A1" "A1" [] >>= fun () ->
-  check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] >>= fun () ->
-  check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] >>= fun () ->
-  check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] >>= fun () -> return_unit
+  let* () = check_path "Genesis" "Genesis" [] in
+  let* () = check_path "A1" "A1" [] in
+  let* () = check_path "A2" "A6" ["A3"; "A4"; "A5"; "A6"] in
+  let* () = check_path "B2" "B6" ["B3"; "B4"; "B5"; "B6"] in
+  let* () = check_path "A1" "B3" ["A2"; "A3"; "B1"; "B2"; "B3"] in
+  return_ok_unit
 
 (****************************************************************************)
 
 (** Chain_traversal.common_ancestor *)
 
 let test_ancestor chain_store tbl =
+  let open Lwt_syntax in
   let check_ancestor h1 h2 expected =
-    Store.Chain_traversal.common_ancestor
-      chain_store
-      (vblock tbl h1)
-      (vblock tbl h2)
-    >>= function
+    let* o =
+      Store.Chain_traversal.common_ancestor
+        chain_store
+        (vblock tbl h1)
+        (vblock tbl h2)
+    in
+    match o with
     | None -> Assert.fail_msg "not ancestor found"
     | Some a ->
         if
@@ -110,20 +120,21 @@ let test_ancestor chain_store tbl =
         then Assert.fail_msg "bad ancestor %s %s" h1 h2 ;
         Lwt.return_unit
   in
-  check_ancestor "Genesis" "Genesis" (vblock tbl "Genesis") >>= fun () ->
-  check_ancestor "Genesis" "A3" (vblock tbl "Genesis") >>= fun () ->
-  check_ancestor "A3" "Genesis" (vblock tbl "Genesis") >>= fun () ->
-  check_ancestor "A1" "A1" (vblock tbl "A1") >>= fun () ->
-  check_ancestor "A1" "A3" (vblock tbl "A1") >>= fun () ->
-  check_ancestor "A3" "A1" (vblock tbl "A1") >>= fun () ->
-  check_ancestor "A6" "B6" (vblock tbl "A3") >>= fun () ->
-  check_ancestor "B6" "A6" (vblock tbl "A3") >>= fun () ->
-  check_ancestor "A4" "B1" (vblock tbl "A3") >>= fun () ->
-  check_ancestor "B1" "A4" (vblock tbl "A3") >>= fun () ->
-  check_ancestor "A3" "B1" (vblock tbl "A3") >>= fun () ->
-  check_ancestor "B1" "A3" (vblock tbl "A3") >>= fun () ->
-  check_ancestor "A2" "B1" (vblock tbl "A2") >>= fun () ->
-  check_ancestor "B1" "A2" (vblock tbl "A2") >>= fun () -> return_unit
+  let* () = check_ancestor "Genesis" "Genesis" (vblock tbl "Genesis") in
+  let* () = check_ancestor "Genesis" "A3" (vblock tbl "Genesis") in
+  let* () = check_ancestor "A3" "Genesis" (vblock tbl "Genesis") in
+  let* () = check_ancestor "A1" "A1" (vblock tbl "A1") in
+  let* () = check_ancestor "A1" "A3" (vblock tbl "A1") in
+  let* () = check_ancestor "A3" "A1" (vblock tbl "A1") in
+  let* () = check_ancestor "A6" "B6" (vblock tbl "A3") in
+  let* () = check_ancestor "B6" "A6" (vblock tbl "A3") in
+  let* () = check_ancestor "A4" "B1" (vblock tbl "A3") in
+  let* () = check_ancestor "B1" "A4" (vblock tbl "A3") in
+  let* () = check_ancestor "A3" "B1" (vblock tbl "A3") in
+  let* () = check_ancestor "B1" "A3" (vblock tbl "A3") in
+  let* () = check_ancestor "A2" "B1" (vblock tbl "A2") in
+  let* () = check_ancestor "B1" "A2" (vblock tbl "A2") in
+  return_ok_unit
 
 (****************************************************************************)
 
@@ -144,13 +155,15 @@ let iter2_exn f l1 l2 =
 (** Block_locator *)
 
 let test_locator chain_store tbl =
+  let open Lwt_syntax in
   let check_locator length h1 expected =
-    Store.Chain.compute_locator
-      chain_store
-      ~max_size:length
-      (vblock tbl h1)
-      seed
-    >>= fun l ->
+    let* l =
+      Store.Chain.compute_locator
+        chain_store
+        ~max_size:length
+        (vblock tbl h1)
+        seed
+    in
     let (_, l) = (l : Block_locator.t :> _ * _) in
     if Compare.List_lengths.(l <> expected) then
       Assert.fail_msg
@@ -166,13 +179,14 @@ let test_locator chain_store tbl =
       expected ;
     Lwt.return_unit
   in
-  check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"] >>= fun () ->
-  check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A3"]
-  >>= fun () ->
-  check_locator 4 "B8" ["B7"; "B6"; "B5"; "B4"] >>= fun () ->
-  check_locator 0 "A5" [] >>= fun () ->
-  check_locator 100 "A5" ["A4"; "A3"; "A2"; "A1"; "Genesis"] >>= fun () ->
-  return_unit
+  let* () = check_locator 6 "A8" ["A7"; "A6"; "A5"; "A4"; "A3"; "A2"] in
+  let* () =
+    check_locator 8 "B8" ["B7"; "B6"; "B5"; "B4"; "B3"; "B2"; "B1"; "A3"]
+  in
+  let* () = check_locator 4 "B8" ["B7"; "B6"; "B5"; "B4"] in
+  let* () = check_locator 0 "A5" [] in
+  let* () = check_locator 100 "A5" ["A4"; "A3"; "A2"; "A1"; "Genesis"] in
+  return_ok_unit
 
 (****************************************************************************)
 
@@ -194,12 +208,13 @@ let compare s name heads l =
     l
 
 let test_known_heads chain_store tbl =
-  Store.Chain.known_heads chain_store >>= fun heads ->
+  let open Lwt_result_syntax in
+  let*! heads = Store.Chain.known_heads chain_store in
   let heads = List.map fst heads in
   compare tbl "initial" heads ["Genesis"] ;
-  Store.Chain.set_head chain_store (vblock tbl "A8") >>=? fun _ ->
-  Store.Chain.set_head chain_store (vblock tbl "B8") >>=? fun _ ->
-  Store.Chain.known_heads chain_store >>= fun heads ->
+  let* _ = Store.Chain.set_head chain_store (vblock tbl "A8") in
+  let* _ = Store.Chain.set_head chain_store (vblock tbl "B8") in
+  let*! heads = Store.Chain.known_heads chain_store in
   let heads = List.map fst heads in
   compare tbl "initial" heads ["A8"; "B8"] ;
   return_unit
@@ -209,16 +224,18 @@ let test_known_heads chain_store tbl =
 (** Chain.head/set_head *)
 
 let test_head chain_store tbl =
-  Store.Chain.current_head chain_store >>= fun head ->
-  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
+  let open Lwt_result_syntax in
+  let*! head = Store.Chain.current_head chain_store in
+  let*! genesis_block = Store.Chain.genesis_block chain_store in
   if not (Store.Block.equal head genesis_block) then
     Assert.fail_msg "unexpected head" ;
-  Store.Chain.set_head chain_store (vblock tbl "A6") >>=? function
+  let* o = Store.Chain.set_head chain_store (vblock tbl "A6") in
+  match o with
   | None -> Assert.fail_msg "unexpected previous head"
   | Some prev_head ->
       if not (Store.Block.equal prev_head genesis_block) then
         Assert.fail_msg "unexpected previous head" ;
-      Store.Chain.current_head chain_store >>= fun head ->
+      let*! head = Store.Chain.current_head chain_store in
       if not (Store.Block.equal head (vblock tbl "A6")) then
         Assert.fail_msg "unexpected head" ;
       return_unit
@@ -234,71 +251,77 @@ let test_head chain_store tbl =
   *)
 
 let test_mem chain_store tbl =
+  let open Lwt_result_syntax in
   let mem x =
     let b = vblock tbl x in
     let b_descr = Store.Block.(hash b, level b) in
     Store.Chain.is_in_chain chain_store b_descr
   in
   let test_mem x =
-    mem x >>= function
-    | true -> Lwt.return_unit
-    | false -> Assert.fail_msg "mem %s" x
+    let*! b = mem x in
+    match b with true -> Lwt.return_unit | false -> Assert.fail_msg "mem %s" x
   in
   let test_not_mem x =
-    mem x >>= function
+    let*! b = mem x in
+    match b with
     | false -> Lwt.return_unit
     | true -> Assert.fail_msg "not (mem %s)" x
   in
-  test_not_mem "A3" >>= fun () ->
-  test_not_mem "A6" >>= fun () ->
-  test_not_mem "A8" >>= fun () ->
-  test_not_mem "B1" >>= fun () ->
-  test_not_mem "B6" >>= fun () ->
-  test_not_mem "B8" >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "A8") >>=? fun _ ->
-  test_mem "A3" >>= fun () ->
-  test_mem "A6" >>= fun () ->
-  test_mem "A8" >>= fun () ->
-  test_not_mem "B1" >>= fun () ->
-  test_not_mem "B6" >>= fun () ->
-  test_not_mem "B8" >>= fun () ->
-  (Store.Chain.set_head chain_store (vblock tbl "A6") >>=? function
-   | Some _prev_head -> Assert.fail_msg "unexpected head switch"
-   | None -> return_unit)
-  >>=? fun () ->
+  let*! () = test_not_mem "A3" in
+  let*! () = test_not_mem "A6" in
+  let*! () = test_not_mem "A8" in
+  let*! () = test_not_mem "B1" in
+  let*! () = test_not_mem "B6" in
+  let*! () = test_not_mem "B8" in
+  let* _ = Store.Chain.set_head chain_store (vblock tbl "A8") in
+  let*! () = test_mem "A3" in
+  let*! () = test_mem "A6" in
+  let*! () = test_mem "A8" in
+  let*! () = test_not_mem "B1" in
+  let*! () = test_not_mem "B6" in
+  let*! () = test_not_mem "B8" in
+  let* () =
+    let* o = Store.Chain.set_head chain_store (vblock tbl "A6") in
+    match o with
+    | Some _prev_head -> Assert.fail_msg "unexpected head switch"
+    | None -> return_unit
+  in
   (* A6 is a predecessor of A8. A8 remains the new head. *)
-  test_mem "A3" >>= fun () ->
-  test_mem "A6" >>= fun () ->
-  test_mem "A8" >>= fun () ->
-  test_not_mem "B1" >>= fun () ->
-  test_not_mem "B6" >>= fun () ->
-  test_not_mem "B8" >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "B6") >>=? fun _ ->
-  test_mem "A3" >>= fun () ->
-  test_not_mem "A4" >>= fun () ->
-  test_not_mem "A6" >>= fun () ->
-  test_not_mem "A8" >>= fun () ->
-  test_mem "B1" >>= fun () ->
-  test_mem "B6" >>= fun () ->
-  test_not_mem "B8" >>= fun () ->
-  Store.Chain.set_head chain_store (vblock tbl "B8") >>=? fun _ ->
-  test_mem "A3" >>= fun () ->
-  test_not_mem "A4" >>= fun () ->
-  test_not_mem "A6" >>= fun () ->
-  test_not_mem "A8" >>= fun () ->
-  test_mem "B1" >>= fun () ->
-  test_mem "B6" >>= fun () ->
-  test_mem "B8" >>= fun () -> return_unit
+  let*! () = test_mem "A3" in
+  let*! () = test_mem "A6" in
+  let*! () = test_mem "A8" in
+  let*! () = test_not_mem "B1" in
+  let*! () = test_not_mem "B6" in
+  let*! () = test_not_mem "B8" in
+  let* _ = Store.Chain.set_head chain_store (vblock tbl "B6") in
+  let*! () = test_mem "A3" in
+  let*! () = test_not_mem "A4" in
+  let*! () = test_not_mem "A6" in
+  let*! () = test_not_mem "A8" in
+  let*! () = test_mem "B1" in
+  let*! () = test_mem "B6" in
+  let*! () = test_not_mem "B8" in
+  let* _ = Store.Chain.set_head chain_store (vblock tbl "B8") in
+  let*! () = test_mem "A3" in
+  let*! () = test_not_mem "A4" in
+  let*! () = test_not_mem "A6" in
+  let*! () = test_not_mem "A8" in
+  let*! () = test_mem "B1" in
+  let*! () = test_mem "B6" in
+  let*! () = test_mem "B8" in
+  return_unit
 
 (****************************************************************************)
 
 (** Chain_traversal.new_blocks *)
 
 let test_new_blocks chain_store tbl =
+  let open Lwt_syntax in
   let test head h expected_ancestor expected =
     let to_block = vblock tbl head and from_block = vblock tbl h in
-    Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
-    >>= fun (ancestor, blocks) ->
+    let* (ancestor, blocks) =
+      Store.Chain_traversal.new_blocks chain_store ~from_block ~to_block
+    in
     if
       not
         (Block_hash.equal
@@ -329,9 +352,10 @@ let test_new_blocks chain_store tbl =
       expected ;
     Lwt.return_unit
   in
-  test "A6" "A6" "A6" [] >>= fun () ->
-  test "A8" "A6" "A6" ["A7"; "A8"] >>= fun () ->
-  test "A8" "B7" "A3" ["A4"; "A5"; "A6"; "A7"; "A8"] >>= fun () -> return_unit
+  let* () = test "A6" "A6" "A6" [] in
+  let* () = test "A8" "A6" "A6" ["A7"; "A8"] in
+  let* () = test "A8" "B7" "A3" ["A4"; "A5"; "A6"; "A7"; "A8"] in
+  return_ok_unit
 
 (** Store.Chain.checkpoint *)
 
@@ -351,19 +375,23 @@ does not prevent a future good block from correctly being reached
  *)
 
 let test_basic_checkpoint chain_store table =
+  let open Lwt_result_syntax in
   let block = vblock table "A1" in
-  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
+  let* _prev_head = Store.Chain.set_head chain_store block in
   (* Setting target for A1 *)
-  Store.Chain.set_target
-    chain_store
-    (Store.Block.hash block, Store.Block.level block)
-  >>=? fun () ->
-  Store.Chain.checkpoint chain_store >>= fun (c_block, c_level) ->
+  let* () =
+    Store.Chain.set_target
+      chain_store
+      (Store.Block.hash block, Store.Block.level block)
+  in
+  let*! (c_block, c_level) = Store.Chain.checkpoint chain_store in
   (* Target should not be set, only the checkpoint. *)
-  (Store.Chain.target chain_store >>= function
-   | Some _target -> Assert.fail_msg "unexpected target"
-   | None -> return_unit)
-  >>=? fun () ->
+  let* () =
+    let*! o = Store.Chain.target chain_store in
+    match o with
+    | Some _target -> Assert.fail_msg "unexpected target"
+    | None -> return_unit
+  in
   if
     (not (Block_hash.equal c_block (Store.Block.hash block)))
     && Int32.equal c_level (Store.Block.level block)
@@ -382,17 +410,19 @@ let test_basic_checkpoint chain_store table =
    will the block is compatible with the current checkpoint? *)
 
 let test_acceptable_block chain_store table =
+  let open Lwt_result_syntax in
   let block = vblock table "A2" in
   let block_hash = Store.Block.hash block in
   let level = Store.Block.level block in
-  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
-  Store.Chain.set_target chain_store (block_hash, level) >>=? fun () ->
+  let* _prev_head = Store.Chain.set_head chain_store block in
+  let* () = Store.Chain.set_target chain_store (block_hash, level) in
   (* it is accepted if the new head is greater than the checkpoint *)
   let block_1 = vblock table "A1" in
-  Store.Chain.is_acceptable_block
-    chain_store
-    (Store.Block.hash block_1, Store.Block.level block_1)
-  >>= fun is_accepted_block ->
+  let*! is_accepted_block =
+    Store.Chain.is_acceptable_block
+      chain_store
+      (Store.Block.hash block_1, Store.Block.level block_1)
+  in
   if not is_accepted_block then return_unit
   else Assert.fail_msg "unacceptable block was accepted"
 
@@ -403,11 +433,12 @@ let test_acceptable_block chain_store table =
   *)
 
 let test_is_valid_target chain_store table =
+  let open Lwt_result_syntax in
   let block = vblock table "A2" in
   let block_hash = Store.Block.hash block in
   let level = Store.Block.level block in
-  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
-  Store.Chain.set_target chain_store (block_hash, level) >>=? fun () ->
+  let* _prev_head = Store.Chain.set_head chain_store block in
+  let* () = Store.Chain.set_target chain_store (block_hash, level) in
   (* "b3" is valid because:
      a1 - a2 (checkpoint) - b1 - b2 - b3
   *)
@@ -417,15 +448,17 @@ let test_is_valid_target chain_store table =
     are compatible with the given checkpoint *)
 
 let test_best_know_head_for_checkpoint chain_store table =
+  let open Lwt_result_syntax in
   let block = vblock table "A2" in
   let block_hash = Store.Block.hash block in
   let level = Store.Block.level block in
   let checkpoint = (block_hash, level) in
-  Store.Chain.set_head chain_store block >>=? fun _prev_head ->
-  Store.Chain.set_target chain_store checkpoint >>=? fun () ->
-  Store.Chain.set_head chain_store (vblock table "B3") >>=? fun _head ->
-  Store.Chain.best_known_head_for_checkpoint chain_store ~checkpoint
-  >>= fun _block ->
+  let* _prev_head = Store.Chain.set_head chain_store block in
+  let* () = Store.Chain.set_target chain_store checkpoint in
+  let* _head = Store.Chain.set_head chain_store (vblock table "B3") in
+  let*! _block =
+    Store.Chain.best_known_head_for_checkpoint chain_store ~checkpoint
+  in
   (* the block returns with the best fitness is B3 at level 5 *)
   return_unit
 
@@ -436,28 +469,38 @@ let test_best_know_head_for_checkpoint chain_store table =
  *)
 
 let test_future_target chain_store _ =
-  Store.Chain.genesis_block chain_store >>= fun genesis_block ->
+  let open Lwt_result_syntax in
+  let*! genesis_block = Store.Chain.genesis_block chain_store in
   let genesis_descr = Store.Block.descriptor genesis_block in
-  make_raw_block_list genesis_descr 5 >>= fun (bad_chain, bad_head) ->
-  make_raw_block_list genesis_descr 5 >>= fun (good_chain, good_head) ->
-  Store.Chain.set_target chain_store (raw_descriptor good_head) >>=? fun () ->
-  List.iter_es
-    (fun b ->
-      Format.printf "storing : %a@." pp_raw_block b ;
-      store_raw_block chain_store b >>=? fun _ -> return_unit)
-    (List.rev
-       (List.tl (List.rev bad_chain) |> WithExceptions.Option.get ~loc:__LOC__))
-  >>=? fun () ->
-  (store_raw_block chain_store bad_head >>= function
-   | Error [Validation_errors.Checkpoint_error _] -> return_unit
-   | Ok _ | _ -> Assert.fail_msg "incompatible head accepted")
-  >>=? fun () ->
-  List.iter_es
-    (fun b -> store_raw_block chain_store b >>=? fun _ -> return_unit)
-    (List.rev
-       (List.tl (List.rev good_chain) |> WithExceptions.Option.get ~loc:__LOC__))
-  >>=? fun () ->
-  store_raw_block chain_store good_head >>=? fun _ -> return_unit
+  let*! (bad_chain, bad_head) = make_raw_block_list genesis_descr 5 in
+  let*! (good_chain, good_head) = make_raw_block_list genesis_descr 5 in
+  let* () = Store.Chain.set_target chain_store (raw_descriptor good_head) in
+  let* () =
+    List.iter_es
+      (fun b ->
+        Format.printf "storing : %a@." pp_raw_block b ;
+        let* _ = store_raw_block chain_store b in
+        return_unit)
+      (List.rev
+         (List.tl (List.rev bad_chain) |> WithExceptions.Option.get ~loc:__LOC__))
+  in
+  let* () =
+    let*! r = store_raw_block chain_store bad_head in
+    match r with
+    | Error [Validation_errors.Checkpoint_error _] -> return_unit
+    | Ok _ | _ -> Assert.fail_msg "incompatible head accepted"
+  in
+  let* () =
+    List.iter_es
+      (fun b ->
+        let* _ = store_raw_block chain_store b in
+        return_unit)
+      (List.rev
+         (List.tl (List.rev good_chain)
+         |> WithExceptions.Option.get ~loc:__LOC__))
+  in
+  let* _ = store_raw_block chain_store good_head in
+  return_unit
 
 (* check if the checkpoint can be reached
 
@@ -468,17 +511,18 @@ let test_future_target chain_store _ =
 *)
 
 let test_reach_target chain_store table =
+  let open Lwt_result_syntax in
   let mem x =
     let b = vblock table x in
     Store.Chain.is_in_chain chain_store Store.Block.(hash b, level b)
   in
   let test_mem x =
-    mem x >>= function
-    | true -> Lwt.return_unit
-    | false -> Assert.fail_msg "mem %s" x
+    let*! b = mem x in
+    match b with true -> Lwt.return_unit | false -> Assert.fail_msg "mem %s" x
   in
   let test_not_mem x =
-    mem x >>= function
+    let*! b = mem x in
+    match b with
     | false -> Lwt.return_unit
     | true -> Assert.fail_msg "not (mem %s)" x
   in
@@ -486,10 +530,11 @@ let test_reach_target chain_store table =
   let header = Store.Block.header block in
   let checkpoint_hash = Store.Block.hash block in
   let checkpoint_level = Store.Block.level block in
-  Store.Chain.set_head chain_store block >>=? fun _pred_head ->
-  Store.Chain.set_target chain_store (checkpoint_hash, checkpoint_level)
-  >>=? fun () ->
-  Store.Chain.checkpoint chain_store >>= fun (c_hash, _c_level) ->
+  let* _pred_head = Store.Chain.set_head chain_store block in
+  let* () =
+    Store.Chain.set_target chain_store (checkpoint_hash, checkpoint_level)
+  in
+  let*! (c_hash, _c_level) = Store.Chain.checkpoint chain_store in
   let time_now = Time.System.to_protocol (Systime_os.now ()) in
   if
     Time.Protocol.compare
@@ -502,8 +547,8 @@ let test_reach_target chain_store table =
       && not (Block_hash.equal checkpoint_hash c_hash)
     then Assert.fail_msg "checkpoint error"
     else
-      Store.Chain.set_head chain_store (vblock table "A2") >>=? fun _ ->
-      Store.Chain.current_head chain_store >>= fun head ->
+      let* _ = Store.Chain.set_head chain_store (vblock table "A2") in
+      let*! head = Store.Chain.current_head chain_store in
       let checkpoint_reached =
         (Store.Block.header head).shell.level >= checkpoint_level
       in
@@ -511,11 +556,12 @@ let test_reach_target chain_store table =
         (* if reached the checkpoint, every block before the checkpoint
            must be the part of the chain *)
         if header.shell.level <= checkpoint_level then
-          test_mem "Genesis" >>= fun () ->
-          test_mem "A1" >>= fun () ->
-          test_mem "A2" >>= fun () ->
-          test_not_mem "A3" >>= fun () ->
-          test_not_mem "B1" >>= fun () -> return_unit
+          let*! () = test_mem "Genesis" in
+          let*! () = test_mem "A1" in
+          let*! () = test_mem "A2" in
+          let*! () = test_not_mem "A3" in
+          let*! () = test_not_mem "B1" in
+          return_unit
         else Assert.fail_msg "checkpoint error"
       else Assert.fail_msg "checkpoint error"
   else Assert.fail_msg "fail future block header"
@@ -534,13 +580,14 @@ let test_reach_target chain_store table =
 *)
 
 let test_not_may_update_target chain_store table =
+  let open Lwt_result_syntax in
   (* set target at (2l, A2) *)
   let block_a2 = vblock table "A2" in
   let target_hash = Store.Block.hash block_a2 in
   let target_level = Store.Block.level block_a2 in
   let target = (target_hash, target_level) in
-  Store.Chain.set_head chain_store block_a2 >>=? fun _pred_head ->
-  Store.Chain.set_target chain_store target >>=? fun () ->
+  let* _pred_head = Store.Chain.set_head chain_store block_a2 in
+  let* () = Store.Chain.set_target chain_store target in
   (* set new target at (1l, A1) in the past *)
   let block_a1 = vblock table "A1" in
   let target_hash = Store.Block.hash block_a1 in
@@ -548,7 +595,7 @@ let test_not_may_update_target chain_store table =
   let new_target = (target_hash, target_level) in
   Lwt.catch
     (fun () ->
-      Store.Chain.set_target chain_store new_target >>=? fun () ->
+      let* () = Store.Chain.set_target chain_store new_target in
       Assert.fail_msg "Unexpected target update")
     (function _ -> return_unit)
 
@@ -562,14 +609,17 @@ let testable_hash =
     Block_hash.equal
 
 let init_block_of_identifier_test chain_store table =
-  vblock table "A8" |> Store.Chain.set_head chain_store >|=? fun _ -> ()
+  let open Lwt_result_syntax in
+  let+ _ = vblock table "A8" |> Store.Chain.set_head chain_store in
+  ()
 
 let vblock_hash table name = vblock table name |> Store.Block.hash
 
 let assert_successful_block_of_identifier
     ?(init = init_block_of_identifier_test) ~input ~expected chain_store table =
-  init chain_store table >>=? fun _ ->
-  Store.Chain.block_of_identifier chain_store input >|=? fun found ->
+  let open Lwt_result_syntax in
+  let* _ = init chain_store table in
+  let+ found = Store.Chain.block_of_identifier chain_store input in
   Alcotest.check
     testable_hash
     "same block hash"
@@ -578,8 +628,10 @@ let assert_successful_block_of_identifier
 
 let assert_failing_block_of_identifier ?(init = init_block_of_identifier_test)
     ~input chain_store table =
-  init chain_store table >>=? fun _ ->
-  Store.Chain.block_of_identifier chain_store input >>= function
+  let open Lwt_result_syntax in
+  let* _ = init chain_store table in
+  let*! r = Store.Chain.block_of_identifier chain_store input in
+  match r with
   | Ok b ->
       Assert.fail_msg
         ~given:(Store.Block.hash b |> Block_hash.to_b58check)
@@ -639,12 +691,13 @@ let test_block_of_identifier_failure_caboose_predecessor chain_store table =
     table
 
 let test_block_of_identifier_success_checkpoint chain_store table =
+  let open Lwt_result_syntax in
   let a5 = vblock table "A5" in
   let a5_hash = Store.Block.hash a5 in
   let a5_descriptor = (a5_hash, Store.Block.level a5) in
   assert_successful_block_of_identifier
     ~init:(fun cs t ->
-      init_block_of_identifier_test cs t >>=? fun _ ->
+      let* _ = init_block_of_identifier_test cs t in
       Store.Unsafe.set_checkpoint cs a5_descriptor)
     ~input:(`Alias (`Checkpoint, 0))
     ~expected:a5_hash
@@ -652,12 +705,13 @@ let test_block_of_identifier_success_checkpoint chain_store table =
     table
 
 let test_block_of_identifier_success_checkpoint_predecessor chain_store table =
+  let open Lwt_result_syntax in
   let a5 = vblock table "A5" in
   let a5_hash = Store.Block.hash a5 in
   let a5_descriptor = (a5_hash, Store.Block.level a5) in
   assert_successful_block_of_identifier
     ~init:(fun cs t ->
-      init_block_of_identifier_test cs t >>=? fun _ ->
+      let* _ = init_block_of_identifier_test cs t in
       Store.Unsafe.set_checkpoint cs a5_descriptor)
     ~input:(`Alias (`Checkpoint, 2))
     ~expected:(vblock_hash table "A3")
@@ -665,12 +719,13 @@ let test_block_of_identifier_success_checkpoint_predecessor chain_store table =
     table
 
 let test_block_of_identifier_success_checkpoint_successor chain_store table =
+  let open Lwt_result_syntax in
   let a5 = vblock table "A5" in
   let a5_hash = Store.Block.hash a5 in
   let a5_descriptor = (a5_hash, Store.Block.level a5) in
   assert_successful_block_of_identifier
     ~init:(fun cs t ->
-      init_block_of_identifier_test cs t >>=? fun _ ->
+      let* _ = init_block_of_identifier_test cs t in
       Store.Unsafe.set_checkpoint cs a5_descriptor)
     ~input:(`Alias (`Checkpoint, -2))
     ~expected:(vblock_hash table "A7")
@@ -678,12 +733,13 @@ let test_block_of_identifier_success_checkpoint_successor chain_store table =
     table
 
 let test_block_of_identifier_failure_checkpoint_successor chain_store table =
+  let open Lwt_result_syntax in
   let a5 = vblock table "A5" in
   let a5_hash = Store.Block.hash a5 in
   let a5_descriptor = (a5_hash, Store.Block.level a5) in
   assert_failing_block_of_identifier
     ~init:(fun cs t ->
-      init_block_of_identifier_test cs t >>=? fun _ ->
+      let* _ = init_block_of_identifier_test cs t in
       Store.Unsafe.set_checkpoint cs a5_descriptor)
     ~input:(`Alias (`Checkpoint, -4))
     chain_store
