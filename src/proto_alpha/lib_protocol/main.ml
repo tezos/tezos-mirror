@@ -598,8 +598,8 @@ let finalize_block
        Apply.check_minimum_endorsements
          ~endorsing_power:included_endorsements
          ~minimum
-      else return_unit)
-      >>=? fun () ->
+      else Result.return_unit)
+      >>?= fun () ->
       Alpha_context.Voting_period.get_rpc_current_info ctxt
       >|=? fun voting_period_info ->
       let level_info = Alpha_context.Level.current ctxt in

@@ -120,9 +120,9 @@ let remove_stake ctxt delegate amount =
   Tez_repr.(staking_balance_before -? amount) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
-  Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
-  if (not inactive) && Tez_repr.(staking_balance_before >= tokens_per_roll) then
-    if Tez_repr.(staking_balance < tokens_per_roll) then
+  if Tez_repr.(staking_balance_before >= tokens_per_roll) then
+    Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
+    if (not inactive) && Tez_repr.(staking_balance < tokens_per_roll) then
       Storage.Stake.Active_delegate_with_one_roll.remove ctxt delegate
       >>= fun ctxt -> return ctxt
     else return ctxt

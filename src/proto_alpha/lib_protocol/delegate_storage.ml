@@ -295,7 +295,7 @@ let expected_slots_for_given_active_stake ctxt ~total_active_stake ~active_stake
   let number_of_endorsements_per_cycle =
     blocks_per_cycle * consensus_committee_size
   in
-  return
+  Result.return
     (Z.to_int
        (Z.div
           (Z.mul
@@ -338,7 +338,7 @@ let distribute_endorsing_rewards ctxt last_cycle unrevealed_nonces =
         ctxt
         ~total_active_stake
         ~active_stake
-      >>=? fun expected_slots ->
+      >>?= fun expected_slots ->
       let rewards = Tez_repr.mul_exn endorsing_reward_per_slot expected_slots in
       (if sufficient_participation && has_revealed_nonces then
        (* Sufficient participation: we pay the rewards *)
@@ -444,11 +444,13 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
          maximum_stake_to_be_deposited <= frozen_deposits + balance
          See select_distribution_for_cycle *)
       let delegate_contract = Contract_repr.implicit_contract delegate in
-      Frozen_deposits_storage.update_deposits_cap
+      Frozen_deposits_storage.update_initial_amount
         ctxt
         delegate_contract
         maximum_stake_to_be_deposited
-      >>=? fun (ctxt, current_amount) ->
+      >>=? fun ctxt ->
+      Frozen_deposits_storage.get ctxt delegate_contract >>=? fun deposits ->
+      let current_amount = deposits.current_amount in
       if Tez_repr.(current_amount > maximum_stake_to_be_deposited) then
         Tez_repr.(current_amount -? maximum_stake_to_be_deposited)
         >>?= fun to_reimburse ->
@@ -491,14 +493,14 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
   Signature.Public_key_hash.Set.fold_es
     (fun delegate (ctxt, balance_updates) ->
       let delegate_contract = Contract_repr.implicit_contract delegate in
+      Frozen_deposits_storage.update_initial_amount
+        ctxt
+        delegate_contract
+        Tez_repr.zero
+      >>=? fun ctxt ->
       Frozen_deposits_storage.get ctxt delegate_contract
       >>=? fun frozen_deposits ->
       if Tez_repr.(frozen_deposits.current_amount > zero) then
-        Frozen_deposits_storage.update_deposits_cap
-          ctxt
-          delegate_contract
-          Tez_repr.zero
-        >>=? fun (ctxt, (_current_amount : Tez_repr.t)) ->
         Token.transfer
           ~origin
           ctxt
@@ -757,7 +759,7 @@ let record_endorsing_participation ctxt ~delegate ~participation
                 ctxt
                 ~total_active_stake
                 ~active_stake
-              >>=? fun expected_slots ->
+              >>?= fun expected_slots ->
               let Constants_repr.{numerator; denominator} =
                 Constants_storage.minimal_participation_ratio ctxt
               in
@@ -835,7 +837,7 @@ let delegate_participation_info ctxt delegate =
         ctxt
         ~total_active_stake
         ~active_stake
-      >>=? fun expected_cycle_activity ->
+      >>?= fun expected_cycle_activity ->
       let Constants_repr.{numerator; denominator} =
         Constants_storage.minimal_participation_ratio ctxt
       in

@@ -29,10 +29,7 @@ open Alpha_context
 
 type error +=
   | (* `Permanent *)
-      Not_enough_endorsements of {
-      required : int;
-      endorsements : int;
-    }
+      Not_enough_endorsements of {required : int; provided : int}
   | (* `Temporary *)
       Wrong_consensus_operation_branch of
       Block_hash.t * Block_hash.t
@@ -130,19 +127,17 @@ let () =
     ~description:
       "The block being validated does not include the required minimum number \
        of endorsements."
-    ~pp:(fun ppf (required, endorsements) ->
+    ~pp:(fun ppf (required, provided) ->
       Format.fprintf
         ppf
         "Wrong number of endorsements (%i), at least %i are expected"
-        endorsements
+        provided
         required)
-    Data_encoding.(obj2 (req "required" int31) (req "endorsements" int31))
+    Data_encoding.(obj2 (req "required" int31) (req "provided" int31))
     (function
-      | Not_enough_endorsements {required; endorsements} ->
-          Some (required, endorsements)
+      | Not_enough_endorsements {required; provided} -> Some (required, provided)
       | _ -> None)
-    (fun (required, endorsements) ->
-      Not_enough_endorsements {required; endorsements}) ;
+    (fun (required, provided) -> Not_enough_endorsements {required; provided}) ;
   register_error_kind
     `Temporary
     ~id:"operation.wrong_consensus_operation_branch"
@@ -528,7 +523,8 @@ let () =
     (function Inconsistent_counters -> Some () | _ -> None)
     (fun () -> Inconsistent_counters)
 
-type error += (* `Temporary *) Wrong_voting_period of int32 * int32
+type error +=
+  | (* `Temporary *) Wrong_voting_period of {expected : int32; provided : int32}
 
 type error +=
   | (* `Permanent *) Internal_operation_replay of packed_internal_operation
@@ -604,8 +600,10 @@ let () =
       Format.fprintf ppf "Wrong voting period %ld, current is %ld" p e)
     Data_encoding.(
       obj2 (req "current_index" int32) (req "provided_index" int32))
-    (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
-    (fun (e, p) -> Wrong_voting_period (e, p)) ;
+    (function
+      | Wrong_voting_period {expected; provided} -> Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) -> Wrong_voting_period {expected; provided}) ;
   register_error_kind
     `Permanent
     ~id:"internal_operation_replay"
@@ -1122,7 +1120,7 @@ let apply_manager_operation_content :
       return (ctxt, result, [])
   | Set_deposits_limit limit -> (
       (match limit with
-      | None -> return_unit
+      | None -> Result.return_unit
       | Some limit ->
           let frozen_deposits_percentage =
             Constants.frozen_deposits_percentage ctxt
@@ -1132,18 +1130,18 @@ let apply_manager_operation_content :
               Int64.(
                 mul (of_int frozen_deposits_percentage) Int64.(div max_int 100L))
           in
-          fail_when
+          error_when
             Tez.(limit > max_limit)
             (Set_deposits_limit_too_high {limit; max_limit}))
-      >>=? fun () ->
-      Contract.is_implicit source |> function
+      >>?= fun () ->
+      match Contract.is_implicit source with
       | None -> fail Set_deposits_limit_on_originated_contract
       | Some delegate ->
           Delegate.registered ctxt delegate >>=? fun is_registered ->
-          fail_unless
+          error_unless
             is_registered
             (Set_deposits_limit_on_unregistered_delegate delegate)
-          >>=? fun () ->
+          >>?= fun () ->
           Delegate.set_frozen_deposits_limit ctxt delegate limit >>= fun ctxt ->
           return
             ( ctxt,
@@ -2263,7 +2261,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       in
       let src = `Collected_commitments blinded_pkh in
       Token.allocated ctxt src >>=? fun src_exists ->
-      fail_unless src_exists (Invalid_activation {pkh}) >>=? fun _ ->
+      fail_unless src_exists (Invalid_activation {pkh}) >>=? fun () ->
       let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
       Token.balance ctxt src >>=? fun amount ->
       Token.transfer ctxt src (`Contract contract) amount
@@ -2275,7 +2273,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
       error_unless
         Compare.Int32.(current_period = period)
-        (Wrong_voting_period (current_period, period))
+        (Wrong_voting_period {expected = current_period; provided = period})
       >>?= fun () ->
       Amendment.record_proposals ctxt source proposals >|=? fun ctxt ->
       (ctxt, Single_result Proposals_result)
@@ -2285,7 +2283,7 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
       Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
       error_unless
         Compare.Int32.(current_period = period)
-        (Wrong_voting_period (current_period, period))
+        (Wrong_voting_period {expected = current_period; provided = period})
       >>?= fun () ->
       Amendment.record_ballot ctxt source proposal ballot >|=? fun ctxt ->
       (ctxt, Single_result Ballot_result)
@@ -2637,18 +2635,17 @@ let are_endorsements_required ctxt ~level =
   Compare.Int32.(tenderbake_level_position > 1l)
 
 let check_minimum_endorsements ~endorsing_power ~minimum =
-  fail_when
+  error_when
     Compare.Int.(endorsing_power < minimum)
-    (Not_enough_endorsements
-       {required = minimum; endorsements = endorsing_power})
+    (Not_enough_endorsements {required = minimum; provided = endorsing_power})
 
 let finalize_application_check_validity ctxt (mode : finalize_application_mode)
     protocol_data ~round ~predecessor ~endorsing_power ~consensus_threshold
     ~required_endorsements =
   (if required_endorsements then
    check_minimum_endorsements ~endorsing_power ~minimum:consensus_threshold
-  else return_unit)
-  >>=? fun () ->
+  else Result.return_unit)
+  >>?= fun () ->
   let block_payload_hash =
     compute_payload_hash
       ctxt

@@ -121,11 +121,10 @@ val begin_partial_construction :
   t ->
   predecessor_level:Level.t ->
   escape_vote:bool ->
-  ( t
-    * packed_successful_manager_operation_result list
-    * Liquidity_baking.escape_ema,
-    error trace )
-  result
+  (t
+  * packed_successful_manager_operation_result list
+  * Liquidity_baking.escape_ema)
+  tzresult
   Lwt.t
 
 type 'a full_construction = {
@@ -258,7 +257,7 @@ val are_endorsements_required : t -> level:Raw_level.t -> bool tzresult Lwt.t
 
 (** Check if a block's endorsing power is at least the minim required. *)
 val check_minimum_endorsements :
-  endorsing_power:int -> minimum:int -> unit tzresult Lwt.t
+  endorsing_power:int -> minimum:int -> unit tzresult
 
 (** [check_manager_signature validation_state op raw_operation]
     The function starts by retrieving the public key hash [pkh] of the manager

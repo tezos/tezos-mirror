@@ -51,11 +51,10 @@ let credit_only_call_from_token ctxt delegate amount =
 let spend_only_call_from_token ctxt delegate amount =
   update_balance ctxt delegate Tez_repr.( -? ) amount
 
-let update_deposits_cap ctxt delegate_contract deposits_cap =
+let update_initial_amount ctxt delegate_contract deposits_cap =
   Storage.Contract.Frozen_deposits.get ctxt delegate_contract
   >>=? fun frozen_deposits ->
   Storage.Contract.Frozen_deposits.update
     ctxt
     delegate_contract
     {frozen_deposits with initial_amount = deposits_cap}
-  >|=? fun ctxt -> (ctxt, frozen_deposits.current_amount)
