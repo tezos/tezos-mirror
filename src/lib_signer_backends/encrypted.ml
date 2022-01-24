@@ -230,9 +230,13 @@ let decrypt_payload cctxt ?name encrypted_sk =
       let retries_left = if cctxt#multiple_password_retries then 3 else 1 in
       interactive_decrypt_loop cctxt ?name ~retries_left ~encrypted_sk algo
 
-let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
+let internal_decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
   let payload = Uri.path (sk_uri : sk_uri :> Uri.t) in
   decrypt_payload cctxt ?name payload
+
+let decrypt (cctxt : #Client_context.prompter) ?name sk_uri =
+  password_file_load cctxt >>=? fun () ->
+  internal_decrypt (cctxt : #Client_context.prompter) ?name sk_uri
 
 let decrypt_all (cctxt : #Client_context.io_wallet) =
   Secret_key.load cctxt >>=? fun sks ->
@@ -240,7 +244,7 @@ let decrypt_all (cctxt : #Client_context.io_wallet) =
   List.iter_es
     (fun (name, sk_uri) ->
       if Uri.scheme (sk_uri : sk_uri :> Uri.t) <> Some scheme then return_unit
-      else decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit)
+      else internal_decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit)
     sks
 
 let decrypt_list (cctxt : #Client_context.io_wallet) keys =
@@ -251,7 +255,7 @@ let decrypt_list (cctxt : #Client_context.io_wallet) keys =
       if
         Uri.scheme (sk_uri : sk_uri :> Uri.t) = Some scheme
         && (keys = [] || List.mem ~equal:String.equal name keys)
-      then decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit
+      then internal_decrypt cctxt ~name sk_uri >>=? fun _ -> return_unit
       else return_unit)
     sks
 
@@ -347,7 +351,7 @@ let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
     | Some sapling_key -> return sapling_key
 
 module Make (C : sig
-  val cctxt : Client_context.io
+  val cctxt : Client_context.io_wallet
 end) =
 struct
   let scheme = "encrypted"

@@ -24,11 +24,11 @@
 (*****************************************************************************)
 
 module Make (C : sig
-  val cctxt : Client_context.io
+  val cctxt : Client_context.io_wallet
 end) : Client_keys.SIGNER
 
 val decrypt :
-  #Client_context.io ->
+  #Client_context.io_wallet ->
   ?name:string ->
   Client_keys.sk_uri ->
   Signature.secret_key tzresult Lwt.t
