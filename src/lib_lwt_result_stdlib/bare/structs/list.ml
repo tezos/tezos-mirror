@@ -23,6 +23,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* A note about the implementation of recursive Lwt and Lwt-result functions: 
+
+   [_s] and [_es] functions are implemented following this pattern:
+
+{[
+let rec traverse f xs =
+  | [] -> ..
+  | x :: xs -> .. f x .. traverse xs ..
+
+let traverse f xs =
+  | [] -> ..
+  | x :: xs -> .. Lwt.apply f x .. traverse xs ..
+]}
+
+   with variations for when [f] takes more than one parameter, when the
+   matching is slightly different, and so on. Whatever the variation, the
+   patterns remain: one recursive function immediately shadowed by a
+   non-recursive function which only handles the first element.
+
+   This is necessary because the application of [f] to the head of the list [x]
+   is not on the right-hand side of an Lwt bind. As such, the call [f x] is not
+   wrapped in a [try]-[with] to convert exceptions into promise rejection.
+
+   We add the shadowing function which uses [Lwt.apply] in order to wrap this
+   specific (head) call. As a result, the behaviour of [traverse f xs] is the
+   same whether [f] raises an exception during the head call or during a
+   subsequent call. *)
+
 open Monad
 include Stdlib.List
 
