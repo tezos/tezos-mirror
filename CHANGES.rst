@@ -23,9 +23,10 @@ be documented here either.
 Node
 ----
 
-- Added an optional parameter ``media-type``.
-  It defines which format of data serialisation must be used for RPC requests to the node.
-  The value can be  ``json``, ``binary`` or ``any``. By default, the value is set to ``any``.
+- Added optional parameter ``--media-type`` and its corresponding field
+  in the configuration file. It defines which format of data serialisation
+  must be used for RPC requests to the node. The value can be  ``json``,
+  ``binary`` or ``any``. By default, the value is set to ``any``.
 
 - Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
   expose some metrics using the Prometheus format.
@@ -254,18 +255,18 @@ Node
 Client
 ------
 
-- Expanded the number of product ids searched with the HID API when looking for a ledger device.
+- Expanded the number of product ids searched with the HID API when
+  looking for a ledger device.
 
-- Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
-  The media accept header indicates to the node which format of data serialisation is supported.
-  The value can be  ``json``, ``binary`` or ``any``.
+- Added an optional parameter ``--media-type`` to control the
+  ``Accept`` header for RPC requests to the node. This header
+  indicates to the node which format of data serialisation is
+  supported. Possible values are ``json``, ``binary`` and ``any``.
 
 - Added two options, ``--now`` and ``--level`` to the ``run script``
   and ``run view`` commands simulating execution of Michelson
   code. These options can be used to override the values normally
   returned by the ``NOW`` and ``LEVEL`` instructions.
-
-- The output of ``tezos-client``'s RPC commands now uses the format specified by the ``--media-type``.
 
 - Added new option ``--replace`` to ``transfer`` and ``multiple transfers`` commands.
   This option allows a manager to inject a transfer or a smart contract call
@@ -282,10 +283,10 @@ Client
 Baker / Endorser / Accuser
 --------------------------
 
-- Added an optional parameter ``media-type`` for the "accept" header for RPC requests to the node.
-  The default ``media_type`` is ``binary`` for bakers.
-  The media accept header indicates to the node which format of data serialisation is supported.
-  The value can be ``json``, ``binary`` or ``any``.
+- Added an optional parameter ``--media-type`` to control the
+  ``Accept`` header for RPC requests to the node. This header
+  indicates to the node which format of data serialisation is
+  supported. Possible values are ``json``, ``binary`` and ``any``.
 
 -  Removed baker, endorser and accuser for Granada.
 
