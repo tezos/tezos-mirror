@@ -131,7 +131,7 @@ val parametric_encoding : parametric Data_encoding.encoding
 
 type t = private {fixed : fixed; parametric : parametric}
 
-val all : parametric -> t
+val all_of_parametric : parametric -> t
 
 val encoding : t Data_encoding.encoding
 

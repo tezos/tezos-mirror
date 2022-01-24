@@ -34,14 +34,15 @@ module type S = sig
   val path_length : int
 end
 
-module Make_hex (H : sig
+module type ENCODING = sig
   type t
 
   val to_bytes : t -> bytes
 
   val of_bytes_opt : bytes -> t option
-end) =
-struct
+end
+
+module Make_hex (H : ENCODING) = struct
   let path_length = 1
 
   let to_path t l =

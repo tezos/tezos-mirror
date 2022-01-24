@@ -27,34 +27,32 @@ open Storage_functors
 open Storage_sigs
 
 module Encoding = struct
-  module UInt16 = struct
+  module UInt16 : VALUE with type t = int = struct
     type t = int
 
     let encoding = Data_encoding.uint16
   end
 
-  module Int32 = struct
+  module Int32 : VALUE with type t = Int32.t = struct
     type t = Int32.t
 
     let encoding = Data_encoding.int32
   end
 
-  module Int64 = struct
+  module Int64 : VALUE with type t = Int64.t = struct
     type t = Int64.t
 
     let encoding = Data_encoding.int64
   end
 
-  module Z = struct
+  module Z : VALUE with type t = Z.t = struct
     type t = Z.t
 
     let encoding = Data_encoding.z
   end
 end
 
-module Int31_index : sig
-  include INDEX with type t = int
-end = struct
+module Int31_index : INDEX with type t = int = struct
   type t = int
 
   let path_length = 1
@@ -411,7 +409,11 @@ module type NEXT = sig
 end
 
 module Global_constants = struct
-  module Map =
+  module Map :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Script_expr_hash.t
+       and type value = Script_repr.expr =
     Make_indexed_carbonated_data_storage
       (Make_subcontext (Registered) (Raw_context)
          (struct
@@ -924,7 +926,7 @@ end
 
 module Public_key_hash_index = Make_index (Public_key_hash)
 
-module Protocol_hash = struct
+module Protocol_hash_with_path_encoding = struct
   include Protocol_hash
   include Path_encoding.Make_hex (Protocol_hash)
 end
@@ -1364,7 +1366,10 @@ module Vote = struct
          (struct
            let name = ["proposals"]
          end))
-         (Pair (Make_index (Protocol_hash)) (Public_key_hash_index))
+         (Pair
+            (Make_index
+               (Protocol_hash_with_path_encoding))
+               (Public_key_hash_index))
 
   module Proposals_count =
     Make_indexed_data_storage
@@ -1450,7 +1455,11 @@ module Seed = struct
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
   end
 
-  module Nonce_legacy = struct
+  module Nonce_legacy :
+    Non_iterable_indexed_data_storage
+      with type key := Level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t = struct
     open Level_repr
 
     type context = Raw_context.t

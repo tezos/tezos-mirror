@@ -92,14 +92,14 @@ val current_era : cycle_eras -> cycle_era
 val root_level : cycle_eras -> level
 
 (** Returns the annotated level corresponding to a raw level *)
-val from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> level
+val level_from_raw : cycle_eras:cycle_eras -> Raw_level_repr.t -> level
 
 (** Returns the annotated level corresponding to a raw level and an
    offset. A positive offset corresponds to a higher level.
    Fails with [Negative_level_and_offset_sum] if the sum of the raw_level and the offset is negative.
    Fails with [Level_not_in_alpha] if the sum of the raw_level and the offset 
    is a level before the first level in the Alpha family of protocols. *)
-val from_raw_with_offset :
+val level_from_raw_with_offset :
   cycle_eras:cycle_eras -> offset:int32 -> Raw_level_repr.t -> level tzresult
 
 (** Returns the first level of the given cycle. *)

@@ -219,7 +219,7 @@ type back = {
   remaining_block_gas : Gas_limit_repr.Arith.fp;
   unlimited_operation_gas : bool;
   consensus : Raw_consensus.t;
-  non_consensus_operations : Operation_hash.t list;
+  non_consensus_operations_rev : Operation_hash.t list;
   sampler_state :
     (Seed_repr.seed
     * (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t)
@@ -281,7 +281,8 @@ let[@inline] temporary_lazy_storage_ids ctxt =
 
 let[@inline] remaining_operation_gas ctxt = ctxt.remaining_operation_gas
 
-let[@inline] non_consensus_operations ctxt = ctxt.back.non_consensus_operations
+let[@inline] non_consensus_operations_rev ctxt =
+  ctxt.back.non_consensus_operations_rev
 
 let[@inline] sampler_state ctxt = ctxt.back.sampler_state
 
@@ -316,8 +317,9 @@ let[@inline] update_fees ctxt fees = update_back ctxt {ctxt.back with fees}
 let[@inline] update_temporary_lazy_storage_ids ctxt temporary_lazy_storage_ids =
   update_back ctxt {ctxt.back with temporary_lazy_storage_ids}
 
-let[@inline] update_non_consensus_operations ctxt non_consensus_operations =
-  update_back ctxt {ctxt.back with non_consensus_operations}
+let[@inline] update_non_consensus_operations_rev ctxt
+    non_consensus_operations_rev =
+  update_back ctxt {ctxt.back with non_consensus_operations_rev}
 
 let[@inline] update_sampler_state ctxt sampler_state =
   update_back ctxt {ctxt.back with sampler_state}
@@ -736,7 +738,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
   >>?= fun round_durations ->
   get_cycle_eras ctxt >|=? fun cycle_eras ->
   check_cycle_eras cycle_eras constants ;
-  let level = Level_repr.from_raw ~cycle_eras level in
+  let level = Level_repr.level_from_raw ~cycle_eras level in
   {
     remaining_operation_gas = Gas_limit_repr.Arith.zero;
     back =
@@ -758,7 +760,7 @@ let prepare ~level ~predecessor_timestamp ~timestamp ctxt =
             constants.Constants_repr.hard_gas_limit_per_block;
         unlimited_operation_gas = true;
         consensus = Raw_consensus.empty;
-        non_consensus_operations = [];
+        non_consensus_operations_rev = [];
         sampler_state = Cycle_repr.Map.empty;
         stake_distribution_for_current_cycle = None;
       };
@@ -1100,11 +1102,11 @@ module Cache = struct
 end
 
 let record_non_consensus_operation_hash ctxt operation_hash =
-  update_non_consensus_operations
+  update_non_consensus_operations_rev
     ctxt
-    (operation_hash :: non_consensus_operations ctxt)
+    (operation_hash :: non_consensus_operations_rev ctxt)
 
-let non_consensus_operations ctxt = List.rev (non_consensus_operations ctxt)
+let non_consensus_operations ctxt = List.rev (non_consensus_operations_rev ctxt)
 
 let set_sampler_for_cycle ctxt cycle sampler_with_seed =
   let map = sampler_state ctxt in

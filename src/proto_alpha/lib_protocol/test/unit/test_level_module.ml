@@ -195,7 +195,7 @@ let test_level_from_raw () =
           Level_repr.create_cycle_eras cycle_eras |> Environment.wrap_tzresult
           >>?= fun cycle_eras ->
           let level_from_raw =
-            Protocol.Level_repr.from_raw ~cycle_eras raw_level
+            Protocol.Level_repr.level_from_raw ~cycle_eras raw_level
           in
           Assert.equal_int
             ~loc:__LOC__
@@ -226,7 +226,7 @@ let test_level_from_raw () =
             Int32.neg (Int32.add Int32.one (Int32.of_int input_level))
           in
           let res =
-            Level_repr.from_raw_with_offset ~cycle_eras ~offset raw_level
+            Level_repr.level_from_raw_with_offset ~cycle_eras ~offset raw_level
           in
           Assert.proto_error
             ~loc:__LOC__

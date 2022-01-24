@@ -62,15 +62,6 @@ let diff = Int32.sub
 
 let to_int32 l = l
 
-let of_int32_exn l =
-  if Compare.Int32.(l >= 0l) then l else invalid_arg "Level_repr.of_int32"
-
-let encoding =
-  Data_encoding.conv_with_guard
-    (fun i -> i)
-    (fun i -> try ok (of_int32_exn i) with Invalid_argument s -> Error s)
-    Data_encoding.int32
-
 type error += Unexpected_level of Int32.t (* `Permanent *)
 
 let () =
@@ -89,7 +80,21 @@ let () =
     (fun l -> Unexpected_level l)
 
 let of_int32 l =
-  Error_monad.catch_f (fun () -> of_int32_exn l) (fun _ -> Unexpected_level l)
+  if Compare.Int32.(l >= 0l) then ok l else error (Unexpected_level l)
+
+let of_int32_exn l =
+  match of_int32 l with
+  | Ok l -> l
+  | Error _ -> invalid_arg "Level_repr.of_int32"
+
+let encoding =
+  Data_encoding.conv_with_guard
+    to_int32
+    (fun l ->
+      match of_int32 l with
+      | Ok l -> Ok l
+      | Error _ -> Error "Level_repr.of_int32")
+    Data_encoding.int32
 
 module Index = struct
   type t = raw_level

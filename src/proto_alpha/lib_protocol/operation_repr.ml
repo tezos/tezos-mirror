@@ -318,9 +318,11 @@ let pack ({shell; protocol_data} : _ operation) : packed_operation =
 type packed_internal_operation =
   | Internal_operation : 'kind internal_operation -> packed_internal_operation
 
-let rec to_list = function
-  | Contents_list (Single o) -> [Contents o]
-  | Contents_list (Cons (o, os)) -> Contents o :: to_list (Contents_list os)
+let rec contents_list_to_list : type a. a contents_list -> _ = function
+  | Single o -> [Contents o]
+  | Cons (o, os) -> Contents o :: contents_list_to_list os
+
+let to_list = function Contents_list l -> contents_list_to_list l
 
 (* This first version of of_list has the type (_, string) result expected by
    the conv_with_guard combinator of Data_encoding. For a more conventional

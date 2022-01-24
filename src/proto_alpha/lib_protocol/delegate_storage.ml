@@ -430,7 +430,9 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
       Storage.Tenderbake.First_level.get ctxt
       >>=? fun first_level_of_tenderbake ->
       let cycle_eras = Raw_context.cycle_eras ctxt in
-      let level = Level_repr.from_raw ~cycle_eras first_level_of_tenderbake in
+      let level =
+        Level_repr.level_from_raw ~cycle_eras first_level_of_tenderbake
+      in
       return level.cycle
   | Some cycle -> return cycle)
   >>=? fun from_cycle ->
