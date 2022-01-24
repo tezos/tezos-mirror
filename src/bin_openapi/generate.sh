@@ -41,7 +41,7 @@ proto_openapi_json=docs/api/$protocol_name-openapi.json
 mempool_openapi_json=docs/api/$protocol_name-mempool-openapi.json
 
 # Get version number.
-version=$(ocaml scripts/print_version.ml)
+version=$(dune exec tezos-version)
 
 # Start a sandbox node.
 $tezos_node config init --data-dir $data_dir \
