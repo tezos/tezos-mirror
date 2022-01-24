@@ -1,0 +1,9 @@
+(tests
+ (names test_parser)
+ (libraries
+   tezos-base.unix
+   tezos-version
+   tezos-version.parser
+   alcotest)
+ (flags (:standard -open Tezos_version))
+)
