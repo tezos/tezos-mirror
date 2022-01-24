@@ -27,16 +27,6 @@ Node
   It defines which format of data serialisation must be used for RPC requests to the node.
   The value can be  ``json``, ``binary`` or ``any``. By default, the value is set to ``any``.
 
-- The output format for RPC ``/chains/<chain_id>/mempool/filter`` changed.
-  The field ``backlog`` was removed. This change is similar to other RPC changes
-  introduced in 12.0~rc1.
-
-- Added two optional fields, ``now`` and ``level`` as input to the
-  ``run_view``, ``run_code``, and ``trace_code`` RPCs (under
-  ``/chains/<chain_id>/blocks/<block>/helpers/scripts/``). These
-  fields can be used to override the values normally returned by the
-  ``NOW`` and ``LEVEL`` instructions.
-
 - Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
   expose some metrics using the Prometheus format.
 
