@@ -59,6 +59,11 @@ services:
       - client_data:/var/run/tezos/client
     restart: on-failure
 
+EOF
+
+if [ "$need_upgrader" = true ]; then
+    cat >> "$docker_compose_yml" <<EOF
+
   upgrader:
     image: $docker_image
     hostname: node
@@ -69,6 +74,7 @@ services:
     restart: on-failure
 
 EOF
+fi
 
 if [ -n "$local_snapshot_path" ]; then
     cat >> "$docker_compose_yml" <<EOF
@@ -635,7 +641,7 @@ update_script() {
 
 upgrade_node_storage() {
     pull_image
-    local_snapshot_path="$1"
+    need_upgrader=true
     update_compose_file
     call_docker_compose up upgrader
     warn_script_uptodate
