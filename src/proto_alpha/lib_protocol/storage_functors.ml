@@ -562,6 +562,8 @@ module Make_carbonated_data_set_storage (C : Raw_context.T) (I : INDEX) :
 
   let init s i = M.init s i ()
 
+  let add s i = M.add s i ()
+
   let remove s i = M.remove s i
 
   let fold_keys_unaccounted = M.fold_keys_unaccounted
