@@ -148,9 +148,9 @@ let update_synchronisation_state w block peer_id =
    valid. Assume:
 
    - [peer_id] is not us *)
-let check_and_update_synchronisation_state w (block, peer_id) : unit Lwt.t =
+let check_and_update_synchronisation_state w (hash, block) peer_id : unit Lwt.t
+    =
   let nv = Worker.state w in
-  let hash = Block_header.hash block in
   Store.Block.is_known_valid nv.parameters.chain_store hash
   >>= fun known_valid ->
   if known_valid then update_synchronisation_state w block peer_id
@@ -429,15 +429,20 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
         >|=? fun () -> event
 
 let on_notify_branch w peer_id locator =
-  let (block, _) = (locator : Block_locator.t :> _ * _) in
-  check_and_update_synchronisation_state w (block, peer_id) >>= fun () ->
+  let {Block_locator.head_hash; head_header; _} = locator in
+  check_and_update_synchronisation_state w (head_hash, head_header) peer_id
+  >>= fun () ->
   with_activated_peer_validator w peer_id (fun pv ->
       Peer_validator.notify_branch pv locator ;
       return_unit)
 
 let on_notify_head w peer_id header mempool =
   let nv = Worker.state w in
-  check_and_update_synchronisation_state w (header, peer_id) >>= fun () ->
+  check_and_update_synchronisation_state
+    w
+    (Block_header.hash header, header)
+    peer_id
+  >>= fun () ->
   with_activated_peer_validator w peer_id (fun pv ->
       Peer_validator.notify_head pv header ;
       return_unit)
@@ -753,8 +758,6 @@ let assert_checkpoint w ((hash, _) as block_descr) =
 
 let validate_block w ?force hash block operations =
   let nv = Worker.state w in
-  let hash' = Block_header.hash block in
-  assert (Block_hash.equal hash hash') ;
   assert_fitness_increases ?force w block >>=? fun () ->
   assert_checkpoint w (hash, block.Block_header.shell.level) >>=? fun () ->
   Block_validator.validate

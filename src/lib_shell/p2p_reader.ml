@@ -183,21 +183,21 @@ let handle_msg state msg =
       Lwt.return_unit
   | Current_branch (chain_id, locator) ->
       may_handle state chain_id @@ fun chain_db ->
-      let (head, hist) = (locator :> Block_header.t * Block_hash.t list) in
+      let {Block_locator.head_hash; head_header; history} = locator in
       List.exists_p
         (Store.Block.is_known_invalid chain_db.chain_store)
-        (Block_header.hash head :: hist)
+        (head_hash :: history)
       >>= fun known_invalid ->
       if known_invalid then (
         P2p.disconnect state.p2p state.conn >>= fun () ->
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit)
       else if
-        not (Clock_drift.is_not_too_far_in_the_future head.shell.timestamp)
+        not
+          (Clock_drift.is_not_too_far_in_the_future head_header.shell.timestamp)
       then (
         Peer_metadata.incr meta Future_block ;
-        P2p_reader_event.(emit received_future_block)
-          (Block_header.hash head, state.gid))
+        P2p_reader_event.(emit received_future_block) (head_hash, state.gid))
       else (
         chain_db.callback.notify_branch state.gid locator ;
         (* TODO discriminate between received advertisements
