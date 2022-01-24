@@ -32,6 +32,8 @@ let hooks =
         ("edpk\\w{50}", "[PUBLIC_KEY]");
         ("KT1\\w{33}", "[CONTRACT_HASH]");
         ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
+        (* Ports are non-deterministic when using -j. *)
+        ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
       ]
     in
     List.fold_left

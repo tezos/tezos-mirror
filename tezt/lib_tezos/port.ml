@@ -23,23 +23,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {total : int; mutable failures : int; mutable current : int}
+(* Each worker gets an interval of [interval_size] ports to work with.
+   The default starting port is 16384.
+   With an interval size of 1000 we can use -j 16 and stay below port 32768.
+   This means that we can run 500 nodes in the same test. *)
+let interval_size = 1000
 
-let create ~total = {total; failures = 0; current = 0}
+let next = ref 0
 
-let update ~has_failed t =
-  t.current <- t.current + 1 ;
-  assert (t.current <= t.total) ;
-  (* No need to check whether t.failures <= t.total since we ensure
-     t.failures <= t.current *)
-  if has_failed then t.failures <- t.failures + 1
+let fresh () =
+  let slot = !next mod interval_size in
+  incr next ;
+  Cli.options.starting_port
+  + (interval_size * (Test.current_worker_id () |> Option.value ~default:0))
+  + slot
 
-let pp ppf t =
-  Format.fprintf
-    ppf
-    "(%d/%d%a)"
-    t.current
-    t.total
-    (fun ppf () ->
-      if t.failures <> 0 then Format.fprintf ppf ", %d failed" t.failures)
-    ()
+let () = Test.declare_reset_function @@ fun () -> next := 0

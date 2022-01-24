@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Base
+
 (* The expected output of a normal run of Tezt is the log of the tests.
    So these should be on stdout.
    However, for some commands (especially those that are expected to be parsed
@@ -264,7 +266,8 @@ let error x = log ~level:Error ~color:Color.FG.red ~prefix:"error" x
 
 type test_result = Successful | Failed of string | Aborted
 
-let test_result ~progress_state ~iteration test_result test_name =
+let test_result ~test_index ~test_count ~failure_count ~iteration test_result
+    test_name =
   let (prefix, prefix_color) =
     match test_result with
     | Successful -> ("SUCCESS", Color.(FG.green ++ bold))
@@ -276,7 +279,13 @@ let test_result ~progress_state ~iteration test_result test_name =
       Printf.sprintf "(loop %d) %s" iteration test_name
     else test_name
   in
-  let progress_msg = Format.asprintf "%a " Progress.pp progress_state in
+  let progress_msg =
+    sf
+      "(%d/%d%s) "
+      test_index
+      test_count
+      (if failure_count > 0 then sf ", %d failed" failure_count else "")
+  in
   log_string ~level:Report ~prefix ~prefix_color ~progress_msg message
 
 let command ?color ?prefix command arguments =

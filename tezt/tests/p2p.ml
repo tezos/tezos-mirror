@@ -290,7 +290,7 @@ let test_advertised_port () =
     Node.wait_for node_1 "maintenance_ended.v0" (fun _ -> Some ())
   in
 
-  let advertised_net_port = Node.fresh_port () in
+  let advertised_net_port = Port.fresh () in
   let node_2 = Node.create ~advertised_net_port [] in
   let* () = Node.identity_generate node_2 in
   let* () = Node.config_init node_2 [] in

@@ -127,17 +127,6 @@ let data_dir node = node.persistent_state.data_dir
 
 let runner node = node.persistent_state.runner
 
-let next_port = ref Cli.options.starting_port
-
-let fresh_port () =
-  let port = !next_port in
-  incr next_port ;
-  port
-
-let () =
-  Test.declare_reset_function @@ fun () ->
-  next_port := Cli.options.starting_port
-
 let spawn_command node =
   Process.spawn
     ?runner:node.persistent_state.runner
@@ -419,10 +408,10 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
   in
   let net_port =
-    match net_port with None -> fresh_port () | Some port -> port
+    match net_port with None -> Port.fresh () | Some port -> port
   in
   let rpc_port =
-    match rpc_port with None -> fresh_port () | Some port -> port
+    match rpc_port with None -> Port.fresh () | Some port -> port
   in
   let arguments =
     (* Give a default value of 0 to --expected-pow. *)

@@ -865,7 +865,10 @@ let test_mempool protocol ?endpoint client =
       "http://localhost:%d/describe/chains/main/mempool?recurse=yes"
       (get_client_port client)
   in
-  let message = Log.quote_shell_command "curl" ["-s"; describe_path] in
+  let describe_path_filtered =
+    "http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes"
+  in
+  let message = Log.quote_shell_command "curl" ["-s"; describe_path_filtered] in
   Regression.capture ("\n" ^ message) ;
   let proc_describe = Process.spawn "curl" ["-s"; describe_path] in
   let* output = Process.check_and_read_stdout proc_describe in

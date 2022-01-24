@@ -90,14 +90,6 @@ val data_dir : t -> string
     If no [msg] is given, the stderr is ignored.*)
 val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
 
-(** Get a fresh, unused port.
-
-    Warning: this function does not guarantee that the given port is
-    not already in use by another process. It only guarantees that
-    it is not already in use by another sc node, and only if you let
-    the [Sc_Rollup_Node] module choose all ports for you. *)
-val fresh_port : unit -> int
-
 (** [run node] launches the given smart contract rollup node. *)
 val run : t -> unit Lwt.t
 

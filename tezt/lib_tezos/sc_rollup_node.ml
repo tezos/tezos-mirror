@@ -70,17 +70,6 @@ let endpoint sc_node =
 
 let data_dir sc_node = sc_node.persistent_state.data_dir
 
-let starting_port = 1000 + Cli.options.starting_port
-
-let next_port = ref starting_port
-
-let fresh_port () =
-  let port = !next_port in
-  incr next_port ;
-  port
-
-let () = Test.declare_reset_function @@ fun () -> next_port := starting_port
-
 let spawn_command sc_node =
   Process.spawn ~name:sc_node.name ~color:sc_node.color sc_node.path
 
@@ -161,7 +150,7 @@ let create ?(path = Constant.sc_rollup_node) ?name ?color ?data_dir ?event_pipe
     match data_dir with None -> Temp.dir name | Some dir -> dir
   in
   let rpc_port =
-    match rpc_port with None -> fresh_port () | Some port -> port
+    match rpc_port with None -> Port.fresh () | Some port -> port
   in
   let sc_node =
     create

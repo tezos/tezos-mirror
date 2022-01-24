@@ -23,19 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Progress indicator for Tezt *)
+(** Network port management. *)
 
-(** A structure to track the progress of a test suite. *)
-type t
+(** Get a fresh, unused port.
 
-(** [create ~total] creates a progress indicator for an expected [total] numbers
-   of tests. *)
-val create : total:int -> t
-
-(** [update ~has_failed progress] updates progress state with a test, usually
-   the last one, which has either failed [~has_failed:true] or not
-   [~has_failed:false]. *)
-val update : has_failed:bool -> t -> unit
-
-(** Pretty-printer for progress indicator. *)
-val pp : Format.formatter -> t -> unit
+    Warning: this function does not guarantee that the given port is
+    not already in use by another process. And if your test needs
+    more than 1000 ports, ports will start to be reused. *)
+val fresh : unit -> int
