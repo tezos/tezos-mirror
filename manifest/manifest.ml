@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module String_map = Map.Make (String)
+module String_set = Set.Make (String)
+
 let ( // ) = Filename.concat
 
 (*****************************************************************************)
@@ -473,7 +476,10 @@ module Target = struct
     name : string;
     opam : string option;
     version : Opam.version_constraints;
+    js_compatible : bool;
   }
+
+  type vendored = {name : string; js_compatible : bool}
 
   type opam_only = {name : string; version : Opam.version_constraints}
 
@@ -509,6 +515,7 @@ module Target = struct
     foreign_stubs : Dune.foreign_stubs option;
     implements : target option;
     inline_tests : bool;
+    js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
     kind : kind;
     linkall : bool;
@@ -543,7 +550,7 @@ module Target = struct
 
   and target =
     | Internal of internal
-    | Vendored of string
+    | Vendored of vendored
     | External of external_
     | Opam_only of opam_only
     | Optional of target
@@ -553,8 +560,6 @@ module Target = struct
 
   (* List of all targets, in reverse order of registration. *)
   let registered = ref []
-
-  module String_map = Map.Make (String)
 
   (* List of targets sorted by path,
      so that we can create dune files with multiple targets. *)
@@ -578,7 +583,7 @@ module Target = struct
     Internal internal
 
   let rec name_for_errors = function
-    | Vendored name | External {name; _} | Opam_only {name; _} -> name
+    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
     | Optional target | Select {package = target; _} -> name_for_errors target
     | Internal {kind; _} -> (
         match kind with
@@ -591,7 +596,7 @@ module Target = struct
             name)
 
   let rec names_for_dune = function
-    | Vendored name | External {name; _} | Opam_only {name; _} -> (name, [])
+    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
     | Optional target | Select {package = target; _} -> names_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -603,7 +608,7 @@ module Target = struct
         )
 
   let rec library_name_for_dune = function
-    | Vendored name | External {name; _} | Opam_only {name; _} -> Ok name
+    | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> Ok name
     | Optional target | Select {package = target; _} ->
         library_name_for_dune target
     | Internal {kind; _} -> (
@@ -633,6 +638,7 @@ module Target = struct
     ?foreign_stubs:Dune.foreign_stubs ->
     ?implements:target ->
     ?inline_tests:bool ->
+    ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
     ?linkall:bool ->
     ?modes:Dune.mode list ->
@@ -658,12 +664,23 @@ module Target = struct
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
-      ?foreign_stubs ?implements ?(inline_tests = false) ?js_of_ocaml
-      ?(linkall = false) ?modes ?modules ?(nopervasives = false) ?ocaml ?opam
-      ?(opaque = false) ?(opens = []) ?(preprocess = [])
+      ?foreign_stubs ?implements ?(inline_tests = false) ?js_compatible
+      ?js_of_ocaml ?(linkall = false) ?modes ?modules ?(nopervasives = false)
+      ?ocaml ?opam ?(opaque = false) ?(opens = []) ?(preprocess = [])
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?static_cclibs ?synopsis ?(virtual_modules = [])
       ?(wrapped = true) ~path names =
+    let (js_compatible, js_of_ocaml) =
+      match (js_compatible, js_of_ocaml) with
+      | (Some false, Some _) ->
+          invalid_arg
+            "Target.internal: cannot specify both `~js_compatible:false` and \
+             `~js_of_ocaml`"
+      | (Some true, Some jsoo) -> (true, Some jsoo)
+      | (Some true, None) -> (true, Some Dune.[])
+      | (None, Some jsoo) -> (true, Some jsoo)
+      | (Some false, None) | (None, None) -> (false, None)
+    in
     let kind = make_kind names in
     let opam =
       match opam with
@@ -745,6 +762,7 @@ module Target = struct
         foreign_stubs;
         implements;
         inline_tests;
+        js_compatible;
         js_of_ocaml;
         kind;
         linkall;
@@ -811,6 +829,12 @@ module Target = struct
   let private_exe =
     internal @@ fun internal_name -> Private_executable (internal_name, [])
 
+  let private_exes =
+    internal @@ fun internal_names ->
+    match internal_names with
+    | [] -> invalid_argf "Target.private_exes: at least one name must be given"
+    | head :: tail -> Private_executable (head, tail)
+
   let test = internal @@ fun test_name -> Test (test_name, [])
 
   let tests =
@@ -827,17 +851,19 @@ module Target = struct
     | [] -> invalid_arg "Target.test_exes: at least one name must be given"
     | head :: tail -> Test_executable (head, tail)
 
-  let vendored_lib name = Vendored name
+  let vendored_lib ?(js_compatible = false) name =
+    Vendored {name; js_compatible}
 
-  let external_lib ?opam name version =
+  let external_lib ?opam ?(js_compatible = false) name version =
     let opam =
       match opam with None -> Some name | Some "" -> None | Some _ as x -> x
     in
-    External {name; opam; version}
+    External {name; opam; version; js_compatible}
 
-  let external_sublib parent name =
+  let external_sublib ?(js_compatible = false) parent name =
     match parent with
-    | External {opam; version; _} -> External {name; opam; version}
+    | External {opam; version; _} ->
+        External {name; opam; version; js_compatible}
     | Opam_only _ ->
         invalid_arg
           "Target.external_sublib: parent must be a non-opam-only external lib"
@@ -863,8 +889,6 @@ end
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
-
-module String_set = Set.Make (String)
 
 let has_prefix ~prefix string =
   let prefix_len = String.length prefix in
@@ -1147,7 +1171,7 @@ let rec as_opam_dependency ~(for_package : string) ~with_test
       let package = Filename.basename package in
       if package = for_package then None
       else Some {Opam.package; version = []; with_test; optional = false}
-  | Vendored package ->
+  | Vendored {name = package; _} ->
       Some {Opam.package; version = []; with_test; optional = false}
   | External {opam = Some opam; version; _} | Opam_only {name = opam; version}
     ->
@@ -1293,12 +1317,82 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
        or declare them in the 'exclude' function." ;
     exit 1)
 
+let check_js_of_ocaml () =
+  let internal_name ({kind; path; _} : Target.internal) =
+    match kind with
+    | Public_library {public_name; _} -> public_name
+    | Private_library internal_name -> internal_name
+    | Public_executable ({public_name = name; _}, _) -> name
+    | Private_executable (name, _) | Test (name, _) | Test_executable (name, _)
+      ->
+        Filename.concat path name
+  in
+  let missing_from_target = ref String_map.empty in
+  let missing_with_js_mode = ref String_set.empty in
+  let missing_jsoo_for_target ~used_by:internal target =
+    let name = internal_name internal in
+    let old =
+      match String_map.find_opt name !missing_from_target with
+      | None -> []
+      | Some x -> x
+    in
+    missing_from_target :=
+      String_map.add name (target :: old) !missing_from_target
+  in
+  let missing_jsoo_with_js_mode name =
+    missing_with_js_mode := String_set.add name !missing_with_js_mode
+  in
+  let rec check_target ~used_by (target : Target.target) =
+    match target with
+    | External {js_compatible; name; _} ->
+        if not js_compatible then missing_jsoo_for_target ~used_by name
+    | Vendored {js_compatible; name} ->
+        if not js_compatible then missing_jsoo_for_target ~used_by name
+    | Internal ({js_compatible; _} as internal) ->
+        if not js_compatible then
+          missing_jsoo_for_target ~used_by (internal_name internal)
+    | Optional internal -> check_target ~used_by internal
+    | Select {package; _} -> check_target ~used_by package
+    | Opam_only _ -> (* irrelevent to this check *) ()
+  in
+  let check_internal (internal : Target.internal) =
+    if internal.js_compatible then
+      List.iter (check_target ~used_by:internal) internal.deps
+    else
+      match internal.modes with
+      | Some modes ->
+          if List.mem Dune.JS modes then
+            missing_jsoo_with_js_mode (internal_name internal)
+      | _ -> ()
+  in
+  Target.iter_internal_by_path (fun _path internals ->
+      List.iter check_internal internals) ;
+  let jsoo_ok = ref true in
+  if String_set.cardinal !missing_with_js_mode > 0 then (
+    jsoo_ok := false ;
+    Printf.eprintf
+      "The following targets use `(modes js)` and are missing \
+       `~js_compatible:true`\n" ;
+    String_set.iter
+      (fun name -> Printf.eprintf "- %s\n" name)
+      !missing_with_js_mode) ;
+  if String_map.cardinal !missing_from_target > 0 then (
+    jsoo_ok := false ;
+    Printf.eprintf
+      "The following targets are not `~js_compatible` but their dependant \
+       expect them to be\n" ;
+    String_map.iter
+      (fun k v -> List.iter (fun v -> Printf.eprintf "- %s used by %s\n" v k) v)
+      !missing_from_target) ;
+  if not !jsoo_ok then exit 1
+
 let generate ?exclude () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
-    check_for_non_generated_files ?exclude ()
+    check_for_non_generated_files ?exclude () ;
+    check_js_of_ocaml ()
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;

@@ -347,6 +347,12 @@ and preprocessor = PPS of target | PPS_args of target * string list
     - [inline_tests]: if [true], add [(inline_tests)] to the [dune] target.
       This does NOT add [ppx_inline_test] to [preprocess].
 
+    - [js_compatible]: whether the target can be compiled to JavaScript.
+      Default value for [js_compatible] is
+      [false] if [js_of_ocaml] is [None],
+      [true] otherwise.
+
+
     - [js_of_ocaml]: specifies a [(js_of_ocaml ...)] stanza for the [dune] target,
       where [...] is the value of the parameter. The toplevel parentheses are removed.
       For instance, [~js_of_ocaml:Dune.[[S "javascript_files"; S "file.js"]]]
@@ -428,6 +434,7 @@ type 'a maker =
   ?foreign_stubs:Dune.foreign_stubs ->
   ?implements:target ->
   ?inline_tests:bool ->
+  ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
   ?linkall:bool ->
   ?modes:Dune.mode list ->
@@ -471,7 +478,7 @@ val public_exe : ?internal_name:string -> string maker
     public names. If not given, the list of internal names is derived from the
     list of names as for [public_lib].
 
-    @raise Invalid_arg if the list of names is empty or if the length of
+    @raise [Invalid_arg] if the list of names is empty or if the length of
     [internal_names] differs from the length of the list of public names. *)
 val public_exes : ?internal_names:string list -> string list maker
 
@@ -486,6 +493,9 @@ val private_lib : string maker
     Since it is private, it has no public name: the ['a] argument of [maker]
     is its internal name. *)
 val private_exe : string maker
+
+(** Same as {!private_exe} but with several names, to define multiple executables at once. *)
+val private_exes : string list maker
 
 (** Register and return an internal test.
 
@@ -506,16 +516,26 @@ val test_exe : string maker
 (** Same as {!test_exe} but with several names, to define multiple tests at once. *)
 val test_exes : string list maker
 
-(** Make an external vendored library, for use in internal target dependencies. *)
-val vendored_lib : string -> target
+(** Make an external vendored library, for use in internal target dependencies.
+    [js_compatible]: whether the library can be compiled to JavaScript.
+    Default value for [js_compatible] is false. *)
+val vendored_lib : ?js_compatible:bool -> string -> target
 
 (** Make an external library, for use in internal target dependencies.
 
     Usage: [external_lib name version_constraints]
 
     [name] is used in [dune] files, while [opam] is used in [.opam] files.
-    Default value for [opam] is [name]. *)
-val external_lib : ?opam:string -> string -> Opam.version_constraints -> target
+    Default value for [opam] is [name].
+
+    [js_compatible]: whether the library can be compiled to JavaScript.
+    Default value for [js_compatible] is false.  *)
+val external_lib :
+  ?opam:string ->
+  ?js_compatible:bool ->
+  string ->
+  Opam.version_constraints ->
+  target
 
 (** Make an external library that is a sublibrary of an other one.
 
@@ -525,8 +545,11 @@ val external_lib : ?opam:string -> string -> Opam.version_constraints -> target
     [version_constraints], this is equivalent to:
     [external_lib ~opam: main_opam name version_constraints].
 
-    @raise Invalid_arg if [main_lib] was not built with [external_lib]. *)
-val external_sublib : target -> string -> target
+    [js_compatible]: whether the library can be compiled to JavaScript.
+    Default value for [js_compatible] is false.
+
+    @raise [Invalid_arg] if [main_lib] was not built with [external_lib]. *)
+val external_sublib : ?js_compatible:bool -> target -> string -> target
 
 (** Make an external library that is to only appear in [.opam] dependencies.
 

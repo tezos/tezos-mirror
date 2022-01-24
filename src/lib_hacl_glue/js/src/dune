@@ -5,6 +5,7 @@
  (name hacl_star_raw_empty)
  (public_name hacl-star-raw-empty)
  (instrumentation (backend bisect_ppx))
+ (js_of_ocaml)
  (modules)
  (foreign_stubs (language c) (names hacl_star)))
 

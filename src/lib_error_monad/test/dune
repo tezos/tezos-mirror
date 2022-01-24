@@ -9,6 +9,7 @@
   tezos-error-monad
   data-encoding
   alcotest)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_error_monad)))
 
 (rule

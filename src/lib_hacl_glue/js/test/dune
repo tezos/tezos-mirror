@@ -14,6 +14,7 @@
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib
@@ -27,6 +28,7 @@
  (modes js)
  (libraries
   tezos-hacl-glue-js)
+ (js_of_ocaml)
  (modules test))
 
 (rule (action (copy ../../unix/test/test_hacl.ml test_hacl.ml.from-unix)))

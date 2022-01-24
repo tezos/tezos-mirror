@@ -19,6 +19,11 @@ libraries are usually trivial to deal with.  Crypto libraries written
 in C/C++ need extra work to provides the corresponsing javascript
 stubs.
 
+We track the libraries compatibility in the manifest file
+``manifest/main.ml`` and enfore that all transitive dependencies of a
+JS-compatible library are JS-compatible.  A library is JS-compatible if it
+has ``~js_compile:true`` or ``~js_of_ocaml``.
+
 In the first phase, the focus is restricted to testing libraries
 needed to expose an Octez client API.
 

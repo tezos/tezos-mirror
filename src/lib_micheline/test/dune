@@ -8,6 +8,7 @@
  (libraries
   tezos-micheline
   alcotest)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_micheline)))
 
 (rule
