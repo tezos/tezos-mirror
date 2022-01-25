@@ -2010,19 +2010,19 @@ let kinstr_traverse i init f =
    fun accu t continue ->
     let accu = f.apply accu t in
     let next k =
-      (aux [@ocaml.tailcall]) accu k @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
+      (aux [@ocaml.tailcall]) accu k (fun accu ->
+          (continue [@ocaml.tailcall]) accu)
     in
     let next2 k1 k2 =
-      (aux [@ocaml.tailcall]) accu k1 @@ fun accu ->
-      (aux [@ocaml.tailcall]) accu k2 @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
+      (aux [@ocaml.tailcall]) accu k1 (fun accu ->
+          (aux [@ocaml.tailcall]) accu k2 (fun accu ->
+              (continue [@ocaml.tailcall]) accu))
     in
     let next3 k1 k2 k3 =
-      (aux [@ocaml.tailcall]) accu k1 @@ fun accu ->
-      (aux [@ocaml.tailcall]) accu k2 @@ fun accu ->
-      (aux [@ocaml.tailcall]) accu k3 @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
+      (aux [@ocaml.tailcall]) accu k1 (fun accu ->
+          (aux [@ocaml.tailcall]) accu k2 (fun accu ->
+              (aux [@ocaml.tailcall]) accu k3 (fun accu ->
+                  (continue [@ocaml.tailcall]) accu)))
     in
     let return () = (continue [@ocaml.tailcall]) accu in
     match t with
@@ -2214,13 +2214,13 @@ let ty_traverse =
         (next2 [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Option_t (ty1, _, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
     | List_t (ty1, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
-    | Set_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty @@ continue
+    | Set_t (cty, _) -> (aux [@ocaml.tailcall]) f accu cty continue
     | Map_t (cty, ty1, _) ->
-        (aux [@ocaml.tailcall]) f accu cty @@ fun accu ->
-        (next [@ocaml.tailcall]) f accu ty1 continue
+        (aux [@ocaml.tailcall]) f accu cty (fun accu ->
+            (next [@ocaml.tailcall]) f accu ty1 continue)
     | Big_map_t (cty, ty1, _) ->
-        (aux [@ocaml.tailcall]) f accu cty @@ fun accu ->
-        (next [@ocaml.tailcall]) f accu ty1 continue
+        (aux [@ocaml.tailcall]) f accu cty (fun accu ->
+            (next [@ocaml.tailcall]) f accu ty1 continue)
     | Contract_t (ty1, _) -> (next [@ocaml.tailcall]) f accu ty1 continue
   and next2 :
       type a ac b bc ret accu.
@@ -2231,15 +2231,15 @@ let ty_traverse =
       (accu -> ret) ->
       ret =
    fun f accu ty1 ty2 continue ->
-    (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
-    (aux [@ocaml.tailcall]) f accu ty2 @@ fun accu ->
-    (continue [@ocaml.tailcall]) accu
+    (aux [@ocaml.tailcall]) f accu ty1 (fun accu ->
+        (aux [@ocaml.tailcall]) f accu ty2 (fun accu ->
+            (continue [@ocaml.tailcall]) accu))
   and next :
       type a ac ret accu.
       accu ty_traverse -> accu -> (a, ac) ty -> (accu -> ret) -> ret =
    fun f accu ty1 continue ->
-    (aux [@ocaml.tailcall]) f accu ty1 @@ fun accu ->
-    (continue [@ocaml.tailcall]) accu
+    (aux [@ocaml.tailcall]) f accu ty1 (fun accu ->
+        (continue [@ocaml.tailcall]) accu)
   in
   fun ty init f -> aux f init ty (fun accu -> accu)
 
@@ -2264,20 +2264,20 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
    fun accu ty x continue ->
     let accu = f.apply accu ty x in
     let next2 ty1 ty2 x1 x2 =
-      (aux [@ocaml.tailcall]) accu ty1 x1 @@ fun accu ->
-      (aux [@ocaml.tailcall]) accu ty2 x2 @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
+      (aux [@ocaml.tailcall]) accu ty1 x1 (fun accu ->
+          (aux [@ocaml.tailcall]) accu ty2 x2 (fun accu ->
+              (continue [@ocaml.tailcall]) accu))
     in
     let next ty1 x1 =
-      (aux [@ocaml.tailcall]) accu ty1 x1 @@ fun accu ->
-      (continue [@ocaml.tailcall]) accu
+      (aux [@ocaml.tailcall]) accu ty1 x1 (fun accu ->
+          (continue [@ocaml.tailcall]) accu)
     in
     let return () = (continue [@ocaml.tailcall]) accu in
     let rec on_list ty' accu = function
       | [] -> (continue [@ocaml.tailcall]) accu
       | x :: xs ->
-          (aux [@ocaml.tailcall]) accu ty' x @@ fun accu ->
-          (on_list [@ocaml.tailcall]) ty' accu xs
+          (aux [@ocaml.tailcall]) accu ty' x (fun accu ->
+              (on_list [@ocaml.tailcall]) ty' accu xs)
     in
     match ty with
     | Unit_t | Int_t | Nat_t | Signature_t | String_t | Bytes_t | Mutez_t
@@ -2324,9 +2324,9 @@ let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
     match xs with
     | [] -> (continue [@ocaml.tailcall]) accu
     | (k, v) :: xs ->
-        (aux [@ocaml.tailcall]) accu kty k @@ fun accu ->
-        (aux [@ocaml.tailcall]) accu ty' v @@ fun accu ->
-        (on_bindings [@ocaml.tailcall]) accu kty ty' continue xs
+        (aux [@ocaml.tailcall]) accu kty k (fun accu ->
+            (aux [@ocaml.tailcall]) accu ty' v (fun accu ->
+                (on_bindings [@ocaml.tailcall]) accu kty ty' continue xs))
   in
   aux init ty x (fun accu -> accu)
   [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
