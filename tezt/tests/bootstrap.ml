@@ -25,12 +25,12 @@
 
 (* The functions below could be put in the Tezt library. *)
 let get_savepoint ?endpoint client =
-  let* json = RPC.get_checkpoint ?endpoint client in
-  return JSON.(json |-> "savepoint" |> as_int)
+  let* json = RPC.get_savepoint ?endpoint client in
+  return JSON.(json |-> "level" |> as_int)
 
 let get_caboose ?endpoint client =
-  let* json = RPC.get_checkpoint ?endpoint client in
-  return JSON.(json |-> "caboose" |> as_int)
+  let* json = RPC.get_caboose ?endpoint client in
+  return JSON.(json |-> "level" |> as_int)
 
 let is_connected ?endpoint client ~peer_id =
   let* connections = RPC.get_connections ?endpoint client in
