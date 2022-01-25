@@ -50,6 +50,8 @@ type t = {
   mutable mode : mode;
 }
 
+type stresstest_gas_estimation = {regular : int}
+
 let name t = t.name
 
 let base_dir t = t.base_dir
@@ -813,7 +815,7 @@ let originate_contract ?hooks ?endpoint ?wait ?init ?burn_cap ~alias ~amount
   | Some hash -> return hash
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
-    ?(source_accounts = []) ?seed ?transfers ?tps
+    ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
     ?(single_op_per_pkh_per_block = false) ?fresh_probability client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
@@ -870,8 +872,13 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     | Some (arg : float) -> [name; Float.to_string arg]
     | None -> []
   in
+  let fee_arg =
+    match fee with None -> [] | Some x -> ["--fee"; Tez.to_string x]
+  in
   spawn_command ?endpoint client
   @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
+  @ fee_arg
+  @ make_int_opt_arg "--gas-limit" gas_limit
   @ make_int_opt_arg "--transfers" transfers
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
@@ -879,13 +886,16 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   if single_op_per_pkh_per_block then ["--single-op-per-pkh-per-block"] else []
 
 let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
-    ?transfers ?tps ?single_op_per_pkh_per_block ?fresh_probability client =
+    ?fee ?gas_limit ?transfers ?tps ?single_op_per_pkh_per_block
+    ?fresh_probability client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
     ?source_pkhs
     ?source_accounts
     ?seed
+    ?fee
+    ?gas_limit
     ?transfers
     ?tps
     ?single_op_per_pkh_per_block
@@ -903,6 +913,15 @@ let spawn_run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage
     @ optional_arg ~name:"source" Fun.id source
     @ optional_arg ~name:"balance" Tez.to_string balance
     @ optional_arg ~name:"self-address" Fun.id self_address)
+
+let stresstest_estimate_gas ?endpoint client =
+  let* output =
+    spawn_command ?endpoint client ["stresstest"; "estimate"; "gas"]
+    |> Process.check_and_read_stdout
+  in
+  let json = JSON.parse ~origin:"transaction_costs" output in
+  let regular = JSON.get "regular" json |> JSON.as_int in
+  Lwt.return {regular}
 
 let run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage ~input
     client =

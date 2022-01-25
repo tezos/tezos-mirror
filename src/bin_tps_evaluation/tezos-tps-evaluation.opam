@@ -16,6 +16,7 @@ depends: [
   "cmdliner"
   "data-encoding" { >= "0.4" & < "0.5" }
   "lwt" { >= "5.4.0" }
+  "tezos-baking-alpha"
   "tezos-client-base-unix"
   "tezos-protocol-alpha"
   "tezt"

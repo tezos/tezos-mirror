@@ -30,8 +30,30 @@ let protocol = Protocol.Alpha
 let constants = Protocol.Constants_mainnet
 
 let estimate_gas_tps ~average_block_path () =
+  Protocol.write_parameter_file
+    ~base:(Either.right (protocol, Some constants))
+    []
+  >>= fun parameter_file ->
+  (* For now we disable operations precheck, but ideally we should
+     pre-populate enough bootstrap accounts and do 1 transaction per
+     account per block. *)
+  Client.init_with_protocol
+    ~nodes_args:
+      Node.
+        [
+          Connections 0; Synchronisation_threshold 0; Disable_operations_precheck;
+        ]
+    ~parameter_file
+    ~timestamp_delay:0.0
+    `Client
+    ~protocol
+    ()
+  >>= fun (_node, client) ->
   Average_block.load average_block_path >>= fun average_block ->
-  let transaction_cost = Gas.average_transaction_cost average_block in
+  Client.stresstest_estimate_gas client >>= fun transaction_costs ->
+  let transaction_cost =
+    Gas.average_transaction_cost transaction_costs average_block
+  in
   Format.printf "Average transaction cost: %d@." transaction_cost ;
   let gas_tps = Gas.deduce_tps ~protocol ~constants ~transaction_cost () in
   Format.printf "Gas TPS: %d@." gas_tps ;
@@ -44,13 +66,33 @@ module Term = struct
     let docv = "AVERAGE_BLOCK_PATH" in
     Arg.(value & opt (some string) None & info ["average-block"] ~docv ~doc)
 
-  let process average_block_path =
-    Lwt_main.run (estimate_gas_tps ~average_block_path ()) ;
-    `Ok ()
+  let tezt_args =
+    let open Cmdliner in
+    let doc = "Extra arguments after -- to be passed directly to Tezt" in
+    let docv = "TEZT_ARGS" in
+    Arg.(value & pos_all string [] & info [] ~docv ~doc)
 
   let term =
+    let process average_block_path tezt_args =
+      (* We are going to need to call the client stress test command here in
+         order to get an estimation of gas cost of various transactions that
+         stress test uses. This functionality is also protocol-dependent, so
+         we need to start a node, too. Hence we use the tezt network to spin
+         up the network. *)
+      (try Cli.init ~args:tezt_args ()
+       with Arg.Help help_str ->
+         Format.eprintf "%s@." help_str ;
+         exit 0) ;
+      Test.register
+        ~__FILE__
+        ~title:"tezos_tps_gas"
+        ~tags:[]
+        (estimate_gas_tps ~average_block_path) ;
+      Test.run () ;
+      `Ok ()
+    in
     let open Cmdliner.Term in
-    ret (const process $ average_block_path_arg)
+    ret (const process $ average_block_path_arg $ tezt_args)
 end
 
 module Manpage = struct

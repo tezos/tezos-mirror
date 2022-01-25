@@ -133,9 +133,6 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
      ]
     else [])
   >>= fun parameter_file ->
-  Average_block.load average_block_path >>= fun average_block ->
-  let transaction_cost = Gas.average_transaction_cost average_block in
-  Format.printf "Average transaction cost: %d@\n" transaction_cost ;
   Format.printf "Spinning up the network...@." ;
   (* For now we disable operations precheck, but ideally we should
      pre-populate enough bootstrap accounts and do 1 transaction per
@@ -152,6 +149,12 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
     ~protocol
     ()
   >>= fun (node, client) ->
+  Average_block.load average_block_path >>= fun average_block ->
+  Client.stresstest_estimate_gas client >>= fun transaction_costs ->
+  let transaction_cost =
+    Gas.average_transaction_cost transaction_costs average_block
+  in
+  Format.printf "Average transaction cost: %d@\n" transaction_cost ;
   Baker.init ~protocol ~delegates node client >>= fun _baker ->
   Format.printf "Using the parameter file: %s@.@." parameter_file ;
   print_out_file parameter_file >>= fun () ->
@@ -173,8 +176,19 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
         if lift_protocol_limits then max_int
         else Gas.deduce_tps ~protocol ~constants ~transaction_cost ()
   in
+  let fee =
+    Tez.of_mutez_int
+      (Q.to_int
+         (Q.mul
+            (Q.of_int transaction_cost)
+            Tezos_baking_alpha.Baking_configuration.default_config.fees
+              .minimal_nanotez_per_gas_unit)
+      / 100)
+  in
   let client_stresstest_process =
     Client.spawn_stresstest
+      ~fee
+      ~gas_limit:transaction_cost
       ~tps:
         target_tps_of_injection
         (* The stresstest command allows a small probability of creating

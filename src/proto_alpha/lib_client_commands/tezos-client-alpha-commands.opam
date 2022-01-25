@@ -10,6 +10,7 @@ depends: [
   "tezos-base"
   "tezos-protocol-environment"
   "tezos-protocol-alpha"
+  "tezos-protocol-alpha-parameters"
   "tezos-shell-services"
   "tezos-client-base-unix"
   "tezos-client-alpha"

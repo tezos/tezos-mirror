@@ -271,6 +271,8 @@ let tezos_protocol_alpha_parameters = todo "tezos-protocol-alpha-parameters"
 
 let tezos_benchmarks_proto_alpha = todo "tezos-benchmarks-proto-alpha"
 
+let tezos_baking_alpha = todo "tezos-baking-alpha"
+
 (* PROTOCOL PACKAGES *)
 
 module Protocol : sig
@@ -3397,6 +3399,7 @@ let _tezos_tps_evaluation =
         data_encoding;
         lwt;
         ppx_blob;
+        tezos_baking_alpha;
         tezos_client_base_unix;
         Protocol.(main alpha);
         tezt;
