@@ -651,7 +651,9 @@ let cement_blocks ?(check_consistency = true) (cemented_store : t)
   if not check_consistency then Array.sort compare_cemented_files new_array ;
   cemented_store.cemented_blocks_files <- Some new_array ;
   (* Compress and write the metadatas *)
-  if write_metadata then cement_blocks_metadata cemented_store blocks
+  if write_metadata then
+    Store_events.(emit start_cementing_blocks_metadata) () >>= fun () ->
+    cement_blocks_metadata cemented_store blocks
   else return_unit
 
 let trigger_full_gc cemented_store cemented_blocks_files offset =
@@ -709,11 +711,12 @@ let trigger_rolling_gc cemented_store cemented_blocks_files offset =
         Unit.catch_s (fun () -> Lwt_unix.unlink (Naming.file_path file)))
       files_to_remove
 
-let trigger_gc cemented_store =
+let trigger_gc cemented_store history_mode =
+  Store_events.(emit start_store_garbage_collection) () >>= fun () ->
   match cemented_store.cemented_blocks_files with
-  | None -> fun _ -> Lwt.return_unit
+  | None -> Lwt.return_unit
   | Some cemented_blocks_files -> (
-      function
+      match history_mode with
       | History_mode.Archive -> Lwt.return_unit
       | Full offset ->
           let offset =
