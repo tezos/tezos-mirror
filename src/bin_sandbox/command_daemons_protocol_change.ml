@@ -143,6 +143,18 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
         in
         return ())
   in
+  let first_lb_vote =
+    match protocol.kind with `Alpha -> Some "pass" | _ -> None
+  in
+  let* second_lb_vote =
+    match new_protocol_path with
+    | "src/proto_alpha/lib_protocol" -> return (Some "pass")
+    | "src/proto_012_Psithaca/lib_protocol" ->
+        (* This branch can be removed after the activation of Ithaca on mainnet,
+           once we stop testing migration to Ithaca. *)
+        return None
+    | s -> failf "Unexpected proto path %s" s
+  in
   let keys_and_daemons =
     let pick_a_node_and_client idx =
       match List.nth nodes ((1 + idx) % List.length nodes) with
@@ -164,13 +176,15 @@ let run state ~protocol ~size ~base_port ~no_daemons_for ?external_peer_ports
                      ~client
                      node
                      ~key
-                     ~name_tag:"first";
+                     ~name_tag:"first"
+                     ~lb_vote:first_lb_vote;
                    Tezos_daemon.baker_of_node
                      ~exec:second_baker_exec
                      ~client
                      ~name_tag:"second"
                      node
-                     ~key;
+                     ~key
+                     ~lb_vote:second_lb_vote;
                    Tezos_daemon.endorser_of_node
                      ~exec:first_endorser_exec
                      ~name_tag:"first"
