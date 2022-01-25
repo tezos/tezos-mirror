@@ -92,6 +92,8 @@ let run (baker : t) =
       "local";
       "node";
       Node.data_dir node;
+      "--liquidity-baking-escape-vote";
+      "pass";
     ]
     @ delegates
   in
