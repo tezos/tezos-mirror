@@ -74,7 +74,7 @@ class TestMultiNodeStorageReconstruction:
             1,
             snapshot=file,
             reconstruct=True,
-            params=PARAMS + ['--history-mode', 'archive'],
+            params=PARAMS,
         )
         assert utils.check_level(sandbox.client(1), session['head_level'])
         clear_cache(sandbox, 1)
