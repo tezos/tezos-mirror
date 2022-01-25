@@ -185,6 +185,9 @@ let test_parse_comb_type () =
   let open Script in
   let open Script_typed_ir in
   let nat_prim = Prim (-1, T_nat, [], []) in
+  let nat_prim_a = Prim (-1, T_nat, [], ["%a"]) in
+  let nat_prim_b = Prim (-1, T_nat, [], ["%b"]) in
+  let nat_prim_c = Prim (-1, T_nat, [], ["%c"]) in
   let nat_ty = nat_t in
   let pair_prim l = Prim (-1, T_pair, l, []) in
   let pair_ty ty1 ty2 = pair_t (-1) ty1 ty2 in
@@ -214,6 +217,34 @@ let test_parse_comb_type () =
     ctxt
     (pair_prim [nat_prim; nat_prim; nat_prim])
     pair_nat_nat_nat_ty
+  >>?= fun ctxt ->
+  (* pair (nat %a) nat *)
+  pair_t (-1) nat_ty nat_ty >>??= fun pair_nat_a_nat_ty ->
+  test_parse_ty ctxt (pair_prim2 nat_prim_a nat_prim) pair_nat_a_nat_ty
+  >>?= fun ctxt ->
+  (* pair nat (nat %b) *)
+  pair_t (-1) nat_ty nat_ty >>??= fun pair_nat_nat_b_ty ->
+  test_parse_ty ctxt (pair_prim2 nat_prim nat_prim_b) pair_nat_nat_b_ty
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) *)
+  pair_t (-1) nat_ty nat_ty >>??= fun pair_nat_a_nat_b_ty ->
+  test_parse_ty ctxt (pair_prim2 nat_prim_a nat_prim_b) pair_nat_a_nat_b_ty
+  >>?= fun ctxt ->
+  (* pair (nat %a) (nat %b) (nat %c) *)
+  pair_t (-1) nat_ty nat_ty >>??= fun pair_nat_b_nat_c_ty ->
+  pair_t (-1) nat_ty pair_nat_b_nat_c_ty >>??= fun pair_nat_a_nat_b_nat_c_ty ->
+  test_parse_ty
+    ctxt
+    (pair_prim [nat_prim_a; nat_prim_b; nat_prim_c])
+    pair_nat_a_nat_b_nat_c_ty
+  >>?= fun ctxt ->
+  (* pair (nat %a) (pair %b nat nat) *)
+  pair_t (-1) nat_ty nat_ty >>??= fun pair_b_nat_nat_ty ->
+  pair_t (-1) nat_ty pair_b_nat_nat_ty >>??= fun pair_nat_a_pair_b_nat_nat_ty ->
+  test_parse_ty
+    ctxt
+    (pair_prim2 nat_prim_a (Prim (-1, T_pair, [nat_prim; nat_prim], ["%b"])))
+    pair_nat_a_pair_b_nat_nat_ty
   >>?= fun _ -> return_unit
 
 let test_unparse_ty loc ctxt expected ty =
