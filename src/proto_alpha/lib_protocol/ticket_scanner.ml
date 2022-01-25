@@ -521,6 +521,9 @@ let type_has_tickets ctxt ty =
 let tickets_of_value ctxt ~include_lazy (ht, ty) =
   Ticket_collection.tickets_of_value ctxt ~include_lazy ht ty
 
+let has_tickets (ht, _) =
+  match ht with Ticket_inspection.False_ht -> false | _ -> true
+
 let tickets_of_node ctxt ~include_lazy (ht, ty) expr =
   match ht with
   | Ticket_inspection.False_ht -> return ([], ctxt)

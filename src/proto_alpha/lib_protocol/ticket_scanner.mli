@@ -86,3 +86,7 @@ val tickets_of_node :
   'a has_tickets ->
   Alpha_context.Script.node ->
   (ex_ticket list * Alpha_context.context) tzresult Lwt.t
+
+(** [has_tickets ht] returns whether or not the type of the given [has_tickets]
+    witness [ht] has tickets. *)
+val has_tickets : 'a has_tickets -> bool
