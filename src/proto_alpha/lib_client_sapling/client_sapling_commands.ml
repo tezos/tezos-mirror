@@ -204,7 +204,7 @@ let shield_cmd =
         ~amount
         ~src_pk
         ~src_sk
-        ~destination:contract_dst
+        ~destination:(Contract contract_dst)
         ~source:pkh
         ~arg
         ?confirmations:cctxt#confirmations
@@ -313,7 +313,7 @@ let unshield_cmd =
         ~amount:Tez.zero
         ~src_pk
         ~src_sk
-        ~destination:contract_dst
+        ~destination:(Contract contract_dst)
         ~source
         ~arg
         ?confirmations:cctxt#confirmations
@@ -525,7 +525,7 @@ let submit_shielded_cmd =
         ~amount:Tez.zero
         ~src_pk
         ~src_sk
-        ~destination
+        ~destination:(Contract destination)
         ~source
         ~arg:contract_input
         ?confirmations:cctxt#confirmations

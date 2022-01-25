@@ -392,7 +392,7 @@ val parse_contract :
   context ->
   Script.location ->
   'a Script_typed_ir.ty ->
-  Contract.t ->
+  Destination.t ->
   entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract) tzresult Lwt.t
 
@@ -400,7 +400,7 @@ val parse_contract_for_script :
   context ->
   Script.location ->
   'a Script_typed_ir.ty ->
-  Contract.t ->
+  Destination.t ->
   entrypoint:Entrypoint.t ->
   (context * 'a Script_typed_ir.typed_contract option) tzresult Lwt.t
 

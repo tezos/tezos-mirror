@@ -52,6 +52,7 @@ let () =
       Unit_test.skip "Raw_level_repr.ml" Test_raw_level_repr.skipped_tests;
       Unit_test.spec "Tez_repr.ml" Test_tez_repr.tests;
       Unit_test.spec "Contract_repr.ml" Test_contract_repr.tests;
+      Unit_test.spec "Destination_repr.ml" Test_destination_repr.tests;
       Unit_test.spec "Operation_repr.ml" Test_operation_repr.tests;
       Unit_test.spec
         "Global_constants_storage.ml"

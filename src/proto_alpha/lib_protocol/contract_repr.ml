@@ -81,6 +81,25 @@ let pp_short ppf = function
   | Implicit pbk -> Signature.Public_key_hash.pp_short ppf pbk
   | Originated h -> Contract_hash.pp_short ppf h
 
+let cases is_contract to_contract =
+  Data_encoding.
+    [
+      case
+        (Tag 0)
+        ~title:"Implicit"
+        Signature.Public_key_hash.encoding
+        (fun k ->
+          match is_contract k with Some (Implicit k) -> Some k | _ -> None)
+        (fun k -> to_contract (Implicit k));
+      case
+        (Tag 1)
+        (Fixed.add_padding Contract_hash.encoding 1)
+        ~title:"Originated"
+        (fun k ->
+          match is_contract k with Some (Originated k) -> Some k | _ -> None)
+        (fun k -> to_contract (Originated k));
+    ]
+
 let encoding =
   let open Data_encoding in
   def
@@ -90,23 +109,7 @@ let encoding =
       "A contract notation as given to an RPC or inside scripts. Can be a \
        base58 implicit contract hash or a base58 originated contract hash."
   @@ splitted
-       ~binary:
-         (union
-            ~tag_size:`Uint8
-            [
-              case
-                (Tag 0)
-                ~title:"Implicit"
-                Signature.Public_key_hash.encoding
-                (function Implicit k -> Some k | _ -> None)
-                (fun k -> Implicit k);
-              case
-                (Tag 1)
-                (Fixed.add_padding Contract_hash.encoding 1)
-                ~title:"Originated"
-                (function Originated k -> Some k | _ -> None)
-                (fun k -> Originated k);
-            ])
+       ~binary:(union ~tag_size:`Uint8 @@ cases (fun x -> Some x) (fun x -> x))
        ~json:
          (conv
             to_b58check

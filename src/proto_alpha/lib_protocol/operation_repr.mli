@@ -222,7 +222,7 @@ and _ manager_operation =
       amount : Tez_repr.tez;
       parameters : Script_repr.lazy_expr;
       entrypoint : Entrypoint_repr.t;
-      destination : Contract_repr.contract;
+      destination : Destination_repr.t;
     }
       -> Kind.transaction manager_operation
   | Origination : {

@@ -46,12 +46,8 @@ let error_encoding =
 
 let trace_encoding = make_trace_encoding error_encoding
 
-type _ successful_manager_operation_result =
-  | Reveal_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.reveal successful_manager_operation_result
-  | Transaction_result : {
+type successful_transaction_result =
+  | Transaction_to_contract_result of {
       storage : Script.expr option;
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
@@ -61,6 +57,14 @@ type _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
     }
+
+type _ successful_manager_operation_result =
+  | Reveal_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.reveal successful_manager_operation_result
+  | Transaction_result :
+      successful_transaction_result
       -> Kind.transaction successful_manager_operation_result
   | Origination_result : {
       lazy_storage_diff : Lazy_storage.diffs option;
@@ -242,27 +246,83 @@ module Manager_result = struct
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
         Reveal_result {consumed_gas = consumed_milligas})
 
+  let[@coq_axiom_with_reason "gadt"] transaction_to_contract_case =
+    union
+      [
+        case
+          ~title:"To_contract"
+          (Tag 0)
+          (obj10
+             (opt "storage" Script.expr_encoding)
+             (opt
+                (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
+                   It is kept here for a transitional period, for tools like indexers to update. *)
+                (* TODO: https://gitlab.com/tezos/tezos/-/issues/1948
+                   Remove it in 009 or later. *)
+                "big_map_diff"
+                Lazy_storage.legacy_big_map_diff_encoding)
+             (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (dft "originated_contracts" (list Contract.encoding) [])
+             (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
+             (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
+             (dft "storage_size" z Z.zero)
+             (dft "paid_storage_size_diff" z Z.zero)
+             (dft "allocated_destination_contract" bool false)
+             (opt "lazy_storage_diff" Lazy_storage.encoding))
+          (function
+            | Transaction_to_contract_result
+                {
+                  storage;
+                  lazy_storage_diff;
+                  balance_updates;
+                  originated_contracts;
+                  consumed_gas;
+                  storage_size;
+                  paid_storage_size_diff;
+                  allocated_destination_contract;
+                } ->
+                Some
+                  ( storage,
+                    lazy_storage_diff,
+                    balance_updates,
+                    originated_contracts,
+                    Gas.Arith.ceil consumed_gas,
+                    consumed_gas,
+                    storage_size,
+                    paid_storage_size_diff,
+                    allocated_destination_contract,
+                    lazy_storage_diff ))
+          (fun ( storage,
+                 legacy_lazy_storage_diff,
+                 balance_updates,
+                 originated_contracts,
+                 consumed_gas,
+                 consumed_milligas,
+                 storage_size,
+                 paid_storage_size_diff,
+                 allocated_destination_contract,
+                 lazy_storage_diff ) ->
+            assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
+            let lazy_storage_diff =
+              Option.either lazy_storage_diff legacy_lazy_storage_diff
+            in
+            Transaction_to_contract_result
+              {
+                storage;
+                lazy_storage_diff;
+                balance_updates;
+                originated_contracts;
+                consumed_gas = consumed_milligas;
+                storage_size;
+                paid_storage_size_diff;
+                allocated_destination_contract;
+              });
+      ]
+
   let[@coq_axiom_with_reason "gadt"] transaction_case =
     make
       ~op_case:Operation.Encoding.Manager_operations.transaction_case
-      ~encoding:
-        (obj10
-           (opt "storage" Script.expr_encoding)
-           (opt
-              (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 It is kept here for a transitional period, for tools like indexers to update. *)
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1948
-                 Remove it in 009 or later. *)
-              "big_map_diff"
-              Lazy_storage.legacy_big_map_diff_encoding)
-           (dft "balance_updates" Receipt.balance_updates_encoding [])
-           (dft "originated_contracts" (list Contract.encoding) [])
-           (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
-           (dft "consumed_milligas" Gas.Arith.n_fp_encoding Gas.Arith.zero)
-           (dft "storage_size" z Z.zero)
-           (dft "paid_storage_size_diff" z Z.zero)
-           (dft "allocated_destination_contract" bool false)
-           (opt "lazy_storage_diff" Lazy_storage.encoding))
+      ~encoding:transaction_to_contract_case
       ~iselect:(function
         | Internal_operation_result (({operation = Transaction _; _} as op), res)
           ->
@@ -272,54 +332,8 @@ module Manager_result = struct
         | Successful_manager_result (Transaction_result _ as op) -> Some op
         | _ -> None)
       ~kind:Kind.Transaction_manager_kind
-      ~proj:(function
-        | Transaction_result
-            {
-              storage;
-              lazy_storage_diff;
-              balance_updates;
-              originated_contracts;
-              consumed_gas;
-              storage_size;
-              paid_storage_size_diff;
-              allocated_destination_contract;
-            } ->
-            ( storage,
-              lazy_storage_diff,
-              balance_updates,
-              originated_contracts,
-              Gas.Arith.ceil consumed_gas,
-              consumed_gas,
-              storage_size,
-              paid_storage_size_diff,
-              allocated_destination_contract,
-              lazy_storage_diff ))
-      ~inj:
-        (fun ( storage,
-               legacy_lazy_storage_diff,
-               balance_updates,
-               originated_contracts,
-               consumed_gas,
-               consumed_milligas,
-               storage_size,
-               paid_storage_size_diff,
-               allocated_destination_contract,
-               lazy_storage_diff ) ->
-        assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        let lazy_storage_diff =
-          Option.either lazy_storage_diff legacy_lazy_storage_diff
-        in
-        Transaction_result
-          {
-            storage;
-            lazy_storage_diff;
-            balance_updates;
-            originated_contracts;
-            consumed_gas = consumed_milligas;
-            storage_size;
-            paid_storage_size_diff;
-            allocated_destination_contract;
-          })
+      ~proj:(function Transaction_result x -> x)
+      ~inj:(fun x -> Transaction_result x)
 
   let[@coq_axiom_with_reason "gadt"] origination_case =
     make

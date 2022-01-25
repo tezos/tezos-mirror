@@ -46,6 +46,7 @@
         "Vote_repr",
         "Block_header_repr",
         "Entrypoint_repr",
+        "Destination_repr",
         "Operation_repr",
         "Manager_repr",
         "Commitment_repr",

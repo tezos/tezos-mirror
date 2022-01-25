@@ -197,7 +197,7 @@ val build_transaction_operation :
   ?fee:Tez.t ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
-  Contract.t ->
+  Destination.t ->
   Kind.transaction Annotated_manager_operation.t
 
 val transfer :
@@ -213,7 +213,7 @@ val transfer :
   source:public_key_hash ->
   src_pk:public_key ->
   src_sk:Client_keys.sk_uri ->
-  destination:Contract.t ->
+  destination:Destination.t ->
   ?entrypoint:Entrypoint.t ->
   ?arg:string ->
   amount:Tez.t ->

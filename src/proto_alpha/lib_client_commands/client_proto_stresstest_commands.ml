@@ -402,7 +402,7 @@ let manager_op_of_transfer parameters
            (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
     in
     let entrypoint = Entrypoint.default in
-    let destination = Contract.implicit_contract dst in
+    let destination = Destination.Contract (Contract.implicit_contract dst) in
     Transaction {amount; parameters; entrypoint; destination}
   in
   match counter with
@@ -1092,7 +1092,9 @@ let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
       match result.contents with
       | Single_result (Manager_operation_result {operation_result; _}) -> (
           match operation_result with
-          | Applied (Transaction_result {consumed_gas; _}) ->
+          | Applied
+              (Transaction_result
+                (Transaction_to_contract_result {consumed_gas; _})) ->
               return (Gas.Arith.ceil consumed_gas)
           | _ -> cctxt#error "Simulation of regular transaction failed"))
 

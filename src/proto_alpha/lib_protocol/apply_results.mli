@@ -104,14 +104,9 @@ and 'kind manager_operation_result =
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 [@@coq_force_gadt]
 
-(** Result of applying a {!manager_operation_content}, either internal
-    or external. *)
-and _ successful_manager_operation_result =
-  | Reveal_result : {
-      consumed_gas : Gas.Arith.fp;
-    }
-      -> Kind.reveal successful_manager_operation_result
-  | Transaction_result : {
+(** Result of applying a transaction, either internal or external *)
+and successful_transaction_result =
+  | Transaction_to_contract_result of {
       storage : Script.expr option;
       lazy_storage_diff : Lazy_storage.diffs option;
       balance_updates : Receipt.balance_updates;
@@ -121,6 +116,16 @@ and _ successful_manager_operation_result =
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
     }
+
+(** Result of applying a {!manager_operation_content}, either internal
+    or external. *)
+and _ successful_manager_operation_result =
+  | Reveal_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.reveal successful_manager_operation_result
+  | Transaction_result :
+      successful_transaction_result
       -> Kind.transaction successful_manager_operation_result
   | Origination_result : {
       lazy_storage_diff : Lazy_storage.diffs option;

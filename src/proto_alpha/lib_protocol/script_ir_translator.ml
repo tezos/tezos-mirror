@@ -400,19 +400,20 @@ let unparse_timestamp ~loc ctxt mode t =
       | None -> ok (Int (loc, Script_timestamp.to_zint t), ctxt)
       | Some s -> ok (String (loc, s), ctxt))
 
-let unparse_address ~loc ctxt mode {contract; entrypoint} =
+let unparse_address ~loc ctxt mode {destination; entrypoint} =
   Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
   match mode with
   | Optimized | Optimized_legacy ->
       let bytes =
         Data_encoding.Binary.to_bytes_exn
-          Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
-          (contract, entrypoint)
+          Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
+          (destination, entrypoint)
       in
       (Bytes (loc, bytes), ctxt)
   | Readable ->
       let notation =
-        Contract.to_b58check contract ^ Entrypoint.to_address_suffix entrypoint
+        Destination.to_b58check destination
+        ^ Entrypoint.to_address_suffix entrypoint
       in
       (String (loc, notation), ctxt)
 
@@ -2127,10 +2128,10 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       match
         Data_encoding.Binary.of_bytes_opt
-          Data_encoding.(tup2 Contract.encoding Entrypoint.value_encoding)
+          Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
           bytes
       with
-      | Some (contract, entrypoint) -> Ok ({contract; entrypoint}, ctxt)
+      | Some (destination, entrypoint) -> Ok ({destination; entrypoint}, ctxt)
       | None ->
           error
           @@ Invalid_syntactic_constant
@@ -2145,8 +2146,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Entrypoint.of_string_strict ~loc name >|? fun entrypoint ->
           (String.sub s 0 pos, entrypoint))
       >>? fun (addr, entrypoint) ->
-      Contract.of_b58check addr >|? fun contract ->
-      ({contract; entrypoint}, ctxt)
+      Destination.of_b58check addr >|? fun destination ->
+      ({destination; entrypoint}, ctxt)
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
@@ -2478,7 +2479,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             ctxt
             loc
             arg_ty
-            address.contract
+            address.destination
             ~entrypoint:address.entrypoint
           >|=? fun (ctxt, _) -> ({arg_ty; address}, ctxt) )
   (* Pairs *)
@@ -2536,8 +2537,9 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       if allow_forged then
         opened_ticket_type (location expr) t >>?= fun ty ->
         parse_comparable_data ?type_logger ctxt ty expr
-        >|=? fun (({contract; entrypoint = _}, (contents, amount)), ctxt) ->
-        ({ticketer = contract; contents; amount}, ctxt)
+        >|=? fun (({destination; entrypoint = _}, (contents, amount)), ctxt) ->
+        match destination with
+        | Contract ticketer -> ({ticketer; contents; amount}, ctxt)
       else traced_fail (Unexpected_forged_value (location expr))
   (* Sets *)
   | (Set_t (t, _ty_name), (Seq (loc, vs) as expr)) ->
@@ -4977,54 +4979,58 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
     context ->
     Script.location ->
     arg ty ->
-    Contract.t ->
+    Destination.t ->
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract) tzresult Lwt.t =
  fun ~stack_depth ~legacy ctxt loc arg contract ~entrypoint ->
-  match Contract.is_implicit contract with
-  | Some _ ->
-      if Entrypoint.is_default entrypoint then
-        (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-        Lwt.return
-          ( ty_eq ~legacy:true ctxt loc arg unit_t >|? fun (Eq, ctxt) ->
-            (ctxt, {arg_ty = arg; address = {contract; entrypoint}}) )
-      else fail (No_such_entrypoint entrypoint)
-  | None -> (
-      (* Originated account *)
-      trace (Invalid_contract (loc, contract))
-      @@ Contract.get_script_code ctxt contract
-      >>=? fun (ctxt, code) ->
-      match code with
-      | None -> fail (Invalid_contract (loc, contract))
-      | Some code ->
-          Lwt.return
-            ( Script.force_decode_in_context
-                ~consume_deserialization_gas:When_needed
-                ctxt
-                code
-            >>? fun (code, ctxt) ->
-              (* can only fail because of gas *)
-              parse_toplevel ctxt ~legacy:true code
-              >>? fun ({arg_type; root_name; _}, ctxt) ->
-              parse_parameter_ty
-                ctxt
-                ~stack_depth:(stack_depth + 1)
-                ~legacy:true
-                arg_type
-              >>? fun (Ex_ty targ, ctxt) ->
-              (* we don't check targ size here because it's a legacy contract code *)
-              Gas_monad.run ctxt
-              @@ find_entrypoint_for_type
-                   ~legacy
-                   ~error_details:Informative
-                   ~full:targ
-                   ~expected:arg
-                   ~root_name
-                   entrypoint
-                   loc
-              >>? fun (entrypoint_arg, ctxt) ->
-              entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-              (ctxt, {arg_ty; address = {contract; entrypoint}}) ))
+  match contract with
+  | Contract contract -> (
+      match Contract.is_implicit contract with
+      | Some _ ->
+          if Entrypoint.is_default entrypoint then
+            (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+            Lwt.return
+              ( ty_eq ~legacy:true ctxt loc arg unit_t >|? fun (Eq, ctxt) ->
+                let destination : Destination.t = Contract contract in
+                (ctxt, {arg_ty = arg; address = {destination; entrypoint}}) )
+          else fail (No_such_entrypoint entrypoint)
+      | None -> (
+          (* Originated account *)
+          trace (Invalid_contract (loc, contract))
+          @@ Contract.get_script_code ctxt contract
+          >>=? fun (ctxt, code) ->
+          match code with
+          | None -> fail (Invalid_contract (loc, contract))
+          | Some code ->
+              Lwt.return
+                ( Script.force_decode_in_context
+                    ~consume_deserialization_gas:When_needed
+                    ctxt
+                    code
+                >>? fun (code, ctxt) ->
+                  (* can only fail because of gas *)
+                  parse_toplevel ctxt ~legacy:true code
+                  >>? fun ({arg_type; root_name; _}, ctxt) ->
+                  parse_parameter_ty
+                    ctxt
+                    ~stack_depth:(stack_depth + 1)
+                    ~legacy:true
+                    arg_type
+                  >>? fun (Ex_ty targ, ctxt) ->
+                  (* we don't check targ size here because it's a legacy contract code *)
+                  Gas_monad.run ctxt
+                  @@ find_entrypoint_for_type
+                       ~legacy
+                       ~error_details:Informative
+                       ~full:targ
+                       ~expected:arg
+                       ~root_name
+                       entrypoint
+                       loc
+                  >>? fun (entrypoint_arg, ctxt) ->
+                  entrypoint_arg >|? fun (entrypoint, arg_ty) ->
+                  let destination : Destination.t = Contract contract in
+                  (ctxt, {arg_ty; address = {destination; entrypoint}}) )))
 
 and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
   function
@@ -5152,71 +5158,80 @@ let parse_contract_for_script :
     context ->
     Script.location ->
     arg ty ->
-    Contract.t ->
+    Destination.t ->
     entrypoint:Entrypoint.t ->
     (context * arg typed_contract option) tzresult Lwt.t =
  fun ctxt loc arg contract ~entrypoint ->
-  match Contract.is_implicit contract with
-  | Some _ ->
-      if Entrypoint.is_default entrypoint then
-        (* An implicit account on the "default" entrypoint always exists and has type unit. *)
-        Lwt.return
-          ( Gas_monad.run ctxt
-          @@ merge_types ~legacy:true ~error_details:Fast loc arg unit_t
-          >|? fun (eq_ty, ctxt) ->
-            match eq_ty with
-            | Ok (Eq, _ty) ->
-                let contract =
-                  {arg_ty = arg; address = {contract; entrypoint}}
-                in
-                (ctxt, Some contract)
-            | Error Inconsistent_types_fast -> (ctxt, None) )
-      else
-        Lwt.return
-          ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle >|? fun ctxt ->
-            (* An implicit account on any other entrypoint is not a valid contract. *)
-            (ctxt, None) )
-  | None -> (
-      (* Originated account *)
-      trace (Invalid_contract (loc, contract))
-      @@ Contract.get_script_code ctxt contract
-      >>=? fun (ctxt, code) ->
-      match code with
-      | None -> return (ctxt, None)
-      | Some code ->
-          Lwt.return
-            ( Script.force_decode_in_context
-                ~consume_deserialization_gas:When_needed
-                ctxt
-                code
-            >>? fun (code, ctxt) ->
-              (* can only fail because of gas *)
-              match parse_toplevel ctxt ~legacy:true code with
-              | Error _ -> error (Invalid_contract (loc, contract))
-              | Ok ({arg_type; root_name; _}, ctxt) -> (
-                  match
-                    parse_parameter_ty ctxt ~stack_depth:0 ~legacy:true arg_type
-                  with
+  match contract with
+  | Contract contract -> (
+      match Contract.is_implicit contract with
+      | Some _ ->
+          if Entrypoint.is_default entrypoint then
+            (* An implicit account on the "default" entrypoint always exists and has type unit. *)
+            Lwt.return
+              ( Gas_monad.run ctxt
+              @@ merge_types ~legacy:true ~error_details:Fast loc arg unit_t
+              >|? fun (eq_ty, ctxt) ->
+                match eq_ty with
+                | Ok (Eq, _ty) ->
+                    let destination : Destination.t = Contract contract in
+                    let contract =
+                      {arg_ty = arg; address = {destination; entrypoint}}
+                    in
+                    (ctxt, Some contract)
+                | Error Inconsistent_types_fast -> (ctxt, None) )
+          else
+            Lwt.return
+              ( Gas.consume ctxt Typecheck_costs.parse_instr_cycle
+              >|? fun ctxt ->
+                (* An implicit account on any other entrypoint is not a valid contract. *)
+                (ctxt, None) )
+      | None -> (
+          (* Originated account *)
+          trace (Invalid_contract (loc, contract))
+          @@ Contract.get_script_code ctxt contract
+          >>=? fun (ctxt, code) ->
+          match code with
+          | None -> return (ctxt, None)
+          | Some code ->
+              Lwt.return
+                ( Script.force_decode_in_context
+                    ~consume_deserialization_gas:When_needed
+                    ctxt
+                    code
+                >>? fun (code, ctxt) ->
+                  (* can only fail because of gas *)
+                  match parse_toplevel ctxt ~legacy:true code with
                   | Error _ -> error (Invalid_contract (loc, contract))
-                  | Ok (Ex_ty targ, ctxt) -> (
-                      (* we don't check targ size here because it's a legacy contract code *)
-                      Gas_monad.run ctxt
-                      @@ find_entrypoint_for_type
-                           ~legacy:false
-                           ~error_details:Fast
-                           ~full:targ
-                           ~expected:arg
-                           ~root_name
-                           entrypoint
-                           loc
-                      >|? fun (entrypoint_arg, ctxt) ->
-                      match entrypoint_arg with
-                      | Ok (entrypoint, arg_ty) ->
-                          let contract =
-                            {arg_ty; address = {contract; entrypoint}}
-                          in
-                          (ctxt, Some contract)
-                      | Error Inconsistent_types_fast -> (ctxt, None))) ))
+                  | Ok ({arg_type; root_name; _}, ctxt) -> (
+                      match
+                        parse_parameter_ty
+                          ctxt
+                          ~stack_depth:0
+                          ~legacy:true
+                          arg_type
+                      with
+                      | Error _ -> error (Invalid_contract (loc, contract))
+                      | Ok (Ex_ty targ, ctxt) -> (
+                          (* we don't check targ size here because it's a legacy contract code *)
+                          Gas_monad.run ctxt
+                          @@ find_entrypoint_for_type
+                               ~legacy:false
+                               ~error_details:Fast
+                               ~full:targ
+                               ~expected:arg
+                               ~root_name
+                               entrypoint
+                               loc
+                          >|? fun (entrypoint_arg, ctxt) ->
+                          match entrypoint_arg with
+                          | Ok (entrypoint, arg_ty) ->
+                              let destination = Destination.Contract contract in
+                              let contract =
+                                {arg_ty; address = {destination; entrypoint}}
+                              in
+                              (ctxt, Some contract)
+                          | Error Inconsistent_types_fast -> (ctxt, None))) )))
 
 let parse_code :
     ?type_logger:type_logger ->
@@ -5523,7 +5538,8 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       (* ideally we would like to allow a little overhead here because it is only used for unparsing *)
       opened_ticket_type loc t >>?= fun opened_ticket_ty ->
       let t = ty_of_comparable_ty opened_ticket_ty in
-      let addr = {contract = ticketer; entrypoint = Entrypoint.default} in
+      let destination : Destination.t = Contract ticketer in
+      let addr = {destination; entrypoint = Entrypoint.default} in
       (unparse_data [@tailcall])
         ctxt
         ~stack_depth
