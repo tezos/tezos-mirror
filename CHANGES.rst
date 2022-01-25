@@ -23,6 +23,7 @@ commits which are related to your changes using ``git log -p -- CHANGES.rst``.
 Relevant items are moved to ``docs/CHANGES.rst`` after each release.
 
 Only describe changes which affect users (bug fixes and new features),
+or which will affect users in the future (deprecated features),
 not refactorings or tests. Changes to the documentation do not need to
 be documented here either.
 
