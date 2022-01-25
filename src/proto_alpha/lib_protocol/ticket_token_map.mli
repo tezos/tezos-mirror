@@ -56,3 +56,58 @@ val fold :
   'state ->
   'a t ->
   ('state * Alpha_context.context) tzresult
+
+(** [find ctxt k m] looks up the value with key [k] in the given map [m] and
+    also accounts for the gas cost of finding the key. *)
+val find :
+  Alpha_context.context ->
+  Ticket_token.ex_token ->
+  'a t ->
+  ('a option * Alpha_context.context) tzresult Lwt.t
+
+(** [of_list ctxt ~merge_overlaps m] creates a map from a list of key-value
+    pairs. In case there are overlapping keys, their values are combined
+    using the [merge_overlap] function. The function accounts for gas for
+    traversing the elements. [merge_overlap] should account for its own gas
+    cost. *)
+val of_list :
+  Alpha_context.context ->
+  merge_overlap:
+    (Alpha_context.context ->
+    'a ->
+    'a ->
+    ('a * Alpha_context.context, error trace) result) ->
+  (Ticket_token.ex_token * 'a) list ->
+  ('a t * Alpha_context.context) tzresult Lwt.t
+
+(** [to_list m] transforms a map [m] into a list. It also accounts for the gas
+    cost for traversing the elements. *)
+val to_list :
+  Alpha_context.context ->
+  'a t ->
+  ((Ticket_token.ex_token * 'a) list * Alpha_context.context) tzresult
+
+(** [map ctxt f m] maps over all key-value pairs in the map [m] using the
+    function [f]. It accounts for gas costs associated with traversing the
+    elements. [f] must account for its own gas cost. *)
+val map :
+  Alpha_context.context ->
+  (Alpha_context.context ->
+  Ticket_token.ex_token ->
+  'a ->
+  ('b * Alpha_context.context) tzresult) ->
+  'a t ->
+  ('b t * Alpha_context.context) tzresult
+
+(** [merge ctxt ~merge_overlap m1 m2] merges the maps [m1] and [m2]. In case
+    there are overlapping keys, their values are combined using the
+    [merge_overlap] function. Gas costs for traversing all elements from both
+    maps are accounted for. [merge_overlap] must account for its own gas
+    costs. *)
+val merge :
+  Alpha_context.context ->
+  merge_overlap:
+    (Alpha_context.context -> 'a -> 'a -> ('a * Alpha_context.context) tzresult) ->
+  'a t ->
+  'a t ->
+  ('a t * Alpha_context.context) tzresult
