@@ -171,13 +171,6 @@ let get_contract_for_pkh contracts pkh =
   in
   find_contract contracts
 
-let get_baker_different_from_baker ctxt baker =
-  Context.get_bakers
-    ~filter:(fun x -> not (Signature.Public_key_hash.equal x.delegate baker))
-    ctxt
-  >>=? fun bakers ->
-  return (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers)
-
 (** Test that
     - the block producer gets the bonus for including the endorsements;
     - the payload producer gets the baking reward.
@@ -258,7 +251,8 @@ let test_rewards_block_and_payload_producer () =
     preendorsers
   >>=? fun preendos ->
   Context.get_baker (B b1) ~round:0 >>=? fun baker_b2 ->
-  get_baker_different_from_baker (B b1) baker_b2 >>=? fun baker_b2' ->
+  Context.get_bakers (B b1) >>=? fun bakers ->
+  let baker_b2' = Context.get_first_different_baker baker_b2 bakers in
   Block.bake
     ~payload_round:(Some Round.zero)
     ~locked_round:(Some Round.zero)

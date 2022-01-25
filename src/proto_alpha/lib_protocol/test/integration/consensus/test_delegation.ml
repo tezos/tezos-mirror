@@ -61,6 +61,14 @@ let expect_no_change_registered_delegate_pkh pkh = function
       return_unit
   | _ -> failwith "Delegate can not be deleted and operation should fail."
 
+let expect_too_low_balance_error i op =
+  Incremental.add_operation i op >>= fun err ->
+  Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+
+let expect_delegate_already_active_error i op =
+  Incremental.add_operation i op >>= fun err ->
+  Assert.proto_error_with_info ~loc:__LOC__ err "Delegate already active"
+
 (** Bootstrap contracts delegate to themselves. *)
 let bootstrap_manager_is_bootstrap_delegate () =
   Context.init 1 >>=? fun (b, bootstrap_contracts) ->
@@ -89,9 +97,7 @@ let bootstrap_delegate_cannot_change ~fee () =
   (* change delegation to bootstrap1 *)
   Op.delegation ~fee (I i) bootstrap0 (Some manager1.pkh)
   >>=? fun set_delegate ->
-  if fee > balance0 then
-    Incremental.add_operation i set_delegate >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance0 then expect_too_low_balance_error i set_delegate
   else
     Incremental.add_operation
       ~expect_failure:(expect_no_change_registered_delegate_pkh delegate0)
@@ -117,9 +123,7 @@ let bootstrap_delegate_cannot_be_removed ~fee () =
   Context.Contract.manager (I i) bootstrap >>=? fun manager ->
   (* remove delegation *)
   Op.delegation ~fee (I i) bootstrap None >>=? fun set_delegate ->
-  if fee > balance then
-    Incremental.add_operation i set_delegate >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i set_delegate
   else
     Incremental.add_operation
       ~expect_failure:(expect_no_change_registered_delegate_pkh manager.pkh)
@@ -162,9 +166,7 @@ let delegate_can_be_changed_from_unregistered_contract ~fee () =
   (* change delegation to bootstrap1 *)
   Op.delegation ~fee (I i) unregistered (Some manager1.pkh)
   >>=? fun change_delegate ->
-  if fee > balance then
-    Incremental.add_operation i change_delegate >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i change_delegate
   else
     Incremental.add_operation i change_delegate >>=? fun i ->
     (* delegate has changed *)
@@ -198,9 +200,7 @@ let delegate_can_be_removed_from_unregistered_contract ~fee () =
   Assert.equal_pkh ~loc:__LOC__ delegate manager.pkh >>=? fun () ->
   (* remove delegation *)
   Op.delegation ~fee (I i) unregistered None >>=? fun delete_delegate ->
-  if fee > balance then
-    Incremental.add_operation i delete_delegate >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i delete_delegate
   else
     Incremental.add_operation i delete_delegate >>=? fun i ->
     (* the delegate has been removed *)
@@ -223,9 +223,7 @@ let bootstrap_manager_already_registered_delegate ~fee () =
   let impl_contract = Contract.implicit_contract pkh in
   Context.Contract.balance (I i) impl_contract >>=? fun balance ->
   Op.delegation ~fee (I i) impl_contract (Some pkh) >>=? fun sec_reg ->
-  if fee > balance then
-    Incremental.add_operation i sec_reg >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i sec_reg
   else
     Incremental.add_operation
       ~expect_failure:(function
@@ -262,9 +260,7 @@ let delegate_to_bootstrap_by_origination ~fee () =
   (* 0.257tz *)
   cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
   fee +? origination_burn >>? ( +? ) Op.dummy_script_cost >>?= fun total_fee ->
-  if fee > balance then
-    Incremental.add_operation i op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i op
   else if total_fee > balance && balance >= fee then
     (* origination did not proceed; fee has been debited *)
     let expect_failure = function
@@ -274,8 +270,11 @@ let delegate_to_bootstrap_by_origination ~fee () =
             Error_monad.find_info_of_error (Environment.wrap_tzerror err)
           in
           if String.equal error_info.title "Balance too low" then return_unit
-          else failwith "unexpected error: %s" error_info.title
-      | _ -> failwith "should fail"
+          else failwith "unexpected failure"
+      | _ ->
+          failwith
+            "Test_delegation.delegate_to_bootstrap_by_origination was expected \
+             to fail but has not"
     in
     Incremental.add_operation i ~expect_failure op >>=? fun i ->
     (* fee was taken *)
@@ -472,9 +471,7 @@ let test_unregistered_delegate_key_init_origination ~fee () =
   fee +? origination_burn >>?= fun _total_fee ->
   (* FIXME unused variable *)
   Context.Contract.balance (I i) bootstrap >>=? fun balance ->
-  if fee > balance then
-    Incremental.add_operation i op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i op
   else
     (* origination did not proceed; fee has been debited *)
     Incremental.add_operation
@@ -514,9 +511,7 @@ let test_unregistered_delegate_key_init_delegation ~fee () =
   (* try to delegate *)
   Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh)
   >>=? fun delegate_op ->
-  if fee > credit then
-    Incremental.add_operation i delegate_op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > credit then expect_too_low_balance_error i delegate_op
   else
     (* fee has been debited; no delegate *)
     Incremental.add_operation
@@ -565,9 +560,7 @@ let test_unregistered_delegate_key_switch_delegation ~fee () =
   (* try to delegate *)
   Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh)
   >>=? fun delegate_op ->
-  if fee > credit then
-    Incremental.add_operation i delegate_op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > credit then expect_too_low_balance_error i delegate_op
   else
     (* fee has been debited; no delegate *)
     Incremental.add_operation
@@ -606,9 +599,7 @@ let test_unregistered_delegate_key_init_origination_credit ~fee ~amount () =
     bootstrap
     ~script:Op.dummy_script
   >>=? fun (op, orig_contract) ->
-  if fee > balance then
-    Incremental.add_operation i op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i op
   else
     (* origination not done, fee taken *)
     Incremental.add_operation
@@ -651,9 +642,7 @@ let test_unregistered_delegate_key_init_delegation_credit ~fee ~amount () =
   (* try to delegate *)
   Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh)
   >>=? fun delegate_op ->
-  if fee > credit then
-    Incremental.add_operation i delegate_op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > credit then expect_too_low_balance_error i delegate_op
   else
     (* fee has been taken, no delegate for contract *)
     Incremental.add_operation
@@ -705,9 +694,7 @@ let test_unregistered_delegate_key_switch_delegation_credit ~fee ~amount () =
   (* switch delegate through delegation *)
   Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh)
   >>=? fun delegate_op ->
-  if fee > credit then
-    Incremental.add_operation i delegate_op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > credit then expect_too_low_balance_error i delegate_op
   else
     (* fee has been taken, delegate for contract has not changed *)
     Incremental.add_operation
@@ -751,9 +738,7 @@ let test_unregistered_delegate_key_init_origination_credit_debit ~fee ~amount ()
     bootstrap
     ~script:Op.dummy_script
   >>=? fun (op, orig_contract) ->
-  if fee > balance then
-    Incremental.add_operation i op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i op
   else
     (* fee taken, origination not processed *)
     Incremental.add_operation
@@ -801,9 +786,7 @@ let test_unregistered_delegate_key_init_delegation_credit_debit ~amount ~fee ()
   (* try to delegate *)
   Op.delegation ~fee (I i) impl_contract (Some unregistered_delegate_pkh)
   >>=? fun delegate_op ->
-  if fee > credit then
-    Incremental.add_operation i delegate_op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > credit then expect_too_low_balance_error i delegate_op
   else
     (* fee has been taken, no delegate for contract *)
     Incremental.add_operation
@@ -859,9 +842,7 @@ let test_unregistered_delegate_key_switch_delegation_credit_debit ~fee ~amount
   (* switch delegate through delegation *)
   Op.delegation (I i) ~fee impl_contract (Some unregistered_delegate_pkh)
   >>=? fun delegate_op ->
-  if fee > credit then
-    Incremental.add_operation i delegate_op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > credit then expect_too_low_balance_error i delegate_op
   else
     (* fee has been taken, delegate for contract has not changed *)
     Incremental.add_operation
@@ -1182,8 +1163,7 @@ let test_double_registration () =
   Incremental.add_operation i self_delegation >>=? fun i ->
   (* second self-delegation *)
   Op.delegation (I i) impl_contract (Some pkh) >>=? fun second_registration ->
-  Incremental.add_operation i second_registration >>= fun err ->
-  Assert.proto_error_with_info ~loc:__LOC__ err "Delegate already active"
+  expect_delegate_already_active_error i second_registration
 
 (** Second self-delegation should fail with implicit contract emptied
     after first self-delegation. *)
@@ -1211,8 +1191,7 @@ let test_double_registration_when_empty () =
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.zero >>=? fun _ ->
   (* second self-delegation *)
   Op.delegation (I i) impl_contract (Some pkh) >>=? fun second_registration ->
-  Incremental.add_operation i second_registration >>= fun err ->
-  Assert.proto_error_with_info ~loc:__LOC__ err "Delegate already active"
+  expect_delegate_already_active_error i second_registration
 
 (** Second self-delegation should fail with implicit contract emptied
     then credited back after first self-delegation. *)
@@ -1245,8 +1224,7 @@ let test_double_registration_when_recredited () =
   Assert.balance_is ~loc:__LOC__ (I i) impl_contract Tez.one_mutez >>=? fun _ ->
   (* second self-delegation *)
   Op.delegation (I i) impl_contract (Some pkh) >>=? fun second_registration ->
-  Incremental.add_operation i second_registration >>= fun err ->
-  Assert.proto_error_with_info ~loc:__LOC__ err "Delegate already active"
+  expect_delegate_already_active_error i second_registration
 
 (** Self-delegation on unrevealed contract. *)
 let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
@@ -1262,9 +1240,7 @@ let test_unregistered_and_unrevealed_self_delegate_key_init_delegation ~fee () =
   Incremental.add_operation i op >>=? fun i ->
   Op.delegation ~fee (I i) contract (Some delegate_pkh) >>=? fun op ->
   Context.Contract.balance (I i) contract >>=? fun balance ->
-  if fee > balance then
-    Incremental.add_operation i op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i op
   else
     (* origination did not proceed; fee has been debited *)
     Incremental.add_operation
@@ -1290,9 +1266,7 @@ let test_unregistered_and_revealed_self_delegate_key_init_delegation ~fee () =
   Incremental.add_operation i op >>=? fun i ->
   Op.delegation ~fee (I i) contract (Some delegate_pkh) >>=? fun op ->
   Context.Contract.balance (I i) contract >>=? fun balance ->
-  if fee > balance then
-    Incremental.add_operation i op >>= fun err ->
-    Assert.proto_error_with_info ~loc:__LOC__ err "Balance too low"
+  if fee > balance then expect_too_low_balance_error i op
   else
     (* origination did not proceed; fee has been debited *)
     Incremental.add_operation

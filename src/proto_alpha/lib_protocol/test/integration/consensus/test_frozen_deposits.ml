@@ -302,7 +302,6 @@ let test_cannot_bake_with_zero_deposits () =
   Block.bake_until_cycle_end ~policy:(By_account account2) b >>=? fun b ->
   Context.Delegate.current_frozen_deposits (B b) account1 >>=? fun fd ->
   Assert.equal_tez ~loc:__LOC__ fd Tez.zero >>=? fun () ->
-  Format.printf "fd = %a@." Tez.pp fd ;
   Block.bake ~policy:(By_account account1) b >>= fun b1 ->
   (* don't know why the zero frozen deposits error is not caught here *)
   (* Assert.proto_error_with_info ~loc:__LOC__ b1 "Zero frozen deposits" *)

@@ -35,6 +35,9 @@ val get_level : t -> Raw_level.t tzresult
 
 val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
+val get_first_different_endorsers :
+  t -> (Plugin.RPC.Validators.t * Plugin.RPC.Validators.t) tzresult Lwt.t
+
 val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
 
 val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
@@ -54,6 +57,12 @@ val get_bakers :
   public_key_hash list tzresult Lwt.t
 
 val get_baker : t -> round:int -> public_key_hash tzresult Lwt.t
+
+val get_first_different_baker :
+  public_key_hash -> public_key_hash trace -> public_key_hash
+
+val get_first_different_bakers :
+  t -> (public_key_hash * public_key_hash) tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 

@@ -41,34 +41,12 @@ open Alpha_context
 (*                  Utility functions                           *)
 (****************************************************************)
 
-let get_hd_hd = function x :: y :: _ -> (x, y) | _ -> assert false
-
-let get_first_different_baker baker bakers =
-  WithExceptions.Option.get ~loc:__LOC__
-  @@ List.find
-       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
-       bakers
-
-let get_first_different_bakers ctxt =
-  Context.get_bakers ctxt >|=? function
-  | [] | [_] -> assert false
-  | baker_1 :: other_bakers ->
-      (baker_1, get_first_different_baker baker_1 other_bakers)
-
-let get_baker_different_from_baker ctxt baker =
-  Context.get_bakers
-    ~filter:(fun x -> not (Signature.Public_key_hash.equal x.delegate baker))
-    ctxt
-  >>=? fun bakers ->
-  return (WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers)
-
-let get_first_different_endorsers ctxt =
-  Context.get_endorsers ctxt >|=? fun endorsers -> get_hd_hd endorsers
-
 (** Bake two block at the same level using the same policy (i.e. same
     baker). *)
 let block_fork ?policy contracts b =
-  let (contract_a, contract_b) = get_hd_hd contracts in
+  let (contract_a, contract_b) =
+    match contracts with x :: y :: _ -> (x, y) | _ -> assert false
+  in
   Op.transaction (B b) contract_a contract_b Alpha_context.Tez.one_cent
   >>=? fun operation ->
   Block.bake ?policy ~operation b >>=? fun blk_a ->
@@ -96,7 +74,7 @@ let test_valid_double_baking_evidence () =
   Context.init ~consensus_threshold:0 2 >>=? fun (genesis, contracts) ->
   Context.get_constants (B genesis)
   >>=? fun Constants.{parametric = {double_baking_punishment; _}; _} ->
-  get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
+  Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork ~policy:(By_account baker1) contracts genesis
   >>=? fun (blk_a, blk_b) ->
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
@@ -143,14 +121,14 @@ let test_valid_double_baking_followed_by_double_endorsing () =
   Block.bake ~policy:(By_account baker2) ~operation blk_a
   >>=? fun blk_with_db_evidence ->
   Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
-  let (e, s) =
+  let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then
       (e1.delegate, e1.slots)
     else (e2.delegate, e2.slots)
   in
-  Op.endorsement ~delegate:(e, s) ~endorsed_block:blk_a (B b) ()
+  Op.endorsement ~delegate ~endorsed_block:blk_a (B b) ()
   >>=? fun endorsement_a ->
-  Op.endorsement ~delegate:(e, s) ~endorsed_block:blk_b (B b) ()
+  Op.endorsement ~delegate ~endorsed_block:blk_b (B b) ()
   >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_with_db_evidence
@@ -192,14 +170,14 @@ let test_valid_double_endorsing_followed_by_double_baking () =
   Block.bake blk_1 >>=? fun blk_a ->
   Block.bake blk_2 >>=? fun blk_b ->
   Context.get_first_different_endorsers (B blk_a) >>=? fun (e1, e2) ->
-  let (e, s) =
+  let delegate =
     if Signature.Public_key_hash.( = ) e1.delegate baker1 then
       (e1.delegate, e1.slots)
     else (e2.delegate, e2.slots)
   in
-  Op.endorsement ~delegate:(e, s) ~endorsed_block:blk_a (B blk_1) ()
+  Op.endorsement ~delegate ~endorsed_block:blk_a (B blk_1) ()
   >>=? fun endorsement_a ->
-  Op.endorsement ~delegate:(e, s) ~endorsed_block:blk_b (B blk_2) ()
+  Op.endorsement ~delegate ~endorsed_block:blk_b (B blk_2) ()
   >>=? fun endorsement_b ->
   let operation = double_endorsement (B genesis) endorsement_a endorsement_b in
   Block.bake ~policy:(By_account baker1) ~operation blk_a
@@ -243,7 +221,7 @@ let test_payload_producer_gets_evidence_rewards () =
                  {double_baking_punishment; baking_reward_fixed_portion; _};
                _;
              } ->
-  get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
+  Context.get_first_different_bakers (B genesis) >>=? fun (baker1, baker2) ->
   block_fork ~policy:(By_account baker1) contracts genesis >>=? fun (b1, b2) ->
   double_baking (B b1) b1.header b2.header |> fun db_evidence ->
   Block.bake ~policy:(By_account baker2) ~operation:db_evidence b1
@@ -376,7 +354,7 @@ let test_just_in_time_double_baking_evidence () =
     block baking with same level made by different bakers fails. *)
 let test_different_delegates () =
   Context.init 2 >>=? fun (b, _) ->
-  get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
+  Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
   Block.bake ~policy:(By_account baker_2) b >>=? fun blk_b ->
   double_baking (B blk_a) blk_a.header blk_b.header |> fun operation ->
@@ -405,7 +383,7 @@ let test_wrong_signer () =
     Block.Forge.set_baker baker_2 header |> Block.Forge.sign_header
   in
   Context.init 2 >>=? fun (b, _) ->
-  get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
+  Context.get_first_different_bakers (B b) >>=? fun (baker_1, baker_2) ->
   Block.bake ~policy:(By_account baker_1) b >>=? fun blk_a ->
   let ts = Timestamp.of_seconds_string (Int64.to_string 10L) in
   match ts with
