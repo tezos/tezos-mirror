@@ -47,7 +47,16 @@ class Baker(subprocess.Popen):
         endpoint = f'http://127.0.0.1:{rpc_port}'
         cmd = [baker, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
-        cmd.extend(['run', 'with', 'local', 'node', node_dir] + accounts)
+        cmd.extend(
+            [
+                'run',
+                'with',
+                'local',
+                'node',
+                node_dir,
+            ]
+            + accounts
+        )
         cmd.extend(run_params)
         env = os.environ.copy()
         if log_levels is not None:

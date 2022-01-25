@@ -38,6 +38,7 @@ class TestProtoTenderbakeIncrementalStart:
                 [account],
                 proto=protocol.DAEMON,
                 log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                run_params=['--liquidity-baking-escape-vote', 'pass'],
             )
 
     def test_activate(self, sandbox):
@@ -63,6 +64,7 @@ class TestProtoTenderbakeIncrementalStart:
                 [account],
                 proto=protocol.DAEMON,
                 log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                run_params=['--liquidity-baking-escape-vote', 'pass'],
             )
             time.sleep(MINIMAL_BLOCK_DELAY)
 

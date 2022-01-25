@@ -44,7 +44,12 @@ class TestAllDaemonsWithOperations:
         protocol.activate(sandbox.client(0), parameters=parameters)
         time.sleep(3)
         for i in range(NUM_NODES - 1):
-            sandbox.add_baker(i, [f'bootstrap{5 - i}'], protocol.DAEMON)
+            sandbox.add_baker(
+                i,
+                [f'bootstrap{5 - i}'],
+                protocol.DAEMON,
+                run_params=['--liquidity-baking-escape-vote', 'pass'],
+            )
 
     def test_wait_for_protocol(self, sandbox: Sandbox):
         clients = sandbox.all_clients()

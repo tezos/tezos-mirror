@@ -20,7 +20,12 @@ def params(threshold=0, latency=3):
 
 def add_fully_delegated_baker(sandbox: Sandbox, node: int, protocol: str):
     """Add a baker that has all known bootstrap accounts delegated to it."""
-    sandbox.add_baker(node, [], proto=protocol)
+    sandbox.add_baker(
+        node,
+        [],
+        proto=protocol,
+        run_params=['--liquidity-baking-escape-vote', 'pass'],
+    )
 
 
 @pytest.mark.baker
@@ -30,7 +35,12 @@ class TestThresholdZero:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
+        sandbox.add_baker(
+            0,
+            ['bootstrap5'],
+            proto=protocol.DAEMON,
+            run_params=['--liquidity-baking-escape-vote', 'pass'],
+        )
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -46,7 +56,12 @@ class TestThresholdOne:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
+        sandbox.add_baker(
+            0,
+            ['bootstrap5'],
+            proto=protocol.DAEMON,
+            run_params=['--liquidity-baking-escape-vote', 'pass'],
+        )
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -67,7 +82,12 @@ class TestThresholdTwo:
         sandbox.add_node(0, params=params(0), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
         time.sleep(3)
-        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
+        sandbox.add_baker(
+            0,
+            ['bootstrap5'],
+            proto=protocol.DAEMON,
+            run_params=['--liquidity-baking-escape-vote', 'pass'],
+        )
 
     def test_add_nodes(self, sandbox: Sandbox):
         sandbox.add_node(

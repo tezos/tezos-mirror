@@ -448,6 +448,7 @@ def scenario(round_duration, num_nodes, log_dir):
                 accounts(i, num_nodes),
                 proto=constants.ALPHA_DAEMON,
                 log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                run_params=['--liquidity-baking-escape-vote', 'pass'],
             )
 
         while 1:

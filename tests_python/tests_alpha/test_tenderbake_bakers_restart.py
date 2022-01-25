@@ -48,6 +48,7 @@ class TestProtoTenderbake:
                 [f'bootstrap{i + 1}'],
                 proto=protocol.DAEMON,
                 log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                run_params=['--liquidity-baking-escape-vote', 'pass'],
             )
 
     def test_restart(self, sandbox):
@@ -68,6 +69,7 @@ class TestProtoTenderbake:
                         [f'bootstrap{dead_baker + 1}'],
                         proto=protocol.DAEMON,
                         log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
+                        run_params=['--liquidity-baking-escape-vote', 'pass'],
                     )
                 # the CYCLE_DUR is long enough for bakers to take a decision
                 time.sleep(CYCLE_DUR)

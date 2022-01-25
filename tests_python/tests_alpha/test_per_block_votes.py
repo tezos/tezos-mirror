@@ -19,7 +19,12 @@ def run_vote_file(sandbox: Sandbox, filename: str) -> None:
         0,
         [f'bootstrap{i}' for i in range(1, 6)],
         proto=protocol.DAEMON,
-        run_params=["--votefile", filename],
+        run_params=[
+            "--votefile",
+            filename,
+            '--liquidity-baking-escape-vote',
+            'pass',
+        ],
     )
     if not sandbox.log_dir:
         pytest.skip()

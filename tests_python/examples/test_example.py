@@ -12,7 +12,12 @@ def sandbox() -> Iterator[Sandbox]:
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=constants.NODE_PARAMS)
         # Empty list makes everyone bake
-        sandbox.add_baker(0, [], proto=constants.ALPHA_DAEMON)
+        sandbox.add_baker(
+            0,
+            [],
+            proto=constants.ALPHA_DAEMON,
+            run_params=['--liquidity-baking-escape-vote', 'pass'],
+        )
         yield sandbox
         assert sandbox.are_daemons_alive()
 

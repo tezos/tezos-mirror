@@ -21,7 +21,12 @@ class TestManyBakers:
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0))
         for i in range(5):
-            sandbox.add_baker(i, [f'bootstrap{i + 1}'], proto=protocol.DAEMON)
+            sandbox.add_baker(
+                i,
+                [f'bootstrap{i + 1}'],
+                proto=protocol.DAEMON,
+                run_params=['--liquidity-baking-escape-vote', 'pass'],
+            )
 
     def test_wait(self):
         # expects two level to be added to level start
