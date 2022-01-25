@@ -61,27 +61,28 @@ val merge_field_annot :
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
-(** Parse a type annotation only. *)
+(** check_xxx_annot functions below are remains from the past (they were called
+    parse_xxx_annot before).
+    They check that annotations are well-formed and, depending on different
+    contexts, that only the annotations that are expected to be found are
+    present.
+    Hopefully we will relax this property soon.
+*)
+
+(** Check a type annotation only. *)
 val check_type_annot : Script.location -> string list -> unit tzresult
 
 (** Parse a field annotation only. *)
 val parse_field_annot :
   Script.location -> string list -> field_annot option tzresult
 
-(** Parse an annotation for composed types, of the form
+(** Check an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
-val parse_composed_type_annot :
-  Script.location ->
-  string list ->
-  (field_annot option * field_annot option) tzresult
+val check_composed_type_annot : Script.location -> string list -> unit tzresult
 
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :
   Script.node -> (Script.node * field_annot option) tzresult
-
-(** Check that field annotations match, used for field accesses. *)
-val check_correct_field :
-  field_annot option -> field_annot option -> unit tzresult
 
 (** Instruction annotations parsing *)
 
@@ -97,13 +98,9 @@ val parse_constr_annot :
 
 val check_two_var_annot : Script.location -> string list -> unit tzresult
 
-val parse_destr_annot :
-  Script.location -> string list -> field_annot option tzresult
+val check_destr_annot : Script.location -> string list -> unit tzresult
 
-val parse_unpair_annot :
-  Script.location ->
-  string list ->
-  (field_annot option * field_annot option) tzresult
+val check_unpair_annot : Script.location -> string list -> unit tzresult
 
 val parse_entrypoint_annot :
   Script.location -> string list -> field_annot option tzresult

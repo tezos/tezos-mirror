@@ -5,7 +5,7 @@ Gas remaining: 1039994.745 units remaining
 { parameter (pair (pair %p1 unit (string %no_name)) bool) ;
   storage unit ;
   code { CAR @param
-         /* [ pair (pair %p1 unit (string %no_name)) bool ] */ ;
+         /* [ pair (pair unit string) bool ] */ ;
          CADR @name %no_name ;
          DROP
          /* [] */ ;

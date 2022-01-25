@@ -5,20 +5,16 @@ Gas remaining: 1039968.110 units remaining
 { parameter mutez ;
   storage (pair (pair nat (pair nat (pair (pair (pair (nat %p) (mutez %value)) nat) nat))) nat) ;
   code { DUP
-         /* [ pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
-            : pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat ] */ ;
+         /* [ pair mutez (pair nat nat (pair (pair nat mutez) nat) nat) nat
+            : pair mutez (pair nat nat (pair (pair nat mutez) nat) nat) nat ] */ ;
          CAR
-         /* [ mutez
-            : pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat ] */ ;
+         /* [ mutez : pair mutez (pair nat nat (pair (pair nat mutez) nat) nat) nat ] */ ;
          SWAP
-         /* [ pair mutez (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
-            : mutez ] */ ;
+         /* [ pair mutez (pair nat nat (pair (pair nat mutez) nat) nat) nat : mutez ] */ ;
          CDR
-         /* [ pair (pair nat nat (pair (pair (nat %p) (mutez %value)) nat) nat) nat
-            : mutez ] */ ;
+         /* [ pair (pair nat nat (pair (pair nat mutez) nat) nat) nat : mutez ] */ ;
          SET_CADDAADR @toplevel_pair_name %value ;
          NIL operation
-         /* [ list operation
-            : pair (pair nat nat (pair (pair nat (mutez %value)) nat) nat) nat ] */ ;
+         /* [ list operation : pair (pair nat nat (pair (pair nat mutez) nat) nat) nat ] */ ;
          PAIR
-         /* [ pair (list operation) (pair nat nat (pair (pair nat (mutez %value)) nat) nat) nat ] */ } }
+         /* [ pair (list operation) (pair nat nat (pair (pair nat mutez) nat) nat) nat ] */ } }

@@ -123,8 +123,8 @@ module Ticket_inspection = struct
     | Timestamp_key _ -> (k [@ocaml.tailcall]) False_ht
     | Chain_id_key _ -> (k [@ocaml.tailcall]) False_ht
     | Address_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Pair_key ((_, _), (_, _), _) -> (k [@ocaml.tailcall]) False_ht
-    | Union_key (_, (_, _), _) -> (k [@ocaml.tailcall]) False_ht
+    | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
+    | Union_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
     | Option_key (_, _) -> (k [@ocaml.tailcall]) False_ht
 
   (* Short circuit pairing of two [has_tickets] values.
@@ -161,7 +161,7 @@ module Ticket_inspection = struct
     | Timestamp_t _ -> (k [@ocaml.tailcall]) False_ht
     | Address_t _ -> (k [@ocaml.tailcall]) False_ht
     | Bool_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Pair_t ((ty1, _), (ty2, _), _) ->
+    | Pair_t (ty1, ty2, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
           ty2
@@ -285,8 +285,8 @@ module Ticket_collection = struct
     | Timestamp_key _ -> (k [@ocaml.tailcall]) ctxt acc
     | Chain_id_key _ -> (k [@ocaml.tailcall]) ctxt acc
     | Address_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Pair_key ((_, _), (_, _), _) -> (k [@ocaml.tailcall]) ctxt acc
-    | Union_key ((_, _), (_, _), _) -> (k [@ocaml.tailcall]) ctxt acc
+    | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
+    | Union_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
     | Option_key (_, _) -> (k [@ocaml.tailcall]) ctxt acc
 
   let tickets_of_set :
@@ -318,7 +318,7 @@ module Ticket_collection = struct
     consume_gas_steps ctxt ~num_steps:1 >>?= fun ctxt ->
     match (hty, ty) with
     | (False_ht, _) -> (k [@ocaml.tailcall]) ctxt acc
-    | (Pair_ht (hty1, hty2), Pair_t ((ty1, _), (ty2, _), _)) ->
+    | (Pair_ht (hty1, hty2), Pair_t (ty1, ty2, _)) ->
         let (l, r) = x in
         (tickets_of_value [@ocaml.tailcall])
           ~include_lazy

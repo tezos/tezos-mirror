@@ -68,7 +68,7 @@ let rec tnames_of_type :
   | Script_typed_ir.Timestamp_t _ -> `TTimestamp :: acc
   | Script_typed_ir.Address_t _ -> `TAddress :: acc
   | Script_typed_ir.Bool_t _ -> `TBool :: acc
-  | Script_typed_ir.Pair_t ((lty, _), (rty, _), _) ->
+  | Script_typed_ir.Pair_t (lty, rty, _) ->
       tnames_of_type lty (tnames_of_type rty (`TPair :: acc))
   | Script_typed_ir.Union_t ((lty, _), (rty, _), _) ->
       tnames_of_type lty (tnames_of_type rty (`TUnion :: acc))
@@ -114,11 +114,11 @@ and tnames_of_comparable_type :
   | Script_typed_ir.Timestamp_key _ -> `TTimestamp :: acc
   | Script_typed_ir.Chain_id_key _ -> `TChain_id :: acc
   | Script_typed_ir.Address_key _ -> `TAddress :: acc
-  | Script_typed_ir.Pair_key ((lty, _), (rty, _), _) ->
+  | Script_typed_ir.Pair_key (lty, rty, _) ->
       tnames_of_comparable_type
         lty
         (tnames_of_comparable_type rty (`TPair :: acc))
-  | Script_typed_ir.Union_key ((lty, _), (rty, _), _) ->
+  | Script_typed_ir.Union_key (lty, rty, _) ->
       tnames_of_comparable_type
         lty
         (tnames_of_comparable_type rty (`TUnion :: acc))

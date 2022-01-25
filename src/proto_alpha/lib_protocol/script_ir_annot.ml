@@ -199,15 +199,13 @@ let check_type_annot : Script.location -> string list -> unit tzresult =
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc types >|? fun _a -> ()
 
-let parse_composed_type_annot :
-    Script.location ->
-    string list ->
-    (field_annot option * field_annot option) tzresult =
+let check_composed_type_annot : Script.location -> string list -> unit tzresult
+    =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
   get_one_annot loc types >>? fun _t ->
-  get_two_annot loc fields >|? fun (f1, f2) -> (f1, f2)
+  get_two_annot loc fields >|? fun (_f1, _f2) -> ()
 
 let parse_field_annot :
     Script.location -> string list -> field_annot option tzresult =
@@ -232,18 +230,6 @@ let extract_field_annot :
       | Some field_annot -> parse_field_annot loc [field_annot])
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr -> ok (expr, None)
-
-let check_correct_field :
-    field_annot option -> field_annot option -> unit tzresult =
- fun f1 f2 ->
-  match (f1, f2) with
-  | (None, _) | (_, None) -> Result.return_unit
-  | (Some (Field_annot s1), Some (Field_annot s2)) ->
-      if Non_empty_string.(s1 = s2) then Result.return_unit
-      else
-        error
-          (Inconsistent_field_annotations
-             ("%" ^ (s1 :> string), "%" ^ (s2 :> string)))
 
 let check_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
@@ -277,24 +263,21 @@ let check_two_var_annot : Script.location -> string list -> unit tzresult =
   error_unexpected_annot loc fields >>? fun () ->
   get_two_annot loc vars >|? fun (_a1, _a2) -> ()
 
-let parse_destr_annot :
-    Script.location -> string list -> field_annot option tzresult =
+let check_destr_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
-  get_one_annot loc fields
+  get_one_annot loc fields >|? fun (_f : field_annot option) -> ()
 
-let parse_unpair_annot :
-    Script.location ->
-    string list ->
-    (field_annot option * field_annot option) tzresult =
+let check_unpair_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
-  get_two_annot loc vars >>? fun (_vcar, _vcdr) -> get_two_annot loc fields
+  get_two_annot loc vars >>? fun (_vcar, _vcdr) ->
+  get_two_annot loc fields >|? fun (_f1, _f2) -> ()
 
 let parse_entrypoint_annot :
     Script.location -> string list -> field_annot option tzresult =

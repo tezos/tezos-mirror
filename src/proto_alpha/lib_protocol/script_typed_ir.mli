@@ -210,14 +210,10 @@ type _ comparable_ty =
       -> Script_chain_id.t comparable_ty
   | Address_key : address ty_metadata -> address comparable_ty
   | Pair_key :
-      ('a comparable_ty * field_annot option)
-      * ('b comparable_ty * field_annot option)
-      * ('a, 'b) pair ty_metadata
+      'a comparable_ty * 'b comparable_ty * ('a, 'b) pair ty_metadata
       -> ('a, 'b) pair comparable_ty
   | Union_key :
-      ('a comparable_ty * field_annot option)
-      * ('b comparable_ty * field_annot option)
-      * ('a, 'b) union ty_metadata
+      'a comparable_ty * 'b comparable_ty * ('a, 'b) union ty_metadata
       -> ('a, 'b) union comparable_ty
   | Option_key :
       'v comparable_ty * 'v option ty_metadata
@@ -253,21 +249,21 @@ val address_key : address comparable_ty
 
 val pair_key :
   Script.location ->
-  'a comparable_ty * field_annot option ->
-  'b comparable_ty * field_annot option ->
+  'a comparable_ty ->
+  'b comparable_ty ->
   ('a, 'b) pair comparable_ty tzresult
 
 val pair_3_key :
   Script.location ->
-  'a comparable_ty * field_annot option ->
-  'b comparable_ty * field_annot option ->
-  'c comparable_ty * field_annot option ->
+  'a comparable_ty ->
+  'b comparable_ty ->
+  'c comparable_ty ->
   ('a, ('b, 'c) pair) pair comparable_ty tzresult
 
 val union_key :
   Script.location ->
-  'a comparable_ty * field_annot option ->
-  'b comparable_ty * field_annot option ->
+  'a comparable_ty ->
+  'b comparable_ty ->
   ('a, 'b) union comparable_ty tzresult
 
 val option_key :
@@ -1371,11 +1367,7 @@ and 'ty ty =
   | Timestamp_t : Script_timestamp.t ty_metadata -> Script_timestamp.t ty
   | Address_t : address ty_metadata -> address ty
   | Bool_t : bool ty_metadata -> bool ty
-  | Pair_t :
-      ('a ty * field_annot option)
-      * ('b ty * field_annot option)
-      * ('a, 'b) pair ty_metadata
-      -> ('a, 'b) pair ty
+  | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
   | Union_t :
       ('a ty * field_annot option)
       * ('b ty * field_annot option)
@@ -1560,11 +1552,7 @@ val address_t : address ty
 
 val bool_t : bool ty
 
-val pair_t :
-  Script.location ->
-  'a ty * field_annot option ->
-  'b ty * field_annot option ->
-  ('a, 'b) pair ty tzresult
+val pair_t : Script.location -> 'a ty -> 'b ty -> ('a, 'b) pair ty tzresult
 
 val union_t :
   Script.location ->

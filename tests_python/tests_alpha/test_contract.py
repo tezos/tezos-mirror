@@ -1411,7 +1411,7 @@ class TestMiniScenarios:
 
     def test_vote_for_delegate_wrong_identity1(self, client: Client):
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        with utils.assert_run_failure("At line 15 characters 57 to 61"):
+        with utils.assert_run_failure("At line 14 characters 9 to 12"):
             client.transfer(
                 0,
                 "bootstrap1",
@@ -1421,7 +1421,7 @@ class TestMiniScenarios:
 
     def test_vote_for_delegate_wrong_identity2(self, client: Client):
         # We check failure of CHECK_SIGNATURE ; ASSERT in the script.
-        with utils.assert_run_failure("At line 15 characters 57 to 61"):
+        with utils.assert_run_failure("At line 14 characters 9 to 12"):
             client.transfer(
                 0,
                 "bootstrap2",
