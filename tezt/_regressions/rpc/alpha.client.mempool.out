@@ -734,7 +734,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/cycle_nonce"
                           },
                           "liquidity_baking_escape_vote": {
-                            "type": "boolean"
+                            "$ref": "#/definitions/alpha.block_header.alpha.liquidity_baking_escape_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -756,6 +756,14 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "level"
                         ],
                         "additionalProperties": false
+                      },
+                      "alpha.block_header.alpha.liquidity_baking_escape_vote": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "on",
+                          "pass"
+                        ]
                       },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
@@ -4133,7 +4141,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             {
                               "name": "liquidity_baking_escape_vote",
                               "layout": {
-                                "kind": "Bool"
+                                "size": "Int8",
+                                "kind": "Int"
                               },
                               "data_kind": {
                                 "size": 1,
@@ -7155,7 +7164,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/cycle_nonce"
                           },
                           "liquidity_baking_escape_vote": {
-                            "type": "boolean"
+                            "$ref": "#/definitions/alpha.block_header.alpha.liquidity_baking_escape_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -7177,6 +7186,14 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "level"
                         ],
                         "additionalProperties": false
+                      },
+                      "alpha.block_header.alpha.liquidity_baking_escape_vote": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "on",
+                          "pass"
+                        ]
                       },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
