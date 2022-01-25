@@ -350,6 +350,11 @@ module type Carbonated_data_set_storage = sig
       Returns the the new size. *)
   val init : context -> elt -> (Raw_context.t * int) tzresult Lwt.t
 
+  (** Adds an elt as a member of the set.
+      Consumes [Gas_repr.write_bytes_cost <size of the new value>].
+      Returns the new size, and true if the value previously existed. *)
+  val add : context -> elt -> (Raw_context.t * int * bool) tzresult Lwt.t
+
   (** Removes an elt from the set ; does nothing if not a member.
       Consumes [Gas_repr.write_bytes_cost Z.zero].
       Returns the freed size, and a boolean
