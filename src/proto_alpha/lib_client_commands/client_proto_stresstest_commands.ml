@@ -162,7 +162,7 @@ let transaction_costs_encoding =
   conv
     (fun {regular} -> regular)
     (fun regular -> {regular})
-    (obj1 (req "regular" Gas_limit_repr.Arith.n_integral_encoding))
+    (obj1 (req "regular" Gas_limit_repr.cost_encoding))
 
 let parse_strategy s =
   match String.split ~limit:1 ':' s with
@@ -1106,7 +1106,8 @@ let estimate_transaction_costs : Protocol_client_context.full Clic.command =
     no_options
     (prefixes ["stresstest"; "estimate"; "gas"] @@ stop)
     (fun () cctxt ->
-      estimate_regular_transaction_cost cctxt >>=? fun regular ->
+      estimate_regular_transaction_cost cctxt >>=? fun estimate ->
+      let regular = Gas.cost_of_gas estimate in
       let transaction_costs : transaction_costs = {regular} in
       let json =
         Data_encoding.Json.construct

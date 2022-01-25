@@ -327,7 +327,7 @@ module Gas : sig
 
   module Arith :
     Fixed_point_repr.Safe
-      with type 'a t = Saturation_repr.may_saturate Saturation_repr.t
+      with type 'a t = private Saturation_repr.may_saturate Saturation_repr.t
   [@@coq_plain_module]
 
   (** For maintenance operations or for testing, gas can be
@@ -412,6 +412,12 @@ module Gas : sig
 
   (** The cost of free operation is [0]. *)
   val free : cost
+
+  (** Convert a fixed-point amount of gas to a cost. *)
+  val cost_of_gas : 'a Arith.t -> cost
+
+  (** Convert an amount of milligas expressed as an int to Arith.fp.  *)
+  val fp_of_milligas_int : int -> Arith.fp
 
   (** [atomic_step_cost x] corresponds to [x] milliunit of gas. *)
   val atomic_step_cost : _ Saturation_repr.t -> cost

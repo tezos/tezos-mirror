@@ -124,7 +124,8 @@ let test_stack_overflow () =
   test_context () >>=? fun ctxt ->
   (* Set the gas counter to the maximum value *)
   let ctxt =
-    Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
+    Gas.update_remaining_operation_gas ctxt
+    @@ Gas.fp_of_milligas_int (Saturation_repr.saturated :> int)
   in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
@@ -154,7 +155,8 @@ let test_stack_overflow_in_lwt () =
   let open Script_typed_ir in
   test_context () >>=? fun ctxt ->
   let ctxt =
-    Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
+    Gas.update_remaining_operation_gas ctxt
+    @@ Gas.fp_of_milligas_int (Saturation_repr.saturated :> int)
   in
   let stack = Bot_t in
   let item ty s = Item_t (ty, s) in

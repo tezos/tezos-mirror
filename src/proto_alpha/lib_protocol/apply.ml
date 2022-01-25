@@ -1678,7 +1678,7 @@ let rec apply_manager_contents_list_rec :
         ctxt
         mode
         chain_id
-        ~gas_consumed_in_precheck:(Some consumed_gas)
+        ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
         op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
@@ -1696,7 +1696,7 @@ let rec apply_manager_contents_list_rec :
         ctxt
         mode
         chain_id
-        ~gas_consumed_in_precheck:(Some consumed_gas)
+        ~gas_consumed_in_precheck:(Some (Gas.cost_of_gas consumed_gas))
         op
       >>= function
       | (Failure, operation_result, internal_operation_results) ->
