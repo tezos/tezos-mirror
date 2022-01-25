@@ -2,7 +2,7 @@ Changelog
 '''''''''
 
 This file lists the changes added to each version of tezos-node,
-tezos-client, and the other Tezos binaries. The changes to the Tezos
+tezos-client, and the other Octez executables. The changes to the economic
 protocol are documented in the ``docs/protocols/`` directory; in
 particular in ``docs/protocols/alpha.rst``.
 
