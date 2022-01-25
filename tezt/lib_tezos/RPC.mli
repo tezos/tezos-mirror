@@ -92,8 +92,24 @@ val is_bootstrapped :
   Client.t ->
   JSON.t Lwt.t
 
-(** Call RPC /chain/[chain]/checkpoint *)
+(** Call RPC /chain/[chain]/levels/checkpoint *)
 val get_checkpoint :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chain/[chain]/levels/savepoint *)
+val get_savepoint :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chain/[chain]/levels/caboose *)
+val get_caboose :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
