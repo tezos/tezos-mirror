@@ -12,6 +12,7 @@ local p2p = import './p2p.jsonnet';
 local node_hardware = import './node_hardware.jsonnet';
 local delegate_hardware = import './delegate_hardware.jsonnet';
 local workers = import './workers.jsonnet';
+local logs = import './logs.jsonnet';
 
 local boardtitle = 'Tezos branch: ' + std.extVar('branch');
 
@@ -51,7 +52,7 @@ dashboard.new(
 
     node.blocksPerSecond                                            + {gridPos: {h: 8, w: 10, x: 4, y: 10 }},
 
-    node.logs                                                                                               + {gridPos: {h: 18, w: 10, x: 14, y: 0}},
+    logs.nodelogs                                                                                               + {gridPos: {h: 18, w: 10, x: 14, y: 0}},
 
 
     node.headOperations { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.invalidBlocksHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
@@ -120,6 +121,15 @@ dashboard.new(
     delegate_hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: 94 } },
     delegate_hardware.memory { gridPos: { h: 8, w: 8, x: 8, y: 94 } },
     delegate_hardware.ios { gridPos: { h: 8, w: 8, x: 16, y: 94 } },
+
+    //#######
+    row.new(
+      title='Logs',
+      repeat='',
+      showTitle=true,
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: 102 } },
+     logs.systemlogs {gridPos: {h: 14, w: 12, x: 0, y: 102}},
+     logs.metricslogs {gridPos: {h:14, w:12, x:12, y:102}},
 
   ]
 )
