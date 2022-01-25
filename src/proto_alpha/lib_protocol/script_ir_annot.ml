@@ -173,31 +173,28 @@ let check_composed_type_annot : Script.location -> string list -> unit tzresult
   get_two_annot loc fields >|? fun (_f1, _f2) -> ()
 
 let parse_field_annot :
-    Script.location -> string list -> field_annot option tzresult =
+    Script.location -> string -> Non_empty_string.t option tzresult =
  fun loc annot ->
-  parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
-  error_unexpected_annot loc vars >>? fun () ->
-  error_unexpected_annot loc types >>? fun () -> get_one_annot loc fields
+  if Compare.Int.(String.length annot <= 0) || Compare.Char.(annot.[0] <> '%')
+  then Result.return_none
+  else
+    parse_annot loc annot >|? function
+    | Field_annot_opt annot_opt -> annot_opt
+    | _ -> None
 
-let is_field_annot loc a =
-  if Compare.Int.(String.length a > 0) && Compare.Char.(a.[0] = '%') then
-    parse_field_annot loc [a] >|? function
-    | Some (_a : field_annot) -> true
-    | None -> false
-  else Result.return_false
+let is_field_annot loc a = parse_field_annot loc a >|? Option.is_some
 
 let extract_field_annot :
-    Script.node -> (Script.node * field_annot option) tzresult = function
+    Script.node -> (Script.node * Non_empty_string.t option) tzresult = function
   | Prim (loc, prim, args, annot) as expr ->
       let rec extract_first acc = function
         | [] -> ok (expr, None)
-        | s :: rest ->
-            if Compare.Int.(String.length s > 0) && Compare.Char.(s.[0] = '%')
-            then
-              parse_field_annot loc [s] >|? fun field_annot ->
-              let annot = List.rev_append acc rest in
-              (Prim (loc, prim, args, annot), field_annot)
-            else extract_first (s :: acc) rest
+        | s :: rest -> (
+            parse_field_annot loc s >>? function
+            | None -> extract_first (s :: acc) rest
+            | Some _ as some_field_annot ->
+                let annot = List.rev_append acc rest in
+                ok (Prim (loc, prim, args, annot), some_field_annot))
       in
       extract_first [] annot
   | expr -> ok (expr, None)
@@ -215,7 +212,7 @@ let extract_entrypoint_annot :
  fun node ->
   extract_field_annot node >|? fun (node, field_annot_opt) ->
   ( node,
-    Option.bind field_annot_opt (fun (Field_annot field_annot) ->
+    Option.bind field_annot_opt (fun field_annot ->
         Entrypoint.of_annot_lax_opt field_annot) )
 
 let check_var_annot : Script.location -> string list -> unit tzresult =
