@@ -164,7 +164,7 @@ module Int = struct
 
   external compare : int -> int -> int = "%compare"
 
-  let equal = ( = )
+  external equal : int -> int -> bool = "%equal"
 
   let max x y = if x >= y then x else y
 

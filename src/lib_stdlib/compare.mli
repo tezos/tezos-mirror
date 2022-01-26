@@ -118,7 +118,7 @@ module Int : sig
 
   val min : int -> int -> int
 
-  val equal : int -> int -> bool
+  external equal : int -> int -> bool = "%equal"
 end
 
 module Int32 : S with type t = int32
