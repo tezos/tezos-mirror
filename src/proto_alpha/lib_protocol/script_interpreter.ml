@@ -642,28 +642,28 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | IBig_map_mem (_, k) ->
           let (map, stack) = stack in
           let key = accu in
-          ( use_gas_counter_in_ctxt ctxt gas @@ fun ctxt ->
+          ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
             Script_ir_translator.big_map_mem ctxt key map )
           >>=? fun (res, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBig_map_get (_, k) ->
           let (map, stack) = stack in
           let key = accu in
-          ( use_gas_counter_in_ctxt ctxt gas @@ fun ctxt ->
+          ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
             Script_ir_translator.big_map_get ctxt key map )
           >>=? fun (res, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBig_map_update (_, k) ->
           let key = accu in
           let (maybe_value, (map, stack)) = stack in
-          ( use_gas_counter_in_ctxt ctxt gas @@ fun ctxt ->
+          ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
             Script_ir_translator.big_map_update ctxt key maybe_value map )
           >>=? fun (big_map, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks big_map stack
       | IBig_map_get_and_update (_, k) ->
           let key = accu in
           let (v, (map, stack)) = stack in
-          ( use_gas_counter_in_ctxt ctxt gas @@ fun ctxt ->
+          ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
             Script_ir_translator.big_map_get_and_update ctxt key v map )
           >>=? fun ((v', map'), ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks v' (map', stack)
@@ -970,13 +970,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* packing *)
       | IPack (_, ty, k) ->
           let value = accu in
-          ( use_gas_counter_in_ctxt ctxt gas @@ fun ctxt ->
+          ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
             Script_ir_translator.pack_data ctxt ty value )
           >>=? fun (bytes, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks bytes stack
       | IUnpack (_, ty, k) ->
           let bytes = accu in
-          ( use_gas_counter_in_ctxt ctxt gas @@ fun ctxt ->
+          ( use_gas_counter_in_context ctxt gas @@ fun ctxt ->
             unpack ctxt ~ty ~bytes )
           >>=? fun (opt, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks opt stack
@@ -999,8 +999,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 addr.destination
                 ~entrypoint
               >>=? fun (ctxt, maybe_contract) ->
-              let gas = update_local_gas_counter ctxt in
-              let ctxt = outdated ctxt in
+              let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
               let accu = maybe_contract in
               (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
@@ -1033,13 +1032,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           | Contract c -> (
               Contract.get_script ctxt c >>=? fun (ctxt, script_opt) ->
               let return_none ctxt =
-                (step [@ocaml.tailcall])
-                  (outdated ctxt, sc)
-                  (update_local_gas_counter ctxt)
-                  k
-                  ks
-                  None
-                  stack
+                let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+                (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack
               in
               match script_opt with
               | None -> (return_none [@ocaml.tailcall]) ctxt
@@ -1109,8 +1103,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                   let ks = KCons (ICons_some (kkinfo, k), ks) in
                                   Contract.get_balance_carbonated ctxt c
                                   >>=? fun (ctxt, balance) ->
+                                  let (gas, ctxt) =
+                                    local_gas_counter_and_outdated_context ctxt
+                                  in
                                   (step [@ocaml.tailcall])
-                                    ( outdated ctxt,
+                                    ( ctxt,
                                       {
                                         source = sc.self;
                                         self = c;
@@ -1124,7 +1121,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                         now = sc.now;
                                         level = sc.level;
                                       } )
-                                    (update_local_gas_counter ctxt)
+                                    gas
                                     kinstr
                                     (KView_exit (sc, KReturn (stack, ks)))
                                     (input, storage)
@@ -1166,13 +1163,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
           let piop = Internal_operation {source = sc.self; operation; nonce} in
           let res = {piop; lazy_storage_diff = None} in
-          let gas = update_local_gas_counter ctxt in
-          let ctxt = outdated ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks res stack
       | IBalance (_, k) ->
           let ctxt = update_context gas ctxt in
-          let gas = update_local_gas_counter ctxt in
-          let ctxt = outdated ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks sc.balance (accu, stack)
       | ILevel (_, k) ->
@@ -1274,8 +1269,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ctxt = update_context gas ctxt in
           Sapling.verify_update ctxt state transaction anti_replay
           >>=? fun (ctxt, balance_state_opt) ->
-          let gas = update_local_gas_counter ctxt in
-          let ctxt = outdated ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           match balance_state_opt with
           | Some (balance, state) ->
               let state = Some (Script_int.of_int64 balance, state) in
@@ -1291,15 +1285,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let ctxt = update_context gas ctxt in
           Vote.get_voting_power ctxt key_hash >>=? fun (ctxt, rolls) ->
           let power = Script_int.(abs (of_int32 rolls)) in
-          let gas = update_local_gas_counter ctxt in
-          let ctxt = outdated ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks power stack
       | ITotal_voting_power (_, k) ->
           let ctxt = update_context gas ctxt in
           Vote.get_total_voting_power ctxt >>=? fun (ctxt, rolls) ->
           let power = Script_int.(abs (of_int32 rolls)) in
-          let gas = update_local_gas_counter ctxt in
-          let ctxt = outdated ctxt in
+          let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks power (accu, stack)
       | IKeccak (_, k) ->
@@ -1637,9 +1629,9 @@ and klog :
 *)
 
 let step_descr ~log_now logger (ctxt, sc) descr accu stack =
-  let gas = (Gas.remaining_operation_gas ctxt :> int) in
+  let (gas, outdated_ctxt) = local_gas_counter_and_outdated_context ctxt in
   (match logger with
-  | None -> step (outdated ctxt, sc) gas descr.kinstr KNil accu stack
+  | None -> step (outdated_ctxt, sc) gas descr.kinstr KNil accu stack
   | Some logger ->
       (if log_now then
        let kinfo = kinfo_of_kinstr descr.kinstr in
@@ -1647,7 +1639,7 @@ let step_descr ~log_now logger (ctxt, sc) descr accu stack =
       let log =
         ILog (kinfo_of_kinstr descr.kinstr, LogEntry, logger, descr.kinstr)
       in
-      step (outdated ctxt, sc) gas log KNil accu stack)
+      step (outdated_ctxt, sc) gas log KNil accu stack)
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
@@ -1656,13 +1648,13 @@ let interp logger g (Lam (code, _)) arg =
   >|=? fun (ret, (EmptyCell, EmptyCell), ctxt) -> (ret, ctxt)
 
 let kstep logger ctxt step_constants kinstr accu stack =
-  let gas = (Gas.remaining_operation_gas ctxt :> int) in
   let kinstr =
     match logger with
     | None -> kinstr
     | Some logger -> ILog (kinfo_of_kinstr kinstr, LogEntry, logger, kinstr)
   in
-  step (outdated ctxt, step_constants) gas kinstr KNil accu stack
+  let (gas, outdated_ctxt) = local_gas_counter_and_outdated_context ctxt in
+  step (outdated_ctxt, step_constants) gas kinstr KNil accu stack
   >>=? fun (accu, stack, ctxt, gas) ->
   return (accu, stack, update_context gas ctxt)
 
@@ -1805,12 +1797,6 @@ let execute ?logger ctxt ~cached_script mode step_constants ~script ~entrypoint
 
 *)
 module Internals = struct
-  type nonrec local_gas_counter = local_gas_counter
-
-  type nonrec outdated_context = outdated_context =
-    | OutDatedContext of Alpha_context.t
-  [@@unboxed]
-
   let next logger g gas ks accu stack =
     let ks =
       match logger with None -> ks | Some logger -> KLog (ks, logger)

@@ -1530,11 +1530,14 @@ let extract_deps_continuation (type bef_top bef aft_top aft) ctxt step_constants
   let logger = {log_interp; log_entry; log_control; log_exit; get_log} in
   try
     let res =
+      let (_gas_counter, outdated_ctxt) =
+        Local_gas_counter.local_gas_counter_and_outdated_context ctxt
+      in
       Lwt_main.run
         (Script_interpreter.Internals.next
            (Some logger)
-           (Script_interpreter.Internals.OutDatedContext ctxt, step_constants)
-           0xFF_FF_FF_FF
+           (outdated_ctxt, step_constants)
+           (Local_gas_counter 0xFF_FF_FF_FF)
            cont
            (fst stack)
            (snd stack))

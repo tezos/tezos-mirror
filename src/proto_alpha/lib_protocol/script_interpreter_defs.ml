@@ -366,12 +366,12 @@ let cost_of_control : type a s r f. (a, s, r, f) continuation -> Gas.cost =
 
 let consume_instr local_gas_counter k accu stack =
   let cost = cost_of_instr k accu stack in
-  update_and_check local_gas_counter cost
+  consume_opt local_gas_counter cost
   [@@ocaml.inline always]
 
 let consume_control local_gas_counter ks =
   let cost = cost_of_control ks in
-  update_and_check local_gas_counter cost
+  consume_opt local_gas_counter cost
   [@@ocaml.inline always]
 
 (*
@@ -490,8 +490,8 @@ let apply ctxt gas capture_ty capture lam =
             ] )
       in
       let lam' = Lam (full_descr, full_expr) in
-      let gas = update_local_gas_counter ctxt in
-      return (lam', outdated ctxt, gas)
+      let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
+      return (lam', ctxt, gas)
 
 (* [transfer (ctxt, sc) gas tez tp p destination entrypoint]
    creates an operation that transfers an amount of [tez] to
@@ -524,8 +524,7 @@ let transfer (ctxt, sc) gas amount tp p destination entrypoint =
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let iop = {source = sc.self; operation; nonce} in
   let res = {piop = Internal_operation iop; lazy_storage_diff} in
-  let gas = update_local_gas_counter ctxt in
-  let ctxt = outdated ctxt in
+  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
   return (res, ctxt, gas)
 
 (* [create_contract (ctxt, sc) gas storage_ty param_ty code root_name
@@ -600,8 +599,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code views root_name
   fresh_internal_nonce ctxt >>?= fun (ctxt, nonce) ->
   let piop = Internal_operation {source = sc.self; operation; nonce} in
   let res = {piop; lazy_storage_diff} in
-  let gas = update_local_gas_counter ctxt in
-  let ctxt = outdated ctxt in
+  let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
   return (res, contract, ctxt, gas)
 
 (* [unpack ctxt ty bytes] deserialize [bytes] into a value of type [ty]. *)
@@ -694,7 +692,7 @@ type ('a, 'b, 'c, 'd, 'i, 'j) klist_exit_type =
   (('a, 'b, 'c, 'd) continuation -> ('a, 'b, 'c, 'd) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('i, 'a * 'b, 'j, 'a * 'b) kinstr * 'i list * 'j list * local_gas_counter ->
+  ('i, 'a * 'b, 'j, 'a * 'b) kinstr * 'i list * 'j list * int ->
   ('j boxed_list, 'a * 'b, 'c, 'd) continuation ->
   'j ->
   'a * 'b ->
@@ -704,7 +702,7 @@ type ('a, 'b, 'c, 'd, 'e, 'j) klist_enter_type =
   (('b, 'a * 'c, 'd, 'e) continuation -> ('b, 'a * 'c, 'd, 'e) continuation) ->
   outdated_context * step_constants ->
   local_gas_counter ->
-  ('j, 'a * 'c, 'b, 'a * 'c) kinstr * 'j list * 'b list * local_gas_counter ->
+  ('j, 'a * 'c, 'b, 'a * 'c) kinstr * 'j list * 'b list * int ->
   ('b boxed_list, 'a * 'c, 'd, 'e) continuation ->
   'a ->
   'c ->
