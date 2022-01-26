@@ -4,9 +4,26 @@
 (tests
  (names bip39_tests pbkdf_tests)
  (package tezos-client-base)
+ (modes native js)
  (libraries
   tezos-base
-  tezos-base.unix
   tezos-client-base
   alcotest)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_client_base)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-client-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./bip39_tests.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-client-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./pbkdf_tests.bc.js})))

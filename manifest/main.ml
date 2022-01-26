@@ -1967,7 +1967,9 @@ let _tezos_client_base_tests =
     ["bip39_tests"; "pbkdf_tests"]
     ~path:"src/lib_client_base/test"
     ~opam:"src/lib_client_base/tezos-client-base"
-    ~deps:[tezos_base; tezos_base_unix; tezos_client_base |> open_; alcotest]
+    ~deps:[tezos_base; tezos_client_base |> open_; alcotest]
+    ~js_compatible:true
+    ~modes:[Native; JS]
 
 let _bip39_generator =
   private_exe
