@@ -28,8 +28,6 @@
     balance table. *)
 
 module Constants : sig
-  val cost_contains_tickets_step : Alpha_context.Gas.cost
-
   val cost_collect_tickets_step : Alpha_context.Gas.cost
 
   val cost_token_and_amount_of_ticket : Alpha_context.Gas.cost
