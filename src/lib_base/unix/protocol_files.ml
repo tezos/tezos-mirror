@@ -36,7 +36,7 @@ let find_component dirname module_name =
 let read_dir dir =
   let open Lwt_result_syntax in
   let* meta = of_file ~dir in
-  let*! components = Lwt_list.map_p (find_component dir) meta.modules in
+  let*! components = Lwt_list.map_s (find_component dir) meta.modules in
   let expected_env =
     match meta.expected_env_version with None -> V0 | Some v -> v
   in
