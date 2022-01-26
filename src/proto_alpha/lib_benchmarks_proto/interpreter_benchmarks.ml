@@ -2405,6 +2405,9 @@ module Registration_section = struct
                halt (sapling_state memo_size @$ unit @$ bot) ))
         ()
 
+    let is_empty =
+      match Type_transaction.type_transaction with Empty -> true | _ -> false
+
     let () =
       (* Note that memo_size is hardcoded to 0 in module [Sapling_generation]. *)
       let memo_size =
@@ -2413,7 +2416,7 @@ module Registration_section = struct
         | Ok sz -> sz
       in
       let info, name =
-        info_and_name ~intercept:false "ISapling_verify_update"
+        info_and_name ~intercept:is_empty "ISapling_verify_update"
       in
       let module B : Benchmark.S = struct
         let name = name
@@ -2479,7 +2482,7 @@ module Registration_section = struct
                   Type_transaction.type_transaction
               in
               let length = List.length transitions in
-              if length < bench_num then
+              if length < bench_num && not is_empty then
                 Format.eprintf
                   "ISapling_verify_update: warning, only %d available \
                    transactions (requested %d)@."
