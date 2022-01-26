@@ -128,8 +128,11 @@ dashboard.new(
       repeat='',
       showTitle=true,
     ) + { gridPos: { h: 0, w: 8, x: 0, y: 102 } },
-     logs.systemlogs {gridPos: {h: 14, w: 12, x: 0, y: 102}},
-     logs.metricslogs {gridPos: {h:14, w:12, x:12, y:102}},
+     logs.bakerlogs {gridPos: {h: 10, w: 8, x: 0, y: 102}},
+     logs.endorserlogs {gridPos: {h: 10, w: 8, x: 8, y: 102}},
+     logs.accuserlogs {gridPos: {h: 10, w: 8, x: 16, y: 102}},
+     logs.systemlogs {gridPos: {h: 14, w: 12, x: 0, y: 112}},
+     logs.metricslogs {gridPos: {h:14, w:12, x:12, y:112}},
 
   ]
 )
