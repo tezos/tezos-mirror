@@ -305,16 +305,6 @@ let _tezos_stdlib_tests =
       [tezos_stdlib; alcotest; bigstring; tezos_test_helpers; qcheck_alcotest]
     ~opens:["Tezos_stdlib"]
     ~js_compatible:true
-    ~dune:
-      Dune.
-        [
-          runtest_js ~package:"tezos-stdlib" ~name:"test_bits";
-          runtest_js ~package:"tezos-stdlib" ~name:"test_tzList";
-          runtest_js ~package:"tezos-stdlib" ~name:"test_bounded_heap";
-          runtest_js ~package:"tezos-stdlib" ~name:"test_tzString";
-          runtest_js ~package:"tezos-stdlib" ~name:"test_fallbackArray";
-          runtest_js ~package:"tezos-stdlib" ~name:"test_functionalArray";
-        ]
 
 let _tezos_stdlib_unix_tests =
   tests
@@ -532,6 +522,7 @@ let tezos_hacl_glue_js =
     ~js_of_ocaml:[[S "javascript_files"; S "hacl_stubs.js"]]
     ~opam_only_deps:
       [(* Build dependency for users of the library. *) js_of_ocaml]
+    ~node_wrapper_flags:["--hacl"]
     ~modules:["hacl"]
 
 (* We use virtual libraries, and want to compile the same test with
@@ -591,18 +582,6 @@ let _tezos_hacl_glue_js_tests_2 =
           "runtest_js"
           ~action:[S "diff"; S file; S (file ^ ".from-unix")]
       in
-      let runtest hacl =
-        alias_rule
-          "runtest_js"
-          ~package:"tezos-hacl-glue-js"
-          ~action:
-            [
-              S "run";
-              S "%{dep:../../../tooling/node_wrapper.exe}";
-              S "--hacl";
-              S ("%{dep:./" ^ hacl ^ ".bc.js}");
-            ]
-      in
       [
         copy "test_hacl.ml";
         copy "vectors_p256.ml";
@@ -610,9 +589,6 @@ let _tezos_hacl_glue_js_tests_2 =
         diff "test_hacl.ml";
         diff "vectors_p256.ml";
         diff "test_prop_signature_pk.ml";
-        runtest "test";
-        runtest "test_hacl";
-        runtest "test_prop_signature_pk";
       ])
 
 let _tezos_error_monad_tests =
@@ -624,13 +600,6 @@ let _tezos_error_monad_tests =
     ~deps:[tezos_error_monad; data_encoding; alcotest]
     ~opens:["Tezos_error_monad"]
     ~js_compatible:true
-    ~dune:
-      Dune.
-        [
-          (* Idea: we could automatically generate this from the fact that
-             ~modes contains JS *)
-          runtest_js ~package:"tezos-error-monad" ~name:"test_registration";
-        ]
 
 let tezos_rpc =
   public_lib
@@ -662,6 +631,7 @@ let tezos_crypto =
         zarith;
         zarith_stubs_js;
       ]
+    ~node_wrapper_flags:["--secp256k1"]
     ~opens:
       [
         "Tezos_stdlib";
@@ -843,12 +813,6 @@ let _tezos_micheline_tests =
     ~deps:[tezos_micheline; alcotest]
     ~opens:["Tezos_micheline"]
     ~js_compatible:true
-    ~dune:
-      Dune.
-        [
-          runtest_js ~package:"tezos-micheline" ~name:"test_parser";
-          runtest_js ~package:"tezos-micheline" ~name:"test_diff";
-        ]
 
 let tezos_base =
   public_lib

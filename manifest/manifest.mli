@@ -179,17 +179,6 @@ module Dune : sig
       [(chdir %{workspace_root} (run %{exe:test.exe}))]. *)
   val chdir_workspace_root : s_expr -> s_expr
 
-  (** Make a [runtest_js] rule.
-
-      This makes stanza of the form:
-      {[
-        (rule
-         (alias runtest_js)
-         (package <PACKAGE>)
-         (action (run node %{dep:./<NAME>.bc.js})))
-      ]} *)
-  val runtest_js : package:string -> name:string -> s_expr
-
   (** Make an [ocamllex] stanza.
 
       Example: [ocamllex "lexer"] results in [(ocamllex parser)], which tells dune
@@ -365,6 +354,9 @@ and preprocessor = PPS of target | PPS_args of target * string list
 
     - [modules]: list of modules to include in this target.
 
+    - [node_wrapper_flags]: flags to add to the [node_wrapper] executable
+      command in [runtest_js] aliases. Only used for test and executable test targets.
+
     - [nopervasives]: if [true], add [-nopervasives] to the list of flags to
       be passed to the OCaml compiler (in the [(flags ...)] stanza).
 
@@ -439,6 +431,7 @@ type 'a maker =
   ?linkall:bool ->
   ?modes:Dune.mode list ->
   ?modules:string list ->
+  ?node_wrapper_flags:string list ->
   ?nopervasives:bool ->
   ?ocaml:Opam.version_constraints ->
   ?opam:string ->
