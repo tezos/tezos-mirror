@@ -230,75 +230,76 @@ let unparse_memo_size ~loc memo_size =
 let rec unparse_ty_uncarbonated :
     type a loc. loc:loc -> a ty -> loc Script.michelson_node =
  fun ~loc ty ->
-  let prim (name, args) = Prim (loc, name, args, []) in
-  match ty with
-  | Unit_t _meta -> prim (T_unit, [])
-  | Int_t _meta -> prim (T_int, [])
-  | Nat_t _meta -> prim (T_nat, [])
-  | Signature_t _meta -> prim (T_signature, [])
-  | String_t _meta -> prim (T_string, [])
-  | Bytes_t _meta -> prim (T_bytes, [])
-  | Mutez_t _meta -> prim (T_mutez, [])
-  | Bool_t _meta -> prim (T_bool, [])
-  | Key_hash_t _meta -> prim (T_key_hash, [])
-  | Key_t _meta -> prim (T_key, [])
-  | Timestamp_t _meta -> prim (T_timestamp, [])
-  | Address_t _meta -> prim (T_address, [])
-  | Operation_t _meta -> prim (T_operation, [])
-  | Chain_id_t _meta -> prim (T_chain_id, [])
-  | Never_t _meta -> prim (T_never, [])
-  | Bls12_381_g1_t _meta -> prim (T_bls12_381_g1, [])
-  | Bls12_381_g2_t _meta -> prim (T_bls12_381_g2, [])
-  | Bls12_381_fr_t _meta -> prim (T_bls12_381_fr, [])
-  | Contract_t (ut, _meta) ->
-      let t = unparse_ty_uncarbonated ~loc ut in
-      prim (T_contract, [t])
-  | Pair_t (utl, utr, _meta) ->
-      let tl = unparse_ty_uncarbonated ~loc utl in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
-      (* Note that the folding does not happen if the pair on the right has an
-         annotation because this annotation would be lost *)
-      prim
-        (match tr with
+  let (name, args) =
+    match ty with
+    | Unit_t _meta -> (T_unit, [])
+    | Int_t _meta -> (T_int, [])
+    | Nat_t _meta -> (T_nat, [])
+    | Signature_t _meta -> (T_signature, [])
+    | String_t _meta -> (T_string, [])
+    | Bytes_t _meta -> (T_bytes, [])
+    | Mutez_t _meta -> (T_mutez, [])
+    | Bool_t _meta -> (T_bool, [])
+    | Key_hash_t _meta -> (T_key_hash, [])
+    | Key_t _meta -> (T_key, [])
+    | Timestamp_t _meta -> (T_timestamp, [])
+    | Address_t _meta -> (T_address, [])
+    | Operation_t _meta -> (T_operation, [])
+    | Chain_id_t _meta -> (T_chain_id, [])
+    | Never_t _meta -> (T_never, [])
+    | Bls12_381_g1_t _meta -> (T_bls12_381_g1, [])
+    | Bls12_381_g2_t _meta -> (T_bls12_381_g2, [])
+    | Bls12_381_fr_t _meta -> (T_bls12_381_fr, [])
+    | Contract_t (ut, _meta) ->
+        let t = unparse_ty_uncarbonated ~loc ut in
+        (T_contract, [t])
+    | Pair_t (utl, utr, _meta) -> (
+        let tl = unparse_ty_uncarbonated ~loc utl in
+        let tr = unparse_ty_uncarbonated ~loc utr in
+        (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
+        (* Note that the folding does not happen if the pair on the right has an
+           annotation because this annotation would be lost *)
+        match tr with
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts)
         | _ -> (T_pair, [tl; tr]))
-  | Union_t ((utl, l_field), (utr, r_field), _meta) ->
-      let utl = unparse_ty_uncarbonated ~loc utl in
-      let tl = add_field_annot l_field utl in
-      let utr = unparse_ty_uncarbonated ~loc utr in
-      let tr = add_field_annot r_field utr in
-      prim (T_or, [tl; tr])
-  | Lambda_t (uta, utr, _meta) ->
-      let ta = unparse_ty_uncarbonated ~loc uta in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_lambda, [ta; tr])
-  | Option_t (ut, _meta) ->
-      let ut = unparse_ty_uncarbonated ~loc ut in
-      prim (T_option, [ut])
-  | List_t (ut, _meta) ->
-      let t = unparse_ty_uncarbonated ~loc ut in
-      prim (T_list, [t])
-  | Ticket_t (ut, _meta) ->
-      let t = unparse_comparable_ty_uncarbonated ~loc ut in
-      prim (T_ticket, [t])
-  | Set_t (ut, _meta) ->
-      let t = unparse_comparable_ty_uncarbonated ~loc ut in
-      prim (T_set, [t])
-  | Map_t (uta, utr, _meta) ->
-      let ta = unparse_comparable_ty_uncarbonated ~loc uta in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_map, [ta; tr])
-  | Big_map_t (uta, utr, _meta) ->
-      let ta = unparse_comparable_ty_uncarbonated ~loc uta in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_big_map, [ta; tr])
-  | Sapling_transaction_t (memo_size, _meta) ->
-      prim (T_sapling_transaction, [unparse_memo_size ~loc memo_size])
-  | Sapling_state_t (memo_size, _meta) ->
-      prim (T_sapling_state, [unparse_memo_size ~loc memo_size])
-  | Chest_key_t _meta -> prim (T_chest_key, [])
-  | Chest_t _meta -> prim (T_chest, [])
+    | Union_t ((utl, l_field), (utr, r_field), _meta) ->
+        let utl = unparse_ty_uncarbonated ~loc utl in
+        let tl = add_field_annot l_field utl in
+        let utr = unparse_ty_uncarbonated ~loc utr in
+        let tr = add_field_annot r_field utr in
+        (T_or, [tl; tr])
+    | Lambda_t (uta, utr, _meta) ->
+        let ta = unparse_ty_uncarbonated ~loc uta in
+        let tr = unparse_ty_uncarbonated ~loc utr in
+        (T_lambda, [ta; tr])
+    | Option_t (ut, _meta) ->
+        let ut = unparse_ty_uncarbonated ~loc ut in
+        (T_option, [ut])
+    | List_t (ut, _meta) ->
+        let t = unparse_ty_uncarbonated ~loc ut in
+        (T_list, [t])
+    | Ticket_t (ut, _meta) ->
+        let t = unparse_comparable_ty_uncarbonated ~loc ut in
+        (T_ticket, [t])
+    | Set_t (ut, _meta) ->
+        let t = unparse_comparable_ty_uncarbonated ~loc ut in
+        (T_set, [t])
+    | Map_t (uta, utr, _meta) ->
+        let ta = unparse_comparable_ty_uncarbonated ~loc uta in
+        let tr = unparse_ty_uncarbonated ~loc utr in
+        (T_map, [ta; tr])
+    | Big_map_t (uta, utr, _meta) ->
+        let ta = unparse_comparable_ty_uncarbonated ~loc uta in
+        let tr = unparse_ty_uncarbonated ~loc utr in
+        (T_big_map, [ta; tr])
+    | Sapling_transaction_t (memo_size, _meta) ->
+        (T_sapling_transaction, [unparse_memo_size ~loc memo_size])
+    | Sapling_state_t (memo_size, _meta) ->
+        (T_sapling_state, [unparse_memo_size ~loc memo_size])
+    | Chest_key_t _meta -> (T_chest_key, [])
+    | Chest_t _meta -> (T_chest, [])
+  in
+  Prim (loc, name, args, [])
 
 let unparse_ty ~loc ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
