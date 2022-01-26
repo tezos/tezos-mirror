@@ -4,26 +4,69 @@
 (tests
  (names test_bounded test_time test_protocol test_compact_encoding)
  (package tezos-base)
+ (modes native js)
  (libraries
   tezos-base
-  tezos-base.unix
   tezos-error-monad
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_base -open Tezos_error_monad))
  (modules test_bounded test_time test_protocol test_compact_encoding))
+
+(rule
+ (alias runtest_js)
+ (package tezos-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_bounded.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_time.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_protocol.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-base)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_compact_encoding.bc.js})))
 
 (test
  (name test_p2p_addr)
  (package tezos-base)
+ (modes native js)
  (libraries
   tezos-base
-  tezos-base.unix
   tezos-error-monad
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_base -open Tezos_error_monad))
  (modules test_p2p_addr)
  (deps (file points.ok) (file points.ko)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-base)
+ (deps points.ok points.ko)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_p2p_addr.bc.js})))

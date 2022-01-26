@@ -894,13 +894,14 @@ let lib_base_tests ?dep_files names =
     ~deps:
       [
         tezos_base |> open_;
-        tezos_base_unix;
         tezos_error_monad |> open_;
         data_encoding;
         qcheck_alcotest;
         tezos_test_helpers;
       ]
     ?dep_files
+    ~modes:[Native; JS]
+    ~js_compatible:true
     ~modules:names
 
 let _tezos_base_tests_1 =
