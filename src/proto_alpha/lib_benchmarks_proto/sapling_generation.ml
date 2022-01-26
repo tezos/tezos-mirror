@@ -536,8 +536,12 @@ let generate (save_to : string) (tx_count : int)
          match seeds with
          | [] -> return acc
          | (i, seed) :: tl ->
-             let nb_input = 1 + Random.int max_inputs in
-             let nb_output = 1 + Random.int max_outputs in
+             let nb_input =
+               if max_inputs = 0 then 0 else 1 + Random.int max_inputs
+             in
+             let nb_output =
+               if max_outputs = 0 then 0 else 1 + Random.int max_outputs
+             in
              let nb_nf = 1 + Random.int max_nullifiers in
              let nb_cm =
                nb_input + nb_nf + Random.int max_additional_commitments
