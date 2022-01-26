@@ -467,7 +467,9 @@ let get_all_sapling_data_files directory =
   in
   loop []
 
-let load ~filename =
+type type_transaction = Empty | No_inputs | No_outputs | Full_transaction
+
+let load ~filename type_transaction =
   if not (Sys.file_exists filename) then (
     Format.eprintf "Sapling_generation.load: file does not exist@." ;
     Stdlib.failwith "Sapling_generation.load")
@@ -479,7 +481,21 @@ let load ~filename =
         filename
     in
     let files = get_all_sapling_data_files filename in
-    List.concat_map load_file files
+    List.concat (List.map load_file files)
+    |> List.filter (fun (_str, transac) ->
+           match type_transaction with
+           | Empty ->
+               List.length transac.sapling_tx.outputs = 0
+               && List.length transac.sapling_tx.inputs = 0
+           | No_inputs ->
+               List.length transac.sapling_tx.outputs != 0
+               && List.length transac.sapling_tx.inputs = 0
+           | No_outputs ->
+               List.length transac.sapling_tx.outputs = 0
+               && List.length transac.sapling_tx.inputs != 0
+           | Full_transaction ->
+               List.length transac.sapling_tx.outputs != 0
+               && List.length transac.sapling_tx.inputs != 0)
   else load_file filename
 
 let shared_seed = [|9798798; 217861209; 876786|]

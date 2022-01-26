@@ -2384,7 +2384,12 @@ module Registration_section = struct
         ()
   end
 
-  module Sapling = struct
+  module type Type_transaction = sig
+    val type_transaction : Sapling_generation.type_transaction
+  end
+
+  module Register_Sapling_benchmark (Type_transaction : Type_transaction) =
+  struct
     let () =
       let memo_size =
         match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
@@ -2469,7 +2474,9 @@ module Registration_section = struct
           match config.sapling with
           | {sapling_txs_file; seed} ->
               let transitions =
-                Sapling_generation.load ~filename:sapling_txs_file
+                Sapling_generation.load
+                  ~filename:sapling_txs_file
+                  Type_transaction.type_transaction
               in
               let length = List.length transitions in
               if length < bench_num then
