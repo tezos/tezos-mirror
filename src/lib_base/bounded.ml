@@ -37,15 +37,11 @@ module Int32 = struct
 
     include Compare.S with type t := t
 
-    type bound_error = Out_of_bounds
-
-    val bound_error_to_string : bound_error -> string
-
     val encoding : t Data_encoding.t
 
     val to_int32 : t -> int32
 
-    val of_int32 : int32 -> (t, bound_error) result
+    val of_int32 : int32 -> t option
   end
 
   module Make (B : BOUNDS) = struct
@@ -53,23 +49,21 @@ module Int32 = struct
 
     include B
 
-    type bound_error = Out_of_bounds
-
-    let bound_error_to_string x =
-      match x with Out_of_bounds -> "Out_of_bounds"
-
     let to_int32 x = x
 
     let of_int32 n =
-      if Compare.Int32.(n < B.min_int) then Error Out_of_bounds
-      else if Compare.Int32.(n > B.max_int) then Error Out_of_bounds
-      else Ok n
+      if Compare.Int32.(n < B.min_int) then None
+      else if Compare.Int32.(n > B.max_int) then None
+      else Some n
 
     let encoding =
       Data_encoding.(
         conv_with_guard
           to_int32
-          (fun x -> Result.map_error bound_error_to_string @@ of_int32 x)
+          (fun x ->
+            match of_int32 x with
+            | None -> Error "Out of bounds"
+            | Some x -> Ok x)
           int32)
   end
 end

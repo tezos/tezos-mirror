@@ -43,8 +43,8 @@ module Make_test_bounded_int32 (B : Bounded.Int32.BOUNDS) = struct
     in
     let in_bounds = Int32.add min_int (Int32.unsigned_rem n size) in
     match of_int32 in_bounds with
-    | Error e -> failwith (bound_error_to_string e)
-    | Ok x -> return x
+    | None -> failwith "Out of bounds"
+    | Some x -> return x
 
   let print (x : t) : string = Int32.to_string (to_int32 x)
 
@@ -95,31 +95,31 @@ let int32_checks =
   let open Alcotest in
   [
     test_case "0 not in empty" `Quick (fun () ->
-        assert (Empty.of_int32 0l = Error Empty.Out_of_bounds));
+        assert (Empty.of_int32 0l = None));
     test_case "123 not in empty" `Quick (fun () ->
-        assert (Empty.of_int32 123l = Error Empty.Out_of_bounds));
+        assert (Empty.of_int32 123l = None));
     test_case "Int32.min_int not in empty" `Quick (fun () ->
-        assert (Empty.of_int32 Int32.min_int = Error Empty.Out_of_bounds));
+        assert (Empty.of_int32 Int32.min_int = None));
     test_case "0 not in Small" `Quick (fun () ->
-        assert (Small.of_int32 0l = Error Small.Out_of_bounds));
+        assert (Small.of_int32 0l = None));
     test_case "1 in Small" `Quick (fun () ->
-        assert (Result.map Small.to_int32 (Small.of_int32 1l) = Ok 1l));
+        assert (Option.map Small.to_int32 (Small.of_int32 1l) = Some 1l));
     test_case "2 in Small" `Quick (fun () ->
-        assert (Result.map Small.to_int32 (Small.of_int32 2l) = Ok 2l));
+        assert (Option.map Small.to_int32 (Small.of_int32 2l) = Some 2l));
     test_case "4 not in Small" `Quick (fun () ->
-        assert (Small.of_int32 4l = Error Small.Out_of_bounds));
+        assert (Small.of_int32 4l = None));
     test_case "0 in full" `Quick (fun () ->
-        assert (Result.map Full.to_int32 (Full.of_int32 0l) = Ok 0l));
+        assert (Option.map Full.to_int32 (Full.of_int32 0l) = Some 0l));
     test_case "123 in full" `Quick (fun () ->
-        assert (Result.map Full.to_int32 (Full.of_int32 123l) = Ok 123l));
+        assert (Option.map Full.to_int32 (Full.of_int32 123l) = Some 123l));
     test_case "Int32.min_int in full" `Quick (fun () ->
         assert (
-          Result.map Full.to_int32 (Full.of_int32 Int32.min_int)
-          = Ok Int32.min_int));
+          Option.map Full.to_int32 (Full.of_int32 Int32.min_int)
+          = Some Int32.min_int));
     test_case "Int32.max_int in full" `Quick (fun () ->
         assert (
-          Result.map Full.to_int32 (Full.of_int32 Int32.max_int)
-          = Ok Int32.max_int));
+          Option.map Full.to_int32 (Full.of_int32 Int32.max_int)
+          = Some Int32.max_int));
   ]
 
 let () =

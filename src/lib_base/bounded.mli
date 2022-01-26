@@ -49,15 +49,11 @@ module Int32 : sig
 
     include Compare.S with type t := t
 
-    type bound_error = Out_of_bounds
-
-    val bound_error_to_string : bound_error -> string
-
     val encoding : t Data_encoding.t
 
     val to_int32 : t -> int32
 
-    val of_int32 : int32 -> (t, bound_error) result
+    val of_int32 : int32 -> t option
   end
 
   (** Produce a module [_ : S] of bounded integers.
