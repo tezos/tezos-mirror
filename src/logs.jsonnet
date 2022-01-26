@@ -20,6 +20,39 @@ local logPanel = grafana.logPanel;
       )
     ),
 
+  bakerlogs:
+    logPanel.new(
+      title='Baker logs',
+      datasource='Loki'
+    ).addTarget(
+      prometheus.target(
+        '{job="tezos-baker"}',
+        legendFormat='Baker logs',
+      )
+    ),
+
+  accuserlogs:
+    logPanel.new(
+      title='Accuser logs',
+      datasource='Loki'
+    ).addTarget(
+      prometheus.target(
+        '{job="tezos-accuser"}',
+        legendFormat='Accuser logs',
+      )
+    ),
+
+  endorserlogs:
+    logPanel.new(
+      title='Endorser logs',
+      datasource='Loki'
+    ).addTarget(
+      prometheus.target(
+        '{job="tezos-endorser"}',
+        legendFormat='Endorser logs',
+      )
+    ),
+
   metricslogs:
     logPanel.new(
       title='Metrics logs',
