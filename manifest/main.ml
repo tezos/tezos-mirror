@@ -1801,47 +1801,6 @@ let tezos_store =
         "Tezos_stdlib";
       ]
 
-let _tezos_store_tests =
-  test_exes
-    ["test"]
-    ~path:"src/lib_store/test"
-    ~opam:"src/lib_store/tezos-store"
-    ~deps:
-      [
-        tezos_base;
-        tezos_store;
-        tezos_stdlib_unix;
-        Protocol.(embedded demo_noops);
-        Protocol.(embedded genesis);
-        Protocol.(embedded alpha);
-        tezos_protocol_alpha_parameters;
-        Protocol.(plugin_exn alpha);
-        tezos_validation;
-        alcotest_lwt;
-      ]
-    ~opens:
-      [
-        "Tezos_base__TzPervasives";
-        "Tezos_store";
-        "Tezos_shell_services";
-        "Tezos_stdlib_unix";
-        "Tezos_validation";
-        "Tezos_protocol_alpha_parameters";
-        "Tezos_protocol_plugin_alpha";
-      ]
-    ~dune:
-      Dune.
-        [
-          alias_rule "buildtest" ~deps:["test.exe"];
-          alias_rule
-            "runtest_store"
-            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~alias_deps:["runtest_store"];
-        ]
-
 let tezos_requester =
   public_lib
     "tezos-requester"
@@ -1916,87 +1875,6 @@ let tezos_shell =
         "Tezos_workers";
         "Tezos_validation";
         "Tezos_version";
-      ]
-
-let _tezos_shell_tests =
-  tests
-    [
-      "test_shell";
-      "test_locator";
-      "test_synchronisation_heuristic_fuzzy";
-      "test_prevalidation";
-      "test_prevalidation_t";
-      "test_prevalidator_classification";
-      "test_prevalidator_classification_operations";
-      "test_prevalidator_pending_operations";
-    ]
-    ~path:"src/lib_shell/test"
-    ~opam:"src/lib_shell/tezos-shell"
-    ~deps:
-      [
-        tezos_base;
-        tezos_base_test_helpers;
-        tezos_store;
-        tezos_context;
-        tezos_shell_context;
-        tezos_p2p;
-        tezos_p2p_services;
-        tezos_protocol_updater;
-        tezos_requester;
-        tezos_shell;
-        tezos_shell_services;
-        Protocol.(embedded demo_noops);
-        tezos_stdlib_unix;
-        tezos_validation;
-        tezos_event_logging_test_helpers;
-        tezos_test_helpers;
-        alcotest_lwt;
-      ]
-    ~opens:
-      [
-        "Tezos_base__TzPervasives";
-        "Tezos_base_test_helpers";
-        "Tezos_store";
-        "Tezos_context";
-        "Tezos_shell_context";
-        "Tezos_protocol_updater";
-        "Tezos_p2p";
-        "Tezos_p2p_services";
-        "Tezos_shell";
-        "Tezos_shell_services";
-        "Tezos_stdlib_unix";
-        "Tezos_validation";
-        "Tezos_event_logging_test_helpers";
-      ]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest_locator_bench"
-            ~package:"tezos-shell"
-            ~action:(run_exe "test_locator" ["--bench"]);
-        ]
-
-let _tezos_shell_benchs =
-  tests
-    ["bench_simple"; "bench_tool"]
-    ~path:"src/lib_shell/bench"
-    ~opam:"src/lib_shell/tezos-shell"
-    ~deps:
-      [
-        tezos_base;
-        tezos_shell;
-        tezos_alpha_test_helpers;
-        Protocol.(plugin_exn alpha);
-      ]
-    ~opens:
-      [
-        "Tezos_base__TzPervasives";
-        "Tezos_shell";
-        "Tezos_protocol_alpha";
-        "Tezos_protocol_plugin_alpha";
-        "Tezos_protocol_alpha_parameters";
-        "Tezos_alpha_test_helpers";
       ]
 
 let tezos_rpc_http =
@@ -2555,22 +2433,6 @@ let tezos_micheline_rewriting =
       ]
     ~opens:["Tezos_stdlib"; "Tezos_error_monad"; "Tezos_micheline"]
 
-let _tezos_micheline_rewriting_tests =
-  test
-    "test_rewriting"
-    ~path:"src/lib_benchmark/lib_micheline_rewriting/test"
-    ~opam:"src/lib_benchmark/lib_micheline_rewriting/tezos-micheline-rewriting"
-    ~deps:
-      [
-        tezos_micheline;
-        tezos_micheline_rewriting;
-        Protocol.(main alpha);
-        tezos_error_monad;
-        Protocol.(client_exn alpha);
-        alcotest_lwt;
-      ]
-    ~opens:["Tezos_micheline"]
-
 let tezos_shell_benchmarks =
   public_lib
     "tezos-shell-benchmarks"
@@ -2986,6 +2848,146 @@ end = struct
     List.map get_all_packages_for_protocol_package_type get_packages
     |> List.flatten |> List.map optional
 end
+
+(* TESTS THAT USE PROTOCOLS *)
+
+let _tezos_micheline_rewriting_tests =
+  test
+    "test_rewriting"
+    ~path:"src/lib_benchmark/lib_micheline_rewriting/test"
+    ~opam:"src/lib_benchmark/lib_micheline_rewriting/tezos-micheline-rewriting"
+    ~deps:
+      [
+        tezos_micheline;
+        tezos_micheline_rewriting;
+        Protocol.(main alpha);
+        tezos_error_monad;
+        Protocol.(client_exn alpha);
+        alcotest_lwt;
+      ]
+    ~opens:["Tezos_micheline"]
+
+let _tezos_store_tests =
+  test_exes
+    ["test"]
+    ~path:"src/lib_store/test"
+    ~opam:"src/lib_store/tezos-store"
+    ~deps:
+      [
+        tezos_base;
+        tezos_store;
+        tezos_stdlib_unix;
+        Protocol.(embedded demo_noops);
+        Protocol.(embedded genesis);
+        Protocol.(embedded alpha);
+        tezos_protocol_alpha_parameters;
+        Protocol.(plugin_exn alpha);
+        tezos_validation;
+        alcotest_lwt;
+      ]
+    ~opens:
+      [
+        "Tezos_base__TzPervasives";
+        "Tezos_store";
+        "Tezos_shell_services";
+        "Tezos_stdlib_unix";
+        "Tezos_validation";
+        "Tezos_protocol_alpha_parameters";
+        "Tezos_protocol_plugin_alpha";
+      ]
+    ~dune:
+      Dune.
+        [
+          alias_rule "buildtest" ~deps:["test.exe"];
+          alias_rule
+            "runtest_store"
+            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~alias_deps:["runtest_store"];
+        ]
+
+let _tezos_shell_tests =
+  tests
+    [
+      "test_shell";
+      "test_locator";
+      "test_synchronisation_heuristic_fuzzy";
+      "test_prevalidation";
+      "test_prevalidation_t";
+      "test_prevalidator_classification";
+      "test_prevalidator_classification_operations";
+      "test_prevalidator_pending_operations";
+    ]
+    ~path:"src/lib_shell/test"
+    ~opam:"src/lib_shell/tezos-shell"
+    ~deps:
+      [
+        tezos_base;
+        tezos_base_test_helpers;
+        tezos_store;
+        tezos_context;
+        tezos_shell_context;
+        tezos_p2p;
+        tezos_p2p_services;
+        tezos_protocol_updater;
+        tezos_requester;
+        tezos_shell;
+        tezos_shell_services;
+        Protocol.(embedded demo_noops);
+        tezos_stdlib_unix;
+        tezos_validation;
+        tezos_event_logging_test_helpers;
+        tezos_test_helpers;
+        alcotest_lwt;
+      ]
+    ~opens:
+      [
+        "Tezos_base__TzPervasives";
+        "Tezos_base_test_helpers";
+        "Tezos_store";
+        "Tezos_context";
+        "Tezos_shell_context";
+        "Tezos_protocol_updater";
+        "Tezos_p2p";
+        "Tezos_p2p_services";
+        "Tezos_shell";
+        "Tezos_shell_services";
+        "Tezos_stdlib_unix";
+        "Tezos_validation";
+        "Tezos_event_logging_test_helpers";
+      ]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest_locator_bench"
+            ~package:"tezos-shell"
+            ~action:(run_exe "test_locator" ["--bench"]);
+        ]
+
+let _tezos_shell_benchs =
+  tests
+    ["bench_simple"; "bench_tool"]
+    ~path:"src/lib_shell/bench"
+    ~opam:"src/lib_shell/tezos-shell"
+    ~deps:
+      [
+        tezos_base;
+        tezos_shell;
+        tezos_alpha_test_helpers;
+        Protocol.(plugin_exn alpha);
+      ]
+    ~opens:
+      [
+        "Tezos_base__TzPervasives";
+        "Tezos_shell";
+        "Tezos_protocol_alpha";
+        "Tezos_protocol_plugin_alpha";
+        "Tezos_protocol_alpha_parameters";
+        "Tezos_alpha_test_helpers";
+      ]
 
 (* INTERNAL EXES *)
 
