@@ -59,6 +59,13 @@ Client
 Baker / Endorser / Accuser
 --------------------------
 
+Signer
+------
+
+- Added global option ``--password-filename`` which acts as the client
+  one. Option ``--password-file`` which actually was a complete no-op
+  has been removed.
+
 Proxy server
 ------------
 
