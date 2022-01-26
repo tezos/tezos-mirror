@@ -2509,7 +2509,43 @@ module Registration_section = struct
       Registration_helpers.register (module B)
   end
 
-  (* when benchmarking, compile bls12-381 without ADX, see
+  module Sapling_empty = struct
+    ;;
+    let module Empty_transaction = struct
+      let type_transaction = Sapling_generation.Empty
+    end in
+    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    ()
+  end
+
+  module Sapling_no_inputs = struct
+    ;;
+    let module Empty_transaction = struct
+      let type_transaction = Sapling_generation.No_inputs
+    end in
+    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    ()
+  end
+
+  module Sapling_no_outputs = struct
+    ;;
+    let module Empty_transaction = struct
+      let type_transaction = Sapling_generation.No_outputs
+    end in
+    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    ()
+  end
+
+  module Sapling_full = struct
+    ;;
+    let module Empty_transaction = struct
+      let type_transaction = Sapling_generation.Full_transaction
+    end in
+    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    ()
+  end
+
+  (* when benchmarking, compile bls12-381-unix without ADX, see
      https://gitlab.com/dannywillems/ocaml-bls12-381/-/blob/71d0b4d467fbfaa6452d702fcc408d7a70916a80/README.md#install
   *)
   module Bls12_381 = struct
