@@ -4,14 +4,18 @@
 (test
  (name test)
  (package tezos-shell-services)
+ (modes native js)
  (libraries
   tezos-base
-  tezos-base.unix
-  tezos-stdlib-unix
   tezos-shell-services
-  alcotest-lwt)
- (flags
-  (:standard
-   -open Tezos_base.TzPervasives
-   -open Tezos_stdlib_unix
-   -open Tezos_shell_services)))
+  alcotest)
+ (js_of_ocaml)
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_shell_services)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-shell-services)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test.bc.js})))

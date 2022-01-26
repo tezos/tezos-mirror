@@ -1044,11 +1044,11 @@ let _tezos_shell_services_tests =
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix;
-        tezos_stdlib_unix |> open_;
         tezos_shell_services |> open_;
-        alcotest_lwt;
+        alcotest;
       ]
+    ~modes:[Native; JS]
+    ~js_compatible:true
 
 let tezos_shell_services_test_helpers =
   public_lib

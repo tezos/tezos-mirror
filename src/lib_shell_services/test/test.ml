@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 let () =
-  Lwt_main.run
-    (Alcotest_lwt.run
-       "tezos-lib-shell-services"
-       [("block-services", Test_block_services.tests)])
+  Alcotest.run
+    "tezos-lib-shell-services"
+    [("block-services", Test_block_services.tests)]
