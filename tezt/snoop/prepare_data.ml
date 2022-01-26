@@ -127,11 +127,36 @@ let prepare_sapling_data snoop cfg protocol =
         Files.(working_dir // sapling_data_dir // sapling_txs_file i)
       in
       call_if_no_file ~file ~if_present:Lwt.return_unit ~if_absent:(fun () ->
+          let open Lwt in
+          Snoop.sapling_generate
+            ~protocol
+            ~tx_count:1
+            ~max_inputs:0
+            ~max_outputs:0
+            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
+            snoop
+          >>= fun () ->
           Snoop.sapling_generate
             ~protocol
             ~tx_count:cfg.sapling_tx_count
-            ~max_inputs:20
-            ~max_outputs:20
+            ~max_inputs:0
+            ~max_outputs:100
+            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
+            snoop
+          >>= fun () ->
+          Snoop.sapling_generate
+            ~protocol
+            ~tx_count:cfg.sapling_tx_count
+            ~max_inputs:100
+            ~max_outputs:0
+            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
+            snoop
+          >>= fun () ->
+          Snoop.sapling_generate
+            ~protocol
+            ~tx_count:cfg.sapling_tx_count
+            ~max_inputs:100
+            ~max_outputs:100
             ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
             snoop))
     (range 0 0)
