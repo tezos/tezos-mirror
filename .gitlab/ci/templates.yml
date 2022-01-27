@@ -33,7 +33,7 @@ variables:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
 .image_template__latest:
-  image: docker:latest
+  image: docker:20.10.12
 
 # Rules template
 

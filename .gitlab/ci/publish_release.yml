@@ -21,9 +21,9 @@ docker:merge_manifests:
   extends:
     - .rules_template__master_and_releases
     - .docker_registry_auth
-  image: docker:latest
+  image: docker:20.10.12
   services:
-    - name: "docker:dind"
+    - name: docker:20.10.12-dind
       command: ["--experimental"]
   variables:
     DOCKER_DRIVER: overlay2
