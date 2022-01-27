@@ -4608,7 +4608,7 @@ module Protocol = Protocol
             octez_base |> open_ |> open_ ~m:"TzPervasives"
             |> open_ ~m:"TzPervasives.Error_monad.Legacy_monad_globals";
             octez_error_monad |> open_;
-            parameters |> if_some;
+            parameters |> if_some |> open_;
             octez_benchmark |> open_;
             benchmark |> if_some |> open_;
             benchmark_type_inference |> if_some |> open_;
