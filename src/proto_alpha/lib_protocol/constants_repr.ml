@@ -384,9 +384,9 @@ let check_constants constants =
        "The delay increment per round must be greater than zero")
   >>? fun () ->
   error_unless
-    Compare.Int.(constants.consensus_committee_size > 3)
+    Compare.Int.(constants.consensus_committee_size > 0)
     (Invalid_protocol_constants
-       "The consensus committee size must be strictly greater than 3.")
+       "The consensus committee size must be strictly greater than 0.")
   >>? fun () ->
   error_unless
     Compare.Int.(
@@ -459,13 +459,17 @@ module Generated = struct
     in
     let rewards_half = Tez_repr.(div_exn rewards_per_block 2) in
     let rewards_quarter = Tez_repr.(div_exn rewards_per_block 4) in
+    let bonus_committee_size = consensus_committee_size - consensus_threshold in
     {
       consensus_threshold;
-      baking_reward_fixed_portion = rewards_quarter;
+      baking_reward_fixed_portion =
+        (if Compare.Int.(bonus_committee_size <= 0) then
+         (* a fortiori, consensus_committee_size < 4 *)
+         rewards_half
+        else rewards_quarter);
       baking_reward_bonus_per_slot =
-        Tez_repr.div_exn
-          rewards_quarter
-          (consensus_committee_size - consensus_threshold);
+        (if Compare.Int.(bonus_committee_size <= 0) then Tez_repr.zero
+        else Tez_repr.div_exn rewards_quarter bonus_committee_size);
       endorsing_reward_per_slot =
         Tez_repr.div_exn rewards_half consensus_committee_size;
     }
