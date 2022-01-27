@@ -1282,55 +1282,56 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
   if Compare.Int.(stack_depth > 10000) then
     error Typechecking_too_many_recursive_calls
   else
+    let return ctxt ty = (Ex_ty ty, ctxt) in
     match node with
     | Prim (loc, T_unit, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty unit_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt unit_t
     | Prim (loc, T_int, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty int_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt int_t
     | Prim (loc, T_nat, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty nat_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt nat_t
     | Prim (loc, T_string, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty string_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt string_t
     | Prim (loc, T_bytes, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bytes_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bytes_t
     | Prim (loc, T_mutez, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty mutez_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt mutez_t
     | Prim (loc, T_bool, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bool_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bool_t
     | Prim (loc, T_key, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty key_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt key_t
     | Prim (loc, T_key_hash, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty key_hash_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt key_hash_t
     | Prim (loc, T_chest_key, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty chest_key_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt chest_key_t
     | Prim (loc, T_chest, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty chest_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt chest_t
     | Prim (loc, T_timestamp, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty timestamp_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt timestamp_t
     | Prim (loc, T_address, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty address_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt address_t
     | Prim (loc, T_signature, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty signature_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt signature_t
     | Prim (loc, T_operation, [], annot) ->
         if allow_operation then
-          check_type_annot loc annot >>? fun () -> ok (Ex_ty operation_t, ctxt)
+          check_type_annot loc annot >|? fun () -> return ctxt operation_t
         else error (Unexpected_operation loc)
     | Prim (loc, T_chain_id, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty chain_id_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt chain_id_t
     | Prim (loc, T_never, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty never_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt never_t
     | Prim (loc, T_bls12_381_g1, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g1_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bls12_381_g1_t
     | Prim (loc, T_bls12_381_g2, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g2_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bls12_381_g2_t
     | Prim (loc, T_bls12_381_fr, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_fr_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bls12_381_fr_t
     | Prim (loc, T_contract, [utl], annot) ->
         if allow_contract then
           parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
           >>? fun (Ex_ty tl, ctxt) ->
           check_type_annot loc annot >>? fun () ->
-          contract_t loc tl >|? fun ty -> (Ex_ty ty, ctxt)
+          contract_t loc tl >|? fun ty -> return ctxt ty
         else error (Unexpected_contract loc)
     | Prim (loc, T_pair, utl :: utr, annot) ->
         extract_field_annot utl >>? fun (utl, _left_field) ->
@@ -1361,7 +1362,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        pair_t loc tl tr >|? fun ty -> (Ex_ty ty, ctxt)
+        pair_t loc tl tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_or, [utl; utr], annot) ->
         extract_field_annot utl >>? fun (utl, left_constr) ->
         extract_field_annot utr >>? fun (utr, right_constr) ->
@@ -1394,7 +1395,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        lambda_t loc ta tr >|? fun ty -> (Ex_ty ty, ctxt)
+        lambda_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_option, [ut], annot) ->
         (if legacy then
          (* legacy semantics with (broken) field annotations *)
@@ -1412,7 +1413,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_ticket
           ut
         >>? fun (Ex_ty t, ctxt) ->
-        option_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+        option_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_list, [ut], annot) ->
         parse_ty
           ctxt
@@ -1425,19 +1426,19 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ut
         >>? fun (Ex_ty t, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        list_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+        list_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_ticket, [ut], annot) ->
         if allow_ticket then
           parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
           >>? fun (Ex_comparable_ty t, ctxt) ->
           check_type_annot loc annot >>? fun () ->
-          ticket_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+          ticket_t loc t >|? fun ty -> return ctxt ty
         else error (Unexpected_ticket loc)
     | Prim (loc, T_set, [ut], annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
         >>? fun (Ex_comparable_ty t, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        set_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+        set_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_map, [uta; utr], annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt uta
         >>? fun (Ex_comparable_ty ta, ctxt) ->
@@ -1452,11 +1453,11 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        map_t loc ta tr >|? fun ty -> (Ex_ty ty, ctxt)
+        map_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
-        (Ex_ty (sapling_transaction_t ~memo_size), ctxt)
+        return ctxt (sapling_transaction_t ~memo_size)
     (*
     /!\ When adding new lazy storage kinds, be careful to use
     [when allow_lazy_storage] /!\
@@ -1468,7 +1469,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
-        (Ex_ty (sapling_state_t ~memo_size), ctxt)
+        return ctxt (sapling_state_t ~memo_size)
     | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
         error (Unexpected_lazy_storage loc)
     | Prim
