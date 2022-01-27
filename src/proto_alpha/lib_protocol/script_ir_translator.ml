@@ -1275,7 +1275,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_pa
          https://gitlab.com/tezos/tezos/-/issues/301 *)
     ~allow_ticket:false
 
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_parameter_ty
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty
     :
     context ->
     stack_depth:int ->
@@ -1425,7 +1425,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
         check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_fr_t, ctxt)
     | Prim (loc, T_contract, [utl], annot) ->
         if allow_contract then
-          parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
+          parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
           >>? fun (Ex_ty tl, ctxt) ->
           check_type_annot loc annot >>? fun () ->
           contract_t loc tl >|? fun ty -> (Ex_ty ty, ctxt)
@@ -1940,7 +1940,7 @@ let parse_parameter_ty_and_entrypoints :
     Script.node ->
     (ex_parameter_ty_and_entrypoints * context) tzresult =
  fun ctxt ~stack_depth ~legacy ~root_name node ->
-  parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy node
+  parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy node
   >>? fun (Ex_ty arg_type, ctxt) ->
   (if legacy then Result.return_unit
   else well_formed_entrypoints ~root_name arg_type)
@@ -4424,7 +4424,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (address_t, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_CONTRACT, [ty], annot), Item_t (Address_t _, rest)) ->
-      parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
+      parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
       contract_t loc t >>?= fun contract_ty ->
       option_t loc contract_ty >>?= fun res_ty ->
@@ -6291,7 +6291,7 @@ let parse_big_map_value_ty = parse_big_map_value_ty ~stack_depth:0
 
 let parse_packable_ty = parse_packable_ty ~stack_depth:0
 
-let parse_parameter_ty = parse_parameter_ty ~stack_depth:0
+let parse_passable_ty = parse_passable_ty ~stack_depth:0
 
 let parse_any_ty = parse_any_ty ~stack_depth:0
 

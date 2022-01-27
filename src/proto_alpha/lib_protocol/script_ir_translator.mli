@@ -270,7 +270,7 @@ val parse_big_map_value_ty :
 val parse_packable_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
-val parse_parameter_ty :
+val parse_passable_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
 val parse_comparable_ty :
@@ -320,7 +320,7 @@ val parse_any_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
 (** We expose [parse_ty] for convenience to external tools. Please use
-    specialized versions such as [parse_packable_ty], [parse_parameter_ty],
+    specialized versions such as [parse_packable_ty], [parse_passable_ty],
     [parse_comparable_ty], or [parse_big_map_value_ty] if possible. *)
 val parse_ty :
   context ->

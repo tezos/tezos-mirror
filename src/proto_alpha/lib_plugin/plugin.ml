@@ -1908,7 +1908,7 @@ module RPC = struct
      fun ~legacy ctxt (data, exp_ty) ->
       record_trace
         (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
-        (Script_ir_translator.parse_parameter_ty
+        (Script_ir_translator.parse_passable_ty
            ctxt
            ~legacy
            (Micheline.root exp_ty))
