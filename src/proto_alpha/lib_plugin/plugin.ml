@@ -1094,7 +1094,12 @@ module Mempool = struct
             in
             precheck_manager_and_check_signature ~on_success)
 
-  let add_manager_restriction filter_state oph info source =
+  let add_manager_restriction filter_state oph info source replacement =
+    let filter_state =
+      match replacement with
+      | `No_replace -> filter_state
+      | `Replace (oph, _class) -> remove ~filter_state oph
+    in
     let prechecked_operations_count =
       if Operation_hash.Map.mem oph filter_state.operation_hash_to_manager then
         filter_state.prechecked_operations_count
@@ -1165,7 +1170,7 @@ module Mempool = struct
           >|= function
           | `Prechecked_manager replacement ->
               let filter_state =
-                add_manager_restriction filter_state oph info source
+                add_manager_restriction filter_state oph info source replacement
               in
               `Passed_precheck (filter_state, replacement)
           | (`Refused _ | `Branch_delayed _ | `Branch_refused _ | `Outdated _)
