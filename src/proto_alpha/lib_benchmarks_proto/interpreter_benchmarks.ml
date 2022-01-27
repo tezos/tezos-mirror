@@ -2386,6 +2386,8 @@ module Registration_section = struct
 
   module type Type_transaction = sig
     val type_transaction : Sapling_generation.type_transaction
+
+    val suffix : string
   end
 
   module Register_Sapling_benchmark (Type_transaction : Type_transaction) =
@@ -2416,7 +2418,9 @@ module Registration_section = struct
         | Ok sz -> sz
       in
       let info, name =
-        info_and_name ~intercept:is_empty "ISapling_verify_update"
+        info_and_name
+          ~intercept:is_empty
+          ("ISapling_verify_update_" ^ Type_transaction.suffix)
       in
       let module B : Benchmark.S = struct
         let name = name
@@ -2510,38 +2514,42 @@ module Registration_section = struct
   end
 
   module Sapling_empty = struct
-    ;;
     let module Empty_transaction = struct
       let type_transaction = Sapling_generation.Empty
+
+      let suffix = "empty"
     end in
     let module A = Register_Sapling_benchmark (Empty_transaction) in
     ()
   end
 
   module Sapling_no_inputs = struct
-    ;;
-    let module Empty_transaction = struct
+    let module No_inputs_transaction = struct
       let type_transaction = Sapling_generation.No_inputs
+
+      let suffix = "no_inputs"
     end in
-    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    let module A = Register_Sapling_benchmark (No_inputs_transaction) in
     ()
   end
 
   module Sapling_no_outputs = struct
-    ;;
-    let module Empty_transaction = struct
+    let module No_outputs_transaction = struct
       let type_transaction = Sapling_generation.No_outputs
+
+      let suffix = "no_output"
     end in
-    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    let module A = Register_Sapling_benchmark (No_outputs_transaction) in
     ()
   end
 
   module Sapling_full = struct
-    ;;
-    let module Empty_transaction = struct
+    let module Full_transaction = struct
       let type_transaction = Sapling_generation.Full_transaction
+
+      let suffix = "full"
     end in
-    let module A = Register_Sapling_benchmark (Empty_transaction) in
+    let module A = Register_Sapling_benchmark (Full_transaction) in
     ()
   end
 
