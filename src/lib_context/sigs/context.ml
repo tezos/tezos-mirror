@@ -248,7 +248,6 @@ module Proof_types = struct
       [{length=l; segment = [i_0;..;i_n]; proof=p}] sharing the same lenght [l]
       and final proof [p]. *)
   type 'a inode_extender = {length : int; segment : index list; proof : 'a}
-  [@@deriving irmin]
 
   (** The type for compressed and partial Merkle tree proofs.
 
@@ -480,6 +479,10 @@ module type S = sig
       Guarantee that the given computation performs exactly the same state
       operations as the generating computation, in the exact same order. *)
   type stream_proof := Proof.stream Proof.t
+
+  val tree_proof_encoding : tree_proof Data_encoding.t
+
+  val stream_proof_encoding : stream_proof Data_encoding.t
 
   (** [produce_stream_proof] is the producer of stream proofs. *)
   val produce_stream_proof : (stream_proof, 'a) producer

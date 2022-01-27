@@ -337,6 +337,216 @@ module Make_proof (Store : DB) = struct
   let verify_stream_proof proof f =
     let proof = Proof.of_stream proof in
     Store.Tree.verify_stream proof f
+
+  module Encoding = struct
+    open Proof
+
+    let value_encoding : value Data_encoding.t = Data_encoding.bytes
+
+    let length_field = Data_encoding.(req "length" int31)
+    (* XXX int31 may not be enough *)
+
+    let step_encoding : step Data_encoding.t =
+      (* I understand that a step here is a file name.
+         [bytes] is used For JSON, in the case when it is not UTF-8 *)
+      let open Data_encoding in
+      conv
+        Bytes.unsafe_of_string
+        Bytes.unsafe_to_string
+        (Bounded.bytes 255 (* 1 byte for the length *))
+
+    let hash_encoding = Context_hash.encoding
+
+    let index_encoding =
+      (* Assuming uint8 covers Conf.entries *)
+      assert (Tezos_context_encoding.Context.Conf.entries <= 256) ;
+      Data_encoding.uint8
+
+    let segment_encoding =
+      assert (Tezos_context_encoding.Context.Conf.entries <= 256) ;
+      (* The segment int is in 5bits.  We may express them in bytes *)
+      Data_encoding.(list uint8)
+
+    let inode_encoding a =
+      let open Data_encoding in
+      conv
+        (fun {length; proofs} -> (length, proofs))
+        (fun (length, proofs) -> {length; proofs})
+      @@ obj2
+           length_field
+           (* Proofs are often full: all the index from 0 to 31 (=Context.Conf.entries - 1) has bindings.
+              Then we can have a better encoding without the indices. *)
+           (req "proofs" (list (tup2 index_encoding a)))
+
+    let inode_extender_encoding a =
+      let open Data_encoding in
+      conv
+        (fun {length; segment; proof} -> (length, segment, proof))
+        (fun (length, segment, proof) -> {length; segment; proof})
+      @@ obj3 length_field (req "segment" segment_encoding) (req "proof" a)
+
+    (* data-encoding.0.4/test/mu.ml for building mutually recursive data_encodings *)
+    let (_inode_tree_encoding, tree_encoding) =
+      let open Data_encoding in
+      let mu_inode_tree_encoding tree_encoding =
+        mu "inode_tree" (fun inode_tree_encoding ->
+            union
+              [
+                case
+                  ~title:"Blinded_inode"
+                  (Tag 0)
+                  (obj1 (req "blinded_inode" hash_encoding))
+                  (function Blinded_inode h -> Some h | _ -> None)
+                  (fun h -> Blinded_inode h);
+                case
+                  ~title:"Inode_values"
+                  (Tag 1)
+                  (obj1
+                     (req
+                        "inode_values"
+                        (list (tup2 step_encoding tree_encoding))))
+                  (function Inode_values xs -> Some xs | _ -> None)
+                  (fun xs -> Inode_values xs);
+                case
+                  ~title:"Inode_tree"
+                  (Tag 2)
+                  (obj1 (req "inode_tree" (inode_encoding inode_tree_encoding)))
+                  (function Inode_tree i -> Some i | _ -> None)
+                  (fun i -> Inode_tree i);
+                case
+                  ~title:"Inode_extender"
+                  (Tag 3)
+                  (obj1
+                     (req
+                        "inode_extender"
+                        (inode_extender_encoding inode_tree_encoding)))
+                  (function
+                    | (Inode_extender i : inode_tree) -> Some i | _ -> None)
+                  (fun i : inode_tree -> Inode_extender i);
+              ])
+      in
+      let mu_tree_encoding =
+        mu "tree_encoding" (fun tree_encoding ->
+            union
+              [
+                case
+                  ~title:"Value"
+                  (Tag 0)
+                  (obj1 (req "value" value_encoding))
+                  (function (Value v : tree) -> Some v | _ -> None)
+                  (fun v -> Value v);
+                case
+                  ~title:"Blinded_value"
+                  (Tag 1)
+                  (obj1 (req "blinded_value" hash_encoding))
+                  (function Blinded_value hash -> Some hash | _ -> None)
+                  (fun hash -> Blinded_value hash);
+                case
+                  ~title:"Node"
+                  (Tag 2)
+                  (obj1 (req "node" (list (tup2 step_encoding tree_encoding))))
+                  (function (Node sts : tree) -> Some sts | _ -> None)
+                  (fun sts -> Node sts);
+                case
+                  ~title:"Blinded_node"
+                  (Tag 3)
+                  (obj1 (req "blinded_node" hash_encoding))
+                  (function Blinded_node hash -> Some hash | _ -> None)
+                  (fun hash -> Blinded_node hash);
+                case
+                  ~title:"Inode"
+                  (Tag 4)
+                  (obj1
+                     (req
+                        "inode"
+                        (inode_encoding (mu_inode_tree_encoding tree_encoding))))
+                  (function (Inode i : tree) -> Some i | _ -> None)
+                  (fun i -> Inode i);
+                case
+                  ~title:"Extender"
+                  (Tag 5)
+                  (obj1
+                     (req
+                        "extender"
+                        (inode_extender_encoding
+                           (mu_inode_tree_encoding tree_encoding))))
+                  (function Extender i -> Some i | _ -> None)
+                  (fun i -> Extender i);
+              ])
+      in
+      (mu_inode_tree_encoding mu_tree_encoding, mu_tree_encoding)
+
+    let kinded_hash_encoding =
+      let open Data_encoding in
+      union
+        [
+          case
+            ~title:"Value"
+            (Tag 0)
+            (obj1 (req "value" Context_hash.encoding))
+            (function `Value ch -> Some ch | _ -> None)
+            (fun ch -> `Value ch);
+          case
+            ~title:"Node"
+            (Tag 1)
+            (obj1 (req "node" Context_hash.encoding))
+            (function `Node ch -> Some ch | _ -> None)
+            (fun ch -> `Node ch);
+        ]
+
+    let elt_encoding =
+      let open Data_encoding in
+      let open Stream in
+      union
+        [
+          case
+            ~title:"Value"
+            (Tag 0)
+            (obj1 (req "value" value_encoding))
+            (function Value v -> Some v | _ -> None)
+            (fun v -> Value v);
+          case
+            ~title:"Node"
+            (Tag 1)
+            (obj1 (req "node" (list (tup2 step_encoding kinded_hash_encoding))))
+            (function Node sks -> Some sks | _ -> None)
+            (fun sks -> Node sks);
+          case
+            ~title:"Inode"
+            (Tag 2)
+            (obj1 (req "inode" (inode_encoding hash_encoding)))
+            (function Inode hinode -> Some hinode | _ -> None)
+            (fun hinode -> Inode hinode);
+          case
+            ~title:"Inode_extender"
+            (Tag 3)
+            (obj1
+               (req "inode_extender" (inode_extender_encoding hash_encoding)))
+            (function Inode_extender e -> Some e | _ -> None)
+            (fun e -> Inode_extender e);
+        ]
+
+    let stream_encoding =
+      let open Data_encoding in
+      conv List.of_seq List.to_seq (list elt_encoding)
+
+    let encoding a =
+      let open Data_encoding in
+      conv
+        (fun {version; before; after; state} -> (version, before, after, state))
+        (fun (version, before, after, state) -> {version; before; after; state})
+      @@ obj4
+           (req "version" int16)
+           (req "before" kinded_hash_encoding)
+           (req "after" kinded_hash_encoding)
+           (req "state" a)
+  end
+
+  open Encoding
+
+  let tree_proof_encoding = encoding tree_encoding
+
+  let stream_proof_encoding = encoding stream_encoding
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t

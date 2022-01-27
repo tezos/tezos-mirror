@@ -80,6 +80,10 @@ module Make_proof (DB : DB) : sig
 
   type stream_proof := Proof.stream Proof.t
 
+  val tree_proof_encoding : tree_proof Data_encoding.t
+
+  val stream_proof_encoding : stream_proof Data_encoding.t
+
   type ('proof, 'result) producer :=
     DB.repo ->
     kinded_hash ->
