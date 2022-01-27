@@ -72,9 +72,8 @@ val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 (** Check a type annotation only. *)
 val check_type_annot : Script.location -> string list -> unit tzresult
 
-(** Parse a field annotation only. *)
-val parse_field_annot :
-  Script.location -> string list -> field_annot option tzresult
+(** Check a field annotation only. *)
+val is_field_annot : Script.location -> string -> bool tzresult
 
 (** Check an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)

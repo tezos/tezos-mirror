@@ -2179,10 +2179,9 @@ module RPC = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        parse_toplevel ctxt ~legacy expr
-        >>=? fun ({arg_type; root_name; _}, ctxt) ->
+        parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
         Lwt.return
-          ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type ~root_name
+          ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
           >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, _) ->
             Gas_monad.run ctxt
             @@ Script_ir_translator.find_entrypoint
@@ -2561,10 +2560,9 @@ module RPC = struct
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = false in
           let open Script_ir_translator in
-          parse_toplevel ~legacy ctxt expr
-          >>=? fun ({arg_type; root_name; _}, ctxt) ->
+          parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type ~root_name
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
             >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, _)
               ->
               Script_ir_translator.list_entrypoints ~root_name arg_type ctxt

@@ -214,6 +214,11 @@ let parse_field_annot :
   error_unexpected_annot loc vars >>? fun () ->
   error_unexpected_annot loc types >>? fun () -> get_one_annot loc fields
 
+let is_field_annot loc a =
+  parse_field_annot loc [a] >|? function
+  | Some (_a : field_annot) -> true
+  | None -> false
+
 let extract_field_annot :
     Script.node -> (Script.node * field_annot option) tzresult = function
   | Prim (loc, prim, args, annot) ->

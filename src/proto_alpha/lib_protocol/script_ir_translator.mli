@@ -88,7 +88,6 @@ type toplevel = {
   arg_type : Script.node;
   storage_type : Script.node;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Entrypoint.t option;
 }
 
 type ('arg, 'storage) code = {
@@ -279,7 +278,6 @@ val parse_comparable_ty :
 val parse_parameter_ty_and_entrypoints :
   context ->
   legacy:bool ->
-  root_name:Entrypoint.t option ->
   Script.node ->
   (ex_parameter_ty_and_entrypoints * context) tzresult
 

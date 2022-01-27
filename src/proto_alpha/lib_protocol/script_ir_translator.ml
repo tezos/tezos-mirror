@@ -1722,7 +1722,6 @@ type toplevel = {
   arg_type : Script.node;
   storage_type : Script.node;
   views : view SMap.t;
-  root_name : Entrypoint.t option;
 }
 
 type ('arg, 'storage) code = {
@@ -1913,10 +1912,15 @@ let parse_parameter_ty_and_entrypoints :
     context ->
     stack_depth:int ->
     legacy:bool ->
-    root_name:Entrypoint.t option ->
     Script.node ->
     (ex_parameter_ty_and_entrypoints * context) tzresult =
- fun ctxt ~stack_depth ~legacy ~root_name node ->
+ fun ctxt ~stack_depth ~legacy node ->
+  extract_field_annot node >>? fun (node, root_annot) ->
+  let root_name =
+    match root_annot with
+    | None -> None
+    | Some (Field_annot annot) -> Entrypoint.of_annot_lax_opt annot
+  in
   parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy node
   >>? fun (Ex_ty arg_type, ctxt) ->
   (if legacy then Result.return_unit
@@ -4460,14 +4464,13 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_two_var_annot loc annot >>?= fun () ->
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
-      >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
+      >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
         (parse_parameter_ty_and_entrypoints
            ctxt
            ~stack_depth:(stack_depth + 1)
            ~legacy
-           ~root_name
            arg_type)
       >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt) ->
       record_trace
@@ -5017,12 +5020,11 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                 >>? fun (code, ctxt) ->
                   (* can only fail because of gas *)
                   parse_toplevel ctxt ~legacy:true code
-                  >>? fun ({arg_type; root_name; _}, ctxt) ->
+                  >>? fun ({arg_type; _}, ctxt) ->
                   parse_parameter_ty_and_entrypoints
                     ctxt
                     ~stack_depth:(stack_depth + 1)
                     ~legacy:true
-                    ~root_name
                     arg_type
                   >>? fun ( Ex_parameter_ty_and_entrypoints
                               {arg_type = targ; root_name},
@@ -5128,34 +5130,34 @@ and parse_toplevel :
           Some (s, sloc, sannot),
           Some (c, cloc, carrot),
           views ) ->
-          let maybe_root_name =
+          let p_pannot =
             (* root name can be attached to either the parameter
-               primitive or the toplevel constructor (legacy only) *)
-            Script_ir_annot.extract_field_annot p >>? fun (p, root_name) ->
+               primitive or the toplevel constructor (legacy only).
+
+               In the latter case we move it to the parameter type.
+            *)
+            Script_ir_annot.extract_field_annot p >>? fun (_p, root_name) ->
             match root_name with
-            | Some (Field_annot root_name) ->
-                let root_name = Entrypoint.of_annot_lax_opt root_name in
-                ok (p, pannot, root_name)
+            | Some _ -> ok (p, pannot)
             | None -> (
                 match pannot with
                 | [single]
                   when legacy
                        && Compare.Int.(String.length single > 0)
                        && Compare.Char.(single.[0] = '%') -> (
-                    parse_field_annot ploc [single] >|? function
-                    | None -> (p, [], None)
-                    | Some (Field_annot pannot) ->
-                        let root_name = Entrypoint.of_annot_lax_opt pannot in
-                        (p, [], root_name))
-                | _ -> ok (p, pannot, None))
+                    is_field_annot ploc single >|? fun is_field_annot ->
+                    match (is_field_annot, p) with
+                    | (true, Prim (loc, prim, args, annots)) ->
+                        (Prim (loc, prim, args, single :: annots), [])
+                    | _ -> (p, []))
+                | _ -> ok (p, pannot))
           in
           (* only one field annot is allowed to set the root entrypoint name *)
-          maybe_root_name >>? fun (arg_type, pannot, root_name) ->
+          p_pannot >>? fun (arg_type, pannot) ->
           Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-          ({code_field = c; arg_type; root_name; views; storage_type = s}, ctxt)
-      )
+          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
@@ -5211,13 +5213,12 @@ let parse_contract_for_script :
                   (* can only fail because of gas *)
                   match parse_toplevel ctxt ~legacy:true code with
                   | Error _ -> error (Invalid_contract (loc, contract))
-                  | Ok ({arg_type; root_name; _}, ctxt) -> (
+                  | Ok ({arg_type; _}, ctxt) -> (
                       match
                         parse_parameter_ty_and_entrypoints
                           ctxt
                           ~stack_depth:0
                           ~legacy:true
-                          ~root_name
                           arg_type
                       with
                       | Error _ -> error (Invalid_contract (loc, contract))
@@ -5259,16 +5260,11 @@ let parse_code :
   >>?= fun (code, ctxt) ->
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
-  >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
+  >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
-    (parse_parameter_ty_and_entrypoints
-       ctxt
-       ~stack_depth:0
-       ~legacy
-       ~root_name
-       arg_type)
+    (parse_parameter_ty_and_entrypoints ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt) ->
   let storage_type_loc = location storage_type in
   record_trace
@@ -5370,17 +5366,12 @@ let typecheck_code :
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
-  >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
+  >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
-    (parse_parameter_ty_and_entrypoints
-       ctxt
-       ~stack_depth:0
-       ~legacy
-       ~root_name
-       arg_type)
+    (parse_parameter_ty_and_entrypoints ctxt ~stack_depth:0 ~legacy arg_type)
   >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt) ->
   let storage_type_loc = location storage_type in
   record_trace
