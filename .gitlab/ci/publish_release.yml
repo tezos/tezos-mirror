@@ -20,13 +20,8 @@ release-on-gitlab:
 docker:merge_manifests:
   extends:
     - .rules_template__master_and_releases
+    - .image_template__latest # Docker-in-Docker (dind)
     - .docker_registry_auth
-  image: docker:20.10.12
-  services:
-    - name: docker:20.10.12-dind
-      command: ["--experimental"]
-  variables:
-    DOCKER_DRIVER: overlay2
   stage: publish_release
   script:
     - apk add git

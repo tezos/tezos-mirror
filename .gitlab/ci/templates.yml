@@ -32,8 +32,28 @@ variables:
 .image_template__runtime_prebuild_dependencies_template:
   image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
+# We should only use the latest version of Docker for experimental features (ex: docker manifest)
 .image_template__latest:
   image: docker:20.10.12
+  services:
+    - name: docker:20.10.12-dind
+      command: ["--experimental"]
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_BUILDKIT: 1
+    BUILDKIT_PROGRESS: plain
+
+# We should use the stable version to build Docker images (this template is not used at the moment)
+# Match the GitLab runners/executors version for Docker-in-Docker
+# https://gitlab.com/nomadic-labs/iac/packer/pck-aws-baseimage/-/blob/master/roles/docker-ubuntu.yaml
+.image_template__stable:
+  image: docker:19.03.15
+  services:
+    - docker:19.03.15-dind
+  variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_BUILDKIT: 1
+    BUILDKIT_PROGRESS: plain
 
 # Rules template
 
