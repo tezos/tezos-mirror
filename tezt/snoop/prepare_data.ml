@@ -141,7 +141,9 @@ let prepare_sapling_data snoop cfg protocol =
             ~tx_count:cfg.sapling_tx_count
             ~max_inputs:0
             ~max_outputs:100
-            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
+            ~file:
+              Files.(
+                working_dir // sapling_data_dir // sapling_txs_file (i + 1))
             snoop
           >>= fun () ->
           Snoop.sapling_generate
@@ -149,7 +151,9 @@ let prepare_sapling_data snoop cfg protocol =
             ~tx_count:cfg.sapling_tx_count
             ~max_inputs:100
             ~max_outputs:0
-            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
+            ~file:
+              Files.(
+                working_dir // sapling_data_dir // sapling_txs_file (i + 2))
             snoop
           >>= fun () ->
           Snoop.sapling_generate
@@ -157,7 +161,9 @@ let prepare_sapling_data snoop cfg protocol =
             ~tx_count:cfg.sapling_tx_count
             ~max_inputs:100
             ~max_outputs:100
-            ~file:Files.(working_dir // sapling_data_dir // sapling_txs_file i)
+            ~file:
+              Files.(
+                working_dir // sapling_data_dir // sapling_txs_file (i + 3))
             snoop))
     (range 0 0)
 
