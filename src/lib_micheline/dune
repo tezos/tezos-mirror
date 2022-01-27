@@ -12,7 +12,7 @@
   tezos-stdlib
   tezos-error-monad
   data-encoding)
- (inline_tests)
+ (inline_tests (flags -verbose))
  (preprocess (pps ppx_inline_test))
  (js_of_ocaml)
  (flags
