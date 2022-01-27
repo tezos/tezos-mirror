@@ -31,12 +31,6 @@ module Constants = struct
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
-  let cost_contains_tickets_step = S.safe_int 28
-
-  (* TODO: #2315
-     Fill in real benchmarked values.
-     Need to create benchmark and fill in values.
-  *)
   let cost_collect_tickets_step = S.safe_int 360
 
   (* TODO: #2315
