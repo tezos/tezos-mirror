@@ -83,6 +83,10 @@ val check_composed_type_annot : Script.location -> string list -> unit tzresult
 val extract_field_annot :
   Script.node -> (Script.node * field_annot option) tzresult
 
+(** Extract and remove a field annotation as an entrypoint from a node *)
+val extract_entrypoint_annot :
+  Script.node -> (Script.node * Entrypoint.t option) tzresult
+
 (** Instruction annotations parsing *)
 
 (** Check a variable annotation. *)

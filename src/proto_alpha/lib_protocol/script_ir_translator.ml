@@ -1915,12 +1915,7 @@ let parse_parameter_ty_and_entrypoints :
     Script.node ->
     (ex_parameter_ty_and_entrypoints * context) tzresult =
  fun ctxt ~stack_depth ~legacy node ->
-  extract_field_annot node >>? fun (node, root_annot) ->
-  let root_name =
-    match root_annot with
-    | None -> None
-    | Some (Field_annot annot) -> Entrypoint.of_annot_lax_opt annot
-  in
+  extract_entrypoint_annot node >>? fun (node, root_name) ->
   parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy node
   >>? fun (Ex_ty arg_type, ctxt) ->
   (if legacy then Result.return_unit

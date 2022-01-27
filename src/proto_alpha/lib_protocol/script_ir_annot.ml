@@ -236,6 +236,14 @@ let extract_field_annot :
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr -> ok (expr, None)
 
+let extract_entrypoint_annot :
+    Script.node -> (Script.node * Entrypoint.t option) tzresult =
+ fun node ->
+  extract_field_annot node >|? fun (node, field_annot_opt) ->
+  ( node,
+    Option.bind field_annot_opt (fun (Field_annot field_annot) ->
+        Entrypoint.of_annot_lax_opt field_annot) )
+
 let check_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
