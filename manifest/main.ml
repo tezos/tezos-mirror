@@ -257,371 +257,6 @@ let ledgerwallet_tezos = vendored_lib "ledgerwallet-tezos"
 
 let pyml_plot = vendored_lib "pyml-plot"
 
-(* PACKAGES THAT ARE NOT IMPLEMENTED YET *)
-
-(* For now we declare them as external packages just so that we can depend on them,
-   but their dune and .opam files are not yet generated. *)
-let todo ?opam name = external_lib ?opam name []
-
-let todo_sub lib sub = external_sublib lib sub
-
-let tezos_alpha_test_helpers = todo "tezos-alpha-test-helpers"
-
-let tezos_protocol_alpha_parameters = todo "tezos-protocol-alpha-parameters"
-
-let tezos_benchmarks_proto_alpha = todo "tezos-benchmarks-proto-alpha"
-
-let tezos_baking_alpha = todo "tezos-baking-alpha"
-
-(* PROTOCOL PACKAGES *)
-
-module Protocol : sig
-  type t
-
-  val number : t -> int option
-
-  (** Name without the number, e.g. "alpha" or "PsDELPH1". *)
-  val name : t -> string
-
-  val main : t -> target
-
-  val embedded : t -> target
-
-  (** [embedded] does not fail, it's just that the optional version
-      composes better with [all_optionally]. *)
-  val embedded_opt : t -> target option
-
-  val client : t -> target option
-
-  val client_exn : t -> target
-
-  val client_commands_registration : t -> target option
-
-  val baking_commands_registration : t -> target option
-
-  val plugin : t -> target option
-
-  val plugin_exn : t -> target
-
-  val plugin_registerer : t -> target option
-
-  val genesis : t
-
-  val demo_noops : t
-
-  val alpha : t
-
-  (** List of active protocols. *)
-  val active : t list
-
-  (** Get packages to link.
-
-      This takes a function that selects packages from a protocol.
-      For instance, the node wants the embedded protocol and the plugin registerer,
-      while the client wants the client commands etc.
-
-      The result is the list of all such packages that exist.
-      All of them are optional dependencies. *)
-  val all_optionally : (t -> target option) list -> target list
-end = struct
-  type t = {
-    number : int option;
-    name : string;
-    main : target;
-    embedded : target;
-    client : target option;
-    client_commands : target option;
-    client_commands_registration : target option;
-    baking_commands_registration : target option;
-    plugin : target option;
-    plugin_registerer : target option;
-  }
-
-  let make ?number ?client ?client_commands ?client_commands_registration
-      ?baking_commands_registration ?plugin ?plugin_registerer ~name ~main
-      ~embedded () =
-    {
-      number;
-      name;
-      main;
-      embedded;
-      client;
-      client_commands;
-      client_commands_registration;
-      baking_commands_registration;
-      plugin;
-      plugin_registerer;
-    }
-
-  let all_rev : t list ref = ref []
-
-  (* Add to the [Protocol.add] list used to link in the node, client, etc.
-     Returns the protocol for easier composability. *)
-  let register protocol =
-    all_rev := protocol :: !all_rev ;
-    protocol
-
-  let mandatory what {main; _} = function
-    | None ->
-        failwith
-          ("protocol " ^ name_for_errors main ^ " has no " ^ what ^ " package")
-    | Some x -> x
-
-  let number p = p.number
-
-  let name p = p.name
-
-  let main p = p.main
-
-  let embedded p = p.embedded
-
-  let embedded_opt p = Some p.embedded
-
-  let client p = p.client
-
-  let client_exn p = mandatory "client" p p.client
-
-  let client_commands_registration p = p.client_commands_registration
-
-  let baking_commands_registration p = p.baking_commands_registration
-
-  let plugin p = p.plugin
-
-  let plugin_exn p = mandatory "plugin" p p.plugin
-
-  let plugin_registerer p = p.plugin_registerer
-
-  let genesis =
-    register
-    @@ make
-         ~name:"genesis"
-         ~main:(todo "tezos-protocol-genesis")
-         ~embedded:(todo "tezos-embedded-protocol-genesis")
-         ~client:(todo "tezos-client-genesis")
-         ()
-
-  let _genesis_carthagenet =
-    register
-    @@ make
-         ~name:"genesis-carthagenet"
-         ~main:(todo "tezos-protocol-genesis-carthagenet")
-         ~embedded:(todo "tezos-embedded-protocol-genesis-carthagenet")
-         ~client:(todo "tezos-client-genesis-carthagenet")
-         ()
-
-  let demo_noops =
-    register
-    @@ make
-         ~name:"demo-noops"
-         ~main:(todo "tezos-protocol-demo-noops")
-         ~embedded:(todo "tezos-embedded-protocol-demo-noops")
-         ()
-
-  let _demo_counter =
-    register
-    @@ make
-         ~name:"demo-counter"
-         ~main:(todo "tezos-protocol-demo-counter")
-         ~embedded:(todo "tezos-embedded-protocol-demo-counter")
-         ~client:(todo "tezos-client-demo-counter")
-         ()
-
-  let _000_Ps9mPmXa =
-    register
-    @@ make
-         ~number:000
-         ~name:"Ps9mPmXa"
-         ~main:(todo "tezos-protocol-000-Ps9mPmXa")
-         ~embedded:(todo "tezos-embedded-protocol-000-Ps9mPmXa")
-         ~client:(todo "tezos-client-000-Ps9mPmXa")
-         ()
-
-  let _001_PtCJ7pwo =
-    let client_commands = todo "tezos-client-001-PtCJ7pwo-commands" in
-    register
-    @@ make
-         ~number:001
-         ~name:"PtCJ7pwo"
-         ~main:(todo "tezos-protocol-001-PtCJ7pwo")
-         ~embedded:(todo "tezos-embedded-protocol-001-PtCJ7pwo")
-         ~client:(todo "tezos-client-001-PtCJ7pwo")
-         ~client_commands
-         ~client_commands_registration:
-           (todo_sub
-              client_commands
-              "tezos-client-001-PtCJ7pwo-commands.registration")
-         ()
-
-  let _002_PsYLVpVv =
-    let client_commands = todo "tezos-client-002-PsYLVpVv-commands" in
-    register
-    @@ make
-         ~number:002
-         ~name:"PsYLVpVv"
-         ~main:(todo "tezos-protocol-002-PsYLVpVv")
-         ~embedded:(todo "tezos-embedded-protocol-002-PsYLVpVv")
-         ~client:(todo "tezos-client-002-PsYLVpVv")
-         ~client_commands
-         ~client_commands_registration:
-           (todo_sub
-              client_commands
-              "tezos-client-002-PsYLVpVv-commands.registration")
-         ()
-
-  let _003_PsddFKi3 =
-    let client_commands = todo "tezos-client-003-PsddFKi3-commands" in
-    register
-    @@ make
-         ~number:003
-         ~name:"PsddFKi3"
-         ~main:(todo "tezos-protocol-003-PsddFKi3")
-         ~embedded:(todo "tezos-embedded-protocol-003-PsddFKi3")
-         ~client:(todo "tezos-client-003-PsddFKi3")
-         ~client_commands
-         ~client_commands_registration:
-           (todo_sub
-              client_commands
-              "tezos-client-003-PsddFKi3-commands.registration")
-         ()
-
-  let _004_Pt24m4xi =
-    let client_commands = todo "tezos-client-004-Pt24m4xi-commands" in
-    register
-    @@ make
-         ~number:004
-         ~name:"Pt24m4xi"
-         ~main:(todo "tezos-protocol-004-Pt24m4xi")
-         ~embedded:(todo "tezos-embedded-protocol-004-Pt24m4xi")
-         ~client:(todo "tezos-client-004-Pt24m4xi")
-         ~client_commands
-         ~client_commands_registration:
-           (todo_sub
-              client_commands
-              "tezos-client-004-Pt24m4xi-commands.registration")
-         ()
-
-  let _005_PsBABY5H =
-    register
-    @@ make
-         ~number:005
-         ~name:"PsBABY5H"
-         ~main:(todo "tezos-protocol-005-PsBABY5H")
-         ~embedded:(todo "tezos-embedded-protocol-005-PsBABY5H")
-         ()
-
-  let _005_PsBabyM1 =
-    let client_commands = todo "tezos-client-005-PsBabyM1-commands" in
-    register
-    @@ make
-         ~number:005
-         ~name:"PsBabyM1"
-         ~main:(todo "tezos-protocol-005-PsBabyM1")
-         ~embedded:(todo "tezos-embedded-protocol-005-PsBabyM1")
-         ~client:(todo "tezos-client-005-PsBabyM1")
-         ~client_commands
-         ~client_commands_registration:
-           (todo_sub
-              client_commands
-              "tezos-client-005-PsBabyM1-commands.registration")
-         ()
-
-  let _006_PsCARTHA =
-    let client_commands = todo "tezos-client-006-PsCARTHA-commands" in
-    register
-    @@ make
-         ~number:006
-         ~name:"PsCARTHA"
-         ~main:(todo "tezos-protocol-006-PsCARTHA")
-         ~embedded:(todo "tezos-embedded-protocol-006-PsCARTHA")
-         ~client:(todo "tezos-client-006-PsCARTHA")
-         ~client_commands
-         ~client_commands_registration:
-           (todo_sub
-              client_commands
-              "tezos-client-006-PsCARTHA-commands.registration")
-         ()
-
-  (* Starting from 007, all protocols follow the current conventions. *)
-
-  (* Note the -registration instead of .registration, compared to previous protocols:
-     the client command registration library is in a separate opam package. *)
-
-  let make_modern ?number name =
-    let full_name =
-      match number with
-      | None -> name
-      | Some number -> Printf.sprintf "%03d-%s" number name
-    in
-    let todo x = Printf.ksprintf todo x in
-    let todo_sub parent x = Printf.ksprintf (todo_sub parent) x in
-    let baking_commands = todo "tezos-baking-%s-commands" full_name in
-    make
-      ?number
-      ~name
-      ~main:(todo "tezos-protocol-%s" full_name)
-      ~embedded:(todo "tezos-embedded-protocol-%s" full_name)
-      ~client:(todo "tezos-client-%s" full_name)
-      ~client_commands:(todo "tezos-client-%s-commands" full_name)
-      ~client_commands_registration:
-        (todo "tezos-client-%s-commands-registration" full_name)
-      ~baking_commands_registration:
-        (todo_sub
-           baking_commands
-           "tezos-baking-%s-commands.registration"
-           full_name)
-      ~plugin:(todo "tezos-protocol-plugin-%s" full_name)
-      ~plugin_registerer:(todo "tezos-protocol-plugin-%s-registerer" full_name)
-      ()
-
-  let active ?number name = register @@ make_modern ?number name
-
-  let frozen ?number name =
-    let p = make_modern ?number name in
-    register {p with baking_commands_registration = None}
-
-  let overridden ?number name =
-    let p = make_modern ?number name in
-    register
-      {
-        p with
-        client = None;
-        client_commands = None;
-        client_commands_registration = None;
-        baking_commands_registration = None;
-        plugin = None;
-        plugin_registerer = None;
-      }
-
-  let _007_PsDELPH1 = frozen ~number:007 "PsDELPH1"
-
-  let _008_PtEdoTez = overridden ~number:008 "PtEdoTez"
-
-  let _008_PtEdo2Zk = frozen ~number:008 "PtEdo2Zk"
-
-  let _009_PsFLoren = frozen ~number:009 "PsFLoren"
-
-  let _010_PtGRANAD = frozen ~number:010 "PtGRANAD"
-
-  let _011_PtHangz2 = active ~number:011 "PtHangz2"
-
-  let _012_Psithaca = active ~number:012 "Psithaca"
-
-  let alpha = active "alpha"
-
-  let all = List.rev !all_rev
-
-  let active = List.filter (fun p -> p.baking_commands_registration <> None) all
-
-  let all_optionally (get_packages : (t -> target option) list) =
-    let get_all_packages_for_protocol_package_type
-        (get_package : t -> target option) =
-      List.map (fun protocol -> Option.to_list (get_package protocol)) all
-      |> List.flatten
-    in
-    List.map get_all_packages_for_protocol_package_type get_packages
-    |> List.flatten |> List.map optional
-end
-
 (* INTERNAL LIBS *)
 
 let tezos_test_helpers =
@@ -2166,47 +1801,6 @@ let tezos_store =
         "Tezos_stdlib";
       ]
 
-let _tezos_store_tests =
-  test_exes
-    ["test"]
-    ~path:"src/lib_store/test"
-    ~opam:"src/lib_store/tezos-store"
-    ~deps:
-      [
-        tezos_base;
-        tezos_store;
-        tezos_stdlib_unix;
-        Protocol.(embedded demo_noops);
-        Protocol.(embedded genesis);
-        Protocol.(embedded alpha);
-        tezos_protocol_alpha_parameters;
-        Protocol.(plugin_exn alpha);
-        tezos_validation;
-        alcotest_lwt;
-      ]
-    ~opens:
-      [
-        "Tezos_base__TzPervasives";
-        "Tezos_store";
-        "Tezos_shell_services";
-        "Tezos_stdlib_unix";
-        "Tezos_validation";
-        "Tezos_protocol_alpha_parameters";
-        "Tezos_protocol_plugin_alpha";
-      ]
-    ~dune:
-      Dune.
-        [
-          alias_rule "buildtest" ~deps:["test.exe"];
-          alias_rule
-            "runtest_store"
-            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
-          alias_rule
-            "runtest"
-            ~package:"tezos-store"
-            ~alias_deps:["runtest_store"];
-        ]
-
 let tezos_requester =
   public_lib
     "tezos-requester"
@@ -2281,87 +1875,6 @@ let tezos_shell =
         "Tezos_workers";
         "Tezos_validation";
         "Tezos_version";
-      ]
-
-let _tezos_shell_tests =
-  tests
-    [
-      "test_shell";
-      "test_locator";
-      "test_synchronisation_heuristic_fuzzy";
-      "test_prevalidation";
-      "test_prevalidation_t";
-      "test_prevalidator_classification";
-      "test_prevalidator_classification_operations";
-      "test_prevalidator_pending_operations";
-    ]
-    ~path:"src/lib_shell/test"
-    ~opam:"src/lib_shell/tezos-shell"
-    ~deps:
-      [
-        tezos_base;
-        tezos_base_test_helpers;
-        tezos_store;
-        tezos_context;
-        tezos_shell_context;
-        tezos_p2p;
-        tezos_p2p_services;
-        tezos_protocol_updater;
-        tezos_requester;
-        tezos_shell;
-        tezos_shell_services;
-        Protocol.(embedded demo_noops);
-        tezos_stdlib_unix;
-        tezos_validation;
-        tezos_event_logging_test_helpers;
-        tezos_test_helpers;
-        alcotest_lwt;
-      ]
-    ~opens:
-      [
-        "Tezos_base__TzPervasives";
-        "Tezos_base_test_helpers";
-        "Tezos_store";
-        "Tezos_context";
-        "Tezos_shell_context";
-        "Tezos_protocol_updater";
-        "Tezos_p2p";
-        "Tezos_p2p_services";
-        "Tezos_shell";
-        "Tezos_shell_services";
-        "Tezos_stdlib_unix";
-        "Tezos_validation";
-        "Tezos_event_logging_test_helpers";
-      ]
-    ~dune:
-      Dune.
-        [
-          alias_rule
-            "runtest_locator_bench"
-            ~package:"tezos-shell"
-            ~action:(run_exe "test_locator" ["--bench"]);
-        ]
-
-let _tezos_shell_benchs =
-  tests
-    ["bench_simple"; "bench_tool"]
-    ~path:"src/lib_shell/bench"
-    ~opam:"src/lib_shell/tezos-shell"
-    ~deps:
-      [
-        tezos_base;
-        tezos_shell;
-        tezos_alpha_test_helpers;
-        Protocol.(plugin_exn alpha);
-      ]
-    ~opens:
-      [
-        "Tezos_base__TzPervasives";
-        "Tezos_shell";
-        "Tezos_protocol_alpha";
-        "Tezos_protocol_plugin_alpha";
-        "Tezos_protocol_alpha_parameters";
-        "Tezos_alpha_test_helpers";
       ]
 
 let tezos_rpc_http =
@@ -2920,22 +2433,6 @@ let tezos_micheline_rewriting =
       ]
     ~opens:["Tezos_stdlib"; "Tezos_error_monad"; "Tezos_micheline"]
 
-let _tezos_micheline_rewriting_tests =
-  test
-    "test_rewriting"
-    ~path:"src/lib_benchmark/lib_micheline_rewriting/test"
-    ~opam:"src/lib_benchmark/lib_micheline_rewriting/tezos-micheline-rewriting"
-    ~deps:
-      [
-        tezos_micheline;
-        tezos_micheline_rewriting;
-        Protocol.(main alpha);
-        tezos_error_monad;
-        Protocol.(client_exn alpha);
-        alcotest_lwt;
-      ]
-    ~opens:["Tezos_micheline"]
-
 let tezos_shell_benchmarks =
   public_lib
     "tezos-shell-benchmarks"
@@ -2986,6 +2483,511 @@ let tezos_openapi =
       "Tezos: a library for querying RPCs and converting into the OpenAPI \
        format"
     ~deps:[ezjsonm; json_data_encoding; tezt]
+
+(* PACKAGES THAT ARE NOT IMPLEMENTED YET *)
+
+(* For now we declare them as external packages just so that we can depend on them,
+   but their dune and .opam files are not yet generated. *)
+let todo ?opam name = external_lib ?opam name []
+
+let todo_sub lib sub = external_sublib lib sub
+
+let tezos_alpha_test_helpers = todo "tezos-alpha-test-helpers"
+
+let tezos_protocol_alpha_parameters = todo "tezos-protocol-alpha-parameters"
+
+let tezos_benchmarks_proto_alpha = todo "tezos-benchmarks-proto-alpha"
+
+let tezos_baking_alpha = todo "tezos-baking-alpha"
+
+(* PROTOCOL PACKAGES *)
+
+module Protocol : sig
+  type t
+
+  val number : t -> int option
+
+  (** Name without the number, e.g. "alpha" or "PsDELPH1". *)
+  val name : t -> string
+
+  val main : t -> target
+
+  val embedded : t -> target
+
+  (** [embedded] does not fail, it's just that the optional version
+      composes better with [all_optionally]. *)
+  val embedded_opt : t -> target option
+
+  val client : t -> target option
+
+  val client_exn : t -> target
+
+  val client_commands_registration : t -> target option
+
+  val baking_commands_registration : t -> target option
+
+  val plugin : t -> target option
+
+  val plugin_exn : t -> target
+
+  val plugin_registerer : t -> target option
+
+  val genesis : t
+
+  val demo_noops : t
+
+  val alpha : t
+
+  (** List of active protocols. *)
+  val active : t list
+
+  (** Get packages to link.
+
+      This takes a function that selects packages from a protocol.
+      For instance, the node wants the embedded protocol and the plugin registerer,
+      while the client wants the client commands etc.
+
+      The result is the list of all such packages that exist.
+      All of them are optional dependencies. *)
+  val all_optionally : (t -> target option) list -> target list
+end = struct
+  type t = {
+    number : int option;
+    name : string;
+    main : target;
+    embedded : target;
+    client : target option;
+    client_commands : target option;
+    client_commands_registration : target option;
+    baking_commands_registration : target option;
+    plugin : target option;
+    plugin_registerer : target option;
+  }
+
+  let make ?number ?client ?client_commands ?client_commands_registration
+      ?baking_commands_registration ?plugin ?plugin_registerer ~name ~main
+      ~embedded () =
+    {
+      number;
+      name;
+      main;
+      embedded;
+      client;
+      client_commands;
+      client_commands_registration;
+      baking_commands_registration;
+      plugin;
+      plugin_registerer;
+    }
+
+  let all_rev : t list ref = ref []
+
+  (* Add to the [Protocol.add] list used to link in the node, client, etc.
+     Returns the protocol for easier composability. *)
+  let register protocol =
+    all_rev := protocol :: !all_rev ;
+    protocol
+
+  let mandatory what {main; _} = function
+    | None ->
+        failwith
+          ("protocol " ^ name_for_errors main ^ " has no " ^ what ^ " package")
+    | Some x -> x
+
+  let number p = p.number
+
+  let name p = p.name
+
+  let main p = p.main
+
+  let embedded p = p.embedded
+
+  let embedded_opt p = Some p.embedded
+
+  let client p = p.client
+
+  let client_exn p = mandatory "client" p p.client
+
+  let client_commands_registration p = p.client_commands_registration
+
+  let baking_commands_registration p = p.baking_commands_registration
+
+  let plugin p = p.plugin
+
+  let plugin_exn p = mandatory "plugin" p p.plugin
+
+  let plugin_registerer p = p.plugin_registerer
+
+  let genesis =
+    register
+    @@ make
+         ~name:"genesis"
+         ~main:(todo "tezos-protocol-genesis")
+         ~embedded:(todo "tezos-embedded-protocol-genesis")
+         ~client:(todo "tezos-client-genesis")
+         ()
+
+  let _genesis_carthagenet =
+    register
+    @@ make
+         ~name:"genesis-carthagenet"
+         ~main:(todo "tezos-protocol-genesis-carthagenet")
+         ~embedded:(todo "tezos-embedded-protocol-genesis-carthagenet")
+         ~client:(todo "tezos-client-genesis-carthagenet")
+         ()
+
+  let demo_noops =
+    register
+    @@ make
+         ~name:"demo-noops"
+         ~main:(todo "tezos-protocol-demo-noops")
+         ~embedded:(todo "tezos-embedded-protocol-demo-noops")
+         ()
+
+  let _demo_counter =
+    register
+    @@ make
+         ~name:"demo-counter"
+         ~main:(todo "tezos-protocol-demo-counter")
+         ~embedded:(todo "tezos-embedded-protocol-demo-counter")
+         ~client:(todo "tezos-client-demo-counter")
+         ()
+
+  let _000_Ps9mPmXa =
+    register
+    @@ make
+         ~number:000
+         ~name:"Ps9mPmXa"
+         ~main:(todo "tezos-protocol-000-Ps9mPmXa")
+         ~embedded:(todo "tezos-embedded-protocol-000-Ps9mPmXa")
+         ~client:(todo "tezos-client-000-Ps9mPmXa")
+         ()
+
+  let _001_PtCJ7pwo =
+    let client_commands = todo "tezos-client-001-PtCJ7pwo-commands" in
+    register
+    @@ make
+         ~number:001
+         ~name:"PtCJ7pwo"
+         ~main:(todo "tezos-protocol-001-PtCJ7pwo")
+         ~embedded:(todo "tezos-embedded-protocol-001-PtCJ7pwo")
+         ~client:(todo "tezos-client-001-PtCJ7pwo")
+         ~client_commands
+         ~client_commands_registration:
+           (todo_sub
+              client_commands
+              "tezos-client-001-PtCJ7pwo-commands.registration")
+         ()
+
+  let _002_PsYLVpVv =
+    let client_commands = todo "tezos-client-002-PsYLVpVv-commands" in
+    register
+    @@ make
+         ~number:002
+         ~name:"PsYLVpVv"
+         ~main:(todo "tezos-protocol-002-PsYLVpVv")
+         ~embedded:(todo "tezos-embedded-protocol-002-PsYLVpVv")
+         ~client:(todo "tezos-client-002-PsYLVpVv")
+         ~client_commands
+         ~client_commands_registration:
+           (todo_sub
+              client_commands
+              "tezos-client-002-PsYLVpVv-commands.registration")
+         ()
+
+  let _003_PsddFKi3 =
+    let client_commands = todo "tezos-client-003-PsddFKi3-commands" in
+    register
+    @@ make
+         ~number:003
+         ~name:"PsddFKi3"
+         ~main:(todo "tezos-protocol-003-PsddFKi3")
+         ~embedded:(todo "tezos-embedded-protocol-003-PsddFKi3")
+         ~client:(todo "tezos-client-003-PsddFKi3")
+         ~client_commands
+         ~client_commands_registration:
+           (todo_sub
+              client_commands
+              "tezos-client-003-PsddFKi3-commands.registration")
+         ()
+
+  let _004_Pt24m4xi =
+    let client_commands = todo "tezos-client-004-Pt24m4xi-commands" in
+    register
+    @@ make
+         ~number:004
+         ~name:"Pt24m4xi"
+         ~main:(todo "tezos-protocol-004-Pt24m4xi")
+         ~embedded:(todo "tezos-embedded-protocol-004-Pt24m4xi")
+         ~client:(todo "tezos-client-004-Pt24m4xi")
+         ~client_commands
+         ~client_commands_registration:
+           (todo_sub
+              client_commands
+              "tezos-client-004-Pt24m4xi-commands.registration")
+         ()
+
+  let _005_PsBABY5H =
+    register
+    @@ make
+         ~number:005
+         ~name:"PsBABY5H"
+         ~main:(todo "tezos-protocol-005-PsBABY5H")
+         ~embedded:(todo "tezos-embedded-protocol-005-PsBABY5H")
+         ()
+
+  let _005_PsBabyM1 =
+    let client_commands = todo "tezos-client-005-PsBabyM1-commands" in
+    register
+    @@ make
+         ~number:005
+         ~name:"PsBabyM1"
+         ~main:(todo "tezos-protocol-005-PsBabyM1")
+         ~embedded:(todo "tezos-embedded-protocol-005-PsBabyM1")
+         ~client:(todo "tezos-client-005-PsBabyM1")
+         ~client_commands
+         ~client_commands_registration:
+           (todo_sub
+              client_commands
+              "tezos-client-005-PsBabyM1-commands.registration")
+         ()
+
+  let _006_PsCARTHA =
+    let client_commands = todo "tezos-client-006-PsCARTHA-commands" in
+    register
+    @@ make
+         ~number:006
+         ~name:"PsCARTHA"
+         ~main:(todo "tezos-protocol-006-PsCARTHA")
+         ~embedded:(todo "tezos-embedded-protocol-006-PsCARTHA")
+         ~client:(todo "tezos-client-006-PsCARTHA")
+         ~client_commands
+         ~client_commands_registration:
+           (todo_sub
+              client_commands
+              "tezos-client-006-PsCARTHA-commands.registration")
+         ()
+
+  (* Starting from 007, all protocols follow the current conventions. *)
+
+  (* Note the -registration instead of .registration, compared to previous protocols:
+     the client command registration library is in a separate opam package. *)
+
+  let make_modern ?number name =
+    let full_name =
+      match number with
+      | None -> name
+      | Some number -> Printf.sprintf "%03d-%s" number name
+    in
+    let todo x = Printf.ksprintf todo x in
+    let todo_sub parent x = Printf.ksprintf (todo_sub parent) x in
+    let baking_commands = todo "tezos-baking-%s-commands" full_name in
+    make
+      ?number
+      ~name
+      ~main:(todo "tezos-protocol-%s" full_name)
+      ~embedded:(todo "tezos-embedded-protocol-%s" full_name)
+      ~client:(todo "tezos-client-%s" full_name)
+      ~client_commands:(todo "tezos-client-%s-commands" full_name)
+      ~client_commands_registration:
+        (todo "tezos-client-%s-commands-registration" full_name)
+      ~baking_commands_registration:
+        (todo_sub
+           baking_commands
+           "tezos-baking-%s-commands.registration"
+           full_name)
+      ~plugin:(todo "tezos-protocol-plugin-%s" full_name)
+      ~plugin_registerer:(todo "tezos-protocol-plugin-%s-registerer" full_name)
+      ()
+
+  let active ?number name = register @@ make_modern ?number name
+
+  let frozen ?number name =
+    let p = make_modern ?number name in
+    register {p with baking_commands_registration = None}
+
+  let overridden ?number name =
+    let p = make_modern ?number name in
+    register
+      {
+        p with
+        client = None;
+        client_commands = None;
+        client_commands_registration = None;
+        baking_commands_registration = None;
+        plugin = None;
+        plugin_registerer = None;
+      }
+
+  let _007_PsDELPH1 = frozen ~number:007 "PsDELPH1"
+
+  let _008_PtEdoTez = overridden ~number:008 "PtEdoTez"
+
+  let _008_PtEdo2Zk = frozen ~number:008 "PtEdo2Zk"
+
+  let _009_PsFLoren = frozen ~number:009 "PsFLoren"
+
+  let _010_PtGRANAD = frozen ~number:010 "PtGRANAD"
+
+  let _011_PtHangz2 = active ~number:011 "PtHangz2"
+
+  let _012_Psithaca = active ~number:012 "Psithaca"
+
+  let alpha = active "alpha"
+
+  let all = List.rev !all_rev
+
+  let active = List.filter (fun p -> p.baking_commands_registration <> None) all
+
+  let all_optionally (get_packages : (t -> target option) list) =
+    let get_all_packages_for_protocol_package_type
+        (get_package : t -> target option) =
+      List.map (fun protocol -> Option.to_list (get_package protocol)) all
+      |> List.flatten
+    in
+    List.map get_all_packages_for_protocol_package_type get_packages
+    |> List.flatten |> List.map optional
+end
+
+(* TESTS THAT USE PROTOCOLS *)
+
+let _tezos_micheline_rewriting_tests =
+  test
+    "test_rewriting"
+    ~path:"src/lib_benchmark/lib_micheline_rewriting/test"
+    ~opam:"src/lib_benchmark/lib_micheline_rewriting/tezos-micheline-rewriting"
+    ~deps:
+      [
+        tezos_micheline;
+        tezos_micheline_rewriting;
+        Protocol.(main alpha);
+        tezos_error_monad;
+        Protocol.(client_exn alpha);
+        alcotest_lwt;
+      ]
+    ~opens:["Tezos_micheline"]
+
+let _tezos_store_tests =
+  test_exes
+    ["test"]
+    ~path:"src/lib_store/test"
+    ~opam:"src/lib_store/tezos-store"
+    ~deps:
+      [
+        tezos_base;
+        tezos_store;
+        tezos_stdlib_unix;
+        Protocol.(embedded demo_noops);
+        Protocol.(embedded genesis);
+        Protocol.(embedded alpha);
+        tezos_protocol_alpha_parameters;
+        Protocol.(plugin_exn alpha);
+        tezos_validation;
+        alcotest_lwt;
+      ]
+    ~opens:
+      [
+        "Tezos_base__TzPervasives";
+        "Tezos_store";
+        "Tezos_shell_services";
+        "Tezos_stdlib_unix";
+        "Tezos_validation";
+        "Tezos_protocol_alpha_parameters";
+        "Tezos_protocol_plugin_alpha";
+      ]
+    ~dune:
+      Dune.
+        [
+          alias_rule "buildtest" ~deps:["test.exe"];
+          alias_rule
+            "runtest_store"
+            ~action:(setenv "SLOW_TEST" "false" @@ run_exe "test" []);
+          alias_rule
+            "runtest"
+            ~package:"tezos-store"
+            ~alias_deps:["runtest_store"];
+        ]
+
+let _tezos_shell_tests =
+  tests
+    [
+      "test_shell";
+      "test_locator";
+      "test_synchronisation_heuristic_fuzzy";
+      "test_prevalidation";
+      "test_prevalidation_t";
+      "test_prevalidator_classification";
+      "test_prevalidator_classification_operations";
+      "test_prevalidator_pending_operations";
+    ]
+    ~path:"src/lib_shell/test"
+    ~opam:"src/lib_shell/tezos-shell"
+    ~deps:
+      [
+        tezos_base;
+        tezos_base_test_helpers;
+        tezos_store;
+        tezos_context;
+        tezos_shell_context;
+        tezos_p2p;
+        tezos_p2p_services;
+        tezos_protocol_updater;
+        tezos_requester;
+        tezos_shell;
+        tezos_shell_services;
+        Protocol.(embedded demo_noops);
+        tezos_stdlib_unix;
+        tezos_validation;
+        tezos_event_logging_test_helpers;
+        tezos_test_helpers;
+        alcotest_lwt;
+      ]
+    ~opens:
+      [
+        "Tezos_base__TzPervasives";
+        "Tezos_base_test_helpers";
+        "Tezos_store";
+        "Tezos_context";
+        "Tezos_shell_context";
+        "Tezos_protocol_updater";
+        "Tezos_p2p";
+        "Tezos_p2p_services";
+        "Tezos_shell";
+        "Tezos_shell_services";
+        "Tezos_stdlib_unix";
+        "Tezos_validation";
+        "Tezos_event_logging_test_helpers";
+      ]
+    ~dune:
+      Dune.
+        [
+          alias_rule
+            "runtest_locator_bench"
+            ~package:"tezos-shell"
+            ~action:(run_exe "test_locator" ["--bench"]);
+        ]
+
+let _tezos_shell_benchs =
+  tests
+    ["bench_simple"; "bench_tool"]
+    ~path:"src/lib_shell/bench"
+    ~opam:"src/lib_shell/tezos-shell"
+    ~deps:
+      [
+        tezos_base;
+        tezos_shell;
+        tezos_alpha_test_helpers;
+        Protocol.(plugin_exn alpha);
+      ]
+    ~opens:
+      [
+        "Tezos_base__TzPervasives";
+        "Tezos_shell";
+        "Tezos_protocol_alpha";
+        "Tezos_protocol_plugin_alpha";
+        "Tezos_protocol_alpha_parameters";
+        "Tezos_alpha_test_helpers";
+      ]
 
 (* INTERNAL EXES *)
 
