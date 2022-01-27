@@ -23,6 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Exception used by the proxy mode when creation of the input environment
+    (of the RPC handler) fails. This exception is used to temporarily escape
+    from the monad, because at the point of throwing, the code is NOT in
+    [tzresult Lwt.t]. As it's dealing with resto APIs it's in an [Lwt.t]-only
+    monad. This exception is injected back in the tzresult [Lwt.t] monad at the
+    point where it is caught (with [Lwt.catch]). *)
+exception Rpc_dir_creation_failure of tztrace
+
 (** Whether using the light mode or the proxy mode (remember that
     the light mode is a different instance of the proxy mode
     (see srcs/lib_proxy/README_LIGHT.md for documentation)

@@ -231,7 +231,7 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
     inherit unix_wallet ~base_dir ~password_filename
 
     inherit
-      Tezos_proxy.RPC_client.http_local_ctxt
+      Tezos_proxy_rpc.RPC_client.http_local_ctxt
         (new unix_logger ~base_dir)
         (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
            rpc_config

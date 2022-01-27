@@ -2,16 +2,13 @@
 ; Edit file manifest/main.ml instead.
 
 (library
- (name tezos_proxy)
- (public_name tezos-proxy)
+ (name tezos_proxy_rpc)
+ (public_name tezos-proxy.rpc)
  (instrumentation (backend bisect_ppx))
  (libraries
-  ringo-lwt
   tezos-base
-  tezos-clic
   tezos-client-base
-  tezos-protocol-environment
+  tezos-mockup-proxy
   tezos-rpc
-  tezos-shell-services
-  tezos-context.memory)
+  tezos-proxy)
  (flags (:standard -open Tezos_base__TzPervasives)))

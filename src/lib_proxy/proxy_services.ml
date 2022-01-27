@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+exception Rpc_dir_creation_failure of tztrace
+
 module Directory = Resto_directory.Make (RPC_encoding)
 
 module Events = struct
@@ -335,7 +337,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
            throwing an exception. It's handled in
            [Tezos_mockup_proxy.RPC_client]. This is not ideal, but
            it's better than asserting false. *)
-        raise (Tezos_mockup_proxy.RPC_client.Rpc_dir_creation_failure trace)
+        raise (Rpc_dir_creation_failure trace)
     | Ok res -> Lwt.return res
   in
   let proto_directory =

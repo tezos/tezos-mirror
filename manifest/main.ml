@@ -2229,11 +2229,21 @@ let tezos_proxy =
         tezos_base;
         tezos_clic;
         tezos_client_base;
-        tezos_mockup_proxy;
         tezos_protocol_environment;
         tezos_rpc;
         tezos_shell_services;
-        tezos_context;
+        tezos_context_memory;
+      ]
+    ~opens:["Tezos_base__TzPervasives"]
+
+let tezos_proxy_rpc =
+  public_lib
+    "tezos-proxy.rpc"
+    ~path:"src/lib_proxy/rpc"
+    ~opam:"src/lib_proxy/tezos-proxy"
+    ~deps:
+      [
+        tezos_base; tezos_client_base; tezos_mockup_proxy; tezos_rpc; tezos_proxy;
       ]
     ~opens:["Tezos_base__TzPervasives"]
 
@@ -2302,6 +2312,7 @@ let tezos_client_base_unix =
         tezos_mockup_registration;
         tezos_mockup_commands;
         tezos_proxy;
+        tezos_proxy_rpc;
         tezos_signer_backends_unix;
         tezos_shell_services;
         lwt_exit;
