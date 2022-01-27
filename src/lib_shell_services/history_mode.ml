@@ -41,10 +41,10 @@ type t =
   | Full of additional_cycles option
   | Rolling of additional_cycles option
 
-(* The default_offset value defines a preserved cycle window which is
-   suitable for baking services. It currently corresponds to 7 as we
-   preserve 5 cycles below the last allowed fork level of the current
-   head which, is set 2 cycles in the past.
+(* The default_offset value defines a window of stored cycles which is
+   suitable for baking services. It currently corresponds to 10 as we
+   store 5 cycles below the last allowed fork level of the current
+   head, which is set to [preserved_cycles] cycles in the past.
    TODO: https://gitlab.com/tezos/tezos/-/issues/1406
    As this value is potentially both network and protocol specific, it
    could be lifted as a protocol value or an hardcoded node
