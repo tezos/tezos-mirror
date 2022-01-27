@@ -1259,8 +1259,19 @@ type ex_parameter_ty_and_entrypoints =
     }
       -> ex_parameter_ty_and_entrypoints
 
+(** [parse_ty] can be used to parse regular types as well as parameter types
+    together with their entrypoints.
+
+    In the first case, use [~ret:Don't_parse_entrypoints], [parse_ty] will
+    return an [ex_ty].
+
+    In the second case, use [~ret:Parse_entrypoints], [parse_ty] will return
+    an [ex_parameter_ty_and_entrypoints].
+*)
 type ('ret, 'name) parse_ty_ret =
   | Don't_parse_entrypoints : (ex_ty, unit) parse_ty_ret
+  | Parse_entrypoints
+      : (ex_parameter_ty_and_entrypoints, Entrypoint.t option) parse_ty_ret
 
 let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty :
     type ret name.
@@ -1287,8 +1298,17 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
   if Compare.Int.(stack_depth > 10000) then
     error Typechecking_too_many_recursive_calls
   else
+    (match ret with
+    | Don't_parse_entrypoints -> ok (node, (() : name))
+    | Parse_entrypoints -> extract_entrypoint_annot node)
+    >>? fun (node, name) ->
     let return ctxt ty : ret * context =
-      match ret with Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
+      match ret with
+      | Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
+      | Parse_entrypoints ->
+          ( Ex_parameter_ty_and_entrypoints
+              {arg_type = ty; entrypoints = {name; nested = Entrypoints_None}},
+            ctxt )
     in
     match node with
     | Prim (loc, T_unit, [], annot) ->
@@ -1381,7 +1401,8 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         (match ret with
         | Don't_parse_entrypoints ->
             extract_field_annot utl >>? fun (utl, _left_constr) ->
-            extract_field_annot utr >|? fun (utr, _right_constr) -> (utl, utr))
+            extract_field_annot utr >|? fun (utr, _right_constr) -> (utl, utr)
+        | Parse_entrypoints -> ok (utl, utr))
         >>? fun (utl, utr) ->
         parse_ty
           ctxt
@@ -1411,7 +1432,21 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
             let (Ex_ty tl) = parsed_l in
             let (Ex_ty tr) = parsed_r in
             union_t loc (tl, None) (tr, None) >|? fun ty ->
-            ((Ex_ty ty : ret), ctxt))
+            ((Ex_ty ty : ret), ctxt)
+        | Parse_entrypoints ->
+            let (Ex_parameter_ty_and_entrypoints
+                  {arg_type = tl; entrypoints = left}) =
+              parsed_l
+            in
+            let (Ex_parameter_ty_and_entrypoints
+                  {arg_type = tr; entrypoints = right}) =
+              parsed_r
+            in
+            union_t loc (tl, None) (tr, None) >|? fun arg_type ->
+            let entrypoints =
+              {name; nested = Entrypoints_Union {left; right}}
+            in
+            (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt))
     | Prim (loc, T_lambda, [uta; utr], annot) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
         >>? fun (Ex_ty ta, ctxt) ->
@@ -1717,29 +1752,6 @@ let parse_storage_ty :
       )
   | _ -> (parse_normal_storage_ty [@tailcall]) ctxt ~stack_depth ~legacy node
 
-let rec parse_entrypoints_uncarbonated :
-    type t.
-    root_name:Entrypoint.t option ->
-    Script.node ->
-    t ty ->
-    t entrypoints tzresult =
- fun ~root_name node arg_ty ->
-  (match root_name with
-  | Some _ -> ok (node, root_name)
-  | None -> extract_entrypoint_annot node)
-  >>? fun (node, name) ->
-  (match (arg_ty, node) with
-  | (Union_t ((tl, _al), (tr, _ar), _), Prim (_loc, T_or, [utl; utr], _annot))
-    ->
-      parse_entrypoints_uncarbonated ~root_name:None utl tl >>? fun left ->
-      parse_entrypoints_uncarbonated ~root_name:None utr tr
-      >|? fun right : t nested_entrypoints -> Entrypoints_Union {left; right}
-  | (Union_t _, _) ->
-      (* this can only happen if [parse_entrypoints_uncarbonated] is not in sync with [parse_ty] *)
-      assert false
-  | (_, _) -> ok Entrypoints_None)
-  >|? fun nested -> {name; nested}
-
 let check_packable ~legacy loc root =
   let rec check : type t. t ty -> unit tzresult = function
     (* /!\ When adding new lazy storage kinds, be sure to return an error. /!\
@@ -1971,18 +1983,18 @@ let parse_parameter_ty_and_entrypoints :
     Script.node ->
     (ex_parameter_ty_and_entrypoints * context) tzresult =
  fun ctxt ~stack_depth ~legacy node ->
-  extract_entrypoint_annot node >>? fun (node, root_name) ->
   parse_passable_ty
     ctxt
     ~stack_depth:(stack_depth + 1)
     ~legacy
-    ~ret:Don't_parse_entrypoints
     node
-  >>? fun (Ex_ty arg_type, ctxt) ->
-  parse_entrypoints_uncarbonated ~root_name node arg_type >>? fun entrypoints ->
+    ~ret:Parse_entrypoints
+  >>? fun (res, ctxt) ->
   (if legacy then Result.return_unit
-  else well_formed_entrypoints arg_type entrypoints)
-  >|? fun () -> (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
+  else
+    let (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) = res in
+    well_formed_entrypoints arg_type entrypoints)
+  >|? fun () -> (res, ctxt)
 
 let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints
 
