@@ -2384,6 +2384,21 @@ module Registration_section = struct
         ()
   end
 
+  let () =
+    let memo_size =
+      match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
+      | Error _ -> assert false
+      | Ok sz -> sz
+    in
+    simple_benchmark
+      ~name:Interpreter_workload.N_ISapling_empty_state
+      ~kinstr:
+        (ISapling_empty_state
+           ( kinfo (unit @$ bot),
+             memo_size,
+             halt (sapling_state memo_size @$ unit @$ bot) ))
+      ()
+
   module type Type_transaction = sig
     val type_transaction : Sapling_generation.type_transaction
 
@@ -2392,21 +2407,6 @@ module Registration_section = struct
 
   module Register_Sapling_benchmark (Type_transaction : Type_transaction) =
   struct
-    let () =
-      let memo_size =
-        match Alpha_context.Sapling.Memo_size.parse_z Z.zero with
-        | Error _ -> assert false
-        | Ok sz -> sz
-      in
-      simple_benchmark
-        ~name:Interpreter_workload.N_ISapling_empty_state
-        ~kinstr:
-          (ISapling_empty_state
-             ( kinfo (unit @$ bot),
-               memo_size,
-               halt (sapling_state memo_size @$ unit @$ bot) ))
-        ()
-
     let is_empty =
       match Type_transaction.type_transaction with Empty -> true | _ -> false
 
