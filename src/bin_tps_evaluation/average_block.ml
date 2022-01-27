@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Contracts = Tezos_client_alpha_commands.Client_proto_stresstest_contracts
+
 type t = {regular : int; origination : int; contract : (string * int) list}
 
 let encoding =
@@ -47,3 +49,12 @@ let load path_option =
       | Ok json -> Lwt.return (Data_encoding.Json.destruct encoding json)
       | Error msg ->
           Format.kasprintf Stdlib.failwith "failed to parse %s: %s@." path msg)
+
+let check_for_unknown_smart_contracts average_block =
+  let check_one (mainnet_address, _) =
+    match Contracts.mainnet_address_to_alias mainnet_address with
+    | None ->
+        Stdlib.failwith ("unknown smart contract address: " ^ mainnet_address)
+    | Some _ -> Lwt.return_unit
+  in
+  List.iter_s check_one average_block.contract

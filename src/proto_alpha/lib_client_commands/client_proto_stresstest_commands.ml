@@ -25,6 +25,7 @@
 
 open Protocol
 open Alpha_context
+module Smart_contracts = Client_proto_stresstest_contracts
 
 type transfer_strategy =
   | Fixed_amount of {mutez : Tez.t}  (** Amount to transfer *)
@@ -38,8 +39,10 @@ type parameters = {
       (** Per-transfer probability that the destination will be fresh *)
   tps : float;  (** Transaction per seconds target *)
   strategy : transfer_strategy;
-  fee_mutez : Tez.t;  (** fees for each transfer, in mutez *)
-  gas_limit : Gas.Arith.integral;  (** gas limit per operation *)
+  regular_transfer_fee : Tez.t;
+      (** fees for each transfer (except for transfers to smart contracts), in mutez *)
+  regular_transfer_gas_limit : Gas.Arith.integral;
+      (** gas limit per operation (except for transfers to smart contracts) *)
   storage_limit : Z.t;  (** storage limit per operation *)
   account_creation_storage : Z.t;
       (** upper bound on bytes consumed when creating a tz1 account *)
@@ -49,6 +52,9 @@ type parameters = {
       (** if true, a single operation will be injected by pkh by block to
           improve the chance for the injected operations to be included in the
           next block *)
+  smart_contracts : Smart_contracts.t;
+      (** An opaque type that stores all the information that is necessary for
+    efficient sampling of smart contract calls. *)
 }
 
 type origin = Explicit | Wallet_pkh | Wallet_alias of string
@@ -66,10 +72,17 @@ type input_source =
 
 type source_origin = {source : source; origin : origin}
 
+(** Destination of a call: either an implicit contract or an originated one
+   with all the necessary data (entrypoint and the argument). *)
+type destination =
+  | Implicit of Signature.Public_key_hash.t
+  | Originated of Smart_contracts.invocation_parameters
+
 type transfer = {
   src : source;
-  dst : public_key_hash;
+  dst : destination;
   fee : Tez.t;
+  gas_limit : Gas.Arith.integral;
   amount : Tez.t;
   counter : Z.t option;
   fresh_dst : bool;
@@ -90,9 +103,12 @@ type state = {
   injected_operations : Operation_hash.t list Block_hash.Table.t;
 }
 
-(** Costs of every kind of transaction used in the stress test. *)
+(** Cost estimations for every kind of transaction used in the stress test.
+   *)
 type transaction_costs = {
-  regular : Gas.cost;  (** Cost of a regular transaction. *)
+  regular : Gas.Arith.integral;  (** Cost of a regular transaction. *)
+  smart_contracts : (string * Gas.Arith.integral) list;
+      (** Cost of a smart contract call (per contract alias). *)
 }
 
 let verbose = ref false
@@ -107,8 +123,8 @@ let default_parameters =
     fresh_probability = 0.001;
     tps = 5.0;
     strategy = Fixed_amount {mutez = Tez.one};
-    fee_mutez = Tez.of_mutez_exn 2_000L;
-    gas_limit = Gas.Arith.integral_of_int_exn 1_600;
+    regular_transfer_fee = Tez.of_mutez_exn 2_000L;
+    regular_transfer_gas_limit = Gas.Arith.integral_of_int_exn 1_600;
     (* [gas_limit] corresponds to a slight overapproximation of the
        gas needed to inject an operation. It was obtained by simulating
        the operation using the client. *)
@@ -119,6 +135,7 @@ let default_parameters =
        It was obtained by simulating the operation using the client. *)
     total_transfers = None;
     single_op_per_pkh_per_block = false;
+    smart_contracts = Smart_contracts.no_contracts;
   }
 
 let input_source_encoding =
@@ -160,9 +177,16 @@ let injected_operations_encoding =
 let transaction_costs_encoding =
   let open Data_encoding in
   conv
-    (fun {regular} -> regular)
-    (fun regular -> {regular})
-    (obj1 (req "regular" Gas_limit_repr.cost_encoding))
+    (fun {regular; smart_contracts} -> (regular, smart_contracts))
+    (fun (regular, smart_contracts) -> {regular; smart_contracts})
+    (obj2
+       (req "regular" Gas.Arith.n_integral_encoding)
+       (req "smart_contracts" (assoc Gas.Arith.n_integral_encoding)))
+
+let destination_to_contract dst =
+  match dst with
+  | Implicit x -> Contract.implicit_contract x
+  | Originated x -> x.destination
 
 let parse_strategy s =
   match String.split ~limit:1 ':' s with
@@ -348,9 +372,25 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
     let fresh =
       Random.State.float rng_state 1.0 < parameters.fresh_probability
     in
-    (if fresh then Lwt.return (generate_fresh_source state rng_state)
-    else sample_any_source_from_pool state rng_state)
-    >>= fun dest ->
+    (match
+       Smart_contracts.select
+         parameters.smart_contracts
+         (Random.State.float rng_state 1.0)
+     with
+    | None ->
+        (if fresh then Lwt.return (generate_fresh_source state rng_state)
+        else sample_any_source_from_pool state rng_state)
+        >|= fun dest ->
+        Ok
+          ( Implicit dest.pkh,
+            parameters.regular_transfer_fee,
+            parameters.regular_transfer_gas_limit )
+    | Some invocation_parameters ->
+        return
+          ( Originated invocation_parameters,
+            invocation_parameters.fee,
+            invocation_parameters.gas_limit ))
+    >>=? fun (dst, fee, gas_limit) ->
     let amount =
       match parameters.strategy with
       | Fixed_amount {mutez} -> mutez
@@ -363,8 +403,7 @@ let rec sample_transfer (cctxt : Protocol_client_context.full) chain block
           in
           Tez.of_mutez_exn amount
     in
-    let fee = parameters.fee_mutez in
-    return {src; dst = dest.pkh; fee; amount; counter = None; fresh_dst = fresh}
+    return {src; dst; fee; gas_limit; amount; counter = None; fresh_dst = fresh}
 
 let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
     contents =
@@ -386,9 +425,8 @@ let inject_contents (cctxt : Protocol_client_context.full) chain branch sk
 
 (* counter _must_ be set before calling this function *)
 let manager_op_of_transfer parameters
-    {src; dst; fee; amount; counter; fresh_dst} =
+    {src; dst; fee; gas_limit; amount; counter; fresh_dst} =
   let source = src.pkh in
-  let gas_limit = parameters.gas_limit in
   let storage_limit =
     if fresh_dst then
       Z.add parameters.account_creation_storage parameters.storage_limit
@@ -398,11 +436,18 @@ let manager_op_of_transfer parameters
     let parameters =
       let open Tezos_micheline in
       Script.lazy_expr
-      @@ Micheline.strip_locations
-           (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
+        (match dst with
+        | Implicit _ ->
+            Micheline.strip_locations
+              (Prim (0, Michelson_v1_primitives.D_Unit, [], []))
+        | Originated x -> x.arg)
     in
-    let entrypoint = Entrypoint.default in
-    let destination = Destination.Contract (Contract.implicit_contract dst) in
+    let entrypoint =
+      match dst with
+      | Implicit _ -> Entrypoint.default
+      | Originated x -> x.entrypoint
+    in
+    let destination = Destination.Contract (destination_to_contract dst) in
     Transaction {amount; parameters; entrypoint; destination}
   in
   match counter with
@@ -500,8 +545,8 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
         reveal_counter
         Z.pp_print
         transf_counter
-        Signature.Public_key_hash.pp
-        transfer.dst
+        Contract.pp
+        (destination_to_contract transfer.dst)
      else Lwt.return_unit)
      >>= fun () ->
      (* NB: regardless of our best efforts to keep track of counters, injection can fail with
@@ -529,8 +574,8 @@ let inject_transfer (cctxt : Protocol_client_context.full) parameters state
          transfer.src.pkh
          Z.pp_print
          transf_counter
-         Signature.Public_key_hash.pp
-         transfer.dst
+         Contract.pp
+         (destination_to_contract transfer.dst)
       else Lwt.return_unit)
       >>= fun () ->
       (* See comment above. *)
@@ -795,6 +840,28 @@ let fresh_probability_arg =
              cctxt#error "While parsing --fresh-probability: invalid argument"
          | f -> return f))
 
+let smart_contract_parameters_arg =
+  let open Clic in
+  arg
+    ~long:"smart-contract-parameters"
+    ~placeholder:"JSON file with smart contract parameters"
+    ~doc:
+      (Format.sprintf
+         "A JSON object that maps smart contract aliases to objects with three \
+          fields: probability in [0;1], invocation_fee, and \
+          invocation_gas_limit.")
+    (parameter (fun (cctxt : Protocol_client_context.full) s ->
+         match Data_encoding.Json.from_string s with
+         | Ok json ->
+             return
+               (Data_encoding.Json.destruct
+                  Smart_contracts.contract_parameters_collection_encoding
+                  json)
+         | Error _ ->
+             cctxt#error
+               "While parsing --smart-contract-parameters: invalid JSON %s"
+               s))
+
 let strategy_arg =
   let open Clic in
   arg
@@ -824,7 +891,7 @@ let gas_limit_arg =
          "Set the gas limit of the transaction instead of using the default \
           value of %a"
          Gas.Arith.pp_integral
-         default_parameters.gas_limit)
+         default_parameters.regular_transfer_gas_limit)
     gas_limit_kind
 
 let storage_limit_arg =
@@ -915,10 +982,11 @@ let generate_random_transactions =
   command
     ~group
     ~desc:"Generate random transactions"
-    (args11
+    (args12
        seed_arg
        tps_arg
        fresh_probability_arg
+       smart_contract_parameters_arg
        strategy_arg
        Client_proto_args.fee_arg
        gas_limit_arg
@@ -937,6 +1005,7 @@ let generate_random_transactions =
     (fun ( seed,
            tps,
            freshp,
+           smart_contract_parameters,
            strat,
            fee,
            gas_limit,
@@ -949,18 +1018,22 @@ let generate_random_transactions =
          (cctxt : Protocol_client_context.full) ->
       verbose := verbose_flag ;
       debug := debug_flag ;
+      Smart_contracts.init
+        cctxt
+        (Option.value ~default:[] smart_contract_parameters)
+      >>=? fun smart_contracts ->
       let parameters =
-        default_parameters
+        {default_parameters with smart_contracts}
         |> set_option seed (fun parameter seed -> {parameter with seed})
         |> set_option tps (fun parameter tps -> {parameter with tps})
         |> set_option freshp (fun parameter fresh_probability ->
                {parameter with fresh_probability})
         |> set_option strat (fun parameter strategy ->
                {parameter with strategy})
-        |> set_option fee (fun parameter fee_mutez ->
-               {parameter with fee_mutez})
-        |> set_option gas_limit (fun parameter gas_limit ->
-               {parameter with gas_limit})
+        |> set_option fee (fun parameter regular_transfer_fee ->
+               {parameter with regular_transfer_fee})
+        |> set_option gas_limit (fun parameter regular_transfer_gas_limit ->
+               {parameter with regular_transfer_gas_limit})
         |> set_option storage_limit (fun parameter storage_limit ->
                {parameter with storage_limit})
         |> set_option transfers (fun parameter transfers ->
@@ -1033,8 +1106,8 @@ let generate_random_transactions =
                (fun _retcode -> save_injected_operations ())) ;
           launch cctxt parameters state rng_state save_pool)
 
-let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
-    Gas.Arith.integral tzresult Lwt.t =
+let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
+    : Gas.Arith.integral tzresult Lwt.t =
   let sources_json =
     From_string
       {
@@ -1073,9 +1146,6 @@ let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
           injected_operations = Block_hash.Table.create 1023;
         }
       in
-      (* Parameters do not influence gas cost of the command, so we just
-         always use default_parameters for this estimation. *)
-      let parameters = default_parameters in
       let rng_state = Random.State.make [|parameters.seed|] in
       let chain = cctxt#chain in
       let block = cctxt#block in
@@ -1088,13 +1158,13 @@ let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
         manager_op_of_transfer
           {
             parameters with
-            gas_limit =
+            regular_transfer_gas_limit =
               Default_parameters.constants_mainnet.hard_gas_limit_per_operation;
           }
           {transfer with counter = Some transf_counter}
       in
       Injection.simulate cctxt ~chain ~block (Single manager_op)
-      >>=? fun (_oph, _op, result) ->
+      >>=? fun (_oph, op, result) ->
       match result.contents with
       | Single_result (Manager_operation_result {operation_result; _}) -> (
           match operation_result with
@@ -1102,7 +1172,17 @@ let estimate_regular_transaction_cost (cctxt : Protocol_client_context.full) :
               (Transaction_result
                 (Transaction_to_contract_result {consumed_gas; _})) ->
               return (Gas.Arith.ceil consumed_gas)
-          | _ -> cctxt#error "Simulation of regular transaction failed"))
+          | _ ->
+              (match operation_result with
+              | Failed (_, errors) ->
+                  Error_monad.pp_print_trace
+                    Format.err_formatter
+                    (Environment.wrap_tztrace errors)
+              | _ -> assert false) ;
+              cctxt#error
+                "@[<v 2>Simulation result:@,%a@]"
+                Operation_result.pp_operation_result
+                (op.protocol_data.contents, result.contents)))
 
 let estimate_transaction_costs : Protocol_client_context.full Clic.command =
   let open Clic in
@@ -1112,9 +1192,14 @@ let estimate_transaction_costs : Protocol_client_context.full Clic.command =
     no_options
     (prefixes ["stresstest"; "estimate"; "gas"] @@ stop)
     (fun () cctxt ->
-      estimate_regular_transaction_cost cctxt >>=? fun estimate ->
-      let regular = Gas.cost_of_gas estimate in
-      let transaction_costs : transaction_costs = {regular} in
+      estimate_transaction_cost default_parameters cctxt >>=? fun regular ->
+      Smart_contracts.with_every_known_smart_contract
+        cctxt
+        (fun smart_contracts ->
+          let params = {default_parameters with smart_contracts} in
+          estimate_transaction_cost params cctxt)
+      >>=? fun smart_contracts ->
+      let transaction_costs : transaction_costs = {regular; smart_contracts} in
       let json =
         Data_encoding.Json.construct
           transaction_costs_encoding
@@ -1127,4 +1212,8 @@ let commands network () =
   match network with
   | Some `Mainnet -> []
   | Some `Testnet | None ->
-      [generate_random_transactions; estimate_transaction_costs]
+      [
+        generate_random_transactions;
+        estimate_transaction_costs;
+        Smart_contracts.originate_command;
+      ]

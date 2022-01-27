@@ -638,6 +638,16 @@ val convert_script_to_json :
 val convert_data_to_json :
   ?endpoint:endpoint -> data:string -> t -> Ezjsonm.value Lwt.t
 
+(** The information that the user has to provide for every smart contract
+    they want to call during the stress test. *)
+type stresstest_contract_parameters = {
+  probability : float;  (** The probability of calling this smart contract *)
+  invocation_fee : Tez.t;
+      (** Fee to use for invocations during the stress test *)
+  invocation_gas_limit : int;
+      (** Gas limit to use for invocations during the stress test *)
+}
+
 (** Run [tezos-client stresstest transfer using <sources>].
 
     [sources] is a string containing all the [source_aliases],
@@ -655,7 +665,7 @@ val convert_data_to_json :
 
     Optional parameters (provided only if the function is called with
     the corresponding optional argument):
-    - [seed] is the seed used for the rangom number generator
+    - [seed] is the seed used for the random number generator
     - [fee] is the custom fee to pay instead of the default one
     - [gas_limit] is the custom gas limit
     - [--transfers <transfers>]
@@ -664,6 +674,8 @@ val convert_data_to_json :
       [single_op_per_pkh_per_block] is [true])
     - [--fresh_probabilty <probability>], probability from 0.0 to 1.0 that
       new bootstrap accounts will be created during the stress test
+    - [--smart-contract-parameters] is the map of parameters for
+      calling smart contracts during the smart test
 
     [endpoint]: cf {!create} *)
 val stresstest :
@@ -678,6 +690,7 @@ val stresstest :
   ?tps:int ->
   ?single_op_per_pkh_per_block:bool ->
   ?fresh_probability:float ->
+  ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
   t ->
   unit Lwt.t
 
@@ -694,17 +707,23 @@ val spawn_stresstest :
   ?tps:int ->
   ?single_op_per_pkh_per_block:bool ->
   ?fresh_probability:float ->
+  ?smart_contract_parameters:(string * stresstest_contract_parameters) list ->
   t ->
   Process.t
 
 (** Costs of every kind of transaction used in the stress test. *)
 type stresstest_gas_estimation = {
   regular : int;  (** Cost of a regular transaction. *)
+  smart_contracts : (string * int) list;  (** Cost of smart contract calls. *)
 }
 
 (** Call the [stresstest estimate gas] command. *)
 val stresstest_estimate_gas :
   ?endpoint:endpoint -> t -> stresstest_gas_estimation Lwt.t
+
+(** Originate all smart contracts for use in the stress test. *)
+val stresstest_originate_smart_contracts :
+  ?endpoint:endpoint -> Account.key -> t -> unit Lwt.t
 
 (** Run [tezos-client run script .. on storage .. and input ..].
 

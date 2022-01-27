@@ -23,25 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Calculate the average transaction cost. *)
-val average_transaction_cost :
-  Client.stresstest_gas_estimation -> Average_block.t -> int
+let protocol = Protocol.Alpha
 
-(** Deduce the maximal theoretical TPS based on hard gas limit per block and
-   the gas cost of the average operation. *)
-val deduce_tps :
-  protocol:Protocol.t ->
-  protocol_constants:Protocol.constants ->
-  average_transaction_cost:int ->
-  unit ->
-  int
+let protocol_constants = Protocol.Constants_mainnet
 
-(** Calculate fee and gas limit given gas cost estimation. *)
-val deduce_fee_and_gas_limit : int -> Tez.t * int
+let all_bootstraps =
+  List.filter
+    (fun {Account.alias; _} -> alias <> "activator")
+    Constant.all_secret_keys
 
-(** Calculate probabilities of smart contracts in a form suitable for
-    passing to the client stresstest command. *)
-val calculate_smart_contract_parameters :
-  Average_block.t ->
-  Client.stresstest_gas_estimation ->
-  (string * Client.stresstest_contract_parameters) list
+let originating_bootstrap = Stdlib.List.hd all_bootstraps
+
+let delegates = List.map (fun {Account.alias; _} -> alias) all_bootstraps

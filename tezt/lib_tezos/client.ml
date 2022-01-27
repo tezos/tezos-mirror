@@ -50,7 +50,16 @@ type t = {
   mutable mode : mode;
 }
 
-type stresstest_gas_estimation = {regular : int}
+type stresstest_gas_estimation = {
+  regular : int;
+  smart_contracts : (string * int) list;
+}
+
+type stresstest_contract_parameters = {
+  probability : float;
+  invocation_fee : Tez.t;
+  invocation_gas_limit : int;
+}
 
 let name t = t.name
 
@@ -849,7 +858,8 @@ let originate_contract ?hooks ?endpoint ?wait ?init ?burn_cap ~alias ~amount
 
 let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
     ?(source_accounts = []) ?seed ?fee ?gas_limit ?transfers ?tps
-    ?(single_op_per_pkh_per_block = false) ?fresh_probability client =
+    ?(single_op_per_pkh_per_block = false) ?fresh_probability
+    ?smart_contract_parameters client =
   let sources =
     (* [sources] is a string containing all the [source_aliases],
        [source_pkhs], and [source_accounts] in JSON format, as
@@ -908,6 +918,31 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   let fee_arg =
     match fee with None -> [] | Some x -> ["--fee"; Tez.to_string x]
   in
+  let smart_contract_parameters_arg =
+    match smart_contract_parameters with
+    | None -> []
+    | Some items ->
+        [
+          "--smart-contract-parameters";
+          Ezjsonm.value_to_string
+            (`O
+              (List.map
+                 (fun ( alias,
+                        {probability; invocation_fee; invocation_gas_limit} ) ->
+                   ( alias,
+                     `O
+                       [
+                         ("probability", Ezjsonm.float probability);
+                         ( "invocation_fee",
+                           Ezjsonm.string
+                             (Int.to_string (Tez.to_mutez invocation_fee)) );
+                         ( "invocation_gas_limit",
+                           Ezjsonm.string (Int.to_string invocation_gas_limit)
+                         );
+                       ] ))
+                 items));
+        ]
+  in
   spawn_command ?endpoint client
   @@ ["stresstest"; "transfer"; "using"; sources; "--seed"; seed]
   @ fee_arg
@@ -915,12 +950,13 @@ let spawn_stresstest ?endpoint ?(source_aliases = []) ?(source_pkhs = [])
   @ make_int_opt_arg "--transfers" transfers
   @ make_int_opt_arg "--tps" tps
   @ make_float_opt_arg "--fresh-probability" fresh_probability
+  @ smart_contract_parameters_arg
   @
   if single_op_per_pkh_per_block then ["--single-op-per-pkh-per-block"] else []
 
 let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?fee ?gas_limit ?transfers ?tps ?single_op_per_pkh_per_block
-    ?fresh_probability client =
+    ?fresh_probability ?smart_contract_parameters client =
   spawn_stresstest
     ?endpoint
     ?source_aliases
@@ -933,6 +969,7 @@ let stresstest ?endpoint ?source_aliases ?source_pkhs ?source_accounts ?seed
     ?tps
     ?single_op_per_pkh_per_block
     ?fresh_probability
+    ?smart_contract_parameters
     client
   |> Process.check
 
@@ -953,8 +990,20 @@ let stresstest_estimate_gas ?endpoint client =
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"transaction_costs" output in
-  let regular = (JSON.get "regular" json |> JSON.as_int) / 1000 in
-  Lwt.return {regular}
+  let regular = JSON.get "regular" json |> JSON.as_int in
+  let prepare_pair (contract_name, json) = (contract_name, JSON.as_int json) in
+  let smart_contracts =
+    List.map prepare_pair (JSON.get "smart_contracts" json |> JSON.as_object)
+  in
+  Lwt.return {regular; smart_contracts}
+
+let stresstest_originate_smart_contracts ?endpoint (source : Account.key) client
+    =
+  spawn_command
+    ?endpoint
+    client
+    ["stresstest"; "originate"; "smart"; "contracts"; "from"; source.alias]
+  |> Process.check
 
 let run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage ~input
     client =

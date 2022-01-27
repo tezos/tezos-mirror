@@ -77,11 +77,13 @@ It is possible to get an estimation of the maximal possible TPS by using the
 protocol parameters.
 
 ```
-./tezos-tps-evaluation gas-tps --average-block=src/bin_tps_evaluation/2021-09-01-to-2021-09-30.json
-Using the default average block description
-Average transaction cost: 1521
-Gas TPS: 114
-[21:18:07.394] [SUCCESS] (1/1) tezos_tps_gas
+./tezos-tps-evaluation gas-tps --average-block=src/bin_tps_evaluation/average-block.json
+[14:47:11.293] Reading description of the average block from src/bin_tps_evaluation/average-block.json
+[14:47:11.380] Originating smart contracts
+[14:47:11.610] Waiting to reach the next level
+[14:47:41.288] Average transaction cost: 3826
+[14:47:41.288] Gas TPS: 46
+[14:47:41.313] [SUCCESS] (1/1) tezos_tps_gas
 ```
 
 This estimation is obtained by dividing the hard gas limit per block by the
@@ -155,7 +157,13 @@ trustworthy:
   add support for more smart contract calls to the benchmark.
 
 * We should enable the mempool pre-check to be closer to the behavior of the
-  system in the real world.
+  system in the real world. Another reason to add support for the mempool
+  pre-check is that currently when there is a mix of transactions to both
+  implicit contracts and smart contracts they are not ordered in the mempool
+  correctly so when the time comes to apply these transactions a
+  considerable part of them will be applied out of order and so with
+  incorrect counters. This will make the validating function reject these
+  transactions and will lead to a lower TPS.
 
 * There is usually a small gap between the target TPS of injection and the
   de facto TPS of injection (see [issue 2414][issue-2414]). It is worth
@@ -167,16 +175,18 @@ trustworthy:
 ### Example usage
 
 ```
-./tezos-tps-evaluation benchmark-tps --average-block=src/bin_tps_evaluation/2021-09-01-to-2021-09-30.json
-Tezos TPS benchmark
-Protocol: Alpha
-Total number of accounts to use: 5
-Blocks to bake: 10
-Spinning up the network...
-Reading description of the average block from src/bin_tps_evaluation/2021-09-01-to-2021-09-30.json
-Average transaction cost: 1521
-Using the parameter file: /run/user/1000/tezt-200367/1/parameters.json
-
+./tezos-tps-evaluation benchmark-tps --average-block=src/bin_tps_evaluation/average_block.json
+[14:49:04.741] Starting test: tezos_tps_benchmark
+[14:49:04.741] Tezos TPS benchmark
+[14:49:04.741] Protocol: Alpha
+[14:49:04.741] Total number of accounts to use: 5
+[14:49:04.741] Blocks to bake: 10
+[14:49:04.742] Spinning up the network...
+[14:49:07.150] Reading description of the average block from src/bin_tps_evaluation/average-block.json
+[14:49:07.237] Originating smart contracts
+[14:49:07.482] Waiting to reach the next level
+[14:49:36.285] Average transaction cost: 3826
+[14:49:36.368] Using the parameter file: /run/user/1000/tezt-92970/1/parameters.json
 {
   "bootstrap_accounts": [
     [
@@ -249,25 +259,25 @@ Using the parameter file: /run/user/1000/tezt-200367/1/parameters.json
   "sc_rollup_origination_size": 6314
 }
 
-Waiting to reach level 3
-The benchmark has been started
-Produced 10 block(s) in 302.40 seconds
-BLrxseo8ndcFNX85gqKxhziWKe16fEVSfyY9SuuepMZWUaaQvcv -> 3178
-BLGiKCr8aHAW4EjkxPLBz5mG8wxL5TdjcUr3vXogntZgjo3XyE3 -> 3088
-BKqNngk3vzHF5PX2yi3CrvETyqzNvaXXFhH9wHgNV1fGCtfP94X -> 3067
-BM1fqcsaQV7ogQNmfhft8jcpPij5VdPmNZxSZVC3XSP6qFUEjzQ -> 3030
-BMLauzzPZxkUydAHLBcWZFEPAmtRKZvDPzg9YLq97FzZs9eJ75W -> 3088
-BM3vcth7K82YP6Vt9tjZwRyjBWfHpF8tuuRkAPydRdAMpP8egLK -> 3025
-BKiK572CzEFhM8Pi73rZwk4uZQumoGUduzLQZvr3ZgiVUzTTb7F -> 3044
-BMYc944mCRx5cRPp6EiSZ1PDP14iBPqDktuHnznZyBaGQVfUJVN -> 3078
-BM4DthifaA1W7RYRy5PAGgh5ijNy6jPgtLYizozhQVJuVZZ7AZD -> 3066
-BLw9T5ULAt92VAMB4t29SpLVbSyYDBW8oSzjjey5rEKtGj76ZaH -> 3057
-Total applied transactions: 30721
-Total injected transactions: 31917
-TPS of injection (target): 114
-TPS of injection (de facto): 105.55
-Empirical TPS: 101.59
-[21:43:46.996] [SUCCESS] (1/1) tezos_tps_benchmark
+[14:49:36.368] Waiting to reach level 3
+[14:50:06.085] The benchmark has been started
+[14:55:09.116] Produced 10 block(s) in 303.03 seconds
+[14:55:09.476] BMDJApQXVTbmjmbt4FgBYYLRMGeZPTwBoLcc1Jiawn458Xjfxm5 -> 1327
+[14:55:09.655] BLjN9qqawkAmitfQAWSfXpQbL7ffb9CmLZyYH1vMXZd1WULJZVk -> 1219
+[14:55:09.845] BLxti3mSSG1uBoyAnrua16xt3UXfQBubZoQUvdSdER3RPmFudPz -> 1232
+[14:55:10.062] BM4aRMmHtcgdYTZmL4UdcKs3C5YKUV9huYSgefq1GpFyhdNWUsd -> 1211
+[14:55:10.241] BMHiCYTxicxU89eRJ7jhmqw7dpDV2pvR2WaDzAG9Lyh4uRF9RD3 -> 1216
+[14:55:10.425] BMGGDgcD7ZFovhntAbP7CkXuxK7aeUzZCXzWYv4bYUbTrit8sN1 -> 1234
+[14:55:10.606] BLK2hupbdccZVaMraoVHAwcYU1ViQwgEsUTm35azXfzZNYrSXZ8 -> 1224
+[14:55:10.793] BMMJw2iBXgUXAgtJfCMeef1ERJ1v3qHHN3JnJePRM6hsp3K9J5N -> 1232
+[14:55:10.980] BLVjp92R3Zefzum87SaPrSxXqzPsSVn6iUz9eKrxMqrcNSPscTs -> 1226
+[14:55:11.165] BL3113yPbvWSWgeUzLugDxzitkQXdhnzzZKpCSVAuZwGTRw7shq -> 1227
+[14:55:11.165] Total applied transactions: 12348
+[14:55:11.165] Total injected transactions: 13254
+[14:55:11.165] TPS of injection (target): 46
+[14:55:11.165] TPS of injection (de facto): 43.74
+[14:55:11.165] Empirical TPS: 40.75
+[14:55:11.193] [SUCCESS] (1/1) tezos_tps_benchmark
 ```
 
 ## Automatic daily runs of the TPS benchmark
@@ -292,23 +302,12 @@ Mainnet. It is imperative to support calling the most popular smart
 contracts as part of the stress test command in order to produce a realistic
 stream of transactions and hence, a credible TPS estimation.
 
-To add support for a smart contract the following changes need to be
-performed:
-
-1. Add an origination sub-command to the collection of client stress test
-   commands. This command should originate the smart contract and prepare
-   the ground for calling it in the benchmark.
-
-2. Add a new option to the stress test command that would allow us to
-   control the probability of calling this smart contract.
-
-3. Implement the logic for calling the smart contract. Every smart contract
-   is different, so, unfortunately, no catch-all solution is possible.
-
-4. Adjust the TPS benchmark code in order to call the origination command
-   during the preparation stage (before level 3 is reached) and pass the
-   correct probability for this smart contract to the stress test command
-   invocation.
+To add support for a smart contract edit the
+`src/proto_alpha/lib_client_commands/client_proto_stresstest_contracts.ml`
+file and include the new smart contract in the `all_contracts` list.
+Normally the new smart contract should start working right away, but since
+the functionality is fairly new, more efforts might be required in some
+cases.
 
 [unify-protocol-limits]: https://gitlab.com/tezos/tezos/-/issues/2089
 [long-tezts-locally]: http://tezos.gitlab.io/developer/long-tezts.html#testing-your-benchmarks-locally

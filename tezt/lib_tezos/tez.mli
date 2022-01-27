@@ -50,5 +50,8 @@ val to_string : t -> string
 (** Convert [t] to a float of tez. *)
 val to_float : t -> float
 
+(** Convert [t] to an [int]. *)
+val to_mutez : t -> int
+
 (** Addition. This doesn't perform any bounds checks. *)
 val ( + ) : t -> t -> t

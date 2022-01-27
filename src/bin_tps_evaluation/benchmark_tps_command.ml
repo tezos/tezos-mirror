@@ -23,11 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The protocol we are using. *)
-let protocol = Protocol.Alpha
-
-(** The constants we are using. *)
-let constants = Protocol.Constants_mainnet
+open Constants
 
 (** The level at which the benchmark starts. We wait till level 3 because we
    need to inject transactions that target already decided blocks. In
@@ -109,22 +105,12 @@ let get_total_applied_transactions_for_block block client =
 (** The entry point of the benchmark. *)
 let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
     ~accounts_total ~blocks_total ~average_block_path () =
-  let all_bootstraps =
-    List.filter
-      (fun {Account.alias; _} -> alias <> "activator")
-      Constant.all_secret_keys
-  in
-  let delegates =
-    List.take_n
-      accounts_total
-      (List.map (fun {Account.alias; _} -> alias) all_bootstraps)
-  in
   Log.info "Tezos TPS benchmark" ;
   Log.info "Protocol: %s" (Protocol.name protocol) ;
   Log.info "Total number of accounts to use: %d" accounts_total ;
   Log.info "Blocks to bake: %d" blocks_total ;
   Protocol.write_parameter_file
-    ~base:(Either.right (protocol, Some constants))
+    ~base:(Either.right (protocol, Some protocol_constants))
     (if lift_protocol_limits then
      [
        (* We're using the maximum representable number. (2 ^ 31 - 1) *)
@@ -150,12 +136,20 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
     ()
   >>= fun (node, client) ->
   Average_block.load average_block_path >>= fun average_block ->
+  Average_block.check_for_unknown_smart_contracts average_block >>= fun () ->
+  Baker.init ~protocol ~delegates node client >>= fun _baker ->
+  Log.info "Originating smart contracts" ;
+  Client.stresstest_originate_smart_contracts originating_bootstrap client
+  >>= fun () ->
+  Log.info "Waiting to reach the next level" ;
+  Node.wait_for_level node 2 >>= fun _ ->
+  (* It is important to give the chain time to include the smart contracts
+     we have originated before we run gas estimations. *)
   Client.stresstest_estimate_gas client >>= fun transaction_costs ->
-  let transaction_cost =
+  let average_transaction_cost =
     Gas.average_transaction_cost transaction_costs average_block
   in
-  Log.info "Average transaction cost: %d@\n" transaction_cost ;
-  Baker.init ~protocol ~delegates node client >>= fun _baker ->
+  Log.info "Average transaction cost: %d" average_transaction_cost ;
   Log.info "Using the parameter file: %s" parameter_file ;
   print_out_file parameter_file >>= fun () ->
   Log.info "Waiting to reach level %d" benchmark_starting_level ;
@@ -174,27 +168,30 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
         (* This is a high enough value (not realistically achievable
            by the benchmark) so we're not limited by it. *)
         if lift_protocol_limits then max_int
-        else Gas.deduce_tps ~protocol ~constants ~transaction_cost ()
+        else
+          Gas.deduce_tps
+            ~protocol
+            ~protocol_constants
+            ~average_transaction_cost
+            ()
   in
-  let fee =
-    Tez.of_mutez_int
-      (Q.to_int
-         (Q.mul
-            (Q.of_int transaction_cost)
-            Tezos_baking_alpha.Baking_configuration.default_config.fees
-              .minimal_nanotez_per_gas_unit)
-      / 100)
+  let (regular_transaction_fee, regular_transaction_gas_limit) =
+    Gas.deduce_fee_and_gas_limit transaction_costs.regular
+  in
+  let smart_contract_parameters =
+    Gas.calculate_smart_contract_parameters average_block transaction_costs
   in
   let client_stresstest_process =
     Client.spawn_stresstest
-      ~fee
-      ~gas_limit:transaction_cost
+      ~fee:regular_transaction_fee
+      ~gas_limit:regular_transaction_gas_limit
       ~tps:
         target_tps_of_injection
         (* The stresstest command allows a small probability of creating
            new accounts along the way. We do not want that, so we set it to
            0. *)
       ~fresh_probability:0.0
+      ~smart_contract_parameters
       client
   in
   Node.wait_for_level node (benchmark_starting_level + blocks_total)
