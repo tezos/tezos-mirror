@@ -115,3 +115,5 @@ module Filename : sig
     val ( // ) : string -> string -> string
   end
 end
+
+module Bounded = Bounded

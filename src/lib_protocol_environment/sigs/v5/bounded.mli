@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,60 +23,48 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib
-module Error_monad = Tezos_error_monad.Error_monad
-include Tezos_rpc
-include Tezos_clic
-include Tezos_crypto
-include Tezos_micheline
-module Data_encoding = Data_encoding
-include Tezos_error_monad.TzLwtreslib
+(** This module implements bounded (or refined) versions of data types. *)
 
-module List = struct
-  include Tezos_stdlib.TzList
-  include Tezos_error_monad.TzLwtreslib.List
+(** Bounded [int32]. *)
+module Int32 : sig
+  (** Bounds.
+
+      Formally each [B : BOUND] represents the interval of all integers
+      between [B.min_int] and [B.max_int]. This is a closed interval, e.g.
+      the endpoints are included.
+
+      Intervals can be empty, for example [struct let min_int = 1; let max_int
+      0 end] is empty.
+   *)
+  module type BOUNDS = sig
+    val min_int : int32
+
+    val max_int : int32
+  end
+
+  module type S = sig
+    type t
+
+    include BOUNDS
+
+    include Compare.S with type t := t
+
+    val encoding : t Data_encoding.t
+
+    val to_int32 : t -> int32
+
+    val of_int32 : int32 -> t option
+  end
+
+  (** Produce a module [_ : S] of bounded integers.
+
+      If the given interval is empty, [S.t] is the empty type, and [of_int32]
+      returns [Error] for all inputs.
+
+      {4 Encoding}
+      [(Make B).encoding] is based on the underlying [int32] encoding. This
+      allow future compatiblity with larger bounds, at the price of addding 1-3
+      redundant bytes to each message.
+   *)
+  module Make (_ : BOUNDS) : S
 end
-
-module String = struct
-  include String
-  include Tezos_stdlib.TzString
-
-  module Hashtbl = Tezos_error_monad.TzLwtreslib.Hashtbl.MakeSeeded (struct
-    type t = string
-
-    let equal = String.equal
-
-    let hash = Hashtbl.seeded_hash
-  end)
-end
-
-module Time = Time
-module Fitness = Fitness
-module User_activated = User_activated
-module Block_header = Block_header
-module Genesis = Genesis
-module Operation = Operation
-module Protocol = Protocol
-module Test_chain_status = Test_chain_status
-module Block_locator = Block_locator
-module Mempool = Mempool
-module P2p_addr = P2p_addr
-module P2p_identity = P2p_identity
-module P2p_peer = P2p_peer
-module P2p_point = P2p_point
-module P2p_connection = P2p_connection
-module P2p_stat = P2p_stat
-module P2p_version = P2p_version
-module P2p_rejection = P2p_rejection
-module Distributed_db_version = Distributed_db_version
-module Network_version = Network_version
-include Utils.Infix
-include Error_monad
-module Internal_event = Internal_event
-
-module Filename = struct
-  include Stdlib.Filename
-  include Tezos_stdlib.TzFilename
-end
-
-module Bounded = Bounded
