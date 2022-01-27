@@ -41,3 +41,12 @@ let write_access ~written_bytes =
   let open Saturation_repr in
   Gas_limit_repr.atomic_step_cost
     (add (safe_int 200_000) (mul (safe_int 4) (safe_int written_bytes)))
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2397
+   Fill in real benchmarked values.
+   Benchmark defined in [Storage_benchmarks].
+*)
+let list_key_values_step_cost = Saturation_repr.safe_int 2
+
+let list_key_values_traverse ~size =
+  Saturation_repr.(mul (safe_int size) list_key_values_step_cost)

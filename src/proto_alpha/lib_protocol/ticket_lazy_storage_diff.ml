@@ -208,11 +208,6 @@ let collect_token_diffs_of_big_map ctxt ~get_token_and_amount big_map_id acc =
       Ticket_scanner.type_has_tickets ctxt value_type
       >>?= fun (has_tickets, ctxt) ->
       (* Iterate over big-map items. *)
-      (* TODO: #2316
-         Verify gas-model for [Big_map.list_values].
-         This is to make sure that we pay sufficient gas for traversing the
-         values.
-      *)
       Big_map.list_key_values ctxt big_map_id >>=? fun (ctxt, exprs) ->
       List.fold_left_es
         (fun (acc, ctxt) (_key_hash, node) ->
