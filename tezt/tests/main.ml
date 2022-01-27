@@ -121,6 +121,7 @@ let () =
   Views.register [Alpha] ;
   Runtime_script_failure.register ~protocols ;
   Deposits_limit.register ~protocols:[Ithaca; Alpha] ;
+  Large_metadata.register ~protocols ;
   (* Relies on a feature only available since J. *)
   Run_script.register ~protocols:[Alpha] ;
   Sapling.register ~protocols:[Alpha] ;
