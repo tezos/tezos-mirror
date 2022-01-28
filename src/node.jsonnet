@@ -22,7 +22,7 @@ local prometheus = grafana.prometheus;
     ).addTarget(
       prometheus.target(
         'tezos_metrics_info_version',
-        legendFormat='{{ version }}<br/>{{ commit_hash }}'
+        legendFormat='{{ version }} {{ commit_hash }}'
       )
     ),
 
