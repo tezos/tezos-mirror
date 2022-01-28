@@ -24,7 +24,6 @@
     - docker push "${DOCKER_IMAGE_NAME%?}:${DOCKER_IMAGE_TAG}" ;
     - docker push "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" ;
     - docker push "${DOCKER_IMAGE_NAME}debug:${DOCKER_IMAGE_TAG}" ;
-  interruptible: false
 
 docker:manual_build_amd64:
   extends:

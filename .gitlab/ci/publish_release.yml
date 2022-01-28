@@ -67,4 +67,3 @@ docker:merge_manifests:
       --amend "${DOCKER_IMAGE_NAME%?}:amd64_${DOCKER_IMAGE_TAG}"
       --amend "${DOCKER_IMAGE_NAME%?}:arm64_${DOCKER_IMAGE_TAG}"
     - docker manifest push "${DOCKER_IMAGE_NAME%?}:${DOCKER_IMAGE_TAG}_${CI_COMMIT_SHORT_SHA}_${LAST_COMMIT_DATE_TIME}"
-  interruptible: false
