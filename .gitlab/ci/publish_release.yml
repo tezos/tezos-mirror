@@ -17,7 +17,7 @@ release-on-gitlab:
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
 # $IMAGE_ARCH_PREFIX is only used when building Docker images,
 # here we handle all architectures so there is no such variable.
-merge-manifest:
+docker:merge_manifests:
   extends:
     - .rules_template__master_and_releases
     - .docker_registry_auth

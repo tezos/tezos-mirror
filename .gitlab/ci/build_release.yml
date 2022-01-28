@@ -26,7 +26,7 @@
     - docker push "${DOCKER_IMAGE_NAME}debug:${DOCKER_IMAGE_TAG}" ;
   interruptible: false
 
-publish:docker_manual_amd64:
+docker:manual_build_amd64:
   extends:
     - .build_docker_release_template
     - .rules_template__development_docker
@@ -35,7 +35,7 @@ publish:docker_manual_amd64:
   stage: manual
   needs: []
 
-publish:docker_manual_arm64:
+docker:manual_build_arm64:
   extends:
     - .build_docker_release_template
     - .rules_template__development_docker
@@ -46,7 +46,7 @@ publish:docker_manual_arm64:
   tags:
     - arm64
 
-build_release:docker_amd64:
+docker:build_amd64:
   extends:
     - .build_docker_release_template
     - .rules_template__master_and_releases
@@ -56,7 +56,7 @@ build_release:docker_amd64:
   tags:
     - safe_docker
 
-build_release:docker_arm64:
+docker:build_arm64:
   extends:
     - .build_docker_release_template
     - .rules_template__master_and_releases
