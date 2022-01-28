@@ -202,7 +202,8 @@ module Dune = struct
           (match libraries with
           | [] -> E
           | _ -> [V (S "libraries" :: libraries)]);
-          (if inline_tests then [S "inline_tests"] else E);
+          (if inline_tests then [S "inline_tests"; [S "flags"; S "-verbose"]]
+          else E);
           (match preprocess with
           | [] -> E
           | _ :: _ -> S "preprocess" :: of_list preprocess);
