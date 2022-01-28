@@ -28,9 +28,9 @@ open Alpha_context
 open Micheline
 open Script_tc_errors
 
-type var_annot = Var_annot of Non_empty_string.t [@@ocaml.unboxed]
+type var_annot = Var_annot
 
-type type_annot = Type_annot of Non_empty_string.t [@@ocaml.unboxed]
+type type_annot = Type_annot
 
 type field_annot = Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
@@ -67,12 +67,8 @@ let max_annot_length = 255
 
 type annot_opt =
   | Field_annot_opt of Non_empty_string.t option
-  | Type_annot_opt of Non_empty_string.t option
-  | Var_annot_opt of Non_empty_string.t option
-
-let percent = Non_empty_string.of_string_exn "%"
-
-let percent_percent = Non_empty_string.of_string_exn "%%"
+  | Type_annot_opt of type_annot option
+  | Var_annot_opt of var_annot option
 
 let at = Non_empty_string.of_string_exn "@"
 
@@ -96,8 +92,18 @@ let parse_annot loc s =
   else
     let rest = String.sub s 1 (len - 1) in
     match s.[0] with
-    | ':' -> sub_or_wildcard (fun a -> Type_annot_opt a) rest
-    | '@' -> sub_or_wildcard (fun a -> Var_annot_opt a) rest
+    | ':' ->
+        sub_or_wildcard
+          (fun a ->
+            Type_annot_opt
+              (Option.map (fun (_ : Non_empty_string.t) -> Type_annot) a))
+          rest
+    | '@' ->
+        sub_or_wildcard
+          (fun a ->
+            Var_annot_opt
+              (Option.map (fun (_ : Non_empty_string.t) -> Var_annot) a))
+          rest
     | '%' -> sub_or_wildcard (fun a -> Field_annot_opt a) rest
     | _ -> error (Unexpected_annotation loc)
 
@@ -105,22 +111,15 @@ let parse_annots loc ?(allow_special_var = false) ?(allow_special_field = false)
     l =
   List.map_e
     (function
-      | "@%" when allow_special_var -> ok @@ Var_annot_opt (Some percent)
-      | "@%%" when allow_special_var ->
-          ok @@ Var_annot_opt (Some percent_percent)
+      | "@%" when allow_special_var -> ok @@ Var_annot_opt (Some Var_annot)
+      | "@%%" when allow_special_var -> ok @@ Var_annot_opt (Some Var_annot)
       | "%@" when allow_special_field -> ok @@ Field_annot_opt (Some at)
       | s -> parse_annot loc s)
     l
 
-let opt_var_of_var_opt = function None -> None | Some a -> Some (Var_annot a)
-
 let opt_field_of_field_opt = function
   | None -> None
   | Some a -> Some (Field_annot a)
-
-let opt_type_of_type_opt = function
-  | None -> None
-  | Some a -> Some (Type_annot a)
 
 let classify_annot loc l :
     (var_annot option list * type_annot option list * field_annot option list)
@@ -132,10 +131,10 @@ let classify_annot loc l :
           match (a, in_v, rv, in_t, rt, in_f, rf) with
           | (Var_annot_opt a, true, _, _, _, _, _)
           | (Var_annot_opt a, false, [], _, _, _, _) ->
-              (true, opt_var_of_var_opt a :: rv, false, rt, false, rf)
+              (true, a :: rv, false, rt, false, rf)
           | (Type_annot_opt a, _, _, true, _, _, _)
           | (Type_annot_opt a, _, _, false, [], _, _) ->
-              (false, rv, true, opt_type_of_type_opt a :: rt, false, rf)
+              (false, rv, true, a :: rt, false, rf)
           | (Field_annot_opt a, _, _, _, _, true, _)
           | (Field_annot_opt a, _, _, _, _, false, []) ->
               (false, rv, false, rt, true, opt_field_of_field_opt a :: rf)
