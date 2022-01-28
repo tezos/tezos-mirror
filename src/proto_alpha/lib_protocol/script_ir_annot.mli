@@ -26,7 +26,7 @@
 
 open Alpha_context
 
-type field_annot = private Field_annot of Non_empty_string.t [@@ocaml.unboxed]
+type field_annot
 
 module FOR_TESTS : sig
   val unsafe_field_annot_of_string : string -> field_annot
