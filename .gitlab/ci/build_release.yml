@@ -53,8 +53,6 @@ docker:build_amd64:
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
   stage: build
-  tags:
-    - safe_docker
 
 docker:build_arm64:
   extends:
