@@ -1375,7 +1375,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_contract
           ~allow_ticket
           utl
-        >>? fun (Ex_ty tl, ctxt) ->
+        >>? fun (parsed_l, ctxt) ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1385,8 +1385,10 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_contract
           ~allow_ticket
           utr
-        >>? fun (Ex_ty tr, ctxt) ->
+        >>? fun (parsed_r, ctxt) ->
         check_type_annot loc annot >>? fun () ->
+        let (Ex_ty tl) = parsed_l in
+        let (Ex_ty tr) = parsed_r in
         union_t loc (tl, left_constr) (tr, right_constr) >|? fun ty ->
         (Ex_ty ty, ctxt)
     | Prim (loc, T_lambda, [uta; utr], annot) ->
@@ -1465,7 +1467,14 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     from another contract with `PUSH t id` or `UNPACK`.
   *)
     | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
-        (parse_big_map_ty [@tailcall]) ctxt ~stack_depth ~legacy loc args annot
+        parse_big_map_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          loc
+          args
+          annot
+        >|? fun (Ex_ty ty, ctxt) -> return ctxt ty
     | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
