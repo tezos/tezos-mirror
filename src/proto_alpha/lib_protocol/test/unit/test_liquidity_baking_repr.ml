@@ -156,7 +156,7 @@ let test_ema_decreases_on () =
         ~loc:__LOC__
         (compute_new_ema ~escape_vote:LB_on ema)
         old_ema)
-    (List.filter (fun ema -> Compare.Int32.(ema > 0l)) ema_range)
+    (List.filter (fun ema -> Compare.Int32.(ema > 1000l)) ema_range)
 
 (* Test that the decrease in EMA caused by an On vote is bounded by 1,000,000 *)
 let test_ema_decreases_on_bound () =
@@ -194,6 +194,25 @@ let test_ema_many_on () =
     ~loc:__LOC__
     (compute_new_ema_n (Stdlib.List.init 1386 (fun _ -> LB_on)) initial_ema)
     1_000_000_000l
+
+(* Test that the EMA update function is symmetric:
+   from two dual values of the EMA (that is, two values x and y such that
+   x + y = 2,000,000,000), voting On on the first one decreases it by as
+   much than voting Off on the second one increases it.
+*)
+let test_ema_symmetry () =
+  List.iter_es
+    (fun ema ->
+      let opposite_ema = Int32.(sub 2_000_000_000l ema) in
+      ema_of_int32 ema >>=? fun ema ->
+      ema_of_int32 opposite_ema >>=? fun opposite_ema ->
+      let new_ema = compute_new_ema ~escape_vote:LB_on ema in
+      let new_opposite_ema = compute_new_ema ~escape_vote:LB_off opposite_ema in
+      Assert.equal_int32
+        ~loc:__LOC__
+        Int32.(add new_ema new_opposite_ema)
+        2_000_000_000l)
+    ema_range
 
 let tests =
   [
@@ -233,4 +252,8 @@ let tests =
       "Test EMA goes from two billions to one billion in 1386 On votes"
       `Quick
       test_ema_many_on;
+    Tztest.tztest
+      "Test that voting On and Off have symmetric effects on the EMA"
+      `Quick
+      test_ema_symmetry;
   ]

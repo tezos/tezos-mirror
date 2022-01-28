@@ -64,16 +64,25 @@ end = struct
 
   (* We perform the computations in Z to avoid overflows. *)
 
-  let z_1_000_000 = Z.of_int 1_000_000
-
   let z_1999 = Z.of_int 1999
 
   let z_2000 = Z.of_int 2000
 
-  let update_ema_off ema =
-    Z.(add (div (mul z_1999 (of_int32 ema)) z_2000) z_1_000_000 |> to_int32)
+  let attenuate z = Z.(div (mul z_1999 z) z_2000)
 
-  let update_ema_on ema = Z.(div (mul z_1999 (of_int32 ema)) z_2000 |> to_int32)
+  let z_1_000_000_000 = Z.of_int 1_000_000_000
+
+  let recenter f ema = Z.(add z_1_000_000_000 (f (sub ema z_1_000_000_000)))
+
+  let z_500_000 = Z.of_int 500_000
+
+  let update_ema_off ema =
+    let ema = Z.of_int32 ema in
+    recenter (fun ema -> Z.add (attenuate ema) z_500_000) ema |> Z.to_int32
+
+  let update_ema_on ema =
+    let ema = Z.of_int32 ema in
+    recenter (fun ema -> Z.sub (attenuate ema) z_500_000) ema |> Z.to_int32
 
   let ( < ) = Compare.Int32.( < )
 
