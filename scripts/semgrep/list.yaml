@@ -47,3 +47,26 @@ rules:
     category: performance
     technology:
     - ocaml
+- id: ocamllint-concat-map
+  pattern-either:
+  - pattern: let $Z = List.map $X $Y in List.concat $Z
+  - pattern: List.concat (List.map $X $Y)
+  - pattern: List.map $X $Y |> List.concat
+  - pattern: let+ $Z = List.map_e $X $Y in List.concat $Z
+  - pattern: let* $Z = List.map_e $X $Y in List.concat $Z
+  - pattern: let*? $Z = List.map_e $X $Y in List.concat $Z
+  - pattern: List.map_e $X $Y >|? fun $Z -> List.concat $Z
+  - pattern: let+ $Z = List.map_s $X $Y in List.concat $Z
+  - pattern: let* $Z = List.map_s $X $Y in List.concat $Z
+  - pattern: let*! $Z = List.map_s $X $Y in List.concat $Z
+  - pattern: List.map_s $X $Y >|= fun $Z -> List.concat $Z
+  - pattern: let+ $Z = List.map_es $X $Y in List.concat $Z
+  - pattern: let* $Z = List.map_es $X $Y in List.concat $Z
+  - pattern: List.map_es $X $Y >|=? fun $Z -> List.concat $Z
+  message: You probably want to use List.concat_map $X $Y, which is faster and tail-recursive. See https://tezos.gitlab.io/developer/guidelines.html#chaining_concat_map for details.
+  languages: [ocaml]
+  severity: ERROR
+  metadata:
+    category: performance
+    technology:
+    - ocaml

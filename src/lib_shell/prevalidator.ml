@@ -1453,11 +1453,11 @@ module Make
                else []
              in
              let current_mempool =
-               List.concat
+               List.concat_map
+                 (List.map (function
+                     | (hash, op, []) -> ((hash, op), None)
+                     | (hash, op, errors) -> ((hash, op), Some errors)))
                  [applied; prechecked; refused; branch_refused; branch_delayed]
-               |> List.map (function
-                      | (hash, op, []) -> ((hash, op), None)
-                      | (hash, op, errors) -> ((hash, op), Some errors))
              in
              let current_mempool = ref (Some current_mempool) in
              let filter_result = function

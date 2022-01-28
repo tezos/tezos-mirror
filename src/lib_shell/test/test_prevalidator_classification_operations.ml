@@ -159,11 +159,12 @@ module Handle_operations = struct
       (* Take all blocks *)
       Tree.values tree
       (* Keep only the ones in live_blocks *)
-      |> List.filter (fun (blk : Block.t) ->
+      |> List.to_seq
+      |> Seq.filter (fun (blk : Block.t) ->
              Block_hash.Set.mem blk.hash live_blocks)
       (* Then extract (oph, op) pairs from them *)
-      |> List.map (fun (blk : Block.t) -> blk.operations)
-      |> List.concat |> List.concat |> List.to_seq
+      |> Seq.flat_map (fun (blk : Block.t) -> List.to_seq blk.operations)
+      |> Seq.flat_map List.to_seq
       |> Seq.map (fun op -> (op.Prevalidation.hash, op))
       |> Op_map.of_seq
     in
@@ -371,7 +372,7 @@ module Recyle_operations = struct
     let to_ops (blk : Block.t) = List.concat blk.operations in
     let oph_op_list_to_map l = List.to_seq l |> Op_map.of_seq in
     let blocks_ops =
-      List.map to_ops blocks |> List.concat
+      List.concat_map to_ops blocks
       |> List.map (fun op -> (op.Prevalidation.hash, op))
       |> oph_op_list_to_map
     in

@@ -528,11 +528,11 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
       in
       let* vstate =
         List.fold_left_es
-          (fun vstate op ->
-            let* (state, _result) = apply_operation vstate op in
-            return state)
+          (List.fold_left_es (fun vstate op ->
+               let* (state, _result) = apply_operation vstate op in
+               return state))
           vstate
-          (List.concat operations)
+          operations
       in
       Main.finalize_block vstate (Some shell)
     in

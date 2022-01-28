@@ -589,6 +589,23 @@ Lwt-, Result-, and Lwt-Result-specific variants of all the traversal functions
 Check the
 `online documentation for a full list of the content of the ``List`` module <https://tezos.gitlab.io/api/odoc/_html/tezos-base/Tezos_base/TzPervasives/List/index.html>`_.
 
+.. _chaining_concat_map:
+
+Chaining List.concat and List.map
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+This rule detects compositions of ``List.concat`` and ``List.map`` that are
+suboptimal.
+
+The specialised ``List.concat_map`` function is equivalent to, but more
+efficient than, the composition of ``List.concat`` and ``List.map``. The
+specialised traversor is even tail-recursive.
+
+Lwtreslib provides additional combinators ``List.concat_map_s``,
+``List.concat_map_e``, and ``List.concat_map_es`` to replace the non-vanilla
+compositions.
+
+Check the `online documentation <https://tezos.gitlab.io/api/odoc/_html/tezos-lwt-result-stdlib/Tezos_lwt_result_stdlib/Lwtreslib/Bare/List/index.html#val-concat_map>`_.
 
 Coding conventions
 ------------------
