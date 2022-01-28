@@ -190,7 +190,7 @@ let liquidity_baking_escape_hatch_100 n () =
     ~n_vote_on:0
     ~n_vote_off:1
     ~n_vote_pass:0
-    1387
+    1386
     n
     ()
 
@@ -200,7 +200,7 @@ let liquidity_baking_escape_hatch_80 n () =
     ~n_vote_on:1
     ~n_vote_off:4
     ~n_vote_pass:0
-    1964
+    1963
     n
     ()
 
@@ -210,7 +210,7 @@ let liquidity_baking_escape_hatch_60 n () =
     ~n_vote_on:2
     ~n_vote_off:3
     ~n_vote_pass:0
-    3590
+    3583
     n
     ()
 
@@ -297,9 +297,9 @@ let liquidity_baking_escape_ema n_vote_on n_vote_off escape_level
 let liquidity_baking_escape_ema_zero () =
   liquidity_baking_escape_ema 0 0 0 100 0 ()
 
-(* The EMA should be not much over the threshold after the escape hatch has been activated. We add 1_000 to the constant to give room for the last update. *)
+(* The EMA should be not much over the threshold after the escape hatch has been activated. We add 1_000_000 to the constant to give room for the last update. *)
 let liquidity_baking_escape_ema_threshold () =
-  liquidity_baking_escape_ema 0 1 1387 1 1_001_000 ()
+  liquidity_baking_escape_ema 0 1 1386 1 1_001_000_000 ()
 
 let liquidity_baking_storage n () =
   Context.init ~consensus_threshold:0 1 >>=? fun (blk, _contracts) ->

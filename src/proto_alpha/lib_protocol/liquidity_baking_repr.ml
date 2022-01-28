@@ -25,7 +25,7 @@
 (*****************************************************************************)
 
 module Escape_EMA : sig
-  (* The exponential moving average is represented as an Int32 between 0l and 2_000_000l *)
+  (* The exponential moving average is represented as an Int32 between 0l and 2_000_000_000l *)
 
   type t
 
@@ -49,7 +49,7 @@ end = struct
      raised. *)
   type error += Liquidity_baking_escape_ema_out_of_bound of Int32.t
 
-  let check_bounds x = Compare.Int32.(0l <= x && x <= 2_000_000l)
+  let check_bounds x = Compare.Int32.(0l <= x && x <= 2_000_000_000l)
 
   let of_int32 x =
     if check_bounds x then return x
@@ -64,14 +64,14 @@ end = struct
 
   (* We perform the computations in Z to avoid overflows. *)
 
-  let z_1000 = Z.of_int 1000
+  let z_1_000_000 = Z.of_int 1_000_000
 
   let z_1999 = Z.of_int 1999
 
   let z_2000 = Z.of_int 2000
 
   let update_ema_off ema =
-    Z.(add (div (mul z_1999 (of_int32 ema)) z_2000) z_1000 |> to_int32)
+    Z.(add (div (mul z_1999 (of_int32 ema)) z_2000) z_1_000_000 |> to_int32)
 
   let update_ema_on ema = Z.(div (mul z_1999 (of_int32 ema)) z_2000 |> to_int32)
 
