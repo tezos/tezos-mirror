@@ -3,9 +3,7 @@ local dashboard = grafana.dashboard;
 local template = grafana.template;
 local singlestat = grafana.singlestat;
 local graphPanel = grafana.graphPanel;
-local logPanel = grafana.logPanel;
 local heatmapPanel = grafana.heatmapPanel;
-local loki = grafana.loki;
 local prometheus = grafana.prometheus;
 
 //##
@@ -343,19 +341,6 @@ local prometheus = grafana.prometheus;
       prometheus.target(
         'tezos_metrics_stats_gc_live_words',
         legendFormat=live,
-      )
-    ),
-
-  //## Logs with Loky
-  //# TODO
-  logs:
-    logPanel.new(
-      title='Node logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="varlogs"}',
-        legendFormat='Node logs',
       )
     ),
 
