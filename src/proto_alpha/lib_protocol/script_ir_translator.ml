@@ -1259,8 +1259,11 @@ type ex_parameter_ty_and_entrypoints =
     }
       -> ex_parameter_ty_and_entrypoints
 
-let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
-    :
+type ('ret, 'name) parse_ty_ret =
+  | Don't_parse_entrypoints : (ex_ty, unit) parse_ty_ret
+
+let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty :
+    type ret name.
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -1268,8 +1271,9 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     allow_operation:bool ->
     allow_contract:bool ->
     allow_ticket:bool ->
+    ret:(ret, name) parse_ty_ret ->
     Script.node ->
-    (ex_ty * context) tzresult =
+    (ret * context) tzresult =
  fun ctxt
      ~stack_depth
      ~legacy
@@ -1277,12 +1281,15 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
      ~allow_operation
      ~allow_contract
      ~allow_ticket
+     ~ret
      node ->
   Gas.consume ctxt Typecheck_costs.parse_type_cycle >>? fun ctxt ->
   if Compare.Int.(stack_depth > 10000) then
     error Typechecking_too_many_recursive_calls
   else
-    let return ctxt ty = (Ex_ty ty, ctxt) in
+    let return ctxt ty : ret * context =
+      match ret with Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
+    in
     match node with
     | Prim (loc, T_unit, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt unit_t
@@ -1328,7 +1335,12 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
         check_type_annot loc annot >|? fun () -> return ctxt bls12_381_fr_t
     | Prim (loc, T_contract, [utl], annot) ->
         if allow_contract then
-          parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
+          parse_passable_ty
+            ctxt
+            ~stack_depth:(stack_depth + 1)
+            ~legacy
+            utl
+            ~ret:Don't_parse_entrypoints
           >>? fun (Ex_ty tl, ctxt) ->
           check_type_annot loc annot >>? fun () ->
           contract_t loc tl >|? fun ty -> return ctxt ty
@@ -1343,6 +1355,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           utl
         >>? fun (Ex_ty tl, ctxt) ->
         (match utr with
@@ -1359,13 +1372,18 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
         pair_t loc tl tr >|? fun ty -> return ctxt ty
-    | Prim (loc, T_or, [utl; utr], annot) ->
-        extract_field_annot utl >>? fun (utl, left_constr) ->
-        extract_field_annot utr >>? fun (utr, right_constr) ->
+    | Prim (loc, T_or, [utl; utr], annot) -> (
+        (match ret with
+        | Don't_parse_entrypoints ->
+            extract_field_annot utl >>? fun utl_left_constr ->
+            extract_field_annot utr >|? fun utr_right_constr ->
+            (utl_left_constr, utr_right_constr))
+        >>? fun ((utl, left_constr), (utr, right_constr)) ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1374,6 +1392,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret
           utl
         >>? fun (parsed_l, ctxt) ->
         parse_ty
@@ -1384,13 +1403,16 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret
           utr
         >>? fun (parsed_r, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        let (Ex_ty tl) = parsed_l in
-        let (Ex_ty tr) = parsed_r in
-        union_t loc (tl, left_constr) (tr, right_constr) >|? fun ty ->
-        (Ex_ty ty, ctxt)
+        match ret with
+        | Don't_parse_entrypoints ->
+            let (Ex_ty tl) = parsed_l in
+            let (Ex_ty tr) = parsed_r in
+            union_t loc (tl, left_constr) (tr, right_constr) >|? fun ty ->
+            ((Ex_ty ty : ret), ctxt))
     | Prim (loc, T_lambda, [uta; utr], annot) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
         >>? fun (Ex_ty ta, ctxt) ->
@@ -1413,6 +1435,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           ut
         >>? fun (Ex_ty t, ctxt) ->
         option_t loc t >|? fun ty -> return ctxt ty
@@ -1425,6 +1448,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           ut
         >>? fun (Ex_ty t, ctxt) ->
         check_type_annot loc annot >>? fun () ->
@@ -1452,6 +1476,7 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
@@ -1532,13 +1557,14 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
                T_ticket;
              ]
 
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty
-    :
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty :
+    type ret name.
     context ->
     stack_depth:int ->
     legacy:bool ->
+    ret:(ret, name) parse_ty_ret ->
     Script.node ->
-    (ex_ty * context) tzresult =
+    (ret * context) tzresult =
  fun ctxt ~stack_depth ~legacy ->
   (parse_ty [@tailcall])
     ctxt
@@ -1565,6 +1591,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_any_ty
     ~allow_operation:true
     ~allow_contract:true
     ~allow_ticket:true
+    ~ret:Don't_parse_entrypoints
 
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_map_ty
     ctxt ~stack_depth ~legacy big_map_loc args map_annot =
@@ -1594,6 +1621,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_ma
     ~allow_operation:false
     ~allow_contract:legacy
     ~allow_ticket:true
+    ~ret:Don't_parse_entrypoints
     value_ty
 
 let parse_packable_ty ctxt ~stack_depth ~legacy node =
@@ -1608,6 +1636,7 @@ let parse_packable_ty ctxt ~stack_depth ~legacy node =
       (* type contract is forbidden in UNPACK because of
          https://gitlab.com/tezos/tezos/-/issues/301 *)
     ~allow_ticket:false
+    ~ret:Don't_parse_entrypoints
     node
 
 let parse_view_input_ty ctxt ~stack_depth ~legacy node =
@@ -1619,6 +1648,7 @@ let parse_view_input_ty ctxt ~stack_depth ~legacy node =
     ~allow_operation:false
     ~allow_contract:true
     ~allow_ticket:false
+    ~ret:Don't_parse_entrypoints
     node
 
 let parse_view_output_ty ctxt ~stack_depth ~legacy node =
@@ -1630,6 +1660,7 @@ let parse_view_output_ty ctxt ~stack_depth ~legacy node =
     ~allow_operation:false
     ~allow_contract:true
     ~allow_ticket:false
+    ~ret:Don't_parse_entrypoints
     node
 
 let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
@@ -1641,6 +1672,7 @@ let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
     ~allow_operation:false
     ~allow_contract:legacy
     ~allow_ticket:true
+    ~ret:Don't_parse_entrypoints
     node
 
 let parse_storage_ty :
@@ -1925,11 +1957,18 @@ let parse_parameter_ty_and_entrypoints :
     (ex_parameter_ty_and_entrypoints * context) tzresult =
  fun ctxt ~stack_depth ~legacy node ->
   extract_entrypoint_annot node >>? fun (node, root_name) ->
-  parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy node
+  parse_passable_ty
+    ctxt
+    ~stack_depth:(stack_depth + 1)
+    ~legacy
+    ~ret:Don't_parse_entrypoints
+    node
   >>? fun (Ex_ty arg_type, ctxt) ->
   (if legacy then Result.return_unit
   else well_formed_entrypoints ~root_name arg_type)
   >|? fun () -> (Ex_parameter_ty_and_entrypoints {arg_type; root_name}, ctxt)
+
+let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints
 
 let parse_uint ~nb_bits =
   assert (Compare.Int.(nb_bits >= 0 && nb_bits <= 30)) ;
@@ -6260,7 +6299,7 @@ let parse_passable_ty = parse_passable_ty ~stack_depth:0
 
 let parse_any_ty = parse_any_ty ~stack_depth:0
 
-let parse_ty = parse_ty ~stack_depth:0
+let parse_ty = parse_ty ~stack_depth:0 ~ret:Don't_parse_entrypoints
 
 let parse_parameter_ty_and_entrypoints =
   parse_parameter_ty_and_entrypoints ~stack_depth:0
