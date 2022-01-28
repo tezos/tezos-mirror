@@ -236,6 +236,17 @@ let views_size views =
     views
     zero
 
+let rec entrypoints_size : type arg. arg entrypoints -> nodes_and_size =
+ fun {name; nested} ->
+  let name_size = option_size Entrypoint.in_memory_size name in
+  let nested_size =
+    match nested with
+    | Entrypoints_None -> zero
+    | Entrypoints_Union {left; right} ->
+        ret_adding (entrypoints_size left ++ entrypoints_size right) h2w
+  in
+  ret_succ_adding nested_size name_size
+
 let kinfo_size {iloc = _; kstack_ty = _} = h2w
 
 (* The following mutually recursive functions are mostly
@@ -538,19 +549,12 @@ and kinstr_size :
     | ITransfer_tokens (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IImplicit_account (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICreate_contract
-        {
-          kinfo;
-          storage_type;
-          arg_type;
-          lambda;
-          entrypoints (* TODO? *) = _;
-          views;
-          k = _;
-        } ->
+        {kinfo; storage_type; arg_type; lambda; entrypoints; views; k = _} ->
         let accu =
           ret_succ_adding
             (accu ++ ty_size storage_type ++ ty_size arg_type
-           ++ views_size views)
+           ++ views_size views
+            ++ entrypoints_size entrypoints)
             (base kinfo +! (word_size *? 4))
         in
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
