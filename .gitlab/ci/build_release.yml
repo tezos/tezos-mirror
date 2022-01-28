@@ -52,7 +52,7 @@ build_release:docker_amd64:
     - .rules_template__master_and_releases
   variables:
     IMAGE_ARCH_PREFIX: "amd64_"
-  stage: build_release
+  stage: build
   tags:
     - safe_docker
 
@@ -62,6 +62,6 @@ build_release:docker_arm64:
     - .rules_template__master_and_releases
   variables:
     IMAGE_ARCH_PREFIX: "arm64_"
-  stage: build_release
+  stage: build
   tags:
     - arm64
