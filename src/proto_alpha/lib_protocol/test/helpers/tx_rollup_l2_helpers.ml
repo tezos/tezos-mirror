@@ -80,4 +80,8 @@ module Irmin_storage :
   end
 end
 
+module Context_l2 = Protocol.Tx_rollup_l2_context.Make (Irmin_storage)
+
 let empty_storage : Irmin_storage.t = Store.Tree.empty ()
+
+let empty_context : Context_l2.t = empty_storage
