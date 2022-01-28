@@ -261,8 +261,9 @@ Long Tests and Performance regression Test Framework
 
 Tezt is also used for tests that are too long to run in the CI. Those
 tests are run on dedicated machines and can send data points to an
-InfluxDB instance to produce graphs using Grafana and/or detect
-performance regressions. See :doc:`long-tezts`.
+`InfluxDB <https://github.com/influxdata/influxdb>`__ instance to produce
+graphs using `Grafana <https://github.com/grafana/grafana>`__ and/or
+detect performance regressions. See :doc:`long-tezts`.
 
 ..
    .. _michelson_unit_tests:
