@@ -7,7 +7,7 @@ local heatmapPanel = grafana.heatmapPanel;
 local prometheus = grafana.prometheus;
 
 //##
-// Tezos related stats
+// Octez related stats
 //##
 
 {

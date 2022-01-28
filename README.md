@@ -1,4 +1,4 @@
-## Grafazos: Grafana dashboards for Tezos node monitoring.
+## Grafazos: Grafana dashboards for Octez node monitoring.
 
 Grafazos allows to generate dashboards from jsonnet programs.
 
