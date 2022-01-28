@@ -132,3 +132,5 @@ improvements of the codebase.
 - Carbonated map utility module. (MR :gl:`!3845`)
 
 - Extend carbonated-map with a fold operation. (MR :gl:`!4156`)
+
+- Other internal refactorings or documentation. (MRs :gl:`!4276`)

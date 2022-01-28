@@ -499,7 +499,13 @@ module Make_indexed_carbonated_data_storage_INTERNAL
     (C.project s, List.rev rev_values)
 
   let fold_keys_unaccounted s ~order ~init ~f =
-    C.fold ~depth:(`Eq I.path_length) s [] ~order ~init ~f:(fun file tree acc ->
+    C.fold
+      ~depth:(`Eq (1 + I.path_length))
+      s
+      []
+      ~order
+      ~init
+      ~f:(fun file tree acc ->
         match C.Tree.kind tree with
         | `Value -> (
             match List.rev file with

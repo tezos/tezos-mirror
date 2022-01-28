@@ -230,3 +230,7 @@ val init_with_constants :
   Constants.parametric ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+(** [default_raw_context] returns a [Raw_context.t] for use in tests
+    below [Alpha_context] *)
+val default_raw_context : unit -> Raw_context.t tzresult Lwt.t
