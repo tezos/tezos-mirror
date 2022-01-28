@@ -13,17 +13,17 @@
     # Build normal, bare and debug image
     - ./scripts/create_docker_image.sh
         "${DOCKER_IMAGE_NAME}"
-        "${TAG_NAME}"
+        "${DOCKER_IMAGE_TAG}"
         "${build_deps_image_name}"
         "${build_deps_image_version}"
         "${CI_COMMIT_SHORT_SHA}"
     # auth gitlab or dockerhub registry
     # notice the different namespace for gitlab and that we remove the `-`
     # Test the bare image
-    - ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${TAG_NAME}" "${CI_COMMIT_SHORT_SHA}" version
-    - docker push "${DOCKER_IMAGE_NAME%?}:${TAG_NAME}" ;
-    - docker push "${DOCKER_IMAGE_NAME}bare:${TAG_NAME}" ;
-    - docker push "${DOCKER_IMAGE_NAME}debug:${TAG_NAME}" ;
+    - ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version
+    - docker push "${DOCKER_IMAGE_NAME%?}:${DOCKER_IMAGE_TAG}" ;
+    - docker push "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" ;
+    - docker push "${DOCKER_IMAGE_NAME}debug:${DOCKER_IMAGE_TAG}" ;
   interruptible: false
 
 publish:docker_manual_amd64:
