@@ -98,7 +98,12 @@ class TestAllPerBlockVotes:
         parameters['minimal_block_delay'] = str(MINIMAL_BLOCK_DELAY)
         parameters['delay_increment_per_round'] = "1"
         protocol.activate(sandbox.client(0), parameters=parameters)
-        sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
+        sandbox.add_baker(
+            0,
+            ['bootstrap1'],
+            proto=protocol.DAEMON,
+            run_params=['--liquidity-baking-escape-vote', 'pass'],
+        )
 
     def test_wait_for_protocol(self, sandbox: Sandbox):
         clients = sandbox.all_clients()
@@ -106,12 +111,16 @@ class TestAllPerBlockVotes:
             proto = protocol.HASH
             assert utils.check_protocol(client, proto)
 
-    def test_true_vote_file(self, sandbox: Sandbox):
-        filename = "tests_alpha/per_block_vote_files/true.json"
+    def test_on_vote_file(self, sandbox: Sandbox):
+        filename = "tests_alpha/per_block_vote_files/on.json"
         run_vote_file_test(sandbox, filename)
 
-    def test_false_vote_file(self, sandbox: Sandbox):
-        filename = "tests_alpha/per_block_vote_files/false.json"
+    def test_off_vote_file(self, sandbox: Sandbox):
+        filename = "tests_alpha/per_block_vote_files/off.json"
+        run_vote_file_test(sandbox, filename)
+
+    def test_pass_vote_file(self, sandbox: Sandbox):
+        filename = "tests_alpha/per_block_vote_files/pass.json"
         run_vote_file_test(sandbox, filename)
 
     def test_nonexistent_vote_file(self, sandbox: Sandbox):
@@ -121,6 +130,14 @@ class TestAllPerBlockVotes:
     def test_invalid_json(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/invalid.json"
         run_invalid_file_test(sandbox, filename)
+
+    def test_true_vote_file(self, sandbox: Sandbox):
+        filename = "tests_alpha/per_block_vote_files/true.json"
+        run_wrong_content_file_test(sandbox, filename)
+
+    def test_false_vote_file(self, sandbox: Sandbox):
+        filename = "tests_alpha/per_block_vote_files/false.json"
+        run_wrong_content_file_test(sandbox, filename)
 
     def test_nonboolean(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/non_boolean.json"
