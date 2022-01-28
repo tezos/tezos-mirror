@@ -32,6 +32,13 @@ let ( // ) = Filename.concat
 (*                                  DUNE                                     *)
 (*****************************************************************************)
 
+module Ne_list = struct
+  (* Non-empty lists. *)
+  type 'a t = 'a * 'a list
+
+  let to_list (head, tail) = head :: tail
+end
+
 module Dune = struct
   type kind = Library | Executable | Test
 
@@ -265,11 +272,28 @@ module Dune = struct
 
   let run_exe exe_name args = run ("%{exe:" ^ exe_name ^ ".exe}") args
 
-  let runtest_js ~package ~name =
+  let runtest_js ~package ~dir ~(node_wrapper_flags : string list) name =
+    let rec go_to_src acc dir =
+      match dir with
+      | "" | "." ->
+          (* we are at the root *)
+          Filename.concat acc "src"
+      | "src" ->
+          (* we are in %root%/src *)
+          acc
+      | _ -> go_to_src (Filename.concat ".." acc) (Filename.dirname dir)
+    in
+    let runner =
+      match node_wrapper_flags with
+      | [] -> S "node"
+      | _ ->
+          let node = go_to_src "tooling/node_wrapper.exe" dir in
+          [S ("%{dep:" ^ node ^ "}"); G (of_atom_list node_wrapper_flags)]
+    in
     alias_rule
       "runtest_js"
       ~package
-      ~action:(run "node" ["%{dep:./" ^ name ^ ".bc.js}"])
+      ~action:[S "run"; G runner; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
 
@@ -492,16 +516,13 @@ module Target = struct
      name for [public_name] stanzas in [dune] and the name in [.opam] files. *)
   type full_name = {internal_name : string; public_name : string}
 
-  (* Non-empty lists. *)
-  type 'a ne_list = 'a * 'a list
-
   type kind =
     | Public_library of full_name
     | Private_library of string
-    | Public_executable of full_name ne_list
-    | Private_executable of string ne_list
-    | Test of string ne_list
-    | Test_executable of string ne_list
+    | Public_executable of full_name Ne_list.t
+    | Private_executable of string Ne_list.t
+    | Test of string Ne_list.t
+    | Test_executable of string Ne_list.t
 
   type preprocessor_dep = File of string
 
@@ -537,6 +558,7 @@ module Target = struct
     synopsis : string option;
     virtual_modules : string list;
     wrapped : bool;
+    node_wrapper_flags : string list;
   }
 
   and preprocessor = PPS of target | PPS_args of target * string list
@@ -643,6 +665,7 @@ module Target = struct
     ?linkall:bool ->
     ?modes:Dune.mode list ->
     ?modules:string list ->
+    ?node_wrapper_flags:string list ->
     ?nopervasives:bool ->
     ?ocaml:Opam.version_constraints ->
     ?opam:string ->
@@ -665,11 +688,11 @@ module Target = struct
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
       ?foreign_stubs ?implements ?(inline_tests = false) ?js_compatible
-      ?js_of_ocaml ?(linkall = false) ?modes ?modules ?(nopervasives = false)
-      ?ocaml ?opam ?(opaque = false) ?(opens = []) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?static_cclibs ?synopsis ?(virtual_modules = [])
-      ?(wrapped = true) ~path names =
+      ?js_of_ocaml ?(linkall = false) ?modes ?modules ?(node_wrapper_flags = [])
+      ?(nopervasives = false) ?ocaml ?opam ?(opaque = false) ?(opens = [])
+      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
+      ?(opam_only_deps = []) ?release ?static ?static_cclibs ?synopsis
+      ?(virtual_modules = []) ?(wrapped = true) ~path names =
     let (js_compatible, js_of_ocaml) =
       match (js_compatible, js_of_ocaml) with
       | (Some false, Some _) ->
@@ -751,6 +774,48 @@ module Target = struct
       | Test _ | Test_executable _ -> false
     in
     let bisect_ppx = Option.value bisect_ppx ~default:not_a_test in
+    let runtest_js_rules =
+      match (kind, opam, js_compatible) with
+      | (Test names, Some package, true)
+      | (Test_executable names, Some package, true) ->
+          let collect_node_wrapper_flags deps =
+            let rec loop (seen, acc) dep =
+              match library_name_for_dune dep with
+              | Error _ -> (seen, acc)
+              | Ok name -> (
+                  if String_set.mem name seen then (seen, acc)
+                  else
+                    let seen = String_set.add name seen in
+                    match dep with
+                    | Internal {deps; node_wrapper_flags; _} ->
+                        let acc = node_wrapper_flags @ acc in
+                        loops (seen, acc) deps
+                    | _ -> (seen, acc))
+            and loops (seen, acc) deps =
+              List.fold_left
+                (fun (seen, acc) x -> loop (seen, acc) x)
+                (seen, acc)
+                deps
+            in
+            loops (String_set.empty, []) deps
+          in
+          let node_wrapper_flags : string list =
+            snd (collect_node_wrapper_flags deps)
+          in
+          List.map
+            (fun name ->
+              Dune.(
+                runtest_js
+                  ~package:(Filename.basename package)
+                  ~node_wrapper_flags
+                  ~dir:path
+                  name))
+            (Ne_list.to_list names)
+      | _ -> []
+    in
+    let dune =
+      List.fold_right (fun x dune -> Dune.(x :: dune)) runtest_js_rules dune
+    in
     register_internal
       {
         bisect_ppx;
@@ -783,6 +848,7 @@ module Target = struct
         static_cclibs;
         synopsis;
         virtual_modules;
+        node_wrapper_flags;
         wrapped;
       }
 
@@ -1294,7 +1360,7 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
     let dir_contents = Sys.readdir dir in
     let add_item acc filename =
       let full_filename = dir // filename in
-      if Sys.is_directory full_filename then
+      if try Sys.is_directory full_filename with Sys_error _ -> false then
         find_opam_and_dune_files acc full_filename
       else if filename = "dune" || Filename.extension filename = ".opam" then
         String_set.add full_filename acc

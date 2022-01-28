@@ -23,6 +23,22 @@
    -open Tezos_hacl_glue))
  (modules (:standard \ test)))
 
+(rule
+ (alias runtest_js)
+ (package tezos-hacl-glue-js)
+ (action
+  (run
+   %{dep:../../../tooling/node_wrapper.exe} --hacl
+   %{dep:./test_hacl.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl-glue-js)
+ (action
+  (run
+   %{dep:../../../tooling/node_wrapper.exe} --hacl
+   %{dep:./test_prop_signature_pk.bc.js})))
+
 (executable
  (name test)
  (modes js)
@@ -30,6 +46,12 @@
   tezos-hacl-glue-js)
  (js_of_ocaml)
  (modules test))
+
+(rule
+ (alias runtest_js)
+ (package tezos-hacl-glue-js)
+ (action
+  (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js})))
 
 (rule (action (copy ../../unix/test/test_hacl.ml test_hacl.ml.from-unix)))
 
@@ -51,36 +73,3 @@
 (rule
  (alias runtest_js)
  (action (diff test_prop_signature_pk.ml test_prop_signature_pk.ml.from-unix)))
-
-(rule
- (alias runtest_js)
- (package tezos-hacl-glue-js)
- (deps ../.npmrc ../package.json ../package-lock.json)
- (action
-  (progn
-   (run npm install hacl-wasm)
-   (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js}))))
-
-(rule
- (alias runtest_js)
- (package tezos-hacl-glue-js)
- (deps ../.npmrc ../package.json ../package-lock.json)
- (action
-  (progn
-   (run npm install hacl-wasm)
-   (run
-    %{dep:../../../tooling/node_wrapper.exe}
-    --hacl
-    %{dep:./test_hacl.bc.js}))))
-
-(rule
- (alias runtest_js)
- (package tezos-hacl-glue-js)
- (deps ../.npmrc ../package.json ../package-lock.json)
- (action
-  (progn
-   (run npm install hacl-wasm)
-   (run
-    %{dep:../../../tooling/node_wrapper.exe}
-    --hacl
-    %{dep:./test_prop_signature_pk.bc.js}))))
