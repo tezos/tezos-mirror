@@ -1,4 +1,4 @@
-all: tezos-basic.jsonnet
+all: octez-basic.jsonnet
 
 BRANCH ?= master
 

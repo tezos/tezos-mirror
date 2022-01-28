@@ -9,7 +9,7 @@ local loki = grafana.loki;
 local prometheus = grafana.prometheus;
 
 //##
-// Tezos related stats
+// Octez related stats
 //##
 
 {

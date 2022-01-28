@@ -20,7 +20,7 @@ local boardtitle = 'Tezos branch: ' + std.extVar('branch');
 //##
 dashboard.new(
   title=boardtitle,
-  tags=['tezos', 'storage'],
+  tags=['octez','tezos'],
   schemaVersion=18,
   editable=true,
   time_from='now-3h',
