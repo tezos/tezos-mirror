@@ -14,10 +14,8 @@ Gas remaining: 1039924.032 units remaining
            { CDR
              /* [ option address ] */ ;
              ASSERT_SOME
-             /* [ int : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ ;
-             DIP { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
-                   NIL operation
-                   /* [ list operation ] */ }
+             /* [ int : pair (or (or nat nat) unit) int ] */ ;
+             DIP { /* [ pair (or (or nat nat) unit) int ] */ NIL operation /* [ list operation ] */ }
              /* [] */ ;
              DUP
              /* [ address : address : list operation ] */ ;
@@ -147,4 +145,4 @@ Gas remaining: 1039924.032 units remaining
              /* [ list operation : option address ] */ ;
              PAIR
              /* [ pair (list operation) (option address) ] */ }
-         /* [ mutez : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ } }
+         /* [ mutez : pair (or (or nat nat) unit) int ] */ } }

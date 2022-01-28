@@ -10,33 +10,27 @@ Gas remaining: 1039921.322 units remaining
          /* [ contract unit : address : pair unit (option address) ] */ ;
          ADDRESS
          /* [ address : address : pair unit (option address) ] */ ;
-         { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
+         { /* [ pair (or (or nat nat) unit) int ] */
            COMPARE
-           /* [ mutez : mutez : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ ;
+           /* [ mutez : mutez : pair (or (or nat nat) unit) int ] */ ;
            EQ
            /* [ bool : pair unit (option address) ] */ ;
            IF { CDR
                 /* [ option address ] */ ;
-                { /* [ mutez : mutez : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
+                { /* [ mutez : mutez : pair (or (or nat nat) unit) int ] */
                   IF_NONE
-                    { { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
-                        UNIT
-                        /* [ unit ] */ ;
-                        FAILWITH
-                        /* [] */ } }
-                    { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ }
-                  /* [ bool : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ } ;
+                    { { /* [ pair (or (or nat nat) unit) int ] */ UNIT /* [ unit ] */ ; FAILWITH /* [] */ } }
+                    { /* [ pair (or (or nat nat) unit) int ] */ }
+                  /* [ bool : pair (or (or nat nat) unit) int ] */ } ;
                 DIP { NIL operation
-                          /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int
-                             : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
+                          /* [ pair (or (or nat nat) unit) int : pair (or (or nat nat) unit) int ] */
                       /* [ list operation ] */ }
                 /* [] */ ;
                 DUP
-                /* [ or (or (nat %add) (nat %sub)) (unit %default)
-                   : pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */ ;
+                /* [ or (or nat nat) unit : pair (or (or nat nat) unit) int ] */ ;
                 CONTRACT %add unit
-                /* [ or (or (nat %add) (nat %sub)) (unit %default) : int ] */ ;
-                { /* [ pair (or (or (nat %add) (nat %sub)) (unit %default)) int ] */
+                /* [ or (or nat nat) unit : int ] */ ;
+                { /* [ pair (or (or nat nat) unit) int ] */
                   IF_NONE
                     { /* [ address : list operation ] */ }
                     { { UNIT /* [ int ] */ ; FAILWITH /* [] */ } } } ;

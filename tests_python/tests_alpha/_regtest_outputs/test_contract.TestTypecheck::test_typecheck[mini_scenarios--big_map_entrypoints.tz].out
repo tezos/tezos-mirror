@@ -15,10 +15,8 @@ Gas remaining: 1039940.196 units remaining
     /* [ big_map string nat ] */)
   /* [ string : big_map string nat ] */ ;
   code { UNPAIR
-         /* [ or (unit %default)
-               (or (or %mem (string %mem_left) (string %mem_right))
-                   (or (or %add (pair %add_left string nat) (pair %add_right string nat))
-                       (or %rem (string %rem_left) (string %rem_right))))
+         /* [ or unit
+               (or (or string string) (or (or (pair string nat) (pair string nat)) (or string string)))
             : pair (big_map string nat) (big_map string nat) ] */ ;
          IF_LEFT
            { DROP
