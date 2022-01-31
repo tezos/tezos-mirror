@@ -462,11 +462,6 @@ let load_inferred_savepoint chain_dir block_store head savepoint_level =
       let inferred_savepoint =
         (Block_repr.hash block, Block_repr.level block)
       in
-      let* () =
-        Stored_data.write_file
-          (Naming.savepoint_file chain_dir)
-          inferred_savepoint
-      in
       (* Try to load the current savepoint *)
       let*! savepoint_data =
         Stored_data.load (Naming.savepoint_file chain_dir)
@@ -497,9 +492,6 @@ let load_inferred_caboose chain_dir block_store head caboose_level =
   match block with
   | Some block ->
       let inferred_caboose = (Block_repr.hash block, Block_repr.level block) in
-      let* () =
-        Stored_data.write_file (Naming.caboose_file chain_dir) inferred_caboose
-      in
       (* Try to load the current caboose *)
       let*! caboose_data = Stored_data.load (Naming.caboose_file chain_dir) in
       let caboose_data = Option.of_result caboose_data in
