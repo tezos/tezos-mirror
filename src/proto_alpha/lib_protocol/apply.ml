@@ -1294,7 +1294,9 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       @@ (* See comment in the Transaction branch *)
       ( Script.force_decode_in_context ~consume_deserialization_gas ctxt value
       >|? fun (_value, ctxt) -> ctxt )
-  | _ -> return ctxt)
+  | Delegation _ | Set_deposits_limit _ | Tx_rollup_origination
+  | Sc_rollup_originate _ | Sc_rollup_add_messages _ ->
+      return ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source_contract) `Block_fees fee
