@@ -1523,6 +1523,8 @@ let tezos_protocol_environment =
         zarith;
         zarith_stubs_js;
         bls12_381;
+        ringo;
+        ringo_lwt;
         tezos_base;
         tezos_sapling;
         tezos_protocol_environment_sigs;
