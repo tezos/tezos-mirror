@@ -747,36 +747,25 @@ let catch_closed_pipe f =
       Error_monad.fail P2p_errors.Connection_closed
   | (Error _ | Ok _) as v -> Lwt.return v
 
-let write {writer; conn; _} msg =
+let write {writer; _} msg =
   let open Lwt_result_syntax in
   catch_closed_pipe (fun () ->
-      let log_msg = Data_encoding.Json.construct writer.encoding msg in
-      let*! () =
-        Events.(emit send_message_event) (conn.info.peer_id, log_msg)
-      in
       let*? buf = Writer.encode_message writer msg in
       let*! () = Lwt_pipe.Maybe_bounded.push writer.messages (buf, None) in
       return_unit)
 
-let write_sync {writer; conn; _} msg =
+let write_sync {writer; _} msg =
   let open Lwt_result_syntax in
   catch_closed_pipe (fun () ->
       let (waiter, wakener) = Lwt.wait () in
-      let log_msg = Data_encoding.Json.construct writer.encoding msg in
-      let*! () =
-        Events.(emit send_message_event) (conn.info.peer_id, log_msg)
-      in
       let*? buf = Writer.encode_message writer msg in
       let*! () =
         Lwt_pipe.Maybe_bounded.push writer.messages (buf, Some wakener)
       in
       waiter)
 
-let write_now {writer; conn; _} msg =
+let write_now {writer; _} msg =
   let open Tzresult_syntax in
-  let log_msg = Data_encoding.Json.construct writer.encoding msg in
-  Events.(emit__dont_wait__use_with_care send_message_event)
-    (conn.info.peer_id, log_msg) ;
   let* buf = Writer.encode_message writer msg in
   try Ok (Lwt_pipe.Maybe_bounded.push_now writer.messages (buf, None))
   with Lwt_pipe.Closed -> fail P2p_errors.Connection_closed

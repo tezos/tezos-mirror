@@ -157,25 +157,24 @@ let iter2_exn f l1 l2 =
 let test_locator chain_store tbl =
   let open Lwt_syntax in
   let check_locator length h1 expected =
-    let* l =
+    let* {Block_locator.history; _} =
       Store.Chain.compute_locator
         chain_store
         ~max_size:length
         (vblock tbl h1)
         seed
     in
-    let (_, l) = (l : Block_locator.t :> _ * _) in
-    if Compare.List_lengths.(l <> expected) then
+    if Compare.List_lengths.(history <> expected) then
       Assert.fail_msg
         "Invalid locator length %s (found: %d, expected: %d)"
         h1
-        (List.length l)
+        (List.length history)
         (List.length expected) ;
     iter2_exn
       (fun h h2 ->
         if not (Block_hash.equal h (Store.Block.hash @@ vblock tbl h2)) then
           Assert.fail_msg "Invalid locator %s (expected: %s)" h1 h2)
-      l
+      history
       expected ;
     Lwt.return_unit
   in

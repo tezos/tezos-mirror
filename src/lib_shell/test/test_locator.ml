@@ -370,10 +370,8 @@ let bench_locator base_dir =
     time ~runs (fun () ->
         compute_linear_locator chain_store ~caboose ~max_size block)
     |> fun (l_lin, t_lin) ->
-    l_exp >>= fun l_exp ->
-    l_lin >>= fun l_lin ->
-    let (_, l_exp) = (l_exp : Block_locator.t :> _ * _) in
-    let (_, l_lin) = (l_lin : Block_locator.t :> _ * _) in
+    l_exp >>= fun {Block_locator.history = l_exp; _} ->
+    l_lin >>= fun {Block_locator.history = l_lin; _} ->
     let _ = Printf.printf "%10i %f %f\n" max_size t_exp t_lin in
     Lwt.return
     @@ List.iter2
@@ -460,15 +458,12 @@ let test_protocol_locator base_dir =
   >>= fun () ->
   (Store.Chain.compute_protocol_locator chain_store ~proto_level:0 seed
    >>= function
-   | Some locator ->
-       let (block_header, hash_list) =
-         (locator :> Block_header.t * Block_hash.t list)
-       in
-       Assert.is_true ~msg:"no block in locator" (hash_list = []) ;
+   | Some {Block_locator.head_header; history; _} ->
+       Assert.is_true ~msg:"no block in locator" (history = []) ;
        Store.Block.read_block chain_store genesis_hash >>=? fun b ->
        Assert.is_true
          ~msg:"single header is genesis"
-         (Block_header.equal (Store.Block.header b) block_header) ;
+         (Block_header.equal (Store.Block.header b) head_header) ;
        return_unit
    | None -> Alcotest.fail "missing genesis locator")
   >>=? fun () ->

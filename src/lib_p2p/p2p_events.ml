@@ -557,16 +557,6 @@ module P2p_socket = struct
       ~pp1:pp_print_top_error_of_trace
       ("error", Error_monad.trace_encoding)
       ("peer", P2p_peer.Id.encoding)
-
-  let send_message_event =
-    declare_2
-      ~section
-      ~name:"socket_send_message"
-      ~level:Debug
-      ~msg:"sending message to {peer}: {content}"
-      ("peer", P2p_peer.Id.encoding)
-      ~pp2:Data_encoding.Json.pp
-      ("content", Data_encoding.json)
 end
 
 module P2p_io_scheduler = struct
