@@ -276,8 +276,8 @@ let ticket_token_map_of_operations ctxt ops =
     ops
 
 (** Traverses a list of operations and scans for tickets. *)
-let ticket_diffs_of_operations ctxt {Script_typed_ir.elements; length = _} =
-  ticket_token_map_of_operations ctxt elements >>=? fun (token_map, ctxt) ->
+let ticket_diffs_of_operations ctxt operations =
+  ticket_token_map_of_operations ctxt operations >>=? fun (token_map, ctxt) ->
   Ticket_token_map.fold
     ctxt
     (fun ctxt acc ticket_token destination_map ->

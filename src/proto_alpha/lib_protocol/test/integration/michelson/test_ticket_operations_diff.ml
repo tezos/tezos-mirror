@@ -316,11 +316,11 @@ let transfer_operation ~src ~destination ~parameters =
       nonce = 1;
     }
 
-let ticket_diffs_of_operations incr elements =
+let ticket_diffs_of_operations incr operations =
   wrap
   @@ Ticket_operations_diff.ticket_diffs_of_operations
        (Incremental.alpha_ctxt incr)
-       {Script_typed_ir.elements; length = List.length elements}
+       operations
 
 let unit_script =
   {|
