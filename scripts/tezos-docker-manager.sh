@@ -608,8 +608,30 @@ snapshot_import() {
     local_snapshot_path="$1"
     shift
     update_compose_file "$@"
+    clear_node_storage
     call_docker_compose up importer
     warn_script_uptodate
+}
+
+clear_node_storage(){
+    tmp_dir="/var/run/tezos/node/tmp"
+    data_dir="/var/run/tezos/node/data"
+
+    docker run \
+    -v $docker_node_volume:/var/run/tezos/node \
+    -v $docker_client_volume:/var/run/tezos/client \
+    --entrypoint /bin/sh "$docker_image" \
+    -c " 
+    if [ -d "$data_dir" ]; then 
+        mkdir -p $tmp_dir
+        if [ -f "$data_dir/config.json" ]; then 
+            mv $data_dir/config.json $tmp_dir
+        fi
+        if [ -f "$data_dir/peers.json" ]; then 
+            mv $data_dir/peers.json $tmp_dir
+        fi
+        rm -r $data_dir && mv $tmp_dir $data_dir
+    fi"
 }
 
 warn_script_uptodate() {
