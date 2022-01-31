@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,34 +25,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let fresh_tx_rollup_from_current_nonce ctxt =
-  Raw_context.increment_origination_nonce ctxt >|? fun (ctxt, nonce) ->
-  (ctxt, Tx_rollup_repr.originated_tx_rollup nonce)
+(** An inbox gathers, for a given Tezos level, messages crafted by the
+    layer-1 for the layer-2 to interpret.
 
-let originate ctxt =
-  fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
-  Tx_rollup_state_storage.init ctxt tx_rollup >|=? fun ctxt -> (ctxt, tx_rollup)
+    The structure comprises two fields: (1) [contents] is the list of
+    message hashes, and (2) [cumulated_size] is the quantity of bytes
+    allocated by the related messages.
 
-let update_tx_rollups_at_block_finalization :
-    Raw_context.t -> Raw_context.t tzresult Lwt.t =
- fun ctxt ->
-  let level = (Raw_context.current_level ctxt).level in
-  Storage.Tx_rollup.fold ctxt level ~init:(ok ctxt) ~f:(fun tx_rollup ctxt ->
-      ctxt >>?= fun ctxt ->
-      (* This call cannot failed as long as we systematically check
-         that a transaction rollup exists before creating a new
-         inbox. *)
-      Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_inbox_storage.get ~level:(`Level level) ctxt tx_rollup
-      >>=? fun (ctxt, inbox) ->
-      let hard_limit =
-        Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-      in
-      let state =
-        Tx_rollup_state_repr.update_fees_per_byte
-          state
-          ~final_size:inbox.cumulated_size
-          ~hard_limit
-      in
-      Storage.Tx_rollup.State.add ctxt tx_rollup state >|=? fun (ctxt, _, _) ->
-      ctxt)
+    We recall that a transaction rollup can have up to one inbox per
+    Tezos level, starting from its origination. See
+    {!Storage.Tx_rollup} for more information. *)
+type t = {contents : Tx_rollup_message_repr.hash list; cumulated_size : int}
+
+val pp : Format.formatter -> t -> unit
+
+val encoding : t Data_encoding.t

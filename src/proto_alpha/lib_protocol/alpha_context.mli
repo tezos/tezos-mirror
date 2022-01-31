@@ -772,6 +772,8 @@ module Constants : sig
     cache_sampler_state_cycles : int;
     tx_rollup_enable : bool;
     tx_rollup_origination_size : int;
+    tx_rollup_hard_size_limit_per_inbox : int;
+    tx_rollup_hard_size_limit_per_message : int;
     sc_rollup_enable : bool;
     sc_rollup_origination_size : int;
   }
@@ -858,6 +860,8 @@ module Constants : sig
   val tx_rollup_enable : context -> bool
 
   val tx_rollup_origination_size : context -> int
+
+  val tx_rollup_hard_size_limit_per_inbox : context -> int
 
   val sc_rollup_enable : context -> bool
 
@@ -1521,52 +1525,6 @@ module Receipt : sig
   val group_balance_updates : balance_updates -> balance_updates tzresult
 end
 
-(** This module re-exports definitions from {!Tx_rollup_repr} and
-    {!Tx_rollup_storage}. *)
-module Tx_rollup : sig
-  include BASIC_DATA
-
-  type tx_rollup = t
-
-  val rpc_arg : tx_rollup RPC_arg.arg
-
-  val to_b58check : tx_rollup -> string
-
-  val of_b58check : string -> tx_rollup tzresult
-
-  val pp : Format.formatter -> tx_rollup -> unit
-
-  val encoding : tx_rollup Data_encoding.t
-
-  val originate : context -> (context * tx_rollup) tzresult Lwt.t
-
-  module Internal_for_tests : sig
-    (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
-    val originated_tx_rollup :
-      Origination_nonce.Internal_for_tests.t -> tx_rollup
-  end
-end
-
-(** This module re-exports definitions from {!Tx_rollup_state_repr}
-    and {!Tx_rollup_state_storage}. *)
-module Tx_rollup_state : sig
-  type t
-
-  val initial_state : t
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val find : context -> Tx_rollup.t -> (context * t option) tzresult Lwt.t
-
-  val get : context -> Tx_rollup.t -> (context * t) tzresult Lwt.t
-
-  type error +=
-    | Tx_rollup_already_exists of Tx_rollup.t
-    | Tx_rollup_does_not_exist of Tx_rollup.t
-end
-
 module Delegate : sig
   val init :
     context ->
@@ -2002,6 +1960,133 @@ module Destination : sig
   val in_memory_size : t -> Cache_memory_helpers.sint
 
   type error += Invalid_destination_b58check of string
+end
+
+(** This module re-exports definitions from {!Tx_rollup_repr} and
+    {!Tx_rollup_storage}. *)
+module Tx_rollup : sig
+  include BASIC_DATA
+
+  type tx_rollup = t
+
+  val rpc_arg : tx_rollup RPC_arg.arg
+
+  val to_b58check : tx_rollup -> string
+
+  val of_b58check : string -> tx_rollup tzresult
+
+  val pp : Format.formatter -> tx_rollup -> unit
+
+  val encoding : tx_rollup Data_encoding.t
+
+  val originate : context -> (context * tx_rollup) tzresult Lwt.t
+
+  val update_tx_rollups_at_block_finalization :
+    context -> context tzresult Lwt.t
+
+  module Internal_for_tests : sig
+    (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
+    val originated_tx_rollup :
+      Origination_nonce.Internal_for_tests.t -> tx_rollup
+  end
+end
+
+(** This module re-exports definitions from {!Tx_rollup_state_repr}
+    and {!Tx_rollup_state_storage}. *)
+module Tx_rollup_state : sig
+  type t
+
+  val initial_state : t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val find : context -> Tx_rollup.t -> (context * t option) tzresult Lwt.t
+
+  val get : context -> Tx_rollup.t -> (context * t) tzresult Lwt.t
+
+  val fees : t -> int -> Tez.t tzresult
+
+  type error +=
+    | Tx_rollup_already_exists of Tx_rollup.t
+    | Tx_rollup_does_not_exist of Tx_rollup.t
+
+  module Internal_for_tests : sig
+    val initial_state_with_fees_per_byte : Tez.t -> t
+
+    val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+  end
+end
+
+(** This module re-exports definitions from {!Tx_rollup_message_repr}. *)
+module Tx_rollup_message : sig
+  type deposit = {
+    destination : Tx_rollup_l2_address.Indexable.t;
+    ticket_hash : Ticket_hash.t;
+    amount : int64;
+  }
+
+  type t = Batch of string | Deposit of deposit
+
+  val size : t -> int
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  type hash
+
+  val hash_encoding : hash Data_encoding.t
+
+  val pp_hash : Format.formatter -> hash -> unit
+
+  val hash : t -> hash
+end
+
+(** This module re-exports definitions from {!Tx_rollup_inbox_repr} and
+    {!Tx_rollup_inbox_storage}. *)
+module Tx_rollup_inbox : sig
+  type t = {contents : Tx_rollup_message.hash list; cumulated_size : int}
+
+  val pp : Format.formatter -> t -> unit
+
+  val encoding : t Data_encoding.t
+
+  val append_message :
+    context ->
+    Tx_rollup.t ->
+    Tx_rollup_message.t ->
+    (int * context) tzresult Lwt.t
+
+  val messages :
+    context ->
+    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup.t ->
+    (context * Tx_rollup_message.hash list) tzresult Lwt.t
+
+  val size :
+    context ->
+    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup.t ->
+    (context * int) tzresult Lwt.t
+
+  val get :
+    context ->
+    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup.t ->
+    (context * t) tzresult Lwt.t
+
+  val find :
+    context ->
+    level:[`Current | `Level of Raw_level.t] ->
+    Tx_rollup.t ->
+    (context * t option) tzresult Lwt.t
+
+  type error +=
+    | Tx_rollup_inbox_does_not_exist of Tx_rollup.t * Raw_level.t
+    | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup.t
+    | Tx_rollup_message_size_exceeds_limit
 end
 
 module Kind : sig

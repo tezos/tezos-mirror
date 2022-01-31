@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,34 +25,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let fresh_tx_rollup_from_current_nonce ctxt =
-  Raw_context.increment_origination_nonce ctxt >|? fun (ctxt, nonce) ->
-  (ctxt, Tx_rollup_repr.originated_tx_rollup nonce)
+(** This module introduces the types used to identify ticket holders
+    within a transaction rollup. *)
 
-let originate ctxt =
-  fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
-  Tx_rollup_state_storage.init ctxt tx_rollup >|=? fun ctxt -> (ctxt, tx_rollup)
+(** The hash of a BLS public key is used as the primary identifier
+    of ticket holders within a transaction rollup. *)
+type t
 
-let update_tx_rollups_at_block_finalization :
-    Raw_context.t -> Raw_context.t tzresult Lwt.t =
- fun ctxt ->
-  let level = (Raw_context.current_level ctxt).level in
-  Storage.Tx_rollup.fold ctxt level ~init:(ok ctxt) ~f:(fun tx_rollup ctxt ->
-      ctxt >>?= fun ctxt ->
-      (* This call cannot failed as long as we systematically check
-         that a transaction rollup exists before creating a new
-         inbox. *)
-      Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_inbox_storage.get ~level:(`Level level) ctxt tx_rollup
-      >>=? fun (ctxt, inbox) ->
-      let hard_limit =
-        Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-      in
-      let state =
-        Tx_rollup_state_repr.update_fees_per_byte
-          state
-          ~final_size:inbox.cumulated_size
-          ~hard_limit
-      in
-      Storage.Tx_rollup.State.add ctxt tx_rollup state >|=? fun (ctxt, _, _) ->
-      ctxt)
+val encoding : t Data_encoding.t
+
+val pp : Format.formatter -> t -> unit
+
+val to_b58check : t -> string
+
+val of_b58check_opt : string -> t option
+
+val of_b58check_exn : string -> t
+
+val of_bytes_exn : bytes -> t
+
+val of_bytes_opt : bytes -> t option
+
+val compare : t -> t -> int
+
+(** [of_bls_pk pk] computes the address of the L2 tickets holder
+    authentified by [pk]. *)
+val of_bls_pk : Bls_signature.pk -> t
+
+(** [in_memory_size a] returns the number of bytes allocated in RAM for [a]. *)
+val in_memory_size : t -> Cache_memory_helpers.sint
+
+(** [size a] returns the number of bytes allocated in an inbox to store [a]. *)
+val size : t -> int
+
+module Indexable : sig
+  type nonrec 'state indexable = ('state, t) Indexable.indexable
+
+  type nonrec index = t Indexable.index
+
+  type nonrec t = t Indexable.t
+
+  val encoding : t Data_encoding.t
+
+  val compare : t -> t -> int
+
+  val pp : Format.formatter -> t -> unit
+
+  val size : t -> int
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
+end

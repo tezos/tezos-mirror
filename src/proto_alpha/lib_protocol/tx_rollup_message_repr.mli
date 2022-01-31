@@ -25,38 +25,52 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The state of a transaction rollup is a set of variables that vary
-    in time, as the rollup progresses. *)
-type t
+(** Communication from the layer-1 (Tezos) to the layer-2 (a
+    transaction rollup) happens thanks to messages, crafted in the
+    layer-1 to be interpreted in the layer-2.
 
-(** The initial value of a transaction rollup state, after its origination. *)
-val initial_state : t
+    Messages are constructed and gathered in the layer-1, in
+    inboxes (see {!Tx_rollup_repr_storage.append_message}). *)
+
+(** Smart contract on the layer-1 can deposit tickets into a
+    transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}. *)
+type deposit = {
+  destination : Tx_rollup_l2_address.Indexable.t;
+  ticket_hash : Ticket_hash_repr.t;
+  amount : int64;
+}
+
+(** A [message] is a piece of data originated from the layer-1 to be
+    interpreted by the layer-2.
+
+    Transaction rollups feature two kind of messages:
+
+    {ul {li An array of bytes that supposedly contains a valid
+            sequence of layer-2 operations; their interpretation and
+            validation is deferred to the layer-2..}
+        {li A deposit order for a L1 ticket.}} *)
+type t = Batch of string | Deposit of deposit
+
+(** [size msg] returns the number of bytes that are allocated in an
+    inbox by [msg]. *)
+val size : t -> int
 
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
 
-(** [update_fees_per_byte state ~final_size ~hard_limit] updates the
-    fees to be paid for each byte submitted to a transaction rollup
-    inbox, based on the ratio of the [hard_limit] maximum amount of
-    byte an inbox can use and the [final_size] amount of bytes it uses
-    at the end of the construction of a Tezos block.
+(** The Blake2B hash of a message.
 
-    In a nutshell, if the ratio is lesser than 80%, the fees per byte
-    are reduced. If the ratio is somewhere between 80% and 90%, the
-    fees per byte remain constant. If the ratio is greater than 90%,
-    then the fees per byte are increased.
+    To avoid unnecessary storage duplication, the inboxes in the
+    layer-1 do not contain the messages, but their hashes (see
+    {!Tx_rollup_inbox_storage.append_message}). This is possible
+    because the content of the messages can be reconstructed off-chain
+    by looking at the layer-1 operations and their receipt. *)
+type hash
 
-    The rationale behind this mechanics is to reduce the activity of a
-    transaction rollup in case it becomes too intense. *)
-val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+val hash_encoding : hash Data_encoding.t
 
-(** [fees state size] computes the fees to be paid to submit [size]
-    bytes in the inbox of the transactional rollup. *)
-val fees : t -> int -> Tez_repr.t tzresult
+val pp_hash : Format.formatter -> hash -> unit
 
-module Internal_for_tests : sig
-  (** [initial_state_with_fees_per_byte fees] returns [initial_state], but
-      wherein it costs [fees] per byte to add a message to an inbox. *)
-  val initial_state_with_fees_per_byte : Tez_repr.t -> t
-end
+(** [hash msg] computes the hash of [msg] to be stored in the inbox. *)
+val hash : t -> hash

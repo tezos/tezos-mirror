@@ -48,6 +48,8 @@ let zero = Tez_tag 0L
 (* all other constant are defined from the value of one micro tez *)
 let one_mutez = Tez_tag 1L
 
+let max_mutez = Tez_tag Int64.max_int
+
 let mul_int (Tez_tag tez) i = Tez_tag (Int64.mul tez i)
 
 let one_cent = mul_int one_mutez 10_000L

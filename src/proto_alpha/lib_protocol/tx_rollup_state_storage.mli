@@ -66,3 +66,9 @@ val get :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+
+(** [assert_exist ctxt tx_rollup] fails with
+    [Tx_rollup_does_not_exist] when [tx_rollup] is not a valid
+    transaction rollup address. *)
+val assert_exist :
+  Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t

@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,34 +25,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let fresh_tx_rollup_from_current_nonce ctxt =
-  Raw_context.increment_origination_nonce ctxt >|? fun (ctxt, nonce) ->
-  (ctxt, Tx_rollup_repr.originated_tx_rollup nonce)
+let address_size = 20
 
-let originate ctxt =
-  fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
-  Tx_rollup_state_storage.init ctxt tx_rollup >|=? fun ctxt -> (ctxt, tx_rollup)
+include
+  Blake2B.Make
+    (Base58)
+    (struct
+      let name = "Tx_rollup_l2_address"
 
-let update_tx_rollups_at_block_finalization :
-    Raw_context.t -> Raw_context.t tzresult Lwt.t =
- fun ctxt ->
-  let level = (Raw_context.current_level ctxt).level in
-  Storage.Tx_rollup.fold ctxt level ~init:(ok ctxt) ~f:(fun tx_rollup ctxt ->
-      ctxt >>?= fun ctxt ->
-      (* This call cannot failed as long as we systematically check
-         that a transaction rollup exists before creating a new
-         inbox. *)
-      Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_inbox_storage.get ~level:(`Level level) ctxt tx_rollup
-      >>=? fun (ctxt, inbox) ->
-      let hard_limit =
-        Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-      in
-      let state =
-        Tx_rollup_state_repr.update_fees_per_byte
-          state
-          ~final_size:inbox.cumulated_size
-          ~hard_limit
-      in
-      Storage.Tx_rollup.State.add ctxt tx_rollup state >|=? fun (ctxt, _, _) ->
-      ctxt)
+      let title =
+        "The hash of a BLS public key used to identify a L2 ticket holders"
+
+      let b58check_prefix = "\001\127\181\224" (* tru2(37) *)
+
+      let size = Some address_size
+    end)
+
+let () = Base58.check_encoded_prefix b58check_encoding "tru2" 37
+
+let of_bls_pk : Bls_signature.pk -> t =
+ fun pk -> hash_bytes [Bls_signature.pk_to_bytes pk]
+
+let in_memory_size : t -> Cache_memory_helpers.sint =
+ fun _ ->
+  let open Cache_memory_helpers in
+  header_size +! word_size +! string_size_gen address_size
+
+let size _ = address_size
+
+module Indexable = struct
+  include Indexable.Make (struct
+    type nonrec t = t
+
+    let encoding = encoding
+
+    let compare = compare
+
+    let pp = pp
+  end)
+
+  let in_memory_size = Indexable.in_memory_size in_memory_size
+
+  let size = Indexable.size size
+end

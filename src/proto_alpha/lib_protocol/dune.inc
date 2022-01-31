@@ -65,6 +65,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -83,6 +85,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -118,6 +122,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
@@ -210,6 +215,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -228,6 +235,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -263,6 +272,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
@@ -355,6 +365,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -373,6 +385,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -408,6 +422,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
@@ -522,6 +537,8 @@ include Tezos_raw_protocol_alpha.Main
    Script_repr
    Cache_memory_helpers
    Contract_repr
+   Indexable
+   Tx_rollup_l2_address
    Tx_rollup_repr
    Tx_rollup_state_repr
    Roll_repr_legacy
@@ -540,6 +557,8 @@ include Tezos_raw_protocol_alpha.Main
    Raw_context_intf
    Raw_context
    Ticket_hash_repr
+   Tx_rollup_message_repr
+   Tx_rollup_inbox_repr
    Storage_costs
    Storage_sigs
    Storage_functors
@@ -575,6 +594,7 @@ include Tezos_raw_protocol_alpha.Main
    Global_constants_costs
    Global_constants_storage
    Tx_rollup_state_storage
+   Tx_rollup_inbox_storage
    Tx_rollup_storage
    Sc_rollup_storage
    Alpha_context
@@ -708,6 +728,8 @@ include Tezos_raw_protocol_alpha.Main
    script_repr.mli script_repr.ml
    cache_memory_helpers.ml
    contract_repr.mli contract_repr.ml
+   indexable.mli indexable.ml
+   tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    roll_repr_legacy.mli roll_repr_legacy.ml
@@ -726,6 +748,8 @@ include Tezos_raw_protocol_alpha.Main
    raw_context_intf.ml
    raw_context.mli raw_context.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
+   tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage_costs.mli storage_costs.ml
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
@@ -761,6 +785,7 @@ include Tezos_raw_protocol_alpha.Main
    global_constants_costs.mli global_constants_costs.ml
    global_constants_storage.mli global_constants_storage.ml
    tx_rollup_state_storage.mli tx_rollup_state_storage.ml
+   tx_rollup_inbox_storage.mli tx_rollup_inbox_storage.ml
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml

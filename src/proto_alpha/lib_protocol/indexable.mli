@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,38 +23,62 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The state of a transaction rollup is a set of variables that vary
-    in time, as the rollup progresses. *)
-type t
+(** In transaction rollups, some values can be replaced by indexes in
+    the messages sent from the layer-1 to the layer-2.
 
-(** The initial value of a transaction rollup state, after its origination. *)
-val initial_state : t
+    This module provides various type-safe helpers to manipulate these
+    particular values. *)
 
-val encoding : t Data_encoding.t
+(** An indexable value is a value which can be replaced by an
+    integer. The first type parameter determines whether or not
+    this replacement has happened already. *)
+type ('state, 'a) indexable =
+  | Value : 'a -> ([> `Value], 'a) indexable
+  | Index : int32 -> ([> `Id], 'a) indexable
 
-val pp : Format.formatter -> t -> unit
+type unknown = [`Value | `Id]
 
-(** [update_fees_per_byte state ~final_size ~hard_limit] updates the
-    fees to be paid for each byte submitted to a transaction rollup
-    inbox, based on the ratio of the [hard_limit] maximum amount of
-    byte an inbox can use and the [final_size] amount of bytes it uses
-    at the end of the construction of a Tezos block.
+type index_only = [`Id]
 
-    In a nutshell, if the ratio is lesser than 80%, the fees per byte
-    are reduced. If the ratio is somewhere between 80% and 90%, the
-    fees per byte remain constant. If the ratio is greater than 90%,
-    then the fees per byte are increased.
+type 'a t = (unknown, 'a) indexable
 
-    The rationale behind this mechanics is to reduce the activity of a
-    transaction rollup in case it becomes too intense. *)
-val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+(** A value of type ['a index] is necessarily an index, that is, not
+    an value. *)
+type 'a index = (index_only, 'a) indexable
 
-(** [fees state size] computes the fees to be paid to submit [size]
-    bytes in the inbox of the transactional rollup. *)
-val fees : t -> int -> Tez_repr.t tzresult
+val encoding : 'a Data_encoding.t -> 'a t Data_encoding.t
 
-module Internal_for_tests : sig
-  (** [initial_state_with_fees_per_byte fees] returns [initial_state], but
-      wherein it costs [fees] per byte to add a message to an inbox. *)
-  val initial_state_with_fees_per_byte : Tez_repr.t -> t
+val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit
+
+(** [index h m] computes the index of [m], if necessary. That is, if
+    [m] is already an index, it is returned as-is. Otherwise, the
+    index is computed using the handler [h]. *)
+val index :
+  ('a -> (int32, error trace) result Lwt.t) -> 'a t -> 'a index tzresult Lwt.t
+
+(** [in_memory_size a] returns the number of bytes allocated in RAM for [a]. *)
+val in_memory_size :
+  ('a -> Cache_memory_helpers.sint) -> 'a t -> Cache_memory_helpers.sint
+
+(** [size a] returns the number of bytes allocated in an inbox to store [a]. *)
+val size : ('a -> int) -> 'a t -> int
+
+val compare : ('a -> 'a -> int) -> 'a t -> 'a t -> int
+
+module type VALUE = sig
+  type t
+
+  val encoding : t Data_encoding.t
+
+  val compare : t -> t -> int
+
+  val pp : Format.formatter -> t -> unit
+end
+
+module Make (V : VALUE) : sig
+  type nonrec 'state indexable = ('state, V.t) indexable
+
+  type nonrec index = V.t index
+
+  include VALUE with type t = V.t t
 end

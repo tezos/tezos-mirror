@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,34 +25,20 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let fresh_tx_rollup_from_current_nonce ctxt =
-  Raw_context.increment_origination_nonce ctxt >|? fun (ctxt, nonce) ->
-  (ctxt, Tx_rollup_repr.originated_tx_rollup nonce)
+type t = {contents : Tx_rollup_message_repr.hash list; cumulated_size : int}
 
-let originate ctxt =
-  fresh_tx_rollup_from_current_nonce ctxt >>?= fun (ctxt, tx_rollup) ->
-  Tx_rollup_state_storage.init ctxt tx_rollup >|=? fun ctxt -> (ctxt, tx_rollup)
+let pp fmt {contents; cumulated_size} =
+  Format.fprintf
+    fmt
+    "tx rollup inbox: %d messages using %d bytes"
+    (List.length contents)
+    cumulated_size
 
-let update_tx_rollups_at_block_finalization :
-    Raw_context.t -> Raw_context.t tzresult Lwt.t =
- fun ctxt ->
-  let level = (Raw_context.current_level ctxt).level in
-  Storage.Tx_rollup.fold ctxt level ~init:(ok ctxt) ~f:(fun tx_rollup ctxt ->
-      ctxt >>?= fun ctxt ->
-      (* This call cannot failed as long as we systematically check
-         that a transaction rollup exists before creating a new
-         inbox. *)
-      Tx_rollup_state_storage.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_inbox_storage.get ~level:(`Level level) ctxt tx_rollup
-      >>=? fun (ctxt, inbox) ->
-      let hard_limit =
-        Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-      in
-      let state =
-        Tx_rollup_state_repr.update_fees_per_byte
-          state
-          ~final_size:inbox.cumulated_size
-          ~hard_limit
-      in
-      Storage.Tx_rollup.State.add ctxt tx_rollup state >|=? fun (ctxt, _, _) ->
-      ctxt)
+let encoding =
+  let open Data_encoding in
+  conv
+    (fun {contents; cumulated_size} -> (contents, cumulated_size))
+    (fun (contents, cumulated_size) -> {contents; cumulated_size})
+    (obj2
+       (req "contents" @@ list Tx_rollup_message_repr.hash_encoding)
+       (req "cumulated_size" int31))

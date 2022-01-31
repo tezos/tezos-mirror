@@ -120,6 +120,45 @@ let test_two_originations () =
   check_tx_rollup_exists (I i) txo1 >>=? fun () ->
   check_tx_rollup_exists (I i) txo2 >>=? fun () -> return_unit
 
+(** [test_fees_per_byte_update] checks [update_fees_per_byte] behaves
+    according to its docstring. *)
+let test_fees_per_byte_update () =
+  let test ~fees_per_byte ~final_size ~hard_limit ~result =
+    let fees_per_byte = Tez.of_mutez_exn fees_per_byte in
+    let result = Tez.of_mutez_exn result in
+    let state =
+      Alpha_context.Tx_rollup_state.Internal_for_tests
+      .initial_state_with_fees_per_byte
+        fees_per_byte
+    in
+    let state =
+      Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
+        state
+        ~final_size
+        ~hard_limit
+    in
+    let new_fees =
+      match Alpha_context.Tx_rollup_state.fees state 1 with
+      | Ok x -> x
+      | Error _ ->
+          Stdlib.failwith "could not compute the fees for a message of 1 byte"
+    in
+    Assert.equal_tez ~loc:__LOC__ result new_fees
+  in
+
+  (* Fees per byte should remain constant *)
+  test ~fees_per_byte:1_000L ~final_size:1_000 ~hard_limit:1_100 ~result:1_000L
+  >>=? fun () ->
+  (* Fees per byte should increase *)
+  test ~fees_per_byte:1_000L ~final_size:1_000 ~hard_limit:1_000 ~result:1_050L
+  >>=? fun () ->
+  (* Fees per byte should decrease *)
+  test ~fees_per_byte:1_000L ~final_size:1_000 ~hard_limit:1_500 ~result:950L
+  >>=? fun () ->
+  (* Fees per byte should increase even with [0] as its initial value *)
+  test ~fees_per_byte:0L ~final_size:1_000 ~hard_limit:1_000 ~result:1L
+  >>=? fun () -> return_unit
+
 let tests =
   [
     Tztest.tztest
@@ -131,4 +170,9 @@ let tests =
       "check two originated tx rollup in one operation have different address"
       `Quick
       test_two_originations;
+    Tztest.tztest
+      "check the function that updates the fees per byte rate of a transaction \
+       rollup"
+      `Quick
+      test_fees_per_byte_update;
   ]

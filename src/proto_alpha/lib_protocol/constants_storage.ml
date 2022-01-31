@@ -153,6 +153,14 @@ let tx_rollup_origination_size c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_origination_size
 
+let tx_rollup_hard_size_limit_per_inbox c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_hard_size_limit_per_inbox
+
+let tx_rollup_hard_size_limit_per_message c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_hard_size_limit_per_message
+
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement

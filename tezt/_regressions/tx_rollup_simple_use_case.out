@@ -1,5 +1,5 @@
 tezt/_regressions/tx_rollup_simple_use_case.out
-tru16exZdBrSxKkp8MrDxdzgR9yujW3RhF5vm
+tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz
 
-./tezos-client rpc get /chains/main/blocks/head/context/tx_rollup/tru16exZdBrSxKkp8MrDxdzgR9yujW3RhF5vm/state
-{}
+./tezos-client rpc get /chains/main/blocks/head/context/tx_rollup/tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz/state
+{ "fees_per_byte": "0" }

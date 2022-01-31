@@ -656,8 +656,9 @@ def _test_create_mockup_init_show_roundtrip(
                 "cache_stake_distribution_cycles": 10,
                 "cache_sampler_state_cycles": 10,
                 "tx_rollup_enable": False,
-                # TODO: https://gitlab.com/tezos/tezos/-/issues/2152
-                "tx_rollup_origination_size": 60_000,
+                "tx_rollup_origination_size": 30_000,
+                "tx_rollup_hard_size_limit_per_inbox": 75_000,
+                "tx_rollup_hard_size_limit_per_message": 9_999,
                 "sc_rollup_enable": False,
                 "sc_rollup_origination_size": 6_314,
             }

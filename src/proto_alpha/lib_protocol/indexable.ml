@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,38 +23,82 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The state of a transaction rollup is a set of variables that vary
-    in time, as the rollup progresses. *)
-type t
+type ('state, 'a) indexable =
+  | Value : 'a -> ([> `Value], 'a) indexable
+  | Index : int32 -> ([> `Id], 'a) indexable
 
-(** The initial value of a transaction rollup state, after its origination. *)
-val initial_state : t
+type unknown = [`Value | `Id]
 
-val encoding : t Data_encoding.t
+type index_only = [`Id]
 
-val pp : Format.formatter -> t -> unit
+type 'a t = (unknown, 'a) indexable
 
-(** [update_fees_per_byte state ~final_size ~hard_limit] updates the
-    fees to be paid for each byte submitted to a transaction rollup
-    inbox, based on the ratio of the [hard_limit] maximum amount of
-    byte an inbox can use and the [final_size] amount of bytes it uses
-    at the end of the construction of a Tezos block.
+type 'a index = (index_only, 'a) indexable
 
-    In a nutshell, if the ratio is lesser than 80%, the fees per byte
-    are reduced. If the ratio is somewhere between 80% and 90%, the
-    fees per byte remain constant. If the ratio is greater than 90%,
-    then the fees per byte are increased.
+let index h : 'a t -> 'a index tzresult Lwt.t = function
+  | Value x -> h x >|=? fun x -> Index x
+  | Index x -> return (Index x)
 
-    The rationale behind this mechanics is to reduce the activity of a
-    transaction rollup in case it becomes too intense. *)
-val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+let encoding : 'a Data_encoding.t -> 'a t Data_encoding.t =
+ fun val_encoding ->
+  Data_encoding.(
+    union
+      [
+        case
+          (Tag 0)
+          ~title:"Key"
+          int32
+          (function Index x -> Some x | _ -> None)
+          (fun x -> Index x);
+        case
+          (Tag 1)
+          ~title:"Value"
+          val_encoding
+          (function Value x -> Some x | _ -> None)
+          (fun x -> Value x);
+      ])
 
-(** [fees state size] computes the fees to be paid to submit [size]
-    bytes in the inbox of the transactional rollup. *)
-val fees : t -> int -> Tez_repr.t tzresult
+let pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit =
+ fun ppv fmt -> function
+  | Index x -> Format.(fprintf fmt "#%ld" x)
+  | Value x -> Format.(fprintf fmt "%a" ppv x)
 
-module Internal_for_tests : sig
-  (** [initial_state_with_fees_per_byte fees] returns [initial_state], but
-      wherein it costs [fees] per byte to add a message to an inbox. *)
-  val initial_state_with_fees_per_byte : Tez_repr.t -> t
+let in_memory_size ims =
+  let open Cache_memory_helpers in
+  function
+  | Value x -> header_size +! word_size +! ims x
+  | Index _ -> header_size +! word_size +! int32_size
+
+let size s = function Value x -> 1 + s x | Index _ -> 1 (* tag *) + 4
+(* int32 *)
+
+let compare c x y =
+  match (x, y) with
+  | (Index x, Index y) -> Compare.Int32.compare x y
+  | (Value x, Value y) -> c x y
+  | (Index _, Value _) -> -1
+  | (Value _, Index _) -> 1
+
+module type VALUE = sig
+  type t
+
+  val encoding : t Data_encoding.t
+
+  val compare : t -> t -> int
+
+  val pp : Format.formatter -> t -> unit
+end
+
+module Make (V : VALUE) = struct
+  type nonrec 'state indexable = ('state, V.t) indexable
+
+  type nonrec t = V.t t
+
+  type nonrec index = V.t index
+
+  let encoding = encoding V.encoding
+
+  let pp = pp V.pp
+
+  let compare = compare V.compare
 end
