@@ -631,7 +631,7 @@ let check_time_preconditions measurement =
     invalid_arg "Long_test.time: newline character in measurement"
 
 let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
-    ?check ?stddev ?(repeat = 1) measurement f =
+    ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
@@ -639,7 +639,7 @@ let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
     for _ = 1 to repeat do
       let duration = f () in
       let data_point =
-        InfluxDB.data_point measurement ("duration", Float duration)
+        InfluxDB.data_point ~tags measurement ("duration", Float duration)
       in
       add_data_point data_point ;
       data_points := data_point :: !data_points
@@ -650,12 +650,13 @@ let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
       ?margin
       ?check
       ?stddev
+      ~tags
       ~data_points:!data_points
       measurement
       "duration"
 
 let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
-    measurement f =
+    ?tags measurement f =
   measure_and_check_regression
     ?previous_count
     ?minimum_previous_count
@@ -663,6 +664,7 @@ let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
     ?check
     ?stddev
     ?repeat
+    ?tags
     measurement
     (fun () ->
       let start = Unix.gettimeofday () in
@@ -671,7 +673,7 @@ let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
       stop -. start)
 
 let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
-    ?margin ?check ?stddev ?(repeat = 1) measurement f =
+    ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
@@ -680,7 +682,7 @@ let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
       Base.repeat repeat @@ fun () ->
       let* duration = f () in
       let data_point =
-        InfluxDB.data_point measurement ("duration", Float duration)
+        InfluxDB.data_point ~tags measurement ("duration", Float duration)
       in
       add_data_point data_point ;
       data_points := data_point :: !data_points ;
@@ -692,12 +694,13 @@ let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
       ?margin
       ?check
       ?stddev
+      ~tags
       ~data_points:!data_points
       measurement
       "duration"
 
 let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
-    ?repeat measurement f =
+    ?repeat ?tags measurement f =
   measure_and_check_regression_lwt
     ?previous_count
     ?minimum_previous_count
@@ -705,6 +708,7 @@ let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
     ?check
     ?stddev
     ?repeat
+    ?tags
     measurement
     (fun () ->
       let start = Unix.gettimeofday () in

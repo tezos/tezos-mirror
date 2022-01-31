@@ -321,6 +321,7 @@ val time :
   ?check:check ->
   ?stddev:bool ->
   ?repeat:int ->
+  ?tags:(string * string) list ->
   InfluxDB.measurement ->
   (unit -> unit) ->
   unit Lwt.t
@@ -337,6 +338,7 @@ val measure_and_check_regression :
   ?check:check ->
   ?stddev:bool ->
   ?repeat:int ->
+  ?tags:(string * string) list ->
   InfluxDB.measurement ->
   (unit -> float) ->
   unit Lwt.t
@@ -352,6 +354,7 @@ val time_lwt :
   ?check:check ->
   ?stddev:bool ->
   ?repeat:int ->
+  ?tags:(string * string) list ->
   InfluxDB.measurement ->
   (unit -> unit Lwt.t) ->
   unit Lwt.t
@@ -368,6 +371,7 @@ val measure_and_check_regression_lwt :
   ?check:check ->
   ?stddev:bool ->
   ?repeat:int ->
+  ?tags:(string * string) list ->
   InfluxDB.measurement ->
   (unit -> float Lwt.t) ->
   unit Lwt.t
