@@ -111,7 +111,7 @@ type error += (* `Permanent *) Failing_noop_error
 
 type error += (* `Branch *) Empty_transaction of Contract.t
 
-type error += (* `Permanent *) Tx_rollup_disabled
+type error += (* `Permanent *) Tx_rollup_feature_disabled
 
 type error += (* `Permanent *) Sc_rollup_feature_disabled
 

@@ -104,7 +104,7 @@ type error +=
     }
   | (* `Branch *) Empty_transaction of Contract.t
   | (* `Permanent *)
-      Tx_rollup_disabled
+      Tx_rollup_feature_disabled
   | (* `Permanent *)
       Sc_rollup_feature_disabled
   | (* `Permanent *)
@@ -491,8 +491,8 @@ let () =
         "Cannot apply a tx rollup operation as it is disabled. This feature \
          will be enabled in a future proposal")
     Data_encoding.unit
-    (function Tx_rollup_disabled -> Some () | _ -> None)
-    (fun () -> Tx_rollup_disabled) ;
+    (function Tx_rollup_feature_disabled -> Some () | _ -> None)
+    (fun () -> Tx_rollup_feature_disabled) ;
 
   let description =
     "Smart contract rollups will be enabled in a future proposal."
@@ -808,6 +808,9 @@ let () =
     (fun delegate -> Zero_frozen_deposits delegate)
 
 open Apply_results
+
+let assert_tx_rollup_feature_enabled ctxt =
+  fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_feature_disabled
 
 let assert_sc_rollup_feature_enabled ctxt =
   fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
@@ -1154,8 +1157,6 @@ let apply_manager_operation_content :
                 },
               [] ))
   | Tx_rollup_origination ->
-      fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_disabled
-      >>=? fun () ->
       Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
       let result =
         Tx_rollup_origination_result
@@ -1167,7 +1168,6 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [])
   | Sc_rollup_originate {kind; boot_sector} ->
-      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
       Sc_rollup_operations.originate ctxt ~kind ~boot_sector
       >>=? fun ({address; size}, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
@@ -1177,7 +1177,6 @@ let apply_manager_operation_content :
       in
       return (ctxt, result, [])
   | Sc_rollup_add_messages {rollup; messages} ->
-      assert_sc_rollup_feature_enabled ctxt >>=? fun () ->
       Sc_rollup.add_messages ctxt rollup messages
       >>=? fun (inbox_after, _size, ctxt) ->
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
@@ -1294,9 +1293,11 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       @@ (* See comment in the Transaction branch *)
       ( Script.force_decode_in_context ~consume_deserialization_gas ctxt value
       >|? fun (_value, ctxt) -> ctxt )
-  | Delegation _ | Set_deposits_limit _ | Tx_rollup_origination
+  | Delegation _ | Set_deposits_limit _ -> return ctxt
+  | Tx_rollup_origination ->
+      assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ ->
-      return ctxt)
+      assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
   Token.transfer ctxt (`Contract source_contract) `Block_fees fee
