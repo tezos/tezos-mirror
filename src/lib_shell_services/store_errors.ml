@@ -1149,8 +1149,9 @@ let () =
 
 type corruption_kind =
   | Inferred_head of Block_hash.t * Int32.t
-  | Cannot_find_cemented_savepoint of string
+  | Cannot_find_floating_savepoint
   | Cannot_find_savepoint_candidate
+  | Cannot_find_floating_caboose
   | Cannot_find_caboose_candidate
   | Cannot_find_block_with_metadata
   | Cannot_find_activation_block of Block_hash.t * int
@@ -1169,30 +1170,36 @@ let corruption_kind_encoding =
         (fun (hash, level) -> Inferred_head (hash, level));
       case
         (Tag 1)
-        ~title:"Cannot_find_cemented_savepoint"
-        (obj1 (req "cemented_metadata_file" string))
-        (function Cannot_find_cemented_savepoint s -> Some s | _ -> None)
-        (fun s -> Cannot_find_cemented_savepoint s);
+        ~title:"Cannot_find_floating_savepoint"
+        empty
+        (function Cannot_find_floating_savepoint -> Some () | _ -> None)
+        (fun () -> Cannot_find_floating_savepoint);
       case
         (Tag 2)
         ~title:"Cannot_find_savepoint_candidate"
-        Data_encoding.empty
+        empty
         (function Cannot_find_savepoint_candidate -> Some () | _ -> None)
         (fun () -> Cannot_find_savepoint_candidate);
       case
         (Tag 3)
+        ~title:"Cannot_find_floating_caboose"
+        empty
+        (function Cannot_find_floating_caboose -> Some () | _ -> None)
+        (fun () -> Cannot_find_floating_caboose);
+      case
+        (Tag 4)
         ~title:"Cannot_find_caboose_candidate"
-        Data_encoding.empty
+        empty
         (function Cannot_find_caboose_candidate -> Some () | _ -> None)
         (fun () -> Cannot_find_caboose_candidate);
       case
-        (Tag 4)
+        (Tag 5)
         ~title:"Cannot_find_block_with_metadata"
-        Data_encoding.empty
+        empty
         (function Cannot_find_block_with_metadata -> Some () | _ -> None)
         (fun () -> Cannot_find_block_with_metadata);
       case
-        (Tag 5)
+        (Tag 6)
         ~title:"Cannot_find_activation_block"
         (obj2 (req "block_hash" Block_hash.encoding) (req "proto_level" int31))
         (function
@@ -1202,9 +1209,9 @@ let corruption_kind_encoding =
         (fun (block_hash, proto_level) ->
           Cannot_find_activation_block (block_hash, proto_level));
       case
-        (Tag 6)
+        (Tag 7)
         ~title:"Missing_genesis"
-        Data_encoding.empty
+        empty
         (function Missing_genesis -> Some () | _ -> None)
         (fun () -> Missing_genesis);
     ]
@@ -1217,18 +1224,17 @@ let pp_corruption_kind ppf = function
         Block_hash.pp
         hash
         level
-  | Cannot_find_cemented_savepoint s ->
+  | Cannot_find_floating_savepoint ->
       Format.fprintf
         ppf
-        "failed to find a valid savepoint in the cemented store as metadata %s \
-         are corrupted"
-        s
+        "failed to find a valid savepoint in the floating store. No block with \
+         metadata were found"
   | Cannot_find_savepoint_candidate ->
-      Format.fprintf
-        ppf
-        "failed to find a valid savepoint candidate in the store"
+      Format.fprintf ppf "failed to find the savepoint candidate in the store"
+  | Cannot_find_floating_caboose ->
+      Format.fprintf ppf "failed to find a valid caboose in the floating store"
   | Cannot_find_caboose_candidate ->
-      Format.fprintf ppf "failed to find a valid caboose candidate in the store"
+      Format.fprintf ppf "failed to find the caboose candidate in the store"
   | Cannot_find_block_with_metadata ->
       Format.fprintf
         ppf

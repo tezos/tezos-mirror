@@ -448,7 +448,7 @@ let lowest_floating_blocks floating_stores =
 
 (* Reads and returns the inferred savepoint. *)
 let load_inferred_savepoint chain_dir block_store head savepoint_level =
-  let open Lwt_result_syntax in
+  let open Lwt_tzresult_syntax in
   let* block =
     Block_store.read_block
       ~read_metadata:false
@@ -476,7 +476,7 @@ let load_inferred_savepoint chain_dir block_store head savepoint_level =
       (* Assumption: the head is valid. Thus, at least the head
          (with metadata) must be a valid candidate for the
          savepoint. *)
-      assert false
+      fail (Corrupted_store Cannot_find_savepoint_candidate)
 
 (* Reads and returns the inferred caboose. *)
 let load_inferred_caboose chain_dir block_store head caboose_level =
@@ -545,7 +545,7 @@ let infer_savepoint_and_caboose chain_dir block_store =
       let* savepoint_level =
         match lowest_floating_with_metadata with
         | Some lvl -> return lvl
-        | None -> fail (Corrupted_store Cannot_find_savepoint_candidate)
+        | None -> fail (Corrupted_store Cannot_find_floating_savepoint)
       in
       return (savepoint_level, caboose_level)
   | (None, None) ->
@@ -557,12 +557,12 @@ let infer_savepoint_and_caboose chain_dir block_store =
       let* savepoint_level =
         match lowest_floating_with_metadata with
         | Some lvl -> return lvl
-        | None -> fail (Corrupted_store Cannot_find_savepoint_candidate)
+        | None -> fail (Corrupted_store Cannot_find_floating_savepoint)
       in
       let* caboose_level =
         match lowest_floating with
         | Some lvl -> return lvl
-        | None -> fail (Corrupted_store Cannot_find_caboose_candidate)
+        | None -> fail (Corrupted_store Cannot_find_floating_caboose)
       in
       return (savepoint_level, caboose_level)
   | (Some _, None) ->
