@@ -31,6 +31,9 @@ Node
 - Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
   expose some metrics using the Prometheus format.
 
+- Fixed missing removal of replaced operation in the plugin when another better
+  one takes its place (when the mempool is full).
+
 Client
 ------
 
