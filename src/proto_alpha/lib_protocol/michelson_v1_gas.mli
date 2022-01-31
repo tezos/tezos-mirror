@@ -494,6 +494,10 @@ module Cost_of : sig
 
     val unparse_data_cycle : Gas.cost
 
+    val unparse_views : Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+
+    val unparse_script : Gas.cost
+
     val unit : Gas.cost
 
     val contract : Gas.cost
