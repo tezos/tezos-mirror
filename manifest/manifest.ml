@@ -28,6 +28,10 @@ module String_set = Set.Make (String)
 
 let ( // ) = Filename.concat
 
+let has_prefix ~prefix string =
+  let prefix_len = String.length prefix in
+  String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
+
 (*****************************************************************************)
 (*                                  DUNE                                     *)
 (*****************************************************************************)
@@ -313,24 +317,81 @@ module Dune = struct
 end
 
 (*****************************************************************************)
+(*                                VERSIONS                                   *)
+(*****************************************************************************)
+
+module Version = struct
+  type t = string
+
+  type atom = V of t | Version
+
+  (* Note: opam does not actually support [False], which makes sense since
+     why would one want to have a dependency which cannot be installed.
+     We support [False] in order to be able to negate any version constraint. *)
+  type constraints =
+    | True
+    | False
+    | Exactly of atom
+    | Different_from of atom
+    | At_least of atom
+    | More_than of atom
+    | At_most of atom
+    | Less_than of atom
+    | Not of constraints
+    | And of constraints * constraints
+    | Or of constraints * constraints
+
+  let exactly x = Exactly (V x)
+
+  let different_from x = Different_from (V x)
+
+  let at_least x = At_least (V x)
+
+  let more_than x = More_than (V x)
+
+  let at_most x = At_most (V x)
+
+  let less_than x = Less_than (V x)
+
+  let not_ = function
+    | True -> False
+    | False -> True
+    | Exactly x -> Different_from x
+    | Different_from x -> Exactly x
+    | At_least x -> Less_than x
+    | More_than x -> At_most x
+    | At_most x -> More_than x
+    | Less_than x -> At_least x
+    | Not x -> x
+    | (And _ | Or _) as x ->
+        (* We could distribute but it could lead to an exponential explosion. *)
+        Not x
+
+  let ( && ) a b =
+    match (a, b) with
+    | (True, x) | (x, True) -> x
+    | (False, _) | (_, False) -> False
+    | _ -> And (a, b)
+
+  let and_list = List.fold_left ( && ) True
+
+  let ( || ) a b =
+    match (a, b) with
+    | (True, _) | (_, True) -> True
+    | (False, x) | (x, False) -> x
+    | _ -> Or (a, b)
+
+  let or_list = List.fold_left ( || ) False
+end
+
+(*****************************************************************************)
 (*                                  OPAM                                     *)
 (*****************************************************************************)
 
 module Opam = struct
-  type version = string
-
-  type version_constraint =
-    | Exactly of version
-    | At_least of version
-    | Less_than of version
-    | At_most of version
-    | Not of version
-
-  type version_constraints = version_constraint list
-
   type dependency = {
     package : string;
-    version : version_constraints;
+    version : Version.constraints;
     with_test : bool;
     optional : bool;
   }
@@ -338,6 +399,8 @@ module Opam = struct
   type command_item = A of string | S of string
 
   type build_instruction = {command : command_item list; with_test : bool}
+
+  type url = {url : string; sha256 : string; sha512 : string}
 
   type t = {
     maintainer : string;
@@ -350,6 +413,7 @@ module Opam = struct
     conflicts : dependency list;
     build : build_instruction list;
     synopsis : string;
+    url : url option;
   }
 
   let pp fmt
@@ -364,8 +428,34 @@ module Opam = struct
         conflicts;
         build;
         synopsis;
+        url;
       } =
     let (depopts, depends) = List.partition (fun dep -> dep.optional) depends in
+    let (depopts, conflicts) =
+      (* Opam documentation says this about [depopts]:
+         "If you require specific versions, add a [conflicts] field with the ones
+         that won't work."
+         One could assume that this is because version constraints need to existe
+         whether the optional dependencies are selected or not?
+         In any case the following piece of code converts version constraints
+         on optional dependencies into conflicts. *)
+      let optional_dep_conflicts =
+        let negate_dependency_constraint dependency =
+          match dependency.version with
+          | True ->
+              (* No conflict to introduce. *)
+              None
+          | version -> Some {dependency with version = Version.not_ version}
+        in
+        List.filter_map negate_dependency_constraint depopts
+      in
+      let depopts =
+        let remove_constraint dependency = {dependency with version = True} in
+        List.map remove_constraint depopts
+      in
+      let conflicts = conflicts @ optional_dep_conflicts in
+      (depopts, conflicts)
+    in
     let pp_line x =
       Format.kfprintf (fun fmt -> Format.pp_print_newline fmt ()) fmt x
     in
@@ -405,7 +495,6 @@ module Opam = struct
             "Cannot use strings with three consecutive double-quotes in opam \
              strings."
     in
-    let pp_version = pp_string in
     let pp_list ?(v = false) ?(prefix = "") pp_item fmt = function
       | [] -> Format.fprintf fmt "%s[]" prefix
       | list ->
@@ -426,36 +515,62 @@ module Opam = struct
             pp_sep_out
             ()
     in
-    let pp_version_constraint fmt = function
-      | Exactly version -> Format.fprintf fmt "= %a" pp_version version
-      | At_least version -> Format.fprintf fmt ">= %a" pp_version version
-      | Less_than version -> Format.fprintf fmt "< %a" pp_version version
-      | At_most version -> Format.fprintf fmt "<= %a" pp_version version
-      | Not version -> Format.fprintf fmt "!= %a" pp_version version
+    let pp_version_atom fmt = function
+      | Version.V x -> pp_string fmt x
+      | Version -> Format.pp_print_string fmt "version"
     in
-    let pp_version_constraints fmt list =
-      Format.pp_print_list pp_version_constraint fmt list ~pp_sep:(fun fmt () ->
-          Format.pp_print_string fmt " & ")
+    let rec pp_version_constraint ~in_and fmt = function
+      | Version.True ->
+          invalid_arg "pp_version_constraint cannot be called with True"
+      | False -> invalid_arg "pp_version_constraint cannot be called with False"
+      | Exactly version -> Format.fprintf fmt "= %a" pp_version_atom version
+      | Different_from version ->
+          Format.fprintf fmt "!= %a" pp_version_atom version
+      | At_least version -> Format.fprintf fmt ">= %a" pp_version_atom version
+      | More_than version -> Format.fprintf fmt "> %a" pp_version_atom version
+      | At_most version -> Format.fprintf fmt "<= %a" pp_version_atom version
+      | Less_than version -> Format.fprintf fmt "< %a" pp_version_atom version
+      | Not atom ->
+          Format.fprintf fmt "! (%a)" (pp_version_constraint ~in_and:false) atom
+      | And (a, b) ->
+          Format.fprintf
+            fmt
+            "%a & %a"
+            (pp_version_constraint ~in_and:true)
+            a
+            (pp_version_constraint ~in_and:true)
+            b
+      | Or (a, b) ->
+          Format.fprintf
+            fmt
+            "%s%a & %a%s"
+            (if in_and then "(" else "")
+            (pp_version_constraint ~in_and:false)
+            a
+            (pp_version_constraint ~in_and:false)
+            b
+            (if in_and then ")" else "")
     in
     let pp_dependency fmt {package; version; with_test; _} =
       match (version, with_test) with
-      | ([], false) -> pp_string fmt package
-      | ([], true) -> Format.fprintf fmt "@[%a {with-test}@]" pp_string package
-      | (_ :: _, false) ->
+      | (True, false) -> pp_string fmt package
+      | (True, true) ->
+          Format.fprintf fmt "@[%a {with-test}@]" pp_string package
+      | (version, false) ->
           Format.fprintf
             fmt
             "@[%a { %a }@]"
             pp_string
             package
-            pp_version_constraints
+            (pp_version_constraint ~in_and:false)
             version
-      | (_ :: _, true) ->
+      | (version, true) ->
           Format.fprintf
             fmt
             "@[%a { with-test & %a }@]"
             pp_string
             package
-            pp_version_constraints
+            (pp_version_constraint ~in_and:false)
             version
     in
     let pp_command_item fmt = function
@@ -469,6 +584,15 @@ module Opam = struct
         (pp_list pp_command_item)
         command
         (if with_test then " {with-test}" else "")
+    in
+    let pp_url {url; sha256; sha512} =
+      pp_line "url {" ;
+      pp_line "  src: \"%s\"" url ;
+      pp_line "  checksum: [" ;
+      pp_line "    \"sha256=%s\"" sha256 ;
+      pp_line "    \"sha512=%s\"" sha512 ;
+      pp_line "  ]" ;
+      pp_line "}"
     in
     pp_line "opam-version: \"2.0\"" ;
     pp_line "maintainer: %a" pp_string maintainer ;
@@ -487,7 +611,7 @@ module Opam = struct
         conflicts ;
     pp_line "%a" (pp_list ~prefix:"build: " pp_build_instruction) build ;
     pp_line "synopsis: %a" pp_string synopsis ;
-    ()
+    Option.iter pp_url url
 end
 
 (*****************************************************************************)
@@ -500,13 +624,13 @@ module Target = struct
   type external_ = {
     name : string;
     opam : string option;
-    version : Opam.version_constraints;
+    version : Version.constraints;
     js_compatible : bool;
   }
 
   type vendored = {name : string; js_compatible : bool}
 
-  type opam_only = {name : string; version : Opam.version_constraints}
+  type opam_only = {name : string; version : Version.constraints}
 
   type modules =
     | All
@@ -544,7 +668,7 @@ module Target = struct
     modes : Dune.mode list option;
     modules : modules;
     nopervasives : bool;
-    ocaml : Opam.version_constraints option;
+    ocaml : Version.constraints option;
     opam : string option;
     opaque : bool;
     opens : string list;
@@ -668,7 +792,7 @@ module Target = struct
     ?modules:string list ->
     ?node_wrapper_flags:string list ->
     ?nopervasives:bool ->
-    ?ocaml:Opam.version_constraints ->
+    ?ocaml:Version.constraints ->
     ?opam:string ->
     ?opaque:bool ->
     ?opens:string list ->
@@ -953,25 +1077,33 @@ module Target = struct
     Select {package; source_if_present; source_if_absent; target}
 end
 
+type release = {version : string; url : Opam.url}
+
 (*****************************************************************************)
 (*                                GENERATOR                                  *)
 (*****************************************************************************)
-
-let has_prefix ~prefix string =
-  let prefix_len = String.length prefix in
-  String.length string >= prefix_len && String.sub string 0 prefix_len = prefix
 
 (* Gather the list of generated files so that we can find out whether
    there are other files that we should have generated. *)
 let generated_files = ref String_set.empty
 
+let rec create_parent path =
+  let parent = Filename.dirname path in
+  if String.length parent < String.length path then (
+    create_parent parent ;
+    if not (Sys.file_exists parent) then Sys.mkdir parent 0o755)
+
 (* Write a file relatively to the root directory of the repository. *)
 let write filename f =
-  let filename = Filename.parent_dir_name // filename in
+  let filename =
+    if Filename.is_relative filename then Filename.parent_dir_name // filename
+    else filename
+  in
   if String_set.mem filename !generated_files then
     failwith
       (filename ^ " is generated twice; did you declare the same library twice?") ;
   generated_files := String_set.add filename !generated_files ;
+  create_parent filename ;
   let outch = open_out filename in
   match f (Format.formatter_of_out_channel outch) with
   | exception exn ->
@@ -1229,26 +1361,46 @@ let generate_dune_files () =
    and in which the dependency will be added.
    If it is the same package as the one in which [target] belongs,
    [None] is returned, since a package cannot depend on itself
-   and there is no need to. *)
-let rec as_opam_dependency ~(for_package : string) ~with_test
+   and there is no need to.
+
+   If [fix_version] is [true], require [target]'s version to be
+   exactly the same as [for_package]'s version, but only if [target] is internal. *)
+let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
     (target : Target.target) : Opam.dependency option =
   match target with
   | Internal {opam = None; _} | External {opam = None; _} -> None
   | Internal {opam = Some package; _} ->
       let package = Filename.basename package in
       if package = for_package then None
-      else Some {Opam.package; version = []; with_test; optional = false}
+      else
+        let version =
+          if fix_version then Version.(Exactly Version) else Version.True
+        in
+        Some {Opam.package; version; with_test; optional = false}
   | Vendored {name = package; _} ->
-      Some {Opam.package; version = []; with_test; optional = false}
+      Some {Opam.package; version = True; with_test; optional = false}
   | External {opam = Some opam; version; _} | Opam_only {name = opam; version}
     ->
+      let version =
+        (* FIXME: https://gitlab.com/tezos/tezos/-/issues/1453
+           Remove this once all packages (including protocol packages)
+           have been ported to the manifest. *)
+        if
+          fix_version
+          && (has_prefix ~prefix:"tezos-" (Filename.basename opam)
+             || has_prefix ~prefix:"octez-" (Filename.basename opam))
+        then Version.(Exactly Version)
+        else version
+      in
       Some {Opam.package = opam; version; with_test; optional = false}
   | Optional target | Select {package = target; _} ->
       Option.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
-        (as_opam_dependency ~for_package ~with_test target)
+        (as_opam_dependency ~fix_version ~for_package ~with_test target)
 
-let generate_opam this_package (internals : Target.internal list) : Opam.t =
+let generate_opam ?release this_package (internals : Target.internal list) :
+    Opam.t =
+  let for_package = Filename.basename this_package in
   let map l f = List.map f l in
   let depends =
     List.flatten @@ map internals
@@ -1262,11 +1414,18 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
     in
     let deps =
       List.filter_map
-        (as_opam_dependency ~for_package:this_package ~with_test)
+        (as_opam_dependency
+           ~fix_version:(release <> None)
+           ~for_package
+           ~with_test)
         deps
     in
     let get_preprocess_dep (Target.PPS target | PPS_args (target, _)) =
-      as_opam_dependency ~for_package:this_package ~with_test target
+      as_opam_dependency
+        ~fix_version:(release <> None)
+        ~for_package
+        ~with_test
+        target
     in
     List.filter_map get_preprocess_dep internal.preprocess @ deps
   in
@@ -1280,7 +1439,7 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
     | versions ->
         {
           Opam.package = "ocaml";
-          version = List.flatten versions;
+          version = Version.and_list versions;
           with_test = false;
           optional = false;
         }
@@ -1289,7 +1448,7 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
   let depends =
     {
       Opam.package = "dune";
-      version = [At_least "2.9"];
+      version = Version.at_least "2.9";
       with_test = false;
       optional = false;
     }
@@ -1307,12 +1466,43 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
     List.flatten @@ map internals
     @@ fun internal ->
     List.filter_map
-      (as_opam_dependency ~for_package:this_package ~with_test:false)
+      (as_opam_dependency ~fix_version:false ~for_package ~with_test:false)
       internal.conflicts
   in
   let synopsis =
     String.concat " " @@ List.flatten @@ map internals
     @@ fun internal -> Option.to_list internal.synopsis
+  in
+  let build =
+    let build : Opam.build_instruction =
+      {
+        command = [S "dune"; S "build"; S "-p"; A "name"; S "-j"; A "jobs"];
+        with_test = false;
+      }
+    in
+    let runtest : Opam.build_instruction =
+      {
+        command = [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
+        with_test = true;
+      }
+    in
+    match release with
+    | None -> [build; runtest]
+    | Some _ ->
+        [
+          {Opam.command = [S "rm"; S "-r"; S "vendors"]; with_test = false};
+          build;
+          {
+            Opam.command =
+              [
+                S "mv";
+                S (Filename.dirname this_package ^ "/%{name}%.install");
+                S "./";
+              ];
+            with_test = false;
+          };
+          runtest;
+        ]
   in
   {
     maintainer = "contact@tezos.com";
@@ -1323,18 +1513,9 @@ let generate_opam this_package (internals : Target.internal list) : Opam.t =
     license = "MIT";
     depends;
     conflicts;
-    build =
-      [
-        {
-          command = [S "dune"; S "build"; S "-p"; A "name"; S "-j"; A "jobs"];
-          with_test = false;
-        };
-        {
-          command = [S "dune"; S "runtest"; S "-p"; A "name"; S "-j"; A "jobs"];
-          with_test = true;
-        };
-      ];
+    build;
     synopsis;
+    url = Option.map (fun {url; _} -> url) release;
   }
 
 let generate_opam_files () =
@@ -1346,15 +1527,26 @@ let generate_opam_files () =
      So each [Target.t] comes with an [opam] path, which defaults to being in the
      same directory as the dune file, with the package as filename (suffixed with .opam),
      but one can specify a custom .opam path too. *)
-  Target.iter_internal_by_opam @@ fun opam_filename internals ->
-  let opam = generate_opam (Filename.basename opam_filename) internals in
-  write (opam_filename ^ ".opam") @@ fun fmt ->
+  Target.iter_internal_by_opam @@ fun package internals ->
+  let opam = generate_opam package internals in
+  write (package ^ ".opam") @@ fun fmt ->
   Format.fprintf
     fmt
     "# This file was automatically generated, do not edit.@.# Edit file \
      manifest/main.ml instead.@.%a"
     Opam.pp
     opam
+
+let generate_opam_files_for_release packages_dir release =
+  Target.iter_internal_by_opam @@ fun package internal_pkgs ->
+  let package_name = Filename.basename package in
+  let opam_filename =
+    packages_dir // package_name
+    // (package_name ^ "." ^ release.version)
+    // "opam"
+  in
+  let opam = generate_opam ~release package internal_pkgs in
+  write opam_filename @@ fun fmt -> Opam.pp fmt opam
 
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
@@ -1453,13 +1645,52 @@ let check_js_of_ocaml () =
       !missing_from_target) ;
   if not !jsoo_ok then exit 1
 
+let usage_msg = "Usage: " ^ Sys.executable_name ^ " [OPTIONS]"
+
+let (packages_dir, release) =
+  let packages_dir = ref "packages" in
+  let url = ref "" in
+  let sha256 = ref "" in
+  let sha512 = ref "" in
+  let version = ref "" in
+  let anon_fun _args = () in
+  let spec =
+    Arg.align
+      [
+        ( "--packages-dir",
+          Arg.Set_string packages_dir,
+          "<PATH> Path of the 'packages' directory where to write opam files \
+           for release (default: 'packages')" );
+        ("--url", Arg.Set_string url, "<URL> Set url for release");
+        ("--sha256", Arg.Set_string sha256, "<HASH> Set sha256 for release");
+        ("--sha512", Arg.Set_string sha512, "<HASH> Set sha512 for release");
+        ( "--release",
+          Arg.Set_string version,
+          "<VERSION> Generate opam files for release instead, for VERSION" );
+      ]
+  in
+  Arg.parse spec anon_fun usage_msg ;
+  let release =
+    match (!url, !sha256, !sha512, !version) with
+    | ("", "", "", "") -> None
+    | ("", _, _, _) | (_, "", _, _) | (_, _, "", _) | (_, _, _, "") ->
+        prerr_endline
+          "Error: either all of --url, --sha256, --sha512 and --release must \
+           be specified, or none of them." ;
+        exit 1
+    | (url, sha256, sha512, version) ->
+        Some {version; url = {url; sha256; sha512}}
+  in
+  (!packages_dir, release)
+
 let generate ?exclude () =
   Printexc.record_backtrace true ;
   try
     generate_dune_files () ;
     generate_opam_files () ;
     check_for_non_generated_files ?exclude () ;
-    check_js_of_ocaml ()
+    check_js_of_ocaml () ;
+    Option.iter (generate_opam_files_for_release packages_dir) release
   with exn ->
     Printexc.print_backtrace stderr ;
     prerr_endline ("Error: " ^ Printexc.to_string exn) ;

@@ -193,44 +193,117 @@ module Dune : sig
   val include_ : string -> s_expr
 end
 
-module Opam : sig
-  (** Opam version constraints. *)
+module Version : sig
+  (** Opam package versions and version constraints. *)
 
-  (** Package versions.
+  (** Opam package versions.
 
       Example: ["1.1.0"] *)
-  type version = string
+  type t = string
 
-  (** Package version constraints.
+  (** Atoms of Opam package versions.
+
+      [V] is a regular version number, and [Version] is Opam's [version] variable
+      which denotes the version of the current package. *)
+  type atom = V of t | Version
+
+  (** Opam package version constraints.
+
+      - [True] means no constraint.
+
+      - [False] means the package cannot be installed.
+        Opam does not actually support this constructor and trying to
+        write an opam package with such a version constraint results in an error.
+        This constructor is provided for completeness sake so that
+        functions {!not_}, {!and_list} and {!or_list} can be more general.
 
       - [Exactly v] means that the version number must be [v].
         It becomes [=] in the generated opam file.
 
+      - [Different_from v] means that the version number cannot be [v].
+        It becomes [!=] in the generated opam file.
+
       - [At_least v] means that the version number must be [v] or more.
         It becomes [>=] in the generated opam file.
+
+      - [More_than v] means that the version number must be greater than [v].
+        In particular it cannot be [v].
+        It becomes [>] in the generated opam file.
+
+      - [At_most v] means that the version number must be [v] or less.
+        It becomes [<=] in the generated opam file.
 
       - [Less_than v] means that the version number must be lower than [v].
         In particular it cannot be [v].
         It becomes [<] in the generated opam file.
 
-      - [At_most v] means that the version number must be [v] or less.
-        It becomes [<=] in the generated opam file.
+      - [Not a] is the negation of constraint [a].
+        It becomes [! (...)] in the generated opam file.
+        It is advised to use {!not_} instead.
 
-      - [Not v] means that the version number cannot be [v].
-        It becomes [!=] in the generated opam file. *)
-  type version_constraint =
-    | Exactly of version
-    | At_least of version
-    | Less_than of version
-    | At_most of version
-    | Not of version
+      - [And (a, b)] is the conjunction of [a] and [b].
+        It becomes [&] in the generated opam file.
+        It is advised to use {!and_} or {and_list} instead.
 
-  (** Conjunctions of package version constraints.
+      - [Or (a, b)] is the disjunction of [a] and [b].
+        It becomes [|] in the generated opam file.
+        It is advised to use {!or_} or {or_list} instead. *)
+  type constraints =
+    | True
+    | False
+    | Exactly of atom
+    | Different_from of atom
+    | At_least of atom
+    | More_than of atom
+    | At_most of atom
+    | Less_than of atom
+    | Not of constraints
+    | And of constraints * constraints
+    | Or of constraints * constraints
 
-      Example: [[ At_least "1.1.0"; Less_than "2.0"; Not "1.3.0" ]]
-      means [>= 1.1.0 & < 2.0 & != 1.3.0], i.e. the major version number
-      must be 1 and the minor version number must be at least 1 but not 3. *)
-  type version_constraints = version_constraint list
+  (** Same as [Exactly (V ...)]. *)
+  val exactly : t -> constraints
+
+  (** Same as [Different_from (V ...)]. *)
+  val different_from : t -> constraints
+
+  (** Same as [At_least (V ...)]. *)
+  val at_least : t -> constraints
+
+  (** Same as [More_than (V ...)]. *)
+  val more_than : t -> constraints
+
+  (** Same as [At_most (V ...)]. *)
+  val at_most : t -> constraints
+
+  (** Same as [Less_than (V ...)]. *)
+  val less_than : t -> constraints
+
+  (** Smart constructor for [Not].
+
+      Simple terms are converted without using [Not].
+      For instance [not_ True] is [False] and [not_ (At_most x)] is [More_than x].
+      [not_ (Not x)] is [x]. Only [And] and [Or] result in an actual [Not], i.e.
+      [not_ (And ...)] is [Not (And ...)]. *)
+  val not_ : constraints -> constraints
+
+  (** Smart constructor for [And].
+
+      Conjunctions between [x] and [True] return [x] instead of [And (x, True)],
+      and conjunctions between [x] and [False] return [False]. *)
+  val ( && ) : constraints -> constraints -> constraints
+
+  (** Same as [List.fold_left and_ True]. *)
+  val and_list : constraints list -> constraints
+
+  (** Smart constructor for [Or].
+
+      Disjunctions between [x] and [True] return [True] instead of [And (x, True)],
+      and disjunctions between [x] and [False] return [x]. *)
+  val ( || ) : constraints -> constraints -> constraints
+
+  (** Same as [List.fold_left or_ False]. *)
+  val or_list : constraints list -> constraints
 end
 
 (** Module lists for the [(modules)] stanza in [dune] files.
@@ -433,7 +506,7 @@ type 'a maker =
   ?modules:string list ->
   ?node_wrapper_flags:string list ->
   ?nopervasives:bool ->
-  ?ocaml:Opam.version_constraints ->
+  ?ocaml:Version.constraints ->
   ?opam:string ->
   ?opaque:bool ->
   ?opens:string list ->
@@ -524,11 +597,7 @@ val vendored_lib : ?js_compatible:bool -> string -> target
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.  *)
 val external_lib :
-  ?opam:string ->
-  ?js_compatible:bool ->
-  string ->
-  Opam.version_constraints ->
-  target
+  ?opam:string -> ?js_compatible:bool -> string -> Version.constraints -> target
 
 (** Make an external library that is a sublibrary of an other one.
 
@@ -547,7 +616,7 @@ val external_sublib : ?js_compatible:bool -> target -> string -> target
 (** Make an external library that is to only appear in [.opam] dependencies.
 
     This avoids using [~opam_only_deps] each time you declare this dependency. *)
-val opam_only : string -> Opam.version_constraints -> target
+val opam_only : string -> Version.constraints -> target
 
 (** Make an optional dependency with a source file to be selected depending on presence.
 

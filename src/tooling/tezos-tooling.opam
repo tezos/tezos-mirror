@@ -18,7 +18,10 @@ depends: [
   "tezos-base"
 ]
 depopts: [
-  "utop" { >= "2.8" }
+  "utop"
+]
+conflicts: [
+  "utop" { < "2.8" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
