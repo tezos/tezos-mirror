@@ -49,7 +49,13 @@ module Constants = struct
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
-  let cost_compare_key_script_expr_hash = S.safe_int 100
+  let cost_compare_ticket_hash = S.safe_int 100
+
+  (* TODO: #2315
+     Fill in real benchmarked values.
+     Need to create benchmark and fill in values.
+  *)
+  let cost_compare_key_contract = S.safe_int 100
 end
 
 let consume_gas_steps ctxt ~step_cost ~num_steps =
@@ -70,3 +76,6 @@ let has_tickets_of_ty_cost ty =
 let negate_cost z =
   let size = (7 + Z.numbits z) / 8 in
   Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
+
+(** Reusing the gas model from [Michelson_v1_gas.Cost_of.add] *)
+let add_cost = Michelson_v1_gas.Cost_of.Interpreter.add_int

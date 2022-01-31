@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
-*)
+open Alpha_context
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-    ]
-  |> Lwt_main.run
+(** A carbonated map where the keys are [Ticket_hash.t] values. *)
+module Ticket_token_map = Carbonated_map.Make (struct
+  type t = Ticket_hash.t
+
+  let compare = Ticket_hash.compare
+
+  let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
+end)
+
+(** Conceptually a map from [Ticket_token.ex_token] to values. Since
+    ticket-tokens are expensive to compare we use [Ticket_hash.t] keys instead,
+    and store the ticket-token along with the value.  *)
+type 'a t = (Ticket_token.ex_token * 'a) Ticket_token_map.t
+
+let empty = Ticket_token_map.empty
+
+let key_of_ticket_token ctxt (Ticket_token.Ex_token {ticketer; _} as token) =
+  (* We use the [ticket_balance_key] function for generating a key-hash
+     for comparing tokens. Since an owner contract is required we use [ticketer]
+     but any dummy value would work as long as it's consistent.
+  *)
+  Ticket_balance_key.ticket_balance_key ctxt ~owner:ticketer token
+
+let update ctxt key f m =
+  key_of_ticket_token ctxt key >>=? fun (key_hash, ctxt) ->
+  let f ctxt val_opt =
+    (match val_opt with
+    | Some (_tkn, value) -> f ctxt (Some value)
+    | None -> f ctxt None)
+    >|? fun (val_opt, ctxt) -> (Option.map (fun v -> (key, v)) val_opt, ctxt)
+  in
+  Ticket_token_map.update ctxt key_hash f m |> Lwt.return
+
+let fold ctxt f =
+  Ticket_token_map.fold ctxt (fun ctxt acc _key_hash (tkn, value) ->
+      f ctxt acc tkn value)

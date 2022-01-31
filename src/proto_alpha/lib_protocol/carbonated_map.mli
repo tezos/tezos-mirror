@@ -35,6 +35,9 @@ module type S = sig
   (** [empty] an empty map. *)
   val empty : 'a t
 
+  (** [singleton k v] returns a map with a single key [k] and value [v] pair. *)
+  val singleton : key -> 'a -> 'a t
+
   (** [size m] returns the number of elements of the map [m] in constant time. *)
   val size : 'a t -> int
 

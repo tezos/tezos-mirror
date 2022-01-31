@@ -40,4 +40,6 @@ type ex_token =
 
 (** [token_and_amount_of_ex_ticket ex_ticket] returns the token and amount of
     the given ticket [ex_ticket]. *)
-val token_and_amount_of_ex_ticket : Ticket_scanner.ex_ticket -> ex_token * Z.t
+val token_and_amount_of_ex_ticket :
+  Ticket_scanner.ex_ticket ->
+  ex_token * Alpha_context.Script_int.n Alpha_context.Script_int.num

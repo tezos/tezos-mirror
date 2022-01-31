@@ -32,7 +32,9 @@ module Constants : sig
 
   val cost_token_and_amount_of_ticket : Alpha_context.Gas.cost
 
-  val cost_compare_key_script_expr_hash : Alpha_context.Gas.cost
+  val cost_compare_ticket_hash : Alpha_context.Gas.cost
+
+  val cost_compare_key_contract : Alpha_context.Gas.cost
 end
 
 (** [consume_gas_steps ctxt ~num_steps] consumes gas corresponding to
@@ -56,3 +58,9 @@ val has_tickets_of_ty_cost :
 
 (** [negate_cost z] returns the cost of negating the given value [z]. *)
 val negate_cost : Z.t -> Alpha_context.Gas.cost
+
+(** [add_cost n1 n2] returns the cost of adding the values [n1] and [n2]. *)
+val add_cost :
+  Alpha_context.Script_int.n Alpha_context.Script_int.num ->
+  Alpha_context.Script_int.n Alpha_context.Script_int.num ->
+  Alpha_context.Gas.cost

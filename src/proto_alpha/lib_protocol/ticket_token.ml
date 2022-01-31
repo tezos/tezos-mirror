@@ -34,5 +34,4 @@ type ex_token =
 let token_and_amount_of_ex_ticket
     (Ticket_scanner.Ex_ticket
       (contents_type, {Script_typed_ir.ticketer; contents; amount})) =
-  let amount = Alpha_context.Script_int.to_zint amount in
   (Ex_token {ticketer; contents_type; contents}, amount)

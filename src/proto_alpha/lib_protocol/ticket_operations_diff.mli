@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
-*)
+(** A module that provides functionality for extracting ticket-token differences
+    from a list of operations. *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-    ]
-  |> Lwt_main.run
+(** A type representing ticket-token balance differences. Each value consists
+    of:
+    - [ticket_token] - the type of the ticket.
+    - [total_amount] - the total amount of transferred ticket-tokens.
+    - [destinations] - a list of amount and contract pairs.
+    Invariant: [total_amount] is the sum of the amounts in [destinations]. *)
+type ticket_token_diff = private {
+  ticket_token : Ticket_token.ex_token;
+  total_amount : Alpha_context.Script_int.n Alpha_context.Script_int.num;
+  destinations :
+    (Alpha_context.Contract.t
+    * Alpha_context.Script_int.n Alpha_context.Script_int.num)
+    list;
+}
+
+(** [ticket_diffs_of_operations ctxt ops] returns a list of ticket-tokens diffs
+    given a context, [ctxt], and list of packed operations, [ops]. The diffs
+    result from either a [Transaction] operation with parameters containing
+    tickets, or an [Origination] operation with the initial storage containing
+    tickets. *)
+val ticket_diffs_of_operations :
+  Alpha_context.context ->
+  Alpha_context.packed_internal_operation Script_typed_ir.boxed_list ->
+  (ticket_token_diff list * Alpha_context.context) tzresult Lwt.t

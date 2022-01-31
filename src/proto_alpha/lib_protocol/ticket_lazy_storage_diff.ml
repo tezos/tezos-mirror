@@ -50,7 +50,9 @@ let () =
 (** Extracts the ticket-token and amount from an ex_ticket value. *)
 let token_and_amount ctxt ex_ticket =
   Gas.consume ctxt Ticket_costs.Constants.cost_token_and_amount_of_ticket
-  >|? fun ctxt -> (Ticket_token.token_and_amount_of_ex_ticket ex_ticket, ctxt)
+  >|? fun ctxt ->
+  let (token, amount) = Ticket_token.token_and_amount_of_ex_ticket ex_ticket in
+  ((token, Script_int.to_zint amount), ctxt)
 
 (** Extracts the ticket-token and amount from an ex_ticket value and returns
   the opposite of the amount. This is used to account for removal of tickets inside
@@ -98,7 +100,7 @@ module Key_hash_map = Carbonated_map.Make (struct
 
   let compare = Script_expr_hash.compare
 
-  let compare_cost _ = Ticket_costs.Constants.cost_compare_key_script_expr_hash
+  let compare_cost _ = Ticket_costs.Constants.cost_compare_ticket_hash
 end)
 
 (** Collects all ticket-token diffs from a big-map update and prepends them

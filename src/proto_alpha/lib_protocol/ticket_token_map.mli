@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Testing
-    -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
-*)
+(** A module exposing a carbonated map where keys are [Ticket_token.ex_token]
+    values. *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol_alpha"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-    ]
-  |> Lwt_main.run
+(** A map where keys are [Ticket_token.ex_token] values. *)
+type 'a t
+
+(** [empty] is a map without any elements. *)
+val empty : 'a t
+
+(** [update ctxt k f map] updates or adds the value of the key [k] using [f].
+    The function accounts for the gas cost for finding the element. [f] must
+    account for its own gas costs. *)
+val update :
+  Alpha_context.context ->
+  Ticket_token.ex_token ->
+  (Alpha_context.context ->
+  'a option ->
+  ('a option * Alpha_context.context) tzresult) ->
+  'a t ->
+  ('a t * Alpha_context.context) tzresult Lwt.t
+
+(** [fold ctxt f z m] folds over the map [m] using the initial value [z] and
+    the accumulator function [f]. [f] must account for its own gas costs.  *)
+val fold :
+  Alpha_context.context ->
+  (Alpha_context.context ->
+  'state ->
+  Ticket_token.ex_token ->
+  'a ->
+  ('state * Alpha_context.context) tzresult) ->
+  'state ->
+  'a t ->
+  ('state * Alpha_context.context) tzresult
