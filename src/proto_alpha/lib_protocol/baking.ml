@@ -77,11 +77,15 @@ let baking_rights c level =
   in
   f c Round.zero
 
+type ordered_slots = Slot.t list
+
+(* Slots returned by this function are assumed by consumers to be in increasing
+   order, hence the use of [Slot.Range.rev_fold_es]. *)
 let endorsing_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
   Slot.Range.create ~min:0 ~count:consensus_committee_size >>?= fun slots ->
-  Slot.Range.fold_es
-    (fun (ctxt, acc) slot ->
+  Slot.Range.rev_fold_es
+    (fun (ctxt, map) slot ->
       Stake_distribution.slot_owner ctxt level slot >>=? fun (ctxt, (_, pkh)) ->
       return (ctxt, (slot, pkh) :: acc))
     (ctxt, [])

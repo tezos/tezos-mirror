@@ -70,7 +70,8 @@ module Set = Set.Make (Compare.Int)
 
 module Range = struct
   (* For now, we only need full intervals. If we ever need sparse ones, we
-     could switch this representation to interval trees. *)
+     could switch this representation to interval trees. [hi] and [lo] bounds
+     are included. *)
   type t = Interval of {lo : int; hi : int}
 
   let create ~min ~count =
@@ -84,14 +85,22 @@ module Range = struct
 
   let fold f init (Interval {lo; hi}) =
     let rec loop ~acc ~next =
-      if next > hi then acc else loop ~acc:(f acc next) ~next:(next + 1)
+      if Compare.Int.(next > hi) then acc
+      else loop ~acc:(f acc next) ~next:(next + 1)
     in
     loop ~acc:(f init lo) ~next:(lo + 1)
 
   let fold_es f init (Interval {lo; hi}) =
     let rec loop ~acc ~next =
-      if next > hi then return acc
+      if Compare.Int.(next > hi) then return acc
       else f acc next >>=? fun acc -> loop ~acc ~next:(next + 1)
     in
     f init lo >>=? fun acc -> loop ~acc ~next:(lo + 1)
+
+  let rev_fold_es f init (Interval {lo; hi}) =
+    let rec loop ~acc ~next =
+      if Compare.Int.(next < lo) then return acc
+      else f acc next >>=? fun acc -> loop ~acc ~next:(next - 1)
+    in
+    f init hi >>=? fun acc -> loop ~acc ~next:(hi - 1)
 end
