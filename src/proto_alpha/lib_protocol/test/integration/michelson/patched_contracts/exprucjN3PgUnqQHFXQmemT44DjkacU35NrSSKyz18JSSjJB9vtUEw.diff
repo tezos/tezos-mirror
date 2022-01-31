@@ -1,0 +1,64 @@
+--- patched_contracts/exprucjN3PgUnqQHFXQmemT44DjkacU35NrSSKyz18JSSjJB9vtUEw.original.tz
++++ patched_contracts/exprucjN3PgUnqQHFXQmemT44DjkacU35NrSSKyz18JSSjJB9vtUEw.patched.tz
+@@ -6,9 +6,9 @@
+               (or (pair %Set_keys
+                      (list %key_groups (pair (list %signatories key) (nat %group_threshold)))
+                      (nat %overall_threshold))
+-                  (option %Set_delegate (key_hash %new_delegate))))
++                  (option %Set_delegate key_hash)))
+            (list %signatures (list (option signature))))
+-        (option (pair %Pour (signature %pour_auth) (mutez %pour_amount)))) ;
++        (option (pair (signature %pour_auth) (mutez %pour_amount)))) ;
+   storage
+     (pair (pair (nat %replay_counter)
+                 (pair %key_info
+@@ -17,7 +17,7 @@
+           (pair (pair %vesting
+                    (pair %vesting_quantities (mutez %vested_balance) (mutez %vesting_increment))
+                    (pair %vesting_schedule (timestamp %next_payout) (int %payout_interval)))
+-                (option %pour_info (pair (contract %pour_dest unit) (key %pour_authorizer))))) ;
++                (option (pair (address %pour_dest) (key %pour_authorizer))))) ;
+   code { DUP ;
+          CAR ;
+          IF_LEFT
+@@ -93,7 +93,8 @@
+                                  DUP ;
+                                  DIP { { { COMPARE ; LE } ; IF {} { { UNIT ; FAILWITH } } } } ;
+                                  SWAP ;
+-                                 SUB @vested_balance ;
++                                 SUB_MUTEZ ;
++                                 IF_NONE { UNIT ; FAILWITH } { RENAME @vested_balance } ;
+                                  DIP { CDR %vesting_increment @% } ;
+                                  PAIR @vesting_quantities %@ %@ ;
+                                  DIP { DUP ; CAR ; CDR %vesting_schedule @% ; DIP { CDR %pour_info @% } } ;
+@@ -109,7 +110,10 @@
+                      TRANSFER_TOKENS @transfer_op ;
+                      CONS @operations }
+                    { SWAP ;
+-                     DIP { SWAP ;
++                     DIP { IF_NONE
++                             { NONE (pair address key) }
++                             { UNPAIR ; ADDRESS ; PAIR; SOME } ;
++                           SWAP ;
+                            DUP ;
+                            CAR ;
+                            DIP { CDR ; CAR %vesting @% ; PAIR %vesting %pour_info } ;
+@@ -191,7 +195,8 @@
+                        BALANCE @balance ;
+                        { { COMPARE ; GE } ; IF {} { { UNIT ; FAILWITH } } } ;
+                        SWAP ;
+-                       SUB @new_cur_balance ;
++                       SUB_MUTEZ @new_cur_balance ;
++                       IF_NONE { UNIT ; FAILWITH } {} ;
+                        DIP { CDR %vesting_increment @% } ;
+                        PAIR %vested_balance %@ @vesting_quantities ;
+                        DIP { CDR %vesting_schedule @% } ;
+@@ -215,6 +220,8 @@
+                  DIP { SWAP ;
+                        DUP ;
+                        CAR %pour_dest @% ;
++                       CONTRACT unit ;
++                       { IF_NONE { PUSH string "Bad transaction receiver" ; FAILWITH } {} } ;
+                        DIP { DUP ;
+                              CDR %pour_authorizer @% ;
+                              DIP { CAR %pour_dest @% ;

@@ -1,7 +1,8 @@
 (test
  (name main)
  (package tezos-protocol-alpha-tests)
- (deps (glob_files contracts/*))
+ (deps (glob_files contracts/*)
+       (glob_files patched_contracts/*))
  (libraries alcotest-lwt
             tezos-base
             tezos-protocol-alpha

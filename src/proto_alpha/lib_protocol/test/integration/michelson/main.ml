@@ -52,5 +52,6 @@ let () =
       ("typechecking", Test_typechecking.tests);
       ("script cache", Test_script_cache.tests);
       ("block time instructions", Test_block_time_instructions.tests);
+      ("patched contracts", Test_patched_contracts.tests);
     ]
   |> Lwt_main.run
