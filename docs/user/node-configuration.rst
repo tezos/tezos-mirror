@@ -297,7 +297,7 @@ Note that the IP address is only used for selecting an active network interface
 It is also possible to advertise to peers a different port than
 the binding port using ``--advertised-net-port`` configuration option or the P2P
 `advertised-net-port`` configuration parameter. Currently it is only possible to
-specify an advertised port, but not an IP address. 
+specify an advertised port, but not an IP address.
 
 .. note::
 
@@ -355,6 +355,14 @@ hardware wallet.
 Shell parameters
 ----------------
 
-Configuration options/parameters for the shell allow tuning the working of the :doc:`validation subsystem <../shell/validation>`.
+Configuration options/parameters for the shell allow tuning the
+working of the :doc:`validation subsystem <../shell/validation>`.
 
-In particular, the synchronization heuristics implemented by the chain validator can be controlled using parameters such as the synchronization threshold or the latency, described in the documentation of the  :doc:`synchronization heuristics <../shell/sync>`.
+In particular, the synchronization heuristics implemented by the chain
+validator can be controlled using parameters such as the
+synchronization threshold or the latency, described in the
+documentation of the :doc:`synchronization heuristics
+<../shell/sync>`.
+
+Configuration parameters for the context's storage can also be done
+through environment variables, see :ref:`context_component`.
