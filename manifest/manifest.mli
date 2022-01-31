@@ -420,6 +420,10 @@ and preprocessor = PPS of target | PPS_args of target * string list
       For instance, [~js_of_ocaml:Dune.[[S "javascript_files"; S "file.js"]]]
       becomes [(js_of_ocaml (javascript_files file.js))].
 
+    - [documentation]: specifies a [(documentation ...)] stanza for the [dune]
+      target where [...] is the value of the parameter. Use this parameter if
+      the library includes an [index.mld] file.
+
     - [linkall]: if [true], add [-linkall] to the list of flags to be passed
       to the OCaml compiler (in the [(flags ...)] stanza).
 
@@ -501,6 +505,7 @@ type 'a maker =
   ?inline_tests:bool ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
+  ?documentation:Dune.s_expr ->
   ?linkall:bool ->
   ?modes:Dune.mode list ->
   ?modules:string list ->
