@@ -27,8 +27,7 @@ module type S = Bare_functor_outputs.Map.S
 
 module Make (Ord : Stdlib.Map.OrderedType) : S with type key = Ord.t = struct
   open Seq
-  module Legacy = Stdlib.Map.Make (Ord)
-  include Legacy
+  include Stdlib.Map.Make (Ord)
 
   let iter_e f t = iter_e (fun (k, v) -> f k v) (to_seq t)
 

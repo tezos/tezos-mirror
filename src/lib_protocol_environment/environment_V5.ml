@@ -92,6 +92,7 @@ module type V5 = sig
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type Bls_signature.pk = Bls12_381.Signature.pk
+       and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -148,7 +149,6 @@ struct
      shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
      versions. Thus we open the module, hiding the incompatible, newer modules.
   *)
-  open Tezos_protocol_environment_structs.V5.M
   module Pervasives = Stdlib
 
   module Logging = struct
@@ -178,17 +178,12 @@ struct
   end
 
   module Compare = Compare
+  module Either = Either
   module Seq = Tezos_error_monad.TzLwtreslib.Seq
-
-  module List = struct
-    include Tezos_error_monad.TzLwtreslib.List
-
-    include Tezos_protocol_environment_structs.V5.M.Lwtreslib_list_combine
-  end
-
+  module List = Tezos_error_monad.TzLwtreslib.List
   module Char = Char
   module Bytes = Bytes
-  module Hex = Hex
+  module Hex = Tezos_stdlib.Hex
   module String = String
   module Bits = Bits
   module TzEndian = TzEndian

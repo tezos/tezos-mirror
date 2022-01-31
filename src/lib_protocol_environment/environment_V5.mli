@@ -87,6 +87,7 @@ module type V5 = sig
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
        and type Bls_signature.pk = Bls12_381.Signature.pk
+       and type ('a, 'b) Either.t = ('a, 'b) Stdlib.Either.t
 
   (** An [Ecoproto_error e] is a shell error that carry a protocol error.
 
