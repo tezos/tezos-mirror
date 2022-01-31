@@ -25,21 +25,30 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {fees_per_byte : Tez_repr.t}
+type t = {
+  fees_per_byte : Tez_repr.t;
+  last_inbox_level : Raw_level_repr.t option;
+}
 
-let initial_state = {fees_per_byte = Tez_repr.zero}
+let initial_state = {fees_per_byte = Tez_repr.zero; last_inbox_level = None}
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {fees_per_byte} -> fees_per_byte)
-    (fun fees_per_byte ->
-      assert (Tez_repr.(zero <= fees_per_byte)) ;
-      {fees_per_byte})
-    (obj1 (req "fees_per_byte" Tez_repr.encoding))
+    (fun {last_inbox_level; fees_per_byte} -> (last_inbox_level, fees_per_byte))
+    (fun (last_inbox_level, fees_per_byte) -> {last_inbox_level; fees_per_byte})
+    (obj2
+       (req "last_inbox_level" (option Raw_level_repr.encoding))
+       (req "fees_per_byte" Tez_repr.encoding))
 
-let pp fmt {fees_per_byte} =
-  Format.fprintf fmt "Tx_rollup: fees_per_byte = %a" Tez_repr.pp fees_per_byte
+let pp fmt {fees_per_byte; last_inbox_level} =
+  Format.fprintf
+    fmt
+    "Tx_rollup: fees_per_byte = %a; last_inbox_level = %a"
+    Tez_repr.pp
+    fees_per_byte
+    (Format.pp_print_option Raw_level_repr.pp)
+    last_inbox_level
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2338
    To get a smoother variation of fees, that is more resistant to
@@ -47,7 +56,7 @@ let pp fmt {fees_per_byte} =
 
    The type [t] probably needs to be updated accordingly. *)
 let update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t =
- fun {fees_per_byte} ~final_size ~hard_limit ->
+ fun ({fees_per_byte; _} as state) ~final_size ~hard_limit ->
   let threshold_increase = 90 in
   let threshold_decrease = 80 in
   let variation_factor = 5L in
@@ -74,14 +83,18 @@ let update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t =
         ok fees_per_byte
   in
   match computation with
-  | Ok fees_per_byte -> {fees_per_byte}
+  | Ok fees_per_byte -> {state with fees_per_byte}
   (* In the (very unlikely) event of an overflow, we force the fees to
      be the maximum amount. *)
-  | Error _ -> {fees_per_byte = Tez_repr.max_mutez}
+  | Error _ -> {state with fees_per_byte = Tez_repr.max_mutez}
 
-let fees {fees_per_byte} size = Tez_repr.(fees_per_byte *? Int64.of_int size)
+let fees {fees_per_byte; _} size = Tez_repr.(fees_per_byte *? Int64.of_int size)
+
+let last_inbox_level {last_inbox_level; _} = last_inbox_level
+
+let append_inbox t level = {t with last_inbox_level = Some level}
 
 module Internal_for_tests = struct
   let initial_state_with_fees_per_byte : Tez_repr.t -> t =
-   fun fees_per_byte -> {fees_per_byte}
+   fun fees_per_byte -> {fees_per_byte; last_inbox_level = None}
 end

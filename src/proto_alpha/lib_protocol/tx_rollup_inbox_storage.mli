@@ -124,3 +124,15 @@ val find :
   level:[`Current | `Level of Raw_level_repr.t] ->
   Tx_rollup_repr.t ->
   (Raw_context.t * Tx_rollup_inbox_repr.t option) tzresult Lwt.t
+
+(** [get_adjacent_levels ctxt level tx_rollup] returns the first level
+    before [level] that has a non-empty inbox, if any, and the first
+    level after [level] that has a non-empty inbox, if any. It is
+    assumed that [level] itself has a non-empty inbox, and if it does
+    not, or if [tx_rollup] does not exist, the result is an error. *)
+val get_adjacent_levels :
+  Raw_context.t ->
+  Raw_level_repr.t ->
+  Tx_rollup_repr.t ->
+  (Raw_context.t * Raw_level_repr.t option * Raw_level_repr.t option) tzresult
+  Lwt.t

@@ -40,3 +40,17 @@ type t = {contents : Tx_rollup_message_repr.hash list; cumulated_size : int}
 val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
+
+(* The metadata for an inbox stores the [cumulated_size] in
+   bytes for the inbox, so that we do not need to retrieve the entries
+   for the inbox just to get the size.  It also stores the
+   [predecessor] and [successor] levels.  For the first inbox of a
+   rollup, the [predecessor] will be None.  For all inboxes, the
+   [successor] will be None until a subsequent inbox is created. *)
+type metadata = {
+  cumulated_size : int;
+  predecessor : Raw_level_repr.t option;
+  successor : Raw_level_repr.t option;
+}
+
+val metadata_encoding : metadata Data_encoding.t

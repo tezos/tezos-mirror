@@ -701,12 +701,13 @@ module Tx_rollup : sig
        and type value = Tx_rollup_state_repr.t
        and type t := Raw_context.t
 
-  (** The number of bytes allocated by the messages stored in each inbox. *)
-  module Inbox_cumulated_size :
+  (** The number of bytes allocated by the messages stored in each inbox,
+      as well as its predecessor and successor. *)
+  module Inbox_metadata :
     Non_iterable_indexed_carbonated_data_storage
       with type t := Raw_context.t * Raw_level_repr.t
        and type key = Tx_rollup_repr.t
-       and type value = int
+       and type value = Tx_rollup_inbox_repr.metadata
 
   (** A carbonated storage to store the hashes of the messages
       appended in an inbox, in reverse order.

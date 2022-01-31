@@ -72,6 +72,8 @@ let test_disable_feature_flag () =
 let message_hash_testable : Tx_rollup_message.hash Alcotest.testable =
   Alcotest.testable Tx_rollup_message.pp_hash ( = )
 
+let wrap m = m >|= Environment.wrap_tzresult
+
 (** [inbox_fees state size] computes the fees (per byte of message)
     one has to pay to submit a message to the current inbox. *)
 let inbox_fees state size =
@@ -131,6 +133,10 @@ let init_originate_and_submit ?(batch = String.make 5 'c') () =
   Op.tx_rollup_submit_batch (B b) contract tx_rollup batch >>=? fun operation ->
   Block.bake ~operation b >>=? fun b ->
   return ((contract, balance), state, tx_rollup, b)
+
+let assert_ok res = match res with Ok r -> r | Error _ -> assert false
+
+let raw_level level = assert_ok @@ Raw_level.of_int32 level
 
 (** ---- TESTS -------------------------------------------------------------- *)
 
@@ -425,6 +431,75 @@ let test_finalization () =
   inbox_fees state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
+let test_inbox_linked_list () =
+  let assert_level_equals ~loc expected actual =
+    match actual with
+    | None -> assert false
+    | Some level ->
+        Assert.equal
+          ~loc
+          Raw_level.equal
+          "expected same level"
+          Raw_level.pp
+          expected
+          level
+  in
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+  let last_inbox_level = Tx_rollup_state.last_inbox_level state in
+  Assert.is_none ~loc:__LOC__ ~pp:Raw_level.pp last_inbox_level >>=? fun () ->
+  Op.tx_rollup_submit_batch (B b) contract tx_rollup "batch"
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+  let last_inbox_level = Tx_rollup_state.last_inbox_level state in
+  assert_level_equals ~loc:__LOC__ (raw_level 2l) last_inbox_level
+  >>=? fun () ->
+  (* This inbox has no predecessor link because it's the first inbox in
+     this rollup, and no successor because no other inbox has yet been
+     created. *)
+  wrap
+    (Tx_rollup_inbox.get_adjacent_levels
+       (Incremental.alpha_ctxt i)
+       (raw_level 2l)
+       tx_rollup)
+  >>=? fun (_, before, after) ->
+  Assert.is_none ~loc:__LOC__ ~pp:Raw_level.pp before >>=? fun () ->
+  Assert.is_none ~loc:__LOC__ ~pp:Raw_level.pp after >>=? fun () ->
+  (* Bake an empty block so that we skip a level*)
+  Block.bake b >>=? fun b ->
+  Op.tx_rollup_submit_batch (B b) contract tx_rollup "batch"
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+  let last_inbox_level = Tx_rollup_state.last_inbox_level state in
+  assert_level_equals ~loc:__LOC__ (raw_level 4l) last_inbox_level
+  >>=? fun () ->
+  (* The new inbox has a predecessor of the previous one *)
+  wrap
+    (Tx_rollup_inbox.get_adjacent_levels
+       (Incremental.alpha_ctxt i)
+       (raw_level 4l)
+       tx_rollup)
+  >>=? fun (_, before, after) ->
+  assert_level_equals ~loc:__LOC__ (raw_level 2l) before >>=? fun () ->
+  Assert.is_none ~loc:__LOC__ ~pp:Raw_level.pp after >>=? fun () ->
+  (* And now the old inbox has a successor but still no predecessor*)
+  wrap
+    (Tx_rollup_inbox.get_adjacent_levels
+       (Incremental.alpha_ctxt i)
+       (raw_level 2l)
+       tx_rollup)
+  >>=? fun (_, before, after) ->
+  Assert.is_none ~loc:__LOC__ ~pp:Raw_level.pp before >>=? fun () ->
+  assert_level_equals ~loc:__LOC__ (raw_level 4l) after >>=? fun () -> return ()
+
 let tests =
   [
     Tztest.tztest
@@ -452,4 +527,5 @@ let tests =
       `Quick
       test_inbox_too_big;
     Tztest.tztest "Test finalization" `Quick test_finalization;
+    Tztest.tztest "Test inbox linked list" `Quick test_inbox_linked_list;
   ]

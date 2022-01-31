@@ -42,3 +42,21 @@ let encoding =
     (obj2
        (req "contents" @@ list Tx_rollup_message_repr.hash_encoding)
        (req "cumulated_size" int31))
+
+type metadata = {
+  cumulated_size : int;
+  predecessor : Raw_level_repr.t option;
+  successor : Raw_level_repr.t option;
+}
+
+let metadata_encoding =
+  let open Data_encoding in
+  conv
+    (fun {cumulated_size; predecessor; successor} ->
+      (cumulated_size, predecessor, successor))
+    (fun (cumulated_size, predecessor, successor) ->
+      {cumulated_size; predecessor; successor})
+    (obj3
+       (req "cumulated_size" int31)
+       (req "predecessor" (option Raw_level_repr.encoding))
+       (req "successor" (option Raw_level_repr.encoding)))

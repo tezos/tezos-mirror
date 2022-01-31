@@ -2018,6 +2018,8 @@ module Tx_rollup_state : sig
 
   val fees : t -> int -> Tez.t tzresult
 
+  val last_inbox_level : t -> Raw_level.t option
+
   type error +=
     | Tx_rollup_already_exists of Tx_rollup.t
     | Tx_rollup_does_not_exist of Tx_rollup.t
@@ -2092,6 +2094,12 @@ module Tx_rollup_inbox : sig
     level:[`Current | `Level of Raw_level.t] ->
     Tx_rollup.t ->
     (context * t option) tzresult Lwt.t
+
+  val get_adjacent_levels :
+    context ->
+    Raw_level.t ->
+    Tx_rollup.t ->
+    (context * Raw_level.t option * Raw_level.t option) tzresult Lwt.t
 
   type error +=
     | Tx_rollup_inbox_does_not_exist of Tx_rollup.t * Raw_level.t
