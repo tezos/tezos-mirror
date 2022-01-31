@@ -224,6 +224,10 @@ called; this should include *all* the regular ``tezos-*`` binaries.
 - ``TEZOS_EVENT_HOSTNAME`` is used by the file-descriptor-sink to tweak the JSON
    output (see above).
 
+As the Irmin context backend uses an internal and specific logging
+system, it is possible to configure it through the ``TEZOS_CONTEXT``
+environment variable, see :ref:`context_component`.
+
 
 .. _configure_node_logging:
 
