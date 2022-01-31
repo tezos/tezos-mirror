@@ -13,11 +13,11 @@ depends: [
   "tezos-base"
   "tezos-clic"
   "tezos-client-base"
-  "tezos-mockup-proxy"
   "tezos-protocol-environment"
   "tezos-rpc"
   "tezos-shell-services"
   "tezos-context"
+  "tezos-mockup-proxy"
   "tezos-stdlib-unix" {with-test}
   "tezos-base-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}

@@ -22,7 +22,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
 (** The class [http_local_ctxt] creates an RPC context that executes
     some RPCs locally and delegates others over http. Arguments are:
 
@@ -33,6 +32,6 @@
 class http_local_ctxt :
   Tezos_client_base.Client_context.printer
   -> RPC_context.generic
-  -> Proxy_services.mode
-  -> Registration.proxy_environment
+  -> Tezos_proxy.Proxy_services.mode
+  -> Tezos_proxy.Registration.proxy_environment
   -> RPC_context.generic

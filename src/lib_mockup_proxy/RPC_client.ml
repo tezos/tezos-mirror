@@ -26,8 +26,6 @@
 module Directory = RPC_directory
 module Service = RPC_service
 
-exception Rpc_dir_creation_failure of tztrace
-
 let media_types = [Tezos_rpc_http.Media_type.json]
 
 module NullLogger = struct

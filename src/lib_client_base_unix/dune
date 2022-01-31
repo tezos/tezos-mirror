@@ -15,6 +15,7 @@
   tezos-mockup-registration
   tezos-mockup-commands
   tezos-proxy
+  tezos-proxy.rpc
   tezos-signer-backends.unix
   tezos-shell-services
   lwt-exit)

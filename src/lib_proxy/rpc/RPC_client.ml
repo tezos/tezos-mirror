@@ -22,7 +22,7 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
+open Tezos_proxy
 module Service = RPC_service
 module Events = Proxy_events
 
