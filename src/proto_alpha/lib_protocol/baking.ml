@@ -87,23 +87,15 @@ let endorsing_rights (ctxt : t) level =
   Slot.Range.rev_fold_es
     (fun (ctxt, map) slot ->
       Stake_distribution.slot_owner ctxt level slot >>=? fun (ctxt, (_, pkh)) ->
-      return (ctxt, (slot, pkh) :: acc))
-    (ctxt, [])
+      let map =
+        Signature.Public_key_hash.Map.update
+          pkh
+          (function None -> Some [slot] | Some slots -> Some (slot :: slots))
+          map
+      in
+      return (ctxt, map))
+    (ctxt, Signature.Public_key_hash.Map.empty)
     slots
-  >>=? fun (ctxt, right_owners) ->
-  let rights =
-    List.fold_left
-      (fun acc (slot, pkh) ->
-        let slots =
-          match Signature.Public_key_hash.Map.find pkh acc with
-          | None -> [slot]
-          | Some slots -> slot :: slots
-        in
-        Signature.Public_key_hash.Map.add pkh slots acc)
-      Signature.Public_key_hash.Map.empty
-      right_owners
-  in
-  return (ctxt, rights)
 
 let endorsing_rights_by_first_slot ctxt level =
   Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
