@@ -37,6 +37,19 @@ module State_transitions = struct
 
   let section = section @ ["transitions"]
 
+  let new_head =
+    declare_3
+      ~section
+      ~name:"new_head"
+      ~level:Notice
+      ~msg:"received new head {block} at level {level}, round {round}"
+      ~pp1:Block_hash.pp
+      ("block", Block_hash.encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("round", Round.encoding)
+
   let new_head_with_increasing_level =
     declare_0
       ~section
@@ -46,23 +59,35 @@ module State_transitions = struct
       ()
 
   let no_proposal_slot =
-    declare_1
+    declare_3
       ~section
       ~name:"no_proposal_slot"
-      ~level:Notice
-      ~msg:"no proposal slot at round {round}"
+      ~level:Info
+      ~msg:
+        "end of round {current_round}; no proposal slot at level {level}, \
+         round {next_round}"
       ~pp1:Round.pp
-      ("round", Round.encoding)
+      ("current_round", Round.encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("next_round", Round.encoding)
 
   let proposal_slot =
-    declare_2
+    declare_4
       ~section
       ~name:"proposal_slot"
-      ~level:Notice
-      ~msg:"proposal slot at round {round} for {delegate}"
+      ~level:Info
+      ~msg:
+        "end of round {current_round}; proposal slot at level {level}, round \
+         {next_round} for {delegate}"
       ~pp1:Round.pp
-      ("round", Round.encoding)
-      ~pp2:Baking_state.pp_delegate
+      ("current_round", Round.encoding)
+      ~pp2:pp_int32
+      ("level", Data_encoding.int32)
+      ~pp3:Round.pp
+      ("next_round", Round.encoding)
+      ~pp4:Baking_state.pp_delegate
       ("delegate", Baking_state.delegate_encoding)
 
   let new_head_while_waiting_for_qc =
@@ -516,7 +541,7 @@ module Actions = struct
     declare_2
       ~section
       ~name:"preendorsement_injected"
-      ~level:Info
+      ~level:Notice
       ~msg:"injected preendorsement {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
@@ -527,7 +552,7 @@ module Actions = struct
     declare_2
       ~section
       ~name:"endorsement_injected"
-      ~level:Info
+      ~level:Notice
       ~msg:"injected endorsement {ophash} for {delegate}"
       ~pp1:Operation_hash.pp
       ("ophash", Operation_hash.encoding)
@@ -573,14 +598,20 @@ module Actions = struct
       ("delegate", Baking_state.delegate_encoding)
 
   let block_injected =
-    declare_2
+    declare_4
       ~section
       ~name:"block_injected"
       ~level:Notice
-      ~msg:"block {block} injected for delegate {delegate}"
+      ~msg:
+        "block {block} at level {level}, round {round} injected for delegate \
+         {delegate}"
       ~pp1:Block_hash.pp
-      ~pp2:Baking_state.pp_delegate
+      ~pp2:pp_int32
+      ~pp3:Round.pp
+      ~pp4:Baking_state.pp_delegate
       ("block", Block_hash.encoding)
+      ("level", Data_encoding.int32)
+      ("round", Round.encoding)
       ("delegate", Baking_state.delegate_encoding)
 
   let signing_preendorsement =
@@ -648,7 +679,7 @@ module Nonces = struct
       ~name:"revealing_nonce"
       ~level:Notice
       ~msg:
-        "revaling nonce of level {level} (chain {chain} with operation \
+        "revealing nonce of level {level} (chain {chain} with operation \
          {ophash})"
       ~pp1:pp_int32
       ("level", Data_encoding.int32)
