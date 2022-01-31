@@ -136,7 +136,7 @@ You can also include those with a dedicated block::
   }
 
 .. warning::
-   When you add an ``index.mld`` file, don't forget to add a documentation stanza in the corresponding dune file.
+   When you add an ``index.mld`` file, don't forget to add a ``~documentation:[]`` parameter to the package's manifest which adds a documentation stanza in the corresponding dune file.
    Otherwise, your ``index.mld`` file will be ignored by ``odoc`` and the API page will be the default one!
 
 
