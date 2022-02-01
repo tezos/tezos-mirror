@@ -26,7 +26,6 @@
 (* From Lwtreslib *)
 
 module type S = sig
-
   type key
 
   type +!'a t
@@ -106,6 +105,8 @@ module type S = sig
 
   val filter : (key -> 'a -> bool) -> 'a t -> 'a t
 
+  val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
+
   val partition : (key -> 'a -> bool) -> 'a t -> 'a t * 'a t
 
   val cardinal : 'a t -> int
@@ -114,23 +115,37 @@ module type S = sig
 
   val min_binding : 'a t -> (key * 'a) option
 
+  val min_binding_opt : 'a t -> (key * 'a) option
+
   val max_binding : 'a t -> (key * 'a) option
 
+  val max_binding_opt : 'a t -> (key * 'a) option
+
   val choose : 'a t -> (key * 'a) option
+
+  val choose_opt : 'a t -> (key * 'a) option
 
   val split : key -> 'a t -> 'a t * 'a option * 'a t
 
   val find : key -> 'a t -> 'a option
 
+  val find_opt : key -> 'a t -> 'a option
+
   val find_first : (key -> bool) -> 'a t -> (key * 'a) option
 
+  val find_first_opt : (key -> bool) -> 'a t -> (key * 'a) option
+
   val find_last : (key -> bool) -> 'a t -> (key * 'a) option
+
+  val find_last_opt : (key -> bool) -> 'a t -> (key * 'a) option
 
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
 
   val to_seq : 'a t -> (key * 'a) Seq.t
+
+  val to_rev_seq : 'a t -> (key * 'a) Seq.t
 
   val to_seq_from : key -> 'a t -> (key * 'a) Seq.t
 

@@ -181,8 +181,25 @@ struct
   module String = String
   module Bits = Bits
   module TzEndian = TzEndian
-  module Set = Tezos_error_monad.TzLwtreslib.Set
-  module Map = Tezos_error_monad.TzLwtreslib.Map
+
+  module Set = struct
+    module type S =
+      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Set.S
+        with type 'a error_monad_trace := 'a Error_monad.trace
+
+    module Make (Ord : Compare.COMPARABLE) : S with type elt = Ord.t =
+      Tezos_error_monad.TzLwtreslib.Set.Make (Ord)
+  end
+
+  module Map = struct
+    module type S =
+      Tezos_protocol_environment_structs.V3.M.Replicated_signatures.Map.S
+        with type 'a error_monad_trace := 'a Error_monad.trace
+
+    module Make (Ord : Compare.COMPARABLE) : S with type key = Ord.t =
+      Tezos_error_monad.TzLwtreslib.Map.Make (Ord)
+  end
+
   module Int32 = Int32
   module Int64 = Int64
   module Buffer = Buffer
