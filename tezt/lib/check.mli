@@ -254,5 +254,8 @@ val list_not_mem :
 
 (** {2 Predicates on Exceptions} *)
 
-(** Check that evaluating the given function raises the expected exception. *)
-val fails_with : (unit -> unit) -> exn -> error_msg:string -> unit
+(** Check that evaluating the given function raises the expected exception.
+
+    Example: [Check.raises f exn ~error_msg:"expected f to raise %L, got %R"] *)
+val raises :
+  ?__LOC__:string -> exn -> (unit -> unit) -> error_msg:string -> unit

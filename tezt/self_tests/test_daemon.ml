@@ -66,20 +66,20 @@ module N_events = struct
     Test.register ~__FILE__ ~title:"Daemon.n_events should fail if n < 0" ~tags
     @@ fun () ->
     let run () = ignore @@ Daemon.n_events (-1) Option.some in
-    Check.fails_with
-      run
+    Check.raises
       (Invalid_argument "Base.n_events_rev: n must be > 0.")
-      ~error_msg:"calling should fail if n < 0" ;
+      run
+      ~error_msg:"expected run to raise %L, got %R" ;
     unit
 
   let should_fail_if_n_eq_zero () =
     Test.register ~__FILE__ ~title:"Daemon.n_events should fail if n = 0" ~tags
     @@ fun () ->
     let run () = ignore @@ Daemon.n_events 0 Option.some in
-    Check.fails_with
-      run
+    Check.raises
       (Invalid_argument "Base.n_events_rev: n must be > 0.")
-      ~error_msg:"calling should fail if n = 0" ;
+      run
+      ~error_msg:"expected run to raise %L, got %R" ;
     unit
 end
 
@@ -122,20 +122,20 @@ module Nth_event = struct
     Test.register ~__FILE__ ~title:"Daemon.nth_event should fail if n < 0" ~tags
     @@ fun () ->
     let run () = ignore @@ Daemon.nth_event (-1) Option.some in
-    Check.fails_with
-      run
+    Check.raises
       (Invalid_argument "Base.n_events_rev: n must be > 0.")
-      ~error_msg:"calling should fail if n < 0" ;
+      run
+      ~error_msg:"expected run to raise %L, got %R" ;
     unit
 
   let should_fail_if_n_eq_zero () =
     Test.register ~__FILE__ ~title:"Daemon.nth_event should fail if n = 0" ~tags
     @@ fun () ->
     let run () = ignore @@ Daemon.nth_event 0 Option.some in
-    Check.fails_with
-      run
+    Check.raises
       (Invalid_argument "Base.n_events_rev: n must be > 0.")
-      ~error_msg:"calling should fail if n = 0" ;
+      run
+      ~error_msg:"expected run to raise %L, got %R" ;
     unit
 end
 
