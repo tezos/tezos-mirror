@@ -757,6 +757,7 @@ struct
   module Fitness = Fitness
   module Operation = Operation
   module Block_header = Block_header
+  module Bounded = Bounded
   module Protocol = Protocol
   module RPC_arg = RPC_arg
   module RPC_path = RPC_path

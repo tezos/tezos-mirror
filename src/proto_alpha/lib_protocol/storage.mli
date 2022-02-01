@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -732,15 +733,26 @@ module Tx_rollup : sig
     'a Lwt.t
 end
 
-(** Smart contract rollup *)
 module Sc_rollup : sig
-  (**
+  (** Smart contract rollup.
 
-     Each smart contract rollup is associated to:
+      Storage from this submodule must only be accessed through the
+      module `Sc_rollup_storage`.
 
-     - a PVM kind (provided at creation time, read-only) ;
-     - a boot sector (provided at creation time, read-only).
-     - a merkelized inbox, of which only the root hash is stored
+      Each smart contract rollup is associated to:
+
+      - a PVM kind (provided at creation time, read-only)
+      - a boot sector (provided at creation time, read-only)
+      - a merkelized inbox, of which only the root hash is stored
+      - a tree of commitments, rooted at the last finalized commitment
+      - a map from stakers to commitments
+
+      For performance reasons we also store (per rollup):
+
+      - the total number of active stakers;
+      - the number of stakers per commitment.
+
+      See module comments for details.
   *)
   module PVM_kind :
     Indexed_data_storage
@@ -759,4 +771,60 @@ module Sc_rollup : sig
       with type key = Sc_rollup_repr.t
        and type value = Sc_rollup_inbox.t
        and type t := Raw_context.t
+
+  module Last_final_commitment :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = Sc_rollup_repr.Commitment_hash.t
+       and type t := Raw_context.t
+
+  module Stakers :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Sc_rollup_repr.Commitment_hash.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Cache: This should always be the size of [Stakers].
+
+      Combined with {!Commitment_stake_count} (see below), this ensures we can
+      check that all stakers agree on a commitment prior to finalization in
+      O(1) - rather than O(n) reads.
+    *)
+  module Stakers_size :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.t
+       and type value = int32
+       and type t := Raw_context.t
+
+  module Commitments :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.Commitment_hash.t
+       and type value = Sc_rollup_repr.Commitment.t
+       and type t = Raw_context.t * Sc_rollup_repr.t
+
+  (** Cache: This should always be the number of stakers that are directly or
+      indirectly staked on this commitment.
+
+      Let Stakers[S] mean "looking up the key S in [Stakers]".
+
+      A staker [S] is directly staked on [C] if [Stakers[S] = C]. A staker
+      [S] is indirectly staked on [C] if [C] is an ancestor of [Stakers[S]].
+
+      This ensures we remove unreachable commitments at the end of a
+      dispute in O(n) reads, where n is the length of the rejected branch.
+
+      We maintain the invariant that each branch has at least one staker.  On
+      rejection, we decrease stake count from the removed staker to the root,
+      and reclaim commitments whose stake count (refcount) thus reaches zero.
+
+      In the worst case all commitments are dishonest and on the same branch.
+      In practice we expect the honest branch, to be the longest, and dishonest
+      branches to be of similar lengths, making removal require a small number
+      of steps with respect to the total number of commitments.
+   *)
+  module Commitment_stake_count :
+    Non_iterable_indexed_carbonated_data_storage
+      with type key = Sc_rollup_repr.Commitment_hash.t
+       and type value = int32
+       and type t = Raw_context.t * Sc_rollup_repr.t
 end

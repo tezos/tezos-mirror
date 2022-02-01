@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -79,6 +80,64 @@ module Address = struct
     | Some nonce -> ok @@ hash_bytes [nonce]
 end
 
+(* 32 *)
+let commitment_hash_prefix = "\017\144\021\100" (* scc1(54) *)
+
+module Commitment_hash = struct
+  let prefix = "scc1"
+
+  let encoded_size = 54
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "commitment_hash"
+
+        let title = "The hash of a commitment of a smart contract rollup"
+
+        let b58check_prefix = commitment_hash_prefix
+
+        (* defaults to 32 *)
+        let size = None
+      end)
+
+  include H
+
+  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
+
+  include Path_encoding.Make_hex (H)
+end
+
+(* 32 *)
+let state_hash_prefix = "\017\144\122\202" (* scs1(54) *)
+
+module State_hash = struct
+  let prefix = "scs1"
+
+  let encoded_size = 54
+
+  module H =
+    Blake2B.Make
+      (Base58)
+      (struct
+        let name = "state_hash"
+
+        let title = "The hash of the VM state of a smart contract rollup"
+
+        let b58check_prefix = state_hash_prefix
+
+        (* defaults to 32 *)
+        let size = None
+      end)
+
+  include H
+
+  let () = Base58.check_encoded_prefix b58check_encoding prefix encoded_size
+
+  include Path_encoding.Make_hex (H)
+end
+
 type t = Address.t
 
 let description =
@@ -152,6 +211,69 @@ module Index = struct
   let encoding = encoding
 
   let compare = Address.compare
+end
+
+module Commitment_hash_index = struct
+  include Commitment_hash
+end
+
+module Number_of_messages = Bounded.Int32.Make (struct
+  let min_int = 1l
+
+  let max_int = 4096l
+  (* TODO: check this is reasonable.
+     See https://gitlab.com/tezos/tezos/-/issues/2373
+  *)
+end)
+
+module Number_of_ticks = Bounded.Int32.Make (struct
+  let min_int = 1l
+
+  let max_int = Int32.max_int
+end)
+
+module Commitment = struct
+  type t = {
+    compressed_state : State_hash.t;
+    inbox_level : Raw_level_repr.t;
+    predecessor : Commitment_hash.t;
+    number_of_messages : Number_of_messages.t;
+    number_of_ticks : Number_of_ticks.t;
+  }
+
+  let encoding =
+    let open Data_encoding in
+    conv
+      (fun {
+             compressed_state;
+             inbox_level;
+             predecessor;
+             number_of_messages;
+             number_of_ticks;
+           } ->
+        ( compressed_state,
+          inbox_level,
+          predecessor,
+          number_of_messages,
+          number_of_ticks ))
+      (fun ( compressed_state,
+             inbox_level,
+             predecessor,
+             number_of_messages,
+             number_of_ticks ) ->
+        {
+          compressed_state;
+          inbox_level;
+          predecessor;
+          number_of_messages;
+          number_of_ticks;
+        })
+      (obj5
+         (req "compressed_state" State_hash.encoding)
+         (req "inbox_level" Raw_level_repr.encoding)
+         (req "predecessor" Commitment_hash.encoding)
+         (req "number_of_messages" Number_of_messages.encoding)
+         (req "number_of_ticks" Number_of_ticks.encoding))
 end
 
 module Kind = struct

@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -59,6 +60,59 @@ module Address : sig
   val encoded_size : int
 end
 
+module Commitment_hash : S.HASH
+
+module State_hash : S.HASH
+
+(** Number of messages consumed by a single commitment. This represents a claim
+    about the shape of the Inbox, which can be disputed as part of a commitment
+    dispute.
+
+    See also {!Sc_rollup_repr.Commitments}. *)
+module Number_of_messages : Bounded.Int32.S
+
+(** Number of ticks computed by a single commitment. This represents a claim
+    about the state of the PVM, which can be disputed as part of a commitment
+    dispute.
+
+    See also {!Sc_rollup_repr.Commitments}. *)
+module Number_of_ticks : Bounded.Int32.S
+
+(** A commitment represents a claim about the state of the Inbox and PVM at
+    some Inbox level.
+
+    More formally, a commitment is a claim that:
+
+    {ul
+      {li assuming the PVM and Inbox are in a state implied by [predecessor]}
+      {li the PVM consumes [number_of_messages] messages tagged with
+      [inbox_level] from the Inbox}
+      {li the PVM advances to the state [compressed_state] over
+      [number_of_ticks] ticks }
+    }
+
+    Commitments are disjoint. The next correct commitment is a function of the
+    previous machine state and Inbox.
+
+    [number_of_messages] and [inbox_level] can be proven/disproven by Merkle
+    proofs on the Inbox state.
+
+    [compressed_state] and [number_of_ticks] can be proven/disproven by PVM
+    execution, or equivalently, by an interactive proof game between
+    conflicting parties, such that a correct executor always wins the game.
+ *)
+module Commitment : sig
+  type t = {
+    compressed_state : State_hash.t;
+    inbox_level : Raw_level_repr.t;
+    predecessor : Commitment_hash.t;
+    number_of_messages : Number_of_messages.t;
+    number_of_ticks : Number_of_ticks.t;
+  }
+
+  val encoding : t Data_encoding.t
+end
+
 (** A smart contract rollup is identified by its address. *)
 type t = Address.t
 
@@ -68,6 +122,9 @@ val rpc_arg : t RPC_arg.t
 
 (** The data model uses an index of these addresses. *)
 module Index : Storage_description.INDEX with type t = Address.t
+
+module Commitment_hash_index :
+  Storage_description.INDEX with type t = Commitment_hash.t
 
 (** A smart contract rollup has a kind, which assigns meaning to
    rollup operations. *)

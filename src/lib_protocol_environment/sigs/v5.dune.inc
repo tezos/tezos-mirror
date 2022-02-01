@@ -70,12 +70,14 @@
 
    v5/micheline.mli
    v5/block_header.mli
+   v5/bounded.mli
    v5/fitness.mli
    v5/operation.mli
    v5/protocol.mli
    v5/context.mli
    v5/updater.mli
    v5/RPC_context.mli
+
  )
  (action (with-stdout-to %{targets} (chdir %{workspace_root}}
           (run %{libexec:tezos-protocol-environment-packer:s_packer} "sigs" %{deps})))))
