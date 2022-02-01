@@ -10,7 +10,6 @@ scripts/install_sapling_parameters.sh
 scripts/opam-check.sh
 scripts/opam-remove.sh
 scripts/opam-upgrade.sh
-scripts/release/binaries.sh
 scripts/snapshot_alpha_and_link.sh
 scripts/snapshot_alpha.sh
 scripts/tezos-docker-manager.sh
