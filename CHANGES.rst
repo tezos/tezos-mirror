@@ -1,13 +1,8 @@
-Changelog
-'''''''''
+Development Changelog
+'''''''''''''''''''''
 
-Releases
-========
+**NB:** The changelog for releases can be found at: https://tezos.gitlab.io/CHANGES.html
 
-The changelog for releases can be found at: https://tezos.gitlab.io/CHANGES.html
-
-Development Version
-===================
 
 This file lists the changes added to each version of tezos-node,
 tezos-client, and the other Octez executables. The changes to the economic
