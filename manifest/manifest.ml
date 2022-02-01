@@ -663,6 +663,7 @@ module Target = struct
     inline_tests : bool;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
+    documentation : Dune.s_expr option;
     kind : kind;
     linkall : bool;
     modes : Dune.mode list option;
@@ -787,6 +788,7 @@ module Target = struct
     ?inline_tests:bool ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
+    ?documentation:Dune.s_expr ->
     ?linkall:bool ->
     ?modes:Dune.mode list ->
     ?modules:string list ->
@@ -813,11 +815,12 @@ module Target = struct
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
       ?foreign_stubs ?implements ?(inline_tests = false) ?js_compatible
-      ?js_of_ocaml ?(linkall = false) ?modes ?modules ?(node_wrapper_flags = [])
-      ?(nopervasives = false) ?ocaml ?opam ?(opaque = false) ?(opens = [])
-      ?(preprocess = []) ?(preprocessor_deps = []) ?(private_modules = [])
-      ?(opam_only_deps = []) ?release ?static ?static_cclibs ?synopsis
-      ?(virtual_modules = []) ?(wrapped = true) ~path names =
+      ?js_of_ocaml ?documentation ?(linkall = false) ?modes ?modules
+      ?(node_wrapper_flags = []) ?(nopervasives = false) ?ocaml ?opam
+      ?(opaque = false) ?(opens = []) ?(preprocess = [])
+      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
+      ?release ?static ?static_cclibs ?synopsis ?(virtual_modules = [])
+      ?(wrapped = true) ~path names =
     let (js_compatible, js_of_ocaml) =
       match (js_compatible, js_of_ocaml) with
       | (Some false, Some _) ->
@@ -954,6 +957,7 @@ module Target = struct
         inline_tests;
         js_compatible;
         js_of_ocaml;
+        documentation;
         kind;
         linkall;
         modes;
@@ -1251,6 +1255,11 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
           ("unsupported: ~implements on a target that is not a library (" ^ name
          ^ ")")
   in
+  let documentation =
+    match internal.documentation with
+    | None -> Dune.E
+    | Some docs -> Dune.(S "documentation" :: docs)
+  in
   Dune.(
     executable_or_library
       kind
@@ -1273,7 +1282,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       ~private_modules:internal.private_modules
       ~deps:(List.map Dune.file internal.dep_files)
       ?js_of_ocaml:internal.js_of_ocaml
-    :: create_empty_files :: internal.dune)
+    :: documentation :: create_empty_files :: internal.dune)
 
 let static_profile (cclibs : string list) =
   Dune.

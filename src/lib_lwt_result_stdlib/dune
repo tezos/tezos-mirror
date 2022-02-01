@@ -12,3 +12,5 @@
   tezos-lwt-result-stdlib.traced.sigs
   tezos-lwt-result-stdlib.traced.structs)
  (js_of_ocaml))
+
+(documentation)

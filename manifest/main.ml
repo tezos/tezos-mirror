@@ -402,6 +402,7 @@ let tezos_lwt_result_stdlib =
     ~synopsis:"Tezos: error-aware stdlib replacement"
     ~ocaml:V.(at_least "4.12")
     ~js_compatible:true
+    ~documentation:[]
     ~deps:
       [
         lwt;
@@ -974,6 +975,7 @@ let tezos_workers =
     "tezos-workers"
     ~path:"src/lib_workers"
     ~synopsis:"Tezos: worker library"
+    ~documentation:[]
     ~deps:[tezos_base; tezos_stdlib_unix; ringo]
     ~opens:["Tezos_base__TzPervasives"; "Tezos_base"; "Tezos_stdlib_unix"]
 
