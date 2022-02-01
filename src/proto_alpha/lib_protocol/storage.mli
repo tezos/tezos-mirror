@@ -351,6 +351,7 @@ module Stake : sig
        and type snapshot = int
        and type t := Raw_context.t
 
+  (** TODO: document *)
   module Last_snapshot :
     Single_data_storage with type value = int and type t := Raw_context.t
 
