@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+module Size = Gas_input_size
 
 module Micheline_common = struct
   let make_printable node =
@@ -80,11 +81,13 @@ module Micheline_common = struct
   let workload_to_vector (workload : workload) =
     let keys =
       [
-        ("encoding_micheline_traversal", Size.to_float workload.size.traversal);
-        ("encoding_micheline_int_bytes", Size.to_float workload.size.int_bytes);
+        ( "encoding_micheline_traversal",
+          float_of_int (Size.to_int workload.size.traversal) );
+        ( "encoding_micheline_int_bytes",
+          float_of_int (Size.to_int workload.size.int_bytes) );
         ( "encoding_micheline_string_bytes",
-          Size.to_float workload.size.string_bytes );
-        ("encoding_micheline_bytes", Size.to_float workload.bytes);
+          float_of_int (Size.to_int workload.size.string_bytes) );
+        ("encoding_micheline_bytes", float_of_int (Size.to_int workload.bytes));
       ]
     in
     Sparse_vec.String.of_list keys

@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol
-
 type t = int
 
 type micheline_size = {traversal : t; int_bytes : t; string_bytes : t}
@@ -59,12 +57,9 @@ let mul = ( * )
 
 let div = ( / )
 
-let max x y = if x < y then y else x
+let max x y = if Compare.Int.(x < y) then y else x
 
-let min x y = if x < y then x else y
-
-(* can't be bothered to do it well *)
-let rec pow x i = if i = 0 then 1 else x * pow x (i - 1)
+let min x y = if Compare.Int.(x < y) then x else y
 
 module Ops = struct
   let ( * ) = mul
@@ -74,17 +69,15 @@ module Ops = struct
   let ( + ) = add
 
   let ( - ) = sub
-
-  let ( ** ) = pow
 end
 
-let compare = Stdlib.compare
+let compare = Compare.Int.compare
 
-let equal = ( = )
+let equal = Compare.Int.( = )
 
-let lt = ( < )
+let lt = Compare.Int.( < )
 
-let leq = ( <= )
+let leq = Compare.Int.( <= )
 
 let pp = Format.pp_print_int
 
@@ -100,10 +93,6 @@ let pp_micheline_size fmtr {traversal; int_bytes; string_bytes} =
     string_bytes
 
 let show = string_of_int
-
-let to_float = float_of_int
-
-let of_float = int_of_float
 
 let to_int x = x
 
@@ -162,6 +151,45 @@ let map (map : ('a, 'b) Script_typed_ir.map) : t =
 let timestamp (tstamp : Alpha_context.Script_timestamp.t) : t =
   Z.numbits (Alpha_context.Script_timestamp.to_zint tstamp) / 8
 
+let rec size_of_comparable_value :
+    type a. a Script_typed_ir.comparable_ty -> a -> t =
+  fun (type a) (wit : a Script_typed_ir.comparable_ty) (v : a) ->
+   match wit with
+   | Never_key -> zero
+   | Unit_key -> unit
+   | Int_key -> integer v
+   | Nat_key -> integer v
+   | String_key -> script_string v
+   | Bytes_key -> bytes v
+   | Mutez_key -> mutez v
+   | Bool_key -> bool v
+   | Key_hash_key -> key_hash v
+   | Timestamp_key -> timestamp v
+   | Address_key -> address v
+   | Tx_rollup_l2_address_key -> tx_rollup_l2_address v
+   | Pair_key (leaf, node, _) ->
+       let (lv, rv) = v in
+       let size =
+         add
+           (size_of_comparable_value leaf lv)
+           (size_of_comparable_value node rv)
+       in
+       add size one
+   | Union_key (left, right, _) ->
+       let size =
+         match v with
+         | L v -> size_of_comparable_value left v
+         | R v -> size_of_comparable_value right v
+       in
+       add size one
+   | Option_key (ty, _) -> (
+       match v with
+       | None -> one
+       | Some x -> add (size_of_comparable_value ty x) one)
+   | Signature_key -> signature v
+   | Key_key -> public_key v
+   | Chain_id_key -> chain_id v
+
 (* ------------------------------------------------------------------------- *)
 (* Micheline/Michelson-related *)
 
@@ -193,20 +221,11 @@ let rec of_micheline (x : ('a, 'b) Micheline.node) =
       node (List.map of_micheline subterms)
   | Micheline.Seq (_loc, subterms) -> node (List.map of_micheline subterms)
 
-let of_encoded_value :
-    type a. Alpha_context.t -> a Script_typed_ir.ty -> a -> micheline_size =
-  fun (type a) ctxt (ty : a Script_typed_ir.ty) (v : a) ->
-   let open Script_ir_translator in
-   let script_res = Lwt_main.run (unparse_data ctxt Optimized ty v) in
-   match script_res with
-   | Ok (node, _ctxt) -> of_micheline node
-   | Error _ -> Stdlib.failwith "sizeof: could not unparse"
-
 (* ------------------------------------------------------------------------- *)
 (* Sapling-related *)
 
 let sapling_transaction_inputs : Alpha_context.Sapling.transaction -> t =
- fun tx -> List.length tx.Tezos_sapling.Core.Client.UTXO.inputs
+ fun tx -> List.length tx.inputs
 
 let sapling_transaction_outputs : Alpha_context.Sapling.transaction -> t =
- fun tx -> List.length tx.Tezos_sapling.Core.Client.UTXO.outputs
+ fun tx -> List.length tx.outputs

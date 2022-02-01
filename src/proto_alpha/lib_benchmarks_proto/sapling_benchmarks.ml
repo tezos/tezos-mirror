@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+module Size = Gas_input_size
 
 module Apply_diff_bench : Benchmark.S = struct
   include Interpreter_benchmarks.Default_config

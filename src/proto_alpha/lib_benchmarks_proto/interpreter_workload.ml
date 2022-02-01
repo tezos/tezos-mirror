@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+module Size = Gas_input_size
 
 (* ------------------------------------------------------------------------- *)
 
@@ -1126,50 +1127,12 @@ end
 
 open Script_typed_ir
 
-let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
-  fun (type a) (wit : a comparable_ty) (v : a) ->
-   match wit with
-   | Never_key -> Size.zero
-   | Unit_key -> Size.unit
-   | Int_key -> Size.integer v
-   | Nat_key -> Size.integer v
-   | String_key -> Size.script_string v
-   | Bytes_key -> Size.bytes v
-   | Mutez_key -> Size.mutez v
-   | Bool_key -> Size.bool v
-   | Key_hash_key -> Size.key_hash v
-   | Timestamp_key -> Size.timestamp v
-   | Address_key -> Size.address v
-   | Tx_rollup_l2_address_key -> Size.tx_rollup_l2_address v
-   | Pair_key (leaf, node, _) ->
-       let (lv, rv) = v in
-       let size =
-         Size.add
-           (size_of_comparable_value leaf lv)
-           (size_of_comparable_value node rv)
-       in
-       Size.add size Size.one
-   | Union_key (left, right, _) ->
-       let size =
-         match v with
-         | L v -> size_of_comparable_value left v
-         | R v -> size_of_comparable_value right v
-       in
-       Size.add size Size.one
-   | Option_key (ty, _) -> (
-       match v with
-       | None -> Size.one
-       | Some x -> Size.add (size_of_comparable_value ty x) Size.one)
-   | Signature_key -> Size.signature v
-   | Key_key -> Size.public_key v
-   | Chain_id_key -> Size.chain_id v
-
 let extract_compare_sized_step :
     type a. a comparable_ty -> a -> a -> ir_sized_step =
  fun comparable_ty x y ->
   Instructions.compare
-    (size_of_comparable_value comparable_ty x)
-    (size_of_comparable_value comparable_ty y)
+    (Size.size_of_comparable_value comparable_ty x)
+    (Size.size_of_comparable_value comparable_ty y)
 
 let extract_ir_sized_step :
     type bef_top bef res_top res.
@@ -1205,11 +1168,11 @@ let extract_ir_sized_step :
   | (ISet_iter _, (set, _)) -> Instructions.set_iter (Size.set set)
   | (ISet_mem (_, _), (v, (set, _))) ->
       let (module S) = Script_set.get set in
-      let sz = size_of_comparable_value S.elt_ty v in
+      let sz = Size.size_of_comparable_value S.elt_ty v in
       Instructions.set_mem sz (Size.set set)
   | (ISet_update (_, _), (v, (_flag, (set, _)))) ->
       let (module S) = Script_set.get set in
-      let sz = size_of_comparable_value S.elt_ty v in
+      let sz = Size.size_of_comparable_value S.elt_ty v in
       Instructions.set_update sz (Size.set set)
   | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)
   | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
@@ -1217,35 +1180,35 @@ let extract_ir_sized_step :
   | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
   | (IMap_mem (_, _), (v, (map, _))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = size_of_comparable_value Map.key_ty v in
+      let key_size = Size.size_of_comparable_value Map.key_ty v in
       Instructions.map_mem key_size (Size.map map)
   | (IMap_get (_, _), (v, (map, _))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = size_of_comparable_value Map.key_ty v in
+      let key_size = Size.size_of_comparable_value Map.key_ty v in
       Instructions.map_get key_size (Size.map map)
   | (IMap_update (_, _), (v, (_elt_opt, (map, _)))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = size_of_comparable_value Map.key_ty v in
+      let key_size = Size.size_of_comparable_value Map.key_ty v in
       Instructions.map_update key_size (Size.map map)
   | (IMap_get_and_update (_, _), (v, (_elt_opt, (map, _)))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = size_of_comparable_value Map.key_ty v in
+      let key_size = Size.size_of_comparable_value Map.key_ty v in
       Instructions.map_get_and_update key_size (Size.map map)
   | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
   | (IEmpty_big_map (_, _, _, _), _) -> Instructions.empty_big_map
   | (IBig_map_mem (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
-      let key_size = size_of_comparable_value key_type v in
-      Instructions.big_map_mem key_size size
+      let key_size = Size.size_of_comparable_value key_type v in
+      Instructions.big_map_mem key_size (Size.of_int size)
   | (IBig_map_get (_, _), (v, ({diff = {size; _}; key_type; _}, _))) ->
-      let key_size = size_of_comparable_value key_type v in
-      Instructions.big_map_get key_size size
+      let key_size = Size.size_of_comparable_value key_type v in
+      Instructions.big_map_get key_size (Size.of_int size)
   | (IBig_map_update (_, _), (v, (_, ({diff = {size; _}; key_type; _}, _)))) ->
-      let key_size = size_of_comparable_value key_type v in
-      Instructions.big_map_update key_size size
+      let key_size = Size.size_of_comparable_value key_type v in
+      Instructions.big_map_update key_size (Size.of_int size)
   | ( IBig_map_get_and_update (_, _),
       (v, (_, ({diff = {size; _}; key_type; _}, _))) ) ->
-      let key_size = size_of_comparable_value key_type v in
-      Instructions.big_map_get_and_update key_size size
+      let key_size = Size.size_of_comparable_value key_type v in
+      Instructions.big_map_get_and_update key_size (Size.of_int size)
   | (IConcat_string (_, _), (ss, _)) ->
       let list_size = Size.list ss in
       let total_bytes =
@@ -1375,9 +1338,13 @@ let extract_ir_sized_step :
           let message = Size.bytes message in
           Instructions.check_signature_p256 pk signature message)
   | (IHash_key (_, _), _) -> Instructions.hash_key
-  | (IPack (_, ty, _), (v, _)) ->
-      let encoding_size = Size.of_encoded_value ctxt ty v in
-      Instructions.pack encoding_size
+  | (IPack (_, ty, _), (v, _)) -> (
+      let script_res =
+        Lwt_main.run (Script_ir_translator.unparse_data ctxt Optimized ty v)
+      in
+      match script_res with
+      | Ok (node, _ctxt) -> Instructions.pack (Size.of_micheline node)
+      | Error _ -> Stdlib.failwith "IPack workload: could not unparse")
   | (IUnpack (_, _, _), _) -> Instructions.unpack
   | (IBlake2b (_, _), (bytes, _)) -> Instructions.blake2b (Size.bytes bytes)
   | (ISha256 (_, _), (bytes, _)) -> Instructions.sha256 (Size.bytes bytes)
@@ -1393,10 +1360,10 @@ let extract_ir_sized_step :
       let outputs = Size.sapling_transaction_outputs transaction in
       let state = Size.zero in
       Instructions.sapling_verify_update inputs outputs state
-  | (IDig (_, n, _, _), _) -> Instructions.dig n
-  | (IDug (_, n, _, _), _) -> Instructions.dug n
-  | (IDipn (_, n, _, _, _), _) -> Instructions.dipn n
-  | (IDropn (_, n, _, _), _) -> Instructions.dropn n
+  | (IDig (_, n, _, _), _) -> Instructions.dig (Size.of_int n)
+  | (IDug (_, n, _, _), _) -> Instructions.dug (Size.of_int n)
+  | (IDipn (_, n, _, _, _), _) -> Instructions.dipn (Size.of_int n)
+  | (IDropn (_, n, _, _), _) -> Instructions.dropn (Size.of_int n)
   | (IChainId (_, _), _) -> Instructions.chain_id
   | (INever _, _) -> .
   | (IVoting_power (_, _), _) -> Instructions.voting_power
@@ -1429,16 +1396,20 @@ let extract_ir_sized_step :
   | (ISplit_ticket (_, _), (_ticket, ((amount_a, amount_b), _))) ->
       Instructions.split_ticket (Size.integer amount_a) (Size.integer amount_b)
   | (IJoin_tickets (_, cmp_ty, _), ((ticket1, ticket2), _)) ->
-      let size1 = size_of_comparable_value cmp_ty ticket1.contents in
-      let size2 = size_of_comparable_value cmp_ty ticket2.contents in
+      let size1 = Size.size_of_comparable_value cmp_ty ticket1.contents in
+      let size2 = Size.size_of_comparable_value cmp_ty ticket2.contents in
       let tez1 = Size.integer ticket1.amount in
       let tez2 = Size.integer ticket2.amount in
       Instructions.join_tickets size1 size2 tez1 tez2
   | (IHalt _, _) -> Instructions.halt
   | (ILog _, _) -> Instructions.log
   | (IOpen_chest (_, _), (_, (chest, (time, _)))) ->
-      let plaintext_size = Script_timelock.get_plaintext_size chest - 1 in
-      let log_time = Z.log2 Z.(one + Script_int_repr.to_zint time) in
+      let plaintext_size =
+        Script_timelock.get_plaintext_size chest - 1 |> Size.of_int
+      in
+      let log_time =
+        Z.log2 Z.(one + Script_int_repr.to_zint time) |> Size.of_int
+      in
       Instructions.open_chest log_time plaintext_size
 
 let extract_control_trace (type bef_top bef aft_top aft)
@@ -1461,7 +1432,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
       Control.map_enter_body (Size.of_int (List.length xs))
   | KMap_exit_body (_, _, map, k, _) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = size_of_comparable_value Map.key_ty k in
+      let key_size = Size.size_of_comparable_value Map.key_ty k in
       Control.map_exit_body key_size (Size.map map)
   | KView_exit _ -> Control.view_exit
   | KLog _ -> Control.log
@@ -1560,7 +1531,7 @@ let sized_step_to_sparse_vec {name; args} =
       List.fold_left
         (fun acc {name; arg} ->
           Sparse_vec.String.(
-            add acc (of_list [(s ^ "_" ^ name, float_of_int arg)])))
+            add acc (of_list [(s ^ "_" ^ name, float_of_int (Size.to_int arg))])))
         Sparse_vec.String.zero
         args
 
