@@ -101,20 +101,21 @@ end
 
 let get_staking_balance = Storage.Stake.Staking_balance.get
 
-let ensure_stake_inited ctxt delegate =
-  Storage.Stake.Staking_balance.mem ctxt delegate >>= function
-  | true -> return ctxt
-  | false ->
+let get_initialized_stake ctxt delegate =
+  Storage.Stake.Staking_balance.find ctxt delegate >>=? function
+  | Some staking_balance -> return (staking_balance, ctxt)
+  | None ->
       Frozen_deposits_storage.init ctxt delegate >>=? fun ctxt ->
-      Storage.Stake.Staking_balance.init ctxt delegate Tez_repr.zero
+      let balance = Tez_repr.zero in
+      Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
+      return (balance, ctxt)
 
 let remove_stake ctxt delegate amount =
-  ensure_stake_inited ctxt delegate >>=? fun ctxt ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  get_staking_balance ctxt delegate >>=? fun staking_balance_before ->
+  get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   Tez_repr.(staking_balance_before -? amount) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
+  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance_before >= tokens_per_roll) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
     if (not inactive) && Tez_repr.(staking_balance < tokens_per_roll) then
@@ -128,12 +129,11 @@ let remove_stake ctxt delegate amount =
     return ctxt
 
 let add_stake ctxt delegate amount =
-  ensure_stake_inited ctxt delegate >>=? fun ctxt ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  get_staking_balance ctxt delegate >>=? fun staking_balance_before ->
+  get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   Tez_repr.(amount +? staking_balance_before) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
+  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance >= tokens_per_roll) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
     if inactive || Tez_repr.(staking_balance_before >= tokens_per_roll) then
@@ -151,8 +151,7 @@ let deactivate_only_call_from_delegate_storage ctxt delegate =
   Storage.Stake.Active_delegate_with_one_roll.remove ctxt delegate
 
 let activate_only_call_from_delegate_storage ctxt delegate =
-  ensure_stake_inited ctxt delegate >>=? fun ctxt ->
-  get_staking_balance ctxt delegate >>=? fun staking_balance ->
+  get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
   let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance >= tokens_per_roll) then
     Storage.Stake.Active_delegate_with_one_roll.add ctxt delegate ()
