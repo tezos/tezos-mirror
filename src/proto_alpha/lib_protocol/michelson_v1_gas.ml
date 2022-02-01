@@ -28,6 +28,7 @@
 open Alpha_context
 open Gas
 module S = Saturation_repr
+module Size = Gas_input_size
 
 module Cost_of = struct
   module S_syntax = struct
@@ -1455,7 +1456,10 @@ module Cost_of = struct
     let set_mem (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
       let (module Box) = Script_set.get set in
-      let per_elt_cost = compare Box.elt_ty elt elt in
+      let per_elt_cost =
+        Size.size_of_comparable_value Box.elt_ty elt
+        |> Size.to_int |> S.safe_int
+      in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 115) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
@@ -1463,7 +1467,10 @@ module Cost_of = struct
     let set_update (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
       let (module Box) = Script_set.get set in
-      let per_elt_cost = compare Box.elt_ty elt elt in
+      let per_elt_cost =
+        Size.size_of_comparable_value Box.elt_ty elt
+        |> Size.to_int |> S.safe_int
+      in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 130) in
       (* The 2 factor reflects the update vs mem overhead as benchmarked
@@ -1473,7 +1480,10 @@ module Cost_of = struct
     let map_mem (type k v) (elt : k) (map : (k, v) Script_typed_ir.map) =
       let open S_syntax in
       let (module Box) = Script_map.get_module map in
-      let per_elt_cost = compare Box.key_ty elt elt in
+      let per_elt_cost =
+        Size.size_of_comparable_value Box.key_ty elt
+        |> Size.to_int |> S.safe_int
+      in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 80) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
@@ -1483,7 +1493,10 @@ module Cost_of = struct
     let map_update (type k v) (elt : k) (map : (k, v) Script_typed_ir.map) =
       let open S_syntax in
       let (module Box) = Script_map.get_module map in
-      let per_elt_cost = compare Box.key_ty elt elt in
+      let per_elt_cost =
+        Size.size_of_comparable_value Box.key_ty elt
+        |> Size.to_int |> S.safe_int
+      in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 80) in
       (* The 2 factor reflects the update vs mem overhead as benchmarked
@@ -1494,7 +1507,10 @@ module Cost_of = struct
         (map : (k, v) Script_typed_ir.map) =
       let open S_syntax in
       let (module Box) = Script_map.get_module map in
-      let per_elt_cost = compare Box.key_ty elt elt in
+      let per_elt_cost =
+        Size.size_of_comparable_value Box.key_ty elt
+        |> Size.to_int |> S.safe_int
+      in
       let size = S.safe_int Box.size in
       let intercept = atomic_step_cost (S.safe_int 80) in
       (* The 3 factor reflects the update vs mem overhead as benchmarked
