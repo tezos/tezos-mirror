@@ -203,10 +203,9 @@ let get_stakes_for_selected_index ctxt index =
             with _ -> staking_balance)
         | None -> staking_balance
       in
-      let max_staking_capacity =
-        Tez_repr.(
-          div_exn (mul_exn total_balance 100) frozen_deposits_percentage)
-      in
+      Tez_repr.(total_balance *? 100L) >>?= fun expanded_balance ->
+      Tez_repr.(expanded_balance /? Int64.of_int frozen_deposits_percentage)
+      >>?= fun max_staking_capacity ->
       let stake_for_cycle =
         Tez_repr.min stake_to_consider max_staking_capacity
       in
