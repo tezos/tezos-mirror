@@ -40,6 +40,19 @@ and specific to the Hangzhou protocol can be found at:
 
 - `hangzhou-mempool-openapi.json (version 11.0) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/hangzhou-mempool-openapi.json>`_
 
+Ithaca RPCs
+-----------
+
+The OpenAPI specification for RPCs which are specific to the Ithaca (``Psithaca``)
+protocol can be found at:
+
+- `ithaca-openapi.json (version 12.0~rc2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/ithaca-openapi.json>`_
+
+The OpenAPI specification for RPCs which are related to the mempool
+and specific to the Ithaca protocol can be found at:
+
+- `ithaca-mempool-openapi.json (version 12.0~rc2) <https://gitlab.com/tezos/tezos/-/blob/master/docs/api/ithaca-mempool-openapi.json>`_
+
 How to Generate
 ---------------
 
