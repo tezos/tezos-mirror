@@ -42,3 +42,4 @@ class MichelsonLexer(RegexLexer):
 
 def setup(sphinx):
     sphinx.add_lexer("michelson", MichelsonLexer)
+    return {'parallel_read_safe': True}

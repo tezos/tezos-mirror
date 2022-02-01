@@ -18,6 +18,7 @@ def setup(app):
     app.add_role('opam', opam_role)
     app.add_role('src', src_role)
     app.add_role('gl', gitlab_role)
+    return {'parallel_read_safe': True}
 
 
 def find_dot_opam(name):
