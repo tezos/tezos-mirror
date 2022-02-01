@@ -52,7 +52,7 @@ let test_disable_feature_flag () =
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
   let expect_failure = function
-    | Environment.Ecoproto_error (Apply.Tx_rollup_disabled as e) :: _ ->
+    | Environment.Ecoproto_error (Apply.Tx_rollup_feature_disabled as e) :: _ ->
         Assert.test_error_encodings e ;
         return_unit
     | _ -> failwith "It should not be possible to send a rollup_operation "
