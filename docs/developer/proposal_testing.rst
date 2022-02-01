@@ -711,11 +711,11 @@ invoking the following eight commands)::
   $ ./scripts/snapshot_alpha.sh d_012
   $ ./scripts/link_protocol.sh src/proto_012_*
   $ ./scripts/user_activated_upgrade.sh src/proto_012_* 1617344
-  $ patch -p1 < scripts/yes-node.patch
-  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create minimal in /tmp/yes-wallet
+  $ ./scripts/patch-yes_node.sh
   $ make
-  $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/mainnet
-  $ ./tezos-node identity generate --data-dir /tmp/mainnet
+  $ ./tezos-node snapshot import ~/mainnet.rolling --data-dir /tmp/tezos-node-mainnet
+  $ ./tezos-node identity generate --data-dir /tmp/tezos-node-mainnet
+  $ dune exec scripts/yes-wallet/yes_wallet.exe -- create from context /tmp/tezos-node-mainnet in /tmp/yes-wallet --active-bakers-only
 
 Copy original folder into test folder::
 
