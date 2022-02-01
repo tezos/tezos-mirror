@@ -33,10 +33,10 @@ The five periods are as follows:
 
   At the end of a **proposal period**, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the cumulated number of :ref:`rolls <Roll>` that delegates supporting the
-  proposal have. E.g., a proposal supported by a single delegate with 100 rolls
-  has more support than a proposal supported by two delegates with 20 rolls
-  each.
+  measured in the cumulated staking power (expressed in mutez) that delegates supporting the
+  proposal have. E.g., a proposal supported by a single delegate with 600,000 tz of staking power
+  has more support than a proposal supported by two delegates with 100,000 tz
+  each of staking power.
 
   If there are no proposals, or a tie between two or more proposals, the process
   moves back to a new **proposal period**.
@@ -101,7 +101,7 @@ Voting Power
 
 When supporting a proposal or casting a Yay, Nay, or Pass ballot, each delegate
 has voting power equal to its *stake*. The stake is always measured in
-**number of rolls**.
+**mutez**.
 
 Note that the stake of each delegate is computed at the beginning of each
 period.
@@ -257,26 +257,29 @@ in the following samples::
   Current period: "proposal"
   Blocks remaining until end of period: 59
   Current proposals:
-  PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 400
+  PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp 2,400,000 ꜩ
 
   $ tezos-client show voting period
   Current period: "exploration"
   Blocks remaining until end of period: 63
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
-  Ballots: { "yay": 400, "nay": 0, "pass": 0 }
+  Ballots:
+    Yay: 2,400,000 ꜩ
+    Nay: 0 ꜩ
+    Pass: 0 ꜩ
   Current participation 20.00%, necessary quorum 80.00%
-  Current in favor 400, needed supermajority 320
+  Current in favor 2,400,000 ꜩ, needed supermajority 1,920,000 ꜩ
 
   $ tezos-client show voting period
   Current period: "cooldown"
   Blocks remaining until end of period: 64
   Current proposal: PsNa6jTtsRfbGaNSoYXNTNM5A7c3Lji22Yf2ZhpFUjQFC17iZVp
 
-It should be noted that the ballot number 400 above is the stake counted in
-number of rolls.
-The proposal has a total stake of 400 rolls, which may come from a single ballot
-from a delegate having 400 rolls, or it may come from multiple ballots from
-delegates with a combined stake of 400 rolls.
+It should be noted that the ballot number 2,400,000 ꜩ above is the stake counted in
+mutez (displayed in tez).
+The proposal has a total stake of 2,400,000 ꜩ, which may come from a single ballot
+from a delegate having a staking balance of 2,400,000 ꜩ or it may come from multiple ballots from
+delegates with a combined stake of 2,400,000 ꜩ.
 
 
 Submit proposals
@@ -293,7 +296,7 @@ following two conditions:
 
 - the protocol hash was already proposed on the network. In this case
   we can submit an additional proposal that "upvotes" an existing one
-  and our rolls are added to the ones already supporting the proposal.
+  and our staking power are added to the ones already supporting the proposal.
 - the protocol is known by the node. In particular the first proposer
   of a protocol should be able to successfully inject the protocol in
   its node which performs some checks, compiles and loads the

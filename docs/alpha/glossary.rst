@@ -153,8 +153,8 @@ _`Roll`
     An amount of tez (e.g., 6000ꜩ) serving as a minimal amount to
     determine delegates' baking_ rights in a cycle_. A delegate_ with
     twice as much stake as another will be given twice as many rights
-    to bake. A roll also serves as a unit to determine delegates'
-    voting rights in a cycle_.
+    to bake. A roll also serves as a minimal amount to determine
+    delegates' voting rights in a cycle_.
 
 _`Smart contract`
     Account_ which is associated to a :ref:`Michelson <glossary_michelson_alpha>` script. They are
@@ -173,7 +173,7 @@ _`Voting period`
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
-    the staking balance (in number of rolls) of each delegate_ that owns more
+    the staking balance (in number of mutez) of each delegate_ that owns more
     than one roll_ at that moment. For each delegate_, The voting listings
     reflects the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.

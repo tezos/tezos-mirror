@@ -1986,9 +1986,14 @@ of the contract in which the ``SELF_ADDRESS`` instruction is written.
 
     :: key_hash : 'S   ->   contract unit : 'S
 
--  ``VOTING_POWER``: Return the voting power of a given contract. This voting power
-   coincides with the weight of the contract in the voting listings (i.e., the rolls
-   count) which is calculated at the beginning of every voting period.
+- ``VOTING_POWER``: Return the voting power of a given contract. This
+   voting power coincides with the weight of the contract in the
+   voting listings, which is calculated at the beginning of every
+   voting period. Currently the voting power is proportional to the
+   full staking balance of the contract, but this might change in
+   future version of the protocol and developers should not rely on
+   this. Hence, the value returned by ``VOTING_POWER`` should only be
+   considered relative to the one returned by ``TOTAL_VOTING_POWER``.
 
 ::
 
@@ -2033,8 +2038,9 @@ Special operations
     :: 'S   ->   nat : 'S
 
 -  ``TOTAL_VOTING_POWER``: Return the total voting power of all contracts. The total
-   voting power coincides with the sum of the rolls count of every contract in the voting
-   listings. The voting listings is calculated at the beginning of every voting period.
+   voting power coincides with the sum of the voting power of every contract in
+   the voting listings (as returned by ``VOTING_POWER``). The voting listings is calculated at the beginning of every
+   voting period.
 
 ::
 

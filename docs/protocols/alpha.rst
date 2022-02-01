@@ -38,7 +38,13 @@ Smart Contract Optimistic Rollups
 
 - Add Inbox. (MR :gl:`!4020`)
 
-  
+Voting procedure
+----------------
+
+The voting power of a delegate is no longer rounded to rolls, it is
+now instead the full staking power of the delegate, currently
+expressed in mutez.
+
 Breaking Changes
 ----------------
 
@@ -52,6 +58,20 @@ Breaking Changes
   a more precise readout for the same value. `consumed_milligas`
   field was added to the encoding of block metadata for uniformity.
   (MR :gl:`!4388`)
+
+- The following RPCs output format changed:
+
+  1. ``/chains/<chain_id>/blocks/<block>/votes/proposals``,
+  2. ``/chains/<chain_id>/blocks/<block>/votes/ballots``,
+  3. ``/chains/<chain_id>/blocks/<block>/votes/listings``,
+  4. ``/chains/<chain_id>/blocks/<block>/votes/total_voting_power``,
+  5. ``/chains/<chain_id>/blocks/<block>/context/delegates/<public_key_hash>``
+  6. ``/chains/<chain_id>/blocks/<block>/context/delegates/<public_key_hash>/voting_power``
+
+  The voting power that was represented by ``int32`` (denoting rolls)
+  is now represented by an ``int64`` (denoting mutez). Furthermore, in
+  the RPC ``/chains/<chain_id>/blocks/<block>/votes/listings``, the
+  field ``rolls`` has been replaced by the field ``voting_power``.
 
 Bug Fixes
 ---------
@@ -107,6 +127,14 @@ Michelson
   is now forbidden. Put the annotation on the parameter type instead.
   E.g. replace ``parameter %a int;`` by ``parameter (int %a);``
   (MR :gl:`!4366`)
+
+- The ``VOTING_POWER`` of a contract is no longer rounded to rolls. It
+  is now instead the full staking power of the delegate, currently
+  expressed in mutez. Though, developers should not rely on
+  ``VOTING_POWER`` to query the staking power of a contract in
+  ``mutez``: the value returned by ``VOTING_POWER`` is still of type`
+  ``nat`` and it should only be considered relative to
+  ``TOTAL_VOTING_POWER``.
 
 Internal
 --------
