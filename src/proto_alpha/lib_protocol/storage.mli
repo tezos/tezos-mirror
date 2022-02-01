@@ -73,7 +73,7 @@ module Contract : sig
      may also possess tez in frozen deposits. Empty balances (of zero
      tez) are only allowed for originated contracts, not for implicit
      ones. *)
-  module Balance :
+  module Spendable_balance :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Tez_repr.t

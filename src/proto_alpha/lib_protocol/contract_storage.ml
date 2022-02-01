@@ -386,7 +386,7 @@ let create_base c ~prepaid_bootstrap_storage
       Storage.Contract.Global_counter.get c >>=? fun counter ->
       Storage.Contract.Counter.init c contract counter)
   >>=? fun c ->
-  Storage.Contract.Balance.init c contract balance >>=? fun c ->
+  Storage.Contract.Spendable_balance.init c contract balance >>=? fun c ->
   (match manager with
   | Some manager ->
       Contract_manager_storage.init c contract (Manager_repr.Hash manager)
@@ -443,7 +443,8 @@ let delete c contract =
       failwith "Non implicit contracts cannot be removed"
   | Some _ ->
       Contract_delegate_storage.remove c contract >>=? fun c ->
-      Storage.Contract.Balance.remove_existing c contract >>=? fun c ->
+      Storage.Contract.Spendable_balance.remove_existing c contract
+      >>=? fun c ->
       Contract_manager_storage.remove_existing c contract >>=? fun c ->
       Storage.Contract.Counter.remove_existing c contract >>=? fun c ->
       Storage.Contract.Code.remove c contract >>=? fun (c, _, _) ->
@@ -452,7 +453,7 @@ let delete c contract =
       Storage.Contract.Used_storage_space.remove c contract >|= ok
 
 let allocated c contract =
-  Storage.Contract.Balance.find c contract >>=? function
+  Storage.Contract.Spendable_balance.find c contract >>=? function
   | None -> return_false
   | Some _ -> return_true
 
@@ -532,7 +533,7 @@ let get_counter c manager =
   | Some v -> return v
 
 let get_balance c contract =
-  Storage.Contract.Balance.find c contract >>=? function
+  Storage.Contract.Spendable_balance.find c contract >>=? function
   | None -> (
       match Contract_repr.is_implicit contract with
       | Some _ -> return Tez_repr.zero
@@ -559,12 +560,13 @@ let update_script_storage c contract storage lazy_storage_diff =
   Storage.Contract.Used_storage_space.update c contract new_size
 
 let spend_only_call_from_token c contract amount =
-  Storage.Contract.Balance.find c contract >>=? fun balance ->
+  Storage.Contract.Spendable_balance.find c contract >>=? fun balance ->
   let balance = Option.value balance ~default:Tez_repr.zero in
   match Tez_repr.(balance -? amount) with
   | Error _ -> fail (Balance_too_low (contract, balance, amount))
   | Ok new_balance -> (
-      Storage.Contract.Balance.update c contract new_balance >>=? fun c ->
+      Storage.Contract.Spendable_balance.update c contract new_balance
+      >>=? fun c ->
       Contract_delegate_storage.remove_contract_stake c contract amount
       >>=? fun c ->
       if Tez_repr.(new_balance > Tez_repr.zero) then return c
@@ -584,16 +586,16 @@ let spend_only_call_from_token c contract amount =
 
 (* [Tez_repr.(amount <> zero)] is a precondition of this function. It ensures that
    no entry associating a null balance to an implicit contract exists in the map
-   [Storage.Contract.Balance]. *)
+   [Storage.Contract.Spendable_balance]. *)
 let credit_only_call_from_token c contract amount =
-  Storage.Contract.Balance.find c contract >>=? function
+  Storage.Contract.Spendable_balance.find c contract >>=? function
   | None -> (
       match Contract_repr.is_implicit contract with
       | None -> fail (Non_existing_contract contract)
       | Some manager -> create_implicit c manager ~balance:amount)
   | Some balance ->
       Tez_repr.(amount +? balance) >>?= fun balance ->
-      Storage.Contract.Balance.update c contract balance >>=? fun c ->
+      Storage.Contract.Spendable_balance.update c contract balance >>=? fun c ->
       Contract_delegate_storage.add_contract_stake c contract amount
 
 let init c =
@@ -618,9 +620,9 @@ let set_paid_storage_space_and_return_fees_to_pay c contract new_storage_space =
     >|=? fun c -> (to_pay, c)
 
 let update_balance ctxt contract f amount =
-  Storage.Contract.Balance.get ctxt contract >>=? fun balance ->
+  Storage.Contract.Spendable_balance.get ctxt contract >>=? fun balance ->
   f balance amount >>?= fun new_balance ->
-  Storage.Contract.Balance.update ctxt contract new_balance
+  Storage.Contract.Spendable_balance.update ctxt contract new_balance
 
 let increase_balance_only_call_from_token ctxt contract amount =
   update_balance ctxt contract Tez_repr.( +? ) amount

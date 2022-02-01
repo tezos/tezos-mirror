@@ -192,7 +192,7 @@ let select_distribution_for_cycle ctxt cycle pubkey =
            let delegate_contract = Contract_repr.implicit_contract delegate in
            Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
            >>=? fun frozen_deposits_limit ->
-           Storage.Contract.Balance.get ctxt delegate_contract
+           Storage.Contract.Spendable_balance.get ctxt delegate_contract
            >>=? fun balance ->
            Frozen_deposits_storage.get ctxt delegate_contract
            >>=? fun frozen_deposits ->

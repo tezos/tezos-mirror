@@ -68,7 +68,7 @@ let balance ctxt stored =
   | `Collected_commitments bpkh -> Commitment_storage.committed_amount ctxt bpkh
   | `Delegate_balance delegate ->
       let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Balance.get ctxt contract
+      Storage.Contract.Spendable_balance.get ctxt contract
   | `Frozen_deposits delegate -> (
       let contract = Contract_repr.implicit_contract delegate in
       Frozen_deposits_storage.find ctxt contract >|=? fun frozen_deposits ->

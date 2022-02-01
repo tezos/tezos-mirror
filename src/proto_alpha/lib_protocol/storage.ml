@@ -188,7 +188,7 @@ module Contract = struct
 
   let list = Indexed_context.keys
 
-  module Balance =
+  module Spendable_balance =
     Indexed_context.Make_map
       (struct
         let name = ["balance"]
