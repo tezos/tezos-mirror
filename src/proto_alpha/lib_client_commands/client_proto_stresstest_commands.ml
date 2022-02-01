@@ -1158,6 +1158,12 @@ let generate_random_transactions =
           (if !verbose then cctxt#message "all sources have been normalized"
           else Lwt.return_unit)
           >>= fun () ->
+          let sources =
+            List.sort_uniq
+              (fun src1 src2 ->
+                Signature.Secret_key.compare src1.source.sk src2.source.sk)
+              sources
+          in
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let rng_state = Random.State.make [|parameters.seed|] in
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
