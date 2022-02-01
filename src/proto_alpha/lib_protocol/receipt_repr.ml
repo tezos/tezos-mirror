@@ -355,7 +355,7 @@ let group_balance_updates balance_updates =
           | (Debited a, Debited b) ->
               Tez_repr.(a +? b) >>? fun update -> ok (Debited update)))
       >>? function
-      | Credited update when Tez_repr.(update = zero) ->
+      | (Credited update | Debited update) when Tez_repr.(update = zero) ->
           ok (BalanceMap.remove (b, o) acc)
       | update -> ok (BalanceMap.add (b, o) update acc))
     BalanceMap.empty
