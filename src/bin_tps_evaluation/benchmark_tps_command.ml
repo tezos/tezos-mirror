@@ -154,7 +154,7 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
   let transaction_cost =
     Gas.average_transaction_cost transaction_costs average_block
   in
-  Format.printf "Average transaction cost: %d@\n" transaction_cost ;
+  Log.info "Average transaction cost: %d@\n" transaction_cost ;
   Baker.init ~protocol ~delegates node client >>= fun _baker ->
   Format.printf "Using the parameter file: %s@.@." parameter_file ;
   print_out_file parameter_file >>= fun () ->

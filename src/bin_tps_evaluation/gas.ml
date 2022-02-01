@@ -27,7 +27,7 @@ let weighted_average (xs : (float * float) list) =
   let (total_weight, total_sum) =
     List.fold_left
       (fun (total_weight, total_sum) (weight, value) ->
-        (total_weight +. weight, total_sum +. value))
+        (total_weight +. weight, total_sum +. (value *. weight)))
       (0.0, 0.0)
       xs
   in
@@ -41,10 +41,9 @@ let average_transaction_cost
   in
   (* TODO Use real smart contract cost instead of 0.0 when we support them. *)
   let infer_contract_cost (_, n) = (Float.of_int n, 0.0) in
-  let contract_costs = List.map infer_contract_cost average_block.contract in
+  let _contract_costs = List.map infer_contract_cost average_block.contract in
   let calculated_cost =
-    regular_cost :: contract_costs
-    |> weighted_average |> Float.ceil |> Float.to_int
+    [regular_cost] |> weighted_average |> Float.ceil |> Float.to_int
   in
   (* Add 100 for safety. *)
   calculated_cost + 100
