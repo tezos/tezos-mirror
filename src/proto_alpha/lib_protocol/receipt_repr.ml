@@ -246,6 +246,8 @@ let compare_balance ba bb =
 
 type balance_update = Debited of Tez_repr.t | Credited of Tez_repr.t
 
+let is_zero_update = function Debited t | Credited t -> Tez_repr.(t = zero)
+
 let balance_update_encoding =
   let open Data_encoding in
   def "operation_metadata.alpha.balance_update"
@@ -331,33 +333,49 @@ let balance_updates_encoding =
              (merge_objs balance_encoding balance_update_encoding)
              update_origin_encoding))
 
-module BalanceMap = Map.Make (struct
-  type t = balance * update_origin
+module BalanceMap = struct
+  include Map.Make (struct
+    type t = balance * update_origin
 
-  let compare (ba, ua) (bb, ub) =
-    let c = compare_balance ba bb in
-    if is_not_zero c then c else compare_update_origin ua ub
-end)
+    let compare (ba, ua) (bb, ub) =
+      let c = compare_balance ba bb in
+      if is_not_zero c then c else compare_update_origin ua ub
+  end)
+
+  let update_r key (f : 'a option -> 'b option tzresult) map =
+    f (find key map) >>? function
+    | Some v -> ok (add key v map)
+    | None -> ok (remove key map)
+end
 
 let group_balance_updates balance_updates =
   List.fold_left_e
     (fun acc (b, update, o) ->
-      (match BalanceMap.find (b, o) acc with
-      | None -> ok update
-      | Some present -> (
-          match (present, update) with
-          | (Credited a, Debited b) | (Debited b, Credited a) ->
-              if Tez_repr.(a >= b) then
-                Tez_repr.(a -? b) >>? fun update -> ok (Credited update)
-              else Tez_repr.(b -? a) >>? fun update -> ok (Debited update)
-          | (Credited a, Credited b) ->
-              Tez_repr.(a +? b) >>? fun update -> ok (Credited update)
-          | (Debited a, Debited b) ->
-              Tez_repr.(a +? b) >>? fun update -> ok (Debited update)))
-      >>? function
-      | (Credited update | Debited update) when Tez_repr.(update = zero) ->
-          ok (BalanceMap.remove (b, o) acc)
-      | update -> ok (BalanceMap.add (b, o) update acc))
+      (* Do not do anything if the update is zero *)
+      if is_zero_update update then ok acc
+      else
+        BalanceMap.update_r
+          (b, o)
+          (function
+            | None -> ok (Some update)
+            | Some balance -> (
+                match (balance, update) with
+                | (Credited a, Debited b) | (Debited b, Credited a) ->
+                    (* Remove the binding since it just fell down to zero *)
+                    if Tez_repr.(a = b) then ok None
+                    else if Tez_repr.(a > b) then
+                      Tez_repr.(a -? b) >>? fun update ->
+                      ok (Some (Credited update))
+                    else
+                      Tez_repr.(b -? a) >>? fun update ->
+                      ok (Some (Debited update))
+                | (Credited a, Credited b) ->
+                    Tez_repr.(a +? b) >>? fun update ->
+                    ok (Some (Credited update))
+                | (Debited a, Debited b) ->
+                    Tez_repr.(a +? b) >>? fun update ->
+                    ok (Some (Debited update))))
+          acc)
     BalanceMap.empty
     balance_updates
   >>? fun map ->
