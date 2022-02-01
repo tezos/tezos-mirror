@@ -79,21 +79,27 @@ module Make (Registration : Registration.S) = struct
   let get_registered_mockup (protocol_hash_opt : Protocol_hash.t option)
       (printer : #Tezos_client_base.Client_context.printer) :
       Registration.mockup_environment tzresult Lwt.t =
+    let open Lwt_result_syntax in
     let mockup_environments = Registration.get_registered_environments () in
-    (match protocol_hash_opt with
-    | Some protocol_hash ->
-        Lwt.return (fun (module Mockup : Registration.MOCKUP) ->
-            Protocol_hash.equal protocol_hash Mockup.protocol_hash)
-    | None ->
+    let hash_is_of_mockup hash (module Mockup : Registration.MOCKUP) =
+      match hash with
+      | Some protocol_hash ->
+          Protocol_hash.equal protocol_hash Mockup.protocol_hash
+      | None ->
+          Re.Str.string_match
+            is_proto_alpha_regexp
+            (Protocol_hash.to_b58check Mockup.protocol_hash)
+            0
+    in
+    let*! () =
+      if Option.is_none protocol_hash_opt then
         printer#warning
           "No protocol specified: using Alpha as default protocol."
-        >|= fun () (module Mockup : Registration.MOCKUP) ->
-        Re.Str.string_match
-          is_proto_alpha_regexp
-          (Protocol_hash.to_b58check Mockup.protocol_hash)
-          0)
-    >>= fun criterion ->
-    match List.find criterion mockup_environments with
+      else Lwt.return_unit
+    in
+    match
+      List.find (hash_is_of_mockup protocol_hash_opt) mockup_environments
+    with
     | Some mockup -> return mockup
     | None ->
         let requested_protocol =
@@ -125,14 +131,17 @@ module Make (Registration : Registration.S) = struct
       (Registration.mockup_environment * Registration.mockup_context) tzresult
       Lwt.t =
    fun cctxt ->
-    get_registered_mockup None cctxt >>=? fun mockup ->
+    let open Lwt_tzresult_syntax in
+    let* mockup = get_registered_mockup None cctxt in
     let (module Mockup) = mockup in
-    Mockup.init
-      ~cctxt
-      ~parameters:Mockup.default_parameters
-      ~constants_overrides_json:None
-      ~bootstrap_accounts_json:None
-    >>=? fun rpc_context -> return (mockup, rpc_context)
+    let* rpc_context =
+      Mockup.init
+        ~cctxt
+        ~parameters:Mockup.default_parameters
+        ~constants_overrides_json:None
+        ~bootstrap_accounts_json:None
+    in
+    return (mockup, rpc_context)
 
   let init_mockup_context_by_protocol_hash :
       cctxt:Tezos_client_base.Client_context.printer ->
@@ -142,20 +151,24 @@ module Make (Registration : Registration.S) = struct
       (Registration.mockup_environment * Registration.mockup_context) tzresult
       Lwt.t =
    fun ~cctxt ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json ->
-    get_registered_mockup (Some protocol_hash) cctxt >>=? fun mockup ->
+    let open Lwt_tzresult_syntax in
+    let* mockup = get_registered_mockup (Some protocol_hash) cctxt in
     let (module Mockup) = mockup in
-    Mockup.init
-      ~cctxt
-      ~parameters:Mockup.default_parameters
-      ~constants_overrides_json
-      ~bootstrap_accounts_json
-    >>=? fun menv -> return (mockup, menv)
+    let* menv =
+      Mockup.init
+        ~cctxt
+        ~parameters:Mockup.default_parameters
+        ~constants_overrides_json
+        ~bootstrap_accounts_json
+    in
+    return (mockup, menv)
 
   let mockup_context_from_persisted
       ({protocol_hash; chain_id; rpc_context; protocol_data} :
         Persistent_mockup_environment.t)
       (printer : #Tezos_client_base.Client_context.printer) =
-    get_registered_mockup (Some protocol_hash) printer >>=? fun mockup ->
+    let open Lwt_tzresult_syntax in
+    let* mockup = get_registered_mockup (Some protocol_hash) printer in
     return
       ( mockup,
         Tezos_mockup_registration.Registration_intf.
@@ -163,12 +176,14 @@ module Make (Registration : Registration.S) = struct
 
   let get_mockup_context_from_disk ~base_dir ~protocol_hash
       (printer : #Tezos_client_base.Client_context.printer) =
+    let open Lwt_tzresult_syntax in
     let file = (Files.Context.get ~dirname:base_dir :> string) in
     if not (Sys.file_exists file) then
       failwith "get_mockup_context_from_disk: file %s not found" file
     else
-      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file
-      >>=? fun context_json ->
+      let* context_json =
+        Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file
+      in
       match Persistent_mockup_environment.of_json context_json with
       | persisted_mockup ->
           let ({
@@ -184,54 +199,60 @@ module Make (Registration : Registration.S) = struct
             Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
           in
           let predecessor = persisted_mockup.rpc_context.block_hash in
-          get_registered_mockup (Some persisted_mockup.protocol_hash) printer
-          >>=? fun (module Mockup) ->
+          let* (module Mockup) =
+            get_registered_mockup (Some persisted_mockup.protocol_hash) printer
+          in
           (*
              In the mockup mode, reactivity is important and there are
              no constraints to be consistent with other nodes. For this
              reason, the mockup mode loads the cache lazily.
              See {!Environment_context.source_of_cache}.
           *)
-          Mockup.Protocol.value_of_key
-            ~chain_id:persisted_mockup.chain_id
-            ~predecessor_context:persisted_mockup.rpc_context.context
-            ~predecessor_timestamp
-            ~predecessor_level
-            ~predecessor_fitness
-            ~predecessor
-            ~timestamp
-          >>=? fun value_of_key ->
-          Tezos_protocol_environment.Context.load_cache
-            predecessor
-            persisted_mockup.rpc_context.context
-            `Lazy
-            value_of_key
-          >>=? fun context ->
+          let* value_of_key =
+            Mockup.Protocol.value_of_key
+              ~chain_id:persisted_mockup.chain_id
+              ~predecessor_context:persisted_mockup.rpc_context.context
+              ~predecessor_timestamp
+              ~predecessor_level
+              ~predecessor_fitness
+              ~predecessor
+              ~timestamp
+          in
+          let* context =
+            Tezos_protocol_environment.Context.load_cache
+              predecessor
+              persisted_mockup.rpc_context.context
+              `Lazy
+              value_of_key
+          in
           let persisted_mockup =
             {
               persisted_mockup with
               rpc_context = {persisted_mockup.rpc_context with context};
             }
           in
-          mockup_context_from_persisted persisted_mockup printer
-          >>=? fun (((module Mockup_environment), _) as res) ->
-          (match protocol_hash with
-          | None -> return_unit
-          | Some desired_protocol
-            when Protocol_hash.equal
-                   Mockup_environment.protocol_hash
-                   desired_protocol ->
-              return_unit
-          | Some desired_protocol ->
-              failwith
-                "Protocol %a was requested via --protocol\n\
-                 yet the mockup at %s was initialized with %a"
-                Protocol_hash.pp_short
-                desired_protocol
-                base_dir
-                Protocol_hash.pp_short
-                Mockup_environment.protocol_hash)
-          >>=? fun () -> return res
+          let* (((module Mockup_environment), _) as res) =
+            mockup_context_from_persisted persisted_mockup printer
+          in
+          let* () =
+            match protocol_hash with
+            | None -> return_unit
+            | Some desired_protocol
+              when Protocol_hash.equal
+                     Mockup_environment.protocol_hash
+                     desired_protocol ->
+                return_unit
+            | Some desired_protocol ->
+                failwith
+                  "Protocol %a was requested via --protocol\n\
+                   yet the mockup at %s was initialized with %a"
+                  Protocol_hash.pp_short
+                  desired_protocol
+                  base_dir
+                  Protocol_hash.pp_short
+                  Mockup_environment.protocol_hash
+          in
+          return res
       | exception _e ->
           failwith "get_mockup_context_from_disk: could not read %s" file
 
@@ -267,57 +288,69 @@ module Make (Registration : Registration.S) = struct
   let is_directory_empty dir = Array.length (Sys.readdir dir) = 0
 
   let classify_base_dir base_dir =
-    if not (Sys.file_exists base_dir) then return Base_dir_does_not_exist
-    else if not (Sys.is_directory base_dir) then return Base_dir_is_file
-    else if is_directory_empty base_dir then return Base_dir_is_empty
+    let open Lwt_syntax in
+    if not (Sys.file_exists base_dir) then return_ok Base_dir_does_not_exist
+    else if not (Sys.is_directory base_dir) then return_ok Base_dir_is_file
+    else if is_directory_empty base_dir then return_ok Base_dir_is_empty
     else
       let dirname = base_dir in
-      Files.exists_mockup_directory ~dirname >>= function
+      let* b = Files.exists_mockup_directory ~dirname in
+      match b with
       | true -> (
-          Files.Context.exists ~dirname >>= function
-          | true -> return Base_dir_is_mockup
-          | false -> return Base_dir_is_nonempty)
-      | false -> return Base_dir_is_nonempty
+          let* b = Files.Context.exists ~dirname in
+          match b with
+          | true -> return_ok Base_dir_is_mockup
+          | false -> return_ok Base_dir_is_nonempty)
+      | false -> return_ok Base_dir_is_nonempty
 
   let create_mockup ~(cctxt : Tezos_client_base.Client_context.full)
       ~protocol_hash ~constants_overrides_json ~bootstrap_accounts_json
       ~asynchronous =
+    let open Lwt_tzresult_syntax in
     let base_dir = cctxt#get_base_dir in
     let create_base_dir () =
-      Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir >>= fun () ->
-      cctxt#message "Created mockup client base dir in %s" base_dir
-      >>= fun () -> return_unit
+      let*! () = Tezos_stdlib_unix.Lwt_utils_unix.create_dir base_dir in
+      let*! () =
+        cctxt#message "Created mockup client base dir in %s" base_dir
+      in
+      return_unit
     in
-    (classify_base_dir base_dir >>=? function
-     | Base_dir_does_not_exist | Base_dir_is_empty -> create_base_dir ()
-     | Base_dir_is_file -> failwith "%s is a file" base_dir
-     | Base_dir_is_mockup ->
-         failwith "%s is already initialized as a mockup directory" base_dir
-     | Base_dir_is_nonempty ->
-         failwith
-           "%s is not empty, please specify a fresh base directory"
-           base_dir)
-    >>=? fun () ->
-    init_mockup_context_by_protocol_hash
-      ~cctxt:(cctxt :> Tezos_client_base.Client_context.printer)
-      ~protocol_hash
-      ~constants_overrides_json
-      ~bootstrap_accounts_json
-    >>=? fun (_mockup_env, {chain = chain_id; rpc_context; protocol_data}) ->
+    let* () =
+      let* bd = classify_base_dir base_dir in
+      match bd with
+      | Base_dir_does_not_exist | Base_dir_is_empty -> create_base_dir ()
+      | Base_dir_is_file -> failwith "%s is a file" base_dir
+      | Base_dir_is_mockup ->
+          failwith "%s is already initialized as a mockup directory" base_dir
+      | Base_dir_is_nonempty ->
+          failwith
+            "%s is not empty, please specify a fresh base directory"
+            base_dir
+    in
+    let* (_mockup_env, {chain = chain_id; rpc_context; protocol_data}) =
+      init_mockup_context_by_protocol_hash
+        ~cctxt:(cctxt :> Tezos_client_base.Client_context.printer)
+        ~protocol_hash
+        ~constants_overrides_json
+        ~bootstrap_accounts_json
+    in
     let mockup_dir = (Files.get_mockup_directory ~dirname:base_dir :> string) in
-    Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir >>= fun () ->
+    let*! () = Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir in
     let context_file = (Files.Context.get ~dirname:base_dir :> string) in
-    Persistent_mockup_environment.(
-      to_json {protocol_hash; chain_id; rpc_context; protocol_data})
-    |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
-    >>=? fun () ->
+    let* () =
+      Persistent_mockup_environment.(
+        to_json {protocol_hash; chain_id; rpc_context; protocol_data})
+      |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
+    in
     if asynchronous then
       (* Setup a local persistent mempool *)
       let mempool_file = (Files.Mempool.get ~dirname:base_dir :> string) in
-      cctxt#message "creating persistent mempool file at %s" mempool_file
-      >>= fun () ->
+      let*! () =
+        cctxt#message "creating persistent mempool file at %s" mempool_file
+      in
       Lwt_io.with_file ~mode:Lwt_io.Output mempool_file (fun oc ->
-          Lwt_io.write oc "[]" >|= ok)
+          let*! () = Lwt_io.write oc "[]" in
+          return_unit)
     else return_unit
 end
 

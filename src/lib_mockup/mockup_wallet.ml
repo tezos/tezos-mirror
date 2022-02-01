@@ -28,6 +28,7 @@ open Tezos_client_base
 type bootstrap_secret = {name : string; sk_uri : Client_keys.sk_uri}
 
 let default_bootstrap_accounts =
+  let open Lwt_result_syntax in
   let unencrypted_keys =
     [
       "edsk3gUfUPyBSfrS9CCgmCiQsTCHGkviBDusMxDJstFtojtc1zcpsh";
@@ -40,29 +41,34 @@ let default_bootstrap_accounts =
   let basename = "bootstrap" in
   List.mapi_es
     (fun i ukey ->
-      Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
-      >>?= fun sk_uri ->
+      let*? sk_uri =
+        Client_keys.make_sk_uri @@ Uri.of_string ("unencrypted:" ^ ukey)
+      in
       let name = basename ^ string_of_int (i + 1) in
       return {name; sk_uri})
     unencrypted_keys
 
 let add_bootstrap_secret cctxt {name; sk_uri} =
+  let open Lwt_result_syntax in
   let force = false in
-  Client_keys.neuterize sk_uri >>=? fun pk_uri ->
-  (Client_keys.Public_key.find_opt cctxt name >>=? function
-   | None -> return_unit
-   | Some (pk_uri_found, _) ->
-       fail_unless
-         (pk_uri = pk_uri_found || force)
-         (error_of_fmt
-            "public and secret keys '%s' don't correspond, please don't use \
-             --force"
-            name))
-  >>=? fun () ->
-  Client_keys.import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
-  >>=? fun (pkh, public_key) ->
-  cctxt#message "Tezos address added: %a" Signature.Public_key_hash.pp pkh
-  >>= fun () ->
+  let* pk_uri = Client_keys.neuterize sk_uri in
+  let* () =
+    Client_keys.Public_key.find_opt cctxt name >>=? function
+    | None -> return_unit
+    | Some (pk_uri_found, _) ->
+        fail_unless
+          (pk_uri = pk_uri_found || force)
+          (error_of_fmt
+             "public and secret keys '%s' don't correspond, please don't use \
+              --force"
+             name)
+  in
+  let* (pkh, public_key) =
+    Client_keys.import_secret_key ~io:(cctxt :> Client_context.io_wallet) pk_uri
+  in
+  let*! () =
+    cctxt#message "Tezos address added: %a" Signature.Public_key_hash.pp pkh
+  in
   Client_keys.register_key cctxt ~force (pkh, pk_uri, sk_uri) ?public_key name
 
 let bootstrap_secret_encoding =
@@ -79,16 +85,20 @@ let bootstrap_secrets_encoding = Data_encoding.list bootstrap_secret_encoding
 
 let populate (cctxt : #Tezos_client_base.Client_context.io_wallet)
     bootstrap_accounts_file =
-  (match bootstrap_accounts_file with
-  | None -> default_bootstrap_accounts
-  | Some accounts_file -> (
-      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
-      >>=? fun json ->
-      match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
-      | accounts -> return accounts
-      | exception e ->
-          failwith
-            "cannot read definitions of bootstrap accounts in %s because: %s"
-            accounts_file
-            (Printexc.to_string e)))
-  >>=? List.iter_es (add_bootstrap_secret cctxt)
+  let open Lwt_tzresult_syntax in
+  let* accounts =
+    match bootstrap_accounts_file with
+    | None -> default_bootstrap_accounts
+    | Some accounts_file -> (
+        let* json =
+          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file accounts_file
+        in
+        match Data_encoding.Json.destruct bootstrap_secrets_encoding json with
+        | accounts -> return accounts
+        | exception e ->
+            failwith
+              "cannot read definitions of bootstrap accounts in %s because: %s"
+              accounts_file
+              (Printexc.to_string e))
+  in
+  List.iter_es (add_bootstrap_secret cctxt) accounts

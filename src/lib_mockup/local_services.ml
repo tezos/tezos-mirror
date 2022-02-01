@@ -292,19 +292,24 @@ module Make (E : MENV) = struct
     let file = (File_accessor.get ~dirname:E.base_dir :> string)
 
     let unsafe_read () =
-      Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file >>=? fun json ->
+      let open Lwt_result_syntax in
+      let* json = Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file in
       return @@ Data_encoding.Json.destruct ops_encoding json
 
     let read () =
-      File_accessor.exists ~dirname:E.base_dir >>= function
-      | true -> unsafe_read ()
-      | false -> return []
+      let open Lwt_syntax in
+      let* b = File_accessor.exists ~dirname:E.base_dir in
+      match b with true -> unsafe_read () | false -> return_ok []
 
     let write ~mode operations =
-      (match mode with
-      | Append -> read () >>=? fun ops -> return (ops @ operations)
-      | Zero_truncate -> return operations)
-      >>=? fun ops ->
+      let open Lwt_result_syntax in
+      let* ops =
+        match mode with
+        | Append ->
+            let* ops = read () in
+            return (ops @ operations)
+        | Zero_truncate -> return operations
+      in
       let json = Data_encoding.Json.construct ops_encoding ops in
       Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file file json
 
@@ -327,40 +332,40 @@ module Make (E : MENV) = struct
         return (operation_hash, op)
 
   let with_chain ?caller_name chain k =
-    check_chain ?caller_name chain >>= function
-    | Error errs -> RPC_answer.fail errs
-    | Ok () -> k ()
+    let open Lwt_syntax in
+    let* r = check_chain ?caller_name chain in
+    match r with Error errs -> RPC_answer.fail errs | Ok () -> k ()
 
   let pending_operations () =
+    let open Lwt_result_syntax in
     Directory.register
       Directory.empty
       (* /chains/<chain_id>/mempool/pending_operations *)
       (E.Block_services.S.Mempool.pending_operations
       @@ Block_services.mempool_path Block_services.chain_path)
       (fun ((), chain) params () ->
-        check_chain chain >>= function
+        let*! pending_operations =
+          let* () = check_chain chain in
+          let* pooled_operations = Mempool.read () in
+          let* applied = List.map_es to_applied pooled_operations in
+          let pending_operations =
+            {
+              E.Block_services.Mempool.applied;
+              refused = Operation_hash.Map.empty;
+              outdated = Operation_hash.Map.empty;
+              branch_refused = Operation_hash.Map.empty;
+              branch_delayed = Operation_hash.Map.empty;
+              unprocessed = Operation_hash.Map.empty;
+            }
+          in
+          return pending_operations
+        in
+        match pending_operations with
         | Error errs -> RPC_answer.fail errs
-        | Ok () -> (
-            Mempool.read () >>= function
-            | Error errs -> RPC_answer.fail errs
-            | Ok pooled_operations -> (
-                List.map_es to_applied pooled_operations >>= function
-                | Error _ -> RPC_answer.fail [Cannot_parse_op]
-                | Ok applied ->
-                    let pending_operations =
-                      {
-                        E.Block_services.Mempool.applied;
-                        refused = Operation_hash.Map.empty;
-                        outdated = Operation_hash.Map.empty;
-                        branch_refused = Operation_hash.Map.empty;
-                        branch_delayed = Operation_hash.Map.empty;
-                        unprocessed = Operation_hash.Map.empty;
-                      }
-                    in
-                    E.Block_services.Mempool
-                    .pending_operations_version_dispatcher
-                      ~version:params#version
-                      pending_operations)))
+        | Ok pending_operations ->
+            E.Block_services.Mempool.pending_operations_version_dispatcher
+              ~version:params#version
+              pending_operations)
 
   let shell_header () =
     Directory.prefix
@@ -402,6 +407,7 @@ module Make (E : MENV) = struct
                RPC_answer.return set))
 
   let simulate_operation (validation_state, preapply_result) op =
+    let open Lwt_tzresult_syntax in
     match
       Data_encoding.Binary.to_bytes
         E.Protocol.operation_data_encoding
@@ -411,7 +417,8 @@ module Make (E : MENV) = struct
     | Ok proto -> (
         let op_t = {Operation.shell = op.shell; proto} in
         let hash = Operation.hash op_t in
-        E.Protocol.apply_operation validation_state op >>= function
+        let*! r = E.Protocol.apply_operation validation_state op in
+        match r with
         | Error e ->
             let open Preapply_result in
             return
@@ -434,6 +441,7 @@ module Make (E : MENV) = struct
                 } ))
 
   let preapply_block () =
+    let open Lwt_tzresult_syntax in
     Directory.prefix
       (Tezos_rpc.RPC_path.prefix
          (* /chains/<chain> *)
@@ -445,74 +453,82 @@ module Make (E : MENV) = struct
          E.Block_services.S.Helpers.Preapply.block
          (fun (((), chain), _block) o {operations; protocol_data} ->
            with_chain ~caller_name:"preapply_block" chain (fun () ->
-               (let timestamp = o#timestamp in
-                full_construction
-                  ~cache:`Lazy
-                  ?timestamp:o#timestamp
-                  ~protocol_data
-                  ()
-                >>=? fun validation_state ->
-                List.fold_left_es
-                  (fun (validation_passes, validation_state, validation_result)
-                       operations ->
-                    List.fold_left_es
-                      simulate_operation
-                      (validation_state, Preapply_result.empty)
-                      operations
-                    >>=? fun (state, result) ->
-                    let open Preapply_result in
-                    let p_result =
-                      {result with applied = List.rev result.applied}
-                    in
-                    return
-                      ( succ validation_passes,
-                        state,
-                        p_result :: validation_result ))
-                  (0, validation_state, [])
-                  operations
-                >>=? fun (validation_passes, validation_state, preapply_results)
-                  ->
-                let cache_nonce = Some E.rpc_context.block_header in
-                E.Protocol.finalize_block validation_state cache_nonce
-                >>=? fun (validation_result, _metadata) ->
-                (* Similar to lib_shell.Prevalidation.preapply *)
-                let operations_hash =
-                  let open Preapply_result in
-                  Operation_list_list_hash.compute
-                  @@ List.rev_map
-                       (fun x ->
-                         Operation_list_hash.compute @@ List.map fst x.applied)
-                       preapply_results
-                in
-                let timestamp =
-                  Option.value
-                    ~default:
-                      (Time.System.to_protocol
-                         (Tezos_stdlib_unix.Systime_os.now ()))
-                    timestamp
-                in
-                let shell_header =
-                  {
-                    E.rpc_context.block_header with
-                    level = Int32.succ E.rpc_context.block_header.level;
-                    (* proto_level should be unchanged in mockup mode
-                       since we cannot switch protocols *)
-                    predecessor = E.rpc_context.block_hash;
-                    timestamp
-                    (* The timestamp exists if --minimal-timestamp has
-                       been given on the command line *);
-                    operations_hash;
-                    validation_passes;
-                    fitness = validation_result.fitness;
-                    context = Context_hash.zero (* TODO: is that correct ? *);
-                  }
-                in
-                return (shell_header, List.rev preapply_results))
-               >>= function
+               let*! r =
+                 let timestamp = o#timestamp in
+                 let* validation_state =
+                   full_construction
+                     ~cache:`Lazy
+                     ?timestamp:o#timestamp
+                     ~protocol_data
+                     ()
+                 in
+                 let* (validation_passes, validation_state, preapply_results) =
+                   List.fold_left_es
+                     (fun ( validation_passes,
+                            validation_state,
+                            validation_result )
+                          operations ->
+                       let* (state, result) =
+                         List.fold_left_es
+                           simulate_operation
+                           (validation_state, Preapply_result.empty)
+                           operations
+                       in
+                       let open Preapply_result in
+                       let p_result =
+                         {result with applied = List.rev result.applied}
+                       in
+                       return
+                         ( succ validation_passes,
+                           state,
+                           p_result :: validation_result ))
+                     (0, validation_state, [])
+                     operations
+                 in
+                 let cache_nonce = Some E.rpc_context.block_header in
+                 let* (validation_result, _metadata) =
+                   E.Protocol.finalize_block validation_state cache_nonce
+                 in
+                 (* Similar to lib_shell.Prevalidation.preapply *)
+                 let operations_hash =
+                   let open Preapply_result in
+                   Operation_list_list_hash.compute
+                   @@ List.rev_map
+                        (fun x ->
+                          Operation_list_hash.compute @@ List.map fst x.applied)
+                        preapply_results
+                 in
+                 let timestamp =
+                   Option.value
+                     ~default:
+                       (Time.System.to_protocol
+                          (Tezos_stdlib_unix.Systime_os.now ()))
+                     timestamp
+                 in
+                 let shell_header =
+                   {
+                     E.rpc_context.block_header with
+                     level = Int32.succ E.rpc_context.block_header.level;
+                     (* proto_level should be unchanged in mockup mode
+                        since we cannot switch protocols *)
+                     predecessor = E.rpc_context.block_hash;
+                     timestamp
+                     (* The timestamp exists if --minimal-timestamp has
+                        been given on the command line *);
+                     operations_hash;
+                     validation_passes;
+                     fitness = validation_result.fitness;
+                     context = Context_hash.zero (* TODO: is that correct ? *);
+                   }
+                 in
+                 return (shell_header, List.rev preapply_results)
+               in
+               match r with
                | Error errs -> RPC_answer.fail errs
                | Ok v -> RPC_answer.return v))
 
   let preapply () =
+    let open Lwt_tzresult_syntax in
     Directory.prefix
       (Tezos_rpc.RPC_path.prefix
          (* /chains/<chain> *)
@@ -525,21 +541,24 @@ module Make (E : MENV) = struct
          E.Block_services.S.Helpers.Preapply.operations
          (fun ((_, chain), _block) () op_list ->
            with_chain ~caller_name:"preapply operations" chain (fun () ->
-               ( partial_construction ~cache:`Lazy () >>=? fun state ->
-                 List.fold_left_es
-                   (fun (state, acc) op ->
-                     E.Protocol.apply_operation state op
-                     >>=? fun (state, result) ->
-                     return (state, (op.protocol_data, result) :: acc))
-                   (state, [])
-                   op_list
-                 >>=? fun (state, acc) ->
+               let*! outcome =
+                 let* state = partial_construction ~cache:`Lazy () in
+                 let* (state, acc) =
+                   List.fold_left_es
+                     (fun (state, acc) op ->
+                       let* (state, result) =
+                         E.Protocol.apply_operation state op
+                       in
+                       return (state, (op.protocol_data, result) :: acc))
+                     (state, [])
+                     op_list
+                 in
                  (* A pre-application should not commit into the
                     protocol caches. For this reason, [cache_nonce]
                     is [None]. *)
-                 E.Protocol.finalize_block state None >>=? fun _ ->
-                 return (List.rev acc) )
-               >>= fun outcome ->
+                 let* _ = E.Protocol.finalize_block state None in
+                 return (List.rev acc)
+               in
                match outcome with
                | Ok result -> RPC_answer.return result
                | Error errs -> RPC_answer.fail errs)))
@@ -562,26 +581,31 @@ module Make (E : MENV) = struct
     Stdlib.compare a_operation_data b_operation_data = 0
 
   let need_operation op =
-    Mempool.read () >>=? fun mempool_operations ->
+    let open Lwt_tzresult_syntax in
+    let* mempool_operations = Mempool.read () in
     if List.mem ~equal:equal_op op mempool_operations then return `Equal
     else
       let operations = op :: mempool_operations in
-      partial_construction ~cache:`Lazy () >>=? fun validation_state ->
-      List.fold_left_es
-        (fun rstate (shell, protocol_data) ->
-          simulate_operation rstate E.Protocol.{shell; protocol_data})
-        (validation_state, Preapply_result.empty)
-        operations
-      >>=? fun (validation_state, preapply_result) ->
+      let* validation_state = partial_construction ~cache:`Lazy () in
+      let* (validation_state, preapply_result) =
+        List.fold_left_es
+          (fun rstate (shell, protocol_data) ->
+            simulate_operation rstate E.Protocol.{shell; protocol_data})
+          (validation_state, Preapply_result.empty)
+          operations
+      in
       if Operation_hash.Map.is_empty preapply_result.refused then
-        E.Protocol.finalize_block validation_state None >>=? fun _ ->
+        let* _ = E.Protocol.finalize_block validation_state None in
         return `Applicable
       else return `Refused
 
   let append_to_thraspool ~notification_msg op =
-    Trashpool.append [op] >>=? fun () -> failwith "%s" notification_msg
+    let open Lwt_result_syntax in
+    let* () = Trashpool.append [op] in
+    failwith "%s" notification_msg
 
   let inject_operation_with_mempool operation_bytes =
+    let open Lwt_tzresult_syntax in
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
     | Error _ -> RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
@@ -593,26 +617,31 @@ module Make (E : MENV) = struct
         | Error _ -> RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
             let op = (shell_header, operation_data) in
-            (need_operation op >>=? function
-             | `Applicable -> Mempool.append [op]
-             | `Equal ->
-                 L.(S.emit warn_mempool_mem) () >>= fun () ->
-                 append_to_thraspool
-                   ~notification_msg:"Last operation is a duplicate"
-                   op
-             | `Refused ->
-                 append_to_thraspool
-                   ~notification_msg:"Last operation is refused"
-                   op)
-            >>= function
+            let*! r =
+              let* n = need_operation op in
+              match n with
+              | `Applicable -> Mempool.append [op]
+              | `Equal ->
+                  let*! () = L.(S.emit warn_mempool_mem) () in
+                  append_to_thraspool
+                    ~notification_msg:"Last operation is a duplicate"
+                    op
+              | `Refused ->
+                  append_to_thraspool
+                    ~notification_msg:"Last operation is refused"
+                    op
+            in
+            match r with
             | Ok _ -> RPC_answer.return operation_hash
             | Error errs -> (
-                Trashpool.append [op] >>= function
+                let*! r = Trashpool.append [op] in
+                match r with
                 | Ok _ -> RPC_answer.fail errs
                 | Error errs2 -> RPC_answer.fail (errs @ errs2))))
 
   let inject_operation_without_mempool
       (write_context_callback : callback_writer) operation_bytes =
+    let open Lwt_result_syntax in
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
     | Error _ -> RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
@@ -626,28 +655,29 @@ module Make (E : MENV) = struct
             let op =
               {E.Protocol.shell = shell_header; protocol_data = operation_data}
             in
-            ( partial_construction ~cache:`Lazy () >>=? fun state ->
-              E.Protocol.apply_operation state op >>=? fun (state, receipt) ->
+            let*! result =
+              let* state = partial_construction ~cache:`Lazy () in
+              let* (state, receipt) = E.Protocol.apply_operation state op in
               (* The following finalization does not have to update protocol
                  caches because we are not interested in block creation here.
                  Hence, [cache_nonce] is set to [None]. *)
-              E.Protocol.finalize_block state None
-              >>=? fun (validation_result, _block_header_metadata) ->
-              return (validation_result, receipt) )
-            >>= fun result ->
+              let* (validation_result, _block_header_metadata) =
+                E.Protocol.finalize_block state None
+              in
+              return (validation_result, receipt)
+            in
             match result with
-            | Ok ({context; _}, _receipt) ->
+            | Ok ({context; _}, _receipt) -> (
                 let rpc_context = {E.rpc_context with context} in
-                Lwt.bind
-                  (write_context_callback rpc_context proto)
-                  (fun result ->
-                    match result with
-                    | Ok () -> RPC_answer.return operation_hash
-                    | Error errs -> RPC_answer.fail errs)
+                let*! result = write_context_callback rpc_context proto in
+                match result with
+                | Ok () -> RPC_answer.return operation_hash
+                | Error errs -> RPC_answer.fail errs)
             | Error errs -> RPC_answer.fail errs))
 
   let inject_block_generic (write_context_callback : callback_writer)
       (update_mempool_callback : Operation.t list list -> unit tzresult Lwt.t) =
+    let open Lwt_tzresult_syntax in
     let reconstruct (operations : Operation.t list list)
         (block_header : Block_header.t) =
       match
@@ -659,35 +689,38 @@ module Make (E : MENV) = struct
       | Some protocol_data ->
           let header = E.rpc_context.block_header in
           let predecessor_context = E.rpc_context.context in
-          E.Protocol.begin_application
-            ~chain_id:E.chain_id
-            ~predecessor_context
-            ~predecessor_timestamp:header.timestamp
-            ~predecessor_fitness:header.fitness
-            {shell = block_header.shell; protocol_data}
-            ~cache:`Lazy
-          >>=? fun validation_state ->
-          List.fold_left_es
-            (List.fold_left_es (fun (validation_state, results) op ->
-                 match
-                   Data_encoding.Binary.of_bytes
-                     op_data_encoding
-                     op.Operation.proto
-                 with
-                 | Error _ -> failwith "Cannot parse"
-                 | Ok operation_data ->
-                     let op =
-                       {
-                         E.Protocol.shell = op.shell;
-                         protocol_data = operation_data;
-                       }
-                     in
-                     E.Protocol.apply_operation validation_state op
-                     >>=? fun (validation_state, receipt) ->
-                     return (validation_state, receipt :: results)))
-            (validation_state, [])
-            operations
-          >>=? fun (validation_state, _) ->
+          let* validation_state =
+            E.Protocol.begin_application
+              ~chain_id:E.chain_id
+              ~predecessor_context
+              ~predecessor_timestamp:header.timestamp
+              ~predecessor_fitness:header.fitness
+              {shell = block_header.shell; protocol_data}
+              ~cache:`Lazy
+          in
+          let* (validation_state, _) =
+            List.fold_left_es
+              (List.fold_left_es (fun (validation_state, results) op ->
+                   match
+                     Data_encoding.Binary.of_bytes
+                       op_data_encoding
+                       op.Operation.proto
+                   with
+                   | Error _ -> failwith "Cannot parse"
+                   | Ok operation_data ->
+                       let op =
+                         {
+                           E.Protocol.shell = op.shell;
+                           protocol_data = operation_data;
+                         }
+                       in
+                       let* (validation_state, receipt) =
+                         E.Protocol.apply_operation validation_state op
+                       in
+                       return (validation_state, receipt :: results)))
+              (validation_state, [])
+              operations
+          in
           E.Protocol.finalize_block validation_state (Some block_header.shell)
     in
     Directory.register
@@ -701,7 +734,8 @@ module Make (E : MENV) = struct
         match Block_header.of_bytes bytes with
         | None -> RPC_answer.fail [Cannot_parse_op]
         | Some block_header -> (
-            ( reconstruct operations block_header >>=? fun ({context; _}, _) ->
+            let*! r =
+              let* ({context; _}, _) = reconstruct operations block_header in
               let rpc_context =
                 Tezos_protocol_environment.
                   {
@@ -713,9 +747,12 @@ module Make (E : MENV) = struct
                       block_header.shell;
                   }
               in
-              write_context_callback rpc_context block_header.protocol_data
-              >>=? fun () -> update_mempool_callback operations )
-            >>= function
+              let* () =
+                write_context_callback rpc_context block_header.protocol_data
+              in
+              update_mempool_callback operations
+            in
+            match r with
             | Error errs -> RPC_answer.fail errs
             | Ok () -> RPC_answer.return block_hash))
 
@@ -723,22 +760,24 @@ module Make (E : MENV) = struct
       and uses a mempool. *)
   let inject_block (write_context_callback : callback_writer) =
     inject_block_generic write_context_callback (fun operations ->
-        Mempool.read () >>=? fun mempool_operations ->
-        List.fold_left_es
-          (fun map ((shell_header, operation_data) as v) ->
-            match
-              Data_encoding.Binary.to_bytes op_data_encoding operation_data
-            with
-            | Error _ ->
-                failwith "mockup inject block: byte encoding operation failed"
-            | Ok proto ->
-                let h =
-                  Operation.hash {Operation.shell = shell_header; proto}
-                in
-                return @@ Operation_hash.Map.add h v map)
-          Operation_hash.Map.empty
-          mempool_operations
-        >>=? fun mempool_map ->
+        let open Lwt_tzresult_syntax in
+        let* mempool_operations = Mempool.read () in
+        let* mempool_map =
+          List.fold_left_es
+            (fun map ((shell_header, operation_data) as v) ->
+              match
+                Data_encoding.Binary.to_bytes op_data_encoding operation_data
+              with
+              | Error _ ->
+                  failwith "mockup inject block: byte encoding operation failed"
+              | Ok proto ->
+                  let h =
+                    Operation.hash {Operation.shell = shell_header; proto}
+                  in
+                  return @@ Operation_hash.Map.add h v map)
+            Operation_hash.Map.empty
+            mempool_operations
+        in
         let refused_map =
           List.fold_left
             (List.fold_left (fun mempool op ->
@@ -746,16 +785,19 @@ module Make (E : MENV) = struct
             mempool_map
             operations
         in
-        unless (Operation_hash.Map.is_empty refused_map) (fun () ->
-            let refused_ops =
-              Operation_hash.Map.fold (fun _k v l -> v :: l) refused_map []
-            in
-            L.(S.emit warn_trashpool_append) refused_ops >>= fun () ->
-            Trashpool.append refused_ops)
-        >>=? fun () -> Mempool.write ~mode:Zero_truncate [])
+        let* () =
+          unless (Operation_hash.Map.is_empty refused_map) (fun () ->
+              let refused_ops =
+                Operation_hash.Map.fold (fun _k v l -> v :: l) refused_map []
+              in
+              let*! () = L.(S.emit warn_trashpool_append) refused_ops in
+              Trashpool.append refused_ops)
+        in
+        Mempool.write ~mode:Zero_truncate [])
 
   let inject_operation (mem_only : bool)
       (write_context_callback : callback_writer) =
+    let open Lwt_syntax in
     Directory.register
       Directory.empty
       (* /injection/operation, vanilla client implementation is in
@@ -770,7 +812,8 @@ module Make (E : MENV) = struct
              because types of concerned variables depend on E,
              which cannot cross functions boundaries without putting all that in
              MOCKUP *)
-          Files.Mempool.exists ~dirname:E.base_dir >>= function
+          let* b = Files.Mempool.exists ~dirname:E.base_dir in
+          match b with
           | true -> inject_operation_with_mempool operation_bytes
           | false ->
               inject_operation_without_mempool
@@ -837,6 +880,7 @@ module Make (E : MENV) = struct
                RPC_answer.return [[]; []; []; []]))
 
   let monitor_operations () =
+    let open Lwt_syntax in
     Directory.register
       Directory.empty
       (E.Block_services.S.Mempool.monitor_operations
@@ -847,9 +891,9 @@ module Make (E : MENV) = struct
             let on b msg =
               if b then L.(S.emit (warn msg)) () else Lwt.return_unit
             in
-            on o#branch_delayed "branch_delayed ignored" >>= fun () ->
-            on o#branch_refused "branch_refused ignored" >>= fun () ->
-            on o#refused "refused ignored" >>= fun () ->
+            let* () = on o#branch_delayed "branch_delayed ignored" in
+            let* () = on o#branch_refused "branch_refused ignored" in
+            let* () = on o#refused "refused ignored" in
             let _ = o#applied in
             RPC_answer.(
               return_stream
