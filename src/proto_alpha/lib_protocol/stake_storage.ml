@@ -57,10 +57,7 @@ module Selected_distribution_for_cycle = struct
 
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
-    (Cache.find ctxt id >>=? function
-     | None -> return ctxt
-     | Some _ -> Cache.update ctxt id None |> Lwt.return)
-    >>=? fun ctxt ->
+    Cache.update ctxt id None >>?= fun ctxt ->
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
@@ -98,10 +95,8 @@ module Delegate_sampler_state = struct
 
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
-    (Cache.find ctxt id >>=? function
-     | None -> return ctxt
-     | Some _ -> Cache.update ctxt id None |> Lwt.return)
-    >>=? fun ctxt -> Storage.Delegate_sampler_state.remove_existing ctxt cycle
+    Cache.update ctxt id None >>?= fun ctxt ->
+    Storage.Delegate_sampler_state.remove_existing ctxt cycle
 end
 
 let get_staking_balance = Storage.Stake.Staking_balance.get
