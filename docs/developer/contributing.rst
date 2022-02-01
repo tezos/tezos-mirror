@@ -200,6 +200,10 @@ While working on your branch to prepare a Merge Request, make sure you respect t
    corresponding README files.
 -  For parts that have specifications in the repository (e.g., Michelson),
    make sure to keep them in sync with the implementation.
+-  If your contribution has an impact on users, e.g. if it fixes a bug,
+   adds a new feature, changes an RPC or the command-line interface,
+   add an item to the changelog in the :src:`CHANGES.rst` file located
+   at the root of the repository.
 
 .. _creating_MR:
 

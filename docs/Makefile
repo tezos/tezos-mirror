@@ -124,7 +124,7 @@ install-dependencies:
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 html: Makefile api/errors.rst rpc p2p install-dependencies
-	echo "$$(echo ':orphan:'; echo ''; cat ../CHANGES.rst)" > CHANGES.rst
+	(echo ':orphan:'; echo ''; cat ../CHANGES.rst) > CHANGES-dev.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
 	@ln -s active "$(BUILDDIR)/011" || true
 
@@ -169,5 +169,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
+	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 011/tezos-*.html 012/tezos-*.html alpha/tezos-*.html

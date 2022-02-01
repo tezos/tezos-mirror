@@ -45,9 +45,10 @@ retrieved easily yet.
 New Version
 ~~~~~~~~~~~
 
-Whenever a new version of an RPC is added (see :ref:`RPC-versioning-dev-adding-an-rpc`), there is a corresponding
-entry in the file :src:`CHANGES.rst` in the release of Octez which
-includes the new version.
+Whenever a new version of an RPC is added (see
+:ref:`RPC-versioning-dev-adding-an-rpc`), there is a corresponding
+entry in the :doc:`changelog<../CHANGES>` in the release of Octez
+which includes the new version.
 
 For example::
 
@@ -59,7 +60,7 @@ New Default Version
 ~~~~~~~~~~~~~~~~~~~
 
 Whenever an Octez release changes the default version of an RPC, there
-is a corresponding entry in the file :src:`CHANGES.rst`.
+is a corresponding entry in the :doc:`changelog<../CHANGES>`.
 
 For example::
 
@@ -74,7 +75,7 @@ Deprecated Version
 ~~~~~~~~~~~~~~~~~~
 
 Whenever an Octez release deprecates an RPC version, there is a
-corresponding entry in the file :src:`CHANGES.rst`.
+corresponding entry in the :doc:`changelog<../CHANGES>`.
 
 For example::
 
