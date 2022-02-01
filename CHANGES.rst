@@ -40,6 +40,9 @@ Node
   now also displays the high-water mark for the round, if available.
   Rounds are introduced in Tenderbake.
 
+- Adds ``tezos-node storage head-commmit`` command to print the current
+  context head commit hash to stdout.
+
 Client
 ------
 

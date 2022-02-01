@@ -54,6 +54,7 @@ module Term = struct
     | Reconstruct_index
     | Integrity_check_inodes
     | Integrity_check_index
+    | Head_commit
 
   let read_config_file config_file =
     Option.filter Sys.file_exists config_file
@@ -170,6 +171,15 @@ module Term = struct
     Context.Checks.Pack.Integrity_check_index.run ~root ~auto_repair () ;
     return_unit
 
+  let find_head config_file data_dir head =
+    let open Lwt_result_syntax in
+    let* head = current_head config_file data_dir head in
+    (* This output isn't particularly useful for most users,
+       it will typically be used to inspect context
+       directories using Irmin tooling *)
+    let () = print_endline head in
+    return_unit
+
   let dispatch_subcommand subcommand config_file data_dir auto_repair dest head
       log_size =
     let run =
@@ -182,6 +192,7 @@ module Term = struct
       | Integrity_check_inodes ->
           integrity_check_inodes config_file data_dir head
       | Integrity_check_index -> check_index config_file data_dir auto_repair
+      | Head_commit -> find_head config_file data_dir head
     in
     match Lwt_main.run @@ Lwt_exit.wrap_and_exit run with
     | Ok () -> `Ok ()
@@ -195,6 +206,7 @@ module Term = struct
       | "reconstruct-index" -> `Ok Reconstruct_index
       | "integrity-check-inodes" -> `Ok Integrity_check_inodes
       | "integrity-check-index" -> `Ok Integrity_check_index
+      | "head-commit" -> `Ok Head_commit
       | s -> `Error ("invalid argument: " ^ s)
     and printer ppf = function
       | Stat_index -> Format.fprintf ppf "stat-index"
@@ -203,12 +215,13 @@ module Term = struct
       | Reconstruct_index -> Format.fprintf ppf "reconstruct-index"
       | Integrity_check_inodes -> Format.fprintf ppf "integrity-check-inodes"
       | Integrity_check_index -> Format.fprintf ppf "integrity-check-index"
+      | Head_commit -> Format.fprintf ppf "head-commit"
     in
     let open Cmdliner.Arg in
     let doc =
       "Operation to perform. Possible values: $(b,stat-index), $(b,stat-pack), \
        $(b,integrity-check), $(b,reconstruct-index), \
-       $(b,integrity-check-inodes), $(b,integrity-check-index)."
+       $(b,integrity-check-inodes), $(b,integrity-check-index), $(b,head)."
     in
     required
     & pos 0 (some (parser, printer)) None
@@ -303,6 +316,7 @@ module Manpage = struct
       `P
         "$(b,integrity-check-index) checks the index for corruptions. If \
          $(b,--auto-repair) flag is set it also tries to repair the index.";
+      `P "$(b,head-commit) prints the current head's context commit hash.";
       `P
         "$(b,WARNING): this API is experimental and may change in future \
          versions.";
