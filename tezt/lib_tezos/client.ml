@@ -1113,6 +1113,45 @@ let originate_tx_rollup ?wait ?burn_cap ?storage_limit ~src client =
   =~* rex "Originated tx rollup: ?(\\w*)"
   |> mandatory "tx rollup hash" |> Lwt.return
 
+let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
+    ?hooks ~content ~tx_rollup ~src client =
+  spawn_command
+    ?hooks
+    client
+    (["--wait"; wait]
+    @ [
+        "submit";
+        "tx";
+        "rollup";
+        "batch";
+        Hex.(of_string content |> show);
+        "to";
+        tx_rollup;
+        "from";
+        src;
+      ]
+    @ Option.fold
+        ~none:[]
+        ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+        burn_cap
+    @ Option.fold
+        ~none:[]
+        ~some:(fun s -> ["--storage-limit"; string_of_int s])
+        storage_limit)
+
+let submit_tx_rollup_batch ?wait ?burn_cap ?storage_limit ?hooks ~content
+    ~tx_rollup ~src client =
+  spawn_submit_tx_rollup_batch
+    ?wait
+    ?burn_cap
+    ?storage_limit
+    ?hooks
+    ~content
+    ~tx_rollup
+    ~src
+    client
+  |> Process.check
+
 let spawn_show_voting_period ?endpoint client =
   spawn_command ?endpoint client (mode_arg client @ ["show"; "voting"; "period"])
 

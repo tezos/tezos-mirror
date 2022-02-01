@@ -511,6 +511,20 @@ let tx_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
   let op = sign account.sk ctxt to_sign_op in
   (op, originated_tx_rollup op |> snd)
 
+let tx_rollup_submit_batch ?counter ?fee ?gas_limit ?storage_limit ctxt
+    (source : Contract.t) (tx_rollup : Tx_rollup.t) (content : string) =
+  manager_operation
+    ?counter
+    ?fee
+    ?gas_limit
+    ?storage_limit
+    ~source
+    ctxt
+    (Tx_rollup_submit_batch {tx_rollup; content})
+  >>=? fun to_sign_op ->
+  Context.Contract.manager ctxt source >|=? fun account ->
+  sign account.sk ctxt to_sign_op
+
 let sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
     (src : Contract.t) kind boot_sector =
   manager_operation

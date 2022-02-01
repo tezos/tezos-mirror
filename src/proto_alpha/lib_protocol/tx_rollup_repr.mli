@@ -46,6 +46,8 @@ val to_b58check : t -> string
 
 val of_b58check : string -> t tzresult
 
+val of_b58check_opt : string -> t option
+
 val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t

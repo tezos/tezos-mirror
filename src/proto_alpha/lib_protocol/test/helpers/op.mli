@@ -203,6 +203,20 @@ val tx_rollup_origination :
   Contract.t ->
   (Operation.packed * Tx_rollup.t) tzresult Lwt.t
 
+(** [tx_rollup_submit_batch ctxt source tx_rollup batch] submits
+    [batch], an array of bytes that is expected to be a batch of L2
+    transactions, to be appended in the inbox of [tx_rollup].  *)
+val tx_rollup_submit_batch :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  string ->
+  Operation.packed tzresult Lwt.t
+
 (** [sc_rollup_origination ctxt source kind boot_sector] originates a new
     smart contract rollup of some given [kind] booting using [boot_sector].
     The process is the same as in [tx_rollup_origination]. *)

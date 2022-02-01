@@ -845,6 +845,30 @@ val spawn_originate_tx_rollup :
   t ->
   Process.t
 
+(** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
+val submit_tx_rollup_batch :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?storage_limit:int ->
+  ?hooks:Process.hooks ->
+  content:string ->
+  tx_rollup:string ->
+  src:string ->
+  t ->
+  unit Lwt.t
+
+(** Same as [submit_tx_rollup_batch], but do not wait for the process to exit. *)
+val spawn_submit_tx_rollup_batch :
+  ?wait:string ->
+  ?burn_cap:Tez.t ->
+  ?storage_limit:int ->
+  ?hooks:Process.hooks ->
+  content:string ->
+  tx_rollup:string ->
+  src:string ->
+  t ->
+  Process.t
+
 (** Run [tezos-client show voting period] and return the period name. *)
 val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t
 

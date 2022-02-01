@@ -42,6 +42,15 @@ open Test_tez
 let check_tx_rollup_exists ctxt tx_rollup =
   Context.Tx_rollup.state ctxt tx_rollup >|=? fun _ -> ()
 
+(** [check_proto_error f t] checks that the first error of [t]
+    satisfies the boolean function [f]. *)
+let check_proto_error f t =
+  match t with
+  | Environment.Ecoproto_error e :: _ when f e ->
+      Assert.test_error_encodings e ;
+      return_unit
+  | _ -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t
+
 (** [test_disable_feature_flag] try to originate a tx rollup with the feature
     flag is deactivated and check it fails *)
 let test_disable_feature_flag () =
@@ -51,13 +60,79 @@ let test_disable_feature_flag () =
   in
   Incremental.begin_construction b >>=? fun i ->
   Op.tx_rollup_origination (I i) contract >>=? fun (op, _tx_rollup) ->
-  let expect_failure = function
-    | Environment.Ecoproto_error (Apply.Tx_rollup_feature_disabled as e) :: _ ->
-        Assert.test_error_encodings e ;
-        return_unit
-    | _ -> failwith "It should not be possible to send a rollup_operation "
+  Incremental.add_operation
+    ~expect_failure:
+      (check_proto_error (function
+          | Apply.Tx_rollup_feature_disabled -> true
+          | _ -> false))
+    i
+    op
+  >>= fun _i -> return_unit
+
+let message_hash_testable : Tx_rollup_message.hash Alcotest.testable =
+  Alcotest.testable Tx_rollup_message.pp_hash ( = )
+
+(** [inbox_fees state size] computes the fees (per byte of message)
+    one has to pay to submit a message to the current inbox. *)
+let inbox_fees state size =
+  Environment.wrap_tzresult (Tx_rollup_state.fees state size)
+
+(** [fees_per_byte state] returns the cost to insert one byte inside
+    the inbox. *)
+let fees_per_byte state = inbox_fees state 1
+
+(** [check_batch_in_inbox inbox n expected] checks that the [n]th
+    element of [inbox] is a batch equal to [expected]. *)
+let check_batch_in_inbox :
+    Tx_rollup_inbox.t -> int -> string -> unit tzresult Lwt.t =
+ fun inbox n expected ->
+  match List.nth inbox.contents n with
+  | Some content ->
+      Alcotest.(
+        check
+          message_hash_testable
+          "Expected batch with a different content"
+          content
+          (Tx_rollup_message.hash (Batch expected))) ;
+      return_unit
+  | _ -> Alcotest.fail "Selected message in the inbox is not a batch"
+
+(** [context_init n] initializes a context with no consensus rewards
+    to not interfere with balances prediction. It returns the created
+    context and [n] contracts. *)
+let context_init n =
+  Context.init
+    ~consensus_threshold:0
+    ~tx_rollup_enable:true
+    ~endorsing_reward_per_slot:Tez.zero
+    ~baking_reward_bonus_per_slot:Tez.zero
+    ~baking_reward_fixed_portion:Tez.zero
+    n
+
+(** [originate b contract] originates a tx_rollup from [contract],
+    and returns the new block and the tx_rollup address. *)
+let originate b contract =
+  Op.tx_rollup_origination (B b) contract >>=? fun (operation, tx_rollup) ->
+  Block.bake ~operation b >>=? fun b -> return (b, tx_rollup)
+
+(** Initializes the context, originates a tx_rollup and submits a batch.
+
+    Returns the first contract and its balance, the originated tx_rollup,
+    the state with the tx_rollup, and the baked block with the batch submitted.
+*)
+let init_originate_and_submit ?(batch = String.make 5 'c') () =
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
   in
-  Incremental.add_operation ~expect_failure i op >>= fun _i -> return_unit
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Context.Contract.balance (B b) contract >>=? fun balance ->
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+  Op.tx_rollup_submit_batch (B b) contract tx_rollup batch >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  return ((contract, balance), state, tx_rollup, b)
+
+(** ---- TESTS -------------------------------------------------------------- *)
 
 (** [test_origination] originates a transaction rollup and checks that
     it burns the expected quantity of xtz. *)
@@ -159,6 +234,197 @@ let test_fees_per_byte_update () =
   test ~fees_per_byte:0L ~final_size:1_000 ~hard_limit:1_000 ~result:1L
   >>=? fun () -> return_unit
 
+(** [test_add_batch] originates a tx rollup and fills one of its inbox
+    with an arbitrary batch of data. *)
+let test_add_batch () =
+  let contents_size = 5 in
+  let contents = String.make contents_size 'c' in
+  init_originate_and_submit ~batch:contents ()
+  >>=? fun ((contract, balance), state, tx_rollup, b) ->
+  Context.Tx_rollup.inbox (B b) tx_rollup >>=? fun {contents; cumulated_size} ->
+  let length = List.length contents in
+  Alcotest.(check int "Expect an inbox with a single item" 1 length) ;
+  Alcotest.(check int "Expect cumulated size" contents_size cumulated_size) ;
+  inbox_fees state contents_size >>?= fun cost ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
+
+(** [test_add_two_batches] originates a tx rollup and adds two
+    arbitrary batches to one of its inboxes. Ensure that their order
+    is correct. *)
+let test_add_two_batches () =
+  (*
+    TODO: https://gitlab.com/tezos/tezos/-/issues/2331
+    This test can be generalized using a property-based approach.
+   *)
+  let contents_size1 = 5 in
+  let contents1 = String.make contents_size1 'c' in
+  init_originate_and_submit ~batch:contents1 ()
+  >>=? fun ((contract, balance), state, tx_rollup, b) ->
+  Op.tx_rollup_submit_batch (B b) contract tx_rollup contents1 >>=? fun op1 ->
+  Context.Contract.counter (B b) contract >>=? fun counter ->
+  let contents_size2 = 6 in
+  let contents2 = String.make contents_size2 'd' in
+  Op.tx_rollup_submit_batch
+    ~counter:Z.(add counter (of_int 1))
+    (B b)
+    contract
+    tx_rollup
+    contents2
+  >>=? fun op2 ->
+  Block.bake ~operations:[op1; op2] b >>=? fun b ->
+  Context.Tx_rollup.inbox (B b) tx_rollup >>=? fun inbox ->
+  let length = List.length inbox.contents in
+  let expected_cumulated_size = contents_size1 + contents_size2 in
+
+  Alcotest.(check int "Expect an inbox with two items" 2 length) ;
+  Alcotest.(
+    check
+      int
+      "Expect cumulated size"
+      expected_cumulated_size
+      inbox.cumulated_size) ;
+
+  Context.Tx_rollup.inbox (B b) tx_rollup >>=? fun {contents; _} ->
+  Alcotest.(check int "Expect an inbox with two items" 2 (List.length contents)) ;
+
+  check_batch_in_inbox inbox 0 contents1 >>=? fun () ->
+  check_batch_in_inbox inbox 1 contents2 >>=? fun () ->
+  inbox_fees state expected_cumulated_size >>?= fun cost ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
+
+(** Try to add a batch too large in an inbox. *)
+let test_batch_too_big () =
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Context.get_constants (B b) >>=? fun constant ->
+  let contents =
+    String.make constant.parametric.tx_rollup_hard_size_limit_per_message 'd'
+  in
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_submit_batch (I i) contract tx_rollup contents >>=? fun op ->
+  Incremental.add_operation i op >>= function
+  | Ok _ -> assert false
+  | Error trace ->
+      check_proto_error
+        (function
+          | Tx_rollup_inbox.Tx_rollup_message_size_exceeds_limit -> true
+          | _ -> false)
+        trace
+
+(** [fill_inbox b tx_rollup contract contents k] fills the inbox of
+    [tx_rollup] with batches containing [contents] sent by [contract].
+    Before exceeding the limit size of the inbox, the continuation [k]
+    is called with two parameters: the incremental state of the block
+    with the almost full inboxes, and an operation that would cause an
+    error if applied. *)
+let fill_inbox b tx_rollup contract contents k =
+  let message_size = String.length contents in
+  Context.get_constants (B b) >>=? fun constant ->
+  let tx_rollup_inbox_limit =
+    constant.parametric.tx_rollup_hard_size_limit_per_inbox
+  in
+  Context.Contract.counter (B b) contract >>=? fun counter ->
+  Incremental.begin_construction b >>=? fun i ->
+  let rec fill_inbox i inbox_size counter =
+    (* By default, the [gas_limit] is the maximum gas that can be
+       consumed by an operation. We set a lower (arbitrary) limit to
+       be able to reach the size limit of an operation. *)
+    Op.tx_rollup_submit_batch
+      ~gas_limit:(Saturation_repr.safe_int 100_000_000)
+      ~counter
+      (I i)
+      contract
+      tx_rollup
+      contents
+    >>=? fun op ->
+    let new_inbox_size = inbox_size + message_size in
+    if new_inbox_size < tx_rollup_inbox_limit then
+      Incremental.add_operation i op >>=? fun i ->
+      fill_inbox i new_inbox_size (Z.succ counter)
+    else k i inbox_size op
+  in
+
+  fill_inbox i 0 counter
+
+(** Try to add enough batch to reach the size limit of an inbox. *)
+let test_inbox_too_big () =
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  Context.get_constants (B b) >>=? fun constant ->
+  let tx_rollup_batch_limit =
+    constant.parametric.tx_rollup_hard_size_limit_per_message - 1
+  in
+  let contents = String.make tx_rollup_batch_limit 'd' in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  fill_inbox b tx_rollup contract contents (fun i _ op ->
+      Incremental.add_operation
+        i
+        op
+        ~expect_failure:
+          (check_proto_error (function
+              | Tx_rollup_inbox.Tx_rollup_inbox_size_would_exceed_limit _ ->
+                  true
+              | _ -> false))
+      >>=? fun _i -> return_unit)
+
+(** Test that block finalization changes gas rates. *)
+let test_finalization () =
+  context_init 2 >>=? fun (b, contracts) ->
+  let filler = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Context.get_constants (B b)
+  >>=? fun {parametric = {tx_rollup_hard_size_limit_per_inbox; _}; _} ->
+  Context.Contract.balance (B b) contract >>=? fun balance ->
+  (* Get the initial fees_per_byte. *)
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+  fees_per_byte state >>?= fun cost ->
+  Assert.equal_tez ~loc:__LOC__ Tez.zero cost >>=? fun () ->
+  (* Fill the inbox. *)
+  Context.get_constants (B b) >>=? fun constant ->
+  let tx_rollup_batch_limit =
+    constant.parametric.tx_rollup_hard_size_limit_per_message - 1
+  in
+  let contents = String.make tx_rollup_batch_limit 'd' in
+  fill_inbox b tx_rollup filler contents (fun i size _ -> return (size, i))
+  >>=? fun (inbox_size, i) ->
+  (* Assert we have filled the inbox enough to provoke a change of fees. *)
+  assert (tx_rollup_hard_size_limit_per_inbox * 90 / 100 < inbox_size) ;
+  (* Finalize the block and check fees per byte has increased. *)
+  Incremental.finalize_block i >>=? fun b ->
+  (* Check the fees we are getting after finalization are (1) strictly
+     positive, and (2) the one we can predict with
+     [update_fees_per_byte]. *)
+  let expected_state =
+    Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
+      state
+      ~final_size:inbox_size
+      ~hard_limit:tx_rollup_hard_size_limit_per_inbox
+  in
+  fees_per_byte expected_state >>?= fun expected_fees_per_byte ->
+  Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+  fees_per_byte state >>?= fun fees_per_byte ->
+  assert (Tez.(zero < fees_per_byte)) ;
+  Assert.equal_tez ~loc:__LOC__ expected_fees_per_byte fees_per_byte
+  >>=? fun () ->
+  (* Insert a small batch in a new block *)
+  let contents_size = 5 in
+  let contents = String.make contents_size 'c' in
+  Context.Contract.counter (B b) contract >>=? fun counter ->
+  Op.tx_rollup_submit_batch ~counter (B b) contract tx_rollup contents
+  >>=? fun op ->
+  Block.bake b ~operation:op >>=? fun b ->
+  (* Predict the cost we had to pay. *)
+  inbox_fees state contents_size >>?= fun cost ->
+  Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
+
 let tests =
   [
     Tztest.tztest
@@ -175,4 +441,15 @@ let tests =
        rollup"
       `Quick
       test_fees_per_byte_update;
+    Tztest.tztest "add one batch to a rollup" `Quick test_add_batch;
+    Tztest.tztest "add two batches to a rollup" `Quick test_add_two_batches;
+    Tztest.tztest
+      "Try to add a batch larger than the limit"
+      `Quick
+      test_batch_too_big;
+    Tztest.tztest
+      "Try to add several batches to reach the inbox limit"
+      `Quick
+      test_inbox_too_big;
+    Tztest.tztest "Test finalization" `Quick test_finalization;
   ]

@@ -75,9 +75,12 @@ end)
 
 let to_b58check rollup = Hash.to_b58check rollup
 
+let of_b58check_opt s =
+  match Base58.decode s with Some (Hash.Data hash) -> Some hash | _ -> None
+
 let of_b58check s =
-  match Base58.decode s with
-  | Some (Hash.Data hash) -> ok hash
+  match of_b58check_opt s with
+  | Some hash -> ok hash
   | _ -> error (Invalid_rollup_notation s)
 
 let pp ppf hash = Hash.pp ppf hash
