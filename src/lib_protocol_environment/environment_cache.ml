@@ -286,13 +286,11 @@ let compatible_layout t layout =
 let from_layout layout = Some (make_caches layout)
 
 let future_cache_expectation t ~time_in_blocks =
-  Some
-    (with_caches t (fun caches ->
-         FunctionalArray.map
-           (fun cache ->
-             let oldness = time_in_blocks * median_entries_removals cache in
-             Utils.fold_n_times oldness remove_dean cache)
-           caches))
+  let expected cache =
+    let oldness = time_in_blocks * median_entries_removals cache in
+    Utils.fold_n_times oldness remove_dean cache
+  in
+  Some (with_caches t (FunctionalArray.map expected))
 
 let record_entries_removals cache =
   let entries_removals =
