@@ -118,12 +118,12 @@ module Internal : INTERNAL = struct
   let mult_ a b =
     if a <> zero then
       let res = Int64.mul a b in
-      if Int64.div res a <> b then None else Some res
+      if Compare.Int64.(Int64.div res a <> b) then None else Some res
     else Some zero
 
   let add_ a b =
     let res = Int64.add a b in
-    if res < a || res < b then None else Some res
+    if Compare.Int64.(res < a || res < b) then None else Some res
 end
 
 include Internal
