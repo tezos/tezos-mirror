@@ -152,16 +152,20 @@ module Make_tree (Store : DB) = struct
   end
 
   let produce_proof repo hash f =
+    let open Lwt_syntax in
     let hash = Kinded_hash.of_context_hash hash in
-    produce_proof repo hash f >|= fun (p, r) -> (Proof.to_tree p, r)
+    let+ (p, r) = produce_proof repo hash f in
+    (Proof.to_tree p, r)
 
   let verify_proof proof f =
     let proof = Proof.of_tree proof in
     verify_proof proof f
 
   let produce_stream repo hash f =
+    let open Lwt_syntax in
     let hash = Kinded_hash.of_context_hash hash in
-    produce_stream repo hash f >|= fun (p, r) -> (Proof.to_stream p, r)
+    let+ (p, r) = produce_stream repo hash f in
+    (Proof.to_stream p, r)
 
   let verify_stream proof f =
     let proof = Proof.of_stream proof in
@@ -183,14 +187,19 @@ module Make_tree (Store : DB) = struct
     match Store.Tree.destruct t with `Contents _ -> `Value | `Node _ -> `Tree
 
   let to_value t =
+    let open Lwt_syntax in
     match Store.Tree.destruct t with
-    | `Contents (c, _) -> Store.Tree.Contents.force_exn c >|= Option.some
+    | `Contents (c, _) ->
+        let+ v = Store.Tree.Contents.force_exn c in
+        Some v
     | `Node _ -> Lwt.return_none
 
   let of_value _ v = Store.Tree.add (Store.Tree.empty ()) [] v
 
   let fold ?depth t k ~(order : [`Sorted | `Undefined]) ~init ~f =
-    find_tree t k >>= function
+    let open Lwt_syntax in
+    let* o = find_tree t k in
+    match o with
     | None -> Lwt.return init
     | Some t ->
         let order =
@@ -227,7 +236,10 @@ module Make_tree (Store : DB) = struct
           (fun v -> raw_of_node (fun t -> k (fun () -> Seq.Cons ((n, v), t))) t)
           v
 
-  let to_raw t = Store.Tree.to_concrete t >|= raw_of_concrete (fun t -> t)
+  let to_raw t =
+    let open Lwt_syntax in
+    let+ c = Store.Tree.to_concrete t in
+    raw_of_concrete (fun t -> t) c
 
   let rec concrete_of_raw : type a. (concrete -> a) -> raw -> a =
    fun k -> function

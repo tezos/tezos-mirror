@@ -44,20 +44,22 @@ module C = struct
   let make_context () =
     (* there is no simple way to build a context *)
     Lwt_utils_unix.with_tempdir "tezos_test_" (fun base_dir ->
+        let open Lwt_syntax in
         let open Filename.Infix in
         let root = base_dir // "context" in
-        init root >>= fun idx ->
-        commit_genesis
-          idx
-          ~chain_id
-          ~time:genesis_time
-          ~protocol:genesis_protocol
-        >>= function
+        let* idx = init root in
+        let* r =
+          commit_genesis
+            idx
+            ~chain_id
+            ~time:genesis_time
+            ~protocol:genesis_protocol
+        in
+        match r with
         | Error _ -> assert false
         | Ok genesis -> (
-            checkout idx genesis >|= function
-            | None -> assert false
-            | Some ctxt -> ctxt))
+            let+ o = checkout idx genesis in
+            match o with None -> assert false | Some ctxt -> ctxt))
 end
 
 (* memory context *)
@@ -74,21 +76,25 @@ module Make (A : sig
 end) =
 struct
   let hash_of_dir n =
-    A.make_context () >>= fun ctxt ->
-    Lwt_list.fold_left_s
-      (fun t x -> A.Tree.add t [x] (Bytes.of_string x))
-      (A.Tree.empty ctxt)
-      (Stdlib.List.init n (fun i -> string_of_int i))
-    >|= A.Tree.hash
+    let open Lwt_syntax in
+    let* ctxt = A.make_context () in
+    let+ t =
+      Lwt_list.fold_left_s
+        (fun t x -> A.Tree.add t [x] (Bytes.of_string x))
+        (A.Tree.empty ctxt)
+        (Stdlib.List.init n (fun i -> string_of_int i))
+    in
+    A.Tree.hash t
 end
 
 (* Compare the shell and memory contexts have the same hashes for large directories *)
 let test_hash =
   let test n _lwt_switch () =
+    let open Lwt_syntax in
     let module C = Make (C) in
     let module M = Make (M) in
-    C.hash_of_dir n >>= fun ch ->
-    M.hash_of_dir n >>= fun mh ->
+    let* ch = C.hash_of_dir n in
+    let* mh = M.hash_of_dir n in
     if not @@ Context_hash.equal ch mh then
       Stdlib.failwith
         (Format.asprintf

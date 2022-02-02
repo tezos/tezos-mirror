@@ -66,7 +66,7 @@ module type VIEW = sig
   (** [length t key] is an Lwt promise that resolve to the number of
       files and sub-nodes stored under [k] in [t].
 
-      It is equivalent to [list t k >|= List.length] but has a
+      It is equivalent to [let+ l = list t k in List.length l] but has a
       constant-time complexity. *)
   val length : t -> key -> int Lwt.t
 
