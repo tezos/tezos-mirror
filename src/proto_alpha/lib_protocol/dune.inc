@@ -92,7 +92,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   cache_repr.mli cache_repr.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
@@ -101,16 +100,17 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_manager_storage.mli contract_manager_storage.ml
    delegate_activation_storage.mli delegate_activation_storage.ml
    frozen_deposits_storage.mli frozen_deposits_storage.ml
-   stake_storage.mli stake_storage.ml
-   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
-   contract_storage.mli contract_storage.ml
    commitment_storage.mli commitment_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
+   cache_repr.mli cache_repr.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
+   contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
@@ -250,7 +250,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   cache_repr.mli cache_repr.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
@@ -259,16 +258,17 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_manager_storage.mli contract_manager_storage.ml
    delegate_activation_storage.mli delegate_activation_storage.ml
    frozen_deposits_storage.mli frozen_deposits_storage.ml
-   stake_storage.mli stake_storage.ml
-   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
-   contract_storage.mli contract_storage.ml
    commitment_storage.mli commitment_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
+   cache_repr.mli cache_repr.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
+   contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
@@ -408,7 +408,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   cache_repr.mli cache_repr.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
@@ -417,16 +416,17 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_manager_storage.mli contract_manager_storage.ml
    delegate_activation_storage.mli delegate_activation_storage.ml
    frozen_deposits_storage.mli frozen_deposits_storage.ml
-   stake_storage.mli stake_storage.ml
-   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
-   contract_storage.mli contract_storage.ml
    commitment_storage.mli commitment_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
+   cache_repr.mli cache_repr.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
+   contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml
@@ -588,7 +588,6 @@ include Tezos_raw_protocol_alpha.Main
    Storage_sigs
    Storage_functors
    Storage
-   Cache_repr
    Ticket_hash_builder
    Constants_storage
    Level_storage
@@ -597,16 +596,17 @@ include Tezos_raw_protocol_alpha.Main
    Contract_manager_storage
    Delegate_activation_storage
    Frozen_deposits_storage
-   Stake_storage
-   Contract_delegate_storage
    Sapling_storage
    Lazy_storage_diff
-   Contract_storage
    Commitment_storage
+   Voting_period_storage
+   Cache_repr
+   Stake_storage
+   Contract_delegate_storage
+   Contract_storage
    Token
    Delegate_storage
    Bootstrap_storage
-   Voting_period_storage
    Vote_storage
    Fees_storage
    Ticket_storage
@@ -787,7 +787,6 @@ include Tezos_raw_protocol_alpha.Main
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    storage.mli storage.ml
-   cache_repr.mli cache_repr.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
    level_storage.mli level_storage.ml
@@ -796,16 +795,17 @@ include Tezos_raw_protocol_alpha.Main
    contract_manager_storage.mli contract_manager_storage.ml
    delegate_activation_storage.mli delegate_activation_storage.ml
    frozen_deposits_storage.mli frozen_deposits_storage.ml
-   stake_storage.mli stake_storage.ml
-   contract_delegate_storage.mli contract_delegate_storage.ml
    sapling_storage.ml
    lazy_storage_diff.mli lazy_storage_diff.ml
-   contract_storage.mli contract_storage.ml
    commitment_storage.mli commitment_storage.ml
+   voting_period_storage.mli voting_period_storage.ml
+   cache_repr.mli cache_repr.ml
+   stake_storage.mli stake_storage.ml
+   contract_delegate_storage.mli contract_delegate_storage.ml
+   contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
    bootstrap_storage.mli bootstrap_storage.ml
-   voting_period_storage.mli voting_period_storage.ml
    vote_storage.mli vote_storage.ml
    fees_storage.mli fees_storage.ml
    ticket_storage.mli ticket_storage.ml

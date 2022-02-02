@@ -43,6 +43,13 @@ val get_current_kind : Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
 (** Returns true if the context level is the last of current voting period.  *)
 val is_last_block : Raw_context.t -> bool tzresult Lwt.t
 
+(** [blocks_before_activation ctxt] returns [Some b] if the current
+    voting period is the Adoption and [b] blocks must be waited before activation
+    of the next protocol amendment. Returns [None] if the current period is not
+    Adoption (then more than [Constants_storage.blocks_per_voting_period] must
+    be waited before activation). *)
+val blocks_before_activation : Raw_context.t -> int32 option tzresult Lwt.t
+
 (** Returns the voting period information for the current level. *)
 val get_rpc_current_info :
   Raw_context.t -> Voting_period_repr.info tzresult Lwt.t

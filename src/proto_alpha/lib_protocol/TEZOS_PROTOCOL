@@ -68,7 +68,6 @@
         "Storage_sigs",
         "Storage_functors",
         "Storage",
-        "Cache_repr",
 
         "Ticket_hash_builder",
         "Constants_storage",
@@ -78,16 +77,19 @@
         "Contract_manager_storage",
         "Delegate_activation_storage",
         "Frozen_deposits_storage",
-        "Stake_storage",
-        "Contract_delegate_storage",
         "Sapling_storage",
         "Lazy_storage_diff",
-        "Contract_storage",
         "Commitment_storage",
+        "Voting_period_storage",
+        "Cache_repr",
+
+        "Stake_storage",
+        "Contract_delegate_storage",
+        "Contract_storage",
         "Token",
         "Delegate_storage",
         "Bootstrap_storage",
-        "Voting_period_storage",
+
         "Vote_storage",
         "Fees_storage",
         "Ticket_storage",
@@ -95,6 +97,7 @@
         "Liquidity_baking_cpmm",
         "Liquidity_baking_lqt",
         "Liquidity_baking_migration",
+
         "Init_storage",
         "Sapling_validator",
 

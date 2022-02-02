@@ -91,16 +91,26 @@ module Admin : sig
 
   (** {3 Cache helpers for RPCs} *)
 
-  (** [future_cache_expectation ctxt ~time_in_blocks] returns [ctxt] except
-      that the entries of the caches that are presumably too old to
-      still be in the caches in [n_blocks] are removed.
+  (** [future_cache_expectation ?blocks_before_activation ctxt
+     ~time_in_blocks] returns [ctxt] except that the entries of the
+     caches that are presumably too old to still be in the caches in
+     [n_blocks] are removed.
 
-      This function is based on a heuristic. The context maintains
-      the median of the number of removed entries: this number is
-      multipled by `n_blocks` to determine the entries that are
-      likely to be removed in `n_blocks`. *)
+      This function is based on a heuristic. The context maintains the
+     median of the number of removed entries: this number is multipled
+     by `n_blocks` to determine the entries that are likely to be
+     removed in `n_blocks`.
+
+     If [blocks_before_activation] is set to [Some n],
+     then the cache is considered empty if [0 <= n <= time_in_blocks].
+     Otherwise, if [blocks_before_activation] is set to [None] and
+     if the voting period is the adoption, the cache is considered
+     empty if [blocks <= time_in_blocks remaining for adoption phase]. *)
   val future_cache_expectation :
-    Raw_context.t -> time_in_blocks:int -> Raw_context.t
+    ?blocks_before_activation:int32 ->
+    Raw_context.t ->
+    time_in_blocks:int ->
+    Raw_context.t tzresult Lwt.t
 
   (** [cache_size ctxt ~cache_index] returns an overapproximation of
        the size of the cache. Returns [None] if [cache_index] is
