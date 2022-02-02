@@ -182,6 +182,8 @@ end
 
 module Internal_for_tests = struct
   module Make = Make
+
+  module type SMass = SMass
 end
 
 module Mass : SMass with type t = int64 = struct

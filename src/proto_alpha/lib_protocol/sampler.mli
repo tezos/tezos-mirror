@@ -28,30 +28,6 @@
       to the given measure.
   *)
 
-(** [Mass] is the module type describing the measure associated to points. *)
-module type SMass = sig
-  (** [t] is the type describing the measure associated to points. *)
-  type t
-
-  val encoding : t Data_encoding.t
-
-  val zero : t
-
-  val of_int : int -> t
-
-  val mul : t -> t -> t
-
-  val add : t -> t -> t
-
-  val sub : t -> t -> t
-
-  val ( = ) : t -> t -> bool
-
-  val ( <= ) : t -> t -> bool
-
-  val ( < ) : t -> t -> bool
-end
-
 (** [S] is the module type of a module allowing to construct samplers based
     on the alias method. *)
 module type S = sig
@@ -90,6 +66,30 @@ end
 (**/**)
 
 module Internal_for_tests : sig
+  (** [Mass] is the module type describing the measure associated to points. *)
+  module type SMass = sig
+    (** [t] is the type describing the measure associated to points. *)
+    type t
+
+    val encoding : t Data_encoding.t
+
+    val zero : t
+
+    val of_int : int -> t
+
+    val mul : t -> t -> t
+
+    val add : t -> t -> t
+
+    val sub : t -> t -> t
+
+    val ( = ) : t -> t -> bool
+
+    val ( <= ) : t -> t -> bool
+
+    val ( < ) : t -> t -> bool
+  end
+
   (** [Make(Mass)] instantiates a module allowing to creates
       samplers for [Mass]-valued finite measures. *)
   module Make : functor (Mass : SMass) -> S with type mass = Mass.t
