@@ -5,6 +5,11 @@ from client.client import Client
 from tools import constants, paths, utils
 from . import protocol
 
+pytestmark = pytest.mark.skipif(
+    utils.check_static_binary(constants.COMPILER),
+    reason="cannot inject with statically compiled binaries",
+)
+
 
 @pytest.fixture(scope="class")
 def client(sandbox):

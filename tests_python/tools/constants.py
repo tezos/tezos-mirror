@@ -22,6 +22,10 @@ def get_parameters(folder: str, network='test') -> dict:
         return json.load(params)
 
 
+# The protocol compiler location
+COMPILER = f'{paths.TEZOS_HOME}/tezos-protocol-compiler'
+
+
 # This is the secret key used to activate a protocol from genesis in sandbox
 # mode. The corresponding public key is hard-coded in the tezos node.
 GENESIS_SK = "edsk31vznjHSSpGExDMHYASz45VZqXN4DPxvsa4hAyY8dHM28cZzp6"

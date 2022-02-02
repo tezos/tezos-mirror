@@ -729,3 +729,15 @@ def originate(
     bake(client, baker)
     assert check_block_contains_operations(client, [origination.operation_hash])
     return origination
+
+
+# Check if a binary is statically compiled
+# used to skip tests
+def check_static_binary(execname: str):
+    ret = subprocess.Popen(
+        ['file', execname], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+    )
+    # Example of line returned by "file":
+    # tezos-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV),
+    # statically linked, no section header
+    return "statically linked" in str(ret.communicate()[0])
