@@ -10,7 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "ezjsonm" { >= "1.1.0" }
-  "json-data-encoding"
+  "json-data-encoding" { >= "0.10" & < "0.11" }
   "tezt"
 ]
 build: [
