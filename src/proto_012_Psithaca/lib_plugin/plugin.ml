@@ -1765,7 +1765,8 @@ module RPC = struct
           ~description:"Simulate an operation"
           ~query:RPC_query.empty
           ~input:
-            (obj3
+            (obj4
+               (opt "blocks_before_activation" int32)
                (req "operation" Operation.encoding)
                (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
@@ -2128,9 +2129,70 @@ module RPC = struct
        time of the operation.
 
     *)
-    let simulate_operation_service ctxt () (op, chain_id, time_in_blocks) =
-      let ctxt = Cache.Admin.future_cache_expectation ctxt ~time_in_blocks in
-      run_operation_service ctxt () (op, chain_id)
+    let simulate_operation_service ctxt ()
+        (user_defined_blocks_before_activation, op, chain_id, time_in_blocks) =
+      let open Voting_period in
+      let time_in_blocks' = Int32.of_int time_in_blocks in
+      (*
+         The following functions are not exposed by {!Voting_period}.
+         So, we unfortunately have to duplicate them here.
+      *)
+      let position_since (level : Level.t) (voting_period : t) =
+        Int32.(sub level.level_position voting_period.start_position)
+      in
+      let remaining_blocks (level : Level.t) (voting_period : t)
+          ~blocks_per_voting_period =
+        let position = position_since level voting_period in
+        Int32.(sub blocks_per_voting_period (succ position))
+      in
+      let blocks_per_voting_period = Constants.blocks_per_voting_period ctxt in
+      let get_current_remaining voting_period =
+        remaining_blocks
+          (Level.current ctxt)
+          voting_period
+          ~blocks_per_voting_period
+      in
+      let blocks_before_activation ctxt =
+        get_current ctxt >|=? function
+        | Voting_period.{kind = Adoption; _} as voting_period ->
+            Some (get_current_remaining voting_period)
+        | _ -> None
+      in
+      ((match user_defined_blocks_before_activation with
+       | None -> blocks_before_activation ctxt
+       | Some block -> return (Some block))
+       >>=? function
+       | Some block
+         when Compare.Int32.(
+                (block >= 0l && block <= time_in_blocks')
+                || blocks_per_voting_period < time_in_blocks') ->
+           (*
+
+              At each protocol activation, the cache is clear.
+
+              For this reason, if the future block considered for the
+              prediction is after the activation, the predicted cache
+              is set to empty. That way, the predicted gas consumption
+              is guaranteed to be an overapproximation of the actual
+              gas consumption.
+
+              This function implicitly assumes that [time_in_blocks]
+              is less than [blocks_per_voting_period]. (The default
+              value in the simulate_operation RPC is set to 3, and
+              therefore satisfies this condition.) As a defensive
+              protection, we clear the cache if this assumption is
+              not satisfied with user-provided values. Notice that
+              high user-provided values for [time_in_blocks] do not
+              make much sense as the cache prediction only works for
+              blocks in the short-term future.
+
+           *)
+           return @@ Cache.Admin.clear ctxt
+       | Some _block ->
+           return @@ Cache.Admin.future_cache_expectation ctxt ~time_in_blocks
+       | None ->
+           return @@ Cache.Admin.future_cache_expectation ctxt ~time_in_blocks)
+      >>=? fun ctxt -> run_operation_service ctxt () (op, chain_id)
 
     let register () =
       let originate_dummy_contract ctxt script balance =
@@ -2655,13 +2717,14 @@ module RPC = struct
     let run_operation ~op ~chain_id ctxt block =
       RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
 
-    let simulate_operation ~op ~chain_id ~latency ctxt block =
+    let simulate_operation ~op ~chain_id ~latency ?blocks_before_activation ctxt
+        block =
       RPC_context.make_call0
         S.simulate_operation
         ctxt
         block
         ()
-        (op, chain_id, latency)
+        (blocks_before_activation, op, chain_id, latency)
 
     let entrypoint_type ~script ~entrypoint ctxt block =
       RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)
