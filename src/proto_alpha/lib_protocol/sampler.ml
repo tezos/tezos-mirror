@@ -123,7 +123,7 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
         measure
     in
     let support = support ~fallback measure in
-    let p = FallbackArray.make length total in
+    let p = FallbackArray.make length Mass.zero in
     let alias = FallbackArray.make length (-1) in
     init_loop total p alias small large ;
     {total; support; p; alias}
