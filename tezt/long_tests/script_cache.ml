@@ -636,10 +636,11 @@ let check_simulation_takes_cache_into_account ~protocol =
 
 *)
 let register ~executors () =
-  let protocol = Protocol.Alpha in
-  check_contract_cache_lowers_gas_consumption ~protocol ~executors ;
-  check_full_cache ~protocol ~executors ;
-  check_block_impact_on_cache ~protocol ~executors ;
-  check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
-  check_cache_reloading_is_not_too_slow ~protocol ~executors ;
-  check_simulation_takes_cache_into_account ~protocol ~executors
+  Protocol.[Ithaca; Alpha]
+  |> List.iter @@ fun protocol ->
+     check_contract_cache_lowers_gas_consumption ~protocol ~executors ;
+     check_full_cache ~protocol ~executors ;
+     check_block_impact_on_cache ~protocol ~executors ;
+     check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
+     check_cache_reloading_is_not_too_slow ~protocol ~executors ;
+     check_simulation_takes_cache_into_account ~protocol ~executors
