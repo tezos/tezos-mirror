@@ -167,14 +167,14 @@ let generate_proof_of_work_with_target_0 pk =
   generate_proof_of_work_n_attempts 1 pk target_0
 
 let rec generate_proof_of_work ?(yield_every = 10000) ?max pk pow_target =
-  let open Lwt.Infix in
+  let open Lwt.Syntax in
   match max with
   | None -> (
       try
         let pow = generate_proof_of_work_n_attempts yield_every pk pow_target in
         Lwt.return pow
       with Not_found ->
-        Lwt.pause () >>= fun () ->
+        let* () = Lwt.pause () in
         generate_proof_of_work ~yield_every pk pow_target)
   | Some max -> (
       if max <= 0 then Lwt.apply raise Not_found
@@ -184,7 +184,7 @@ let rec generate_proof_of_work ?(yield_every = 10000) ?max pk pow_target =
           let pow = generate_proof_of_work_n_attempts attempts pk pow_target in
           Lwt.return pow
         with Not_found ->
-          Lwt.pause () >>= fun () ->
+          let* () = Lwt.pause () in
           let max = max - attempts in
           generate_proof_of_work ~yield_every ~max pk pow_target)
 
