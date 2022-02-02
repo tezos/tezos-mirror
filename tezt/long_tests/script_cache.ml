@@ -570,11 +570,7 @@ let check_cache_reloading_is_not_too_slow ~protocol =
    The simulation correctly takes the cache into account.
 
 *)
-let check_simulation_takes_cache_into_account ~protocol =
-  check "operation simulation takes cache into account" ~protocol @@ fun () ->
-  let* (_, client) = init1 ~protocol in
-  let* contract_id = originate_very_small_contract client in
-  let* chain_id = RPC.get_chain_id client in
+let gas_from_simulation client chain_id contract_id counter value =
   let data block counter =
     Ezjsonm.value_from_string
     @@ Printf.sprintf
@@ -591,7 +587,7 @@ let check_simulation_takes_cache_into_account ~protocol =
           "destination": "%s",
         "parameters": {
           "entrypoint": "default",
-          "value": { "prim" : "Unit" }
+          "value": %s
          }
         } ],
       "signature": "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
@@ -600,15 +596,21 @@ let check_simulation_takes_cache_into_account ~protocol =
          Constant.bootstrap1.public_key_hash
          counter
          contract_id
+         value
          (JSON.as_string chain_id)
   in
+
+  let* block = RPC.get_branch ~offset:0 client in
+  let data = data block counter in
+  let* result = RPC.post_run_simulation client ~data in
+  return (read_consumed_gas JSON.(get "contents" result |> geti 0))
+
+let check_simulation_takes_cache_into_account ~protocol =
+  check "operation simulation takes cache into account" ~protocol @@ fun () ->
+  let* (_, client) = init1 ~protocol in
+  let* contract_id = originate_very_small_contract client in
+  let* chain_id = RPC.get_chain_id client in
   let* () = Client.bake_for client in
-  let gas_from_simulation counter =
-    let* block = RPC.get_branch ~offset:0 client in
-    let data = data block counter in
-    let* result = RPC.post_run_operation client ~data in
-    return (read_consumed_gas JSON.(get "contents" result |> geti 0))
-  in
   let check simulation_gas real_gas =
     if simulation_gas <> real_gas then
       Test.fail
@@ -616,13 +618,14 @@ let check_simulation_takes_cache_into_account ~protocol =
         simulation_gas
         real_gas
   in
-  let* gas_no_cache = gas_from_simulation 2 in
+  let arg = {|{ "prim" : "Unit" }|} in
+  let* gas_no_cache = gas_from_simulation client chain_id contract_id 2 arg in
   Log.info "no cache: %d" gas_no_cache ;
   let* real_gas_consumption = call_contract contract_id "Unit" client in
   Log.info "real gas consumption with no cache: %d" real_gas_consumption ;
   check gas_no_cache real_gas_consumption ;
   let* () = Client.bake_for client in
-  let* gas_with_cache = gas_from_simulation 3 in
+  let* gas_with_cache = gas_from_simulation client chain_id contract_id 3 arg in
   Log.info "with cache: %d" gas_with_cache ;
   let* real_gas_consumption = call_contract contract_id "Unit" client in
   Log.info "real gas consumption with cache: %d" real_gas_consumption ;
