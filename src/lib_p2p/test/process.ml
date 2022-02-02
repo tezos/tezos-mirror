@@ -174,8 +174,10 @@ module Channel = struct
 end
 
 let terminate pid =
+  let open Lwt_syntax in
   (try Unix.kill pid Sys.sigterm with _ -> ()) ;
-  Lwt_unix.waitpid [] pid >>= fun (_pid, _status) -> Lwt.return_unit
+  let* (_pid, _status) = Lwt_unix.waitpid [] pid in
+  Lwt.return_unit
 
 let wait ~value_encoding ~flags pid result_ch =
   let open Lwt_syntax in
