@@ -570,7 +570,8 @@ let check_cache_reloading_is_not_too_slow ~protocol =
    The simulation correctly takes the cache into account.
 
 *)
-let gas_from_simulation client chain_id contract_id counter value =
+let gas_from_simulation client chain_id contract_id ?blocks_before_activation
+    counter value =
   let data block counter =
     Ezjsonm.value_from_string
     @@ Printf.sprintf
@@ -591,26 +592,34 @@ let gas_from_simulation client chain_id contract_id counter value =
          }
         } ],
       "signature": "edsigtXomBKi5CTRf5cjATJWSyaRvhfYNHqSUGrn4SdbYRcGwQrUGjzEfQDTuqHhuA8b2d8NarZjz8TRf65WkpQmo423BtomS8Q"
-    }, "chain_id" : "%s" } |}
+    }, "chain_id" : "%s" %s } |}
          (JSON.as_string block)
          Constant.bootstrap1.public_key_hash
          counter
          contract_id
          value
          (JSON.as_string chain_id)
+         (match blocks_before_activation with
+         | None -> ""
+         | Some b -> Printf.sprintf {|, "blocks_before_activation" : %d |} b)
   in
 
   let* block = RPC.get_branch ~offset:0 client in
   let data = data block counter in
-  let* result = RPC.post_run_simulation client ~data in
+  let* result = RPC.post_simulate_operation client ~data in
   return (read_consumed_gas JSON.(get "contents" result |> geti 0))
 
 let check_simulation_takes_cache_into_account ~protocol =
-  check "operation simulation takes cache into account" ~protocol @@ fun () ->
+  check
+    "operation simulation takes cache into account"
+    ~tags:["simulation"]
+    ~protocol
+  @@ fun () ->
   let* (_, client) = init1 ~protocol in
-  let* contract_id = originate_very_small_contract client in
   let* chain_id = RPC.get_chain_id client in
+  let* contract_id = originate_very_small_contract client in
   let* () = Client.bake_for client in
+
   let check simulation_gas real_gas =
     if simulation_gas <> real_gas then
       Test.fail
@@ -634,16 +643,268 @@ let check_simulation_takes_cache_into_account ~protocol =
 
 (*
 
+   Check cache-aware operation simulations close to protocol user activation
+   -------------------------------------------------------------------------
+
+*)
+let check_simulation_close_to_protocol_user_activation ~executors ~migrate_from
+    ~migrate_to =
+  Long_test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s -> %s) Cache: Simulation behaves well close to protocol user \
+          upgrades"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to))
+    ~tags:["cache"; "simulation"; "user"; "upgrade"]
+    ~timeout:(Minutes 2000)
+    ~executors
+  @@ fun () ->
+  let setup_migration_time ~migration_level cont =
+    let node = Node.create [] in
+    let* () = Node.config_init node [Synchronisation_threshold 0] in
+    Node.Config_file.(
+      update
+        node
+        (set_sandbox_network_with_user_activated_upgrades
+           [(migration_level, migrate_to)])) ;
+    let* () = Node.run node [] in
+    let* () = Node.wait_for_ready node in
+    let* client = Client.(init ~endpoint:(Node node) ()) in
+    let* () = Client.activate_protocol ~protocol:migrate_from client in
+    cont node client
+  in
+  setup_migration_time ~migration_level:8 @@ fun node client ->
+  let* contract_id = originate_very_small_contract client in
+  let* chain_id = RPC.get_chain_id client in
+  let simulate ~blocks_before_activation counter =
+    let arg = {|{ "prim" : "Unit" }|} in
+    gas_from_simulation
+      ~blocks_before_activation
+      client
+      chain_id
+      contract_id
+      counter
+      arg
+  in
+
+  (* At level 2, the cache is empty. *)
+  let* gas_prediction_no_cache = simulate ~blocks_before_activation:5 2 in
+  let* gas_no_cache = call_contract contract_id "Unit" client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 3 in
+
+  Log.info
+    "Gas predicted from simulation with no cache: %d"
+    gas_prediction_no_cache ;
+  Log.info "Gas required with no cache: %d" gas_no_cache ;
+
+  (* At level 3, the cache contains the contract. *)
+  let* gas_with_cache = call_contract contract_id "Unit" client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 4 in
+
+  Log.info "Gas required with a cache: %d" gas_with_cache ;
+
+  Check.((gas_with_cache < gas_no_cache) int)
+    ~error_msg:"Gas consumption with cache should better but we have %L >= %R" ;
+
+  Check.((gas_prediction_no_cache > gas_with_cache) int)
+    ~error_msg:"Simulation matches actual gas consumption with cache miss" ;
+
+  (* At level 4, a simulation considers there will be cache hit in 3 blocks. *)
+  let* gas_prediction_with_cache = simulate ~blocks_before_activation:4 4 in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 5 in
+
+  Log.info
+    "Gas predicted from simulation with cache: %d"
+    gas_prediction_with_cache ;
+
+  Check.((gas_prediction_with_cache = gas_with_cache) int)
+    ~error_msg:"Simulation matches actual gas consumption with cache hit" ;
+
+  (* At level 5, a simulation considers the cache is empty since the
+     protocol will be been upgraded at level 8. *)
+  let* gas_prediction_with_no_cache_because_of_activation =
+    simulate ~blocks_before_activation:3 4
+  in
+
+  Log.info
+    "Gas predicted from simulation with no cache because we are too close to \
+     activation: %d"
+    gas_prediction_with_no_cache_because_of_activation ;
+
+  Check.(
+    (gas_prediction_with_no_cache_because_of_activation > gas_with_cache) int)
+    ~error_msg:
+      "Contract cache is empty in simulation close to activation but %L <= %R" ;
+  return ()
+
+(*
+
+   Check cache-aware operation simulations close to protocol automatic activation
+   ------------------------------------------------------------------------------
+
+*)
+let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
+    ~migrate_to =
+  Long_test.register
+    ~__FILE__
+    ~title:
+      (sf
+         "(%s -> %s) Cache: Simulation behaves well close to protocol \
+          automatic upgrades"
+         (Protocol.name migrate_from)
+         (Protocol.name migrate_to))
+    ~tags:["cache"; "simulation"; "auto"; "upgrade"]
+    ~timeout:(Minutes 2000)
+    ~executors
+  @@ fun () ->
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Right (migrate_from, None))
+      [
+        (["blocks_per_cycle"], Some "20");
+        (["blocks_per_voting_period"], Some "8");
+      ]
+  in
+  let* node = Node.init [Synchronisation_threshold 0] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let* () =
+    Client.activate_protocol ~protocol:migrate_from ~parameter_file client
+  in
+  let* () = Client.bake_for client in
+  let migrate_to_hash = Protocol.hash migrate_to in
+  let* () = Client.submit_proposals ~proto_hashes:[migrate_to_hash] client in
+  let* () = Client.bake_for client in
+
+  let* () =
+    Client.submit_proposals
+      ~key:Constant.bootstrap2.alias
+      ~proto_hashes:[migrate_to_hash]
+      client
+  in
+
+  let* () = Client.bake_for client in
+
+  let vote (account : Account.key) ballot =
+    Client.submit_ballot
+      ~key:account.alias
+      ~proto_hash:migrate_to_hash
+      ballot
+      client
+  in
+  let* () = Client.bake_for client in
+  let* final_period =
+    let get_period () =
+      let* json = RPC.Votes.get_current_period client in
+      return @@ JSON.(json |-> "voting_period" |-> "kind" |> as_string)
+    in
+    let current_period = ref "proposal" in
+    let* () =
+      repeat 28 (fun () ->
+          let* period = get_period () in
+          let* _ =
+            if !current_period <> period then (
+              current_period := period ;
+              Log.info "Period is %s" period ;
+              if period <> "cooldown" && period <> "adoption" then
+                let* () = vote Constant.bootstrap1 Yay in
+                let* () = vote Constant.bootstrap2 Yay in
+                let* () = vote Constant.bootstrap3 Yay in
+                let* () = vote Constant.bootstrap4 Yay in
+                let* () = vote Constant.bootstrap5 Yay in
+                return ()
+              else return ())
+            else return ()
+          in
+          Client.bake_for client)
+    in
+    get_period ()
+  in
+  Check.(
+    (final_period = "adoption")
+      string
+      ~error_msg:"We never reached the adoption period") ;
+
+  let* json = RPC.Votes.get_current_period client in
+  let level = JSON.(json |-> "remaining" |> as_int) in
+  Log.info "Remaining %d blocks before the end of %s" level final_period ;
+  Check.(
+    (level = 7)
+      int
+      ~error_msg:"Expecting %R remaining blocks in adoption, got %L instead") ;
+
+  Log.info "Doing a contract call to have a contract in the cache" ;
+
+  let* contract_id = originate_very_small_contract client in
+  let* gas_no_cache = call_contract contract_id "Unit" client in
+  Log.info
+    "The first contract is without a cache and consumes %d gas"
+    gas_no_cache ;
+
+  let* gas_with_cache = call_contract contract_id "Unit" client in
+  Log.info
+    "The second contract is with a cache and consumes %d gas"
+    gas_with_cache ;
+
+  let simulate counter =
+    let arg = {|{ "prim" : "Unit" }|} in
+    let* chain_id = RPC.get_chain_id client in
+    gas_from_simulation client chain_id contract_id counter arg
+  in
+  let* predicted_gas_in_simulation = simulate 4 in
+  Log.info
+    "Since we are not too close to activation (more than 3 blocks), the \
+     simulation assumes a cache hit\n\
+    \    and predicts %d gas consumption"
+    predicted_gas_in_simulation ;
+
+  Check.(
+    (predicted_gas_in_simulation = gas_with_cache)
+      int
+      ~error_msg:"Expecting %R, got %L") ;
+
+  let* _json = RPC.Votes.get_current_period client in
+  let* () = Client.bake_for client in
+  let* predicted_gas_in_simulation = simulate 4 in
+  Log.info
+    "Since we are now too close to activation (less than 3 blocks), the \
+     simulation assumes an empty cache, hence a cache miss\n\
+    \    and predicts %d gas consumption"
+    predicted_gas_in_simulation ;
+
+  Check.(
+    (predicted_gas_in_simulation > gas_with_cache)
+      int
+      ~error_msg:"Expecting %R, got %L") ;
+
+  return ()
+
+(*
+
    Main entrypoints
    ----------------
 
 *)
 let register ~executors () =
-  Protocol.[Ithaca; Alpha]
+  (Protocol.[Ithaca; Alpha]
   |> List.iter @@ fun protocol ->
      check_contract_cache_lowers_gas_consumption ~protocol ~executors ;
      check_full_cache ~protocol ~executors ;
      check_block_impact_on_cache ~protocol ~executors ;
      check_cache_backtracking_during_chain_reorganization ~protocol ~executors ;
      check_cache_reloading_is_not_too_slow ~protocol ~executors ;
-     check_simulation_takes_cache_into_account ~protocol ~executors
+     check_simulation_takes_cache_into_account ~protocol ~executors) ;
+  Protocol.[Ithaca; Alpha]
+  |> List.iter @@ fun migrate_from ->
+     check_simulation_close_to_protocol_user_activation
+       ~executors
+       ~migrate_from
+       ~migrate_to:Protocol.Alpha ;
+     check_simulation_close_to_protocol_auto_activation
+       ~executors
+       ~migrate_from
+       ~migrate_to:Protocol.Alpha

@@ -246,6 +246,21 @@ let post_run_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
   in
   Client.rpc ?endpoint ?hooks ~data POST path client
 
+let post_simulate_operation ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+    ~data client =
+  let path =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "helpers";
+      "scripts";
+      "simulate_operation";
+    ]
+  in
+  Client.rpc ?endpoint ?hooks ~data POST path client
+
 module Big_maps = struct
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~id ~key_hash
       client =
