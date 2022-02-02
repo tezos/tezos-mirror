@@ -10,10 +10,10 @@
   tezos-crypto
   data-encoding
   tezos-error-monad
-  tezos-event-logging
   tezos-rpc
   tezos-clic
   tezos-micheline
+  tezos-event-logging
   ptime
   ezjsonm
   lwt

@@ -6,10 +6,13 @@
  (package tezos-sapling)
  (libraries
   tezos-sapling
+  tezos-crypto
   str
   tezos-base
   tezos-base.unix
+  tezos-stdlib
   tezos-stdlib-unix
+  data-encoding
   tezos-base-test-helpers
   alcotest-lwt)
  (flags

@@ -11,12 +11,12 @@ depends: [
   "dune" { >= "2.9" }
   "tezos-base"
   "tezos-rpc-http-client"
+  "tezos-stdlib-unix"
   "tezos-shell-services"
   "tezos-client-base"
   "tezos-client-commands"
   "tezos-mockup-commands"
   "tezos-proxy"
-  "tezos-stdlib-unix"
   "tezos-client-base-unix"
   "tezos-signer-backends"
 ]

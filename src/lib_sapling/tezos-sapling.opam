@@ -13,8 +13,8 @@ depends: [
   "integers"
   "ctypes" { >= "0.18.0" }
   "data-encoding" { >= "0.4" & < "0.5" }
-  "tezos-crypto"
   "tezos-stdlib"
+  "tezos-crypto"
   "tezos-error-monad"
   "tezos-rust-libs" { = "1.1" }
   "tezos-lwt-result-stdlib"

@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
+  "tezos-stdlib-unix"
   "cmdliner"
   "lwt-exit"
   "tezos-proxy"

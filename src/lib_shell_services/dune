@@ -14,7 +14,7 @@
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base
    -open Tezos_p2p_services
    -open Tezos_version)))

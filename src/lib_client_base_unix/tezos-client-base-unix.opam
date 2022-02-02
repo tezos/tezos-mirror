@@ -10,16 +10,17 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
+  "tezos-rpc-http"
+  "tezos-rpc-http-client-unix"
+  "tezos-shell-services"
+  "tezos-stdlib-unix"
   "tezos-client-base"
   "tezos-client-commands"
-  "tezos-stdlib-unix"
-  "tezos-rpc-http-client-unix"
   "tezos-mockup"
   "tezos-mockup-registration"
   "tezos-mockup-commands"
   "tezos-proxy"
   "tezos-signer-backends"
-  "tezos-shell-services"
   "lwt-exit"
   "tezos-base-test-helpers" {with-test}
   "alcotest" { with-test & >= "1.5.0" }

@@ -10,9 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
+  "tezos-rpc"
   "tezos-shell-services"
   "tezos-sapling"
-  "tezos-rpc"
   "alcotest" { with-test & >= "1.5.0" }
 ]
 build: [

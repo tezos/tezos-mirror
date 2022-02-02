@@ -6,5 +6,6 @@
  (public_name tezos-context.sigs)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base)
- (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib)))
+  tezos-base
+  tezos-stdlib)
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib)))

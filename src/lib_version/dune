@@ -7,7 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base)
- (flags (:standard -open Tezos_base__TzPervasives)))
+ (flags (:standard -open Tezos_base.TzPervasives)))
 
 (rule
  (targets generated_git_info.ml)

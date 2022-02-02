@@ -9,7 +9,6 @@
   lwt-watcher
   lwt-canceler
   tezos-base
-  tezos-version
   tezos-context
   tezos-store
   tezos-shell-context
@@ -21,10 +20,11 @@
   tezos-requester
   tezos-workers
   tezos-validation
+  tezos-version
   lwt-exit)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base
    -open Tezos_context
    -open Tezos_store

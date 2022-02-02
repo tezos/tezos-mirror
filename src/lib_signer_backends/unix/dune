@@ -8,17 +8,23 @@
  (libraries
   ocplib-endian.bigstring
   fmt
-  tezos-signer-backends
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
+  tezos-stdlib
+  tezos-client-base
+  tezos-rpc-http
+  tezos-rpc-http-client
   tezos-rpc-http-client-unix
+  tezos-signer-services
+  tezos-signer-backends
+  tezos-shell-services
   (select ledger.ml from
    (ledgerwallet-tezos -> ledger.available.ml)
    (-> ledger.none.ml)))
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_stdlib
    -open Tezos_client_base

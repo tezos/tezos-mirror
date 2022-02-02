@@ -13,7 +13,7 @@ depends: [
   "tezos-version"
   "tezos-stdlib-unix"
   "tezos-shell-services"
-  "tezos-workers"
+  "tezos-rpc-http"
   "tezos-rpc-http-server"
   "tezos-p2p"
   "tezos-shell"
@@ -21,6 +21,7 @@ depends: [
   "tezos-context"
   "tezos-validator"
   "tezos-shell-context"
+  "tezos-workers"
   "tezos-protocol-updater"
   "cmdliner"
   "fmt" { >= "0.8.7" }

@@ -10,6 +10,7 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "ppx_blob"
+  "tezos-base"
   "caqti"
   "caqti-driver-postgresql"
   "caqti-lwt"

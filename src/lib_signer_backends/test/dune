@@ -7,12 +7,16 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-stdlib
+  tezos-error-monad
+  tezos-crypto
+  tezos-client-base
   tezos-signer-backends
   alcotest-lwt)
  (flags
   (:standard
-   -open Tezos_error_monad
    -open Tezos_stdlib
+   -open Tezos_error_monad
    -open Tezos_error_monad.TzLwtreslib
    -open Tezos_crypto
    -open Tezos_client_base

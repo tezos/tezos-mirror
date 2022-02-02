@@ -21,11 +21,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-protocol-compiler
-  tezos-stdlib-unix)
+  tezos-stdlib-unix
+  tezos-protocol-compiler)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_protocol_compiler))
  (modules Main_packer))
@@ -43,7 +43,7 @@
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base_unix
    -open Tezos_stdlib_unix))
  (modules Main_embedded_packer))
@@ -56,7 +56,7 @@
   tezos-base.unix
   tezos-stdlib-unix
   re.str)
- (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix))
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib_unix))
  (modules Replace))
 
 (install (section libexec) (files (replace.exe as replace)))

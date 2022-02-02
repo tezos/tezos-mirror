@@ -11,11 +11,11 @@ depends: [
   "dune" { >= "2.9" }
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-base"
+  "tezos-client-base-unix"
+  "tezos-client-base"
+  "tezos-clic"
   "tezos-stdlib-unix"
   "tezos-event-logging"
-  "tezos-client-base"
-  "tezos-client-base-unix"
-  "tezos-clic"
   "tezos-signer-services"
 ]
 depopts: [

@@ -11,12 +11,12 @@
   ringo
   tezos-base
   tezos-base.unix
-  tezos-stdlib
   tezos-stdlib-unix
+  tezos-stdlib
   tezos-p2p-services)
  (flags
   (:standard
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base_unix
    -open Tezos_stdlib_unix
    -open Tezos_stdlib

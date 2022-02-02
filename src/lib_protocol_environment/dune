@@ -18,7 +18,7 @@
   tezos-micheline
   tezos-context.memory
   tezos-event-logging)
- (flags (:standard -open Tezos_base__TzPervasives -open Tezos_micheline))
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_micheline))
  (wrapped false)
  (modules
   Tezos_protocol_environment

@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-stdlib
   irmin
   irmin-pack)
- (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib)))
+ (flags (:standard -open Tezos_base.TzPervasives -open Tezos_stdlib)))
