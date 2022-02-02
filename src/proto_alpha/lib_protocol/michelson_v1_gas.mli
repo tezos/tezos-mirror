@@ -435,6 +435,8 @@ module Cost_of : sig
 
     val check_dupable_cycle : Gas.cost
 
+    val find_entrypoint_cycle : Gas.cost
+
     val bool : Gas.cost
 
     val unit : Gas.cost

@@ -1814,6 +1814,7 @@ let find_entrypoint (type full error_trace)
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
+        consume_gas Typecheck_costs.find_entrypoint_cycle >>$ fun () ->
         if field_annot_opt_eq_entrypoint_lax al entrypoint then
           return ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
         else if field_annot_opt_eq_entrypoint_lax ar entrypoint then
@@ -1826,6 +1827,7 @@ let find_entrypoint (type full error_trace)
               ((fun e -> Prim (loc, D_Right, [f e], [])), t))
     | _ -> of_result (Error ())
   in
+  (* This comparison should be taken into account by the caller. *)
   if field_annot_opt_eq_entrypoint_lax root_name entrypoint then
     return ((fun e -> e), Ex_ty full)
   else
