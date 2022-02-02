@@ -171,9 +171,7 @@ let () =
     (fun pkh -> Not_registered pkh)
 
 let set_inactive ctxt delegate =
-  let delegate_contract = Contract_repr.implicit_contract delegate in
-  Delegate_activation_storage.set_inactive ctxt delegate_contract
-  >>= fun ctxt ->
+  Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
   Stake_storage.deactivate_only_call_from_delegate_storage ctxt delegate >|= ok
 
 let set_active ctxt delegate =

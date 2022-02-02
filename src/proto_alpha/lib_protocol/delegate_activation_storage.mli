@@ -31,7 +31,8 @@ val is_inactive :
 val grace_period :
   Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
 
-val set_inactive : Raw_context.t -> Contract_repr.t -> Raw_context.t Lwt.t
+val set_inactive :
+  Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
 val set_active :
   Raw_context.t ->

@@ -48,7 +48,10 @@ let grace_period ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
   Storage.Contract.Delegate_desactivation.get ctxt contract
 
-let set_inactive = Storage.Contract.Inactive_delegate.add
+let set_inactive ctxt delegate =
+  Storage.Contract.Inactive_delegate.add
+    ctxt
+    (Contract_repr.implicit_contract delegate)
 
 let set_active ctxt delegate =
   is_inactive ctxt delegate >>=? fun inactive ->
