@@ -390,28 +390,28 @@ let register ~executors () =
     ~__FILE__
     ~title:"shell.validation.block.batch"
     ~tags:["shell"; "validation"; "block"; "batch"]
-    ~timeout:(Long_test.Minutes 10)
+    ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
-  @@ Benchmark.chunk_of_consecutive_blocks_total ~size:10 ~repeat:3 ;
+  @@ Benchmark.chunk_of_consecutive_blocks_total ~size:1000 ~repeat:1 ;
 
   Long_test.register
     ~__FILE__
     ~title:("shell.validation.block." ^ block_with_highest_gas)
     ~tags:["shell"; "validation"; "block"; "specific"]
-    ~timeout:(Long_test.Minutes 10)
+    ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
   @@ Benchmark.batch_of_same_block_total
        ~size:10
-       ~repeat:3
+       ~repeat:30
        block_with_highest_gas ;
 
   Long_test.register
     ~__FILE__
     ~title:("shell.validation.subpart." ^ block_with_highest_gas)
     ~tags:["shell"; "validation"; "block"; "subpart"]
-    ~timeout:(Long_test.Minutes 10)
+    ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
-  @@ Benchmark.batch_of_same_block_subparts ~size:10 block_with_highest_gas
+  @@ Benchmark.batch_of_same_block_subparts ~size:30 block_with_highest_gas
