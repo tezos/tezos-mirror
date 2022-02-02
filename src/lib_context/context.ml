@@ -225,12 +225,12 @@ let exists index key =
 let checkout index key =
   let open Lwt_syntax in
   let* () = sync index in
-  let+ o = Store.Commit.of_hash index.repo (Hash.of_context_hash key) in
-  Option.map
-    (fun commit ->
+  let* o = Store.Commit.of_hash index.repo (Hash.of_context_hash key) in
+  match o with
+  | None -> return_none
+  | Some commit ->
       let tree = Store.Commit.tree commit in
-      {index; tree; parents = [commit]; ops = 0})
-    o
+      return_some {index; tree; parents = [commit]; ops = 0}
 
 let checkout_exn index key =
   let open Lwt_syntax in
@@ -368,14 +368,13 @@ let rec tree_to_raw_context tree =
       Block_services.Key v
   | `Node _ ->
       let* kvs = Store.Tree.list tree [] in
-      let keys = List.map fst kvs in
-      let f acc key =
+      let f acc (key, _) =
         (* get_tree is safe, because we iterate over keys *)
         let* tree = Store.Tree.get_tree tree [key] in
         let+ sub_raw_context = tree_to_raw_context tree in
-        TzString.Map.add key sub_raw_context acc
+        String.Map.add key sub_raw_context acc
       in
-      let+ res = Lwt_list.fold_left_s f TzString.Map.empty keys in
+      let+ res = List.fold_left_s f String.Map.empty kvs in
       Block_services.Dir res
 
 let merkle_hash tree =
@@ -391,7 +390,7 @@ let merkle_tree t leaf_kind key =
   let open Lwt_syntax in
   let* subtree_opt = Store.Tree.find_tree t.tree (data_key []) in
   match subtree_opt with
-  | None -> Lwt.return TzString.Map.empty
+  | None -> Lwt.return String.Map.empty
   | Some subtree ->
       let key_to_string k = String.concat ";" k in
       let rec key_to_merkle_tree t target =
@@ -420,11 +419,11 @@ let merkle_tree t leaf_kind key =
                 Lwt.return @@ merkle_hash tree
             in
             let* l = Store.Tree.list t [] in
-            Lwt_list.fold_left_s
+            List.fold_left_s
               (fun acc (key, _) ->
                 let+ v = finally key in
-                TzString.Map.add key v acc)
-              TzString.Map.empty
+                String.Map.add key v acc)
+              String.Map.empty
               l
         | (`Node _, target_hd :: target_tl) ->
             let continue key =
@@ -439,11 +438,11 @@ let merkle_tree t leaf_kind key =
                 Lwt.return @@ merkle_hash tree
             in
             let* l = Store.Tree.list t [] in
-            Lwt_list.fold_left_s
+            List.fold_left_s
               (fun acc (key, _) ->
                 let+ atom = continue key in
-                TzString.Map.add key atom acc)
-              TzString.Map.empty
+                String.Map.add key atom acc)
+              String.Map.empty
               l
         | (`Contents _, _) ->
             raise
@@ -462,9 +461,8 @@ let merkle_tree t leaf_kind key =
 let get_protocol v =
   let open Lwt_syntax in
   let+ o = raw_find v current_protocol_key in
-  match o with
-  | None -> assert false
-  | Some data -> Protocol_hash.of_bytes_exn data
+  let data = WithExceptions.Option.to_exn_f ~none:(fun () -> assert false) o in
+  Protocol_hash.of_bytes_exn data
 
 let add_protocol v key =
   let key = Protocol_hash.to_bytes key in
@@ -473,17 +471,19 @@ let add_protocol v key =
 let get_test_chain v =
   let open Lwt_syntax in
   let* o = raw_find v current_test_chain_key in
-  match o with
-  | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
-  | Some data -> (
-      match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
-      | Error re ->
-          Format.kasprintf
-            (fun s -> Lwt.fail (Failure s))
-            "Error in Context.get_test_chain: %a"
-            Data_encoding.Binary.pp_read_error
-            re
-      | Ok r -> Lwt.return r)
+  let data =
+    WithExceptions.Option.to_exn
+      ~none:(Failure "Unexpected error (Context.get_test_chain)")
+      o
+  in
+  match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+  | Error re ->
+      Format.kasprintf
+        (fun s -> raise (Failure s))
+        "Error in Context.get_test_chain: %a"
+        Data_encoding.Binary.pp_read_error
+        re
+  | Ok r -> Lwt.return r
 
 let add_test_chain v id =
   let id = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding id in
