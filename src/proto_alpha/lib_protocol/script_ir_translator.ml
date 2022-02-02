@@ -1808,30 +1808,30 @@ let find_entrypoint (type full error_trace)
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t.
-      t ty -> Entrypoint.t -> ((Script.node -> Script.node) * ex_ty) option =
+      t ty ->
+      Entrypoint.t ->
+      ((Script.node -> Script.node) * ex_ty, unit) Gas_monad.t =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
         if field_annot_opt_eq_entrypoint_lax al entrypoint then
-          Some ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
+          return ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
         else if field_annot_opt_eq_entrypoint_lax ar entrypoint then
-          Some ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
+          return ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
         else
-          match find_entrypoint tl entrypoint with
-          | Some (f, t) -> Some ((fun e -> Prim (loc, D_Left, [f e], [])), t)
-          | None -> (
-              match find_entrypoint tr entrypoint with
-              | Some (f, t) ->
-                  Some ((fun e -> Prim (loc, D_Right, [f e], [])), t)
-              | None -> None))
-    | _ -> None
+          find_entrypoint tl entrypoint >??$ function
+          | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
+          | Error () ->
+              find_entrypoint tr entrypoint >|$ fun (f, t) ->
+              ((fun e -> Prim (loc, D_Right, [f e], [])), t))
+    | _ -> of_result (Error ())
   in
   if field_annot_opt_eq_entrypoint_lax root_name entrypoint then
     return ((fun e -> e), Ex_ty full)
   else
-    match find_entrypoint full entrypoint with
-    | Some result -> return result
-    | None ->
+    find_entrypoint full entrypoint >??$ function
+    | Ok result -> return result
+    | Error () ->
         if Entrypoint.is_default entrypoint then
           return ((fun e -> e), Ex_ty full)
         else
