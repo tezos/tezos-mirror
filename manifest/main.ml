@@ -127,7 +127,10 @@ let irmin_pack_mem = external_sublib irmin_pack "irmin-pack.mem"
 let js_of_ocaml = external_lib ~js_compatible:true "js_of_ocaml" V.True
 
 let json_data_encoding =
-  external_lib ~js_compatible:true "json-data-encoding" V.True
+  external_lib
+    ~js_compatible:true
+    "json-data-encoding"
+    V.(at_least "0.10" && less_than "0.11")
 
 let logs = external_lib "logs" V.True
 
