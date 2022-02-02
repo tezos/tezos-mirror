@@ -140,6 +140,8 @@ module Make_subcontext (R : REGISTER) (C : Raw_context.T) (N : NAME) :
       if R.ghost then Storage_description.create () else C.description
     in
     Storage_description.register_named_subcontext description N.name
+
+  let length = C.length
 end
 
 module Make_single_data_storage
@@ -822,6 +824,10 @@ module Make_indexed_subcontext (C : Raw_context.T) (I : INDEX) :
       C.check_enough_gas t g
 
     let description = description
+
+    let length c =
+      let (t, _i) = unpack c in
+      C.length t
   end
 
   module Make_set (R : REGISTER) (N : NAME) :
