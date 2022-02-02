@@ -240,6 +240,9 @@ let load_metadata_table cemented_blocks_dir =
             return_some cemented_files_array)
       else return_none)
 
+let cemented_metadata_files cemented_block_store =
+  load_metadata_table cemented_block_store.cemented_blocks_dir
+
 let load ~readonly ~log_size cemented_blocks_dir =
   let open Lwt_tzresult_syntax in
   let cemented_block_level_index =
