@@ -53,7 +53,8 @@ let add_bootstrap_secret cctxt {name; sk_uri} =
   let force = false in
   let* pk_uri = Client_keys.neuterize sk_uri in
   let* () =
-    Client_keys.Public_key.find_opt cctxt name >>=? function
+    let* o = Client_keys.Public_key.find_opt cctxt name in
+    match o with
     | None -> return_unit
     | Some (pk_uri_found, _) ->
         fail_unless
