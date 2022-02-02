@@ -471,10 +471,12 @@ let spawn_tenderbake_action_for ~tenderbake_action ?endpoint ?protocol
     else
       []
       @
-      match force with
-      | None | Some false -> []
-      | Some true when protocol = Some Protocol.Alpha -> ["--force"]
-      | Some true -> [] (* --force is not supported prior to Tenderbake *))
+      match (force, protocol) with
+      | (None, _) | (Some false, _) -> []
+      | (Some true, Some Protocol.Ithaca) | (Some true, Some Protocol.Alpha) ->
+          ["--force"]
+      | (Some true, Some Protocol.Hangzhou) | (Some true, None) -> []
+      (* --force is not supported prior to Tenderbake *))
 
 let spawn_endorse_for ?endpoint ?protocol ?key ?force client =
   spawn_tenderbake_action_for

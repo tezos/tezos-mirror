@@ -76,12 +76,12 @@ let () =
      on previous protocols, if not for a problem that was introduced in
      Client.bake_for which causes the default key to be a baking account key). *)
   Baking.register ~protocols:[Alpha] ;
-  Mempool.register ~protocols:[Alpha] ;
+  Mempool.register ~protocols:[Ithaca; Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
   Stresstest_command.register ~protocols:[Alpha] ;
   (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
   Encoding.register ~protocols ;
-  Precheck.register ~protocols:[Alpha] ;
+  Precheck.register ~protocols:[Ithaca; Alpha] ;
   Tenderbake.register ~protocols:[Alpha] ;
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
@@ -107,7 +107,7 @@ let () =
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
   Tx_rollup.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
-  Replace_by_fees.register ~protocols:[Alpha] ;
+  Replace_by_fees.register ~protocols:[Ithaca; Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;
   Views.register ~protocols:[Alpha] () ;
   Runtime_script_failure.register ~protocols ;
