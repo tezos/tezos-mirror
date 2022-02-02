@@ -2182,14 +2182,16 @@ module RPC = struct
         parse_toplevel ctxt ~legacy expr
         >>=? fun ({arg_type; root_name; _}, ctxt) ->
         Lwt.return
-          ( ( parse_parameter_ty ctxt ~legacy arg_type
-            >>? fun (Ex_ty arg_type, _) ->
-              Script_ir_translator.find_entrypoint
-                ~error_details:Informative
-                ~root_name
-                arg_type
-                entrypoint )
-          >>? fun (_f, Ex_ty ty) ->
+          ( parse_parameter_ty ctxt ~legacy arg_type
+          >>? fun (Ex_ty arg_type, _) ->
+            Gas_monad.run ctxt
+            @@ Script_ir_translator.find_entrypoint
+                 ~error_details:Informative
+                 ~root_name
+                 arg_type
+                 entrypoint
+            >>? fun (r, ctxt) ->
+            r >>? fun (_f, Ex_ty ty) ->
             unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
             Micheline.strip_locations ty_node )
       in

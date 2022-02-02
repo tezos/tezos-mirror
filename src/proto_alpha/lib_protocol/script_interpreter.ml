@@ -1699,9 +1699,11 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
                  views;
                },
              ctxt ) ->
-  record_trace
-    (Bad_contract_parameter step_constants.self)
+  Gas_monad.run
+    ctxt
     (find_entrypoint ~error_details:Informative arg_type ~root_name entrypoint)
+  >>?= fun (r, ctxt) ->
+  record_trace (Bad_contract_parameter step_constants.self) r
   >>?= fun (box, _) ->
   trace
     (Bad_contract_parameter step_constants.self)
