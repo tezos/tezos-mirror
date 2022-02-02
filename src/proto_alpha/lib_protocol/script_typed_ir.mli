@@ -352,8 +352,6 @@ type ('key, 'value) big_map_overlay = {
 
 type 'elt boxed_list = {elements : 'elt list; length : int}
 
-module SMap : Map.S with type key = Script_string.t
-
 type view = {
   input_ty : Script.node;
   output_ty : Script.node;
