@@ -25,6 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error +=
+  | Tx_rollup_submit_batch_fees_excedeed of {
+      fees : Tez_repr.t;
+      limit : Tez_repr.t;
+    }
+
 (** The state of a transaction rollup is a set of variables that vary
     in time, as the rollup progresses. *)
 type t
@@ -51,9 +57,13 @@ val pp : Format.formatter -> t -> unit
     transaction rollup in case it becomes too intense. *)
 val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
 
-(** [fees state size] computes the fees to be paid to submit [size]
-    bytes in the inbox of the transactional rollup. *)
-val fees : t -> int -> Tez_repr.t tzresult
+(** [fees ~limit state size] computes the fees to be paid to submit [size]
+    bytes in the inbox of the transactional rollup.
+
+    Returns [Tx_rollup_submit_batch_fees_excedeed] if the (computed) fees
+    exceeds [limit].
+*)
+val fees : limit:Tez_repr.t option -> t -> int -> Tez_repr.t tzresult
 
 (** [last_inbox_level state] returns the last level for which any messages
      have been submitted, or None if no messages have been submitted. *)

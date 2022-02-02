@@ -1990,7 +1990,7 @@ module Tx_rollup_state : sig
 
   val update : context -> Tx_rollup.t -> t -> context tzresult Lwt.t
 
-  val fees : t -> int -> Tez.t tzresult
+  val fees : limit:Tez.t option -> t -> int -> Tez.t tzresult
 
   val last_inbox_level : t -> Raw_level.t option
 
@@ -2342,6 +2342,7 @@ and _ manager_operation =
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup.t;
       content : string;
+      fees_limit : Tez.tez option;
     }
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {

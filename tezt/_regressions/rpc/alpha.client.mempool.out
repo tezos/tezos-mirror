@@ -1868,6 +1868,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               },
                               "content": {
                                 "$ref": "#/definitions/unistring"
+                              },
+                              "fees_limit": {
+                                "$ref": "#/definitions/alpha.mutez"
                               }
                             },
                             "required": [
@@ -4882,6 +4885,21 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                     "kind": "Variable"
                                   },
                                   "kind": "named"
+                                },
+                                {
+                                  "kind": "option_indicator",
+                                  "name": "fees_limit"
+                                },
+                                {
+                                  "name": "fees_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
                                 }
                               ],
                               "name": "Tx_rollup_submit_batch"
@@ -7105,6 +7123,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               },
                               "content": {
                                 "$ref": "#/definitions/unistring"
+                              },
+                              "fees_limit": {
+                                "$ref": "#/definitions/alpha.mutez"
                               }
                             },
                             "required": [

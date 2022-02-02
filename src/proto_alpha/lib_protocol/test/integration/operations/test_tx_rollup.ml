@@ -77,7 +77,7 @@ let wrap m = m >|= Environment.wrap_tzresult
 (** [inbox_fees state size] computes the fees (per byte of message)
     one has to pay to submit a message to the current inbox. *)
 let inbox_fees state size =
-  Environment.wrap_tzresult (Tx_rollup_state.fees state size)
+  Environment.wrap_tzresult (Tx_rollup_state.fees ~limit:None state size)
 
 (** [fees_per_byte state] returns the cost to insert one byte inside
     the inbox. *)
@@ -252,7 +252,7 @@ let test_fees_per_byte_update () =
         ~hard_limit
     in
     let new_fees =
-      match Alpha_context.Tx_rollup_state.fees state 1 with
+      match Alpha_context.Tx_rollup_state.fees ~limit:None state 1 with
       | Ok x -> x
       | Error _ ->
           Stdlib.failwith "could not compute the fees for a message of 1 byte"
@@ -306,6 +306,28 @@ let test_add_batch () =
   Alcotest.(check int "Expect cumulated size" contents_size cumulated_size) ;
   inbox_fees state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
+
+let test_add_batch_with_limit () =
+  (* From an empty context the fee will be [Tez.zero], we set the hard limit to
+     [Tez.zero], so [cost] >= [limit] *)
+  let fees_limit = Tez.zero in
+  let contents = String.make 5 'd' in
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_submit_batch (I i) contract tx_rollup contents ~fees_limit
+  >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error (function
+          | Tx_rollup_state_repr.Tx_rollup_submit_batch_fees_excedeed _ -> true
+          | _ -> false))
+  >>=? fun _ -> return_unit
 
 (** [test_add_two_batches] originates a tx rollup and adds two
     arbitrary batches to one of its inboxes. Ensure that their order
@@ -789,6 +811,10 @@ let tests =
       test_fees_per_byte_update;
     Tztest.tztest "add one batch to a rollup" `Quick test_add_batch;
     Tztest.tztest "add two batches to a rollup" `Quick test_add_two_batches;
+    Tztest.tztest
+      "add one batch and limit the fees"
+      `Quick
+      test_add_batch_with_limit;
     Tztest.tztest
       "Try to add a batch larger than the limit"
       `Quick

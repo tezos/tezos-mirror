@@ -209,6 +209,7 @@ val tx_rollup_origination :
 val tx_rollup_submit_batch :
   ?counter:Z.t ->
   ?fee:Tez.tez ->
+  ?fees_limit:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   Context.t ->

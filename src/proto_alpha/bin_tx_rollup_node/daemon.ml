@@ -49,14 +49,22 @@ let compute_messages block_info rollup_id =
    fun acc -> function
     | Single_and_result
         ( Manager_operation
-            {operation = Tx_rollup_submit_batch {tx_rollup; content}; _},
+            {
+              operation =
+                Tx_rollup_submit_batch {tx_rollup; content; fees_limit = _};
+              _;
+            },
           Manager_operation_result
             {operation_result = Applied (Tx_rollup_submit_batch_result _); _} )
       when Tx_rollup.equal rollup_id tx_rollup ->
         List.rev (content :: acc)
     | Cons_and_result
         ( Manager_operation
-            {operation = Tx_rollup_submit_batch {tx_rollup; content}; _},
+            {
+              operation =
+                Tx_rollup_submit_batch {tx_rollup; content; fees_limit = _};
+              _;
+            },
           Manager_operation_result
             {operation_result = Applied (Tx_rollup_submit_batch_result _); _},
           xs )

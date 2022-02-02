@@ -818,8 +818,8 @@ let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
       return (oph, op, result)
 
 let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
-    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
-    ~src_pk ~src_sk ~fee_parameter ~content ~tx_rollup () =
+    ?verbose_signing ?simulation ?fee ?fees_limit ?gas_limit ?storage_limit
+    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~content ~tx_rollup () =
   (match Hex.to_string (`Hex content) with
   | Some content -> return content
   | None ->
@@ -834,7 +834,7 @@ let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
          ~fee:(Limit.of_option fee)
          ~gas_limit:(Limit.of_option gas_limit)
          ~storage_limit:(Limit.of_option storage_limit)
-         (Tx_rollup_submit_batch {tx_rollup; content}))
+         (Tx_rollup_submit_batch {tx_rollup; content; fees_limit}))
   in
   Injection.inject_manager_operation
     cctxt

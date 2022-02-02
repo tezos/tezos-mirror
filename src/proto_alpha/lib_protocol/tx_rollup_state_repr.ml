@@ -25,6 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type error +=
+  | Tx_rollup_submit_batch_fees_excedeed of {
+      fees : Tez_repr.t;
+      limit : Tez_repr.t;
+    }
+
 (** The state of a transaction rollup is composed of [fees_per_byte]
     and [inbox_ema] fields. [initial_state] introduces their initial
     values. Both values are updated by [update_fees_per_byte] as the
@@ -126,6 +132,40 @@ let fees {fees_per_byte; _} size = Tez_repr.(fees_per_byte *? Int64.of_int size)
 let last_inbox_level {last_inbox_level; _} = last_inbox_level
 
 let append_inbox t level = {t with last_inbox_level = Some level}
+
+let fees ~limit state size =
+  let fees = fees state size in
+  fees >>? fun fees ->
+  match limit with
+  | Some limit when Tez_repr.(limit >= fees) ->
+      error (Tx_rollup_submit_batch_fees_excedeed {fees; limit})
+  | _ -> ok fees
+
+(* ------ Error registration ------------------------------------------------ *)
+
+let () =
+  (* Tx_rollup_submit_batch_fees_excedeed *)
+  register_error_kind
+    `Permanent
+    ~id:"operation.tx_rollup_submit_batch_fees_excedeed"
+    ~title:"Submit batch excedeed fees limit"
+    ~description:
+      "The submit batch would exceed the fees limit, we withdraw the submit."
+    ~pp:(fun ppf (fees, limit) ->
+      Format.fprintf
+        ppf
+        "Cannot submit the batch of L2 operations as the cost (%a) would \
+         exceed the fees limit (%a)"
+        Tez_repr.pp
+        fees
+        Tez_repr.pp
+        limit)
+    Data_encoding.(
+      obj2 (req "fees" Tez_repr.encoding) (req "limit" Tez_repr.encoding))
+    (function
+      | Tx_rollup_submit_batch_fees_excedeed {fees; limit} -> Some (fees, limit)
+      | _ -> None)
+    (fun (fees, limit) -> Tx_rollup_submit_batch_fees_excedeed {fees; limit})
 
 module Internal_for_tests = struct
   let make :
