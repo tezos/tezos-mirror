@@ -19,6 +19,12 @@ To reflect the fact that various networks or protocol may expose different metri
 
 ### Run:
 
+First, run
+```
+git submodule init
+git submodule update
+```
+
 To create a dashboard with for branch "master" in the title (default)
 
     make
