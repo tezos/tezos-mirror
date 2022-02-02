@@ -40,6 +40,12 @@ val empty : 'a comparable_ty -> ('a, 'b) map
 val fold :
   ('key -> 'value -> 'acc -> 'acc) -> ('key, 'value) map -> 'acc -> 'acc
 
+val fold_es :
+  ('key -> 'value -> 'acc -> 'acc tzresult Lwt.t) ->
+  ('key, 'value) map ->
+  'acc ->
+  'acc tzresult Lwt.t
+
 val update : 'a -> 'b option -> ('a, 'b) map -> ('a, 'b) map
 
 val mem : 'key -> ('key, 'value) map -> bool

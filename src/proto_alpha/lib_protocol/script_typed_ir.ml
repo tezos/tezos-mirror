@@ -463,6 +463,9 @@ module type Boxed_map_OPS = sig
   val find : key -> t -> value option
 
   val fold : (key -> value -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val fold_es :
+    (key -> value -> 'a -> 'a tzresult Lwt.t) -> t -> 'a -> 'a tzresult Lwt.t
 end
 
 module type Boxed_map = sig
