@@ -240,7 +240,7 @@ let view_size {input_ty; output_ty; view_code} =
     h3w
 
 let views_size views =
-  SMap.fold
+  Script_map.fold
     (fun k view accu ->
       ret_adding (accu ++ view_size view) (script_string_size k +! h4w))
     views

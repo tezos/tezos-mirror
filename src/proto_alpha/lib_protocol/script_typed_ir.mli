@@ -360,7 +360,7 @@ type view = {
   view_code : Script.node;
 }
 
-type view_map = view SMap.t
+type view_map = (Script_string.t, view) map
 
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].

@@ -507,7 +507,7 @@ type view = {
   view_code : Script.node;
 }
 
-type view_map = view SMap.t
+type view_map = (Script_string.t, view) map
 
 type 'arg entrypoints = {
   name : Entrypoint.t option;

@@ -2899,7 +2899,7 @@ and typecheck_views :
     parse_view_returning ?type_logger ctxt ~legacy storage_type cur_view
     >|=? fun (_parsed_view, ctxt) -> ctxt
   in
-  SMap.fold_es aux views ctxt
+  Script_map.fold_es aux views ctxt
 
 and[@coq_axiom_with_reason "gadt"] parse_returning :
     type arg ret.
@@ -5177,10 +5177,13 @@ and parse_toplevel :
               ctxt
               (Michelson_v1_gas.Cost_of.Interpreter.view_update str views)
             >>? fun ctxt ->
-            if SMap.mem str views then error (Duplicated_view_name loc)
+            if Script_map.mem str views then error (Duplicated_view_name loc)
             else
               let views' =
-                SMap.add str {input_ty; output_ty; view_code} views
+                Script_map.update
+                  str
+                  (Some {input_ty; output_ty; view_code})
+                  views
               in
               find_fields ctxt p s c views' rest
         | Prim (loc, K_view, args, _) :: _ ->
@@ -5189,7 +5192,7 @@ and parse_toplevel :
             let allowed = [K_parameter; K_storage; K_code; K_view] in
             error (Invalid_primitive (loc, allowed, name))
       in
-      find_fields ctxt None None None SMap.empty fields
+      find_fields ctxt None None None (Script_map.empty string_key) fields
       >>? fun (ctxt, toplevel) ->
       match toplevel with
       | (None, _, _, _) -> error (Missing_field K_parameter)
@@ -5371,7 +5374,9 @@ let parse_code :
       node_size view.view_code ++ node_size view.input_ty
       ++ node_size view.output_ty
     in
-    let views_size = SMap.fold (fun _ v s -> view_size v ++ s) views zero in
+    let views_size =
+      Script_map.fold (fun _ v s -> view_size v ++ s) views zero
+    in
     (* The size of the storage_type and the arg_type is counted by
        [lambda_size]. *)
     let ir_size = lambda_size code in
@@ -5828,7 +5833,9 @@ let unparse_script ctxt mode
      in
      let unparse_views views =
        Gas.consume ctxt (Unparse_costs.unparse_views views) >|? fun ctxt ->
-       let views = SMap.fold unparse_view_unaccounted views [] |> List.rev in
+       let views =
+         Script_map.fold unparse_view_unaccounted views [] |> List.rev
+       in
        (views, ctxt)
      in
      unparse_views views >>? fun (views, ctxt) ->

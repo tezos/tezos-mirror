@@ -601,7 +601,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code views
         [] )
     :: views
   in
-  let views = SMap.fold view views [] |> List.rev in
+  let views = Script_map.fold view views [] |> List.rev in
   let code =
     strip_locations
       (Seq
