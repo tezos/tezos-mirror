@@ -15,7 +15,7 @@ The protocol-independent tools are documented :doc:`here <../shell/cli-commands>
 
 
 .. _client_manual:
-.. _client_manual_011:
+.. _client_manual_hangzhou:
 
 Client manual
 =============
@@ -25,7 +25,7 @@ Client manual
 
 
 .. _baker_manual:
-.. _baker_manual_011:
+.. _baker_manual_hangzhou:
 
 Baker manual
 ============
@@ -35,7 +35,7 @@ Baker manual
 
 
 .. _endorser_manual:
-.. _endorser_manual_011:
+.. _endorser_manual_hangzhou:
 
 Endorser manual
 ===============
@@ -45,7 +45,7 @@ Endorser manual
 
 
 .. _accuser_manual:
-.. _accuser_manual_011:
+.. _accuser_manual_hangzhou:
 
 Accuser manual
 ==============

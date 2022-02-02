@@ -277,7 +277,7 @@ constructors is fixed by this specification. Michelson does not let the
 programmer introduce its own types.
 
 Be aware that the syntax used in the specification may differ from
-the :ref:`concrete syntax <ConcreteSyntax_012>`. In particular
+the :ref:`concrete syntax <ConcreteSyntax_ithaca>`. In particular
 some instructions are annotated with types that are not present in the
 concrete language because they are synthesized by the typechecker.
 
@@ -303,7 +303,7 @@ The concrete language also has some syntax sugar to group some common
 sequences of operations as one. This is described in this specification
 using a simple regular expression style recursive instruction rewriting.
 
-.. _michelson_type_system_012:
+.. _michelson_type_system_ithaca:
 
 Introduction to the type system and notations
 ---------------------------------------------
@@ -494,7 +494,7 @@ Core data types and notations
    A ``big_map`` also has a lower storage cost than a standard map of the same size, when large keys are used, since only the hash of each key is stored in a ``big_map``.
 
    A ``big_map`` cannot appear inside another ``big_map``.
-   See the section on :ref:`operations on big maps <OperationsOnBigMaps_012>` for a description of the syntax of values of type ``big_map (k) (t)`` and available operations.
+   See the section on :ref:`operations on big maps <OperationsOnBigMaps_ithaca>` for a description of the syntax of values of type ``big_map (k) (t)`` and available operations.
 
 Core instructions
 -----------------
@@ -1488,7 +1488,7 @@ value that was previously stored in the ``map`` at the same key as
 
 Operations on ``big_maps``
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
-.. _OperationsOnBigMaps_012:
+.. _OperationsOnBigMaps_ithaca:
 
 Big maps have three possible representations. A map literal is always
 a valid representation for a big map. Big maps can also be represented
@@ -1883,7 +1883,7 @@ until it is actually originated.
 The parameter must be consistent with the one expected by the
 contract, unit for an account.
 
-.. _MichelsonSetDelegate_012:
+.. _MichelsonSetDelegate_ithaca:
 
 -  ``SET_DELEGATE``: Set or withdraw the contract's delegation.
 
@@ -2250,7 +2250,7 @@ comprehensive description of the Sapling protocol.
         with memo_size `ms`
 
 
-.. _MichelsonTickets_012:
+.. _MichelsonTickets_ithaca:
 
 Operations on tickets
 ~~~~~~~~~~~~~~~~~~~~~
@@ -2361,7 +2361,7 @@ parameter if the sender is the contract's manager.
 
     :: 'S   ->   nat : 'S
 
-.. _MichelsonViews_012:
+.. _MichelsonViews_ithaca:
 
 Operations on views
 ~~~~~~~~~~~~~~~~~~~~
@@ -2675,7 +2675,7 @@ A typing rule can be inferred:
 
 Concrete syntax
 ---------------
-.. _ConcreteSyntax_012:
+.. _ConcreteSyntax_ithaca:
 
 The concrete language is very close to the formal notation of the
 specification. Its structure is extremely simple: an expression in the
@@ -3070,7 +3070,7 @@ Primitive applications can receive one or many annotations.
 An annotation is a sequence of characters that matches the regular
 expression ``@%|@%%|%@|[@:%][_0-9a-zA-Z][_0-9a-zA-Z\.%@]*``.
 Note however that ``@%``, ``@%%`` and ``%@`` are
-:ref:`special annotations <SpecialAnnotations_012>` and are not allowed everywhere.
+:ref:`special annotations <SpecialAnnotations_ithaca>` and are not allowed everywhere.
 
 Annotations come after the primitive name and before its potential arguments.
 
@@ -3224,7 +3224,7 @@ type (which can be changed). For instance the annotated typing rule for
 
 Special annotations
 ~~~~~~~~~~~~~~~~~~~
-.. _SpecialAnnotations_012:
+.. _SpecialAnnotations_ithaca:
 
 The special variable annotations ``@%`` and ``@%%`` can be used on instructions
 ``CAR``, ``CDR``, and ``UNPAIR``. It means to use the accessed field name (if any) as
@@ -3492,7 +3492,7 @@ data include not only a description of the action to perform but also
 the address of the multisig contract and a counter that gets
 incremented at each successful call to the contract.
 
-The multisig commands of :ref:`Tezos command line client <client_manual_012>`
+The multisig commands of :ref:`Tezos command line client <client_manual_ithaca>`
 use this
 smart contract. Moreover, `functional correctness of this contract has
 been verified

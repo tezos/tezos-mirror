@@ -325,7 +325,7 @@ Other resources
 ~~~~~~~~~~~~~~~
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_011`.
+:ref:`client_manual_hangzhou`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.

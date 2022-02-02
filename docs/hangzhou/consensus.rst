@@ -37,7 +37,7 @@ finality.
 
 
 .. _terminology:
-.. _terminology_011:
+.. _terminology_hangzhou:
 
 Terminology
 ~~~~~~~~~~~
@@ -45,7 +45,7 @@ Terminology
 A *block* in the blockchain consists of a header and a list of operations. The
 header has a shell part (common to all protocols) and a
 protocol-specific part. In Emmy*, :ref:`the protocol-specific part of the
-header<emmyp_fitness_and_header_011>` contains, most notably, a
+header<emmyp_fitness_and_header_hangzhou>` contains, most notably, a
 priority (a natural number). The consensus operations in a block are called *endorsements*.
 These operations can be seen as votes for a given block.
 The endorsements included a block at level ``l`` are votes for the block at the previous
@@ -54,10 +54,10 @@ level ``l-1``. Each block is signed.
 Before being endorsed, blocks are baked. *Baking* is the action of producing and
 signing a block. Corresponding to these two actions of baking and endorsing, at
 each level, two lists of slots are being created: a (conceptually) infinite list
-of baking slots and a list of ``ENDORSERS_PER_BLOCK`` endorsing slots (the value of ``ENDORSERS_PER_BLOCK`` is one of the :ref:`parameters of the consensus protocol <cs_constants_011>`). The index
+of baking slots and a list of ``ENDORSERS_PER_BLOCK`` endorsing slots (the value of ``ENDORSERS_PER_BLOCK`` is one of the :ref:`parameters of the consensus protocol <cs_constants_hangzhou>`). The index
 of a baking slot is called a *priority*. Each slot is associated to a
 participant. A participant can appear several times in both lists. The selection
-of participants is at :ref:`random<emmyp_slot_selection_011>`, independently for
+of participants is at :ref:`random<emmyp_slot_selection_hangzhou>`, independently for
 each slot, and is stake based.
 
 An endorsement for a block at level :math:`\ell` is *valid* if it is signed by
@@ -76,7 +76,7 @@ block's priority `p`, and its endorsing power `e`. Namely, Emmy* defines the
 minimal block delay function as follows:
 
 .. _delaystar:
-.. _delaystar_011:
+.. _delaystar_hangzhou:
 
 .. math::
    delay^*(p, e) = \begin{cases}
@@ -127,7 +127,7 @@ participant. Emmy* can be described in an abstract manner as
 follows:
 
 - A participant continuously observes blocks and endorsements.
-- A participant always adopts the :ref:`fittest<emmyp_fitness_and_header_011>`, that
+- A participant always adopts the :ref:`fittest<emmyp_fitness_and_header_hangzhou>`, that
   is, the longest (valid) chain it observes.
 - A participant that has at least an endorsement slot at level :math:`\ell`,
   emits an endorsement for the first block it observes at level
@@ -139,7 +139,7 @@ Emmy* concretely
 ~~~~~~~~~~~~~~~~
 
 In Tezos, a participant is a :ref:`delegate<delegation>` that has at least one
-:ref:`roll<roll_pos_011>`, and is :ref:`active<active_delegate_011>`. For simplicity we
+:ref:`roll<roll_pos_hangzhou>`, and is :ref:`active<active_delegate_hangzhou>`. For simplicity we
 just refer to participants as delegates (and omit the "active" and "with rolls"
 attributes).  A delegate plays two roles:
 
@@ -149,17 +149,17 @@ attributes).  A delegate plays two roles:
 
 
 .. _emmyp_slot_selection:
-.. _emmyp_slot_selection_011:
+.. _emmyp_slot_selection_hangzhou:
 
 To these roles correspond the two types of actions mentioned above, baking and
 endorsing. As mentioned above, the baking and endorsing rights of a delegate are
 given by its baking, respectively endorsing slots, whose selection is described
-:ref:`here<rights_011>`. The mechanism behind baking slots is meant to ensure that
+:ref:`here<rights_hangzhou>`. The mechanism behind baking slots is meant to ensure that
 if the delegate whose turn is to bake is for some reason unable to bake, the
 next delegate in the list can step up and bake the block.
 
 .. _emmyp_fitness_and_header:
-.. _emmyp_fitness_and_header_011:
+.. _emmyp_fitness_and_header_hangzhou:
 
 There are two more notions which are defined abstractly at the level of the
 shell and concretized in Emmy*, the :ref:`fitness<Score>`, and the
@@ -172,12 +172,12 @@ protocol-specific header:
     headers (excluding the signature itself).
   - ``priority``: the position in the priority list of delegates
     at which the block was baked.
-  - ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_011>`, used to
+  - ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_hangzhou>`, used to
     generate entropy on the chain. Present in only one out of
-    ``BLOCKS_PER_COMMITMENT`` (see :ref:`Constants<ps_constants_011>`).
+    ``BLOCKS_PER_COMMITMENT`` (see :ref:`Constants<ps_constants_hangzhou>`).
   - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty
     proof-of-work for the block, as a spam prevention measure.
-  - ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_011>` that requests ending the subsidy.
+  - ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_hangzhou>` that requests ending the subsidy.
 
 
 The consensus algorithm is implemented in Tezos in five components: the shell,
@@ -273,14 +273,14 @@ given cycle should immediately stop both baking and endorsing for the rest of
 that cycle.
 
 .. _cs_constants:
-.. _cs_constants_011:
+.. _cs_constants_hangzhou:
 
 Consensus protocol parameters
 -----------------------------
 
 In this section we map the above notation to their corresponding parameter
 values.
-Note that these parameters are part of the larger set of :ref:`protocol constants <protocol_constants_011>`.
+Note that these parameters are part of the larger set of :ref:`protocol constants <protocol_constants_hangzhou>`.
 
 .. list-table:: Mapping
    :widths: 55 50 25
@@ -328,12 +328,12 @@ Note that these parameters are part of the larger set of :ref:`protocol constant
 
 Since blocks are at least ``MINIMAL_BLOCK_DELAY``, that is 30 seconds apart,
 and since a cycle has ``BLOCKS_PER_CYCLE``, that is :ref:`8192
-blocks<ps_constants_011>`, a cycle lasts *at least* 2 days, 20 hours, and 16
+blocks<ps_constants_hangzhou>`, a cycle lasts *at least* 2 days, 20 hours, and 16
 minutes, and ``PRESERVED_CYCLES`` cycles, that is 5 cycles, last *at least* 14
 days, 5 hours, and 20 minutes.
 
 Given that ``MINIMAL_BLOCK_DELAY`` is 30 seconds, :ref:`the minimal block delay
-function<delaystar_011>` says that:
+function<delaystar_hangzhou>` says that:
 
 - if the block is baked at priority 0 and it contains at least 60% of the
   endorsements (namely, at least 153 endorsements) then the minimal delay is 30

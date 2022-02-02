@@ -329,7 +329,7 @@ Further details and explanations on the voting procedure can be found at:
 - `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
-:ref:`client_manual_012`.
+:ref:`client_manual_ithaca`.
 
 For vote related RPCs check the :doc:`rpc` under the prefix
 ``votes/``.

@@ -11,10 +11,10 @@ For instance, protocol plugins do not define the context, or restrict the validi
 In turn protocol plugins may, for example:
 
 - be adjacent enough to the protocol code that it needs to have access to the protocol's internal representations for certain structures: e.g., it has some RPCs that can introspect on the protocol dependent content for certain operations;
-- implement some common operations that are customized for each protocol (e.g., :ref:`prevalidator_filters_011`).
+- implement some common operations that are customized for each protocol (e.g., :ref:`prevalidator_filters_hangzhou`).
 
 .. _prevalidator_filters:
-.. _prevalidator_filters_011:
+.. _prevalidator_filters_hangzhou:
 
 Prevalidator filters
 ~~~~~~~~~~~~~~~~~~~~

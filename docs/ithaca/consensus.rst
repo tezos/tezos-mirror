@@ -52,7 +52,7 @@ post <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html>`_. Here we
 only provide a user/developer perspective.
 
 .. _tb_validator:
-.. _tb_validator_012:
+.. _tb_validator_ithaca:
 
 Tenderbake is executed for each new block level by a "committee" whose members
 are called *validators*, which are delegates selected at random based on their
@@ -82,7 +82,7 @@ Round durations thus increase linearly with ``DELAY_INCREMENT_PER_ROUND``.
 Schematically, a round consists in the following steps:
 
 .. _candidate_block:
-.. _candidate_block_012:
+.. _candidate_block_ithaca:
 
 
 * a validator designated for that round injects a *candidate block* (representing a proposal) and consensus operations (representing votes) into the node to which it is attached, which then
@@ -90,7 +90,7 @@ Schematically, a round consists in the following steps:
 * communicates them to the validators attached to those nodes, to carry out voting on which block to accept.
 
 .. _quorum:
-.. _quorum_012:
+.. _quorum_ithaca:
 
 Unlike Emmy*, Tenderbake has `two types of
 votes <https://blog.nomadic-labs.com/a-look-ahead-to-tenderbake.html#why-do-we-need-preendorsements>`_:
@@ -110,7 +110,7 @@ the same *payload* as
 the initial block. We talk about a *re-proposal* in this case.
 
 
-.. _finality_012:
+.. _finality_ithaca:
 
 Transaction and block finality
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -162,7 +162,7 @@ balance). Let us first (re)define these and related concepts.
   of the maximum active stake during the last ``PRESERVED_CYCLES + MAX_SLASHING_PERIOD``. This amount
   represents the delegate's skin in the game: in the case that the
   delegate behaves badly, its frozen deposit is partly slashed (see
-  :ref:`slashing_012`).  Taking the maximum over an
+  :ref:`slashing_ithaca`).  Taking the maximum over an
   interval of cycles (instead of just considering the active stake at
   the cycle where the bad action can occur) allows to avoid situations
   where a malicious delegate empties its accounts between the time when
@@ -313,7 +313,7 @@ a block. However, two conditions must be met:
  - the validator has revealed its nonce, and
  - the validator has been present during the cycle.
 
-Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_012>`
+Not giving rewards in case of missing revelations is not new as it is :ref:`adapted<random_seed_ithaca>`
 from Emmy*.
 The second condition is new. We say that a delegate is *present* during a cycle
 if the endorsing power (that is, the number of validator slots at the
@@ -364,7 +364,7 @@ included during that cycle has been ``3,123,456`` slots. Given that this number 
 bigger than the minimum required (``3,276,800 * 2 / 3``), it receives an endorsing
 reward of ``3,276,800 * 0.0025 = 8192`` tez for that cycle.
 
-.. _slashing_012:
+.. _slashing_ithaca:
 
 Slashing
 ^^^^^^^^
@@ -391,7 +391,7 @@ correct validators have more than two thirds of the total stake, these correct
 validators have sufficient power for agreement to be reached, thus the lack of
 participation of a selfish baker does not have an impact.
 
-.. _cs_constants_012:
+.. _cs_constants_ithaca:
 
 Consensus related protocol parameters
 -------------------------------------
@@ -428,30 +428,30 @@ Consensus related protocol parameters
      - ``endorsing_reward / CONSENSUS_COMMITTEE_SIZE`` = 0.002857 tez
 
 
-.. _shell_proto_revisit_012:
+.. _shell_proto_revisit_ithaca:
 
 Shell-protocol interaction revisited
 ------------------------------------
 
-:ref:`Recall<shell_proto_interact_012>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
+:ref:`Recall<shell_proto_interact_ithaca>` that, for the shell to interact with the economic protocol, two notions are defined abstractly at the level of the shell and made concrete at the level of the consensus protocol.
 Namely, these two notions are the protocol-specific header and the fitness.
 As in Emmy*, the protocol-specific header contains the fields:
 
 - ``signature``: a digital signature of the shell and protocol headers (excluding the signature itself)
-- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_012>`, used to generate entropy on the chain
+- ``seed_nonce_hash``: a commitment to :ref:`a random number<random_seed_ithaca>`, used to generate entropy on the chain
 - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty proof-of-work for the block, as a spam prevention measure
-- ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_012>` that requests ending the subsidy.
+- ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_ithaca>` that requests ending the subsidy.
 
-There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_012>`.
+There are two additional fields: ``payload_hash`` and ``payload_round`` which are needed for establishing if a block is :ref:`final<finality_ithaca>`.
 
-.. _fitness_012:
+.. _fitness_ithaca:
 
 The fitness is given by the tuple ``(level, locked_round, predecessor_round, round)``.
-The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_012>`.
+The fitness encapsulates more information than in Emmy* because Tenderbake is more complex: recall that blocks at the last level only represent :ref:`candidate blocks<finality_ithaca>`.
 In Emmy*, only the level mattered.
 But in Tenderbake, we need to, for instance, allow for new blocks at the same level to be accepted by nodes.
 Therefore the fitness also includes the block's round.
-Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_012>`.
+Furthermore, we also allow to change the predecessor block when it has a :ref:`smaller round<finality_ithaca>`.
 Therefore the fitness also includes the predecessor block's round.
 
 

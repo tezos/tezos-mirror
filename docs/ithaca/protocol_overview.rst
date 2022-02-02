@@ -59,9 +59,9 @@ therefore protocol specific. The context may contain, for instance, a list of
 accounts and their balances. More generally, the context must provide enough
 information to determine the validity of a block. Given a context and a block,
 the ``apply`` function returns the updated context if the block is valid and has
-a higher :ref:`fitness<fitness_012>`. The fitness determines a total ordering between blocks.
+a higher :ref:`fitness<fitness_ithaca>`. The fitness determines a total ordering between blocks.
 
-.. _shell_proto_interact_012:
+.. _shell_proto_interact_ithaca:
 
 Shell-protocol interaction
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -77,11 +77,11 @@ Blocks
 
 A block consists of a header and operations. A block's header is
 composed of two parts: :ref:`the protocol-agnostic part<shell_header>`
-and :ref:`the protocol-specific part<shell_proto_revisit_012>`.
+and :ref:`the protocol-specific part<shell_proto_revisit_ithaca>`.
 This separation enables the shell to interact with different
 protocols.
 
-.. _validation_passes_proto_012:
+.. _validation_passes_proto_ithaca:
 
 Operations & Validation Passes
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -92,7 +92,7 @@ There are four classes of operations: :doc:`consensus <consensus>` operations, :
 
 Consensus operations are endorsements, while `voting <voting>` operations are ballot and proposal.
 
-Anonymous operations are operations which are not signed. There are three anonymous operations: seed nonce revelation, double baking evidence, and double endorsing evidence. The evidence for double baking and double endorsing is included in a block by the so-called accuser (see :ref:`slashing<slashing_012>`).
+Anonymous operations are operations which are not signed. There are three anonymous operations: seed nonce revelation, double baking evidence, and double endorsing evidence. The evidence for double baking and double endorsing is included in a block by the so-called accuser (see :ref:`slashing<slashing_ithaca>`).
 
 Manager operations are activation, origination (see :doc:`smart contracts<michelson>`), transaction, reveal, and delegation (see :doc:`proof of stake <proof_of_stake>`). Manager operations are the only fee-paying operations.
 

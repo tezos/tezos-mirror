@@ -34,7 +34,7 @@ As a safety precaution, the subsidy expires automatically at a given
 level called the liquidity baking sunset level. The sunset level can
 be renewed periodically by protocol amendment.
 
-.. _esc_hatch_012:
+.. _esc_hatch_ithaca:
 
 Escape hatch
 ~~~~~~~~~~~~
@@ -48,4 +48,4 @@ If at any block ``e[n] >= 666667`` then it means that an exponential moving aver
 
 For indicative purposes, if a fraction ``f`` of blocks start signalling the flag, the threshold is reached after roughly ``2*(log(1-1/(3f)) / log(0.999))`` blocks, about 812 blocks if everyone signals, 1079 blocks if 80% do, 1624 blocks if 60% do, 3590 blocks if 40% do, etc. Recall for comparison that assuming two blocks per minute there are 2880 blocks per day.
 
-The escape hatch can be invoked through a JSON file containing a vote that is repeatedly submitted on each baked block, e.g. ``tezos-baker run with local node ~/.tezos-node alice --votefile "per_block_votes.json"`` where ``per_block_votes.json`` contains just ``{"liquidity_baking_escape_vote": true}``. See also the :ref:`baker man page<baker_manual_012>`.
+The escape hatch can be invoked through a JSON file containing a vote that is repeatedly submitted on each baked block, e.g. ``tezos-baker run with local node ~/.tezos-node alice --votefile "per_block_votes.json"`` where ``per_block_votes.json`` contains just ``{"liquidity_baking_escape_vote": true}``. See also the :ref:`baker man page<baker_manual_ithaca>`.
