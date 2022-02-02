@@ -89,12 +89,8 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
           init_loop total p alias ((qj', j) :: small') large'
         else init_loop total p alias small' ((qj', j) :: large')
 
-  let support :
-      fallback:'a -> length:int -> ('a * Mass.t) list -> 'a FallbackArray.t =
-   fun ~fallback ~length measure ->
-    let a = FallbackArray.make length fallback in
-    List.iteri (fun i (elt, _) -> FallbackArray.set a i elt) measure ;
-    a
+  let support : fallback:'a -> ('a * Mass.t) list -> 'a FallbackArray.t =
+   fun ~fallback measure -> FallbackArray.of_list ~fallback ~proj:fst measure
 
   let check_and_cleanup measure =
     let (total, measure) =
@@ -126,7 +122,7 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
         (0, [], [])
         measure
     in
-    let support = support ~fallback ~length measure in
+    let support = support ~fallback measure in
     let p = FallbackArray.make length total in
     let alias = FallbackArray.make length (-1) in
     init_loop total p alias small large ;
