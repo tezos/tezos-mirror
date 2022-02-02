@@ -39,6 +39,7 @@ let operation_param ~name ~desc t =
     t
 
 let commands () =
+  let open Lwt_tzresult_syntax in
   let open Clic in
   let group =
     {
@@ -59,12 +60,14 @@ let commands () =
       (fun () blocks (cctxt : #Client_context.full) ->
         List.iter_es
           (fun block ->
-            Shell_services.Invalid_blocks.delete cctxt block >>=? fun () ->
-            cctxt#message
-              "Block %a no longer marked invalid."
-              Block_hash.pp
-              block
-            >>= fun () -> return_unit)
+            let* () = Shell_services.Invalid_blocks.delete cctxt block in
+            let*! () =
+              cctxt#message
+                "Block %a no longer marked invalid."
+                Block_hash.pp
+                block
+            in
+            return_unit)
           blocks);
     command
       ~group
@@ -72,15 +75,17 @@ let commands () =
       no_options
       (prefixes ["unmark"; "all"; "invalid"; "blocks"] @@ stop)
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Invalid_blocks.list cctxt () >>=? fun invalid_blocks ->
+        let* invalid_blocks = Shell_services.Invalid_blocks.list cctxt () in
         List.iter_es
           (fun {Chain_services.hash; _} ->
-            Shell_services.Invalid_blocks.delete cctxt hash >>=? fun () ->
-            cctxt#message
-              "Block %a no longer marked invalid."
-              Block_hash.pp_short
-              hash
-            >>= fun () -> return_unit)
+            let* () = Shell_services.Invalid_blocks.delete cctxt hash in
+            let*! () =
+              cctxt#message
+                "Block %a no longer marked invalid."
+                Block_hash.pp_short
+                hash
+            in
+            return_unit)
           invalid_blocks);
     command
       ~group
@@ -90,14 +95,17 @@ let commands () =
       no_options
       (fixed ["show"; "current"; "checkpoint"])
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Chain.Levels.checkpoint cctxt ~chain:cctxt#chain ()
-        >>=? fun (checkpoint_hash, checkpoint_level) ->
-        cctxt#message
-          "@[<v 0>Checkpoint: %a@,Checkpoint level: %ld@]"
-          Block_hash.pp
-          checkpoint_hash
-          checkpoint_level
-        >>= fun () -> return ());
+        let* (checkpoint_hash, checkpoint_level) =
+          Shell_services.Chain.Levels.checkpoint cctxt ~chain:cctxt#chain ()
+        in
+        let*! () =
+          cctxt#message
+            "@[<v 0>Checkpoint: %a@,Checkpoint level: %ld@]"
+            Block_hash.pp
+            checkpoint_hash
+            checkpoint_level
+        in
+        return ());
     command
       ~group
       ~desc:
@@ -111,10 +119,13 @@ let commands () =
       @@ operation_param ~name:"operation" ~desc:"hash of operation to ban"
       @@ stop)
       (fun () op_hash (cctxt : #Client_context.full) ->
-        Shell_services.Mempool.ban_operation cctxt ~chain:cctxt#chain op_hash
-        >>=? fun () ->
-        cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
-        >>= fun () -> return ());
+        let* () =
+          Shell_services.Mempool.ban_operation cctxt ~chain:cctxt#chain op_hash
+        in
+        let*! () =
+          cctxt#message "Operation %a is now banned." Operation_hash.pp op_hash
+        in
+        return ());
     command
       ~group
       ~desc:
@@ -125,17 +136,31 @@ let commands () =
       @@ operation_param ~name:"operation" ~desc:"hash of operation to unban"
       @@ stop)
       (fun () op_hash (cctxt : #Client_context.full) ->
-        Shell_services.Mempool.unban_operation cctxt ~chain:cctxt#chain op_hash
-        >>=? fun () ->
-        cctxt#message "Operation %a is now unbanned." Operation_hash.pp op_hash
-        >>= fun () -> return ());
+        let* () =
+          Shell_services.Mempool.unban_operation
+            cctxt
+            ~chain:cctxt#chain
+            op_hash
+        in
+        let*! () =
+          cctxt#message
+            "Operation %a is now unbanned."
+            Operation_hash.pp
+            op_hash
+        in
+        return ());
     command
       ~group
       ~desc:"Clear the set of banned operations."
       no_options
       (fixed ["unban"; "all"; "operations"])
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.Mempool.unban_all_operations cctxt ~chain:cctxt#chain ()
-        >>=? fun () ->
-        cctxt#message "All operations are now unbanned." >>= fun () -> return ());
+        let* () =
+          Shell_services.Mempool.unban_all_operations
+            cctxt
+            ~chain:cctxt#chain
+            ()
+        in
+        let*! () = cctxt#message "All operations are now unbanned." in
+        return ());
   ]
