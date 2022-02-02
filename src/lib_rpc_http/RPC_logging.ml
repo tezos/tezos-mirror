@@ -52,7 +52,9 @@ end
 module Event = Internal_event.Make (Event_def)
 
 let emit level message =
-  Event.emit ~section (fun () -> {level; message}) >>= function
+  let open Lwt_syntax in
+  let* r = Event.emit ~section (fun () -> {level; message}) in
+  match r with
   | Ok () -> Lwt.return_unit
   | Error e -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace e
 

@@ -137,13 +137,16 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
           'i ->
           'o tzresult Lwt.t =
       fun s p q i ->
-        RPC_directory.transparent_lookup dir s p q i >>= function
-        | `Ok v | `OkChunk v -> return v
+        let open Lwt_syntax in
+        let* r = RPC_directory.transparent_lookup dir s p q i in
+        match r with
+        | `Ok v | `OkChunk v -> return_ok v
         | `OkStream {next; shutdown} -> (
-            next () >>= function
+            let* o = next () in
+            match o with
             | Some v ->
                 shutdown () ;
-                return v
+                return_ok v
             | None ->
                 shutdown () ;
                 not_found s p q)
@@ -174,10 +177,13 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
           'i ->
           (unit -> unit) tzresult Lwt.t =
       fun s ~on_chunk ~on_close p q i ->
-        RPC_directory.transparent_lookup dir s p q i >>= function
+        let open Lwt_syntax in
+        let* r = RPC_directory.transparent_lookup dir s p q i in
+        match r with
         | `OkStream {next; shutdown} ->
             let rec loop () =
-              next () >>= function
+              let* o = next () in
+              match o with
               | None ->
                   on_close () ;
                   Lwt.return_unit
@@ -186,11 +192,11 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
                   loop ()
             in
             let _ = loop () in
-            return shutdown
+            return_ok shutdown
         | `Ok v | `OkChunk v ->
             on_chunk v ;
             on_close () ;
-            return (fun () -> ())
+            return_ok (fun () -> ())
         | `Gone None -> gone s p q
         | `Not_found None -> not_found s p q
         | `Unauthorized (Some err)
@@ -220,9 +226,10 @@ let make_call3 s ctxt x y z = make_call s ctxt ((((), x), y), z)
 type stopper = unit -> unit
 
 let make_streamed_call s (ctxt : #streamed) p q i =
+  let open Lwt_result_syntax in
   let (stream, push) = Lwt_stream.create () in
   let on_chunk v = push (Some v) and on_close () = push None in
-  ctxt#call_streamed_service s ~on_chunk ~on_close p q i >>=? fun close ->
+  let* close = ctxt#call_streamed_service s ~on_chunk ~on_close p q i in
   return (stream, close)
 
 let () =
