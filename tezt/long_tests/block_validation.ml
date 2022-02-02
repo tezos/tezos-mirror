@@ -327,8 +327,15 @@ module Benchmark = struct
     if size <= 0 then
       invalid_arg "chunk_of_consecutive_blocks_total: size must be > 0" ;
     let open List in
-    let blocks = init size (fun i -> "head~" ^ string_of_int i) |> rev in
-    mean_block_validation_duration ~repeat blocks blocks datadir
+    let init_blocks size offset =
+      init size (fun i -> "head~" ^ string_of_int (offset - i - 1))
+    in
+    (* Dry running on the 50 first blocks seems to be enough as it
+       permit to initiate most relevant disk pages and only takes
+       1 minute when disk pages are not yet pre-loaded. *)
+    let dry_run_blocks = init_blocks (min size 50) size in
+    let blocks = init_blocks size size in
+    mean_block_validation_duration ~repeat dry_run_blocks blocks datadir
 
   (** [batch_of_same_block_total ~size ~repeat block datadir]
       is a benchmark that measures the total time taken by the
