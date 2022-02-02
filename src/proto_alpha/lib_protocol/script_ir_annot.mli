@@ -39,11 +39,6 @@ end
 val field_annot_opt_to_entrypoint_strict :
   loc:Script.location -> field_annot option -> Entrypoint.t tzresult
 
-(** Checks whether a field annot option equals an entrypoint.
-    When the field annot option is [None], the result is always [false]. *)
-val field_annot_opt_eq_entrypoint_lax :
-  field_annot option -> Entrypoint.t -> bool
-
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
     and different, unless [legacy] *)
