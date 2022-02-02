@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 let base = 58
 
@@ -293,7 +293,7 @@ struct
                     assert (String.sub prefix 0 ignored = encoding.prefix) ;
                     String.sub prefix ignored (len - ignored))
                 in
-                resolver context msg >|= fun msgs ->
+                let+ msgs = resolver context msg in
                 List.filter_map
                   (fun msg ->
                     let res = simple_encode encoding ?alphabet msg in
