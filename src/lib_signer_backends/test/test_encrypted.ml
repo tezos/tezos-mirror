@@ -51,7 +51,7 @@ let passwords =
 
 let nb_passwds = List.length passwords
 
-let fake_ctx () =
+let fake_ctx () : Client_context.io_wallet =
   object
     val mutable i = 0
 
@@ -79,6 +79,30 @@ let fake_ctx () =
                 (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth passwords i))
 
     method multiple_password_retries = true
+
+    method get_base_dir = ""
+
+    method load
+        : 'a.
+          string ->
+          default:'a ->
+          'a Data_encoding.t ->
+          'a Tezos_base__TzPervasives.tzresult Lwt.t =
+      fun _ ~default _ -> return default
+
+    method load_passwords = None
+
+    method read_file _ = return ""
+
+    method with_lock : 'a. (unit -> 'a Lwt.t) -> 'a Lwt.t = fun f -> f ()
+
+    method write
+        : 'a.
+          string ->
+          'a ->
+          'a Data_encoding.t ->
+          unit Tezos_base__TzPervasives.tzresult Lwt.t =
+      fun _ _ _ -> return ()
   end
 
 let make_sk_uris =
@@ -151,7 +175,7 @@ let test_vectors () =
 let test_random algo =
   let open Encrypted in
   let ctx = fake_ctx () in
-  let decrypt_ctx = (ctx :> Client_context.io) in
+  let decrypt_ctx = (ctx :> Client_context.io_wallet) in
   let rec inner i =
     if i >= loops then return_unit
     else

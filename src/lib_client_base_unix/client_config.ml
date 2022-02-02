@@ -827,7 +827,6 @@ type parsed_config_args = {
   config_commands : Client_context.full command list;
   base_dir : string option;
   require_auth : bool;
-  password_filename : string option;
 }
 
 let default_parsed_config_args =
@@ -837,7 +836,6 @@ let default_parsed_config_args =
     config_commands = [];
     base_dir = None;
     require_auth = false;
-    password_filename = None;
   }
 
 (* Check that the base directory is actually in the right configuration for

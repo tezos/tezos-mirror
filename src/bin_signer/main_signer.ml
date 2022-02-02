@@ -329,10 +329,10 @@ let require_auth_arg () =
 
 let password_filename_arg () =
   arg
-    ~long:"password-file"
+    ~long:"password-filename"
     ~short:'f'
     ~placeholder:"filename"
-    ~doc:"Absolute path of the password file"
+    ~doc:"path to the password filename"
     (string_parameter ())
 
 let global_options () =
@@ -351,9 +351,15 @@ module Signer_config = struct
     return
       ( {
           Client_config.default_parsed_config_args with
+          parsed_args =
+            Some
+              {
+                Client_config.default_cli_args with
+                confirmations = None;
+                password_filename;
+              };
           base_dir;
           require_auth;
-          password_filename;
         },
         remaining )
 
