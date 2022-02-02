@@ -298,7 +298,9 @@ module Cfg_file = struct
   let from_json json = Data_encoding.Json.destruct encoding json
 
   let read fp =
-    Lwt_utils_unix.Json.read_file fp >>=? fun json -> return (from_json json)
+    let open Lwt_result_syntax in
+    let* json = Lwt_utils_unix.Json.read_file fp in
+    return (from_json json)
 
   let write out cfg =
     Lwt_utils_unix.Json.write_file
@@ -332,15 +334,17 @@ let media_type_parameter () :
       | None -> fail (Invalid_media_type_arg x))
 
 let endpoint_parameter () =
+  let open Lwt_tzresult_syntax in
   parameter (fun _ x ->
       let parsed = Uri.of_string x in
-      (match Uri.scheme parsed with
-      | Some "http" | Some "https" -> return ()
-      | _ ->
-          fail
-            (Invalid_endpoint_arg
-               ("only http and https endpoints are supported: " ^ x)))
-      >>=? fun _ ->
+      let* _ =
+        match Uri.scheme parsed with
+        | Some "http" | Some "https" -> return ()
+        | _ ->
+            fail
+              (Invalid_endpoint_arg
+                 ("only http and https endpoints are supported: " ^ x))
+      in
       match (Uri.query parsed, Uri.fragment parsed) with
       | ([], None) -> return parsed
       | _ ->
@@ -349,8 +353,10 @@ let endpoint_parameter () =
                ("endpoint uri should not have query string or fragment: " ^ x)))
 
 let sources_parameter () =
+  let open Lwt_tzresult_syntax in
   parameter (fun _ path ->
-      Lwt_utils_unix.Json.read_file path >>= function
+      let*! r = Lwt_utils_unix.Json.read_file path in
+      match r with
       | Error errs ->
           failwith
             "Can't parse the file specified by --sources as JSON: %s@,%a"
@@ -581,7 +587,9 @@ let client_mode_arg () =
        (fun _ param -> parse_client_mode param))
 
 let read_config_file config_file =
-  Lwt_utils_unix.Json.read_file config_file >>= function
+  let open Lwt_tzresult_syntax in
+  let*! r = Lwt_utils_unix.Json.read_file config_file in
+  match r with
   | Error errs ->
       failwith
         "Can't parse the configuration file as a JSON: %s@,%a"
@@ -598,9 +606,11 @@ let read_config_file config_file =
           exn)
 
 let fail_on_non_mockup_dir (cctxt : #Client_context.full) =
+  let open Lwt_tzresult_syntax in
   let base_dir = cctxt#get_base_dir in
   let open Tezos_mockup.Persistence in
-  classify_base_dir base_dir >>=? function
+  let* b = classify_base_dir base_dir in
+  match b with
   | Base_dir_does_not_exist | Base_dir_is_file | Base_dir_is_nonempty
   | Base_dir_is_empty ->
       failwith
@@ -621,45 +631,54 @@ let mockup_protocol_constants = "protocol-constants"
 (* The implementation of ["config"; "show"] when --mode is "client" *)
 let config_show_client (cctxt : #Client_context.full) (config_file : string) cfg
     =
-  (if not @@ Sys.file_exists config_file then
-   cctxt#warning
-     "@[<v 2>Warning: no config file at %s,@,\
-      displaying the default configuration.@]"
-     config_file
-  else Lwt.return_unit)
-  >>= fun () ->
-  cctxt#message
-    "%a@,"
-    Data_encoding.Json.pp
-    (Data_encoding.Json.construct Cfg_file.encoding cfg)
-  >>= return
+  let open Lwt_syntax in
+  let* () =
+    if not @@ Sys.file_exists config_file then
+      cctxt#warning
+        "@[<v 2>Warning: no config file at %s,@,\
+         displaying the default configuration.@]"
+        config_file
+    else Lwt.return_unit
+  in
+  let* () =
+    cctxt#message
+      "%a@,"
+      Data_encoding.Json.pp
+      (Data_encoding.Json.construct Cfg_file.encoding cfg)
+  in
+  return_ok_unit
 
 (* The implementation of ["config"; "show"] when --mode is "mockup" *)
 let config_show_mockup (cctxt : #Client_context.full)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
-  fail_on_non_mockup_dir cctxt >>=? fun () ->
-  Tezos_mockup.Persistence.get_mockup_context_from_disk
-    ~base_dir
-    ~protocol_hash:protocol_hash_opt
-    cctxt
-  >>=? fun (mockup, _) ->
+  let open Lwt_tzresult_syntax in
+  let* () = fail_on_non_mockup_dir cctxt in
+  let* (mockup, _) =
+    Tezos_mockup.Persistence.get_mockup_context_from_disk
+      ~base_dir
+      ~protocol_hash:protocol_hash_opt
+      cctxt
+  in
   let (module Mockup) = mockup in
   let json_pp encoding ppf value =
     Data_encoding.Json.pp ppf (Data_encoding.Json.construct encoding value)
   in
-  Mockup.default_bootstrap_accounts cctxt >>=? fun bootstrap_accounts_string ->
-  cctxt#message
-    "@[<v>Default value of --%s:@,%s@]"
-    mockup_bootstrap_accounts
-    bootstrap_accounts_string
-  >>= fun () ->
-  Mockup.default_protocol_constants cctxt >>=? fun protocol_constants ->
-  cctxt#message
-    "@[<v>Default value of --%s:@,%a@]"
-    mockup_protocol_constants
-    (json_pp Mockup.protocol_constants_encoding)
-    protocol_constants
-  >>= return
+  let* bootstrap_accounts_string = Mockup.default_bootstrap_accounts cctxt in
+  let*! () =
+    cctxt#message
+      "@[<v>Default value of --%s:@,%s@]"
+      mockup_bootstrap_accounts
+      bootstrap_accounts_string
+  in
+  let* protocol_constants = Mockup.default_protocol_constants cctxt in
+  let*! () =
+    cctxt#message
+      "@[<v>Default value of --%s:@,%a@]"
+      mockup_protocol_constants
+      (json_pp Mockup.protocol_constants_encoding)
+      protocol_constants
+  in
+  return_unit
 
 (* The implementation of ["config"; "init"] when --mode is "client" *)
 let config_init_client config_file cfg =
@@ -670,48 +689,57 @@ let config_init_client config_file cfg =
 (* The implementation of ["config"; "init"] when --mode is "mockup" *)
 let config_init_mockup cctxt protocol_hash_opt bootstrap_accounts_file
     protocol_constants_file base_dir =
-  fail_on_non_mockup_dir cctxt >>=? fun () ->
-  fail_when
-    (Sys.file_exists bootstrap_accounts_file)
-    (error_of_fmt
-       "Config file to write value of --%s exists already: %s"
-       mockup_bootstrap_accounts
-       bootstrap_accounts_file)
-  >>=? fun () ->
-  fail_when
-    (Sys.file_exists protocol_constants_file)
-    (error_of_fmt
-       "Config file to write value of --%s exists already: %s"
-       mockup_protocol_constants
-       protocol_constants_file)
-  >>=? fun () ->
-  Tezos_mockup.Persistence.get_mockup_context_from_disk
-    ~base_dir
-    ~protocol_hash:protocol_hash_opt
-    cctxt
-  >>=? fun (mockup, _) ->
+  let open Lwt_tzresult_syntax in
+  let* () = fail_on_non_mockup_dir cctxt in
+  let* () =
+    fail_when
+      (Sys.file_exists bootstrap_accounts_file)
+      (error_of_fmt
+         "Config file to write value of --%s exists already: %s"
+         mockup_bootstrap_accounts
+         bootstrap_accounts_file)
+  in
+  let* () =
+    fail_when
+      (Sys.file_exists protocol_constants_file)
+      (error_of_fmt
+         "Config file to write value of --%s exists already: %s"
+         mockup_protocol_constants
+         protocol_constants_file)
+  in
+  let* (mockup, _) =
+    Tezos_mockup.Persistence.get_mockup_context_from_disk
+      ~base_dir
+      ~protocol_hash:protocol_hash_opt
+      cctxt
+  in
   let (module Mockup) = mockup in
-  Mockup.default_bootstrap_accounts cctxt >>=? fun string_to_write ->
-  Lwt_utils_unix.create_file bootstrap_accounts_file string_to_write
-  >>= fun _ ->
-  cctxt#message
-    "Written default --%s file: %s"
-    mockup_bootstrap_accounts
-    bootstrap_accounts_file
-  >>= fun () ->
-  Mockup.default_protocol_constants cctxt >>=? fun protocol_constants ->
+  let* string_to_write = Mockup.default_bootstrap_accounts cctxt in
+  let*! _ =
+    Lwt_utils_unix.create_file bootstrap_accounts_file string_to_write
+  in
+  let*! () =
+    cctxt#message
+      "Written default --%s file: %s"
+      mockup_bootstrap_accounts
+      bootstrap_accounts_file
+  in
+  let* protocol_constants = Mockup.default_protocol_constants cctxt in
   let string_to_write =
     Data_encoding.Json.construct
       Mockup.protocol_constants_encoding
       protocol_constants
   in
-  Lwt_utils_unix.Json.write_file protocol_constants_file string_to_write
-  >>=? fun () ->
-  cctxt#message
-    "Written default --%s file: %s"
-    mockup_protocol_constants
-    protocol_constants_file
-  >>= return
+  let* () =
+    Lwt_utils_unix.Json.write_file protocol_constants_file string_to_write
+  in
+  let*! () =
+    cctxt#message
+      "Written default --%s file: %s"
+      mockup_protocol_constants
+      protocol_constants_file
+  in
+  return_unit
 
 let commands config_file cfg (client_mode : client_mode)
     (protocol_hash_opt : Protocol_hash.t option) (base_dir : string) =
@@ -846,8 +874,9 @@ let default_parsed_config_args =
  * fail).
  *)
 let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
+  let open Lwt_tzresult_syntax in
   let open Tezos_mockup.Persistence in
-  classify_base_dir base_dir >>=? fun base_dir_class ->
+  let* base_dir_class = classify_base_dir base_dir in
   match client_mode with
   | `Mode_client | `Mode_light | `Mode_proxy -> (
       match base_dir_class with
@@ -868,13 +897,15 @@ let check_base_dir_for_mode (ctx : #Client_context.full) client_mode base_dir =
       | _ -> return_unit)
   | `Mode_mockup -> (
       let warn_might_not_work explain =
-        ctx#warning
-          "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
-           not work correctly.@]"
-          base_dir
-          explain
-          ()
-        >>= fun () -> return_unit
+        let*! () =
+          ctx#warning
+            "@[<hv>Base directory %s %a@ Some commands (e.g., transfer) might \
+             not work correctly.@]"
+            base_dir
+            explain
+            ()
+        in
+        return_unit
       in
       let show_cmd ppf () =
         Format.fprintf
@@ -967,70 +998,80 @@ let light_mode_checks mode endpoint sources =
           (List.hd sources_uris)
 
 let parse_config_args (ctx : #Client_context.full) argv =
-  parse_global_options (global_options ()) ctx argv
-  >>=? fun ( ( base_dir,
-               config_file,
-               timings,
-               chain,
-               block,
-               confirmations,
-               protocol,
-               log_requests,
-               node_addr,
-               node_port,
-               tls,
-               media_type,
-               endpoint,
-               sources,
-               remote_signer,
-               password_filename,
-               client_mode ),
-             remaining ) ->
-  (match base_dir with
-  | None ->
-      let base_dir = default_base_dir in
-      unless
-        (* Mockup mode will create the base directory on need *)
-        (client_mode = `Mode_mockup || Sys.file_exists base_dir)
-        (fun () -> Lwt_utils_unix.create_dir base_dir >>= return)
-      >>=? fun () -> return base_dir
-  | Some dir -> (
-      match client_mode with
-      | `Mode_client | `Mode_light | `Mode_proxy ->
-          if not (Sys.file_exists dir) then
-            failwith
-              "Specified --base-dir does not exist. Please create the \
-               directory and try again."
-          else if Sys.is_directory dir then return dir
-          else failwith "Specified --base-dir must be a directory"
-      | `Mode_mockup ->
-          (* In mockup mode base dir may be created automatically. *)
-          return dir))
-  >>=? fun base_dir ->
-  check_base_dir_for_mode ctx client_mode base_dir >>=? fun () ->
-  when_
-    (Option.is_some sources && client_mode <> `Mode_light)
-    (fun () ->
-      failwith
-        "--sources is specific to --mode light, please do not specify it with \
-         --mode %s."
-      @@ client_mode_to_string client_mode)
-  >>=? fun () ->
-  (match config_file with
-  | None -> return @@ (base_dir // default_config_file_name)
-  | Some config_file ->
-      if Sys.file_exists config_file then return config_file
-      else
+  let open Lwt_tzresult_syntax in
+  let* ( ( base_dir,
+           config_file,
+           timings,
+           chain,
+           block,
+           confirmations,
+           protocol,
+           log_requests,
+           node_addr,
+           node_port,
+           tls,
+           media_type,
+           endpoint,
+           sources,
+           remote_signer,
+           password_filename,
+           client_mode ),
+         remaining ) =
+    parse_global_options (global_options ()) ctx argv
+  in
+  let* base_dir =
+    match base_dir with
+    | None ->
+        let base_dir = default_base_dir in
+        let* () =
+          unless
+            (* Mockup mode will create the base directory on need *)
+            (client_mode = `Mode_mockup || Sys.file_exists base_dir)
+            (fun () ->
+              let*! () = Lwt_utils_unix.create_dir base_dir in
+              return_unit)
+        in
+        return base_dir
+    | Some dir -> (
+        match client_mode with
+        | `Mode_client | `Mode_light | `Mode_proxy ->
+            if not (Sys.file_exists dir) then
+              failwith
+                "Specified --base-dir does not exist. Please create the \
+                 directory and try again."
+            else if Sys.is_directory dir then return dir
+            else failwith "Specified --base-dir must be a directory"
+        | `Mode_mockup ->
+            (* In mockup mode base dir may be created automatically. *)
+            return dir)
+  in
+  let* () = check_base_dir_for_mode ctx client_mode base_dir in
+  let* () =
+    when_
+      (Option.is_some sources && client_mode <> `Mode_light)
+      (fun () ->
         failwith
-          "Config file specified in option does not exist. Use `client config \
-           init` to create one.")
-  >>=? fun config_file ->
+          "--sources is specific to --mode light, please do not specify it \
+           with --mode %s."
+        @@ client_mode_to_string client_mode)
+  in
+  let* config_file =
+    match config_file with
+    | None -> return @@ (base_dir // default_config_file_name)
+    | Some config_file ->
+        if Sys.file_exists config_file then return config_file
+        else
+          failwith
+            "Config file specified in option does not exist. Use `client \
+             config init` to create one."
+  in
   let config_dir = Filename.dirname config_file in
   let protocol = match protocol with None -> None | Some p -> p in
-  (if not (Sys.file_exists config_file) then
-   return {Cfg_file.default with base_dir}
-  else read_config_file config_file)
-  >>=? fun cfg ->
+  let* cfg =
+    if not (Sys.file_exists config_file) then
+      return {Cfg_file.default with base_dir}
+    else read_config_file config_file
+  in
   (* endpoint logic:
    *   1) when --endpoint provided as argument,
    *      use it but check no presence of --addr, --port, or --tls
@@ -1054,18 +1095,21 @@ let parse_config_args (ctx : #Client_context.full) argv =
     else return ()
   in
   let tls = if tls then Some true else None in
-  (match endpoint with
-  | Some endpt ->
-      check_absence node_addr node_port tls >>=? fun _ -> return endpt
-  | None -> (
-      let node_addr = Option.either node_addr cfg.node_addr in
-      let node_port = Option.either node_port cfg.node_port in
-      let tls = Option.either tls cfg.tls in
-      match cfg.endpoint with
-      | Some endpt ->
-          check_absence node_addr node_port tls >>=? fun _ -> return endpt
-      | None -> return (build_endpoint node_addr node_port tls)))
-  >>=? fun endpoint ->
+  let* endpoint =
+    match endpoint with
+    | Some endpt ->
+        let* _ = check_absence node_addr node_port tls in
+        return endpt
+    | None -> (
+        let node_addr = Option.either node_addr cfg.node_addr in
+        let node_port = Option.either node_port cfg.node_port in
+        let tls = Option.either tls cfg.tls in
+        match cfg.endpoint with
+        | Some endpt ->
+            let* _ = check_absence node_addr node_port tls in
+            return endpt
+        | None -> return (build_endpoint node_addr node_port tls))
+  in
   (* give a kind warning when any of -A -P -S exists *)
   (let got = function Some _ -> true | None -> false in
    let gotany =
@@ -1078,9 +1122,10 @@ let parse_config_args (ctx : #Client_context.full) argv =
          "@{<warning>Warning:@}  the --addr --port --tls options are now \
           deprecated; use --endpoint instead\n" ;
        pp_print_flush err_formatter ()))) ;
-  light_mode_checks client_mode endpoint sources >>=? fun () ->
-  Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
-  >>=? fun remote_signer_env ->
+  let* () = light_mode_checks client_mode endpoint sources in
+  let* remote_signer_env =
+    Tezos_signer_backends_unix.Remote.read_base_uri_from_env ()
+  in
   let remote_signer =
     Option.either remote_signer
     @@ Option.either remote_signer_env cfg.remote_signer
@@ -1111,10 +1156,13 @@ let parse_config_args (ctx : #Client_context.full) argv =
   if Sys.file_exists config_dir && not (Sys.is_directory config_dir) then (
     Format.eprintf "%s is not a directory.@." config_dir ;
     exit 1) ;
-  unless
-    (client_mode = `Mode_mockup)
-    (fun () -> Lwt_utils_unix.create_dir config_dir >>= return)
-  >>=? fun () ->
+  let* () =
+    unless
+      (client_mode = `Mode_mockup)
+      (fun () ->
+        let*! () = Lwt_utils_unix.create_dir config_dir in
+        return_unit)
+  in
   let parsed_args =
     {
       chain;

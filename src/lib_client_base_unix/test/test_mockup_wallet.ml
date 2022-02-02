@@ -61,10 +61,13 @@ let testable_string_list_ignoring_order : string list Alcotest.testable =
 
 (** Validate SK and PK consistency *)
 let validate_key (_, pk_hash, pk_sig_opt, sk_uri_opt) =
+  let open Lwt_tzresult_syntax in
   match (pk_sig_opt, sk_uri_opt) with
   | (Some pk_sig, Some sk_uri) -> (
-      Client_keys.neuterize sk_uri >>=? Client_keys.public_key_hash
-      >>=? fun (pk_hash_from_sk, pk_sig_from_sk_opt) ->
+      let* (pk_hash_from_sk, pk_sig_from_sk_opt) =
+        let* pk = Client_keys.neuterize sk_uri in
+        Client_keys.public_key_hash pk
+      in
       match pk_sig_from_sk_opt with
       | None -> return @@ Alcotest.fail "Is this a valid scenario?"
       | Some pk_sig_from_sk ->
@@ -93,6 +96,7 @@ let validate_accounts_names key_list accounts_names =
 (** When no bootstrap accounts file is provided, then the wallet is
     populated with the default bootstrap accounts *)
 let test_no_bootstrap_accounts_file_populates_defaults =
+  let open Lwt_result_syntax in
   Tztest.tztest
     "When no bootstrap accounts file is provided, then the wallet is populated \
      with the default bootstrap accounts"
@@ -108,8 +112,8 @@ let test_no_bootstrap_accounts_file_populates_defaults =
             Client_keys.register_signer
               (module Tezos_signer_backends.Unencrypted)
           in
-          populate io_wallet None >>=? fun () ->
-          Client_keys.list_keys io_wallet >>=? fun key_list ->
+          let* () = populate io_wallet None in
+          let* key_list = Client_keys.list_keys io_wallet in
           validate_accounts_names key_list default_bootstrap_accounts_names ;
           List.iter_es validate_key key_list))
 
@@ -122,6 +126,7 @@ let test_with_valid_bootstrap_accounts_file_populates =
     `Quick
     (fun () ->
       Lwt_utils_unix.with_tempdir "test_mockup_wallet" (fun base_dir ->
+          let open Lwt_tzresult_syntax in
           let io_wallet =
             new Client_context_unix.unix_io_wallet
               ~base_dir
@@ -159,12 +164,13 @@ let test_with_valid_bootstrap_accounts_file_populates =
             Client_keys.register_signer
               (module Tezos_signer_backends.Unencrypted)
           in
-          Lwt_utils_unix.Json.write_file
-            bootstrap_accounts_file_path
-            bootstrap_accounts
-          >>=? fun () ->
-          populate io_wallet (Some bootstrap_accounts_file_path) >>=? fun () ->
-          Client_keys.list_keys io_wallet >>=? fun key_list ->
+          let* () =
+            Lwt_utils_unix.Json.write_file
+              bootstrap_accounts_file_path
+              bootstrap_accounts
+          in
+          let* () = populate io_wallet (Some bootstrap_accounts_file_path) in
+          let* key_list = Client_keys.list_keys io_wallet in
           validate_accounts_names key_list [account_name_1; account_name_2] ;
           List.iter_es validate_key key_list))
 
