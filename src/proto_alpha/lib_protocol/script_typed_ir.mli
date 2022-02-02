@@ -360,6 +360,8 @@ type view = {
   view_code : Script.node;
 }
 
+type view_map = view SMap.t
+
 (** ['arg entrypoints] represents the tree of entrypoints of a parameter type
     ['arg].
     [name] is the name of the entrypoint at that node if it is not [None].
@@ -389,7 +391,7 @@ type ('arg, 'storage) script = {
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
-  views : view SMap.t;
+  views : view_map;
   entrypoints : 'arg entrypoints;
   code_size : Cache_memory_helpers.sint;
 }
@@ -936,7 +938,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       storage_type : 'a ty;
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
-      views : view SMap.t;
+      views : view_map;
       entrypoints : 'b entrypoints;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }

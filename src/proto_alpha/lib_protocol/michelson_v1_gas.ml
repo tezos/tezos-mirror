@@ -1451,16 +1451,14 @@ module Cost_of = struct
       compare ty x y Gas.free Return
      [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
-    let view_get (elt : Script_string.t)
-        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+    let view_get (elt : Script_string.t) (m : Script_typed_ir.view_map) =
       let open S_syntax in
       let per_elt_cost = compare Script_typed_ir.string_key elt elt in
       let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
       let intercept = atomic_step_cost (S.safe_int 80) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
 
-    let view_update (elt : Script_string.t)
-        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
+    let view_update (elt : Script_string.t) (m : Script_typed_ir.view_map) =
       let open S_syntax in
       let per_elt_cost = compare Script_typed_ir.string_key elt elt in
       let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
@@ -1837,7 +1835,7 @@ module Cost_of = struct
 
     let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
 
-    let unparse_views (views : Script_typed_ir.view Script_typed_ir.SMap.t) =
+    let unparse_views (views : Script_typed_ir.view_map) =
       let number_of_views = Script_typed_ir.SMap.cardinal views in
       atomic_step_cost @@ cost_UNPARSING_VIEWS number_of_views
 

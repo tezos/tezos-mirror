@@ -302,11 +302,9 @@ module Cost_of : sig
 
     val view : Gas.cost
 
-    val view_get :
-      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+    val view_get : Script_string.t -> Script_typed_ir.view_map -> Gas.cost
 
-    val view_update :
-      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+    val view_update : Script_string.t -> Script_typed_ir.view_map -> Gas.cost
 
     val transfer_tokens : Gas.cost
 
@@ -494,7 +492,7 @@ module Cost_of : sig
 
     val unparse_data_cycle : Gas.cost
 
-    val unparse_views : Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
+    val unparse_views : Script_typed_ir.view_map -> Gas.cost
 
     val unparse_script : Gas.cost
 

@@ -1752,14 +1752,14 @@ type toplevel = {
   code_field : Script.node;
   arg_type : Script.node;
   storage_type : Script.node;
-  views : view SMap.t;
+  views : view_map;
 }
 
 type ('arg, 'storage) code = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage_type : 'storage ty;
-  views : view SMap.t;
+  views : view_map;
   entrypoints : 'arg entrypoints;
   code_size : Cache_memory_helpers.sint;
 }
@@ -2892,7 +2892,7 @@ and typecheck_views :
     context ->
     legacy:bool ->
     storage ty ->
-    view SMap.t ->
+    view_map ->
     context tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy storage_type views ->
   let aux _name cur_view ctxt =

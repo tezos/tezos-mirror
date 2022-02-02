@@ -88,7 +88,7 @@ type toplevel = {
   code_field : Script.node;
   arg_type : Script.node;
   storage_type : Script.node;
-  views : Script_typed_ir.view Script_typed_ir.SMap.t;
+  views : Script_typed_ir.view_map;
 }
 
 type ('arg, 'storage) code = {
@@ -100,7 +100,7 @@ type ('arg, 'storage) code = {
     Script_typed_ir.lambda;
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
-  views : Script_typed_ir.view Script_typed_ir.SMap.t;
+  views : Script_typed_ir.view_map;
   entrypoints : 'arg Script_typed_ir.entrypoints;
   code_size : Cache_memory_helpers.sint;
       (** This is an over-approximation of the value size in memory, in
@@ -302,7 +302,7 @@ val typecheck_views :
   context ->
   legacy:bool ->
   'storage Script_typed_ir.ty ->
-  Script_typed_ir.view Script_typed_ir.SMap.t ->
+  Script_typed_ir.view_map ->
   context tzresult Lwt.t
 
 (**
