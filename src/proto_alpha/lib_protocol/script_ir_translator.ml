@@ -5056,7 +5056,7 @@ and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
 
 and parse_toplevel :
     context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy toplevel ->
+ fun ctxt ~legacy:_ toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
   match root toplevel with
@@ -5133,19 +5133,11 @@ and parse_toplevel :
                     ok (p, [], pannot)
                 | _ -> ok (p, pannot, None))
           in
-          (if legacy then
-           (* legacy semantics ignores spurious annotations *)
-           match maybe_root_name with
-           | Ok (p, _, root_name) -> ok (p, root_name)
-           | Error _ -> ok (p, None)
-          else
-            (* only one field annot is allowed to set the root entrypoint name *)
-            maybe_root_name >>? fun (p, pannot, root_name) ->
-            Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
-            Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
-            Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-            (p, root_name))
-          >|? fun (arg_type, root_name) ->
+          (* only one field annot is allowed to set the root entrypoint name *)
+          maybe_root_name >>? fun (arg_type, pannot, root_name) ->
+          Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
           ({code_field = c; arg_type; root_name; views; storage_type = s}, ctxt)
       )
 
