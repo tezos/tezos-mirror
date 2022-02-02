@@ -61,17 +61,17 @@ val init :
   Client.t ->
   t Lwt.t
 
-(** Specialised version of [Daemon.Make.terminate]. *)
+(** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
-(** Specialised version of [Daemon.Make.log_events]. *)
+(** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
 
-(** Specialised version of [Daemon.Make.wait_for]. *)
+(** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t}
 
-(** Specialised version of [Daemon.Make.on_event]. *)
+(** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
