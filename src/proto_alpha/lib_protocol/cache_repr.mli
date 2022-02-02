@@ -115,7 +115,11 @@ module Admin : sig
   val cache_size_limit : Raw_context.t -> cache_index:int -> size option
 
   (** [value_of_key ctxt k] interprets the functions introduced by
-     [register] to construct a cacheable value for a key [k]. *)
+     [register] to construct a cacheable value for a key [k]. 
+
+     [value_of_key] is a maintenance operation: it is typically run
+     when a node reboots. For this reason, this operation is not
+     carbonated. *)
   val value_of_key :
     Raw_context.t -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
 end
