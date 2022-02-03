@@ -155,7 +155,7 @@ let rec size_of_comparable_value :
     type a. a Script_typed_ir.comparable_ty -> a -> t =
   fun (type a) (wit : a Script_typed_ir.comparable_ty) (v : a) ->
    match wit with
-   | Never_key -> zero
+   | Never_key -> ( match v with _ -> .)
    | Unit_key -> unit
    | Int_key -> integer v
    | Nat_key -> integer v
@@ -170,22 +170,18 @@ let rec size_of_comparable_value :
    | Pair_key (leaf, node, _) ->
        let (lv, rv) = v in
        let size =
-         add
-           (size_of_comparable_value leaf lv)
-           (size_of_comparable_value node rv)
+         size_of_comparable_value leaf lv + size_of_comparable_value node rv
        in
-       add size one
+       size + 1
    | Union_key (left, right, _) ->
        let size =
          match v with
          | L v -> size_of_comparable_value left v
          | R v -> size_of_comparable_value right v
        in
-       add size one
+       size + 1
    | Option_key (ty, _) -> (
-       match v with
-       | None -> one
-       | Some x -> add (size_of_comparable_value ty x) one)
+       match v with None -> 1 | Some x -> size_of_comparable_value ty x + 1)
    | Signature_key -> signature v
    | Key_key -> public_key v
    | Chain_id_key -> chain_id v
@@ -197,14 +193,14 @@ let micheline_zero = {traversal = 0; int_bytes = 0; string_bytes = 0}
 
 let ( ++ ) x y =
   {
-    traversal = Ops.(x.traversal + y.traversal);
-    int_bytes = Ops.(x.int_bytes + y.int_bytes);
-    string_bytes = Ops.(x.string_bytes + y.string_bytes);
+    traversal = x.traversal + y.traversal;
+    int_bytes = x.int_bytes + y.int_bytes;
+    string_bytes = x.string_bytes + y.string_bytes;
   }
 
 let node leaves =
   let r = List.fold_left ( ++ ) micheline_zero leaves in
-  {r with traversal = Ops.(r.traversal + 1)}
+  {r with traversal = r.traversal + 1}
 
 let rec of_micheline (x : ('a, 'b) Micheline.node) =
   match x with
