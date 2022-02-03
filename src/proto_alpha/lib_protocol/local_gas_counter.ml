@@ -66,7 +66,7 @@ type outdated_context = Outdated_context of context [@@ocaml.unboxed]
 let outdated_context ctxt = Outdated_context ctxt [@@ocaml.inline always]
 
 let update_context (Local_gas_counter gas_counter) (Outdated_context ctxt) =
-  Gas.update_remaining_operation_gas ctxt (Saturation_repr.safe_int gas_counter)
+  Gas.update_remaining_operation_gas ctxt (Gas.fp_of_milligas_int gas_counter)
   [@@ocaml.inline always]
 
 let local_gas_counter ctxt =

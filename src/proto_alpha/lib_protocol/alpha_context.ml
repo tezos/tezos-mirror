@@ -194,7 +194,7 @@ module Gas = struct
     Raw_context.update_remaining_operation_gas
 
   let reset_block_gas ctxt =
-    let gas = Constants.hard_gas_limit_per_block ctxt in
+    let gas = Arith.fp @@ Constants.hard_gas_limit_per_block ctxt in
     Raw_context.update_remaining_block_gas ctxt gas
 
   let level = Raw_context.gas_level

@@ -209,8 +209,6 @@ module Mempool = struct
             int31
             default_config.max_prechecked_manager_operations))
 
-  type manager_gas_witness
-
   (* For each Prechecked manager operation (batched or not), we associate the
      following information to its source:
      - the operation's hash, needed in case the operation is replaced
@@ -221,7 +219,7 @@ module Mempool = struct
   *)
   type manager_op_info = {
     operation_hash : Operation_hash.t;
-    gas_limit : manager_gas_witness Gas.Arith.t;
+    gas_limit : Gas.Arith.fp;
     fee : Tez.t;
     weight : Q.t;
   }
@@ -554,8 +552,14 @@ module Mempool = struct
         } ->
         (* Manager already seen: one manager per block limitation triggered.
            Can replace old operation if new operation's fees are better *)
-        if better_fees_and_ratio config old_gas old_fee gas_limit fee then
-          `Replace old_hash
+        if
+          better_fees_and_ratio
+            config
+            (Gas.Arith.floor old_gas)
+            old_fee
+            gas_limit
+            fee
+        then `Replace old_hash
         else
           `Fail
             (`Branch_delayed
@@ -1019,7 +1023,7 @@ module Mempool = struct
       Tezos_base.Operation.shell_header ->
       t Kind.manager protocol_data ->
       fee:Tez.t ->
-      gas_limit:manager_gas_witness Gas.Arith.t ->
+      gas_limit:Gas.Arith.fp ->
       public_key_hash ->
       [> `Prechecked_manager of
          [`No_replace | `Replace of Operation_hash.t * error_classification]
@@ -1050,6 +1054,7 @@ module Mempool = struct
           | Temporary -> `Branch_delayed err
           | Outdated -> `Outdated err)
     in
+    let gas_limit = Gas.Arith.floor gas_limit in
     match
       check_manager_restriction config filter_state source ~fee ~gas_limit
     with
@@ -1156,6 +1161,7 @@ module Mempool = struct
               ~gas:gas_limit
               (Operation_data protocol_data)
           in
+          let gas_limit = Gas.Arith.fp gas_limit in
           let info = {operation_hash = oph; gas_limit; fee; weight} in
           precheck_manager
             config

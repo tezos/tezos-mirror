@@ -196,6 +196,11 @@ let step_cost n = S.scale_fast step_weight n
 
 let free = S.zero
 
+let cost_of_gas (gas : 'a Arith.t) = (gas :> cost)
+
+let fp_of_milligas_int milligas =
+  (Saturation_repr.safe_int milligas :> Arith.fp)
+
 let read_bytes_cost n =
   S.add read_base_weight (S.scale_fast byte_read_weight (S.safe_int n))
 

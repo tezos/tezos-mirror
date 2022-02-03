@@ -563,8 +563,8 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
       type kind.
       kind Annotated_manager_operation.annotated_list ->
       int ->
-      Saturation_repr.may_saturate Saturation_repr.t ->
-      int * Saturation_repr.may_saturate Saturation_repr.t =
+      Gas.Arith.integral ->
+      int * Gas.Arith.integral =
    fun op need_patching gas_consumed ->
     match op with
     | Single_manager minfo ->
