@@ -189,17 +189,21 @@ let get_stakes_for_selected_index ctxt index =
         match frozen_deposits_limit with
         | Some frozen_deposits_limit -> (
             try
-              let max_mutez = Tez_repr.of_mutez_exn Int64.max_int in
-              let frozen_stake_limit =
-                if Tez_repr.(frozen_deposits_limit > div_exn max_mutez 100) then
-                  max_mutez
-                else
-                  Tez_repr.(
-                    div_exn
-                      (mul_exn frozen_deposits_limit 100)
-                      frozen_deposits_percentage)
-              in
-              Tez_repr.min staking_balance frozen_stake_limit
+              let open Tez_repr in
+              let max_mutez = of_mutez_exn Int64.max_int in
+              if frozen_deposits_limit > div_exn max_mutez 100 then
+                let frozen_deposits_limit_by_10 =
+                  mul_exn frozen_deposits_limit 10
+                in
+                if frozen_deposits_limit_by_10 < staking_balance then
+                  frozen_deposits_limit_by_10
+                else staking_balance
+              else
+                min
+                  staking_balance
+                  (div_exn
+                     (mul_exn frozen_deposits_limit 100)
+                     frozen_deposits_percentage)
             with _ -> staking_balance)
         | None -> staking_balance
       in
