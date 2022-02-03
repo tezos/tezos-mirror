@@ -23,11 +23,11 @@ trace
     [ "hello"
       (Some "world")
       {} ]
-  - location: 20 (remaining gas: 1039989.656 units remaining)
+  - location: 20 (remaining gas: 1039989.716 units remaining)
     [ { Elt "hello" "world" } ]
-  - location: 21 (remaining gas: 1039989.641 units remaining)
+  - location: 21 (remaining gas: 1039989.701 units remaining)
     [ {}
       { Elt "hello" "world" } ]
-  - location: 23 (remaining gas: 1039989.626 units remaining)
+  - location: 23 (remaining gas: 1039989.686 units remaining)
     [ (Pair {} { Elt "hello" "world" }) ]
 

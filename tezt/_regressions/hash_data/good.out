@@ -385,7 +385,7 @@ Raw Script-expression-ID-Hash: 0xac6995309e75f33132a6819b36c2ae787684be3c23e7cf2
 Ledger Blake2b hash: Cc2W7aPZgPoiuVfuxR8j6gjxgpuZDBJGjSaRQemzTnFM
 Raw Sha256 hash: 0x732bb539d52c41e6cc09d6116b1b3d25257b27dfd7adc7a09e03d345c09e0594
 Raw Sha512 hash: 0x0d565633ca0b3c3751aee0fe54d9be744bea79b1a714d97227397dfe79b5058d6385bc86dcdabbb280c5fc2fb56fc073550ac63d947df2787a5927a1342c343b
-Gas remaining: 1039997.442 units remaining
+Gas remaining: 1039997.652 units remaining
 
 ./tezos-client --mode mockup hash data 0 of type mutez
 Raw packed data: 0x050000
@@ -529,7 +529,7 @@ Raw Script-expression-ID-Hash: 0x7b470c4d4cd099659964e7ae56f49599a16e5c4ddbe0389
 Ledger Blake2b hash: 9JDyxjR1Pex14hzrrVN6wUuVdug418EbGy9PytyWi36E
 Raw Sha256 hash: 0x79b8b0a86bb4e9939b552d8bfc98c50b991ae227235a3d39381349817ebdda9f
 Raw Sha512 hash: 0x34de860c30437423f988cff5ed945981ed4b82dc8a9153f1fbb387e3a05d502d494aa3fb627698a2d7d3b769715e24f844274d0a86bbddff3d955d97ba39d410
-Gas remaining: 1039997.788 units remaining
+Gas remaining: 1039998.208 units remaining
 
 ./tezos-client --mode mockup hash data '"ABC\n123"' of type string
 Raw packed data: 0x0501000000074142430a313233
