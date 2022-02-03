@@ -97,6 +97,11 @@ Michelson
 - Field annotations are ignored and not propagated on comparable types and on
   regular pairs (MR :gl:`!4175`)
 
+- Annotating the parameter toplevel constructor to designate the root entrypoint
+  is now forbidden. Put the annotation on the parameter type instead.
+  E.g. replace ``parameter %a int;`` by ``parameter (int %a);``
+  (MR :gl:`!4366`)
+
 Internal
 --------
 
