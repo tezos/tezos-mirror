@@ -47,37 +47,7 @@ let micheline_size_encoding : micheline_size Data_encoding.encoding =
 
 let zero = 0
 
-let one = 1
-
 let add = ( + )
-
-let sub = ( - )
-
-let mul = ( * )
-
-let div = ( / )
-
-let max x y = if Compare.Int.(x < y) then y else x
-
-let min x y = if Compare.Int.(x < y) then x else y
-
-module Ops = struct
-  let ( * ) = mul
-
-  let ( / ) = div
-
-  let ( + ) = add
-
-  let ( - ) = sub
-end
-
-let compare = Compare.Int.compare
-
-let equal = Compare.Int.( = )
-
-let lt = Compare.Int.( < )
-
-let leq = Compare.Int.( <= )
 
 let pp = Format.pp_print_int
 
@@ -92,13 +62,9 @@ let pp_micheline_size fmtr {traversal; int_bytes; string_bytes} =
     pp
     string_bytes
 
-let show = string_of_int
-
 let to_int x = x
 
 let of_int x = x
-
-let log2 x = Z.log2 (Z.of_int x)
 
 let unit : t = 1
 

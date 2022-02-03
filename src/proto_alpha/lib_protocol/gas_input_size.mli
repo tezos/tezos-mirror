@@ -45,51 +45,15 @@ val micheline_size_encoding : micheline_size Data_encoding.encoding
 
 val zero : t
 
-val one : t
-
 val add : t -> t -> t
-
-val sub : t -> t -> t
-
-val mul : t -> t -> t
-
-val div : t -> t -> t
-
-val max : t -> t -> t
-
-val min : t -> t -> t
-
-module Ops : sig
-  val ( * ) : t -> t -> t
-
-  val ( / ) : t -> t -> t
-
-  val ( + ) : t -> t -> t
-
-  val ( - ) : t -> t -> t
-end
-
-val compare : t -> t -> int
-
-val equal : t -> t -> bool
-
-val lt : t -> t -> bool
-
-val leq : t -> t -> bool
 
 val pp : Format.formatter -> t -> unit
 
 val pp_micheline_size : Format.formatter -> micheline_size -> unit
 
-val show : t -> string
-
 val to_int : t -> int
 
 val of_int : int -> t
-
-val log2 : t -> t
-
-val unit : t
 
 val integer : 'a Alpha_context.Script_int.num -> t
 
@@ -100,18 +64,6 @@ val script_string : Alpha_context.Script_string.t -> t
 val bytes : Bytes.t -> t
 
 val mutez : Alpha_context.Tez.tez -> t
-
-val bool : bool -> t
-
-val signature : Script_typed_ir.Script_signature.t -> t
-
-val key_hash : Signature.public_key_hash -> t
-
-val public_key : Signature.public_key -> t
-
-val chain_id : Script_typed_ir.Script_chain_id.t -> t
-
-val address : Script_typed_ir.address -> t
 
 val list : 'a Script_typed_ir.boxed_list -> t
 
@@ -125,12 +77,6 @@ val size_of_comparable_value : 'a Script_typed_ir.comparable_ty -> 'a -> t
 
 (* ------------------------------------------------------------------------- *)
 (* Micheline/Michelson-related *)
-
-val micheline_zero : micheline_size
-
-val ( ++ ) : micheline_size -> micheline_size -> micheline_size
-
-val node : micheline_size list -> micheline_size
 
 val of_micheline : ('a, 'b) Micheline.node -> micheline_size
 
