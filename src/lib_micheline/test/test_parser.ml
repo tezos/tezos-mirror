@@ -58,154 +58,170 @@ let assert_tokenize_error ~loc given forbidden_tokens =
    annotations, comments. *)
 let test_tokenize_basic () =
   (* String *)
-  assert_tokenize ~loc:__LOC__ "\"abc\"" [String "abc"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "\"abc\t\"" [String "abc\t"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "\"abc\b\"" [String "abc\b"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "\"abc\\n\"" [String "abc\n"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "\"abc\\r\"" [String "abc\r"] >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ "\"abc\"" [String "abc"] in
+  let* () = assert_tokenize ~loc:__LOC__ "\"abc\t\"" [String "abc\t"] in
+  let* () = assert_tokenize ~loc:__LOC__ "\"abc\b\"" [String "abc\b"] in
+  let* () = assert_tokenize ~loc:__LOC__ "\"abc\\n\"" [String "abc\n"] in
+  let* () = assert_tokenize ~loc:__LOC__ "\"abc\\r\"" [String "abc\r"] in
   (*fail*)
-  assert_tokenize_error ~loc:__LOC__ "\"abc\n\"" [String "abc\n"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "\"abc\\\"" [String "abc\\"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "\"abc\"" [String "abc\n"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "\"abc\r\"" [String "abc\r"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "abc\r" [String "abc\r"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "\"abc\"\r" [String "abc\r"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "\"abc" [String "abc"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "abc\"" [String "abc"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "\"\"\"" [String ""] >>=? fun () ->
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"abc\n\"" [String "abc\n"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"abc\\\"" [String "abc\\"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"abc\"" [String "abc\n"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"abc\r\"" [String "abc\r"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "abc\r" [String "abc\r"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"abc\"\r" [String "abc\r"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"abc" [String "abc"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "abc\"" [String "abc"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "\"\"\"" [String ""] in
   (* Bytes *)
-  assert_tokenize ~loc:__LOC__ "0xabc" [Bytes "0xabc"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "0x" [Bytes "0x"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "0x1" [Bytes "0x1"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "xabc" [Bytes "xabc"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "1xabc" [Bytes "1xabc"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "1c" [Bytes "1c"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "0c" [Bytes "0c"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "0xx" [Bytes "0xx"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "0b" [Bytes "0b"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "0xg" [Bytes "0xg"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "0X" [Bytes "0X"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "1x" [Bytes "1x"] >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ "0xabc" [Bytes "0xabc"] in
+  let* () = assert_tokenize ~loc:__LOC__ "0x" [Bytes "0x"] in
+  let* () = assert_tokenize ~loc:__LOC__ "0x1" [Bytes "0x1"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "xabc" [Bytes "xabc"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "1xabc" [Bytes "1xabc"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "1c" [Bytes "1c"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "0c" [Bytes "0c"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "0xx" [Bytes "0xx"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "0b" [Bytes "0b"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "0xg" [Bytes "0xg"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "0X" [Bytes "0X"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "1x" [Bytes "1x"] in
   (* Int *)
-  assert_tokenize ~loc:__LOC__ "10" [Int "10"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "0" [Int "0"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "00" [Int "00"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "001" [Int "001"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "-0" [Int "0"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "-1" [Int "-1"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "1" [Int "1"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "-10" [Int "-10"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ ".1000" [Int ".1000"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "10_00" [Int "10_00"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "1,000" [Int "1,000"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "1000.000" [Int "1000.000"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "-0" [Int "-0"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "--0" [Int "0"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "+0" [Int "0"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "a" [Int "a"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "0a" [Int "0a"] >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ "10" [Int "10"] in
+  let* () = assert_tokenize ~loc:__LOC__ "0" [Int "0"] in
+  let* () = assert_tokenize ~loc:__LOC__ "00" [Int "00"] in
+  let* () = assert_tokenize ~loc:__LOC__ "001" [Int "001"] in
+  let* () = assert_tokenize ~loc:__LOC__ "-0" [Int "0"] in
+  let* () = assert_tokenize ~loc:__LOC__ "-1" [Int "-1"] in
+  let* () = assert_tokenize ~loc:__LOC__ "1" [Int "1"] in
+  let* () = assert_tokenize ~loc:__LOC__ "-10" [Int "-10"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ ".1000" [Int ".1000"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "10_00" [Int "10_00"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "1,000" [Int "1,000"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "1000.000" [Int "1000.000"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "-0" [Int "-0"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "--0" [Int "0"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "+0" [Int "0"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "a" [Int "a"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "0a" [Int "0a"] in
   (* Ident *)
-  assert_tokenize ~loc:__LOC__ "string" [Ident "string"] >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ "string" [Ident "string"] in
   (* Annotation *)
-  assert_tokenize ~loc:__LOC__ "@my_pair" [Annot "@my_pair"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "@@my_pair" [Annot "@@my_pair"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "$t" [Annot "$t"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "&t" [Annot "&t"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":t" [Annot ":t"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":_" [Annot ":_"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":0" [Annot ":0"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":%" [Annot ":%"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":%%" [Annot ":%%"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":%@" [Annot ":%@"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":%@_" [Annot ":%@_"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ":%@_0" [Annot ":%@_0"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "%from" [Annot "%from"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "%@from" [Annot "%@from"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "%from_a" [Annot "%from_a"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "%from.a" [Annot "%from.a"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "%From.a" [Annot "%From.a"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "%0From.a" [Annot "%0From.a"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "?t" [Annot "?t"] >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ "@my_pair" [Annot "@my_pair"] in
+  let* () = assert_tokenize ~loc:__LOC__ "@@my_pair" [Annot "@@my_pair"] in
+  let* () = assert_tokenize ~loc:__LOC__ "$t" [Annot "$t"] in
+  let* () = assert_tokenize ~loc:__LOC__ "&t" [Annot "&t"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":t" [Annot ":t"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":_" [Annot ":_"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":0" [Annot ":0"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":%" [Annot ":%"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":%%" [Annot ":%%"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":%@" [Annot ":%@"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":%@_" [Annot ":%@_"] in
+  let* () = assert_tokenize ~loc:__LOC__ ":%@_0" [Annot ":%@_0"] in
+  let* () = assert_tokenize ~loc:__LOC__ "%from" [Annot "%from"] in
+  let* () = assert_tokenize ~loc:__LOC__ "%@from" [Annot "%@from"] in
+  let* () = assert_tokenize ~loc:__LOC__ "%from_a" [Annot "%from_a"] in
+  let* () = assert_tokenize ~loc:__LOC__ "%from.a" [Annot "%from.a"] in
+  let* () = assert_tokenize ~loc:__LOC__ "%From.a" [Annot "%From.a"] in
+  let* () = assert_tokenize ~loc:__LOC__ "%0From.a" [Annot "%0From.a"] in
+  let* () = assert_tokenize ~loc:__LOC__ "?t" [Annot "?t"] in
   (*fail*)
-  assert_tokenize_error ~loc:__LOC__ "??t" [Annot "??t"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "&&t" [Annot "&&t"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "$$t" [Annot "$$t"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "_from" [Annot "_from"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ ".from" [Annot ".from"] >>=? fun () ->
+  let* () = assert_tokenize_error ~loc:__LOC__ "??t" [Annot "??t"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "&&t" [Annot "&&t"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "$$t" [Annot "$$t"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "_from" [Annot "_from"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ ".from" [Annot ".from"] in
   (*NOTE: the cases below fail because ':' is used in the middle of the
     annotation. *)
-  assert_tokenize_error ~loc:__LOC__ "%:from" [Annot "%:from"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "%:@from" [Annot "%:@from"] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "::t" [Annot "::t"] >>=? fun () ->
+  let* () = assert_tokenize_error ~loc:__LOC__ "%:from" [Annot "%:from"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "%:@from" [Annot "%:@from"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "::t" [Annot "::t"] in
   (* Comment *)
-  assert_tokenize ~loc:__LOC__ "/*\"/**/\"*/" [Comment "/*\"/**/\"*/"]
-  >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "/* /* /* */ */ */" [Comment "/* /* /* */ */ */"]
-  >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "/*parse 1" [Comment "/*parse 1"]
-  >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "parse 1*/" [Comment "parse 1*/"]
-  >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "/* */*/" [Comment "/* */*/"]
-  >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "/*/* */" [Comment "/*/* */"]
-  >>=? fun () ->
+  let* () =
+    assert_tokenize ~loc:__LOC__ "/*\"/**/\"*/" [Comment "/*\"/**/\"*/"]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "/* /* /* */ */ */"
+      [Comment "/* /* /* */ */ */"]
+  in
+  let* () =
+    assert_tokenize_error ~loc:__LOC__ "/*parse 1" [Comment "/*parse 1"]
+  in
+  let* () =
+    assert_tokenize_error ~loc:__LOC__ "parse 1*/" [Comment "parse 1*/"]
+  in
+  let* () = assert_tokenize_error ~loc:__LOC__ "/* */*/" [Comment "/* */*/"] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "/*/* */" [Comment "/*/* */"] in
   (* EOL *)
-  assert_tokenize ~loc:__LOC__ "#Access" [Eol_comment "#Access"] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "##Access" [Eol_comment "##Access"]
-  >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "?Access" [Eol_comment "?Access"]
-  >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ "#Access" [Eol_comment "#Access"] in
+  let* () = assert_tokenize ~loc:__LOC__ "##Access" [Eol_comment "##Access"] in
+  let* () =
+    assert_tokenize_error ~loc:__LOC__ "?Access" [Eol_comment "?Access"]
+  in
   (* SKIP *)
-  assert_tokenize ~loc:__LOC__ ";" [Semi] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "{" [Open_brace] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "}" [Close_brace] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "(" [Open_paren] >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ ")" [Close_paren] >>=? fun () ->
+  let* () = assert_tokenize ~loc:__LOC__ ";" [Semi] in
+  let* () = assert_tokenize ~loc:__LOC__ "{" [Open_brace] in
+  let* () = assert_tokenize ~loc:__LOC__ "}" [Close_brace] in
+  let* () = assert_tokenize ~loc:__LOC__ "(" [Open_paren] in
+  let* () = assert_tokenize ~loc:__LOC__ ")" [Close_paren] in
   (*fail*)
-  assert_tokenize_error ~loc:__LOC__ "{" [Semi] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ ";" [Open_brace] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "}" [Open_brace] >>=? fun () ->
-  assert_tokenize_error ~loc:__LOC__ "(" [Close_paren] >>=? fun () ->
+  let* () = assert_tokenize_error ~loc:__LOC__ "{" [Semi] in
+  let* () = assert_tokenize_error ~loc:__LOC__ ";" [Open_brace] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "}" [Open_brace] in
+  let* () = assert_tokenize_error ~loc:__LOC__ "(" [Close_paren] in
   assert_tokenize_error ~loc:__LOC__ ")" [Open_paren]
 
 (** Tokenizing simple one-line contracts (not including parsing). *)
 let test_one_line_contract () =
-  assert_tokenize
-    ~loc:__LOC__
-    "(option int)"
-    [Open_paren; Ident "option"; Ident "int"; Close_paren]
-  >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "DIP {ADD}"
-    [Ident "DIP"; Open_brace; Ident "ADD"; Close_brace]
-  >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "parameter int;"
-    [Ident "parameter"; Ident "int"; Semi]
-  >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "PUSH string \"abc\";"
-    [Ident "PUSH"; Ident "string"; String "abc"; Semi]
-  >>=? fun () ->
-  assert_tokenize ~loc:__LOC__ "DROP; SWAP" [Ident "DROP"; Semi; Ident "SWAP"]
-  >>=? fun () ->
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "(option int)"
+      [Open_paren; Ident "option"; Ident "int"; Close_paren]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "DIP {ADD}"
+      [Ident "DIP"; Open_brace; Ident "ADD"; Close_brace]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "parameter int;"
+      [Ident "parameter"; Ident "int"; Semi]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "PUSH string \"abc\";"
+      [Ident "PUSH"; Ident "string"; String "abc"; Semi]
+  in
+  let* () =
+    assert_tokenize ~loc:__LOC__ "DROP; SWAP" [Ident "DROP"; Semi; Ident "SWAP"]
+  in
   (* NOTE: the cases below do not fail because we only do tokenization. *)
-  assert_tokenize ~loc:__LOC__ "DIP {ADD" [Ident "DIP"; Open_brace; Ident "ADD"]
-  >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "(option int"
-    [Open_paren; Ident "option"; Ident "int"]
-  >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "parameter int}"
-    [Ident "parameter"; Ident "int"; Close_brace]
-  >>=? fun () ->
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "DIP {ADD"
+      [Ident "DIP"; Open_brace; Ident "ADD"]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "(option int"
+      [Open_paren; Ident "option"; Ident "int"]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "parameter int}"
+      [Ident "parameter"; Ident "int"; Close_brace]
+  in
   assert_tokenize
     ~loc:__LOC__
     "}{}{}{"
@@ -213,88 +229,91 @@ let test_one_line_contract () =
 
 (** Tokenizing conditional contracts (not including parsing). *)
 let test_condition_contract () =
-  assert_tokenize
-    ~loc:__LOC__
-    "parameter (or string (option int));storage unit;return string;code \
-     {CAR;IF_LEFT{}{IF_NONE {FAIL}{PUSH int 0; CMPGT; IF {FAIL}{PUSH string \
-     \"\"}}};UNIT; SWAP; PAIR}"
-    [
-      Ident "parameter";
-      Open_paren;
-      Ident "or";
-      Ident "string";
-      Open_paren;
-      Ident "option";
-      Ident "int";
-      Close_paren;
-      Close_paren;
-      Semi;
-      Ident "storage";
-      Ident "unit";
-      Semi;
-      Ident "return";
-      Ident "string";
-      Semi;
-      Ident "code";
-      Open_brace;
-      Ident "CAR";
-      Semi;
-      Ident "IF_LEFT";
-      Open_brace;
-      Close_brace;
-      Open_brace;
-      Ident "IF_NONE";
-      Open_brace;
-      Ident "FAIL";
-      Close_brace;
-      Open_brace;
-      Ident "PUSH";
-      Ident "int";
-      Int "0";
-      Semi;
-      Ident "CMPGT";
-      Semi;
-      Ident "IF";
-      Open_brace;
-      Ident "FAIL";
-      Close_brace;
-      Open_brace;
-      Ident "PUSH";
-      Ident "string";
-      String "";
-      Close_brace;
-      Close_brace;
-      Close_brace;
-      Semi;
-      Ident "UNIT";
-      Semi;
-      Ident "SWAP";
-      Semi;
-      Ident "PAIR";
-      Close_brace;
-    ]
-  >>=? fun () ->
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "parameter (or string (option int));storage unit;return string;code \
+       {CAR;IF_LEFT{}{IF_NONE {FAIL}{PUSH int 0; CMPGT; IF {FAIL}{PUSH string \
+       \"\"}}};UNIT; SWAP; PAIR}"
+      [
+        Ident "parameter";
+        Open_paren;
+        Ident "or";
+        Ident "string";
+        Open_paren;
+        Ident "option";
+        Ident "int";
+        Close_paren;
+        Close_paren;
+        Semi;
+        Ident "storage";
+        Ident "unit";
+        Semi;
+        Ident "return";
+        Ident "string";
+        Semi;
+        Ident "code";
+        Open_brace;
+        Ident "CAR";
+        Semi;
+        Ident "IF_LEFT";
+        Open_brace;
+        Close_brace;
+        Open_brace;
+        Ident "IF_NONE";
+        Open_brace;
+        Ident "FAIL";
+        Close_brace;
+        Open_brace;
+        Ident "PUSH";
+        Ident "int";
+        Int "0";
+        Semi;
+        Ident "CMPGT";
+        Semi;
+        Ident "IF";
+        Open_brace;
+        Ident "FAIL";
+        Close_brace;
+        Open_brace;
+        Ident "PUSH";
+        Ident "string";
+        String "";
+        Close_brace;
+        Close_brace;
+        Close_brace;
+        Semi;
+        Ident "UNIT";
+        Semi;
+        Ident "SWAP";
+        Semi;
+        Ident "PAIR";
+        Close_brace;
+      ]
+  in
   (* NOTE: the cases below do not fail because we only do tokenization. *)
-  assert_tokenize
-    ~loc:__LOC__
-    "parameter (or string (option int);"
-    [
-      Ident "parameter";
-      Open_paren;
-      Ident "or";
-      Ident "string";
-      Open_paren;
-      Ident "option";
-      Ident "int";
-      Close_paren;
-      Semi;
-    ]
-  >>=? fun () ->
-  assert_tokenize
-    ~loc:__LOC__
-    "parameter (or)"
-    [Ident "parameter"; Open_paren; Ident "or"; Close_paren]
-  >>=? fun () ->
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "parameter (or string (option int);"
+      [
+        Ident "parameter";
+        Open_paren;
+        Ident "or";
+        Ident "string";
+        Open_paren;
+        Ident "option";
+        Ident "int";
+        Close_paren;
+        Semi;
+      ]
+  in
+  let* () =
+    assert_tokenize
+      ~loc:__LOC__
+      "parameter (or)"
+      [Ident "parameter"; Open_paren; Ident "or"; Close_paren]
+  in
   assert_tokenize_error
     ~loc:__LOC__
     "parameter (or"
@@ -313,9 +332,11 @@ let assert_toplevel_parsing ~loc source expected =
       | (ast, []) ->
           let ast = List.map Micheline.strip_locations ast in
           let expected = List.map Micheline.strip_locations expected in
-          Assert.equal ~loc (List.length ast) (List.length expected)
-          >>=? fun () ->
-          iter2_p (Assert.equal ~loc) ast expected >>=? fun () -> return_unit)
+          let* () =
+            Assert.equal ~loc (List.length ast) (List.length expected)
+          in
+          let* () = iter2_p (Assert.equal ~loc) ast expected in
+          return_unit)
 
 let assert_toplevel_parsing_error ~loc source forbidden_tokens =
   match Micheline_parser.tokenize source with
@@ -328,146 +349,169 @@ let assert_toplevel_parsing_error ~loc source forbidden_tokens =
           let forbidden_tokens =
             List.map Micheline.strip_locations forbidden_tokens
           in
-          Assert.equal ~loc (List.length ast) (List.length forbidden_tokens)
-          >>=? fun () -> iter2_p (Assert.not_equal ~loc) ast forbidden_tokens)
+          let* () =
+            Assert.equal ~loc (List.length ast) (List.length forbidden_tokens)
+          in
+          iter2_p (Assert.not_equal ~loc) ast forbidden_tokens)
 
 (** Parse basic terms (not including type-checking). *)
 let test_basic_parsing () =
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "parameter unit;"
-    [Prim ((), "parameter", [Prim ((), "unit", [], [])], [])]
-  >>=? fun () ->
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "parameter unit;"
+      [Prim ((), "parameter", [Prim ((), "unit", [], [])], [])]
+  in
   (* Sequence *)
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "code {}"
-    [Prim ((), "code", [Seq ((), [])], [])]
-  >>=? fun () ->
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "code {}"
+      [Prim ((), "code", [Seq ((), [])], [])]
+  in
   (* Int *)
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "PUSH int 100"
-    [Prim ((), "PUSH", [Prim ((), "int", [], []); Int ((), Z.of_int 100)], [])]
-  >>=? fun () ->
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "PUSH int 100"
+      [
+        Prim ((), "PUSH", [Prim ((), "int", [], []); Int ((), Z.of_int 100)], []);
+      ]
+  in
   (*NOTE: this case doesn't fail because we don't type check *)
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "PUSH string 100"
-    [
-      Prim
-        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
-    ]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "PUSH int 100_000"
-    [
-      Prim
-        ( (),
-          "PUSH",
-          [Prim ((), "string", [], []); Int ((), Z.of_int 100_000)],
-          [] );
-    ]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "PUSH int 100"
-    [Prim ((), "PUSH", [Prim ((), "int", [], []); Int ((), Z.of_int 1000)], [])]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "PUSH int 100"
-    [
-      Prim
-        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
-    ]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "PUSH int \"100\""
-    [
-      Prim
-        ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
-    ]
-  >>=? fun () ->
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "PUSH string 100"
+      [
+        Prim
+          ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
+      ]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "PUSH int 100_000"
+      [
+        Prim
+          ( (),
+            "PUSH",
+            [Prim ((), "string", [], []); Int ((), Z.of_int 100_000)],
+            [] );
+      ]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "PUSH int 100"
+      [
+        Prim
+          ((), "PUSH", [Prim ((), "int", [], []); Int ((), Z.of_int 1000)], []);
+      ]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "PUSH int 100"
+      [
+        Prim
+          ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
+      ]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "PUSH int \"100\""
+      [
+        Prim
+          ((), "PUSH", [Prim ((), "string", [], []); Int ((), Z.of_int 100)], []);
+      ]
+  in
   (* String *)
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "Pair False \"abc\""
-    [Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], [])]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "Pair False \"ab\""
-    [Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], [])]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "Pair False abc\""
-    [Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], [])]
-  >>=? fun () ->
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "Pair False \"abc\""
+      [Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], [])]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "Pair False \"ab\""
+      [Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], [])]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "Pair False abc\""
+      [Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], [])]
+  in
   (* annotations *)
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "NIL @annot string; #comment\n"
-    [Prim ((), "NIL", [Prim ((), "string", [], [])], ["@annot"])]
-  >>=? fun () ->
-  assert_toplevel_parsing_error
-    ~loc:__LOC__
-    "NIL @annot string; #comment\n"
-    [Prim ((), "NIL", [Prim ((), "string", [], [])], [])]
-  >>=? fun () ->
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "IF_NONE {FAIL} {}"
-    [
-      Prim
-        ( (),
-          "IF_NONE",
-          [Seq ((), [Prim ((), "FAIL", [], [])]); Seq ((), [])],
-          [] );
-    ]
-  >>=? fun () ->
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "PUSH (map int bool) (Map (Item 100 False))"
-    [
-      Prim
-        ( (),
-          "PUSH",
-          [
-            Prim
-              ( (),
-                "map",
-                [Prim ((), "int", [], []); Prim ((), "bool", [], [])],
-                [] );
-            Prim
-              ( (),
-                "Map",
-                [
-                  Prim
-                    ( (),
-                      "Item",
-                      [Int ((), Z.of_int 100); Prim ((), "False", [], [])],
-                      [] );
-                ],
-                [] );
-          ],
-          [] );
-    ]
-  >>=? fun () ->
-  assert_toplevel_parsing
-    ~loc:__LOC__
-    "LAMBDA @name int int {}"
-    [
-      Prim
-        ( (),
-          "LAMBDA",
-          [Prim ((), "int", [], []); Prim ((), "int", [], []); Seq ((), [])],
-          ["@name"] );
-    ]
-  >>=? fun () ->
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "NIL @annot string; #comment\n"
+      [Prim ((), "NIL", [Prim ((), "string", [], [])], ["@annot"])]
+  in
+  let* () =
+    assert_toplevel_parsing_error
+      ~loc:__LOC__
+      "NIL @annot string; #comment\n"
+      [Prim ((), "NIL", [Prim ((), "string", [], [])], [])]
+  in
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "IF_NONE {FAIL} {}"
+      [
+        Prim
+          ( (),
+            "IF_NONE",
+            [Seq ((), [Prim ((), "FAIL", [], [])]); Seq ((), [])],
+            [] );
+      ]
+  in
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "PUSH (map int bool) (Map (Item 100 False))"
+      [
+        Prim
+          ( (),
+            "PUSH",
+            [
+              Prim
+                ( (),
+                  "map",
+                  [Prim ((), "int", [], []); Prim ((), "bool", [], [])],
+                  [] );
+              Prim
+                ( (),
+                  "Map",
+                  [
+                    Prim
+                      ( (),
+                        "Item",
+                        [Int ((), Z.of_int 100); Prim ((), "False", [], [])],
+                        [] );
+                  ],
+                  [] );
+            ],
+            [] );
+      ]
+  in
+  let* () =
+    assert_toplevel_parsing
+      ~loc:__LOC__
+      "LAMBDA @name int int {}"
+      [
+        Prim
+          ( (),
+            "LAMBDA",
+            [Prim ((), "int", [], []); Prim ((), "int", [], []); Seq ((), [])],
+            ["@name"] );
+      ]
+  in
   assert_toplevel_parsing
     ~loc:__LOC__
     "code {DUP @test; DROP}"
@@ -629,17 +673,19 @@ let assert_expression_parsing ~loc source expected =
 (** Parses Michelson-expressions. *)
 let test_parses_expression () =
   (* String *)
-  assert_expression_parsing
-    ~loc:__LOC__
-    "Pair False \"abc\""
-    (Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], []))
-  >>=? fun () ->
+  let* () =
+    assert_expression_parsing
+      ~loc:__LOC__
+      "Pair False \"abc\""
+      (Prim ((), "Pair", [Prim ((), "False", [], []); String ((), "abc")], []))
+  in
   (* Int *)
-  assert_expression_parsing
-    ~loc:__LOC__
-    "Item 100"
-    (Prim ((), "Item", [Int ((), Z.of_int 100)], []))
-  >>=? fun () ->
+  let* () =
+    assert_expression_parsing
+      ~loc:__LOC__
+      "Item 100"
+      (Prim ((), "Item", [Int ((), Z.of_int 100)], []))
+  in
   (* Sequence *)
   assert_expression_parsing ~loc:__LOC__ "{}" (Seq ((), []))
 
@@ -659,7 +705,7 @@ let tests =
 
 let wrap (n, f) =
   Alcotest.test_case n `Quick (fun () ->
-      f () >>= function Ok () -> () | Error err -> Stdlib.failwith err)
+      match f () with Ok () -> () | Error err -> Stdlib.failwith err)
 
 let () =
   Alcotest.run

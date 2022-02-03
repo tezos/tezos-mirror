@@ -36,9 +36,7 @@ module Compat = struct
 
   let return_unit = Ok ()
 
-  let ( >>= ) x f = f x
-
-  let ( >>=? ) v f = v >>= function Error _ as err -> err | Ok v -> f v
+  let ( let* ) = Result.bind
 
   let rec iter2_p f l1 l2 =
     match (l1, l2) with
@@ -46,8 +44,8 @@ module Compat = struct
     | ([], _) | (_, []) -> invalid_arg "Error_monad.iter2_p"
     | (x1 :: l1, x2 :: l2) -> (
         let tx = f x1 x2 and tl = iter2_p f l1 l2 in
-        tx >>= fun tx_res ->
-        tl >>= fun tl_res ->
+        let tx_res = tx in
+        let tl_res = tl in
         match (tx_res, tl_res) with
         | (Ok (), Ok ()) -> Ok ()
         | (Error exn1, Error exn2) -> failwith "%s -- %s" exn1 exn2
