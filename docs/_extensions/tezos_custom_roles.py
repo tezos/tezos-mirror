@@ -9,7 +9,7 @@ from docutils import nodes
 from gitlab_custom_role import gitlab_role
 
 TEZOS_HOME = '../'
-
+OPAM_CACHE = None
 
 def setup(app):
     app.add_role('package', package_role)
@@ -18,14 +18,23 @@ def setup(app):
     app.add_role('opam', opam_role)
     app.add_role('src', src_role)
     app.add_role('gl', gitlab_role)
+    global OPAM_CACHE
+    if OPAM_CACHE is not None:
+        raise ValueError('package_role: opam cache already set!!!')
+    OPAM_CACHE = {}
+    for path, _, files in os.walk('..'):
+        for file in files:
+            parts = re.match("^([^/]*)[.]opam$", file)
+            if parts:
+                name = parts.group(1)
+                OPAM_CACHE[name] = path
+    print("package_role: cached", len(OPAM_CACHE), "opam packages")
     return {'parallel_read_safe': True}
 
 
 def find_dot_opam(name):
-    for path, _, files in os.walk('..'):
-        for file in files:
-            if file == name + '.opam':
-                return path.lstrip('../')
+    if name in OPAM_CACHE:
+        return OPAM_CACHE[name]
     raise ValueError('opam file ' + name + '.opam does not exist in the odoc')
 
 
