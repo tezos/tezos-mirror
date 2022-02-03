@@ -5056,7 +5056,7 @@ and parse_view_name ctxt : Script.node -> (Script_string.t * context) tzresult =
 
 and parse_toplevel :
     context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult =
- fun ctxt ~legacy:_ toplevel ->
+ fun ctxt ~legacy toplevel ->
   record_trace (Ill_typed_contract (toplevel, []))
   @@
   match root toplevel with
@@ -5120,14 +5120,15 @@ and parse_toplevel :
           views ) ->
           let maybe_root_name =
             (* root name can be attached to either the parameter
-                 primitive or the toplevel constructor *)
+               primitive or the toplevel constructor (legacy only) *)
             Script_ir_annot.extract_field_annot p >>? fun (p, root_name) ->
             match root_name with
             | Some _ -> ok (p, pannot, root_name)
             | None -> (
                 match pannot with
                 | [single]
-                  when Compare.Int.(String.length single > 0)
+                  when legacy
+                       && Compare.Int.(String.length single > 0)
                        && Compare.Char.(single.[0] = '%') ->
                     parse_field_annot ploc [single] >>? fun pannot ->
                     ok (p, [], pannot)
