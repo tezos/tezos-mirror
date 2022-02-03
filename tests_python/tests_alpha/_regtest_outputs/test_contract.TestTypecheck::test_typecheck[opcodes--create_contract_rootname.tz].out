@@ -14,7 +14,7 @@ Gas remaining: 1039988.704 units remaining
          NONE key_hash
          /* [ option key_hash : mutez : unit ] */ ;
          CREATE_CONTRACT
-           { parameter %root unit ;
+           { parameter (unit %root) ;
              storage unit ;
              code { CDR ; NIL operation ; PAIR } }
          /* [ operation : address ] */ ;
