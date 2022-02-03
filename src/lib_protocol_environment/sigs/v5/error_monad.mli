@@ -222,3 +222,203 @@ val both_e :
 type shell_tztrace
 
 type 'a shell_tzresult = ('a, shell_tztrace) result
+
+module Lwt_syntax : sig
+  val return : 'a -> 'a Lwt.t
+
+  val return_none : _ option Lwt.t
+
+  val return_nil : _ list Lwt.t
+
+  val return_true : bool Lwt.t
+
+  val return_false : bool Lwt.t
+
+  val return_some : 'a -> 'a option Lwt.t
+
+  val return_ok : 'a -> ('a, _) result Lwt.t
+
+  val return_error : 'e -> (_, 'e) result Lwt.t
+
+  val return_ok_unit : (unit, 'e) result Lwt.t
+
+  val return_ok_true : (bool, 'e) result Lwt.t
+
+  val return_ok_false : (bool, 'e) result Lwt.t
+
+  val return_ok_none : ('a option, 'e) result Lwt.t
+
+  val return_ok_nil : ('a list, 'e) result Lwt.t
+
+  val ( let* ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+
+  val ( let+ ) : 'a Lwt.t -> ('a -> 'b) -> 'b Lwt.t
+
+  val ( and+ ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+
+  val join : unit Lwt.t list -> unit Lwt.t
+
+  val all : 'a Lwt.t list -> 'a list Lwt.t
+
+  val both : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+end
+
+module Result_syntax : sig
+  val return : 'a -> ('a, 'e) result
+
+  val return_unit : (unit, 'e) result
+
+  val return_none : ('a option, 'e) result
+
+  val return_some : 'a -> ('a option, 'e) result
+
+  val return_nil : ('a list, 'e) result
+
+  val return_true : (bool, 'e) result
+
+  val return_false : (bool, 'e) result
+
+  val fail : 'e -> ('a, 'e) result
+
+  val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+  val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+
+  val join : (unit, 'e) result list -> (unit, 'e list) result
+
+  val all : ('a, 'e) result list -> ('a list, 'e list) result
+
+  val both : ('a, 'e) result -> ('b, 'e) result -> ('a * 'b, 'e list) result
+end
+
+module Lwt_result_syntax : sig
+  val return : 'a -> ('a, 'e) result Lwt.t
+
+  val return_unit : (unit, 'e) result Lwt.t
+
+  val return_none : ('a option, 'e) result Lwt.t
+
+  val return_some : 'a -> ('a option, 'e) result Lwt.t
+
+  val return_nil : ('a list, 'e) result Lwt.t
+
+  val return_true : (bool, 'e) result Lwt.t
+
+  val return_false : (bool, 'e) result Lwt.t
+
+  val fail : 'e -> ('a, 'e) result Lwt.t
+
+  val ( let* ) :
+    ('a, 'e) result Lwt.t ->
+    ('a -> ('b, 'e) result Lwt.t) ->
+    ('b, 'e) result Lwt.t
+
+  val ( let+ ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
+
+  val lwt_map_error :
+    ('e -> 'f) -> ('a, 'e) result Lwt.t -> ('a, 'f) result Lwt.t
+
+  val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  val ( let*? ) :
+    ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+
+  val join : (unit, 'e) result Lwt.t list -> (unit, 'e list) result Lwt.t
+
+  val all : ('a, 'e) result Lwt.t list -> ('a list, 'e list) result Lwt.t
+
+  val both :
+    ('a, 'e) result Lwt.t ->
+    ('b, 'e) result Lwt.t ->
+    ('a * 'b, 'e list) result Lwt.t
+end
+
+module Tzresult_syntax : sig
+  val return : 'a -> ('a, 'error) result
+
+  val return_unit : (unit, 'error) result
+
+  val return_none : ('a option, 'error) result
+
+  val return_some : 'a -> ('a option, 'error) result
+
+  val return_nil : ('a list, 'error) result
+
+  val return_true : (bool, 'error) result
+
+  val return_false : (bool, 'error) result
+
+  val fail : 'error -> ('a, 'error trace) result
+
+  val ( let* ) : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+  val ( and* ) :
+    ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result
+
+  val ( let+ ) : ('a, 'e) result -> ('a -> 'b) -> ('b, 'e) result
+
+  val ( and+ ) :
+    ('a, 'e trace) result -> ('b, 'e trace) result -> ('a * 'b, 'e trace) result
+
+  val join : (unit, 'error trace) result list -> (unit, 'error trace) result
+
+  val all : ('a, 'error trace) result list -> ('a list, 'error trace) result
+
+  val both :
+    ('a, 'error trace) result ->
+    ('b, 'error trace) result ->
+    ('a * 'b, 'error trace) result
+end
+
+module Lwt_tzresult_syntax : sig
+  val return : 'a -> ('a, 'error) result Lwt.t
+
+  val return_unit : (unit, 'error) result Lwt.t
+
+  val return_none : ('a option, 'error) result Lwt.t
+
+  val return_some : 'a -> ('a option, 'error) result Lwt.t
+
+  val return_nil : ('a list, 'error) result Lwt.t
+
+  val return_true : (bool, 'error) result Lwt.t
+
+  val return_false : (bool, 'error) result Lwt.t
+
+  val fail : 'error -> ('a, 'error trace) result Lwt.t
+
+  val ( let* ) :
+    ('a, 'e) result Lwt.t ->
+    ('a -> ('b, 'e) result Lwt.t) ->
+    ('b, 'e) result Lwt.t
+
+  val ( and* ) :
+    ('a, 'e trace) result Lwt.t ->
+    ('b, 'e trace) result Lwt.t ->
+    ('a * 'b, 'e trace) result Lwt.t
+
+  val ( let+ ) : ('a, 'e) result Lwt.t -> ('a -> 'b) -> ('b, 'e) result Lwt.t
+
+  val ( and+ ) :
+    ('a, 'e trace) result Lwt.t ->
+    ('b, 'e trace) result Lwt.t ->
+    ('a * 'b, 'e trace) result Lwt.t
+
+  val ( let*! ) : 'a Lwt.t -> ('a -> 'b Lwt.t) -> 'b Lwt.t
+
+  val ( let*? ) :
+    ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
+
+  val join :
+    (unit, 'error trace) result Lwt.t list -> (unit, 'error trace) result Lwt.t
+
+  val all :
+    ('a, 'error trace) result Lwt.t list -> ('a list, 'error trace) result Lwt.t
+
+  val both :
+    ('a, 'error trace) result Lwt.t ->
+    ('b, 'error trace) result Lwt.t ->
+    ('a * 'b, 'error trace) result Lwt.t
+end
