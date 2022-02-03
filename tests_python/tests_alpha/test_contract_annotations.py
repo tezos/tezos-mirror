@@ -51,14 +51,34 @@ class TestAnnotations:
             'unexpected annotation',
         )
 
-    def test_field_annotation_in_root_alphabetic(self, client):
+    def test_field_annotation_in_root_alphabetic_legacy(self, client):
         client.typecheck(
-            'parameter %r unit; storage unit; code {FAILWITH}', file=False
+            'parameter %r unit; storage unit; code {FAILWITH}',
+            file=False,
+            legacy=True,
+        )
+
+    def test_field_annotation_in_root_numeral_legacy(self, client):
+        client.typecheck(
+            'parameter %1 unit; storage unit; code {FAILWITH}',
+            file=False,
+            legacy=True,
+        )
+
+    def test_field_annotation_in_root_alphabetic(self, client):
+        assert_typecheck_failure(
+            client,
+            'parameter %r unit; storage unit; code {FAILWITH}',
+            'unexpected annotation',
+            file=False,
         )
 
     def test_field_annotation_in_root_numeral(self, client):
-        client.typecheck(
-            'parameter %1 unit; storage unit; code {FAILWITH}', file=False
+        assert_typecheck_failure(
+            client,
+            'parameter %1 unit; storage unit; code {FAILWITH}',
+            'unexpected annotation',
+            file=False,
         )
 
     def test_field_annotation_in_root_invalid_character(self, client):
