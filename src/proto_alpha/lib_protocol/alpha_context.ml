@@ -353,7 +353,8 @@ module Delegate = struct
     current_amount : Tez.t;
   }
 
-  let grace_period = Delegate_activation_storage.grace_period
+  let last_cycle_before_deactivation =
+    Delegate_activation_storage.last_cycle_before_deactivation
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 

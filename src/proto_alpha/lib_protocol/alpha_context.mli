@@ -1643,7 +1643,7 @@ module Delegate : sig
   val deactivated :
     context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
-  val grace_period :
+  val last_cycle_before_deactivation :
     context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
 
   val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t

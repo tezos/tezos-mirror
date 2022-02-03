@@ -362,7 +362,7 @@ let register () =
       Delegate.delegated_contracts ctxt pkh >>= fun delegated_contracts ->
       Delegate.delegated_balance ctxt pkh >>=? fun delegated_balance ->
       Delegate.deactivated ctxt pkh >>=? fun deactivated ->
-      Delegate.grace_period ctxt pkh >>=? fun grace_period ->
+      Delegate.last_cycle_before_deactivation ctxt pkh >>=? fun grace_period ->
       Vote.get_voting_power_free ctxt pkh >|=? fun voting_power ->
       {
         full_balance;
@@ -404,7 +404,7 @@ let register () =
       Delegate.deactivated ctxt pkh) ;
   register1 ~chunked:false S.grace_period (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
-      Delegate.grace_period ctxt pkh) ;
+      Delegate.last_cycle_before_deactivation ctxt pkh) ;
   register1 ~chunked:false S.voting_power (fun ctxt pkh () () ->
       Delegate.check_delegate ctxt pkh >>=? fun () ->
       Vote.get_voting_power_free ctxt pkh) ;

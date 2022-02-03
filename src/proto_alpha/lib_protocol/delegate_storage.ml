@@ -274,7 +274,9 @@ let update_activity ctxt last_cycle =
         ~init:(Ok (ctxt, []))
         ~f:(fun delegate () acc ->
           acc >>?= fun (ctxt, deactivated) ->
-          Delegate_activation_storage.grace_period ctxt delegate
+          Delegate_activation_storage.last_cycle_before_deactivation
+            ctxt
+            delegate
           >>=? fun cycle ->
           if Cycle_repr.(cycle <= last_cycle) then
             set_inactive ctxt delegate >|=? fun ctxt ->

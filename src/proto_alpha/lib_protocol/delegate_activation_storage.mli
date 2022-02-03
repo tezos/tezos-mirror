@@ -26,11 +26,13 @@
 val is_inactive :
   Raw_context.t -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
-(** [grace_period ctxt delegate] is the cycle at which the delegate is
-    scheduled to become inactive. *)
-val grace_period :
+(** [last_cycle_before_deactivation ctxt delegate] is the cycle at which
+    the delegate is scheduled to become inactive. *)
+val last_cycle_before_deactivation :
   Raw_context.t -> Signature.Public_key_hash.t -> Cycle_repr.t tzresult Lwt.t
 
+(** [set_inactive context delegate] adds [delegate] to the set of inactive
+ * contracts. *)
 val set_inactive :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 

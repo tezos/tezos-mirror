@@ -223,9 +223,10 @@ module Contract = struct
         let name = ["inactive_delegate"]
       end)
 
-  module Delegate_desactivation =
+  module Delegate_last_cycle_before_deactivation =
     Indexed_context.Make_map
       (struct
+        (* FIXME? Change the key name to reflect the functor's name *)
         let name = ["delegate_desactivation"]
       end)
       (Cycle_repr)

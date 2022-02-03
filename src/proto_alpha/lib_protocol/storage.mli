@@ -141,7 +141,7 @@ module Contract : sig
 
   (** The last cycle where the delegate is considered active; that is,
      at the next cycle it will be considered inactive. *)
-  module Delegate_desactivation :
+  module Delegate_last_cycle_before_deactivation :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Cycle_repr.t
