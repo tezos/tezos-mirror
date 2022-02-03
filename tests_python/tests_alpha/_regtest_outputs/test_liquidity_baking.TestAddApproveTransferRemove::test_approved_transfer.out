@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestAddApproveTransferRemove::test_approved_transfer
 
 Node is bootstrapped.
-Estimated gas: 4366.195 units (will add 100 for safety)
+Estimated gas: 4366.545 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -36,6 +36,6 @@ This sequence of operations was run:
         Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 71007
         Set map(2)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 1000
       Storage size: 2116 bytes
-      Consumed gas: 4366.195
+      Consumed gas: 4366.545
 
 Injected block at minimal timestamp
