@@ -212,7 +212,7 @@ module Acl = struct
     let rec resolve_domain_names resolve =
       let open Lwt_syntax in
       function
-      | [] -> Lwt.return []
+      | [] -> return_nil
       | (endpoint, acl) :: remainder ->
           let open P2p_point.Id in
           let* resolved = resolve endpoint in

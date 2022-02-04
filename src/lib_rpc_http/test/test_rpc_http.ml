@@ -359,7 +359,7 @@ let test_matching_with_name_resolving =
               expected
               (ip_addr, port))
           to_test ;
-        Lwt.return ()))
+        return_unit))
 
 let () =
   let open Qcheck_helpers in

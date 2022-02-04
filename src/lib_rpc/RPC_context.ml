@@ -158,7 +158,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `Not_found (Some err)
         | `Conflict (Some err)
         | `Error (Some err) ->
-            Lwt.return_error err
+            return_error err
         | `Unauthorized None
         | `Error None
         | `Forbidden None
@@ -186,7 +186,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
               match o with
               | None ->
                   on_close () ;
-                  Lwt.return_unit
+                  return_unit
               | Some v ->
                   on_chunk v ;
                   loop ()
@@ -205,7 +205,7 @@ class ['pr] of_directory (dir : 'pr RPC_directory.t) =
         | `Not_found (Some err)
         | `Conflict (Some err)
         | `Error (Some err) ->
-            Lwt.return_error err
+            return_error err
         | `Unauthorized None
         | `Error None
         | `Forbidden None

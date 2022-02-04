@@ -55,7 +55,7 @@ let emit level message =
   let open Lwt_syntax in
   let* r = Event.emit ~section (fun () -> {level; message}) in
   match r with
-  | Ok () -> Lwt.return_unit
+  | Ok () -> return_unit
   | Error e -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace e
 
 (** Wrap an lwt computation so that it can return without waiting until the promise
