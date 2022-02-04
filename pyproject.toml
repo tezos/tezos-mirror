@@ -35,7 +35,7 @@ pytest = "6.2.5"
 pytest-regtest = { "git" = "https://gitlab.com/nomadic-labs/pytest-regtest", branch="fc5bd9b2" }
 pytest-timeout = "1.4.2"
 requests = "2.26.0"
-black = "^20.8b1"
+black = "22.1.0"
 # Used to validate the OpenAPI spec.
 openapi-spec-validator = "0.2.9"
 
