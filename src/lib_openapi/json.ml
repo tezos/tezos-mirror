@@ -42,6 +42,13 @@ let as_variant json =
   | [(name, value)] -> (name, value)
   | _ -> error json "expected an object with a single field"
 
+let as_variant_named json name =
+  match as_variant json with
+  | (name', value) when name' = name -> value
+  | _ -> error json "expected a variant named %s" name
+
+let ( |~> ) json name = as_variant_named json name
+
 (* Convert an [`O] into a record.
    Ensure no field is left.
    [make] takes an argument to get field from their names,

@@ -285,8 +285,8 @@ let convert_service expected_path expected_method
   if expected_method <> meth then
     fail
       "expected method %s but found %s"
-      (Api.show_method expected_method)
-      (Api.show_method meth) ;
+      (Method.to_http_string expected_method)
+      (Method.to_http_string meth) ;
   (* TODO: in practice [expected_path <> path]. Investigate why. *)
   if expected_path <> path then
     warn
