@@ -3090,6 +3090,7 @@ let _tezos_node =
          tezos_store |> open_;
          tezos_context |> open_;
          tezos_validator_lib |> open_;
+         tezos_validation |> open_;
          tezos_shell_context |> open_;
          tezos_workers |> open_;
          tezos_protocol_updater |> open_;

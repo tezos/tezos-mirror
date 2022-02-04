@@ -20,6 +20,7 @@ depends: [
   "tezos-store"
   "tezos-context"
   "tezos-validator"
+  "tezos-validation"
   "tezos-shell-context"
   "tezos-workers"
   "tezos-protocol-updater"
