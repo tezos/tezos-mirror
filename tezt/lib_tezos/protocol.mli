@@ -198,13 +198,14 @@ val register_long_test :
 (** Register a regression test that uses the protocol.
 
     This is the same as [Regression.register], with the same differences
-    as [Protocol.register_test] compared to [Test.register]. *)
+    as [Protocol.register_test] compared to [Test.register], and where
+    [output_file] is parameterized by the protocol. *)
 val register_regression_test :
   __FILE__:string ->
   title:string ->
   tags:string list ->
   ?supports:supported_protocols ->
-  output_file:string ->
+  output_file:(t -> string) ->
   (t -> unit Lwt.t) ->
   t list ->
   unit

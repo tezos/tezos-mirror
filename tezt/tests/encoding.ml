@@ -89,17 +89,18 @@ let check_sample ~name ~file =
 
 (** The given samples must be included in registered encodings. These can be
     found with [tezos-codec list encodings]. *)
-let check_samples_encoding ~group_name ~protocols ~samples =
+let check_samples_encoding ~protocols ~samples =
   List.iter
     (fun sample ->
       Protocol.register_regression_test
         ~__FILE__
         ~title:(sf "encoding regression test: %s" sample)
         ~tags:["encoding"]
-        ~output_file:("encoding" // sf "%s.%s" group_name sample)
+        ~output_file:(fun p -> "encoding" // sf "%s.%s" (Protocol.tag p) sample)
         (fun protocol ->
           let base_path =
-            "tezt" // "tests" // "encoding_samples" // group_name // sample
+            "tezt" // "tests" // "encoding_samples" // Protocol.tag protocol
+            // sample
           in
           Sys.readdir base_path |> Array.to_list |> List.sort String.compare
           |> Lwt_list.iter_s (fun file ->
@@ -176,8 +177,5 @@ let register ~protocols =
         if Protocol.(protocol = Alpha || protocol = Ithaca) then alpha_samples
         else default_samples
       in
-      check_samples_encoding
-        ~group_name:(Protocol.tag protocol)
-        ~protocols:[protocol]
-        ~samples)
+      check_samples_encoding ~protocols:[protocol] ~samples)
     protocols

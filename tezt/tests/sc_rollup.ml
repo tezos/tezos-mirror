@@ -83,7 +83,7 @@ let sc_rollup_node_rpc sc_node service =
 
 *)
 let test_origination =
-  let output_file = "sc_rollup_origination" in
+  let output_file _ = "sc_rollup_origination" in
   test
     ~__FILE__
     ~output_file
@@ -137,7 +137,7 @@ let with_fresh_rollups n f node client bootstrap1 =
   go n String_set.empty f
 
 let test_rollup_node_configuration =
-  let output_file = "sc_rollup_node_configuration" in
+  let output_file _ = "sc_rollup_node_configuration" in
   test
     ~__FILE__
     ~output_file
@@ -204,7 +204,7 @@ let test_rollup_node_running =
 
 *)
 let test_rollup_client_gets_address =
-  let output_file = "sc_rollup_client_gets_address" in
+  let output_file _ = "sc_rollup_client_gets_address" in
   test
     ~__FILE__
     ~output_file
@@ -235,7 +235,7 @@ let test_rollup_client_gets_address =
    inbox.
 *)
 let test_rollup_inbox =
-  let output_file = "sc_rollup_inbox" in
+  let output_file _ = "sc_rollup_inbox" in
   test
     ~__FILE__
     ~output_file
@@ -309,7 +309,7 @@ let test_rollup_list =
 
   test
     ~__FILE__
-    ~output_file:"sc_rollup_list"
+    ~output_file:(fun _ -> "sc_rollup_list")
     ~tags:["list"]
     "list originated rollups"
     (fun protocol -> setup ~protocol go)

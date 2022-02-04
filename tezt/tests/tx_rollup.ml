@@ -124,7 +124,7 @@ module Regressions = struct
     let rpc_state =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_rpc_state"
+        ~output_file:(fun _ -> "tx_rollup_rpc_state")
         ~title:"RPC (tx_rollup, regression) - state"
         ~tags:["tx_rollup"; "rpc"]
       @@ fun protocol ->
@@ -135,7 +135,7 @@ module Regressions = struct
     let rpc_inbox =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_rpc_inbox"
+        ~output_file:(fun _ -> "tx_rollup_rpc_inbox")
         ~title:"RPC (tx_rollups, regression) - inbox"
         ~tags:["tx_rollup"; "rpc"; "inbox"]
       @@ fun protocol ->
@@ -151,7 +151,7 @@ module Regressions = struct
     let rpc_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_rpc_commitment"
+        ~output_file:(fun _ -> "tx_rollup_rpc_commitment")
         ~title:"RPC (tx_rollups, regression) - commitment"
         ~tags:["tx_rollup"; "rpc"; "commitment"]
       @@ fun protocol ->
@@ -179,7 +179,7 @@ module Regressions = struct
     let rpc_pending_bonded_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_rpc_pending_bonded_commitments"
+        ~output_file:(fun _ -> "tx_rollup_rpc_pending_bonded_commitments")
         ~title:"RPC (tx_rollups, regression) - pending bonded commitments"
         ~tags:["tx_rollup"; "rpc"; "commitment"; "bond"]
       @@ fun protocol ->
@@ -221,7 +221,7 @@ module Regressions = struct
     let batch_encoding =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_batch_encoding"
+        ~output_file:(fun _ -> "tx_rollup_batch_encoding")
         ~title:"RPC (tx_rollups, regression) - batch encoding"
         ~tags:["tx_rollup"; "batch"; "encoding"]
       @@ fun protocol ->
@@ -257,7 +257,7 @@ module Regressions = struct
     let submit_empty_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_limit_empty_batch"
+        ~output_file:(fun _ -> "tx_rollup_limit_empty_batch")
         ~title:"Submit empty batch"
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
@@ -269,7 +269,7 @@ module Regressions = struct
     let submit_maximum_size_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_limit_maximum_size_batch"
+        ~output_file:(fun _ -> "tx_rollup_limit_maximum_size_batch")
         ~title:"Submit maximum size batch"
         ~tags:["tx_rollup"; "batch"; "client"]
       @@ fun protocol ->
@@ -294,7 +294,7 @@ module Regressions = struct
     let inbox_maximum_size =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_limit_maximum_size_inbox"
+        ~output_file:(fun _ -> "tx_rollup_limit_maximum_size_inbox")
         ~title:"Submit maximum size inbox"
         ~tags:["tx_rollup"; "inbox"; "client"]
       @@ fun protocol ->
@@ -335,7 +335,8 @@ module Regressions = struct
       let open Tezt_tezos in
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_client_submit_batch_invalid_rollup_address"
+        ~output_file:(fun _ ->
+          "tx_rollup_client_submit_batch_invalid_rollup_address")
         ~title:"Submit a batch to an invalid rollup address should fail"
         ~tags:["tx_rollup"; "client"; "fail"; "batch"]
       @@ fun protocol ->
@@ -367,7 +368,7 @@ module Regressions = struct
     let client_submit_finalize_commitment_no_batch =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_finalize_commitment_no_batch"
+        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_no_batch")
         ~title:"Submit a finalize commitment operation without batch"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -384,7 +385,7 @@ module Regressions = struct
     let client_submit_finalize_commitment_no_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_finalize_commitment_no_commitment"
+        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_no_commitment")
         ~title:"Submit a finalize commitment operation without commitment"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
@@ -404,7 +405,7 @@ module Regressions = struct
     let client_submit_finalize_commitment_future =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_finalize_commitment_future"
+        ~output_file:(fun _ -> "tx_rollup_finalize_commitment_future")
         ~title:
           "Submit a finalize commitment operation for a commitment in the \
            future"
@@ -426,7 +427,7 @@ module Regressions = struct
     let client_submit_finalize_too_recent_commitment =
       Protocol.register_regression_test
         ~__FILE__
-        ~output_file:"tx_rollup_finalize_too_recent_commitment"
+        ~output_file:(fun _ -> "tx_rollup_finalize_too_recent_commitment")
         ~title:"Try to finalize a too recent commitment"
         ~tags:["tx_rollup"; "client"; "fail"; "finalize"]
       @@ fun protocol ->
