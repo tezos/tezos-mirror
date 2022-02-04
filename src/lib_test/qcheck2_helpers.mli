@@ -72,6 +72,17 @@ val qcheck_eq' :
   unit ->
   bool
 
+(** [qcheck_cond pp cond a] evaluate [cond a], if this condition is false,
+    raises a failure and prints an error message.
+
+    If [pp] is provided, use this to print [a] if [cond a] is false. *)
+val qcheck_cond :
+  ?pp:(Format.formatter -> 'a -> unit) ->
+  cond:('a -> bool) ->
+  'a ->
+  unit ->
+  bool
+
 (** [int64_range_gen a b] generates an [int64] between [a] inclusive
     and [b] inclusive.
 

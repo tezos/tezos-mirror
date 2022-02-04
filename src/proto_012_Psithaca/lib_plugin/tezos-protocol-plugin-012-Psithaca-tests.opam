@@ -8,8 +8,14 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "tezos-base"
+  "tezos-base-test-helpers" { with-test }
   "tezos-stdlib-unix"
   "tezos-protocol-012-Psithaca"
+  "tezos-protocol-012-Psithaca-parameters" {with-test}
+  "tezos-012-Psithaca-test-helpers" { with-test }
+  "tezos-test-helpers" {with-test}
+  "alcotest-lwt" {with-test}
+  "qcheck-alcotest" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

@@ -26,15 +26,7 @@
 open Lib_test.Qcheck2_helpers
 open Plugin.Mempool
 open Alpha_context
-
-let config drift_opt =
-  {
-    default_config with
-    clock_drift =
-      Option.map
-        (fun drift -> Period.of_seconds_exn (Int64.of_int drift))
-        drift_opt;
-  }
+open Test_utils
 
 type Environment.Error_monad.error += Generation_failure
 
