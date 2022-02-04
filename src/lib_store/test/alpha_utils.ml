@@ -598,6 +598,22 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
     apply ctxt chain_id ~policy ~operations pred
   in
   let context_hash = block_header.shell.context in
+  let ops_metadata =
+    let operations_metadata =
+      WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])
+    in
+    match ops_metadata_hashes with
+    | Some metadata_hashes ->
+        let res =
+          WithExceptions.List.map2
+            ~loc:__LOC__
+            (WithExceptions.List.map2 ~loc:__LOC__ (fun x y -> (x, y)))
+            operations_metadata
+            metadata_hashes
+        in
+        Block_validation.Metadata_hash res
+    | None -> Block_validation.(No_metadata_hash operations_metadata)
+  in
   let validation_result =
     {
       Tezos_validation.Block_validation.validation_store =
@@ -608,10 +624,8 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
           max_operations_ttl = validation.max_operations_ttl;
           last_allowed_fork_level = validation.last_allowed_fork_level;
         };
-      block_metadata = block_header_metadata;
-      ops_metadata = WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> []);
-      block_metadata_hash;
-      ops_metadata_hashes;
+      block_metadata = (block_header_metadata, block_metadata_hash);
+      ops_metadata;
     }
   in
   let operations =

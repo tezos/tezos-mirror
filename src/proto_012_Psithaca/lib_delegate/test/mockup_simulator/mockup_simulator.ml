@@ -598,13 +598,12 @@ let rec process_block state block_hash (block_header : Block_header.t)
                     Protocol.operation_data_encoding
                     proto
                 in
-                let receipt = None in
                 {
                   Mockup.M.Block_services.chain_id;
                   hash;
                   shell;
                   protocol_data;
-                  receipt;
+                  receipt = Empty;
                 })
               pass)
           operations

@@ -166,14 +166,20 @@ let check_context_hash_consistency block_validation_result block_header =
 
 (* We assume that the given list is not empty. *)
 let compute_block_metadata_hash block_metadata =
-  Some (Block_metadata_hash.hash_bytes block_metadata)
+  Some (Block_metadata_hash.hash_bytes [block_metadata])
 
-(* We assume that the given list is not empty. *)
-let compute_operations_metadata_hashes ops_metadata_hashes =
-  Some
-    (List.map
-       (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
-       ops_metadata_hashes)
+let split_operations_metadata = function
+  | Block_validation.No_metadata_hash metadata -> (metadata, None)
+  | Metadata_hash l ->
+      let (metadata, hashes) =
+        List.fold_left
+          (fun (metadata_acc, hashes_acc) l ->
+            let (metadata, hashes) = List.split l in
+            (metadata :: metadata_acc, hashes :: hashes_acc))
+          ([], [])
+          l
+      in
+      (List.rev metadata, Some (List.rev hashes))
 
 let compute_all_operations_metadata_hash block =
   if Block_repr.validation_passes block = 0 then None
@@ -233,13 +239,11 @@ let apply_context context_index chain_id ~user_activated_upgrades
   in
   let* () = check_context_hash_consistency validation_store block_header in
   return
-    {
-      Store.Block.message = validation_store.message;
-      max_operations_ttl = validation_store.max_operations_ttl;
-      last_allowed_fork_level = validation_store.last_allowed_fork_level;
-      block_metadata;
-      operations_metadata = ops_metadata;
-    }
+    ( validation_store.message,
+      validation_store.max_operations_ttl,
+      validation_store.last_allowed_fork_level,
+      fst block_metadata,
+      ops_metadata )
 
 (** Returns the protocol environment version of a given protocol level. *)
 let protocol_env_of_protocol_level chain_store protocol_level block_hash =
@@ -260,7 +264,11 @@ let protocol_env_of_protocol_level chain_store protocol_level block_hash =
 (* Restores the block and operations metadata hash of a given block,
    if needed. *)
 let restore_block_contents chain_store block_protocol_env ~block_metadata
-    ~operations_metadata metadata block =
+    ~operations_metadata message max_operations_ttl last_allowed_fork_level
+    block =
+  let (operations_metadata, operations_metadata_hashes) =
+    split_operations_metadata operations_metadata
+  in
   let contents =
     if
       Store.Block.is_genesis chain_store (Block_repr.hash block)
@@ -269,12 +277,52 @@ let restore_block_contents chain_store block_protocol_env ~block_metadata
     else
       {
         block.contents with
-        block_metadata_hash = compute_block_metadata_hash [block_metadata];
-        operations_metadata_hashes =
-          compute_operations_metadata_hashes operations_metadata;
+        block_metadata_hash = compute_block_metadata_hash block_metadata;
+        operations_metadata_hashes;
       }
   in
+  let metadata =
+    {
+      Block_repr.message;
+      max_operations_ttl;
+      last_allowed_fork_level;
+      block_metadata;
+      operations_metadata;
+    }
+  in
   {block with contents; metadata = Some metadata}
+
+let reconstruct_genesis_operations_metadata chain_store =
+  let open Lwt_tzresult_syntax in
+  let*! genesis_block = Store.Chain.genesis_block chain_store in
+  let* {
+         message;
+         max_operations_ttl;
+         last_allowed_fork_level;
+         block_metadata;
+         operations_metadata;
+       } =
+    Store.Block.get_block_metadata chain_store genesis_block
+  in
+  let operations_metadata =
+    match Store.Block.operations_metadata_hashes genesis_block with
+    | Some v ->
+        let operations_metadata =
+          WithExceptions.List.map2
+            ~loc:__LOC__
+            (WithExceptions.List.combine ~loc:__LOC__)
+            operations_metadata
+            v
+        in
+        Block_validation.Metadata_hash operations_metadata
+    | None -> No_metadata_hash operations_metadata
+  in
+  return
+    ( message,
+      max_operations_ttl,
+      last_allowed_fork_level,
+      block_metadata,
+      operations_metadata )
 
 let reconstruct_chunk chain_store context_index ~user_activated_upgrades
     ~user_activated_protocol_overrides ~start_level ~end_level =
@@ -291,10 +339,13 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
               "Cannot read block in cemented store. The storage is corrupted."
         | Some b -> return b
       in
-      let* metadata =
+      let* ( message,
+             max_operations_ttl,
+             last_allowed_fork_level,
+             block_metadata,
+             operations_metadata ) =
         if Store.Block.is_genesis chain_store (Store.Block.hash block) then
-          let*! genesis_block = Store.Chain.genesis_block chain_store in
-          Store.Block.get_block_metadata chain_store genesis_block
+          reconstruct_genesis_operations_metadata chain_store
         else
           let* ( predecessor_block,
                  predecessor_block_metadata_hash,
@@ -346,9 +397,11 @@ let reconstruct_chunk chain_store context_index ~user_activated_upgrades
         restore_block_contents
           chain_store
           block_protocol_env
-          ~block_metadata:metadata.block_metadata
-          ~operations_metadata:metadata.operations_metadata
-          metadata
+          ~block_metadata
+          ~operations_metadata
+          message
+          max_operations_ttl
+          last_allowed_fork_level
           (Store.Unsafe.repr_of_block block)
       in
       loop (Int32.succ level) ((reconstructed_block, block_protocol_env) :: acc)
@@ -556,14 +609,14 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                 (fun (block, predecessors) ->
                   let level = Block_repr.level block in
                   (* If the block is genesis then just retrieve its metadata. *)
-                  let* metadata =
+                  let* ( message,
+                         max_operations_ttl,
+                         last_allowed_fork_level,
+                         block_metadata,
+                         operations_metadata ) =
                     if
                       Store.Block.is_genesis chain_store (Block_repr.hash block)
-                    then
-                      let*! genesis_block =
-                        Store.Chain.genesis_block chain_store
-                      in
-                      Store.Block.get_block_metadata chain_store genesis_block
+                    then reconstruct_genesis_operations_metadata chain_store
                     else
                       (* It is needed to read the metadata using the
                          cemented_block_store to avoid the cache mechanism which
@@ -639,7 +692,36 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                               (Store.Block.descriptor block)
                           in
                           return res
-                      | Some m -> return m
+                      | Some
+                          {
+                            message;
+                            max_operations_ttl;
+                            last_allowed_fork_level;
+                            block_metadata;
+                            operations_metadata;
+                          } ->
+                          let operations_metadata =
+                            match
+                              Block_repr.operations_metadata_hashes block
+                            with
+                            | Some v ->
+                                let operations_metadata =
+                                  WithExceptions.List.map2
+                                    ~loc:__LOC__
+                                    (WithExceptions.List.combine ~loc:__LOC__)
+                                    operations_metadata
+                                    v
+                                in
+                                Block_validation.Metadata_hash
+                                  operations_metadata
+                            | None -> No_metadata_hash operations_metadata
+                          in
+                          return
+                            ( message,
+                              max_operations_ttl,
+                              last_allowed_fork_level,
+                              block_metadata,
+                              operations_metadata )
                   in
                   let* block_protocol_env =
                     protocol_env_of_protocol_level
@@ -651,9 +733,11 @@ let reconstruct_floating chain_store context_index ~user_activated_upgrades
                     restore_block_contents
                       chain_store
                       block_protocol_env
-                      ~block_metadata:metadata.block_metadata
-                      ~operations_metadata:metadata.operations_metadata
-                      metadata
+                      ~block_metadata
+                      ~operations_metadata
+                      message
+                      max_operations_ttl
+                      last_allowed_fork_level
                       block
                   in
                   let*! () =

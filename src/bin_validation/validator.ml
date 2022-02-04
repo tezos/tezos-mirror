@@ -295,7 +295,7 @@ let run input output =
               (err, None)
           | Error _ as err -> (err, cache)
           | Ok {result; cache} ->
-              ( Ok result,
+              ( ok result,
                 Some {context_hash = block_header.shell.context; cache} )
         in
         let*! () =

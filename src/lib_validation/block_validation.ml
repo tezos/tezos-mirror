@@ -83,12 +83,43 @@ let validation_store_encoding =
        (req "max_operations_ttl" int31)
        (req "last_allowed_fork_level" int32))
 
+type operation_metadata = Metadata of Bytes.t | Too_large_metadata
+
+let operation_metadata_encoding =
+  let open Data_encoding in
+  def
+    "operation_metadata"
+    ~title:"operation_metadata"
+    ~description:"An operation metadata"
+    (union
+       ~tag_size:`Uint8
+       [
+         case
+           ~title:"metadata"
+           ~description:"Content of an operation's metadata."
+           (Tag 0)
+           bytes
+           (function Metadata bytes -> Some bytes | _ -> None)
+           (fun bytes -> Metadata bytes);
+         case
+           ~title:"too_large_metadata"
+           ~description:
+             "Nothing, as this operation metadata was declared to be too large \
+              to be considered."
+           (Tag 1)
+           unit
+           (function Too_large_metadata -> Some () | _ -> None)
+           (fun () -> Too_large_metadata);
+       ])
+
+type ops_metadata =
+  | No_metadata_hash of operation_metadata list list
+  | Metadata_hash of (operation_metadata * Operation_metadata_hash.t) list list
+
 type result = {
   validation_store : validation_store;
-  block_metadata : Bytes.t;
-  ops_metadata : Bytes.t list list;
-  block_metadata_hash : Block_metadata_hash.t option;
-  ops_metadata_hashes : Operation_metadata_hash.t list list option;
+  block_metadata : Bytes.t * Block_metadata_hash.t option;
+  ops_metadata : ops_metadata;
 }
 
 type apply_result = {result : result; cache : Environment_context.Context.cache}
@@ -146,39 +177,39 @@ let init_test_chain ctxt forked_header =
 
 let result_encoding =
   let open Data_encoding in
+  let ops_metadata_encoding =
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"no metadata hash"
+          (Tag 0)
+          (list (list operation_metadata_encoding))
+          (function
+            | No_metadata_hash ops_metadata -> Some ops_metadata | _ -> None)
+          (fun ops_metadata -> No_metadata_hash ops_metadata);
+        case
+          ~title:"metadata hash"
+          (Tag 1)
+          (list
+             (list
+                (tup2
+                   operation_metadata_encoding
+                   Operation_metadata_hash.encoding)))
+          (function
+            | Metadata_hash ops_metadata -> Some ops_metadata | _ -> None)
+          (fun ops_metadata -> Metadata_hash ops_metadata);
+      ]
+  in
   conv
-    (fun {
-           validation_store;
-           block_metadata;
-           ops_metadata;
-           block_metadata_hash;
-           ops_metadata_hashes;
-         } ->
-      ( validation_store,
-        block_metadata,
-        ops_metadata,
-        block_metadata_hash,
-        ops_metadata_hashes ))
-    (fun ( validation_store,
-           block_metadata,
-           ops_metadata,
-           block_metadata_hash,
-           ops_metadata_hashes ) ->
-      {
-        validation_store;
-        block_metadata;
-        ops_metadata;
-        block_metadata_hash;
-        ops_metadata_hashes;
-      })
-    (obj5
+    (fun {validation_store; block_metadata; ops_metadata} ->
+      (validation_store, block_metadata, ops_metadata))
+    (fun (validation_store, block_metadata, ops_metadata) ->
+      {validation_store; block_metadata; ops_metadata})
+    (obj3
        (req "validation_store" validation_store_encoding)
-       (req "block_metadata" bytes)
-       (req "ops_metadata" (list (list bytes)))
-       (opt "block_metadata_hash" Block_metadata_hash.encoding)
-       (opt
-          "ops_metadata_hashes"
-          (list @@ list @@ Operation_metadata_hash.encoding)))
+       (req "block_metadata" (tup2 bytes (option Block_metadata_hash.encoding)))
+       (req "ops_metadata" ops_metadata_encoding))
 
 let preapply_result_encoding :
     (Block_header.shell_header * error Preapply_result.t list) Data_encoding.t =
@@ -371,6 +402,80 @@ module Make (Proto : Registered_protocol.T) = struct
                 return op))
       operations
 
+  (* [metadata_size_cap] is used to filter and potentially discard a
+     given metadata if its size exceed the cap. *)
+  let metadata_size_cap = 10_000
+
+  (* FIXME: This code is used by preapply but emitting time
+     measurement events in prevalidation should not impact current
+     benchmarks.
+     See https://gitlab.com/tezos/tezos/-/issues/2716 *)
+  let compute_metadata proto_env_version block_data ops_metadata =
+    let open Lwt_tzresult_syntax in
+    (* Block and operation metadata hashes are not required for
+       environment V0. *)
+    let should_include_metadata_hashes =
+      match proto_env_version with
+      | Protocol.V0 -> false
+      | Protocol.(V1 | V2 | V3 | V4 | V5) -> true
+    in
+    let block_metadata =
+      let metadata =
+        Data_encoding.Binary.to_bytes_exn
+          Proto.block_header_metadata_encoding
+          block_data
+      in
+      let metadata_hash_opt =
+        if should_include_metadata_hashes then
+          Some (Block_metadata_hash.hash_bytes [metadata])
+        else None
+      in
+      (metadata, metadata_hash_opt)
+    in
+    let* ops_metadata =
+      try[@time.duration_lwt metadata_serde_check]
+        let metadata_list_list =
+          List.map
+            (List.map (fun receipt ->
+                 (* Check that the metadata are
+                    serializable/deserializable *)
+                 let bytes =
+                   Data_encoding.Binary.to_bytes_exn
+                     Proto.operation_receipt_encoding
+                     receipt
+                 in
+                 let _ =
+                   Data_encoding.Binary.of_bytes_exn
+                     Proto.operation_receipt_encoding
+                     bytes
+                 in
+                 let metadata =
+                   if Bytes.length bytes < metadata_size_cap then Metadata bytes
+                   else Too_large_metadata
+                 in
+                 (bytes, metadata)))
+            ops_metadata
+        in
+        if [@time.duration_lwt metadata_hash] should_include_metadata_hashes
+        then
+          return
+            (Metadata_hash
+               (List.map
+                  (List.map (fun (bytes, metadata) ->
+                       let metadata_hash =
+                         Operation_metadata_hash.hash_bytes [bytes]
+                       in
+                       (metadata, metadata_hash)))
+                  metadata_list_list))
+        else
+          return (No_metadata_hash (List.map (List.map snd) metadata_list_list))
+      with exn ->
+        trace
+          Validation_errors.Cannot_serialize_operation_metadata
+          (fail (Exn exn))
+    in
+    return (block_metadata, ops_metadata)
+
   let apply ?cached_result chain_id ~cache ~user_activated_upgrades
       ~user_activated_protocol_overrides ~max_operations_ttl
       ~(predecessor_block_header : Block_header.t)
@@ -427,7 +532,7 @@ module Make (Proto : Registered_protocol.T) = struct
           | Some hash -> Context.add_predecessor_ops_metadata_hash context hash
         in
         let context = Shell_context.wrap_disk_context context in
-        let* (validation_result, block_data, ops_metadata) =
+        let* (validation_result, block_metadata, ops_metadata) =
           let*! r =
             let* state =
               (Proto.begin_application
@@ -537,50 +642,12 @@ module Make (Proto : Registered_protocol.T) = struct
             (min (max_operations_ttl + 1) validation_result.max_operations_ttl)
         in
         let validation_result = {validation_result with max_operations_ttl} in
-        let block_metadata =
-          Data_encoding.Binary.to_bytes_exn
-            Proto.block_header_metadata_encoding
-            block_data
-        in
-        let* ops_metadata =
-          try[@time.duration_lwt metadata_serde_check]
-            return
-              (List.map
-                 (List.map (fun receipt ->
-                      (* Check that the metadata are
-                         serializable/deserializable *)
-                      let bytes =
-                        Data_encoding.Binary.to_bytes_exn
-                          Proto.operation_receipt_encoding
-                          receipt
-                      in
-                      let _ =
-                        Data_encoding.Binary.of_bytes_exn
-                          Proto.operation_receipt_encoding
-                          bytes
-                      in
-                      bytes))
-                 ops_metadata)
-          with exn ->
-            trace
-              Validation_errors.Cannot_serialize_operation_metadata
-              (fail (Exn exn))
+        let* (block_metadata, ops_metadata) =
+          compute_metadata new_protocol_env_version block_metadata ops_metadata
         in
         let (Context {cache; _}) = validation_result.context in
         let context =
           Shell_context.unwrap_disk_context validation_result.context
-        in
-        let*! (ops_metadata_hashes, block_metadata_hash) =
-          match[@time.duration_lwt metadata_hash] new_protocol_env_version with
-          | Protocol.V0 -> Lwt.return (None, None)
-          | Protocol.(V1 | V2 | V3 | V4 | V5) ->
-              Lwt.return
-                ( Some
-                    (List.map
-                       (List.map (fun r ->
-                            Operation_metadata_hash.hash_bytes [r]))
-                       ops_metadata),
-                  Some (Block_metadata_hash.hash_bytes [block_metadata]) )
         in
         let*! context_hash =
           (Context.commit
@@ -604,17 +671,7 @@ module Make (Proto : Registered_protocol.T) = struct
           }
         in
         return
-          {
-            result =
-              {
-                validation_store;
-                block_metadata;
-                ops_metadata;
-                block_metadata_hash;
-                ops_metadata_hashes;
-              };
-            cache;
-          }
+          {result = {validation_store; block_metadata; ops_metadata}; cache}
 
   let preapply_operation pv op =
     let open Lwt_syntax in
@@ -889,45 +946,11 @@ module Make (Proto : Registered_protocol.T) = struct
     let preapply_result =
       ({shell_header with context = context_hash}, validation_result_list)
     in
-    let block_metadata =
-      Data_encoding.Binary.to_bytes_exn
-        Proto.block_header_metadata_encoding
+    let* (block_metadata, ops_metadata) =
+      compute_metadata
+        new_protocol_env_version
         block_header_metadata
-    in
-    let* ops_metadata =
-      try
-        return
-          (List.map
-             (List.map (fun receipt ->
-                  (* Check that the metadata are
-                     serializable/deserializable *)
-                  let bytes =
-                    Data_encoding.Binary.to_bytes_exn
-                      Proto.operation_receipt_encoding
-                      receipt
-                  in
-                  let _ =
-                    Data_encoding.Binary.of_bytes_exn
-                      Proto.operation_receipt_encoding
-                      bytes
-                  in
-                  bytes))
-             applied_ops_metadata)
-      with exn ->
-        trace
-          Validation_errors.Cannot_serialize_operation_metadata
-          (fail (Exn exn))
-    in
-    let*! (ops_metadata_hashes, block_metadata_hash) =
-      match new_protocol_env_version with
-      | Protocol.V0 -> Lwt.return (None, None)
-      | Protocol.(V1 | V2 | V3 | V4 | V5) ->
-          Lwt.return
-            ( Some
-                (List.map
-                   (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
-                   ops_metadata),
-              Some (Block_metadata_hash.hash_bytes [block_metadata]) )
+        applied_ops_metadata
     in
     let max_operations_ttl =
       max
@@ -946,15 +969,7 @@ module Make (Proto : Registered_protocol.T) = struct
           last_allowed_fork_level = validation_result.last_allowed_fork_level;
         }
       in
-      let result =
-        {
-          validation_store;
-          block_metadata;
-          ops_metadata;
-          block_metadata_hash;
-          ops_metadata_hashes;
-        }
-      in
+      let result = {validation_store; block_metadata; ops_metadata} in
       {result; cache}
     in
     return (preapply_result, (result, context))

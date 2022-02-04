@@ -208,10 +208,13 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       Data_encoding.Binary.of_bytes_exn Proto.operation_data_encoding op.proto
     in
     let receipt =
-      Some
-        (Data_encoding.Binary.of_bytes_exn
-           Proto.operation_receipt_encoding
-           metadata)
+      match metadata with
+      | Block_validation.Metadata bytes ->
+          Block_services.Receipt
+            (Data_encoding.Binary.of_bytes_exn
+               Proto.operation_receipt_encoding
+               bytes)
+      | Too_large_metadata -> Too_large
     in
     {
       Block_services.chain_id;
@@ -230,7 +233,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
       hash = Operation.hash op;
       shell = op.shell;
       protocol_data;
-      receipt = None;
+      receipt = Empty;
     }
   in
   let operations chain_store block =
