@@ -69,13 +69,8 @@ let make_client_bake_for () =
 
 (* A helper to register a RPC test environment with a node and a client for the
    given protocol version. *)
-let check_rpc ~protocols ~test_mode_tag
-    ~(rpcs :
-       (string
-       * (?endpoint:Client.endpoint -> Client.t -> unit Lwt.t)
-       * Protocol.parameter_overrides option
-       * Node.argument list option)
-       list) () =
+let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
+    ?node_parameters sub_group =
   let (client_mode_tag, title_tag) =
     match test_mode_tag with
     | `Client -> (`Client, "client")
@@ -83,55 +78,51 @@ let check_rpc ~protocols ~test_mode_tag
     | `Light -> (`Light, "light")
     | `Proxy -> (`Proxy, "proxy")
   in
-  List.iter
-    (fun (sub_group, rpc, parameter_overrides, node_parameters) ->
-      Protocol.register_regression_test
-        ~__FILE__
-        ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
-        ~tags:["rpc"; sub_group]
-        ~output_file:(fun p ->
-          "rpc" // sf "%s.%s.%s" (Protocol.tag p) title_tag sub_group)
-        (fun protocol ->
-          (* Initialize a node with alpha protocol and data to be used for RPC calls.
-             The log of the node is not captured in the regression output. *)
-          let* parameter_file =
-            match parameter_overrides with
-            | None -> Lwt.return_none
-            | Some overrides ->
-                let* file =
-                  Protocol.write_parameter_file
-                    ~base:(Either.right (protocol, None))
-                    overrides
-                in
-                Lwt.return_some file
-          in
-          let bake =
-            match test_mode_tag with
-            | `Client_with_proxy_server ->
-                (* Because the proxy server doesn't support genesis. *)
-                true
-            | `Client | `Light | `Proxy -> false
-          in
-          let* (node, client) =
-            Client.init_with_protocol
-              ?parameter_file
-              ?nodes_args:node_parameters
-              ~protocol
-              client_mode_tag
-              ()
-          in
-          let* () = if bake then Client.bake_for client else Lwt.return_unit in
-          let* endpoint =
-            match test_mode_tag with
-            | `Client | `Light | `Proxy -> return Client.(Node node)
-            | `Client_with_proxy_server ->
-                let* proxy_server = Proxy_server.init node in
-                return Client.(Proxy_server proxy_server)
-          in
-          let* _ = rpc ?endpoint:(Some endpoint) client in
-          unit)
-        protocols)
-    rpcs
+  Protocol.register_regression_test
+    ~__FILE__
+    ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
+    ~tags:["rpc"; sub_group]
+    ~output_file:(fun p ->
+      "rpc" // sf "%s.%s.%s" (Protocol.tag p) title_tag sub_group)
+  @@ fun protocol ->
+  (* Initialize a node with alpha protocol and data to be used for RPC calls.
+     The log of the node is not captured in the regression output. *)
+  let* parameter_file =
+    match parameter_overrides with
+    | None -> Lwt.return_none
+    | Some overrides ->
+        let* file =
+          Protocol.write_parameter_file
+            ~base:(Either.right (protocol, None))
+            overrides
+        in
+        Lwt.return_some file
+  in
+  let bake =
+    match test_mode_tag with
+    | `Client_with_proxy_server ->
+        (* Because the proxy server doesn't support genesis. *)
+        true
+    | `Client | `Light | `Proxy -> false
+  in
+  let* (node, client) =
+    Client.init_with_protocol
+      ?parameter_file
+      ?nodes_args:node_parameters
+      ~protocol
+      client_mode_tag
+      ()
+  in
+  let* () = if bake then Client.bake_for client else Lwt.return_unit in
+  let* endpoint =
+    match test_mode_tag with
+    | `Client | `Light | `Proxy -> return Client.(Node node)
+    | `Client_with_proxy_server ->
+        let* proxy_server = Proxy_server.init node in
+        return Client.(Proxy_server proxy_server)
+  in
+  let* _ = test_function ?endpoint:(Some endpoint) client in
+  unit
 
 (* Test the contracts RPC. *)
 let test_contracts ?endpoint client =
@@ -1031,69 +1022,77 @@ let register () =
     ~output_file:"rpc/binary_rpc"
     binary_regression_test ;
   let alpha_consensus_threshold = [(["consensus_threshold"], Some "0")] in
-  let alpha_overrides = Some alpha_consensus_threshold in
   let register_alpha test_mode_tag =
+    let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group
+        =
+      check_rpc
+        ~test_mode_tag
+        ?parameter_overrides
+        ?node_parameters
+        ~test_function
+        sub_group
+        [Alpha]
+    in
     check_rpc
-      ~protocols:[Protocol.Alpha]
-      ~test_mode_tag
-      ~rpcs:
+      "contracts"
+      ~test_function:test_contracts
+      ~parameter_overrides:alpha_consensus_threshold ;
+    check_rpc
+      "delegates"
+      ~test_function:(test_delegates Alpha)
+      ~parameter_overrides:alpha_consensus_threshold ;
+    check_rpc
+      "votes"
+      ~test_function:test_votes
+      ~parameter_overrides:
+        (* reduced periods duration to get to testing vote period faster *)
         ([
-           ("contracts", test_contracts, alpha_overrides, None);
-           ("delegates", test_delegates Protocol.Alpha, alpha_overrides, None);
-           ( "votes",
-             test_votes,
-             Some
-               (* reduced periods duration to get to testing vote period faster *)
-               ([
-                  (["blocks_per_cycle"], Some "4");
-                  (["cycles_per_voting_period"], Some "1");
-                ]
-               @ alpha_consensus_threshold),
-             None );
-           ("others", test_others, alpha_overrides, None);
+           (["blocks_per_cycle"], Some "4");
+           (["cycles_per_voting_period"], Some "1");
          ]
-        @
-        match test_mode_tag with
-        | `Client_with_proxy_server | `Light -> []
-        | _ ->
-            [
-              ( "mempool",
-                test_mempool Protocol.Alpha,
-                None,
-                Some mempool_node_flags );
-            ])
-      ()
+        @ alpha_consensus_threshold) ;
+    check_rpc
+      "others"
+      ~test_function:test_others
+      ~parameter_overrides:alpha_consensus_threshold ;
+    match test_mode_tag with
+    | `Client_with_proxy_server | `Light -> ()
+    | _ ->
+        check_rpc
+          "mempool"
+          ~test_function:(test_mempool Alpha)
+          ~node_parameters:mempool_node_flags
   in
   let register_current_mainnet test_mode_tag =
+    let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group
+        =
+      check_rpc
+        ~test_mode_tag
+        ?parameter_overrides
+        ?node_parameters
+        ~test_function
+        sub_group
+        [Hangzhou]
+    in
+    check_rpc "contracts" ~test_function:test_contracts ;
+    check_rpc "delegates" ~test_function:(test_delegates Hangzhou) ;
     check_rpc
-      ~protocols:[Hangzhou]
-      ~test_mode_tag
-      ~rpcs:
-        ([
-           ("contracts", test_contracts, None, None);
-           ("delegates", test_delegates Hangzhou, None, None);
-           ( "votes",
-             test_votes,
-             Some
-               (* reduced periods duration to get to testing vote period faster *)
-               [
-                 (["blocks_per_cycle"], Some "4");
-                 (["blocks_per_voting_period"], Some "4");
-               ],
-             None );
-           ("others", test_others, None, None);
-         ]
-        @
-        match test_mode_tag with
-        | `Client_with_proxy_server | `Light -> []
-        | _ ->
-            [
-              ( "mempool",
-                test_mempool Protocol.Hangzhou,
-                None,
-                Some [Node.Synchronisation_threshold 0; Node.Connections 1] );
-            ])
-      ()
+      "votes"
+      ~test_function:test_votes
+      ~parameter_overrides:
+        (* reduced periods duration to get to testing vote period faster *)
+        [
+          (["blocks_per_cycle"], Some "4");
+          (["blocks_per_voting_period"], Some "4");
+        ] ;
+    check_rpc "others" ~test_function:test_others ;
+    match test_mode_tag with
+    | `Client_with_proxy_server | `Light -> ()
+    | _ ->
+        check_rpc
+          "mempool"
+          ~test_function:(test_mempool Hangzhou)
+          ~node_parameters:mempool_node_flags
   in
   let modes = [`Client; `Light; `Proxy; `Client_with_proxy_server] in
 
