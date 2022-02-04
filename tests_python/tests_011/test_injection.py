@@ -79,7 +79,7 @@ def client(sandbox):
 
 @pytest.mark.incremental
 class TestActivation:
-    """ Protocol activation (protocol already linked to the node) """
+    """Protocol activation (protocol already linked to the node)"""
 
     def test_proto_known(self, client: Client):
         res = client.list_protocols()

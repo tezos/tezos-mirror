@@ -10,7 +10,7 @@ from . import protocol
 @pytest.mark.slow
 @pytest.mark.incremental
 class TestMempool:
-    " Tests mempool"
+    "Tests mempool"
 
     def test_init(self, sandbox: Sandbox):
         sandbox.add_node(1, params=constants.NODE_PARAMS)

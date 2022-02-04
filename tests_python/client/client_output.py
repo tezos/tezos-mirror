@@ -476,7 +476,7 @@ class CreateMockupResult(Enum):
     OK = auto()
 
     def to_return_code(self) -> int:
-        """ The expected return code of the client when 'self' is returned """
+        """The expected return code of the client when 'self' is returned"""
         if self == CreateMockupResult.OK:
             return 0
         return 1

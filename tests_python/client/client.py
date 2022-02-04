@@ -1866,7 +1866,7 @@ class Client:
         return client_output.ViewResult(self.run(cmd))
 
     def frozen_deposits(self, delegate: str, level: str = None) -> int:
-        """ returns deposits (in mutez) held for account for given level """
+        """returns deposits (in mutez) held for account for given level"""
         if level:
             level_arg = f'/?level={level}'
         else:
