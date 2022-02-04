@@ -2229,7 +2229,7 @@ module RPC = struct
                  entrypoints
                  entrypoint
             >>? fun (r, ctxt) ->
-            r >>? fun (_f, Ex_ty ty) ->
+            r >>? fun (Ex_ty_cstr (ty, _)) ->
             unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
             Micheline.strip_locations ty_node )
       in

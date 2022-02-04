@@ -1719,11 +1719,12 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     (find_entrypoint ~error_details:Informative arg_type entrypoints entrypoint)
   >>?= fun (r, ctxt) ->
   record_trace (Bad_contract_parameter step_constants.self) r
-  >>?= fun (box, _) ->
+  >>?= fun (Ex_ty_cstr (entrypoint_ty, box)) ->
   trace
     (Bad_contract_parameter step_constants.self)
-    (parse_data ctxt ~legacy:false ~allow_forged:internal arg_type (box arg))
+    (parse_data ctxt ~legacy:false ~allow_forged:internal entrypoint_ty arg)
   >>=? fun (arg, ctxt) ->
+  let arg = box arg in
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt storage_type old_storage

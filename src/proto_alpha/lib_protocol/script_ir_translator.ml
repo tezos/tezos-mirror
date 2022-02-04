@@ -1898,36 +1898,36 @@ let rec make_comb_set_proof_argument :
       let whole_stack = serialize_stack_for_error ctxt stack_ty in
       error (Bad_stack (loc, I_UPDATE, 2, whole_stack))
 
+type 'a ex_ty_cstr = Ex_ty_cstr : 'b ty * ('b -> 'a) -> 'a ex_ty_cstr
+
 let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty)
     (entrypoints : full entrypoints) entrypoint :
-    ((Script.node -> Script.node) * ex_ty, error_trace) Gas_monad.t =
+    (full ex_ty_cstr, error_trace) Gas_monad.t =
   let open Gas_monad.Syntax in
-  let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t.
-      t ty ->
-      t entrypoints ->
-      Entrypoint.t ->
-      ((Script.node -> Script.node) * ex_ty, unit) Gas_monad.t =
+      t ty -> t entrypoints -> Entrypoint.t -> (t ex_ty_cstr, unit) Gas_monad.t
+      =
    fun ty entrypoints entrypoint ->
     let* () = Gas_monad.consume_gas Typecheck_costs.find_entrypoint_cycle in
     match (ty, entrypoints) with
     | (_, {name = Some name; _}) when Entrypoint.(name = entrypoint) ->
-        return ((fun e -> e), Ex_ty ty)
+        return (Ex_ty_cstr (ty, fun e -> e))
     | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) -> (
         Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
-        | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
+        | Ok (Ex_ty_cstr (t, f)) -> return (Ex_ty_cstr (t, fun e -> L (f e)))
         | Error () ->
-            let+ (f, t) = find_entrypoint tr right entrypoint in
-            ((fun e -> Prim (loc, D_Right, [f e], [])), t))
+            let+ (Ex_ty_cstr (t, f)) = find_entrypoint tr right entrypoint in
+            Ex_ty_cstr (t, fun e -> R (f e)))
     | (_, {nested = Entrypoints_None; _}) -> Gas_monad.of_result (Error ())
   in
   Gas_monad.bind_recover (find_entrypoint full entrypoints entrypoint)
   @@ function
   | Ok f_t -> return f_t
   | Error () ->
-      if Entrypoint.is_default entrypoint then return ((fun e -> e), Ex_ty full)
+      if Entrypoint.is_default entrypoint then
+        return (Ex_ty_cstr (full, fun e -> e))
       else
         Gas_monad.of_result
         @@ Error
@@ -1941,7 +1941,7 @@ let find_entrypoint_for_type (type full exp error_trace) ~error_details
   let open Gas_monad.Syntax in
   let* res = find_entrypoint ~error_details full entrypoints entrypoint in
   match res with
-  | (_, Ex_ty ty) -> (
+  | Ex_ty_cstr (ty, _) -> (
       match entrypoints.name with
       | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint ->
           Gas_monad.bind_recover
@@ -4651,7 +4651,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
                    entrypoints
                    entrypoint
               >>? fun (r, ctxt) ->
-              r >>? fun (_, Ex_ty param_type) ->
+              r >>? fun (Ex_ty_cstr (param_type, _)) ->
               contract_t loc param_type >>? fun res_ty ->
               let instr =
                 {
