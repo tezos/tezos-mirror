@@ -2016,6 +2016,8 @@ module Tx_rollup_state : sig
 
   val get : context -> Tx_rollup.t -> (context * t) tzresult Lwt.t
 
+  val update : context -> Tx_rollup.t -> t -> context tzresult Lwt.t
+
   val fees : t -> int -> Tez.t tzresult
 
   val last_inbox_level : t -> Raw_level.t option
@@ -2068,8 +2070,9 @@ module Tx_rollup_inbox : sig
   val append_message :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_message.t ->
-    (int * context) tzresult Lwt.t
+    (context * Tx_rollup_state.t * int) tzresult Lwt.t
 
   val messages :
     context ->
