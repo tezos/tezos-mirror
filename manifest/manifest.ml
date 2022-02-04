@@ -661,12 +661,12 @@ module Target = struct
   type internal = {
     bisect_ppx : bool;
     c_library_flags : string list option;
-    conflicts : target list;
+    conflicts : t list;
     dep_files : string list;
-    deps : target list;
+    deps : t list;
     dune : Dune.s_expr;
     foreign_stubs : Dune.foreign_stubs option;
-    implements : target option;
+    implements : t option;
     inline_tests : bool;
     js_compatible : bool;
     js_of_ocaml : Dune.s_expr option;
@@ -684,7 +684,7 @@ module Target = struct
     preprocess : preprocessor list;
     preprocessor_deps : preprocessor_dep list;
     private_modules : string list;
-    opam_only_deps : target list;
+    opam_only_deps : t list;
     release : bool;
     static : bool;
     static_cclibs : string list;
@@ -694,23 +694,23 @@ module Target = struct
     node_wrapper_flags : string list;
   }
 
-  and preprocessor = PPS of target | PPS_args of target * string list
+  and preprocessor = PPS of t | PPS_args of t * string list
 
   and select = {
-    package : target;
+    package : t;
     source_if_present : string;
     source_if_absent : string;
     target : string;
   }
 
-  and target =
+  and t =
     | Internal of internal
     | Vendored of vendored
     | External of external_
     | Opam_only of opam_only
-    | Optional of target
+    | Optional of t
     | Select of select
-    | Open of target * string
+    | Open of t * string
 
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
@@ -789,12 +789,12 @@ module Target = struct
     ?all_modules_except:string list ->
     ?bisect_ppx:bool ->
     ?c_library_flags:string list ->
-    ?conflicts:target list ->
+    ?conflicts:t list ->
     ?dep_files:string list ->
-    ?deps:target list ->
+    ?deps:t list ->
     ?dune:Dune.s_expr ->
     ?foreign_stubs:Dune.foreign_stubs ->
-    ?implements:target ->
+    ?implements:t ->
     ?inline_tests:bool ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
@@ -811,7 +811,7 @@ module Target = struct
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
-    ?opam_only_deps:target list ->
+    ?opam_only_deps:t list ->
     ?release:bool ->
     ?static:bool ->
     ?static_cclibs:string list ->
@@ -820,7 +820,7 @@ module Target = struct
     ?wrapped:bool ->
     path:string ->
     'a ->
-    target
+    t
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
@@ -1155,6 +1155,8 @@ module Target = struct
     Select {package; source_if_present; source_if_absent; target}
 end
 
+type target = Target.t
+
 type release = {version : string; url : Opam.url}
 
 (*****************************************************************************)
@@ -1194,7 +1196,7 @@ let write filename f =
 let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   let (libraries, empty_files_to_create) =
     let empty_files_to_create = ref [] in
-    let rec get_library (dep : Target.target) =
+    let rec get_library (dep : Target.t) =
       let name =
         match Target.library_name_for_dune dep with
         | Ok name -> name
@@ -1450,7 +1452,7 @@ let generate_dune_files () =
    If [fix_version] is [true], require [target]'s version to be
    exactly the same as [for_package]'s version, but only if [target] is internal. *)
 let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
-    (target : Target.target) : Opam.dependency option =
+    (target : Target.t) : Opam.dependency option =
   match target with
   | Internal {opam = None; _} | External {opam = None; _} -> None
   | Internal {opam = Some package; _} ->
@@ -1687,7 +1689,7 @@ let check_js_of_ocaml () =
   let missing_jsoo_with_js_mode name =
     missing_with_js_mode := String_set.add name !missing_with_js_mode
   in
-  let rec check_target ~used_by (target : Target.target) =
+  let rec check_target ~used_by (target : Target.t) =
     match target with
     | External {js_compatible; name; _} ->
         if not js_compatible then missing_jsoo_for_target ~used_by name
