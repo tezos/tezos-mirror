@@ -61,18 +61,19 @@ module RetryClient : Cohttp_lwt.S.Client = struct
 
   let call ?ctx ?headers ?body ?chunked meth uri =
     let rec call_and_retry_on_502 attempt delay =
-      call ?ctx ?headers ?body ?chunked meth uri >>= fun (response, ansbody) ->
+      let open Lwt_syntax in
+      let* (response, ansbody) = call ?ctx ?headers ?body ?chunked meth uri in
       let status = Cohttp.Response.status response in
       match status with
       | `Bad_gateway ->
           let log_ansbody = clone_body ansbody in
-          Cohttp_lwt.Body.to_string log_ansbody >>= fun text ->
-          Attempt_logging.emit (fun () -> {attempt; delay; text}) >>= fun _ ->
-          if attempt >= 10 then Lwt.return (response, ansbody)
+          let* text = Cohttp_lwt.Body.to_string log_ansbody in
+          let* _ = Attempt_logging.emit (fun () -> {attempt; delay; text}) in
+          if attempt >= 10 then return (response, ansbody)
           else
-            Lwt_unix.sleep delay >>= fun () ->
+            let* () = Lwt_unix.sleep delay in
             call_and_retry_on_502 (attempt + 1) (delay +. 0.1)
-      | _ -> Lwt.return (response, ansbody)
+      | _ -> return (response, ansbody)
     in
     call_and_retry_on_502 1 0.
 end

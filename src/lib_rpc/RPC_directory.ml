@@ -40,26 +40,32 @@ let gen_register =
 
 let register dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i >>= function
-      | Ok o -> RPC_answer.return o
-      | Error e -> RPC_answer.fail e)
+      let open Lwt_syntax in
+      let* r = handler p q i in
+      match r with Ok o -> RPC_answer.return o | Error e -> RPC_answer.fail e)
 
 let register_chunked dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i >>= function
+      let open Lwt_syntax in
+      let* r = handler p q i in
+      match r with
       | Ok o -> RPC_answer.return_chunked o
       | Error e -> RPC_answer.fail e)
 
 let opt_register dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i >>= function
+      let open Lwt_syntax in
+      let* ro = handler p q i in
+      match ro with
       | Ok (Some o) -> RPC_answer.return o
       | Ok None -> RPC_answer.not_found
       | Error e -> RPC_answer.fail e)
 
 let lwt_register dir service handler =
   gen_register dir service (fun p q i ->
-      handler p q i >>= fun o -> RPC_answer.return o)
+      let open Lwt_syntax in
+      let* o = handler p q i in
+      RPC_answer.return o)
 
 open Curry
 

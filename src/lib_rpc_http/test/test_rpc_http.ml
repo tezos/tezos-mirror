@@ -349,16 +349,17 @@ let test_matching_with_name_resolving =
     `Quick
     (fun () ->
       Lwt_main.run
-        ( resolve_domain_names_in_policy example_policy >>= fun policy ->
-          List.iter
-            (fun (ip_addr, port, expected) ->
-              check_acl_search
-                "a domain name should match an appropriate IP address"
-                policy
-                expected
-                (ip_addr, port))
-            to_test ;
-          Lwt.return () ))
+        (let open Lwt_syntax in
+        let* policy = resolve_domain_names_in_policy example_policy in
+        List.iter
+          (fun (ip_addr, port, expected) ->
+            check_acl_search
+              "a domain name should match an appropriate IP address"
+              policy
+              expected
+              (ip_addr, port))
+          to_test ;
+        return_unit))
 
 let () =
   let open Qcheck_helpers in

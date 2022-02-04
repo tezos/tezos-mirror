@@ -137,15 +137,17 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
   let generic_call ?headers ?accept ?body ?media meth uri :
       (content, content) RPC_context.rest_result Lwt.t =
-    Client.generic_call meth ?headers ?accept ?body ?media uri >>= function
-    | `Ok (Some v) -> return (`Ok v)
+    let open Lwt_syntax in
+    let* r = Client.generic_call meth ?headers ?accept ?body ?media uri in
+    match r with
+    | `Ok (Some v) -> return_ok (`Ok v)
     | `Ok None -> request_failed meth uri Empty_answer
     | ( `Conflict _ | `Error _ | `Forbidden _ | `Unauthorized _ | `Not_found _
       | `Gone _ ) as v ->
-        return v
+        return_ok v
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in
-        Cohttp_lwt.Body.to_string content >>= fun content ->
+        let* content = Cohttp_lwt.Body.to_string content in
         request_failed
           meth
           uri
@@ -168,15 +170,17 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         request_failed meth uri (Unauthorized_host host)
 
   let handle_error (body, content_type, _) f =
-    Cohttp_lwt.Body.is_empty body >>= fun empty ->
-    if empty then return (content_type, f None)
+    let open Lwt_syntax in
+    let* empty = Cohttp_lwt.Body.is_empty body in
+    if empty then return_ok (content_type, f None)
     else
-      Cohttp_lwt.Body.to_string body >>= fun body ->
-      return (content_type, f (Some body))
+      let* body = Cohttp_lwt.Body.to_string body in
+      return_ok (content_type, f (Some body))
 
   let jsonify_other meth uri content_type error :
       (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
       Lwt.t =
+    let open Lwt_result_syntax in
     let jsonify_body string_body =
       match content_type with
       | Some ("application", "json") | None -> (
@@ -207,18 +211,34 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     let jsonify_body_opt = function
       | None -> return_none
       | Some string_body ->
-          jsonify_body string_body >>=? fun json_body -> return_some json_body
+          let* json_body = jsonify_body string_body in
+          return_some json_body
     in
     match error with
-    | `Conflict s -> jsonify_body_opt s >|=? fun s -> `Conflict s
-    | `Error s -> jsonify_body_opt s >|=? fun s -> `Error s
-    | `Forbidden s -> jsonify_body_opt s >|=? fun s -> `Forbidden s
-    | `Not_found s -> jsonify_body_opt s >|=? fun s -> `Not_found s
-    | `Gone s -> jsonify_body_opt s >|=? fun s -> `Gone s
-    | `Unauthorized s -> jsonify_body_opt s >|=? fun s -> `Unauthorized s
-    | `Ok s -> jsonify_body s >|=? fun s -> `Ok s
+    | `Conflict s ->
+        let+ s = jsonify_body_opt s in
+        `Conflict s
+    | `Error s ->
+        let+ s = jsonify_body_opt s in
+        `Error s
+    | `Forbidden s ->
+        let+ s = jsonify_body_opt s in
+        `Forbidden s
+    | `Not_found s ->
+        let+ s = jsonify_body_opt s in
+        `Not_found s
+    | `Gone s ->
+        let+ s = jsonify_body_opt s in
+        `Gone s
+    | `Unauthorized s ->
+        let+ s = jsonify_body_opt s in
+        `Unauthorized s
+    | `Ok s ->
+        let+ s = jsonify_body s in
+        `Ok s
 
   let post_process_error_responses response meth uri accept =
+    let open Lwt_syntax in
     match response with
     | `Conflict body -> handle_error body (fun v -> `Conflict v)
     | `Error body -> handle_error body (fun v -> `Error v)
@@ -231,7 +251,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Gone body -> handle_error body (fun v -> `Gone v)
     | `Unauthorized body -> handle_error body (fun v -> `Unauthorized v)
     | `Ok (body, (Some _ as content_type), _) ->
-        Cohttp_lwt.Body.to_string body >>= fun body ->
+        let* body = Cohttp_lwt.Body.to_string body in
         request_failed
           meth
           uri
@@ -246,7 +266,8 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
                body;
              })
     | `Ok (body, None, _) ->
-        Cohttp_lwt.Body.to_string body >>= fun body -> return (None, `Ok body)
+        let* body = Cohttp_lwt.Body.to_string body in
+        return_ok (None, `Ok body)
 
   let post_process_json_response ~body meth uri =
     match Data_encoding.Json.from_string body with
@@ -282,41 +303,45 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   (* This function checks that the content type of the answer belongs to accepted ones in [accept]. If not, it is processed as an error. If the answer lacks content-type, the response is decoded as JSON if possible. *)
   let generic_media_type_call ?headers ~accept ?body meth uri :
       RPC_context.generic_call_result tzresult Lwt.t =
+    let open Lwt_tzresult_syntax in
     let body =
       Option.map
         (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
         body
     in
     let media = Media_type.json in
-    generic_call meth ?headers ~accept ?body ~media uri >>=? fun response ->
+    let* response = generic_call meth ?headers ~accept ?body ~media uri in
     match response with
     | `Ok (body, Some ("application", "octet-stream"), _)
       when List.mem ~equal:( == ) Media_type.octet_stream accept -> (
-        Cohttp_lwt.Body.to_string body >>= fun body ->
+        let*! body = Cohttp_lwt.Body.to_string body in
         (* The binary RPCs are prefixed with a size header, we remove it here. *)
         match Data_encoding.Binary.of_string_opt Data_encoding.string body with
         | Some response -> return (`Binary (`Ok response))
         | None -> return (`Binary (`Error (Some body))))
     | `Ok (body, Some ("application", "json"), _)
       when List.mem ~equal:( == ) Media_type.json accept ->
-        Cohttp_lwt.Body.to_string body >>= fun body ->
-        post_process_json_response ~body meth uri >>=? fun body ->
+        let*! body = Cohttp_lwt.Body.to_string body in
+        let* body = post_process_json_response ~body meth uri in
         return (`Json (`Ok body))
     | `Ok (body, Some ("application", "bson"), _)
       when List.mem ~equal:( == ) Media_type.bson accept ->
-        Cohttp_lwt.Body.to_string body >>= fun body ->
-        post_process_bson_response ~body meth uri >>=? fun body ->
+        let*! body = Cohttp_lwt.Body.to_string body in
+        let* body = post_process_bson_response ~body meth uri in
         return (`Json (`Ok body))
     | _ -> (
-        post_process_error_responses response meth uri accept
-        >>=? fun (content_type, other_resp) ->
+        let* (content_type, other_resp) =
+          post_process_error_responses response meth uri accept
+        in
         (* We attempt to decode in JSON. It might
            work. *)
-        jsonify_other meth uri content_type other_resp >>= function
+        let*! r = jsonify_other meth uri content_type other_resp in
+        match r with
         | Ok jsonified -> return (`Json jsonified)
         | Error _ -> return (`Other (content_type, other_resp)))
 
   let handle accept (meth, uri, ans) =
+    let open Lwt_tzresult_syntax in
     match ans with
     | `Ok (Some v) -> return v
     | `Ok None -> request_failed meth uri Empty_answer
@@ -340,7 +365,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
         fail (RPC_context.Generic_error {meth; uri})
     | `Unexpected_status_code (code, (content, _, media_type)) ->
         let media_type = Option.map Media_type.name media_type in
-        Cohttp_lwt.Body.to_string content >>= fun content ->
+        let*! content = Cohttp_lwt.Body.to_string content in
         request_failed
           meth
           uri
@@ -368,7 +393,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
           (Unexpected_content {content; media_type; error})
     | `Unexpected_error_content_type (body, media)
     | `Unexpected_content_type (body, media) ->
-        Cohttp_lwt.Body.to_string body >>= fun body ->
+        let*! body = Cohttp_lwt.Body.to_string body in
         let received =
           Option.fold media ~none:"" ~some:(fun (l, r) -> l ^ "/" ^ r)
         in
@@ -385,24 +410,38 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
   let call_streamed_service (type p q i o) accept ?logger ?headers ~base
       (service : (_, _, p, q, i, o) RPC_service.t) ~on_chunk ~on_close
       (params : p) (query : q) (body : i) : (unit -> unit) tzresult Lwt.t =
-    Client.call_streamed_service
-      accept
-      ?logger
-      ?headers
-      ~base
-      ~on_chunk
-      ~on_close
-      service
-      params
-      query
-      body
-    >>= fun ans -> handle accept ans
+    let open Lwt_syntax in
+    let* ans =
+      Client.call_streamed_service
+        accept
+        ?logger
+        ?headers
+        ~base
+        ~on_chunk
+        ~on_close
+        service
+        params
+        query
+        body
+    in
+    handle accept ans
 
   let call_service (type p q i o) accept ?logger ?headers ~base
       (service : (_, _, p, q, i, o) RPC_service.t) (params : p) (query : q)
       (body : i) : o tzresult Lwt.t =
-    Client.call_service ?logger ?headers ~base accept service params query body
-    >>= fun ans -> handle accept ans
+    let open Lwt_syntax in
+    let* ans =
+      Client.call_service
+        ?logger
+        ?headers
+        ~base
+        accept
+        service
+        params
+        query
+        body
+    in
+    handle accept ans
 
   type config = {
     media_type : Media_type.Command_line.t;
