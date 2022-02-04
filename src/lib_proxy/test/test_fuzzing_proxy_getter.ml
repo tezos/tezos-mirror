@@ -50,7 +50,7 @@ let tree_gen =
     match sets with
     | [] -> Lwt.return acc
     | (key, value) :: tl -> (
-        let* v = Tree.set_leaf acc key value in
+        let* v = Tree.add_leaf acc key value in
         match v with
         | Tezos_proxy.Proxy.Mutation -> (mk_tree [@ocaml.tailcall]) acc tl
         | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
@@ -58,10 +58,10 @@ let tree_gen =
   let mk_tree acc sets = Lwt_main.run @@ mk_tree acc sets in
   QCheck2.Gen.(map (mk_tree Tree.empty) (list (pair key_gen raw_context_gen)))
 
-(** [Tree.set_leaf] then [Tree.get] should return the inserted data *)
-let test_set_leaf_get =
+(** [Tree.add_leaf] then [Tree.get] should return the inserted data *)
+let test_add_leaf_get =
   QCheck2.Test.make
-    ~name:"Tree.get (Tree.set_leaf t k v) k = v"
+    ~name:"Tree.get (Tree.add_leaf t k v) k = v"
     ~print:
       (QCheck2.Print.triple (fun _ -> "<tree>") print_key print_raw_context)
     QCheck2.Gen.(triple tree_gen key_gen raw_context_gen)
@@ -71,7 +71,7 @@ let test_set_leaf_get =
   in
   (* We need to make sure that we are actually setting something: *)
   QCheck2.assume @@ Option.is_some expected ;
-  let tree' = Lwt_main.run @@ Tree.set_leaf tree key value in
+  let tree' = Lwt_main.run @@ Tree.add_leaf tree key value in
   let tree' =
     match tree' with
     | Tezos_proxy.Proxy.Mutation -> tree
@@ -85,4 +85,4 @@ let test_set_leaf_get =
 let () =
   Alcotest.run
     "Proxy Getter"
-    [("Array theory", qcheck_wrap [test_set_leaf_get])]
+    [("Array theory", qcheck_wrap [test_add_leaf_get])]

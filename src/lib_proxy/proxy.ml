@@ -59,7 +59,7 @@ type 'a update = Mutation | Value of 'a
 (** An ad-hoc module type used by implementations of the proxy mode
     when it uses the [../raw/bytes] RPC to query its distant endpoint.
     It is ad-hoc because its [get] function has the concrete {!Proxy_context.M.tree}
-    as a return type and because [set_leaf] has the concrete
+    as a return type and because [add_leaf] has the concrete
     {!Tezos_shell_services.Block_services.raw_context} as a parameter
     (this type is inherited from the return type of the [../raw/bytes] RPC). *)
 module type TREE = sig
@@ -76,18 +76,17 @@ module type TREE = sig
   (** [get t key] returns the tree of data mapped by [key], if any. *)
   val get : t -> key -> Proxy_context.M.tree option Lwt.t
 
-  (** [set_leaf t key raw_ctxt] returns a variant of [t] where [key] is
-      mapped to [raw_ctxt]. When this function is called, it
-      transforms [raw_ctxt], under the hood, into an instance of {!Proxy_context.M.tree},
+  (** [add_leaf t key raw_ctxt] returns a variant of [t] where [key] is
+      mapped to [raw_ctxt]. When this function is called, it transforms
+      [raw_ctxt], under the hood, into an instance of {!Proxy_context.M.tree},
       as the latter is the type internally stored in {!t} (it needs to be,
       as it's the return type of {!get}).
 
-      This function is called [set_leaf], whereas one might expect [set].
-      That's because the proxy mode iteratively builds its local copy of the
-      endpoint's data. This function is only called when adding a new leaf
-      in the tree of data, never to replace existing data. In other words,
-      it's not a general purpose setter. *)
-  val set_leaf :
+      This function is called [add_leaf], because the proxy mode iteratively
+      builds its local copy of the endpoint's data. This function is only called
+      when adding a new leaf in the tree of data, never to replace existing
+      data. In other words, it's not a general purpose setter. *)
+  val add_leaf :
     t ->
     key ->
     Tezos_shell_services.Block_services.raw_context ->
