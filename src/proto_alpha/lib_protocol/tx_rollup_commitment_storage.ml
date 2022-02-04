@@ -240,8 +240,8 @@ let finalize_commitment ctxt rollup state =
         ~dir:`Decr
       >>=? fun ctxt ->
       (* We remove the inbox *)
-      Tx_rollup_inbox_storage.remove ctxt oldest_inbox_level rollup
-      >>=? fun ctxt ->
+      Tx_rollup_inbox_storage.remove ctxt oldest_inbox_level rollup state
+      >>=? fun (ctxt, state) ->
       (* We update the commitment to mark it as finalized *)
       Storage.Tx_rollup.Commitment.update
         ctxt

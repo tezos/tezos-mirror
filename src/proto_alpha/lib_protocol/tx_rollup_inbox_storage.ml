@@ -73,7 +73,8 @@ let prepare_inbox :
     (Raw_context.t
     * Tx_rollup_state_repr.t
     * Tx_rollup_level_repr.t
-    * Tx_rollup_inbox_repr.t)
+    * Tx_rollup_inbox_repr.t
+    * Z.t)
     tzresult
     Lwt.t =
  fun ctxt rollup state level ->
@@ -91,7 +92,7 @@ let prepare_inbox :
   | Some (tx_lvl, tezos_lvl) when Raw_level_repr.(tezos_lvl = level) ->
       (* An inbox should already exists *)
       Storage.Tx_rollup.Inbox.get (ctxt, tx_lvl) rollup
-      >>=? fun (ctxt, metadata) -> return (ctxt, state, tx_lvl, metadata)
+      >>=? fun (ctxt, metadata) -> return (ctxt, state, tx_lvl, metadata, Z.zero)
   | _ ->
       let pred_level =
         Option.fold
@@ -149,7 +150,12 @@ let prepare_inbox :
       >>?= fun (state, tx_level) ->
       let inbox = Tx_rollup_inbox_repr.empty in
       Storage.Tx_rollup.Inbox.init (ctxt, tx_level) rollup inbox
-      >>=? fun (ctxt, _) -> return (ctxt, state, tx_level, inbox)
+      >>=? fun (ctxt, inbox_size_alloc) ->
+      Tx_rollup_state_repr.adjust_storage_allocation
+        state
+        ~delta:(Z.of_int inbox_size_alloc)
+      >>?= fun (state, paid_storage_space_diff) ->
+      return (ctxt, state, tx_level, inbox, paid_storage_space_diff)
 
 (** [update_inbox inbox msg_size] updates [metadata] to account
     for a new message of [msg_size] bytes. *)
@@ -171,13 +177,17 @@ let append_message :
     Tx_rollup_repr.t ->
     Tx_rollup_state_repr.t ->
     Tx_rollup_message_repr.t ->
-    (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
+    (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t =
  fun ctxt rollup state message ->
   let level = (Raw_context.current_level ctxt).level in
   let message_size = Tx_rollup_message_repr.size message in
   (* Update the burn cost to pay for appending new messages *)
   prepare_inbox ctxt rollup state level
-  >>=? fun (ctxt, new_state, tx_level, inbox) ->
+  >>=? fun ( ctxt,
+             new_state,
+             tx_level,
+             inbox,
+             paid_storage_space_diff_for_init_inbox ) ->
   fail_when
     Compare.Int.(
       inbox.inbox_length
@@ -199,16 +209,43 @@ let append_message :
   >>=? fun () ->
   (* Checks have passed, so we can actually record in the storage. *)
   Storage.Tx_rollup.Inbox.add (ctxt, tx_level) rollup new_inbox
-  >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
+  >>=? fun (ctxt, new_inbox_size_alloc, _) ->
+  (* To protect against spam, the message depositor pays upfront the
+     storage burn [commitment_message_hash_preallocation] that will be
+     require to commit this message in the future.
+
+     In {!Tx_rollup_commitment_storage.add_commitment} we deduct the
+     total amount of pre-payed storage burn when calculating the
+     storage burn of adding the commitment. *)
+  let commitment_message_hash_preallocation =
+    Tx_rollup_commitment_repr.Message_result_hash.size
+  in
+  Tx_rollup_state_repr.adjust_storage_allocation
+    new_state
+    ~delta:
+      (Z.of_int (new_inbox_size_alloc + commitment_message_hash_preallocation))
+  >>?= fun (new_state, paid_storage_space_diff) ->
+  return
+    ( ctxt,
+      new_state,
+      Z.add paid_storage_space_diff_for_init_inbox paid_storage_space_diff )
 
 let remove :
     Raw_context.t ->
     Tx_rollup_level_repr.t ->
     Tx_rollup_repr.t ->
-    Raw_context.t tzresult Lwt.t =
- fun ctxt level rollup ->
-  Storage.Tx_rollup.Inbox.remove (ctxt, level) rollup >|=? fun (ctxt, _, _) ->
-  ctxt
+    Tx_rollup_state_repr.t ->
+    (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
+ fun ctxt level rollup state ->
+  Storage.Tx_rollup.Inbox.remove (ctxt, level) rollup
+  >>=? fun (ctxt, freed, _) ->
+  let delta = Z.of_int freed |> Z.neg in
+  (* while we free storage space and adjust storage
+     allocation, the returned [_paid_storage_size_diff]
+     is always 0. Therefore, we neglect
+     [_paid_storage_size_diff]. *)
+  Tx_rollup_state_repr.adjust_storage_allocation state ~delta
+  >>?= fun (state, _paid_storage_size_diff) -> return (ctxt, state)
 
 let check_message_hash :
     Raw_context.t ->

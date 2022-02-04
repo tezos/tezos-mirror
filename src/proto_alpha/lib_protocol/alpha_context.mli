@@ -1740,7 +1740,7 @@ module Tx_rollup_inbox : sig
     Tx_rollup.t ->
     Tx_rollup_state.t ->
     Tx_rollup_message.t ->
-    (context * Tx_rollup_state.t) tzresult Lwt.t
+    (context * Tx_rollup_state.t * Z.t) tzresult Lwt.t
 
   val size :
     context ->

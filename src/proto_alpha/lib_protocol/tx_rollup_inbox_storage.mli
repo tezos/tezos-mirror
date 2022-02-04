@@ -34,8 +34,8 @@
     [message] to the inbox of [tx_rollup] at the current level, creating
     it in the process if need be. This function returns the size of the
     appended message (in bytes), in order for the appropriate burn to be
-    taken from the message author, as well as the new state.  It
-    is the caller's responsibility to store the returned state.
+    taken from the message author, the new state, as well as the storage
+    size diff. It is the caller's responsibility to store the returned state.
 
     {b Note:} [tx_rollup] needs to be a valid transaction address. It
     is the responsibility of the caller to assert it.
@@ -54,7 +54,7 @@ val append_message :
   Tx_rollup_repr.t ->
   Tx_rollup_state_repr.t ->
   Tx_rollup_message_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t * Z.t) tzresult Lwt.t
 
 (** [size ctxt level tx_rollup] returns the number of bytes allocated
     by the messages of the inbox of [tx_rollup] at level [level].
@@ -94,8 +94,8 @@ val find :
   Tx_rollup_repr.t ->
   (Raw_context.t * Tx_rollup_inbox_repr.t option) tzresult Lwt.t
 
-(** [remove ctxt level tx_rollup] removes from the context the
-    inbox of [level].
+(** [remove ctxt level tx_rollup state] removes from the context the
+    inbox of [level] and adjusts [occupied_storage] in the [state].
 
     This function will returns the error [Inbox_does_not_exist] if
     there is no inbox for [level] in the storage. It is the
@@ -105,7 +105,8 @@ val remove :
   Raw_context.t ->
   Tx_rollup_level_repr.t ->
   Tx_rollup_repr.t ->
-  Raw_context.t tzresult Lwt.t
+  Tx_rollup_state_repr.t ->
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
 (** [check_message_hash ctxt level tx_rollup position message path]
     checks that [message] is part of the [tx_rollup] inbox for [level]

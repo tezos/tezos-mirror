@@ -1032,13 +1032,8 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
       cost
     >>=? fun (ctxt, balance_updates) ->
     Tx_rollup_inbox.append_message ctxt dst_rollup state deposit
-    >>=? fun (ctxt, state) ->
+    >>=? fun (ctxt, state, paid_storage_size_diff) ->
     Tx_rollup_state.update ctxt dst_rollup state >>=? fun ctxt ->
-    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
-       Storage fees for transaction rollup.
-       We need to charge for newly allocated storage (as we do for
-       Michelson’s big map). This also means taking into account
-       the global table of tickets. *)
     let result =
       Transaction_result
         (Transaction_to_tx_rollup_result
@@ -1046,6 +1041,7 @@ let apply_transaction_to_tx_rollup ~ctxt ~parameters_ty ~parameters ~amount
              balance_updates;
              consumed_gas = Gas.consumed ~since ~until:ctxt;
              ticket_hash;
+             paid_storage_size_diff;
            })
     in
     return (ctxt, result, [])
@@ -1544,7 +1540,7 @@ let apply_external_manager_operation_content :
       let (message, message_size) = Tx_rollup_message.make_batch content in
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
       Tx_rollup_inbox.append_message ctxt tx_rollup state message
-      >>=? fun (ctxt, state) ->
+      >>=? fun (ctxt, state, paid_storage_size_diff) ->
       Tx_rollup_state.burn_cost ~limit:burn_limit state message_size
       >>?= fun cost ->
       Token.transfer ctxt (`Contract source_contract) `Burned cost
@@ -1555,6 +1551,7 @@ let apply_external_manager_operation_content :
           {
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             balance_updates;
+            paid_storage_size_diff;
           }
       in
       return (ctxt, result, [])
