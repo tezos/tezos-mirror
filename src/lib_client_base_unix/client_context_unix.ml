@@ -34,10 +34,11 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
           else None
 
     method read_file path =
+      let open Lwt_syntax in
       Lwt.catch
         (fun () ->
-          Lwt_io.(with_file ~mode:Input path read) >>= fun content ->
-          return content)
+          let* content = Lwt_io.(with_file ~mode:Input path read) in
+          return_ok content)
         (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
 
     method private filename alias_name =
@@ -49,42 +50,48 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
 
     method with_lock : type a. (unit -> a Lwt.t) -> a Lwt.t =
       fun f ->
+        let open Lwt_syntax in
         let unlock fd =
           let fd = Lwt_unix.unix_file_descr fd in
           Unix.lockf fd Unix.F_ULOCK 0 ;
           Unix.close fd
         in
         let lock () =
-          Lwt_unix.openfile
-            (Filename.concat base_dir "wallet_lock")
-            Lwt_unix.[O_CREAT; O_WRONLY]
-            0o644
-          >>= fun fd ->
-          Lwt_unix.lockf fd Unix.F_LOCK 0 >>= fun () ->
+          let* fd =
+            Lwt_unix.openfile
+              (Filename.concat base_dir "wallet_lock")
+              Lwt_unix.[O_CREAT; O_WRONLY]
+              0o644
+          in
+          let* () = Lwt_unix.lockf fd Unix.F_LOCK 0 in
           let sighandler =
             Lwt_unix.on_signal Sys.sigint (fun _s -> unlock fd)
           in
           Lwt.return (fd, sighandler)
         in
-        lock () >>= fun (fd, sh) ->
+        let* (fd, sh) = lock () in
         (* catch might be useless if f always uses the error monad *)
-        Lwt.finalize f (fun () ->
-            unlock fd ;
-            Lwt.return_unit)
-        >>= fun res ->
+        let* res =
+          Lwt.finalize f (fun () ->
+              unlock fd ;
+              Lwt.return_unit)
+        in
         Lwt_unix.disable_signal_handler sh ;
         Lwt.return res
 
     method load : type a.
         string -> default:a -> a Data_encoding.encoding -> a tzresult Lwt.t =
       fun alias_name ~default encoding ->
+        let open Lwt_result_syntax in
         let filename = self#filename alias_name in
         if not (Sys.file_exists filename) then return default
         else
-          Lwt_utils_unix.Json.read_file filename
-          >|= record_trace_eval (fun () ->
-                  error_of_fmt "could not read the %s alias file" alias_name)
-          >>=? fun json ->
+          let* json =
+            trace_eval
+              (fun () ->
+                error_of_fmt "could not read the %s alias file" alias_name)
+              (Lwt_utils_unix.Json.read_file filename)
+          in
           match Data_encoding.Json.destruct encoding json with
           | exception e ->
               failwith
@@ -97,15 +104,17 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
     method write : type a.
         string -> a -> a Data_encoding.encoding -> unit tzresult Lwt.t =
       fun alias_name list encoding ->
-        Error_monad.catch_es (fun () ->
-            Lwt_utils_unix.create_dir base_dir >>= fun () ->
-            let filename = self#filename alias_name in
-            let json = Data_encoding.Json.construct encoding list in
-            let filename_tmp = filename ^ "_tmp" in
-            Lwt_utils_unix.Json.write_file filename_tmp json >>=? fun () ->
-            Lwt_unix.rename filename_tmp filename >>= fun () -> return_unit)
-        >|= record_trace_eval (fun () ->
-                error_of_fmt "could not write the %s alias file." alias_name)
+        let open Lwt_tzresult_syntax in
+        trace_eval (fun () ->
+            error_of_fmt "could not write the %s alias file." alias_name)
+        @@ Error_monad.catch_es (fun () ->
+               let*! () = Lwt_utils_unix.create_dir base_dir in
+               let filename = self#filename alias_name in
+               let json = Data_encoding.Json.construct encoding list in
+               let filename_tmp = filename ^ "_tmp" in
+               let* () = Lwt_utils_unix.Json.write_file filename_tmp json in
+               let*! () = Lwt_unix.rename filename_tmp filename in
+               return_unit)
   end
 
 class unix_prompter : Client_context.prompter =
@@ -133,6 +142,7 @@ class unix_prompter : Client_context.prompter =
 class unix_logger ~base_dir : Client_context.printer =
   let startup = Format.asprintf "%a" Time.System.pp_hum (Systime_os.now ()) in
   let log channel msg =
+    let open Lwt_syntax in
     match channel with
     | "stdout" ->
         print_endline msg ;
@@ -142,7 +152,7 @@ class unix_logger ~base_dir : Client_context.printer =
         Lwt.return_unit
     | log ->
         let open Filename.Infix in
-        Lwt_utils_unix.create_dir (base_dir // "logs" // log) >>= fun () ->
+        let* () = Lwt_utils_unix.create_dir (base_dir // "logs" // log) in
         Lwt_io.with_file
           ~flags:Unix.[O_APPEND; O_CREAT; O_WRONLY]
           ~mode:Lwt_io.Output
