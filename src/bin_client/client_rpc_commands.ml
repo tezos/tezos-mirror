@@ -25,7 +25,6 @@
 
 (* Tezos Command line interface - Generic JSON RPC interface *)
 
-open Lwt.Infix
 open Clic
 open Json_schema
 
@@ -44,12 +43,12 @@ type input = {
 
 let no_service_at_valid_prefix (cctxt : #Client_context.full) =
   cctxt#error "No service found at this URL (but this is a valid prefix)\n"
-  >>= fun () -> return_unit
 
 (* generic JSON generation from a schema with callback for random or
    interactive filling *)
 let fill_in ?(show_optionals = true) input schema =
   let rec element path {title; kind; _} =
+    let open Lwt_syntax in
     match kind with
     | Integer {minimum; maximum; _} ->
         let minimum =
@@ -64,51 +63,68 @@ let fill_in ?(show_optionals = true) input schema =
           | Some (m, `Inclusive) -> int_of_float m
           | Some (m, `Exclusive) -> int_of_float m - 1
         in
-        input.int minimum maximum title path >>= fun i ->
-        Lwt.return (`Float (float i))
-    | Number _ -> input.float title path >>= fun f -> Lwt.return (`Float f)
-    | Boolean -> input.bool title path >>= fun f -> Lwt.return (`Bool f)
-    | String _ -> input.string title path >>= fun f -> Lwt.return (`String f)
+        let+ i = input.int minimum maximum title path in
+        `Float (float i)
+    | Number _ ->
+        let+ f = input.float title path in
+        `Float f
+    | Boolean ->
+        let+ f = input.bool title path in
+        `Bool f
+    | String _ ->
+        let+ f = input.string title path in
+        `String f
     | Combine ((One_of | Any_of), elts) ->
         let nb = List.length elts in
-        input.int 0 (nb - 1) (Some "Select the schema to follow") path
-        >>= fun n ->
+        let* n =
+          input.int 0 (nb - 1) (Some "Select the schema to follow") path
+        in
         element path (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth elts n)
     | Combine ((All_of | Not), _) -> Lwt.fail Unsupported_construct
     | Def_ref name ->
         Lwt.return (`String (Json_query.json_pointer_of_path name))
     | Id_ref _ | Ext_ref _ -> Lwt.fail Unsupported_construct
     | Array (elts, _) ->
-        List.mapi_s (fun n elt -> element (string_of_int n :: path) elt) elts
-        >|= fun a -> `A a
+        let+ a =
+          List.mapi_s (fun n elt -> element (string_of_int n :: path) elt) elts
+        in
+        `A a
     | Object {properties; _} ->
         if show_optionals then
-          List.map_s
-            (fun (n, elt, _, _) ->
-              element (n :: path) elt >|= fun json -> (n, json))
-            properties
-          >|= fun o -> `O o
+          let+ o =
+            List.map_s
+              (fun (n, elt, _, _) ->
+                let+ json = element (n :: path) elt in
+                (n, json))
+              properties
+          in
+          `O o
         else
-          List.filter_map_s
-            (fun (n, elt, optional, _) ->
-              if optional then
-                element (n :: path) elt >|= fun json -> Some (n, json)
-              else Lwt.return_none)
-            properties
-          >|= fun o -> `O o
+          let+ o =
+            List.filter_map_s
+              (fun (n, elt, optional, _) ->
+                if optional then
+                  let+ json = element (n :: path) elt in
+                  Some (n, json)
+                else Lwt.return_none)
+              properties
+          in
+          `O o
     | Monomorphic_array (elt, specs) ->
         let rec fill_loop acc min n max =
           if n > max then Lwt.return acc
           else
-            element (string_of_int n :: path) elt >>= fun json ->
-            (if n < min then Lwt.return_true else input.continue title path)
-            >>= function
-            | true -> fill_loop (json :: acc) min (succ n) max
-            | false -> Lwt.return (json :: acc)
+            let* json = element (string_of_int n :: path) elt in
+            let* b =
+              if n < min then Lwt.return_true else input.continue title path
+            in
+            if b then fill_loop (json :: acc) min (succ n) max
+            else Lwt.return (json :: acc)
         in
         let max = Option.value specs.max_items ~default:max_int in
-        fill_loop [] specs.min_items 0 max >>= fun acc ->
-        Lwt.return (`A (List.rev acc))
+        let+ a = fill_loop [] specs.min_items 0 max in
+        let a = List.rev a in
+        `A a
     | Any -> Lwt.fail Unsupported_construct
     | Dummy -> Lwt.fail Unsupported_construct
     | Null -> Lwt.return `Null
@@ -129,26 +145,30 @@ let random_fill_in ?(show_optionals = true) schema =
   let continue _ _ = Lwt.return (Random.int 4 = 0) in
   Lwt.catch
     (fun () ->
-      fill_in
-        ~show_optionals
-        {int; float; string; bool; display; continue}
-        schema
-      >>= fun json -> Lwt.return_ok json)
+      Lwt_result.ok
+      @@ fill_in
+           ~show_optionals
+           {int; float; string; bool; display; continue}
+           schema)
     (fun e ->
       let msg = Printf.sprintf "Fill-in failed %s\n%!" (Printexc.to_string e) in
       Lwt.return_error msg)
 
 let editor_fill_in ?(show_optionals = true) schema =
   let tmp = Filename.temp_file "tezos_rpc_call_" ".json" in
+  let open Lwt_syntax in
   let rec init () =
     (* write a temp file with instructions *)
-    random_fill_in ~show_optionals schema >>= function
+    let* r = random_fill_in ~show_optionals schema in
+    match r with
     | Error msg -> Lwt.return_error msg
     | Ok json ->
-        Lwt_io.(
-          with_file ~mode:Output tmp (fun fp ->
-              write_line fp (Data_encoding.Json.to_string json)))
-        >>= fun () -> edit ()
+        let* () =
+          Lwt_io.(
+            with_file ~mode:Output tmp (fun fp ->
+                write_line fp (Data_encoding.Json.to_string json)))
+        in
+        edit ()
   and edit () =
     (* launch the user's editor on it *)
     let editor_cmd =
@@ -165,16 +185,19 @@ let editor_fill_in ?(show_optionals = true) schema =
       in
       Lwt_process.shell (ed ^ " " ^ tmp)
     in
-    (Lwt_process.open_process_none editor_cmd)#status >>= function
+    let* s = (Lwt_process.open_process_none editor_cmd)#status in
+    match s with
     | Unix.WEXITED 0 ->
-        reread () >>= fun json ->
-        delete () >>= fun () -> Lwt.return json
+        let* json = reread () in
+        let* () = delete () in
+        Lwt.return json
     | Unix.WSIGNALED x | Unix.WSTOPPED x | Unix.WEXITED x ->
         let msg = Printf.sprintf "FAILED %d \n%!" x in
-        delete () >>= fun () -> Lwt.return_error msg
+        let* () = delete () in
+        Lwt.return_error msg
   and reread () =
     (* finally reread the file *)
-    Lwt_io.(with_file ~mode:Input tmp (fun fp -> read fp)) >>= fun text ->
+    let* text = Lwt_io.(with_file ~mode:Input tmp (fun fp -> read fp)) in
     match Data_encoding.Json.from_string text with
     | Ok r -> Lwt.return_ok r
     | Error msg -> Lwt.return_error (Format.asprintf "bad input: %s" msg)
@@ -205,8 +228,9 @@ let rec count =
 (*-- Commands ---------------------------------------------------------------*)
 
 let list url (cctxt : #Client_context.full) =
+  let open Lwt_result_syntax in
   let args = String.split '/' url in
-  RPC_description.describe cctxt ~recurse:true args >>=? fun tree ->
+  let* tree = RPC_description.describe cctxt ~recurse:true args in
   let open RPC_description in
   let collected_args = ref [] in
   let collect arg =
@@ -304,23 +328,28 @@ let list url (cctxt : #Client_context.full) =
   and display_list tpath =
     Format.pp_print_list (fun ppf (n, t) -> display ppf ([n], tpath @ [n], t))
   in
-  cctxt#message
-    "@ @[<v 2>Available services:@ @ %a@]@."
-    display
-    (args, args, tree)
-  >>= fun () ->
-  if !collected_args <> [] then
+  let*! () =
     cctxt#message
-      "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
-      (Format.pp_print_list display_arg)
-      !collected_args
-    >>= fun () -> return_unit
+      "@ @[<v 2>Available services:@ @ %a@]@."
+      display
+      (args, args, tree)
+  in
+  if !collected_args <> [] then
+    let*! () =
+      cctxt#message
+        "@,@[<v 2>Dynamic parameter description:@ @ %a@]@."
+        (Format.pp_print_list display_arg)
+        !collected_args
+    in
+    return_unit
   else return_unit
 
 let schema meth url (cctxt : #Client_context.full) =
+  let open Lwt_result_syntax in
   let args = String.split '/' url in
   let open RPC_description in
-  RPC_description.describe cctxt ~recurse:false args >>=? function
+  let* s = RPC_description.describe cctxt ~recurse:false args in
+  match s with
   | Static {services; _} -> (
       match RPC_service.MethMap.find_opt meth services with
       | None -> no_service_at_valid_prefix cctxt
@@ -332,17 +361,18 @@ let schema meth url (cctxt : #Client_context.full) =
                 ("output", Json_schema.to_json (fst (Lazy.force output)));
               ]
           in
-          cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+          let*! () = cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json in
           return_unit
       | Some {input = None; output; _} ->
           let json =
             `O [("output", Json_schema.to_json (fst (Lazy.force output)))]
           in
-          cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json >>= fun () ->
+          let*! () = cctxt#message "%a" Json_repr.(pp (module Ezjsonm)) json in
           return_unit)
   | _ -> no_service_at_valid_prefix cctxt
 
 let format binary meth url (cctxt : #Client_context.io_rpcs) =
+  let open Lwt_result_syntax in
   let args = String.split '/' url in
   let open RPC_description in
   let pp =
@@ -350,24 +380,33 @@ let format binary meth url (cctxt : #Client_context.io_rpcs) =
       Data_encoding.Binary_schema.pp ppf schema
     else fun ppf (schema, _) -> Json_schema.pp ppf schema
   in
-  RPC_description.describe cctxt ~recurse:false args >>=? function
+  let* s = RPC_description.describe cctxt ~recurse:false args in
+  match s with
   | Static {services; _} -> (
       match RPC_service.MethMap.find_opt meth services with
       | None -> no_service_at_valid_prefix cctxt
       | Some {input = Some input; output; _} ->
-          cctxt#message
-            "@[<v 0>@[<v 2>Input format:@,%a@]@,@[<v 2>Output format:@,%a@]@,@]"
-            pp
-            (Lazy.force input)
-            pp
-            (Lazy.force output)
-          >>= fun () -> return_unit
+          let*! () =
+            cctxt#message
+              "@[<v 0>@[<v 2>Input format:@,\
+               %a@]@,\
+               @[<v 2>Output format:@,\
+               %a@]@,\
+               @]"
+              pp
+              (Lazy.force input)
+              pp
+              (Lazy.force output)
+          in
+          return_unit
       | Some {input = None; output; _} ->
-          cctxt#message
-            "@[<v 0>@[<v 2>Output format:@,%a@]@,@]"
-            pp
-            (Lazy.force output)
-          >>= fun () -> return_unit)
+          let*! () =
+            cctxt#message
+              "@[<v 0>@[<v 2>Output format:@,%a@]@,@]"
+              pp
+              (Lazy.force output)
+          in
+          return_unit)
   | _ -> no_service_at_valid_prefix cctxt
 
 let fill_in ?(show_optionals = true) schema =
@@ -414,30 +453,38 @@ let display_answer (cctxt : #Client_context.full) :
   | _ -> cctxt#error "Unexpected server answer\n%!"
 
 let call ?body meth raw_url (cctxt : #Client_context.full) =
+  let open Lwt_result_syntax in
   let uri = Uri.of_string raw_url in
   let args = String.split_path (Uri.path uri) in
-  RPC_description.describe cctxt ~recurse:false args >>=? function
+  let* s = RPC_description.describe cctxt ~recurse:false args in
+  match s with
   | Static {services; _} -> (
       match RPC_service.MethMap.find_opt meth services with
       | None -> no_service_at_valid_prefix cctxt
       | Some {input = None; _} ->
-          (match body with
-          | None -> Lwt.return_unit
-          | Some _ ->
-              cctxt#warning
-                "This URL did not expect a JSON input but one was provided\n%!")
-          >>= fun () ->
-          cctxt#generic_media_type_call meth ?body uri >>=? fun answer ->
-          display_answer cctxt answer >|= ok
+          let*! () =
+            match body with
+            | None -> Lwt.return_unit
+            | Some _ ->
+                cctxt#warning
+                  "This URL did not expect a JSON input but one was provided\n\
+                   %!"
+          in
+          let* answer = cctxt#generic_media_type_call meth ?body uri in
+          let*! () = display_answer cctxt answer in
+          return_unit
       | Some {input = Some input; _} -> (
-          (match body with
-          | None -> fill_in ~show_optionals:false (fst (Lazy.force input))
-          | Some body -> Lwt.return (Ok body))
-          >>= function
+          let*! r =
+            match body with
+            | None -> fill_in ~show_optionals:false (fst (Lazy.force input))
+            | Some body -> Lwt.return (Ok body)
+          in
+          match r with
           | Error msg -> cctxt#error "%s" msg
           | Ok body ->
-              cctxt#generic_media_type_call meth ~body uri >>=? fun answer ->
-              display_answer cctxt answer >|= ok))
+              let* answer = cctxt#generic_media_type_call meth ~body uri in
+              let*! () = display_answer cctxt answer in
+              return_unit))
   | _ -> cctxt#error "No service found at this URL\n%!"
 
 let call_with_json meth raw_url json (cctxt : #Client_context.full) =
@@ -449,16 +496,17 @@ let call_with_json meth raw_url json (cctxt : #Client_context.full) =
   | Ok body -> call meth ~body raw_url cctxt
 
 let call_with_file_or_json meth url maybe_file (cctxt : #Client_context.full) =
-  (match TzString.split ':' ~limit:1 maybe_file with
-  | ["file"; filename] ->
-      (* Mostly copied from src/client/client_aliases.ml *)
-      Lwt.catch
-        (fun () ->
-          Lwt_io.(with_file ~mode:Input filename read) >>= fun content ->
-          return content)
-        (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
-  | _ -> return maybe_file)
-  >>=? fun json -> call_with_json meth url json cctxt
+  let open Lwt_result_syntax in
+  let* json =
+    match TzString.split ':' ~limit:1 maybe_file with
+    | ["file"; filename] ->
+        Lwt.catch
+          (fun () ->
+            Lwt_result.ok @@ Lwt_io.(with_file ~mode:Input filename read))
+          (fun exn -> failwith "cannot read file (%s)" (Printexc.to_string exn))
+    | _ -> return maybe_file
+  in
+  call_with_json meth url json cctxt
 
 let meth_params ?(name = "HTTP method") ?(desc = "") params =
   param

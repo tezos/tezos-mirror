@@ -111,7 +111,9 @@ let rpc_timeout ~timeout ?canceler f ctxt =
   Error_monad.with_timeout ~canceler alarm (fun _ -> request)
 
 let check_network ~timeout ctxt =
-  rpc_timeout ~timeout Version_services.version ctxt >>= function
+  let open Lwt_syntax in
+  let* r = rpc_timeout ~timeout Version_services.version ctxt in
+  match r with
   | Error _ -> Lwt.return_none
   | Ok {network_version; _} ->
       let has_prefix prefix =
@@ -125,11 +127,14 @@ let check_network ~timeout ctxt =
         Lwt.return_some `Testnet)
 
 let get_commands_for_version ~timeout ctxt network chain block protocol =
-  rpc_timeout
-    ~timeout
-    (fun ctxt -> Shell_services.Blocks.protocols ctxt ~chain ~block ())
-    ctxt
-  >>= function
+  let open Lwt_syntax in
+  let* r =
+    rpc_timeout
+      ~timeout
+      (fun ctxt -> Shell_services.Blocks.protocols ctxt ~chain ~block ())
+      ctxt
+  in
+  match r with
   | Ok {next_protocol = version; _} -> (
       match protocol with
       | None ->
@@ -166,16 +171,19 @@ let get_commands_for_version ~timeout ctxt network chain block protocol =
       )
 
 let select_commands ctxt {chain; block; protocol; _} =
+  let open Lwt_syntax in
   let timeout = timeout_seconds () in
-  check_network ~timeout ctxt >>= fun network ->
-  get_commands_for_version ~timeout ctxt network chain block protocol
-  >|=? fun (_, commands_for_version) ->
-  Client_rpc_commands.commands
-  @ Tezos_signer_backends_unix.Ledger.commands ()
-  @ Client_keys_commands.commands network
-  @ Client_helpers_commands.commands ()
-  @ Mockup_commands.commands ()
-  @ Tezos_proxy.Proxy_commands.commands ()
-  @ commands_for_version
+  let* network = check_network ~timeout ctxt in
+  let* (_, commands_for_version) =
+    get_commands_for_version ~timeout ctxt network chain block protocol
+  in
+  Lwt.return_ok
+    (Client_rpc_commands.commands
+    @ Tezos_signer_backends_unix.Ledger.commands ()
+    @ Client_keys_commands.commands network
+    @ Client_helpers_commands.commands ()
+    @ Mockup_commands.commands ()
+    @ Tezos_proxy.Proxy_commands.commands ()
+    @ commands_for_version)
 
 let () = Client_main_run.run (module Client_config) ~select_commands
