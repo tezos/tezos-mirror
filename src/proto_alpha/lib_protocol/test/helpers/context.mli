@@ -218,6 +218,7 @@ val init :
   ?blocks_per_cycle:int32 ->
   ?cycles_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
+  ?tx_rollup_origination_size:int ->
   ?sc_rollup_enable:bool ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
