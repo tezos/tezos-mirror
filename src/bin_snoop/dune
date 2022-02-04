@@ -25,6 +25,6 @@
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_benchmark)))

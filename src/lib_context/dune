@@ -6,21 +6,22 @@
  (public_name tezos-context)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-shell-services
   tezos-base
   bigstringaf
-  tezos-shell-services
   fmt
   logs.fmt
   digestif.c
   irmin
   irmin-pack
   tezos-stdlib-unix
+  tezos-stdlib
   tezos-context.sigs
   tezos-context.helpers
   tezos-context.encoding)
  (flags
   (:standard
    -open Tezos_shell_services
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_stdlib)))

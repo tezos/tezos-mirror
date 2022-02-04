@@ -6,6 +6,7 @@
  (public_name tezos-crypto)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-stdlib
   data-encoding
   tezos-lwt-result-stdlib
   lwt
@@ -13,7 +14,6 @@
   secp256k1-internal
   tezos-error-monad
   tezos-rpc
-  tezos-stdlib
   ringo
   zarith
   zarith_stubs_js)

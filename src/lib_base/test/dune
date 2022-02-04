@@ -7,6 +7,7 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-error-monad
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)
@@ -19,6 +20,7 @@
  (libraries
   tezos-base
   tezos-base.unix
+  tezos-error-monad
   data-encoding
   qcheck-alcotest
   tezos-test-helpers)

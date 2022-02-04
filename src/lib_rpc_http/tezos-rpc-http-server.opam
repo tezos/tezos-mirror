@@ -13,9 +13,11 @@ depends: [
   "tezos-stdlib-unix"
   "resto-cohttp-server" { >= "0.6" & < "0.7" }
   "resto-acl" { >= "0.6" & < "0.7" }
+  "tezos-rpc"
   "tezos-rpc-http"
-  "tezos-base-test-helpers" {with-test}
+  "tezos-stdlib" {with-test}
   "tezos-test-helpers" {with-test}
+  "tezos-base-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.15" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
 ]

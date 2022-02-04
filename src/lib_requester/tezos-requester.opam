@@ -14,6 +14,7 @@ depends: [
   "lwt-watcher" { = "0.1" }
   "tezos-test-helpers" {with-test}
   "tezos-base-test-helpers" {with-test}
+  "tezos-stdlib" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "qcheck-alcotest" { with-test & >= "0.15" }
 ]

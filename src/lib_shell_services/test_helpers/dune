@@ -9,4 +9,4 @@
   tezos-shell-services
   tezos-test-helpers
   qcheck-core)
- (flags (:standard -linkall -open Tezos_base__TzPervasives)))
+ (flags (:standard -linkall -open Tezos_base.TzPervasives)))

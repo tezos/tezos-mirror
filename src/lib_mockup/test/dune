@@ -5,6 +5,7 @@
  (names test_mockup_args test_fuzzing_mockup_args test_persistence)
  (package tezos-mockup)
  (libraries
+  tezos-base
   tezos-base-test-helpers
   tezos-mockup
   tezos-mockup-registration
@@ -12,4 +13,4 @@
   qcheck-alcotest
   alcotest-lwt)
  (flags
-  (:standard -open Tezos_base__TzPervasives -open Tezos_base_test_helpers)))
+  (:standard -open Tezos_base.TzPervasives -open Tezos_base_test_helpers)))

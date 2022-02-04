@@ -5,7 +5,9 @@
  (name test_unix_error)
  (package tezos-base)
  (libraries
+  tezos-base
   tezos-base.unix
+  tezos-error-monad
   data-encoding
   tezos-test-helpers
   qcheck-alcotest)

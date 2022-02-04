@@ -11,11 +11,11 @@
  (libraries
   data-encoding
   tezos-base
+  tezos-client-base-unix
+  tezos-client-base
+  tezos-clic
   tezos-stdlib-unix
   tezos-event-logging
-  tezos-client-base
-  tezos-client-base-unix
-  tezos-clic
   tezos-signer-services
   (select void_for_linking-tezos-client-005-PsBabyM1 from
    (tezos-client-005-PsBabyM1 -> void_for_linking-tezos-client-005-PsBabyM1.empty)
@@ -48,7 +48,7 @@
   (:standard
    -linkall
    -open Data_encoding
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_client_base_unix
    -open Tezos_client_base
    -open Tezos_clic

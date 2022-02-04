@@ -12,7 +12,6 @@ depends: [
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
   "tezos-base"
-  "tezos-version"
   "tezos-context"
   "tezos-store"
   "tezos-shell-context"
@@ -24,14 +23,17 @@ depends: [
   "tezos-requester"
   "tezos-workers"
   "tezos-validation"
+  "tezos-version"
   "lwt-exit"
   "tezos-base-test-helpers" {with-test}
   "tezos-embedded-protocol-demo-noops" {with-test}
   "tezos-event-logging-test-helpers" {with-test}
   "tezos-test-helpers" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
-  "tezos-alpha-test-helpers" {with-test}
+  "tezos-protocol-alpha" {with-test}
   "tezos-protocol-plugin-alpha" {with-test}
+  "tezos-protocol-alpha-parameters" {with-test}
+  "tezos-alpha-test-helpers" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

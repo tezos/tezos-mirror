@@ -5,6 +5,7 @@
  (name test_clic)
  (package tezos-clic)
  (libraries
+  tezos-stdlib
   tezos-clic
   alcotest-lwt)
  (flags (:standard -open Tezos_stdlib -open Tezos_clic)))

@@ -14,7 +14,7 @@
   tezos-version
   tezos-stdlib-unix
   tezos-shell-services
-  tezos-workers
+  tezos-rpc-http
   tezos-rpc-http-server
   tezos-p2p
   tezos-shell
@@ -22,6 +22,7 @@
   tezos-context
   tezos-validator
   tezos-shell-context
+  tezos-workers
   tezos-protocol-updater
   cmdliner
   fmt.cli
@@ -113,7 +114,7 @@
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_base
    -open Tezos_stdlib_unix
    -open Tezos_shell_services

@@ -6,14 +6,14 @@
  (public_name tezos-base.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
-  data-encoding
+  tezos-error-monad
   tezos-crypto
+  tezos-base
   bls12-381-unix
   tezos-hacl-glue-unix
-  tezos-base
   tezos-stdlib
   tezos-stdlib-unix
-  tezos-error-monad)
+  data-encoding)
  (flags
   (:standard
    -open Tezos_error_monad

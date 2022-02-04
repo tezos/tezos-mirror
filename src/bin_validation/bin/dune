@@ -9,11 +9,18 @@
  (package tezos-validator)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-base
+  tezos-context
+  tezos-stdlib-unix
+  tezos-shell
+  tezos-shell-services
+  tezos-validation
+  tezos-protocol-updater
   tezos-validator)
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_stdlib_unix
    -open Tezos_shell

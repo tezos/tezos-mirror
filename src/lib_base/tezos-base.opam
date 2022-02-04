@@ -13,10 +13,10 @@ depends: [
   "tezos-crypto"
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-error-monad"
-  "tezos-event-logging"
   "tezos-rpc"
   "tezos-clic"
   "tezos-micheline"
+  "tezos-event-logging"
   "ptime" { >= "0.8.4" }
   "ezjsonm" { >= "1.1.0" }
   "lwt" { >= "5.4.0" }

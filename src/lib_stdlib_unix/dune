@@ -7,11 +7,11 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   unix
-  data-encoding
   tezos-error-monad
   tezos-lwt-result-stdlib
   tezos-event-logging
   tezos-stdlib
+  data-encoding
   lwt.unix
   ipaddr.unix
   re

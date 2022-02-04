@@ -6,6 +6,7 @@
  (public_name tezos-clic.unix)
  (instrumentation (backend bisect_ppx))
  (libraries
+  tezos-stdlib
   tezos-clic
   tezos-stdlib-unix
   tezos-error-monad

@@ -623,12 +623,17 @@ module Target = struct
 
   type external_ = {
     name : string;
+    main_module : string option;
     opam : string option;
     version : Version.constraints;
     js_compatible : bool;
   }
 
-  type vendored = {name : string; js_compatible : bool}
+  type vendored = {
+    name : string;
+    main_module : string option;
+    js_compatible : bool;
+  }
 
   type opam_only = {name : string; version : Version.constraints}
 
@@ -703,6 +708,7 @@ module Target = struct
     | Opam_only of opam_only
     | Optional of target
     | Select of select
+    | Open of target * string
 
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
@@ -732,7 +738,8 @@ module Target = struct
 
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
-    | Optional target | Select {package = target; _} -> name_for_errors target
+    | Optional target | Select {package = target; _} | Open (target, _) ->
+        name_for_errors target
     | Internal {kind; _} -> (
         match kind with
         | Public_library {public_name = name; _}
@@ -745,7 +752,8 @@ module Target = struct
 
   let rec names_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> (name, [])
-    | Optional target | Select {package = target; _} -> names_for_dune target
+    | Optional target | Select {package = target; _} | Open (target, _) ->
+        names_for_dune target
     | Internal {kind; _} -> (
         match kind with
         | Public_library {public_name; _} -> (public_name, [])
@@ -757,7 +765,7 @@ module Target = struct
 
   let rec library_name_for_dune = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> Ok name
-    | Optional target | Select {package = target; _} ->
+    | Optional target | Select {package = target; _} | Open (target, _) ->
         library_name_for_dune target
     | Internal {kind; _} -> (
         match kind with
@@ -821,6 +829,14 @@ module Target = struct
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?static_cclibs ?synopsis ?(virtual_modules = [])
       ?(wrapped = true) ~path names =
+    let opens =
+      let rec get_opens acc = function
+        | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
+        | Optional target | Select {package = target; _} -> get_opens acc target
+        | Open (target, module_name) -> get_opens (module_name :: acc) target
+      in
+      List.flatten (List.map (get_opens []) deps) @ opens
+    in
     let (js_compatible, js_of_ocaml) =
       match (js_compatible, js_of_ocaml) with
       | (Some false, Some _) ->
@@ -1046,19 +1062,19 @@ module Target = struct
     | [] -> invalid_arg "Target.test_exes: at least one name must be given"
     | head :: tail -> Test_executable (head, tail)
 
-  let vendored_lib ?(js_compatible = false) name =
-    Vendored {name; js_compatible}
+  let vendored_lib ?main_module ?(js_compatible = false) name =
+    Vendored {name; main_module; js_compatible}
 
-  let external_lib ?opam ?(js_compatible = false) name version =
+  let external_lib ?main_module ?opam ?(js_compatible = false) name version =
     let opam =
       match opam with None -> Some name | Some "" -> None | Some _ as x -> x
     in
-    External {name; opam; version; js_compatible}
+    External {name; main_module; opam; version; js_compatible}
 
-  let external_sublib ?(js_compatible = false) parent name =
+  let rec external_sublib ?main_module ?(js_compatible = false) parent name =
     match parent with
     | External {opam; version; _} ->
-        External {name; opam; version; js_compatible}
+        External {name; main_module; opam; version; js_compatible}
     | Opam_only _ ->
         invalid_arg
           "Target.external_sublib: parent must be a non-opam-only external lib"
@@ -1072,10 +1088,52 @@ module Target = struct
         invalid_arg
           "Target.external_sublib: Select should be used in dependency lists, \
            not when registering"
+    | Open (target, module_name) ->
+        Open (external_sublib target name, module_name)
 
   let opam_only name version = Opam_only {name; version}
 
   let optional target = Optional target
+
+  let open_ ?m target =
+    let rec main_module_name = function
+      | Internal {kind; _} -> (
+          match kind with
+          | Public_library {internal_name; _} | Private_library internal_name ->
+              String.capitalize_ascii internal_name
+          | Public_executable _ | Private_executable _ | Test _
+          | Test_executable _ ->
+              invalid_argf
+                "Manifest.open_: cannot be used on executable and test targets \
+                 (such as %s)"
+                (name_for_errors target))
+      | Optional target | Select {package = target; _} | Open (target, _) ->
+          main_module_name target
+      | Vendored {main_module = Some main_module; _}
+      | External {main_module = Some main_module; _} ->
+          String.capitalize_ascii main_module
+      | Vendored {main_module = None; _} ->
+          invalid_argf
+            "Manifest.open_: cannot be used on vendored targets with no \
+             specified main module (such as %s)"
+            (name_for_errors target)
+      | External {main_module = None; _} ->
+          invalid_argf
+            "Manifest.open_: cannot be used on external targets with no \
+             specified main module (such as %s)"
+            (name_for_errors target)
+      | Opam_only _ ->
+          invalid_argf
+            "Manifest.open_: cannot be used on opam-only targets (such as %s)"
+            (name_for_errors target)
+    in
+    let main_module_name = main_module_name target in
+    let module_name =
+      match m with
+      | None -> main_module_name
+      | Some m -> main_module_name ^ "." ^ String.capitalize_ascii m
+    in
+    Open (target, module_name)
 
   let select ~package ~source_if_present ~source_if_absent ~target =
     Select {package; source_if_present; source_if_absent; target}
@@ -1120,7 +1178,7 @@ let write filename f =
 let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
   let (libraries, empty_files_to_create) =
     let empty_files_to_create = ref [] in
-    let get_library (dep : Target.target) =
+    let rec get_library (dep : Target.target) =
       let name =
         match Target.library_name_for_dune dep with
         | Ok name -> name
@@ -1158,6 +1216,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
               [G [S name; S "->"; S source_if_present]];
               [G [S "->"; S source_if_absent]];
             ]
+      | Open (target, _) -> get_library target
     in
     let libraries = List.map get_library internal.deps |> Dune.of_list in
     (libraries, List.rev !empty_files_to_create)
@@ -1406,6 +1465,8 @@ let rec as_opam_dependency ~fix_version ~(for_package : string) ~with_test
       Option.map
         (fun (dep : Opam.dependency) -> {dep with optional = true})
         (as_opam_dependency ~fix_version ~for_package ~with_test target)
+  | Open (target, _) ->
+      as_opam_dependency ~fix_version ~for_package ~with_test target
 
 let generate_opam ?release this_package (internals : Target.internal list) :
     Opam.t =
@@ -1614,13 +1675,13 @@ let check_js_of_ocaml () =
     match target with
     | External {js_compatible; name; _} ->
         if not js_compatible then missing_jsoo_for_target ~used_by name
-    | Vendored {js_compatible; name} ->
+    | Vendored {js_compatible; name; _} ->
         if not js_compatible then missing_jsoo_for_target ~used_by name
     | Internal ({js_compatible; _} as internal) ->
         if not js_compatible then
           missing_jsoo_for_target ~used_by (internal_name internal)
     | Optional internal -> check_target ~used_by internal
-    | Select {package; _} -> check_target ~used_by package
+    | Select {package; _} | Open (package, _) -> check_target ~used_by package
     | Opam_only _ -> (* irrelevent to this check *) ()
   in
   let check_internal (internal : Target.internal) =

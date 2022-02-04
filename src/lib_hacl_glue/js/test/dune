@@ -9,9 +9,9 @@
   tezos-error-monad
   zarith
   zarith_stubs_js
+  data-encoding
   tezos-hacl-glue
   tezos-hacl-glue-js
-  data-encoding
   qcheck-alcotest
   tezos-test-helpers)
  (js_of_ocaml)

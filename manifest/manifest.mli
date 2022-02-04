@@ -588,9 +588,13 @@ val test_exe : string maker
 val test_exes : string list maker
 
 (** Make an external vendored library, for use in internal target dependencies.
+
+    [main_module] is the name of the main module provided by the library (see [open_]).
+
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false. *)
-val vendored_lib : ?js_compatible:bool -> string -> target
+val vendored_lib :
+  ?main_module:string -> ?js_compatible:bool -> string -> target
 
 (** Make an external library, for use in internal target dependencies.
 
@@ -599,10 +603,17 @@ val vendored_lib : ?js_compatible:bool -> string -> target
     [name] is used in [dune] files, while [opam] is used in [.opam] files.
     Default value for [opam] is [name].
 
+    [main_module] is the name of the main module provided by the library (see [open_]).
+
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.  *)
 val external_lib :
-  ?opam:string -> ?js_compatible:bool -> string -> Version.constraints -> target
+  ?main_module:string ->
+  ?opam:string ->
+  ?js_compatible:bool ->
+  string ->
+  Version.constraints ->
+  target
 
 (** Make an external library that is a sublibrary of an other one.
 
@@ -612,11 +623,15 @@ val external_lib :
     [version_constraints], this is equivalent to:
     [external_lib ~opam: main_opam name version_constraints].
 
+    [main_module] is the name of the main module provided by the library (see [open_]).
+    The main module of [main_lib] is ignored.
+
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.
 
     @raise [Invalid_arg] if [main_lib] was not built with [external_lib]. *)
-val external_sublib : ?js_compatible:bool -> target -> string -> target
+val external_sublib :
+  ?main_module:string -> ?js_compatible:bool -> target -> string -> target
 
 (** Make an external library that is to only appear in [.opam] dependencies.
 
@@ -682,6 +697,21 @@ val select :
     Like [select], the target is put in the [depopts] section of the [.opam] file
     instead of the [depends] section. *)
 val optional : target -> target
+
+(** Make a target with a module that should automatically be opened.
+
+    If [m] is specified, open this submodule instead of the main module.
+
+    When such targets appear in [?deps] of a target [maker], they are
+    automatically prepended to [?opens] in the order of declaration in [?deps].
+    If you use [open_] on an [open_], the innermost [open_]s is opened first;
+    For instance, [tezos_base |> open_ |> open_ ~m: "TzPervasives"]
+    is target [tezos_base], but when used in [?deps], this automatically prepend
+    ["Tezos_base"], followed by ["Tezos_base__TzPervasives"], to [?opens].
+
+    Can only be used on internal libraries and on external or vendored
+    libraries for which a [main_module] was specified. *)
+val open_ : ?m:string -> target -> target
 
 (** Get a name for a given target, to display in errors.
 

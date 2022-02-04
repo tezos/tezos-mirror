@@ -7,9 +7,9 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
-  tezos-client-base
-  tezos-clic.unix
   tezos-rpc
+  tezos-clic.unix
+  tezos-client-base
   tezos-shell-services
   tezos-p2p-services
   tezos-stdlib-unix
@@ -18,7 +18,7 @@
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_rpc
    -open Tezos_clic_unix
    -open Tezos_client_base

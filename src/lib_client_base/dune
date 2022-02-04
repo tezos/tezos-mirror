@@ -7,13 +7,13 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-rpc
   tezos-shell-services
-  tezos-sapling
-  tezos-rpc)
+  tezos-sapling)
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_rpc
    -open Tezos_shell_services))
  (modules :standard bip39_english))

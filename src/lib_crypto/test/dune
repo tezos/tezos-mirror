@@ -5,8 +5,9 @@
  (names test_run test_prop_signature)
  (package tezos-crypto)
  (libraries
-  tezos-crypto
   tezos-stdlib
+  tezos-crypto
+  tezos-error-monad
   zarith
   zarith_stubs_js
   tezos-hacl-glue-unix

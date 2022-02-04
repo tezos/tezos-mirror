@@ -10,8 +10,8 @@
   ctypes
   ctypes.stubs
   data-encoding
-  tezos-crypto
   tezos-stdlib
+  tezos-crypto
   tezos-error-monad
   tezos-lwt-result-stdlib)
  (flags

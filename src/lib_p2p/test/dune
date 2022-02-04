@@ -15,18 +15,19 @@
   tezos-base
   tezos-base.unix
   tezos-stdlib-unix
+  tezos-stdlib
   tezos-p2p
-  tezos-p2p-services
   tezos-test-helpers
   tezos-base-test-helpers
   tezos-event-logging-test-helpers
+  tezos-p2p-services
   alcotest-lwt
   astring)
  (preprocess (pps bisect_ppx --bisect-sigterm))
  (flags
   (:standard
    -linkall
-   -open Tezos_base__TzPervasives
+   -open Tezos_base.TzPervasives
    -open Tezos_stdlib_unix
    -open Tezos_stdlib
    -open Tezos_p2p
