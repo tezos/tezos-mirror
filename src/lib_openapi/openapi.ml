@@ -53,9 +53,13 @@ let obj ll : Json.u = `O (List.flatten ll)
 module Schema = struct
   type kind =
     | Boolean
-    | Integer of {minimum : int option; maximum : int option; enum : int list}
+    | Integer of {
+        minimum : int option;
+        maximum : int option;
+        enum : int list option;
+      }
     | Number of {minimum : float option; maximum : float option}
-    | String of {enum : string list; pattern : string option}
+    | String of {enum : string list option; pattern : string option}
     | Array of t
     | Object of {properties : property list; additional_properties : t option}
     | One_of of t list
@@ -93,7 +97,9 @@ module Schema = struct
                 typ "integer";
                 field_opt "minimum" minimum int;
                 field_opt "maximum" maximum int;
-                field_list "enum" (List.map int enum);
+                (match enum with
+                | None -> []
+                | Some enum -> field "enum" (`A (List.map int enum)));
               ]
           | Number {minimum; maximum} ->
               [
@@ -104,7 +110,9 @@ module Schema = struct
           | String {enum; pattern} ->
               [
                 typ "string";
-                field_list "enum" (List.map string enum);
+                (match enum with
+                | None -> []
+                | Some enum -> field "enum" (`A (List.map string enum)));
                 field_opt "pattern" pattern string;
               ]
           | Array item_schema ->
@@ -173,7 +181,11 @@ module Schema = struct
         match json |-> "type" |> unannotate with
         | `String "boolean" -> make Boolean
         | `String "integer" ->
-            let enum = json |-> "enum" |> as_list |> List.map as_int in
+            let enum =
+              json |-> "enum" |> function
+              | enum when is_null enum -> None
+              | enum -> Some (as_list enum |> List.map as_int)
+            in
             let minimum = json |-> "minimum" |> as_int_opt in
             let maximum = json |-> "maximum" |> as_int_opt in
             make (Integer {minimum; maximum; enum})
@@ -183,7 +195,11 @@ module Schema = struct
             make (Number {minimum; maximum})
         | `String "string" ->
             let pattern = json |-> "pattern" |> as_string_opt in
-            let enum = json |-> "enum" |> as_list |> List.map as_string in
+            let enum =
+              json |-> "enum" |> function
+              | enum when is_null enum -> None
+              | enum -> Some (as_list enum |> List.map as_string)
+            in
             make (String {enum; pattern})
         | `String "object" ->
             let properties_list =
@@ -229,15 +245,15 @@ module Schema = struct
   let boolean ?title ?description ?(nullable = false) () =
     Other {title; description; nullable; kind = Boolean}
 
-  let integer ?minimum ?maximum ?(enum = []) ?title ?description
-      ?(nullable = false) () =
+  let integer ?minimum ?maximum ?enum ?title ?description ?(nullable = false) ()
+      =
     Other
       {title; description; nullable; kind = Integer {minimum; maximum; enum}}
 
   let number ?minimum ?maximum ?title ?description ?(nullable = false) () =
     Other {title; description; nullable; kind = Number {minimum; maximum}}
 
-  let string ?(enum = []) ?pattern ?title ?description ?(nullable = false) () =
+  let string ?enum ?pattern ?title ?description ?(nullable = false) () =
     Other {title; description; nullable; kind = String {enum; pattern}}
 
   let array ~items ?title ?description ?(nullable = false) () =

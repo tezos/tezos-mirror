@@ -37,9 +37,13 @@ module Schema : sig
   (** Nullable (i.e. non-ref) schemas. *)
   type kind =
     | Boolean
-    | Integer of {minimum : int option; maximum : int option; enum : int list}
+    | Integer of {
+        minimum : int option;
+        maximum : int option;
+        enum : int list option;
+      }
     | Number of {minimum : float option; maximum : float option}
-    | String of {enum : string list; pattern : string option}
+    | String of {enum : string list option; pattern : string option}
     | Array of t
     | Object of {properties : property list; additional_properties : t option}
     | One_of of t list
