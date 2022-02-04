@@ -1021,8 +1021,7 @@ let register () =
     ~tags:["rpc"; "regression"; "binary"]
     ~output_file:"rpc/binary_rpc"
     binary_regression_test ;
-  let alpha_consensus_threshold = [(["consensus_threshold"], Some "0")] in
-  let register_alpha test_mode_tag =
+  let register protocol test_mode_tag =
     let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group
         =
       check_rpc
@@ -1031,75 +1030,51 @@ let register () =
         ?node_parameters
         ~test_function
         sub_group
-        [Alpha]
+        [protocol]
+    in
+    let consensus_threshold =
+      if Protocol.number protocol >= 012 then
+        [(["consensus_threshold"], Some "0")]
+      else []
     in
     check_rpc
       "contracts"
       ~test_function:test_contracts
-      ~parameter_overrides:alpha_consensus_threshold ;
+      ~parameter_overrides:consensus_threshold ;
     check_rpc
       "delegates"
-      ~test_function:(test_delegates Alpha)
-      ~parameter_overrides:alpha_consensus_threshold ;
+      ~test_function:(test_delegates protocol)
+      ~parameter_overrides:consensus_threshold ;
     check_rpc
       "votes"
       ~test_function:test_votes
       ~parameter_overrides:
         (* reduced periods duration to get to testing vote period faster *)
-        ([
-           (["blocks_per_cycle"], Some "4");
-           (["cycles_per_voting_period"], Some "1");
-         ]
-        @ alpha_consensus_threshold) ;
+        (let cycles_per_voting_period =
+           if Protocol.number protocol >= 013 then
+             (["cycles_per_voting_period"], Some "1")
+           else (["blocks_per_voting_period"], Some "4")
+         in
+         [(["blocks_per_cycle"], Some "4"); cycles_per_voting_period]
+         @ consensus_threshold) ;
     check_rpc
       "others"
       ~test_function:test_others
-      ~parameter_overrides:alpha_consensus_threshold ;
+      ~parameter_overrides:consensus_threshold ;
     match test_mode_tag with
     | `Client_with_proxy_server | `Light -> ()
     | _ ->
         check_rpc
           "mempool"
-          ~test_function:(test_mempool Alpha)
-          ~node_parameters:mempool_node_flags
-  in
-  let register_current_mainnet test_mode_tag =
-    let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group
-        =
-      check_rpc
-        ~test_mode_tag
-        ?parameter_overrides
-        ?node_parameters
-        ~test_function
-        sub_group
-        [Hangzhou]
-    in
-    check_rpc "contracts" ~test_function:test_contracts ;
-    check_rpc "delegates" ~test_function:(test_delegates Hangzhou) ;
-    check_rpc
-      "votes"
-      ~test_function:test_votes
-      ~parameter_overrides:
-        (* reduced periods duration to get to testing vote period faster *)
-        [
-          (["blocks_per_cycle"], Some "4");
-          (["blocks_per_voting_period"], Some "4");
-        ] ;
-    check_rpc "others" ~test_function:test_others ;
-    match test_mode_tag with
-    | `Client_with_proxy_server | `Light -> ()
-    | _ ->
-        check_rpc
-          "mempool"
-          ~test_function:(test_mempool Hangzhou)
+          ~test_function:(test_mempool protocol)
           ~node_parameters:mempool_node_flags
   in
   let modes = [`Client; `Light; `Proxy; `Client_with_proxy_server] in
 
   List.iter
     (fun mode ->
-      register_alpha mode ;
-      register_current_mainnet mode)
+      register Alpha mode ;
+      register Hangzhou mode)
     modes ;
 
   let addresses = ["localhost"; "127.0.0.1"] in
