@@ -598,7 +598,12 @@ module Random = struct
       if Compare.Int.(n > state_size - consumed_bytes) then
         loop (Raw_hashes.blake2b bytes, 0)
       else
-        let r = Int64.abs (TzEndian.get_int64 bytes n) in
+        let r = TzEndian.get_int64 bytes n in
+        (* The absolute value of min_int is min_int.  Also, every
+           positive integer is represented twice (positive and negative),
+           but zero is only represented once.  We fix both problems at
+           once. *)
+        let r = if Compare.Int64.(r = Int64.min_int) then 0L else Int64.abs r in
         if Compare.Int64.(r >= drop_if_over) then
           loop (bytes, n + consumed_bytes)
         else

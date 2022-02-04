@@ -80,7 +80,12 @@ let take_int32 s bound =
     in
     let rec loop s =
       let (bytes, s) = take s in
-      let r = Int32.abs (TzEndian.get_int32 bytes 0) in
+      let r = TzEndian.get_int32 bytes 0 in
+      (* The absolute value of min_int is min_int.  Also, every
+           positive integer is represented twice (positive and negative),
+           but zero is only represented once.  We fix both problems at
+           once. *)
+      let r = if Compare.Int32.(r = Int32.min_int) then 0l else Int32.abs r in
       if Compare.Int32.(r >= drop_if_over) then loop s
       else
         let v = Int32.rem r bound in
@@ -98,7 +103,12 @@ let take_int64 s bound =
 
     let rec loop s =
       let (bytes, s) = take s in
-      let r = Int64.abs (TzEndian.get_int64 bytes 0) in
+      let r = TzEndian.get_int64 bytes 0 in
+      (* The absolute value of min_int is min_int.  Also, every
+           positive integer is represented twice (positive and negative),
+           but zero is only represented once.  We fix both problems at
+           once. *)
+      let r = if Compare.Int64.(r = Int64.min_int) then 0L else Int64.abs r in
       if Compare.Int64.(r >= drop_if_over) then loop s
       else
         let v = Int64.rem r bound in
