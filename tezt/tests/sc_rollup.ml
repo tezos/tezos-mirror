@@ -254,8 +254,8 @@ let test_rollup_inbox =
         client)
 
 let register ~protocols =
-  test_origination ~protocols ;
-  test_rollup_node_configuration ~protocols ;
-  test_rollup_node_running ~protocols ;
-  test_rollup_client_gets_address ~protocols ;
-  test_rollup_inbox ~protocols
+  test_origination protocols ;
+  test_rollup_node_configuration protocols ;
+  test_rollup_node_running protocols ;
+  test_rollup_client_gets_address protocols ;
+  test_rollup_inbox protocols

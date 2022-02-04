@@ -201,5 +201,5 @@ let check_prevalidator_start =
   unit
 
 let register ~protocols =
-  check_node_synchronization_state ~protocols ;
-  check_prevalidator_start ~protocols
+  check_node_synchronization_state protocols ;
+  check_prevalidator_start protocols

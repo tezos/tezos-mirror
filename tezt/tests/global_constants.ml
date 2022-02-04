@@ -177,6 +177,6 @@ let test_entrypoint_expansion =
   else Test.fail "Expected to find two entrypoints: 'do' and 'default'"
 
 let register ~protocols =
-  test_large_flat_contract ~protocols ;
-  test_billion_laughs_contract ~protocols ;
-  test_entrypoint_expansion ~protocols
+  test_large_flat_contract protocols ;
+  test_billion_laughs_contract protocols ;
+  test_entrypoint_expansion protocols

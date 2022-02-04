@@ -209,8 +209,8 @@ let register ~protocols =
       ~title:(sf "big_map_perf (%s)" mode_tag)
       ~tags:["bigmapperf"; mode_tag]
       (fun protocol -> big_map_get ~protocol mode ())
-      ~protocols
+      protocols
   in
   register `Node ;
   register `Proxy_server ;
-  test_equivalence ~protocols
+  test_equivalence protocols

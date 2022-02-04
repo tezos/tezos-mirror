@@ -116,5 +116,3 @@ let register =
   let* () = last_bake () in
   let* _ = Node.wait_for_level node 4 in
   unit
-
-let register ~protocols = register ~protocols

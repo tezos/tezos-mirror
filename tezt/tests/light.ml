@@ -297,9 +297,9 @@ let register_protocol_independent () =
   Proxy.test_support_four_protocols `Light
 
 let register ~protocols =
-  test_transfer ~protocols ;
-  test_bake ~protocols ;
-  NoUselessRpc.test ~protocols ;
-  test_wrong_proto ~protocols ;
-  test_locations ~protocols ;
-  test_compare_light ~protocols
+  test_transfer protocols ;
+  test_bake protocols ;
+  NoUselessRpc.test protocols ;
+  test_wrong_proto protocols ;
+  test_locations protocols ;
+  test_compare_light protocols

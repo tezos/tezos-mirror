@@ -77,6 +77,6 @@ let test_normalize_proxy =
   Lwt.return_unit
 
 let register ~protocols =
-  test_normalize_vanilla ~protocols ;
-  test_normalize_mockup ~protocols ;
-  test_normalize_proxy ~protocols
+  test_normalize_vanilla protocols ;
+  test_normalize_mockup protocols ;
+  test_normalize_proxy protocols

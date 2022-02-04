@@ -137,7 +137,7 @@ val register_test :
   title:string ->
   tags:string list ->
   (t -> unit Lwt.t) ->
-  protocols:t list ->
+  t list ->
   unit
 
 (** Register a long-test that uses the propocol.
@@ -152,7 +152,7 @@ val register_long_test :
   executors:Long_test.executor list ->
   timeout:Long_test.timeout ->
   (t -> unit Lwt.t) ->
-  protocols:t list ->
+  t list ->
   unit
 
 (** Register a regression test that uses the protocol.
@@ -165,5 +165,5 @@ val register_regression_test :
   tags:string list ->
   output_file:string ->
   (t -> unit Lwt.t) ->
-  protocols:t list ->
+  t list ->
   unit

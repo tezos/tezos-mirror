@@ -97,16 +97,16 @@ let check_samples_encoding ~group_name ~protocols ~samples =
         ~title:(sf "%s encoding regression test: %s" group_name sample)
         ~tags:["encoding"; group_name]
         ~output_file:("encoding" // sf "%s.%s" group_name sample)
-        ~protocols
-      @@ fun protocol ->
-      let base_path =
-        "tezt" // "tests" // "encoding_samples" // group_name // sample
-      in
-      Sys.readdir base_path |> Array.to_list |> List.sort String.compare
-      |> Lwt_list.iter_s (fun file ->
-             check_sample
-               ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
-               ~file:(base_path // file)))
+        (fun protocol ->
+          let base_path =
+            "tezt" // "tests" // "encoding_samples" // group_name // sample
+          in
+          Sys.readdir base_path |> Array.to_list |> List.sort String.compare
+          |> Lwt_list.iter_s (fun file ->
+                 check_sample
+                   ~name:(Protocol.encoding_prefix protocol ^ "." ^ sample)
+                   ~file:(base_path // file)))
+        protocols)
     samples
 
 let default_samples =

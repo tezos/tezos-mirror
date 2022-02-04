@@ -91,4 +91,4 @@ let check_client_force =
       assert (JSON.(first_failed_script |> as_list |> List.length = 3))) ;
   return ()
 
-let register ~protocols = check_client_force ~protocols
+let register ~protocols = check_client_force protocols

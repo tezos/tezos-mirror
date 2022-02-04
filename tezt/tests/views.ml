@@ -94,13 +94,12 @@ let hooks =
       (fun cmd args -> mask_temp_dir args |> Regression.hooks.on_spawn cmd);
   }
 
-let register ~protocols () =
+let register =
   Protocol.register_regression_test
     ~__FILE__
     ~title:"Run views"
     ~tags:["client"; "michelson"]
     ~output_file:"run_views"
-    ~protocols
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let* register_callers =

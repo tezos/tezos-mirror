@@ -808,9 +808,9 @@ module Illtyped_originations = struct
     unit
 
   let register ~protocols =
-    contract_body_illtyped_1 ~protocols ;
-    contract_body_illtyped_2 ~protocols ;
-    initial_storage_illtyped ~protocols
+    contract_body_illtyped_1 protocols ;
+    contract_body_illtyped_2 protocols ;
+    initial_storage_illtyped protocols
 end
 
 module Reveal = struct
@@ -929,11 +929,11 @@ module Reveal = struct
     Memchecks.check_revealed ~__LOC__ nodes.main key ~revealed:false
 
   let register ~protocols =
-    simple_reveal_bad_pk ~protocols ;
-    simple_reveal_not_a_pk ~protocols ;
-    revealed_twice_in_batch ~protocols ;
-    revealed_twice_in_batch_bad_first_key ~protocols ;
-    revealed_twice_in_batch_bad_second_key ~protocols
+    simple_reveal_bad_pk protocols ;
+    simple_reveal_not_a_pk protocols ;
+    revealed_twice_in_batch protocols ;
+    revealed_twice_in_batch_bad_first_key protocols ;
+    revealed_twice_in_batch_bad_second_key protocols
 end
 
 module Simple_transfers = struct
@@ -1504,21 +1504,21 @@ module Simple_transfers = struct
     unit
 
   let register ~protocols =
-    test_simple_transfer_applied ~protocols ;
-    test_simple_transfer_low_balance_to_pay_fees ~protocols ;
-    test_simple_transfer_low_balance_to_make_transfer ~protocols ;
-    test_simple_transfer_counter_in_the_past ~protocols ;
-    test_simple_transfer_counter_in_the_future ~protocols ;
-    test_simple_transfer_wrong_signature ~protocols ;
-    test_simple_transfer_not_enough_gas ~protocols ;
-    test_simple_transfer_not_enough_fees_for_gas ~protocols ;
-    test_simple_transfer_low_balance_to_pay_allocation_1 ~protocols ;
-    test_simple_transfer_low_balance_to_pay_allocation_2 ~protocols ;
-    test_simple_transfer_of_the_whole_balance ~protocols ;
-    test_simple_transfers_successive_wrong_counters ~protocols:[Ithaca; Alpha] ;
-    test_simple_transfers_successive_wrong_counters_no_op_pre ~protocols ;
-    test_batch_simple_transfers_wrong_counters ~protocols:[Alpha] ;
-    test_batch_simple_transfers_wrong_counters_2 ~protocols:[Alpha]
+    test_simple_transfer_applied protocols ;
+    test_simple_transfer_low_balance_to_pay_fees protocols ;
+    test_simple_transfer_low_balance_to_make_transfer protocols ;
+    test_simple_transfer_counter_in_the_past protocols ;
+    test_simple_transfer_counter_in_the_future protocols ;
+    test_simple_transfer_wrong_signature protocols ;
+    test_simple_transfer_not_enough_gas protocols ;
+    test_simple_transfer_not_enough_fees_for_gas protocols ;
+    test_simple_transfer_low_balance_to_pay_allocation_1 protocols ;
+    test_simple_transfer_low_balance_to_pay_allocation_2 protocols ;
+    test_simple_transfer_of_the_whole_balance protocols ;
+    test_simple_transfers_successive_wrong_counters [Ithaca; Alpha] ;
+    test_simple_transfers_successive_wrong_counters_no_op_pre protocols ;
+    test_batch_simple_transfers_wrong_counters [Alpha] ;
+    test_batch_simple_transfers_wrong_counters_2 [Alpha]
 end
 
 module Simple_contract_calls = struct
@@ -1631,10 +1631,10 @@ module Simple_contract_calls = struct
     unit
 
   let register ~protocols =
-    sucessful_smart_contract_call ~protocols ;
-    call_with_illtyped_argument ~protocols ;
-    test_contract_call_with_failwith ~protocols ;
-    test_contract_call_with_loop_gas_exhaution ~protocols
+    sucessful_smart_contract_call protocols ;
+    call_with_illtyped_argument protocols ;
+    test_contract_call_with_failwith protocols ;
+    test_contract_call_with_loop_gas_exhaution protocols
 end
 
 let register ~protocols =

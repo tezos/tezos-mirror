@@ -120,12 +120,11 @@ let test_transfer =
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
-let test_calling_contract_with_global_constant_success ~protocols =
+let test_calling_contract_with_global_constant_success =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant success"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -141,12 +140,11 @@ let test_calling_contract_with_global_constant_success ~protocols =
   if result = value then return ()
   else Test.fail "Expected storage '%s' but got '%s'" value result
 
-let test_calling_contract_with_global_constant_failure ~protocols =
+let test_calling_contract_with_global_constant_failure =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Calling a contract with a global constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let* client = Client.init_mockup ~protocol () in
   let script = "file:./tezt/tests/contracts/proto_alpha/constant_999.tz" in
@@ -158,12 +156,11 @@ let test_calling_contract_with_global_constant_failure ~protocols =
     ~msg:(rex "No registered global was found")
     process
 
-let test_register_global_constant_success ~protocols =
+let test_register_global_constant_success =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Register Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -173,12 +170,11 @@ let test_register_global_constant_success ~protocols =
   Log.info "Registered Global Connstant %s with hash %s" value result ;
   return ()
 
-let test_register_global_constant_failure ~protocols =
+let test_register_global_constant_failure =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Register Global Constant failure"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -192,12 +188,11 @@ let test_register_global_constant_failure ~protocols =
     ~msg:(rex "register global constant simulation failed")
     proccess
 
-let test_originate_contract_with_global_constant_success ~protocols =
+let test_originate_contract_with_global_constant_success =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Originate Contract with Global Constant success"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -217,12 +212,11 @@ let test_originate_contract_with_global_constant_success ~protocols =
   Log.info "result %s" result ;
   return ()
 
-let test_typechecking_and_normalization_work_with_constants ~protocols =
+let test_typechecking_and_normalization_work_with_constants =
   Protocol.register_test
     ~__FILE__
     ~title:"(Mockup) Typechecking and normalization work with constants"
     ~tags:["mockup"; "client"; "global_constant"]
-    ~protocols
   @@ fun protocol ->
   let (src, _, _) = transfer_data in
   let* client = Client.init_mockup ~protocol () in
@@ -646,24 +640,24 @@ let test_empty_block_baking =
   Client.bake_for ~keys:[giver] client
 
 let register ~protocols =
-  test_rpc_list ~protocols ;
-  test_same_transfer_twice ~protocols ;
-  test_transfer_same_participants ~protocols ;
-  test_transfer ~protocols ;
-  test_empty_block_baking ~protocols ;
-  test_simple_baking_event ~protocols ;
-  test_multiple_baking ~protocols ;
-  test_rpc_header_shell ~protocols ;
-  test_origination_from_unrevealed_fees ~protocols ;
-  test_multiple_transfers ~protocols
+  test_rpc_list protocols ;
+  test_same_transfer_twice protocols ;
+  test_transfer_same_participants protocols ;
+  test_transfer protocols ;
+  test_empty_block_baking protocols ;
+  test_simple_baking_event protocols ;
+  test_multiple_baking protocols ;
+  test_rpc_header_shell protocols ;
+  test_origination_from_unrevealed_fees protocols ;
+  test_multiple_transfers protocols
 
 let register_global_constants ~protocols =
-  test_register_global_constant_success ~protocols ;
-  test_register_global_constant_failure ~protocols ;
-  test_calling_contract_with_global_constant_success ~protocols ;
-  test_calling_contract_with_global_constant_failure ~protocols ;
-  test_originate_contract_with_global_constant_success ~protocols ;
-  test_typechecking_and_normalization_work_with_constants ~protocols
+  test_register_global_constant_success protocols ;
+  test_register_global_constant_failure protocols ;
+  test_calling_contract_with_global_constant_success protocols ;
+  test_calling_contract_with_global_constant_failure protocols ;
+  test_originate_contract_with_global_constant_success protocols ;
+  test_typechecking_and_normalization_work_with_constants protocols
 
 let register_constant_migration ~migrate_from ~migrate_to =
   test_migration_constants ~migrate_from ~migrate_to

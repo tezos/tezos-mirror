@@ -42,4 +42,4 @@ let test_baker =
   let* () = Client.stresstest ~tps:25 ~transfers:100 client in
   Lwt.return_unit
 
-let register ~protocols = test_baker ~protocols
+let register ~protocols = test_baker protocols

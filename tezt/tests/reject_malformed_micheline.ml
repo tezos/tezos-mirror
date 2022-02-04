@@ -111,4 +111,4 @@ let reject_malformed_micheline =
     if has_correct_error_message then return ()
     else Test.fail "Unexpected success on malformed Micheline value"
 
-let register ~protocols = reject_malformed_micheline ~protocols
+let register ~protocols = reject_malformed_micheline protocols

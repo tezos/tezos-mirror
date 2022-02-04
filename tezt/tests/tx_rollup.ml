@@ -98,25 +98,23 @@ module Regressions = struct
     return ()
 
   module RPC = struct
-    let rpc_state ~protocols =
+    let rpc_state =
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_rpc_state"
         ~title:"RPC (tx_rollup, regression) - state"
         ~tags:["tx_rollup"; "rpc"; "state"]
-        ~protocols
       @@ fun protocol ->
       let* {node = _; client; rollup} = init_with_tx_rollup ~protocol () in
       let*! _state = Rollup.get_state ~hooks ~rollup client in
       return ()
 
-    let rpc_inbox ~protocols =
+    let rpc_inbox =
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_rpc_inbox"
         ~title:"RPC (tx_rollup, regression) - inbox"
         ~tags:["tx_rollup"; "rpc"; "inbox"]
-        ~protocols
       @@ fun protocol ->
       let* ({rollup; client; node = _} as state) =
         init_with_tx_rollup ~protocol ()
@@ -127,13 +125,12 @@ module Regressions = struct
       let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
       unit
 
-    let rpc_commitment ~protocols =
+    let rpc_commitment =
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_rpc_commitment"
         ~title:"RPC (tx_rollup, regression) - commitment"
         ~tags:["tx_rollup"; "rpc"; "commitment"]
-        ~protocols
       @@ fun protocol ->
       let* ({rollup; client; node} as state) =
         init_with_tx_rollup ~protocol ()
@@ -176,26 +173,24 @@ module Regressions = struct
 
     let inbox_limit = 100_000
 
-    let submit_empty_batch ~protocols =
+    let submit_empty_batch =
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_limit_empty_batch"
         ~title:"Submit empty batch"
         ~tags:["tx_rollup"; "batch"; "client"]
-        ~protocols
       @@ fun protocol ->
       let* state = init_with_tx_rollup ~protocol () in
       let batch = "" in
       let* () = submit_batch_and_bake ~batch state in
       unit
 
-    let submit_maximum_size_batch ~protocols =
+    let submit_maximum_size_batch =
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_limit_maximum_size_batch"
         ~title:"Submit maximum size batch"
         ~tags:["tx_rollup"; "batch"; "client"]
-        ~protocols
       @@ fun protocol ->
       let* state = init_with_tx_rollup ~protocol () in
       let batch = String.make batch_limit 'b' in
@@ -208,13 +203,12 @@ module Regressions = struct
              "A message submtitted to a transaction rollup inbox exceeds limit")
         process
 
-    let inbox_maximum_size ~protocols =
+    let inbox_maximum_size =
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_limit_maximum_size_inbox"
         ~title:"Submit maximum size inbox"
         ~tags:["tx_rollup"; "inbox"; "client"]
-        ~protocols
       @@ fun protocol ->
       (* The test assumes inbox_limit % batch_limit = 0 *)
       let max_batch_number_per_inbox = inbox_limit / batch_limit in
@@ -242,14 +236,13 @@ module Regressions = struct
   end
 
   module Fail = struct
-    let client_submit_batch_invalid_rollup_address ~protocols =
+    let client_submit_batch_invalid_rollup_address =
       let open Tezt_tezos in
       Protocol.register_regression_test
         ~__FILE__
         ~output_file:"tx_rollup_client_submit_batch_invalid_rollup_address"
         ~title:"Submit a batch to an invalid rollup address should fail"
         ~tags:["tx_rollup"; "client"; "fail"]
-        ~protocols
       @@ fun protocol ->
       let* parameter_file = parameter_file protocol in
       let* (_node, client) =
@@ -270,13 +263,13 @@ module Regressions = struct
   end
 
   let register ~protocols =
-    RPC.rpc_state ~protocols ;
-    RPC.rpc_inbox ~protocols ;
-    RPC.rpc_commitment ~protocols ;
-    Limits.submit_empty_batch ~protocols ;
-    Limits.submit_maximum_size_batch ~protocols ;
-    Limits.inbox_maximum_size ~protocols ;
-    Fail.client_submit_batch_invalid_rollup_address ~protocols
+    RPC.rpc_state protocols ;
+    RPC.rpc_inbox protocols ;
+    RPC.rpc_commitment protocols ;
+    Limits.submit_empty_batch protocols ;
+    Limits.submit_maximum_size_batch protocols ;
+    Limits.inbox_maximum_size protocols ;
+    Fail.client_submit_batch_invalid_rollup_address protocols
 end
 
 (** To be attached to process whose output needs to be captured by the
@@ -315,12 +308,11 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
       Rollup.Check.inbox) ;
   return ()
 
-let test_submit_batches_in_several_blocks ~protocols =
+let test_submit_batches_in_several_blocks =
   Protocol.register_test
     ~__FILE__
     ~title:"Submit batches in several blocks"
     ~tags:["tx_rollup"]
-    ~protocols
   @@ fun protocol ->
   let* parameter_file = parameter_file protocol in
   let* (node, client) =
@@ -378,13 +370,12 @@ let test_submit_batches_in_several_blocks ~protocols =
   in
   unit
 
-let test_submit_from_originated_source ~protocols =
+let test_submit_from_originated_source =
   let open Tezt_tezos in
   Protocol.register_test
     ~__FILE__
     ~title:"Submit from an originated contract should fail"
     ~tags:["tx_rollup"; "client"]
-    ~protocols
   @@ fun protocol ->
   let* parameter_file = parameter_file protocol in
   let* (node, client) =
@@ -428,5 +419,5 @@ let test_submit_from_originated_source ~protocols =
 
 let register ~protocols =
   Regressions.register ~protocols ;
-  test_submit_batches_in_several_blocks ~protocols ;
-  test_submit_from_originated_source ~protocols
+  test_submit_batches_in_several_blocks protocols ;
+  test_submit_from_originated_source protocols

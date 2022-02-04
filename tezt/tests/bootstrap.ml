@@ -320,14 +320,14 @@ let register ~protocols =
      blocks. Putting the number `0` in parameters allows to
      save 16 blocks. *)
   let rolling_0 = Node.Rolling (Some 0) in
-  check_bootstrap_with_history_modes archive archive ~protocols ;
-  check_bootstrap_with_history_modes archive full ~protocols ;
-  check_bootstrap_with_history_modes archive rolling ~protocols ;
-  check_bootstrap_with_history_modes full archive ~protocols ;
-  check_bootstrap_with_history_modes full full ~protocols ;
-  check_bootstrap_with_history_modes full rolling ~protocols ;
-  check_bootstrap_with_history_modes rolling_0 Archive ~protocols ;
-  check_bootstrap_with_history_modes rolling_0 rolling_0 ~protocols ;
-  check_bootstrap_with_history_modes rolling_0 full ~protocols
+  check_bootstrap_with_history_modes archive archive protocols ;
+  check_bootstrap_with_history_modes archive full protocols ;
+  check_bootstrap_with_history_modes archive rolling protocols ;
+  check_bootstrap_with_history_modes full archive protocols ;
+  check_bootstrap_with_history_modes full full protocols ;
+  check_bootstrap_with_history_modes full rolling protocols ;
+  check_bootstrap_with_history_modes rolling_0 Archive protocols ;
+  check_bootstrap_with_history_modes rolling_0 rolling_0 protocols ;
+  check_bootstrap_with_history_modes rolling_0 full protocols
 
 let register_protocol_independent () = check_rpc_force_bootstrapped ()
