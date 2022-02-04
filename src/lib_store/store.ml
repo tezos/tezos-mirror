@@ -185,7 +185,7 @@ module Block = struct
     max_operations_ttl : int;
     last_allowed_fork_level : Int32.t;
     block_metadata : Bytes.t;
-    operations_metadata : Bytes.t list list;
+    operations_metadata : Block_validation.operation_metadata list list;
   }
 
   let equal b b' = Block_hash.equal (Block_repr.hash b) (Block_repr.hash b')
@@ -335,42 +335,7 @@ module Block = struct
     | Some b -> return b
     | None -> fail (Block_not_found {hash; distance = 0})
 
-  let store_block chain_store ~block_header ~operations validation_result =
-    let {
-      Block_validation.validation_store =
-        {
-          context_hash;
-          timestamp = _;
-          message;
-          max_operations_ttl;
-          last_allowed_fork_level;
-        };
-      block_metadata;
-      ops_metadata;
-      block_metadata_hash;
-      ops_metadata_hashes;
-    } =
-      validation_result
-    in
-    let bytes = Block_header.to_bytes block_header in
-    let hash = Block_header.hash_raw bytes in
-    let operations_length = List.length operations in
-    let operation_metadata_length = List.length ops_metadata in
-    let validation_passes = block_header.shell.validation_passes in
-    fail_unless
-      (validation_passes = operations_length)
-      (Cannot_store_block
-         ( hash,
-           Invalid_operations_length
-             {validation_passes; operations = operations_length} ))
-    >>=? fun () ->
-    fail_unless
-      (validation_passes = operation_metadata_length)
-      (Cannot_store_block
-         ( hash,
-           Invalid_operations_length
-             {validation_passes; operations = operation_metadata_length} ))
-    >>=? fun () ->
+  let check_metadata_list ~block_hash ~operations ~ops_metadata =
     fail_unless
       (List.for_all2
          ~when_different_lengths:(`X "unreachable")
@@ -389,12 +354,56 @@ module Block = struct
            l
        in
        Cannot_store_block
-         ( hash,
+         ( block_hash,
            Inconsistent_operations_lengths
              {
                operations_lengths = to_string operations;
                operations_data_lengths = to_string ops_metadata;
              } ))
+
+  let store_block chain_store ~block_header ~operations validation_result =
+    let {
+      Block_validation.validation_store =
+        {
+          context_hash;
+          timestamp = _;
+          message;
+          max_operations_ttl;
+          last_allowed_fork_level;
+        };
+      block_metadata;
+      ops_metadata;
+    } =
+      validation_result
+    in
+    let bytes = Block_header.to_bytes block_header in
+    let hash = Block_header.hash_raw bytes in
+    let operations_length = List.length operations in
+    let operation_metadata_length =
+      match ops_metadata with
+      | Block_validation.No_metadata_hash x -> List.length x
+      | Block_validation.Metadata_hash x -> List.length x
+    in
+    let validation_passes = block_header.shell.validation_passes in
+    fail_unless
+      (validation_passes = operations_length)
+      (Cannot_store_block
+         ( hash,
+           Invalid_operations_length
+             {validation_passes; operations = operations_length} ))
+    >>=? fun () ->
+    fail_unless
+      (validation_passes = operation_metadata_length)
+      (Cannot_store_block
+         ( hash,
+           Invalid_operations_length
+             {validation_passes; operations = operation_metadata_length} ))
+    >>=? fun () ->
+    (match ops_metadata with
+    | No_metadata_hash ops_metadata ->
+        check_metadata_list ~block_hash:hash ~operations ~ops_metadata
+    | Metadata_hash ops_metadata ->
+        check_metadata_list ~block_hash:hash ~operations ~ops_metadata)
     >>=? fun () ->
     Stored_data.get chain_store.genesis_block_data >>= fun genesis_block ->
     let is_main_chain =
@@ -450,8 +459,12 @@ module Block = struct
           {
             Block_repr.header = block_header;
             operations;
-            block_metadata_hash;
-            operations_metadata_hashes = ops_metadata_hashes;
+            block_metadata_hash = snd block_metadata;
+            operations_metadata_hashes =
+              (match ops_metadata with
+              | Block_validation.No_metadata_hash _ -> None
+              | Block_validation.Metadata_hash ops_metadata ->
+                  Some (List.map (List.map snd) ops_metadata));
           }
         in
         let metadata =
@@ -460,8 +473,12 @@ module Block = struct
               message;
               max_operations_ttl;
               last_allowed_fork_level;
-              block_metadata;
-              operations_metadata = ops_metadata;
+              block_metadata = fst block_metadata;
+              operations_metadata =
+                (match ops_metadata with
+                | Block_validation.No_metadata_hash ops_metadata -> ops_metadata
+                | Block_validation.Metadata_hash ops_metadata ->
+                    List.map (List.map fst) ops_metadata);
             }
         in
         let block = {Block_repr.hash; contents; metadata} in

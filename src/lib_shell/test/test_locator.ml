@@ -83,10 +83,8 @@ let make_empty_chain chain_store n : Block_hash.t Lwt.t =
               max_operations_ttl;
               last_allowed_fork_level = 0l;
             };
-          block_metadata = zero;
-          ops_metadata = [];
-          block_metadata_hash = None;
-          ops_metadata_hashes = None;
+          block_metadata = (zero, None);
+          ops_metadata = Block_validation.No_metadata_hash [];
         }
       in
       Store.Block.store_block
@@ -157,10 +155,8 @@ let make_multiple_protocol_chain (chain_store : Store.Chain.t)
         {
           Block_validation.validation_store =
             {empty_result with last_allowed_fork_level};
-          block_metadata = zero;
-          ops_metadata = [];
-          block_metadata_hash;
-          ops_metadata_hashes = None;
+          block_metadata = (zero, block_metadata_hash);
+          ops_metadata = Block_validation.No_metadata_hash [];
         }
       in
       Store.Block.store_block
