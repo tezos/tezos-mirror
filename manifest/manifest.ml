@@ -712,7 +712,9 @@ module Target = struct
     | Select of select
     | Open of t * string
 
-  let pps ?(args = []) target = PPS (target, args)
+  let pps ?(args = []) = function
+    | None -> invalid_arg "Manifest.Target.pps cannot be given no_target"
+    | Some target -> PPS (target, args)
 
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
@@ -738,8 +740,9 @@ module Target = struct
         by_opam := String_map.add opam (internal :: old) !by_opam)
       opam ;
     registered := internal :: !registered ;
-    Internal internal
+    Some (Internal internal)
 
+  (* Note: this function is redefined below for the version with optional targets. *)
   let rec name_for_errors = function
     | Vendored {name; _} | External {name; _} | Opam_only {name; _} -> name
     | Optional target | Select {package = target; _} | Open (target, _) ->
@@ -791,12 +794,12 @@ module Target = struct
     ?all_modules_except:string list ->
     ?bisect_ppx:bool ->
     ?c_library_flags:string list ->
-    ?conflicts:t list ->
+    ?conflicts:t option list ->
     ?dep_files:string list ->
-    ?deps:t list ->
+    ?deps:t option list ->
     ?dune:Dune.s_expr ->
     ?foreign_stubs:Dune.foreign_stubs ->
-    ?implements:t ->
+    ?implements:t option ->
     ?inline_tests:bool ->
     ?js_compatible:bool ->
     ?js_of_ocaml:Dune.s_expr ->
@@ -813,7 +816,7 @@ module Target = struct
     ?preprocess:preprocessor list ->
     ?preprocessor_deps:preprocessor_dep list ->
     ?private_modules:string list ->
-    ?opam_only_deps:t list ->
+    ?opam_only_deps:t option list ->
     ?release:bool ->
     ?static:bool ->
     ?static_cclibs:string list ->
@@ -822,7 +825,7 @@ module Target = struct
     ?wrapped:bool ->
     path:string ->
     'a ->
-    t
+    t option
 
   let internal make_kind ?all_modules_except ?bisect_ppx ?c_library_flags
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
@@ -833,6 +836,16 @@ module Target = struct
       ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
       ?release ?static ?static_cclibs ?synopsis ?(virtual_modules = [])
       ?(wrapped = true) ~path names =
+    let conflicts = List.filter_map Fun.id conflicts in
+    let deps = List.filter_map Fun.id deps in
+    let opam_only_deps = List.filter_map Fun.id opam_only_deps in
+    let implements =
+      match implements with
+      | None -> None
+      | Some None ->
+          invalid_arg "Target.internal: cannot pass no_target to ~implements"
+      | Some (Some _ as x) -> x
+    in
     let opens =
       let rec get_opens acc = function
         | Internal _ | Vendored _ | External _ | Opam_only _ -> acc
@@ -1077,15 +1090,16 @@ module Target = struct
 
   let vendored_lib ?main_module ?(js_compatible = false)
       ?(node_wrapper_flags = []) name =
-    Vendored {name; main_module; js_compatible; node_wrapper_flags}
+    Some (Vendored {name; main_module; js_compatible; node_wrapper_flags})
 
   let external_lib ?main_module ?opam ?(js_compatible = false)
       ?(node_wrapper_flags = []) name version =
     let opam =
       match opam with None -> Some name | Some "" -> None | Some _ as x -> x
     in
-    External
-      {name; main_module; opam; version; js_compatible; node_wrapper_flags}
+    Some
+      (External
+         {name; main_module; opam; version; js_compatible; node_wrapper_flags})
 
   let rec external_sublib ?main_module ?(js_compatible = false)
       ?(node_wrapper_flags = []) parent name =
@@ -1109,9 +1123,22 @@ module Target = struct
     | Open (target, module_name) ->
         Open (external_sublib target name, module_name)
 
-  let opam_only name version = Opam_only {name; version}
+  let external_sublib ?main_module ?js_compatible ?node_wrapper_flags parent
+      name =
+    match parent with
+    | None -> invalid_arg "external_sublib cannot be called with no_target"
+    | Some parent ->
+        Some
+          (external_sublib
+             ?main_module
+             ?js_compatible
+             ?node_wrapper_flags
+             parent
+             name)
 
-  let optional target = Optional target
+  let opam_only name version = Some (Opam_only {name; version})
+
+  let optional = function None -> None | Some target -> Some (Optional target)
 
   let open_ ?m target =
     let rec main_module_name = function
@@ -1153,11 +1180,22 @@ module Target = struct
     in
     Open (target, module_name)
 
+  let open_ ?m = function None -> None | Some target -> Some (open_ ?m target)
+
   let select ~package ~source_if_present ~source_if_absent ~target =
-    Select {package; source_if_present; source_if_absent; target}
+    match package with
+    | None -> None
+    | Some package ->
+        Some (Select {package; source_if_present; source_if_absent; target})
 end
 
-type target = Target.t
+type target = Target.t option
+
+let no_target = None
+
+let if_some = function None -> None | Some x -> x
+
+let if_ condition target = if condition then target else None
 
 type release = {version : string; url : Opam.url}
 
@@ -1782,3 +1820,7 @@ let generate ?exclude () =
     exit 1
 
 include Target
+
+let name_for_errors = function
+  | None -> "(no target)"
+  | Some target -> name_for_errors target

@@ -362,6 +362,31 @@ type preprocessor_dep = File of string
     or one [.opam] file with several [dune] files, or any other combinations. *)
 type target
 
+(** A target that is ignored when it appears in lists given to target [maker]s.
+
+    [no_target] can be used in dependency lists, i.e. in [?deps], [?conflicts]
+    and [?opam_only_deps]. [no_target] is removed from those lists automatically.
+    It can thus be used to conveniently build target lists where some targets
+    are computed programatically and may not always be included.
+
+    [optional no_target], [select ~package:no_target ...] and [open_ no_target]
+    are equivalent to [no_target].
+
+    See also [if_some] and [if_]. *)
+val no_target : target
+
+(** Make a target that is ignored if [None].
+
+    [if_some (Some x)] is equivalent to [x], and
+    [if_some None] is equivalent to [no_target]. *)
+val if_some : target option -> target
+
+(** Make a target that is ignored depending on a condition.
+
+    [target |> if_ condition] is equivalent to [target] if [condition] is [true],
+    and to [no_target] if [condition] is [false]. *)
+val if_ : bool -> target -> target
+
 (** Preprocessors. *)
 type preprocessor
 
