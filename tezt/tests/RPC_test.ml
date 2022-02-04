@@ -94,7 +94,7 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
         let* file =
           Protocol.write_parameter_file
             ~base:(Either.right (protocol, None))
-            overrides
+            (overrides protocol)
         in
         Lwt.return_some file
   in
@@ -121,11 +121,11 @@ let check_rpc ~test_mode_tag ~test_function ?parameter_overrides
         let* proxy_server = Proxy_server.init node in
         return Client.(Proxy_server proxy_server)
   in
-  let* _ = test_function ?endpoint:(Some endpoint) client in
+  let* _ = test_function protocol ?endpoint:(Some endpoint) client in
   unit
 
 (* Test the contracts RPC. *)
-let test_contracts ?endpoint client =
+let test_contracts _protocol ?endpoint client =
   let client_bake_for = make_client_bake_for () in
   let test_implicit_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
@@ -572,7 +572,7 @@ let test_delegates protocol ?endpoint client =
   unit
 
 (* Test the votes RPC. *)
-let test_votes ?endpoint client =
+let test_votes _protocol ?endpoint client =
   let client_bake_for = make_client_bake_for () in
   (* initialize data *)
   let proto_hash = "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp" in
@@ -608,7 +608,7 @@ let test_votes ?endpoint client =
   unit
 
 (* Test the various other RPCs. *)
-let test_others ?endpoint client =
+let test_others _protocol ?endpoint client =
   let* _ = RPC.get_constants ?endpoint ~hooks client in
   let* _ = RPC.get_baking_rights ?endpoint ~hooks client in
   let* _ = RPC.get_current_level ?endpoint ~hooks client in
@@ -1014,14 +1014,14 @@ let test_no_service_at_valid_prefix address () =
   in
   unit
 
-let register () =
+let register protocols =
   Regression.register
     ~__FILE__
     ~title:"Binary RPC regression tests"
     ~tags:["rpc"; "regression"; "binary"]
     ~output_file:"rpc/binary_rpc"
     binary_regression_test ;
-  let register protocol test_mode_tag =
+  let register protocols test_mode_tag =
     let check_rpc ?parameter_overrides ?node_parameters ~test_function sub_group
         =
       check_rpc
@@ -1030,9 +1030,9 @@ let register () =
         ?node_parameters
         ~test_function
         sub_group
-        [protocol]
+        protocols
     in
-    let consensus_threshold =
+    let consensus_threshold protocol =
       if Protocol.number protocol >= 012 then
         [(["consensus_threshold"], Some "0")]
       else []
@@ -1043,20 +1043,20 @@ let register () =
       ~parameter_overrides:consensus_threshold ;
     check_rpc
       "delegates"
-      ~test_function:(test_delegates protocol)
+      ~test_function:test_delegates
       ~parameter_overrides:consensus_threshold ;
     check_rpc
       "votes"
       ~test_function:test_votes
-      ~parameter_overrides:
+      ~parameter_overrides:(fun protocol ->
         (* reduced periods duration to get to testing vote period faster *)
-        (let cycles_per_voting_period =
-           if Protocol.number protocol >= 013 then
-             (["cycles_per_voting_period"], Some "1")
-           else (["blocks_per_voting_period"], Some "4")
-         in
-         [(["blocks_per_cycle"], Some "4"); cycles_per_voting_period]
-         @ consensus_threshold) ;
+        let cycles_per_voting_period =
+          if Protocol.number protocol >= 013 then
+            (["cycles_per_voting_period"], Some "1")
+          else (["blocks_per_voting_period"], Some "4")
+        in
+        [(["blocks_per_cycle"], Some "4"); cycles_per_voting_period]
+        @ consensus_threshold protocol) ;
     check_rpc
       "others"
       ~test_function:test_others
@@ -1066,16 +1066,12 @@ let register () =
     | _ ->
         check_rpc
           "mempool"
-          ~test_function:(test_mempool protocol)
+          ~test_function:test_mempool
           ~node_parameters:mempool_node_flags
   in
-  let modes = [`Client; `Light; `Proxy; `Client_with_proxy_server] in
-
   List.iter
-    (fun mode ->
-      register Alpha mode ;
-      register Hangzhou mode)
-    modes ;
+    (register protocols)
+    [`Client; `Light; `Proxy; `Client_with_proxy_server] ;
 
   let addresses = ["localhost"; "127.0.0.1"] in
   let mk_title list_type address =
