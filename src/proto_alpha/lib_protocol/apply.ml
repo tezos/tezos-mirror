@@ -870,6 +870,10 @@ let update_script_storage_and_ticket_balances ctxt ~self storage
   >>=? fun ctxt ->
   Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
 
+let apply_delegation ~ctxt ~source ~delegate ~since =
+  Delegate.set ctxt source delegate >|=? fun ctxt ->
+  (ctxt, Delegation_result {consumed_gas = Gas.consumed ~since ~until:ctxt}, [])
+
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1200,11 +1204,7 @@ let apply_manager_operation_content :
       in
       (ctxt, result, [])
   | Delegation delegate ->
-      Delegate.set ctxt source delegate >|=? fun ctxt ->
-      ( ctxt,
-        Delegation_result
-          {consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt},
-        [] )
+      apply_delegation ~ctxt ~source ~delegate ~since:before_operation
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
       Script.force_decode_in_context ~consume_deserialization_gas ctxt value
