@@ -31,6 +31,7 @@ type 'protocol_operation operation = {
   hash : Operation_hash.t;
   raw : Operation.t;
   protocol : 'protocol_operation;
+  count_successful_prechecks : int;
 }
 
 type error += Endorsement_branch_not_live
@@ -68,6 +69,9 @@ module type T = sig
 
   val parse :
     Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
+
+  val increment_successful_precheck :
+    protocol_operation operation -> protocol_operation operation
 
   val create :
     chain_store ->
@@ -142,7 +146,24 @@ module MakeAbstract
       error (Oversized_operation {size; max = Proto.max_operation_data_length})
     else
       parse_unsafe raw.proto >|? fun protocol_data ->
-      {hash; raw; protocol = {Proto.shell = raw.Operation.shell; protocol_data}}
+      {
+        hash;
+        raw;
+        protocol = {Proto.shell = raw.Operation.shell; protocol_data};
+        (* When an operation is parsed, we assume that it has never been
+           successfully prechecked. *)
+        count_successful_prechecks = 0;
+      }
+
+  let increment_successful_precheck op =
+    (* We avoid {op with ...} to get feedback from the compiler if the record
+       type is extended/modified in the future. *)
+    {
+      hash = op.hash;
+      raw = op.raw;
+      protocol = op.protocol;
+      count_successful_prechecks = op.count_successful_prechecks + 1;
+    }
 
   let create chain_store ?protocol_data ~predecessor ~live_operations ~timestamp
       () =
@@ -266,7 +287,10 @@ module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
 module Internal_for_tests = struct
   let to_raw {raw; _} = raw
 
-  let make_operation op oph data = {hash = oph; raw = op; protocol = data}
+  let make_operation op oph data =
+    (* When we build an operation, we assume that it has never been
+       successfully prechecked. *)
+    {hash = oph; raw = op; protocol = data; count_successful_prechecks = 0}
 
   let safe_binary_of_bytes = safe_binary_of_bytes
 

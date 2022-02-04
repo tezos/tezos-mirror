@@ -302,7 +302,9 @@ module Mempool = struct
     | Cons (Manager_operation _, _) as op -> prefilter_manager_op op)
     |> fun res -> Lwt.return res
 
-  let precheck _ ~filter_state:_ ~validation_state:_ _ _ = Lwt.return `Undecided
+  let precheck _ ~filter_state:_ ~validation_state:_ _ _
+      ~nb_successful_prechecks:_ =
+    Lwt.return `Undecided
 
   open Apply_results
 

@@ -58,6 +58,7 @@ module type FILTER = sig
       validation_state:Proto.validation_state ->
       Operation_hash.t ->
       Proto.operation ->
+      nb_successful_prechecks:int ->
       [ `Passed_precheck of
         state
         * [ `No_replace
@@ -109,7 +110,8 @@ module No_filter (Proto : Registered_protocol.T) = struct
 
     let on_flush _ _ ?validation_state:_ ~predecessor:_ () = return_unit
 
-    let precheck _ ~filter_state:_ ~validation_state:_ _ _ =
+    let precheck _ ~filter_state:_ ~validation_state:_ _ _
+        ~nb_successful_prechecks:_ =
       Lwt.return `Undecided
 
     let pre_filter _ ~filter_state:_ ?validation_state_before:_ _ =

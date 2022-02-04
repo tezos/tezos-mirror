@@ -645,13 +645,15 @@ module Make_s
         filter_config
         ~filter_state
         ~validation_state
+        ~nb_successful_prechecks:op.count_successful_prechecks
         op.hash
         op.protocol
       >|= function
       | `Passed_precheck (filter_state, replacement) ->
           (* The [precheck] optimization triggers: no need to call the
               protocol [apply_operation]. *)
-          `Passed_precheck (filter_state, replacement)
+          let new_op = Prevalidation_t.increment_successful_precheck op in
+          `Passed_precheck (filter_state, new_op, replacement)
       | (`Branch_delayed _ | `Branch_refused _ | `Refused _ | `Outdated _) as
         errs ->
           (* Note that we don't need to distinguish some failure cases
@@ -696,11 +698,11 @@ module Make_s
      | `Fail errs ->
          (* Precheck rejected the operation *)
          Lwt.return_error errs
-     | `Passed_precheck (filter_state, replacement) ->
+     | `Passed_precheck (filter_state, new_op, replacement) ->
          (* Precheck succeeded *)
          let to_handle =
            match replacement with
-           | `No_replace -> [(op, `Prechecked)]
+           | `No_replace -> [(new_op, `Prechecked)]
            | `Replace (old_oph, replacement_classification) ->
                (* Precheck succeeded, but an old operation is replaced *)
                let to_replace =
@@ -709,7 +711,7 @@ module Make_s
                    shell
                    replacement_classification
                in
-               (op, `Prechecked) :: to_replace
+               (new_op, `Prechecked) :: to_replace
          in
          Lwt.return_ok (filter_state, validation_state, to_handle)
      | `Undecided -> (
