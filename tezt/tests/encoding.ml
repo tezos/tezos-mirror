@@ -94,8 +94,8 @@ let check_samples_encoding ~group_name ~protocols ~samples =
     (fun sample ->
       Protocol.register_regression_test
         ~__FILE__
-        ~title:(sf "%s encoding regression test: %s" group_name sample)
-        ~tags:["encoding"; group_name]
+        ~title:(sf "encoding regression test: %s" sample)
+        ~tags:["encoding"]
         ~output_file:("encoding" // sf "%s.%s" group_name sample)
         (fun protocol ->
           let base_path =

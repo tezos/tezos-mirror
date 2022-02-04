@@ -87,13 +87,8 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
     (fun (sub_group, rpc, parameter_overrides, node_parameters) ->
       Protocol.register_regression_test
         ~__FILE__
-        ~title:
-          (sf
-             "%s (mode %s) RPC regression tests: %s"
-             group_name
-             title_tag
-             sub_group)
-        ~tags:["rpc"; group_name; sub_group]
+        ~title:(sf "(mode %s) RPC regression tests: %s" title_tag sub_group)
+        ~tags:["rpc"; sub_group]
         ~output_file:("rpc" // sf "%s.%s.%s" group_name title_tag sub_group)
         (fun protocol ->
           (* Initialize a node with alpha protocol and data to be used for RPC calls.
