@@ -362,15 +362,14 @@ type preprocessor_dep = File of string
     or one [.opam] file with several [dune] files, or any other combinations. *)
 type target
 
-(** Preprocessors.
+(** Preprocessors. *)
+type preprocessor
 
-    - [PPS]: becomes a [(preprocess (pps ...))] stanza in the [dune] file.
-      The target's package is also added as a dependency in the [.opam] file.
+(** Make a preprocessor.
 
-    - [PPS_args (target, args)]: becomes a [(preprocess (pps <target> <args>))]
-      stanza in the [dune] file. It is thus a more general version of [PPS]
-      that allows to pass arguments to the preprocessor. *)
-and preprocessor = PPS of target | PPS_args of target * string list
+    [pps ?args target] becomes a [(preprocess (pps target args))] stanza in the [dune] file.
+    The target's package is also added as a dependency in the [.opam] file. *)
+val pps : ?args:string list -> target -> preprocessor
 
 (** Functions that build internal targets.
 

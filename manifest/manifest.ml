@@ -694,7 +694,7 @@ module Target = struct
     node_wrapper_flags : string list;
   }
 
-  and preprocessor = PPS of t | PPS_args of t * string list
+  and preprocessor = PPS of t * string list
 
   and select = {
     package : t;
@@ -711,6 +711,8 @@ module Target = struct
     | Optional of t
     | Select of select
     | Open of t * string
+
+  let pps ?(args = []) target = PPS (target, args)
 
   let convert_to_identifier = String.map @@ function '-' | '.' -> '_' | c -> c
 
@@ -1259,19 +1261,14 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     | _ :: _ -> Some (Dune.of_list (Dune.S ":standard" :: flags))
   in
   let preprocess =
-    let make_pp (preprocessor : Target.preprocessor) =
-      let pps target args =
-        match Target.names_for_dune target with
-        | (name, []) -> Dune.pps ~args name
-        | (hd, (_ :: _ as tl)) ->
-            invalid_arg
-              ("preprocessor target has multiple names, don't know which one \
-                to choose: "
-              ^ String.concat ", " (hd :: tl))
-      in
-      match preprocessor with
-      | PPS target -> pps target []
-      | PPS_args (target, args) -> pps target args
+    let make_pp (PPS (target, args) : Target.preprocessor) =
+      match Target.names_for_dune target with
+      | (name, []) -> Dune.pps ~args name
+      | (hd, (_ :: _ as tl)) ->
+          invalid_arg
+            ("preprocessor target has multiple names, don't know which one to \
+              choose: "
+            ^ String.concat ", " (hd :: tl))
     in
     List.map make_pp internal.preprocess
   in
@@ -1508,7 +1505,7 @@ let generate_opam ?release this_package (internals : Target.internal list) :
            ~with_test)
         deps
     in
-    let get_preprocess_dep (Target.PPS target | PPS_args (target, _)) =
+    let get_preprocess_dep (Target.PPS (target, _)) =
       as_opam_dependency
         ~fix_version:(release <> None)
         ~for_package
