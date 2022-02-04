@@ -1,4 +1,5 @@
 # pylint: disable=dangerous-default-value
+# pylint: disable=global-statement
 
 import os
 import os.path
@@ -10,6 +11,7 @@ from gitlab_custom_role import gitlab_role
 
 TEZOS_HOME = '../'
 OPAM_CACHE = None
+
 
 def setup(app):
     app.add_role('package', package_role)
