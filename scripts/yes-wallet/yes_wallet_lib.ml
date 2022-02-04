@@ -124,6 +124,7 @@ let alias_pkh_pk_list =
 
 let get_delegates (proto : protocol) context
     (header : Block_header.shell_header) active_bakers_only =
+  let open Lwt_tzresult_syntax in
   let level = header.Block_header.level in
   let predecessor_timestamp = header.timestamp in
   let timestamp = Time.Protocol.add predecessor_timestamp 10000L in
@@ -131,31 +132,39 @@ let get_delegates (proto : protocol) context
   match proto with
   | Florence ->
       let open Tezos_protocol_009_PsFLoren.Protocol in
-      Alpha_context.prepare
-        context
-        ~level
-        ~predecessor_timestamp
-        ~timestamp
-        ~fitness
-      >|= Environment.wrap_tzresult
-      >>=? fun (ctxt, _) ->
-      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-          Alpha_context.Roll.delegate_pubkey ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun pk ->
-          acc >>?= fun acc ->
-          Alpha_context.Delegate.staking_balance ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun staking_balance ->
-          (* Filter deactivated bakers if required *)
-          if active_bakers_only then
-            Alpha_context.Delegate.deactivated ctxt pkh
-            >|= Environment.wrap_tzresult
-            >>=? function
-            | true -> return acc
-            | false -> return ((pkh, pk, staking_balance) :: acc)
-          else return ((pkh, pk, staking_balance) :: acc))
-      >>=? fun delegates ->
+      let* (ctxt, _) =
+        let*! r =
+          Alpha_context.prepare
+            context
+            ~level
+            ~predecessor_timestamp
+            ~timestamp
+            ~fitness
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      let* delegates =
+        Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              | true -> return acc
+              | false -> return ((pkh, pk, staking_balance) :: acc)
+            else return ((pkh, pk, staking_balance) :: acc))
+      in
       return
       @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
       @@ (* By swapping x and y we do a descending sort *)
@@ -164,31 +173,39 @@ let get_delegates (proto : protocol) context
         delegates
   | Granada ->
       let open Tezos_protocol_010_PtGRANAD.Protocol in
-      Alpha_context.prepare
-        context
-        ~level
-        ~predecessor_timestamp
-        ~timestamp
-        ~fitness
-      >|= Environment.wrap_tzresult
-      >>=? fun (ctxt, _, _) ->
-      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-          Alpha_context.Roll.delegate_pubkey ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun pk ->
-          acc >>?= fun acc ->
-          Alpha_context.Delegate.staking_balance ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun staking_balance ->
-          (* Filter deactivated bakers if required *)
-          if active_bakers_only then
-            Alpha_context.Delegate.deactivated ctxt pkh
-            >|= Environment.wrap_tzresult
-            >>=? function
-            | true -> return acc
-            | false -> return ((pkh, pk, staking_balance) :: acc)
-          else return ((pkh, pk, staking_balance) :: acc))
-      >>=? fun delegates ->
+      let* (ctxt, _, _) =
+        let*! r =
+          Alpha_context.prepare
+            context
+            ~level
+            ~predecessor_timestamp
+            ~timestamp
+            ~fitness
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      let* delegates =
+        Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              | true -> return acc
+              | false -> return ((pkh, pk, staking_balance) :: acc)
+            else return ((pkh, pk, staking_balance) :: acc))
+      in
       return
       @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
       @@ (* By swapping x and y we do a descending sort *)
@@ -197,31 +214,39 @@ let get_delegates (proto : protocol) context
         delegates
   | Hangzhou ->
       let open Tezos_protocol_011_PtHangz2.Protocol in
-      Alpha_context.prepare
-        context
-        ~level
-        ~predecessor_timestamp
-        ~timestamp
-        ~fitness
-      >|= Environment.wrap_tzresult
-      >>=? fun (ctxt, _, _) ->
-      Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
-          Alpha_context.Roll.delegate_pubkey ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun pk ->
-          acc >>?= fun acc ->
-          Alpha_context.Delegate.staking_balance ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun staking_balance ->
-          (* Filter deactivated bakers if required *)
-          if active_bakers_only then
-            Alpha_context.Delegate.deactivated ctxt pkh
-            >|= Environment.wrap_tzresult
-            >>=? function
-            | true -> return acc
-            | false -> return ((pkh, pk, staking_balance) :: acc)
-          else return ((pkh, pk, staking_balance) :: acc))
-      >>=? fun delegates ->
+      let* (ctxt, _, _) =
+        let*! r =
+          Alpha_context.prepare
+            context
+            ~level
+            ~predecessor_timestamp
+            ~timestamp
+            ~fitness
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      let* delegates =
+        Alpha_context.Delegate.fold ctxt ~init:(ok []) ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Roll.delegate_pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              | true -> return acc
+              | false -> return ((pkh, pk, staking_balance) :: acc)
+            else return ((pkh, pk, staking_balance) :: acc))
+      in
       return
       @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
       @@ (* By swapping x and y we do a descending sort *)
@@ -230,29 +255,38 @@ let get_delegates (proto : protocol) context
         delegates
   | Ithaca ->
       let open Tezos_protocol_012_Psithaca.Protocol in
-      Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
-      >|= Environment.wrap_tzresult
-      >>=? fun (ctxt, _, _) ->
-      Alpha_context.Delegate.fold
-        ctxt
-        ~order:`Sorted
-        ~init:(ok [])
-        ~f:(fun pkh acc ->
-          Alpha_context.Delegate.pubkey ctxt pkh >|= Environment.wrap_tzresult
-          >>=? fun pk ->
-          acc >>?= fun acc ->
-          Alpha_context.Delegate.staking_balance ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun staking_balance ->
-          (* Filter deactivated bakers if required *)
-          if active_bakers_only then
-            Alpha_context.Delegate.deactivated ctxt pkh
-            >|= Environment.wrap_tzresult
-            >>=? function
-            | true -> return acc
-            | false -> return ((pkh, pk, staking_balance) :: acc)
-          else return ((pkh, pk, staking_balance) :: acc))
-      >>=? fun delegates ->
+      let* (ctxt, _, _) =
+        let*! r =
+          Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      let* delegates =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~order:`Sorted
+          ~init:(ok [])
+          ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              | true -> return acc
+              | false -> return ((pkh, pk, staking_balance) :: acc)
+            else return ((pkh, pk, staking_balance) :: acc))
+      in
       return
       @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
       @@ (* By swapping x and y we do a descending sort *)
@@ -261,29 +295,38 @@ let get_delegates (proto : protocol) context
         delegates
   | Alpha ->
       let open Tezos_protocol_alpha.Protocol in
-      Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
-      >|= Environment.wrap_tzresult
-      >>=? fun (ctxt, _, _) ->
-      Alpha_context.Delegate.fold
-        ctxt
-        ~order:`Sorted
-        ~init:(ok [])
-        ~f:(fun pkh acc ->
-          Alpha_context.Delegate.pubkey ctxt pkh >|= Environment.wrap_tzresult
-          >>=? fun pk ->
-          acc >>?= fun acc ->
-          Alpha_context.Delegate.staking_balance ctxt pkh
-          >|= Environment.wrap_tzresult
-          >>=? fun staking_balance ->
-          (* Filter deactivated bakers if required *)
-          if active_bakers_only then
-            Alpha_context.Delegate.deactivated ctxt pkh
-            >|= Environment.wrap_tzresult
-            >>=? function
-            | true -> return acc
-            | false -> return ((pkh, pk, staking_balance) :: acc)
-          else return ((pkh, pk, staking_balance) :: acc))
-      >>=? fun delegates ->
+      let* (ctxt, _, _) =
+        let*! r =
+          Alpha_context.prepare context ~level ~predecessor_timestamp ~timestamp
+        in
+        Lwt.return @@ Environment.wrap_tzresult r
+      in
+      let* delegates =
+        Alpha_context.Delegate.fold
+          ctxt
+          ~order:`Sorted
+          ~init:(ok [])
+          ~f:(fun pkh acc ->
+            let* pk =
+              let*! r = Alpha_context.Delegate.pubkey ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            let*? acc = acc in
+            let* staking_balance =
+              let*! r = Alpha_context.Delegate.staking_balance ctxt pkh in
+              Lwt.return @@ Environment.wrap_tzresult r
+            in
+            (* Filter deactivated bakers if required *)
+            if active_bakers_only then
+              let* b =
+                let*! r = Alpha_context.Delegate.deactivated ctxt pkh in
+                Lwt.return @@ Environment.wrap_tzresult r
+              in
+              match b with
+              | true -> return acc
+              | false -> return ((pkh, pk, staking_balance) :: acc)
+            else return ((pkh, pk, staking_balance) :: acc))
+      in
       return
       @@ List.map (fun (pkh, pk, _) -> (pkh, pk))
       @@ (* By swapping x and y we do a descending sort *)
@@ -317,6 +360,7 @@ let protocol_of_hash protocol_hash =
     the list.
 *)
 let load_mainnet_bakers_public_keys base_dir active_bakers_only =
+  let open Lwt_tzresult_syntax in
   let open Tezos_store in
   let mainnet_genesis =
     {
@@ -329,32 +373,35 @@ let load_mainnet_bakers_public_keys base_dir active_bakers_only =
           "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
     }
   in
-  Tezos_store.Store.init
-    ~store_dir:(Filename.concat base_dir "store")
-    ~context_dir:(Filename.concat base_dir "context")
-    ~allow_testchains:true
-    ~readonly:true
-    mainnet_genesis
-  >>=? fun store ->
+  let* store =
+    Tezos_store.Store.init
+      ~store_dir:(Filename.concat base_dir "store")
+      ~context_dir:(Filename.concat base_dir "context")
+      ~allow_testchains:true
+      ~readonly:true
+      mainnet_genesis
+  in
   let main_chain_store = Store.main_chain_store store in
-  Tezos_store.Store.Chain.current_head main_chain_store >>= fun block ->
+  let*! block = Tezos_store.Store.Chain.current_head main_chain_store in
   Format.printf
     "Head block found and loaded (%a)@."
     Block_hash.pp
     (Tezos_store.Store.Block.hash block) ;
   let header = Store.Block.header block in
-  Store.Block.context_exn main_chain_store block
-  >|= Tezos_shell_context.Shell_context.wrap_disk_context
-  >>= fun context ->
-  Store.Block.protocol_hash_exn main_chain_store block >>= fun protocol_hash ->
+  let*! context =
+    let*! r = Store.Block.context_exn main_chain_store block in
+    Lwt.return @@ Tezos_shell_context.Shell_context.wrap_disk_context r
+  in
+  let*! protocol_hash = Store.Block.protocol_hash_exn main_chain_store block in
   let header = header.shell in
-  (match protocol_of_hash protocol_hash with
-  | None -> Error_monad.failwith "unknown protocol hash"
-  | Some protocol ->
-      Format.printf "Protocol %a detected@." pp_protocol protocol ;
-      get_delegates protocol context header active_bakers_only)
-  >>=? fun delegates ->
-  Tezos_store.Store.close_store store >>= fun () ->
+  let* delegates =
+    match protocol_of_hash protocol_hash with
+    | None -> Error_monad.failwith "unknown protocol hash"
+    | Some protocol ->
+        Format.printf "Protocol %a detected@." pp_protocol protocol ;
+        get_delegates protocol context header active_bakers_only
+  in
+  let*! () = Tezos_store.Store.close_store store in
   return
   @@ List.mapi
        (fun i (pkh, pk) ->
