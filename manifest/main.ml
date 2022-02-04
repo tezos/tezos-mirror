@@ -940,7 +940,6 @@ let tezos_shell_services =
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives" |> open_;
-        tezos_workers;
         tezos_stdlib_unix;
         tezos_p2p_services |> open_;
         tezos_version |> open_;
@@ -1283,7 +1282,6 @@ let tezos_sapling =
         conf_rust;
         integers;
         ctypes;
-        ctypes_stubs;
         data_encoding;
         tezos_stdlib |> open_;
         tezos_crypto |> open_;
