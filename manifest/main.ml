@@ -42,7 +42,7 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
-  external_lib "bls12-381" V.(at_least "1.1.0" && less_than "1.2.0")
+  external_lib "bls12-381" V.(at_least "2.0.0" && less_than "2.1.0")
 
 let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
