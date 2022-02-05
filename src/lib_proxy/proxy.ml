@@ -37,11 +37,17 @@ type mode =
   | Client  (** Mode when [tezos-client] executes *)
   | Server  (** Mode when [tezos-proxy-server] executes *)
 
+(** A dumb container, used to perform RPC calls concerning a specific
+    chain and block. In other words this container is used to perform
+    RPC calls of the form [/chains/<chain>/blocks/<block>] where the <...>
+    received the value of the corresponding field of this record. *)
 type proxy_getter_input = {
-  rpc_context : RPC_context.simple;
-  mode : mode;
+  rpc_context : RPC_context.simple;  (** How to perform RPC calls *)
+  mode : mode;  (** Whether [tezos-client] or [tezos-proxy-server] is running *)
   chain : Tezos_shell_services.Block_services.chain;
+      (** The chain involved in the RPC call *)
   block : Tezos_shell_services.Block_services.block;
+      (** The block involved in the RPC call *)
 }
 
 (** The result of setting a leaf. A mutation if done in place, otherwise
@@ -50,16 +56,37 @@ type proxy_getter_input = {
     performs a mutation (because of Irmin under the hood). *)
 type 'a update = Mutation | Value of 'a
 
+(** An ad-hoc module type used by implementations of the proxy mode
+    when it uses the [../raw/bytes] RPC to query its distant endpoint.
+    It is ad-hoc because its [get] function has the concrete {!Proxy_context.M.tree}
+    as a return type and because [add_leaf] has the concrete
+    {!Tezos_shell_services.Block_services.raw_context} as a parameter
+    (this type is inherited from the return type of the [../raw/bytes] RPC). *)
 module type TREE = sig
+  (** The abstract type that implementors of this module type provide.
+      Obtain an instance with {!empty}. Think of [t] as a tree type. *)
   type t
 
+  (** An abstract type of key. *)
   type key
 
+  (** [empty] returns a pristine value *)
   val empty : t
 
+  (** [get t key] returns the tree of data mapped by [key], if any. *)
   val get : t -> key -> Proxy_context.M.tree option Lwt.t
 
-  val set_leaf :
+  (** [add_leaf t key raw_ctxt] returns a variant of [t] where [key] is
+      mapped to [raw_ctxt]. When this function is called, it transforms
+      [raw_ctxt], under the hood, into an instance of {!Proxy_context.M.tree},
+      as the latter is the type internally stored in {!t} (it needs to be,
+      as it's the return type of {!get}).
+
+      This function is called [add_leaf], because the proxy mode iteratively
+      builds its local copy of the endpoint's data. This function is only called
+      when adding a new leaf in the tree of data, never to replace existing
+      data. In other words, it's not a general purpose setter. *)
+  val add_leaf :
     t ->
     key ->
     Tezos_shell_services.Block_services.raw_context ->
