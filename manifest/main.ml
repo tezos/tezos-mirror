@@ -227,7 +227,10 @@ let ringo = external_lib "ringo" V.(exactly "0.7")
 let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
 
 let secp256k1_internal =
-  external_lib ~node_wrapper_flags:["--secp256k1"] "secp256k1-internal" V.True
+  external_lib
+    ~node_wrapper_flags:["--secp256k1"; "1.1.1"]
+    "secp256k1-internal"
+    V.True
 
 let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
@@ -535,7 +538,7 @@ let tezos_hacl_glue_js =
     ~js_of_ocaml:[[S "javascript_files"; S "hacl_stubs.js"]]
     ~opam_only_deps:
       [(* Build dependency for users of the library. *) js_of_ocaml]
-    ~node_wrapper_flags:["--hacl"]
+    ~node_wrapper_flags:["--hacl"; "1.1.0"]
     ~modules:["hacl"]
 
 (* We use virtual libraries, and want to compile the same test with
