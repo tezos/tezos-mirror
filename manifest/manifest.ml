@@ -627,12 +627,14 @@ module Target = struct
     opam : string option;
     version : Version.constraints;
     js_compatible : bool;
+    node_wrapper_flags : string list;
   }
 
   type vendored = {
     name : string;
     main_module : string option;
     js_compatible : bool;
+    node_wrapper_flags : string list;
   }
 
   type opam_only = {name : string; version : Version.constraints}
@@ -929,12 +931,21 @@ module Target = struct
               | Ok name -> (
                   if String_set.mem name seen then (seen, acc)
                   else
-                    let seen = String_set.add name seen in
                     match dep with
                     | Internal {deps; node_wrapper_flags; _} ->
                         let acc = node_wrapper_flags @ acc in
+                        let seen = String_set.add name seen in
                         loops (seen, acc) deps
-                    | _ -> (seen, acc))
+                    | External {node_wrapper_flags; _} ->
+                        let seen = String_set.add name seen in
+                        (seen, node_wrapper_flags @ acc)
+                    | Vendored {node_wrapper_flags; _} ->
+                        let seen = String_set.add name seen in
+                        (seen, node_wrapper_flags @ acc)
+                    | Select {package; _} -> loop (seen, acc) package
+                    | Opam_only _ -> (seen, acc)
+                    | Optional t -> loop (seen, acc) t
+                    | Open (t, _) -> loop (seen, acc) t)
             and loops (seen, acc) deps =
               List.fold_left
                 (fun (seen, acc) x -> loop (seen, acc) x)
@@ -1062,19 +1073,24 @@ module Target = struct
     | [] -> invalid_arg "Target.test_exes: at least one name must be given"
     | head :: tail -> Test_executable (head, tail)
 
-  let vendored_lib ?main_module ?(js_compatible = false) name =
-    Vendored {name; main_module; js_compatible}
+  let vendored_lib ?main_module ?(js_compatible = false)
+      ?(node_wrapper_flags = []) name =
+    Vendored {name; main_module; js_compatible; node_wrapper_flags}
 
-  let external_lib ?main_module ?opam ?(js_compatible = false) name version =
+  let external_lib ?main_module ?opam ?(js_compatible = false)
+      ?(node_wrapper_flags = []) name version =
     let opam =
       match opam with None -> Some name | Some "" -> None | Some _ as x -> x
     in
-    External {name; main_module; opam; version; js_compatible}
+    External
+      {name; main_module; opam; version; js_compatible; node_wrapper_flags}
 
-  let rec external_sublib ?main_module ?(js_compatible = false) parent name =
+  let rec external_sublib ?main_module ?(js_compatible = false)
+      ?(node_wrapper_flags = []) parent name =
     match parent with
     | External {opam; version; _} ->
-        External {name; main_module; opam; version; js_compatible}
+        External
+          {name; main_module; opam; version; js_compatible; node_wrapper_flags}
     | Opam_only _ ->
         invalid_arg
           "Target.external_sublib: parent must be a non-opam-only external lib"

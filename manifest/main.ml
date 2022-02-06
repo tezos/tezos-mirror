@@ -226,7 +226,8 @@ let ringo = external_lib "ringo" V.(exactly "0.7")
 
 let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
 
-let secp256k1_internal = external_lib "secp256k1-internal" V.True
+let secp256k1_internal =
+  external_lib ~node_wrapper_flags:["--secp256k1"] "secp256k1-internal" V.True
 
 let str = external_lib ~js_compatible:true "str" ~opam:"" V.True
 
@@ -640,7 +641,6 @@ let tezos_crypto =
         zarith;
         zarith_stubs_js;
       ]
-    ~node_wrapper_flags:["--secp256k1"]
 
 let _tezos_crypto_tests =
   tests
