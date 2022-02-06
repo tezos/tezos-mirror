@@ -5169,10 +5169,7 @@ and parse_toplevel :
             | true -> ok (p, pannot)
             | false -> (
                 match pannot with
-                | [single]
-                  when legacy
-                       && Compare.Int.(String.length single > 0)
-                       && Compare.Char.(single.[0] = '%') -> (
+                | [single] when legacy -> (
                     is_field_annot ploc single >|? fun is_field_annot ->
                     match (is_field_annot, p) with
                     | (true, Prim (loc, prim, args, annots)) ->
