@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_after_fib_view.tz]
 
 Well typed
-Gas remaining: 1039985.135 units remaining
+Gas remaining: 1039985.100 units remaining
 { parameter address ;
   storage address ;
   code { CAR

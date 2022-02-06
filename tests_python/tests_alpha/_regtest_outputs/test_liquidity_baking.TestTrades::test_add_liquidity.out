@@ -34,7 +34,7 @@ This sequence of operations was run:
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
       Paid storage size diff: 3 bytes
-      Consumed gas: 2912.681
+      Consumed gas: 2912.646
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.00075
         storage fees ........................... +ꜩ0.00075
@@ -58,7 +58,7 @@ This sequence of operations was run:
           Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
         Storage size: 2263 bytes
         Paid storage size diff: 68 bytes
-        Consumed gas: 4394.801
+        Consumed gas: 4394.836
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.017
           storage fees ........................... +ꜩ0.017

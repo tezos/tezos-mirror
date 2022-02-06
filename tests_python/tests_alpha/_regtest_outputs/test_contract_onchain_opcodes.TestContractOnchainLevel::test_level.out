@@ -47,7 +47,7 @@ Contract memorized as level.
 Injected block at minimal timestamp
 Injected block at minimal timestamp
 Node is bootstrapped.
-Estimated gas: 2049.563 units (will add 100 for safety)
+Estimated gas: 2049.598 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -72,7 +72,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 4
       Storage size: 40 bytes
-      Consumed gas: 2049.563
+      Consumed gas: 2049.598
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500
@@ -89,7 +89,7 @@ Injected block at minimal timestamp
 Injected block at minimal timestamp
 4
 Node is bootstrapped.
-Estimated gas: 1202.350 units (will add 100 for safety)
+Estimated gas: 1202.385 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -114,7 +114,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: 7
       Storage size: 40 bytes
-      Consumed gas: 1202.350
+      Consumed gas: 1202.385
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ500
         [CONTRACT_HASH] ... +ꜩ500

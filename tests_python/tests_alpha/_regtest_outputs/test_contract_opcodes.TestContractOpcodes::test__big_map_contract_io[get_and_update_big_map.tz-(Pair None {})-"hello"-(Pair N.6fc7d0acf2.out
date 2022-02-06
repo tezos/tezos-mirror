@@ -8,28 +8,28 @@ big_map diff
   New map(4) of type (big_map string nat)
   Unset map(4)["hello"]
 trace
-  - location: 13 (remaining gas: 1039989.346 units remaining)
+  - location: 13 (remaining gas: 1039989.311 units remaining)
     [ (Pair "hello" None {}) ]
-  - location: 13 (remaining gas: 1039989.336 units remaining)
+  - location: 13 (remaining gas: 1039989.301 units remaining)
     [ "hello"
       (Pair None {}) ]
-  - location: 14 (remaining gas: 1039989.321 units remaining)
+  - location: 14 (remaining gas: 1039989.286 units remaining)
     [ (Pair None {}) ]
-  - location: 16 (remaining gas: 1039989.311 units remaining)
+  - location: 16 (remaining gas: 1039989.276 units remaining)
     [ None
       {} ]
-  - location: 14 (remaining gas: 1039989.281 units remaining)
+  - location: 14 (remaining gas: 1039989.246 units remaining)
     [ "hello"
       None
       {} ]
-  - location: 17 (remaining gas: 1039988.209 units remaining)
+  - location: 17 (remaining gas: 1039988.174 units remaining)
     [ None
       {} ]
-  - location: 18 (remaining gas: 1039988.194 units remaining)
+  - location: 18 (remaining gas: 1039988.159 units remaining)
     [ (Pair None {}) ]
-  - location: 19 (remaining gas: 1039988.179 units remaining)
+  - location: 19 (remaining gas: 1039988.144 units remaining)
     [ {}
       (Pair None {}) ]
-  - location: 21 (remaining gas: 1039988.164 units remaining)
+  - location: 21 (remaining gas: 1039988.129 units remaining)
     [ (Pair {} None {}) ]
 

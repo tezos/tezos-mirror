@@ -10,126 +10,126 @@ big_map diff
   New map(4) of type (big_map string string)
   Set map(4)["foo"] to "bar"
 trace
-  - location: 43 (remaining gas: 1039918.789 units remaining)
+  - location: 43 (remaining gas: 1039918.754 units remaining)
     [ (Pair (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))) (Right Unit)) ]
-  - location: 43 (remaining gas: 1039918.779 units remaining)
+  - location: 43 (remaining gas: 1039918.744 units remaining)
     [ (Right (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))))
       (Right Unit) ]
-  - location: 44 (remaining gas: 1039918.769 units remaining)
+  - location: 44 (remaining gas: 1039918.734 units remaining)
     [ (Right (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })))
       (Right Unit) ]
-  - location: 60 (remaining gas: 1039918.759 units remaining)
+  - location: 60 (remaining gas: 1039918.724 units remaining)
     [ (Left (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }))
       (Right Unit) ]
-  - location: 65 (remaining gas: 1039918.749 units remaining)
+  - location: 65 (remaining gas: 1039918.714 units remaining)
     [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" })
       (Right Unit) ]
-  - location: 67 (remaining gas: 1039918.734 units remaining)
+  - location: 67 (remaining gas: 1039918.699 units remaining)
     [ (Right Unit) ]
-  - location: 70 (remaining gas: 1039918.724 units remaining)
+  - location: 70 (remaining gas: 1039918.689 units remaining)
     [ Unit ]
-  - location: 70 (remaining gas: 1039918.709 units remaining)
+  - location: 70 (remaining gas: 1039918.674 units remaining)
     [ Unit ]
-  - location: 76 (remaining gas: 1039918.699 units remaining)
+  - location: 76 (remaining gas: 1039918.664 units remaining)
     [  ]
-  - location: 67 (remaining gas: 1039918.669 units remaining)
+  - location: 67 (remaining gas: 1039918.634 units remaining)
     [ (Pair { Pair "foo" "bar" } { Pair "gaz" "baz" }) ]
-  - location: 77 (remaining gas: 1039918.659 units remaining)
+  - location: 77 (remaining gas: 1039918.624 units remaining)
     [ { Pair "foo" "bar" }
       { Pair "gaz" "baz" } ]
-  - location: 78 (remaining gas: 1039918.644 units remaining)
+  - location: 78 (remaining gas: 1039918.609 units remaining)
     [ { Pair "gaz" "baz" } ]
-  - location: 80 (remaining gas: 1039918.629 units remaining)
+  - location: 80 (remaining gas: 1039918.594 units remaining)
     [ {}
       { Pair "gaz" "baz" } ]
-  - location: 78 (remaining gas: 1039918.599 units remaining)
+  - location: 78 (remaining gas: 1039918.564 units remaining)
     [ { Pair "foo" "bar" }
       {}
       { Pair "gaz" "baz" } ]
-  - location: 83 (remaining gas: 1039918.599 units remaining)
+  - location: 83 (remaining gas: 1039918.564 units remaining)
     [ (Pair "foo" "bar")
       {}
       { Pair "gaz" "baz" } ]
-  - location: 85 (remaining gas: 1039918.589 units remaining)
+  - location: 85 (remaining gas: 1039918.554 units remaining)
     [ "foo"
       "bar"
       {}
       { Pair "gaz" "baz" } ]
-  - location: 86 (remaining gas: 1039918.574 units remaining)
+  - location: 86 (remaining gas: 1039918.539 units remaining)
     [ "bar"
       {}
       { Pair "gaz" "baz" } ]
-  - location: 88 (remaining gas: 1039918.559 units remaining)
+  - location: 88 (remaining gas: 1039918.524 units remaining)
     [ (Some "bar")
       {}
       { Pair "gaz" "baz" } ]
-  - location: 86 (remaining gas: 1039918.529 units remaining)
+  - location: 86 (remaining gas: 1039918.494 units remaining)
     [ "foo"
       (Some "bar")
       {}
       { Pair "gaz" "baz" } ]
-  - location: 89 (remaining gas: 1039917.531 units remaining)
+  - location: 89 (remaining gas: 1039917.496 units remaining)
     [ { Elt "foo" "bar" }
       { Pair "gaz" "baz" } ]
-  - location: 83 (remaining gas: 1039917.516 units remaining)
+  - location: 83 (remaining gas: 1039917.481 units remaining)
     [ { Elt "foo" "bar" }
       { Pair "gaz" "baz" } ]
-  - location: 90 (remaining gas: 1039917.506 units remaining)
+  - location: 90 (remaining gas: 1039917.471 units remaining)
     [ { Pair "gaz" "baz" }
       { Elt "foo" "bar" } ]
-  - location: 91 (remaining gas: 1039917.491 units remaining)
+  - location: 91 (remaining gas: 1039917.456 units remaining)
     [ { Elt "foo" "bar" } ]
-  - location: 93 (remaining gas: 1039917.476 units remaining)
+  - location: 93 (remaining gas: 1039917.441 units remaining)
     [ {}
       { Elt "foo" "bar" } ]
-  - location: 91 (remaining gas: 1039917.446 units remaining)
+  - location: 91 (remaining gas: 1039917.411 units remaining)
     [ { Pair "gaz" "baz" }
       {}
       { Elt "foo" "bar" } ]
-  - location: 96 (remaining gas: 1039917.446 units remaining)
+  - location: 96 (remaining gas: 1039917.411 units remaining)
     [ (Pair "gaz" "baz")
       {}
       { Elt "foo" "bar" } ]
-  - location: 98 (remaining gas: 1039917.436 units remaining)
+  - location: 98 (remaining gas: 1039917.401 units remaining)
     [ "gaz"
       "baz"
       {}
       { Elt "foo" "bar" } ]
-  - location: 99 (remaining gas: 1039917.421 units remaining)
+  - location: 99 (remaining gas: 1039917.386 units remaining)
     [ "baz"
       {}
       { Elt "foo" "bar" } ]
-  - location: 101 (remaining gas: 1039917.406 units remaining)
+  - location: 101 (remaining gas: 1039917.371 units remaining)
     [ (Some "baz")
       {}
       { Elt "foo" "bar" } ]
-  - location: 99 (remaining gas: 1039917.376 units remaining)
+  - location: 99 (remaining gas: 1039917.341 units remaining)
     [ "gaz"
       (Some "baz")
       {}
       { Elt "foo" "bar" } ]
-  - location: 102 (remaining gas: 1039916.378 units remaining)
+  - location: 102 (remaining gas: 1039916.343 units remaining)
     [ { Elt "gaz" "baz" }
       { Elt "foo" "bar" } ]
-  - location: 96 (remaining gas: 1039916.363 units remaining)
+  - location: 96 (remaining gas: 1039916.328 units remaining)
     [ { Elt "gaz" "baz" }
       { Elt "foo" "bar" } ]
-  - location: 103 (remaining gas: 1039916.353 units remaining)
+  - location: 103 (remaining gas: 1039916.318 units remaining)
     [ { Elt "foo" "bar" }
       { Elt "gaz" "baz" } ]
-  - location: 104 (remaining gas: 1039916.338 units remaining)
+  - location: 104 (remaining gas: 1039916.303 units remaining)
     [ (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }) ]
-  - location: 105 (remaining gas: 1039916.323 units remaining)
+  - location: 105 (remaining gas: 1039916.288 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
-  - location: 65 (remaining gas: 1039916.308 units remaining)
+  - location: 65 (remaining gas: 1039916.273 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
-  - location: 60 (remaining gas: 1039916.293 units remaining)
+  - location: 60 (remaining gas: 1039916.258 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
-  - location: 44 (remaining gas: 1039916.278 units remaining)
+  - location: 44 (remaining gas: 1039916.243 units remaining)
     [ (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
-  - location: 151 (remaining gas: 1039916.263 units remaining)
+  - location: 151 (remaining gas: 1039916.228 units remaining)
     [ {}
       (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" })) ]
-  - location: 153 (remaining gas: 1039916.248 units remaining)
+  - location: 153 (remaining gas: 1039916.213 units remaining)
     [ (Pair {} (Left (Pair { Elt "foo" "bar" } { Elt "gaz" "baz" }))) ]
 

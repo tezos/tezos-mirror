@@ -7,55 +7,55 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039983.772 units remaining)
+  - location: 11 (remaining gas: 1039983.737 units remaining)
     [ (Pair "Hi" { "Hi" } None) ]
-  - location: 11 (remaining gas: 1039983.762 units remaining)
+  - location: 11 (remaining gas: 1039983.727 units remaining)
     [ (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 12 (remaining gas: 1039983.752 units remaining)
+  - location: 12 (remaining gas: 1039983.717 units remaining)
     [ (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 13 (remaining gas: 1039983.742 units remaining)
+  - location: 13 (remaining gas: 1039983.707 units remaining)
     [ "Hi"
       (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 14 (remaining gas: 1039983.727 units remaining)
+  - location: 14 (remaining gas: 1039983.692 units remaining)
     [ (Pair "Hi" { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 17 (remaining gas: 1039983.717 units remaining)
+  - location: 17 (remaining gas: 1039983.682 units remaining)
     [ (Pair { "Hi" } None)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 18 (remaining gas: 1039983.707 units remaining)
+  - location: 18 (remaining gas: 1039983.672 units remaining)
     [ { "Hi" }
       (Pair "Hi" { "Hi" } None) ]
-  - location: 14 (remaining gas: 1039983.677 units remaining)
+  - location: 14 (remaining gas: 1039983.642 units remaining)
     [ "Hi"
       { "Hi" }
       (Pair "Hi" { "Hi" } None) ]
-  - location: 19 (remaining gas: 1039983.492 units remaining)
+  - location: 19 (remaining gas: 1039983.457 units remaining)
     [ True
       (Pair "Hi" { "Hi" } None) ]
-  - location: 20 (remaining gas: 1039983.477 units remaining)
+  - location: 20 (remaining gas: 1039983.442 units remaining)
     [ (Some True)
       (Pair "Hi" { "Hi" } None) ]
-  - location: 21 (remaining gas: 1039983.462 units remaining)
+  - location: 21 (remaining gas: 1039983.427 units remaining)
     [ (Pair "Hi" { "Hi" } None) ]
-  - location: 24 (remaining gas: 1039983.452 units remaining)
+  - location: 24 (remaining gas: 1039983.417 units remaining)
     [ (Pair { "Hi" } None) ]
-  - location: 25 (remaining gas: 1039983.442 units remaining)
+  - location: 25 (remaining gas: 1039983.407 units remaining)
     [ { "Hi" } ]
-  - location: 21 (remaining gas: 1039983.412 units remaining)
+  - location: 21 (remaining gas: 1039983.377 units remaining)
     [ (Some True)
       { "Hi" } ]
-  - location: 26 (remaining gas: 1039983.402 units remaining)
+  - location: 26 (remaining gas: 1039983.367 units remaining)
     [ { "Hi" }
       (Some True) ]
-  - location: 27 (remaining gas: 1039983.387 units remaining)
+  - location: 27 (remaining gas: 1039983.352 units remaining)
     [ (Pair { "Hi" } (Some True)) ]
-  - location: 28 (remaining gas: 1039983.372 units remaining)
+  - location: 28 (remaining gas: 1039983.337 units remaining)
     [ {}
       (Pair { "Hi" } (Some True)) ]
-  - location: 30 (remaining gas: 1039983.357 units remaining)
+  - location: 30 (remaining gas: 1039983.322 units remaining)
     [ (Pair {} { "Hi" } (Some True)) ]
 

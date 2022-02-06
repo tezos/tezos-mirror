@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/authentication.tz]
 
 Well typed
-Gas remaining: 1039978.751 units remaining
+Gas remaining: 1039978.716 units remaining
 { parameter (pair (lambda unit (list operation)) signature) ;
   storage (pair (nat %counter) key) ;
   code { UNPPAIPAIR ;
