@@ -186,19 +186,18 @@ let is_field_annot loc a =
 
 let extract_field_annot :
     Script.node -> (Script.node * field_annot option) tzresult = function
-  | Prim (loc, prim, args, annot) ->
+  | Prim (loc, prim, args, annot) as expr ->
       let rec extract_first acc = function
-        | [] -> (None, annot)
+        | [] -> ok (expr, None)
         | s :: rest ->
             if Compare.Int.(String.length s > 0) && Compare.Char.(s.[0] = '%')
-            then (Some s, List.rev_append acc rest)
+            then
+              parse_field_annot loc [s] >|? fun field_annot ->
+              let annot = List.rev_append acc rest in
+              (Prim (loc, prim, args, annot), field_annot)
             else extract_first (s :: acc) rest
       in
-      let (field_annot, annot) = extract_first [] annot in
-      (match field_annot with
-      | None -> Result.return_none
-      | Some field_annot -> parse_field_annot loc [field_annot])
-      >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
+      extract_first [] annot
   | expr -> ok (expr, None)
 
 let has_field_annot node =
