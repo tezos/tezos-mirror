@@ -3336,7 +3336,7 @@ name the root of the type. The conventional name for that is ``root``.
 
 Let us recapitulate this by tweaking the names of the previous example.
 
-``parameter %root (or (or (nat %A) (bool %B)) (or (unit %default) string))``
+``parameter (or %root (or (nat %A) (bool %B)) (or (unit %default) string))``
 
 The input values will be wrapped as in the following examples.
 

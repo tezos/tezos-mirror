@@ -6,7 +6,7 @@ code { DROP;
        AMOUNT;                   # Push the starting balance
        NONE key_hash;                 # No delegate
        CREATE_CONTRACT          # Create the contract
-         { parameter (unit %root) ;
+         { parameter %root unit ;
            storage unit ;
            code
              { CDR;
