@@ -100,19 +100,40 @@ let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
-    client =
+    ?applied ?branch_delayed ?branch_refused ?refused ?outdated client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  Client.rpc
-    ?endpoint
-    ?hooks
-    ~query_string:(match version with None -> [] | Some v -> [("version", v)])
-    GET
-    path
-    client
+  let query_parameter param param_s =
+    match param with
+    | None -> []
+    | Some true -> [(param_s, "true")]
+    | Some false -> [(param_s, "false")]
+  in
+  let query_string =
+    (match version with None -> [] | Some v -> [("version", v)])
+    @ query_parameter applied "applied"
+    @ query_parameter refused "refused"
+    @ query_parameter outdated "outdated"
+    @ query_parameter branch_delayed "branch_delayed"
+    @ query_parameter branch_refused "branch_refused"
+  in
+  Client.rpc ?endpoint ?hooks ~query_string GET path client
 
-let get_mempool ?endpoint ?hooks ?chain client =
+let get_mempool ?endpoint ?hooks ?chain ?(applied = true) ?(prechecked = true)
+    ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
+    ?(outdated = true) client =
   let* pending_ops =
-    get_mempool_pending_operations ?endpoint ?hooks ?chain ~version:"1" client
+    get_mempool_pending_operations
+      ?endpoint
+      ?hooks
+      ?chain
+      ~version:"1"
+      ~applied
+      ~prechecked
+      ~branch_delayed
+      ~branch_refused
+      ~refused
+      ~outdated
+      client
   in
   let get_hash op = JSON.(op |-> "hash" |> as_string) in
   let get_hashes classification =

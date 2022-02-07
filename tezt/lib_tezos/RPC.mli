@@ -203,6 +203,11 @@ val get_mempool_pending_operations :
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?version:string ->
+  ?applied:bool ->
+  ?branch_delayed:bool ->
+  ?branch_refused:bool ->
+  ?refused:bool ->
+  ?outdated:bool ->
   Client.t ->
   JSON.t Lwt.t
 
@@ -211,6 +216,12 @@ val get_mempool :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
+  ?applied:bool ->
+  ?prechecked:bool ->
+  ?branch_delayed:bool ->
+  ?branch_refused:bool ->
+  ?refused:bool ->
+  ?outdated:bool ->
   Client.t ->
   Mempool.t Lwt.t
 
