@@ -48,12 +48,14 @@ include Tree
 let index {repo; _} = repo
 
 let exists index key =
-  Store.Commit.of_hash index (Hash.of_context_hash key) >|= function
-  | None -> false
-  | Some _ -> true
+  let open Lwt_syntax in
+  let+ o = Store.Commit.of_hash index (Hash.of_context_hash key) in
+  Option.is_some o
 
 let checkout index key =
-  Store.Commit.of_hash index (Hash.of_context_hash key) >>= function
+  let open Lwt_syntax in
+  let* o = Store.Commit.of_hash index (Hash.of_context_hash key) in
+  match o with
   | None -> Lwt.return_none
   | Some commit ->
       let tree = Store.Commit.tree commit in
@@ -61,32 +63,35 @@ let checkout index key =
       Lwt.return_some ctxt
 
 let checkout_exn index key =
-  checkout index key >>= function
-  | None -> Lwt.fail Not_found
-  | Some p -> Lwt.return p
+  let open Lwt_syntax in
+  let* o = checkout index key in
+  match o with None -> Lwt.fail Not_found | Some p -> Lwt.return p
 
 (* unshallow possible 1-st level objects from previous partial
    checkouts ; might be better to pass directly the list of shallow
    objects. *)
 let unshallow context =
-  Store.Tree.list context.tree [] >>= fun children ->
+  let open Lwt_syntax in
+  let* children = Store.Tree.list context.tree [] in
   Store.Private.Repo.batch context.repo (fun x y _ ->
       List.iter_s
         (fun (s, k) ->
           match Store.Tree.destruct k with
           | `Contents _ -> Lwt.return ()
           | `Node _ ->
-              Store.Tree.get_tree context.tree [s] >>= fun tree ->
-              Store.save_tree ~clear:true context.repo x y tree >|= fun _ -> ())
+              let* tree = Store.Tree.get_tree context.tree [s] in
+              let+ _ = Store.save_tree ~clear:true context.repo x y tree in
+              ())
         children)
 
 let raw_commit ~time ?(message = "") context =
+  let open Lwt_syntax in
   let info =
     Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
   in
   let parents = List.map Store.Commit.hash context.parents in
-  unshallow context >>= fun () ->
-  Store.Commit.v context.repo ~info ~parents context.tree >|= fun h ->
+  let* () = unshallow context in
+  let+ h = Store.Commit.v context.repo ~info ~parents context.tree in
   Store.Tree.clear context.tree ;
   h
 
@@ -101,7 +106,8 @@ let hash ~time ?(message = "") context =
   Hash.to_context_hash x
 
 let commit ~time ?message context =
-  raw_commit ~time ?message context >|= fun commit ->
+  let open Lwt_syntax in
+  let+ commit = raw_commit ~time ?message context in
   Hash.to_context_hash (Store.Commit.hash commit)
 
 (*-- Generic Store Primitives ------------------------------------------------*)
@@ -120,18 +126,25 @@ let length ctxt key = Tree.length ctxt.tree key
 let find ctxt key = Tree.find ctxt.tree (data_key key)
 
 let raw_add ctxt key data =
-  Tree.add ctxt.tree key data >|= fun tree -> {ctxt with tree}
+  let open Lwt_syntax in
+  let+ tree = Tree.add ctxt.tree key data in
+  {ctxt with tree}
 
 let add ctxt key data = raw_add ctxt (data_key key) data
 
-let raw_remove ctxt k = Tree.remove ctxt.tree k >|= fun tree -> {ctxt with tree}
+let raw_remove ctxt k =
+  let open Lwt_syntax in
+  let+ tree = Tree.remove ctxt.tree k in
+  {ctxt with tree}
 
 let remove ctxt key = raw_remove ctxt (data_key key)
 
 let find_tree ctxt key = Tree.find_tree ctxt.tree (data_key key)
 
 let add_tree ctxt key tree =
-  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree -> {ctxt with tree}
+  let open Lwt_syntax in
+  let+ tree = Tree.add_tree ctxt.tree (data_key key) tree in
+  {ctxt with tree}
 
 let fold ?depth ctxt key ~order ~init ~f =
   Tree.fold ?depth ctxt.tree (data_key key) ~order ~init ~f
@@ -145,7 +158,9 @@ let current_predecessor_ops_metadata_hash_key =
   ["predecessor_ops_metadata_hash"]
 
 let get_protocol ctxt =
-  Tree.find ctxt.tree current_protocol_key >>= function
+  let open Lwt_syntax in
+  let* o = Tree.find ctxt.tree current_protocol_key in
+  match o with
   | None -> assert false
   | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
 
@@ -174,9 +189,10 @@ let add_predecessor_ops_metadata_hash v hash =
   raw_add v current_predecessor_ops_metadata_hash_key data
 
 let create () =
+  let open Lwt_syntax in
   let cfg = Irmin_pack.config "/tmp" in
   let promise =
-    Store.Repo.v cfg >>= fun repo ->
+    let* repo = Store.Repo.v cfg in
     Lwt.return {repo; parents = []; tree = Store.Tree.empty ()}
   in
   match Lwt.state promise with
@@ -227,7 +243,9 @@ let encoding : t Data_encoding.t =
 let current_test_chain_key = ["test_chain"]
 
 let get_test_chain v =
-  Tree.find v.tree current_test_chain_key >>= function
+  let open Lwt_syntax in
+  let* o = Tree.find v.tree current_test_chain_key in
+  match o with
   | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
   | Some data -> (
       match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with

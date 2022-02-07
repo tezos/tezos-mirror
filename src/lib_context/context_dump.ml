@@ -158,12 +158,13 @@ module Make (I : Dump_interface) = struct
   (* IO toolkit. *)
 
   let rec read_string rbuf ~len =
+    let open Lwt_tzresult_syntax in
     let (fd, buf, ofs, total) = !rbuf in
     if Bytes.length buf - ofs < len then (
       let blen = Bytes.length buf - ofs in
       let neu = Bytes.create (blen + 1_000_000) in
       Bytes.blit buf ofs neu 0 blen ;
-      Lwt_unix.read fd neu blen 1_000_000 >>= fun bread ->
+      let*! bread = Lwt_unix.read fd neu blen 1_000_000 in
       total := !total + bread ;
       if bread = 0 then fail Inconsistent_context_dump
       else
@@ -178,7 +179,8 @@ module Make (I : Dump_interface) = struct
       return res
 
   let read_mbytes rbuf b =
-    read_string rbuf ~len:(Bytes.length b) >>=? fun string ->
+    let open Lwt_result_syntax in
+    let* string = read_string rbuf ~len:(Bytes.length b) in
     Bytes.blit_string string 0 b 0 (Bytes.length b) ;
     return ()
 
@@ -188,15 +190,18 @@ module Make (I : Dump_interface) = struct
     Buffer.add_bytes buf b
 
   let get_int64 rbuf =
-    read_string ~len:8 rbuf >>=? fun s ->
+    let open Lwt_result_syntax in
+    let* s = read_string ~len:8 rbuf in
     return @@ EndianString.BigEndian.get_int64 s 0
 
   let get_char rbuf =
-    read_string ~len:1 rbuf >>=? fun s ->
+    let open Lwt_result_syntax in
+    let* s = read_string ~len:1 rbuf in
     return @@ EndianString.BigEndian.get_int8 s 0
 
   let get_int4 rbuf =
-    read_string ~len:4 rbuf >>=? fun s ->
+    let open Lwt_result_syntax in
+    let* s = read_string ~len:4 rbuf in
     return @@ EndianString.BigEndian.get_int32 s 0
 
   let set_mbytes buf b =
@@ -207,31 +212,36 @@ module Make (I : Dump_interface) = struct
      string, encoded on 4 bytes; 2/ reset the offset to the beginning of the string
      encoding. *)
   let get_length_and_reset_offset rbuf =
-    get_int4 rbuf >|=? Int32.to_int >>=? fun length ->
+    let open Lwt_result_syntax in
+    let* l = get_int4 rbuf in
+    let length = Int32.to_int l in
     let (fd, buf, ofs, total) = !rbuf in
     rbuf := (fd, buf, ofs - 4, total) ;
     Lwt.return_ok (length + 4)
 
   let read_variable_length_string rbuf =
-    get_length_and_reset_offset rbuf >>=? fun length_name ->
+    let open Lwt_result_syntax in
+    let* length_name = get_length_and_reset_offset rbuf in
     let b = Bytes.create length_name in
-    read_mbytes rbuf b >|=? fun () ->
+    let+ () = read_mbytes rbuf b in
     let name = Data_encoding.(Binary.of_bytes_exn string) b in
     (length_name, name)
 
   let read_fixed_length_hash rbuf =
+    let open Lwt_result_syntax in
     let length_hash = 1 + 4 + 32 (*enum + size + hash*) in
     let b = Bytes.create length_hash in
-    read_mbytes rbuf b >|=? fun () ->
+    let+ () = read_mbytes rbuf b in
     let hash = Data_encoding.Binary.of_bytes_exn I.Kinded_hash.encoding b in
     (length_hash, hash)
 
   let read_seq rbuf total =
+    let open Lwt_result_syntax in
     let step i =
       if i >= total then Lwt.return_ok None
       else
-        read_variable_length_string rbuf >>=? fun (length_name, name) ->
-        read_fixed_length_hash rbuf >|=? fun (length_hash, hash) ->
+        let* (length_name, name) = read_variable_length_string rbuf in
+        let+ (length_hash, hash) = read_fixed_length_hash rbuf in
         let node = (name, hash) in
         let i = i + length_name + length_hash in
         Some (node, i)
@@ -245,21 +255,28 @@ module Make (I : Dump_interface) = struct
       (req "parents" (list I.Commit_hash.encoding))
 
   let get_command rbuf =
-    get_int64 rbuf >|=? Int64.to_int >>=? fun total ->
-    get_char rbuf >|=? Char.chr >>=? fun tag ->
+    let open Lwt_tzresult_syntax in
+    let* t = get_int64 rbuf in
+    let total = Int64.to_int t in
+    let* t = get_char rbuf in
+    let tag = Char.chr t in
     let read_empty () =
       let len = total - 1 in
       let b = Bytes.create len in
-      read_mbytes rbuf b >|=? fun () ->
+      let+ () = read_mbytes rbuf b in
       Data_encoding.Binary.of_bytes_exn Data_encoding.empty b
     in
     match tag with
-    | 'r' -> read_empty () >|=? fun () -> Root
-    | 'e' -> read_empty () >|=? fun () -> Eof
+    | 'r' ->
+        let+ () = read_empty () in
+        Root
+    | 'e' ->
+        let+ () = read_empty () in
+        Eof
     | 'c' ->
         let len = total - 1 in
         let b = Bytes.create len in
-        read_mbytes rbuf b >|=? fun () ->
+        let+ () = read_mbytes rbuf b in
         let (info, parents) =
           Data_encoding.Binary.of_bytes_exn eoc_encoding_raw b
         in
@@ -267,14 +284,16 @@ module Make (I : Dump_interface) = struct
     | 'b' ->
         let len = total - 1 in
         let b = Bytes.create len in
-        read_mbytes rbuf b >|=? fun () ->
+        let+ () = read_mbytes rbuf b in
         let data = Data_encoding.Binary.of_bytes_exn Data_encoding.bytes b in
         Blob data
     | 'n' ->
-        get_int4 rbuf >|=? Int32.to_int >>=? fun list_size ->
+        let* s = get_int4 rbuf in
+        let list_size = Int32.to_int s in
         let data = read_seq rbuf list_size in
         Lwt.return_ok (Node_seq data)
     | _ -> fail Restore_context_failure
+
   (* Getter and setters *)
 
   let set_root buf =
@@ -297,11 +316,14 @@ module Make (I : Dump_interface) = struct
     set_mbytes buf bytes
 
   let serialize_tree ~notify ~maybe_flush buf =
+    let open Lwt_syntax in
     I.tree_iteri_unique (fun sub_tree ->
         set_tree buf sub_tree ;
-        maybe_flush () >>= fun () -> notify ())
+        let* () = maybe_flush () in
+        notify ())
 
   let dump_context_fd idx context_hash ~context_fd =
+    let open Lwt_syntax in
     (* Dumping *)
     let buf = Buffer.create 1_000_000 in
     let written = ref 0 in
@@ -316,7 +338,8 @@ module Make (I : Dump_interface) = struct
     in
     Lwt.catch
       (fun () ->
-        I.checkout idx context_hash >>= function
+        let* o = I.checkout idx context_hash in
+        match o with
         | None ->
             (* FIXME: dirty *)
             fail @@ Context_not_found (I.Commit_hash.to_bytes context_hash)
@@ -333,13 +356,14 @@ module Make (I : Dump_interface) = struct
                   else Format.asprintf "%dKiB" (!written / 1_024)))
               (fun notify ->
                 set_root buf ;
-                I.context_tree ctxt |> serialize_tree ~notify ~maybe_flush buf
-                >>= fun elements ->
+                let* elements =
+                  I.context_tree ctxt |> serialize_tree ~notify ~maybe_flush buf
+                in
                 let parents = I.context_parents ctxt in
                 set_eoc buf (I.context_info ctxt) parents ;
                 set_end buf ;
-                return_unit >>=? fun () ->
-                flush () >>= fun () -> return elements))
+                let* () = flush () in
+                return_ok elements))
       (function
         | Unix.Unix_error (e, _, _) ->
             fail @@ System_write_error (Unix.error_message e)
@@ -348,63 +372,70 @@ module Make (I : Dump_interface) = struct
   (* Restoring *)
 
   let restore_context_fd index ~expected_context_hash ~fd ~nb_context_elements =
+    let open Lwt_tzresult_syntax in
     let read = ref 0 in
     let rbuf = ref (fd, Bytes.empty, 0, read) in
     (* Editing the repository *)
-    let add_blob t blob = I.add_bytes t blob >>= fun tree -> return tree in
+    let add_blob t blob =
+      let*! tree = I.add_bytes t blob in
+      return tree
+    in
     let add_dir t keys =
-      I.add_dir t keys >>=? function
+      let* o = I.add_dir t keys in
+      match o with
       | None -> fail Restore_context_failure
       | Some tree -> return tree
     in
     let restore () =
       let first_pass () =
-        get_command rbuf >>=? function
-        | Root -> return_unit
-        | _ -> fail Inconsistent_context_dump
+        let* r = get_command rbuf in
+        match r with Root -> return_unit | _ -> fail Inconsistent_context_dump
       in
       let rec second_pass batch ctxt context_hash notify =
-        notify () >>= fun () ->
-        get_command rbuf >>=? function
+        let*! () = notify () in
+        let* c = get_command rbuf in
+        match c with
         | Node_seq contents ->
-            add_dir batch contents >>=? fun tree ->
+            let* tree = add_dir batch contents in
             second_pass batch (I.update_context ctxt tree) context_hash notify
         | Blob data ->
-            add_blob batch data >>=? fun tree ->
+            let* tree = add_blob batch data in
             second_pass batch (I.update_context ctxt tree) context_hash notify
         | Eoc {info; parents} -> (
-            I.set_context ~info ~parents ctxt context_hash >>= function
+            let*! b = I.set_context ~info ~parents ctxt context_hash in
+            match b with
             | false -> fail Inconsistent_context_dump
             | true -> return_unit)
         | _ -> fail Inconsistent_context_dump
       in
       let check_eof () =
-        get_command rbuf >>=? function
-        | Eof -> return_unit
-        | _ -> fail Inconsistent_context_dump
+        let* e = get_command rbuf in
+        match e with Eof -> return_unit | _ -> fail Inconsistent_context_dump
       in
-      first_pass () >>=? fun block_data ->
-      Animation.display_progress
-        ~every:1000
-        ~pp_print_step:(fun fmt i ->
-          Format.fprintf
-            fmt
-            "Writing context: %dK/%dK (%d%%) elements, %s read"
-            (i / 1_000)
-            (nb_context_elements / 1_000)
-            (100 * i / nb_context_elements)
-            (if !read > 1_048_576 then
-             Format.asprintf "%dMiB" (!read / 1_048_576)
-            else Format.asprintf "%dKiB" (!read / 1_024)))
-        (fun notify ->
-          I.batch index (fun batch ->
-              second_pass
-                batch
-                (I.make_context index)
-                expected_context_hash
-                notify))
-      >>=? fun () ->
-      check_eof () >>=? fun () -> return block_data
+      let* block_data = first_pass () in
+      let* () =
+        Animation.display_progress
+          ~every:1000
+          ~pp_print_step:(fun fmt i ->
+            Format.fprintf
+              fmt
+              "Writing context: %dK/%dK (%d%%) elements, %s read"
+              (i / 1_000)
+              (nb_context_elements / 1_000)
+              (100 * i / nb_context_elements)
+              (if !read > 1_048_576 then
+               Format.asprintf "%dMiB" (!read / 1_048_576)
+              else Format.asprintf "%dKiB" (!read / 1_024)))
+          (fun notify ->
+            I.batch index (fun batch ->
+                second_pass
+                  batch
+                  (I.make_context index)
+                  expected_context_hash
+                  notify))
+      in
+      let* () = check_eof () in
+      return block_data
     in
     Lwt.catch
       (fun () -> restore ())
