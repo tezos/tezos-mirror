@@ -1329,32 +1329,43 @@ module Make
                Operation_hash.Map.add oph (res, error) acc
              in
              let applied =
-               List.rev_map
-                 (fun op -> (op.Prevalidation.hash, op.Prevalidation.protocol))
-                 pv.shell.classification.applied_rev
+               if params#applied then
+                 List.rev_map
+                   (fun op ->
+                     (op.Prevalidation.hash, op.Prevalidation.protocol))
+                   pv.shell.classification.applied_rev
+               else []
              in
              let filter f map =
                Operation_hash.Map.fold f map Operation_hash.Map.empty
              in
              let refused =
-               filter
-                 map_op_error
-                 (Classification.map pv.shell.classification.refused)
+               if params#refused then
+                 filter
+                   map_op_error
+                   (Classification.map pv.shell.classification.refused)
+               else Operation_hash.Map.empty
              in
              let outdated =
-               filter
-                 map_op_error
-                 (Classification.map pv.shell.classification.outdated)
+               if params#outdated then
+                 filter
+                   map_op_error
+                   (Classification.map pv.shell.classification.outdated)
+               else Operation_hash.Map.empty
              in
              let branch_refused =
-               filter
-                 map_op_error
-                 (Classification.map pv.shell.classification.branch_refused)
+               if params#branch_refused then
+                 filter
+                   map_op_error
+                   (Classification.map pv.shell.classification.branch_refused)
+               else Operation_hash.Map.empty
              in
              let branch_delayed =
-               filter
-                 map_op_error
-                 (Classification.map pv.shell.classification.branch_delayed)
+               if params#branch_delayed then
+                 filter
+                   map_op_error
+                   (Classification.map pv.shell.classification.branch_delayed)
+               else Operation_hash.Map.empty
              in
              let unprocessed =
                Pending_ops.fold
@@ -1371,10 +1382,12 @@ module Make
                 and not the plugin, we will change the encoding to
                 reflect that. *)
              let prechecked_with_applied =
-               (Operation_hash.Map.bindings pv.shell.classification.prechecked
-               |> List.rev_map (fun (oph, op) ->
-                      (oph, op.Prevalidation.protocol)))
-               @ applied
+               if params#applied then
+                 (Operation_hash.Map.bindings pv.shell.classification.prechecked
+                 |> List.rev_map (fun (oph, op) ->
+                        (oph, op.Prevalidation.protocol)))
+                 @ applied
+               else applied
              in
              let pending_operations =
                {

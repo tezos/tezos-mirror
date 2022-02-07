@@ -410,9 +410,25 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     val pending_operations_version_dispatcher :
       version:int -> t -> t_with_version RPC_answer.t Lwt.t
 
-    (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
+    (** Call RPC GET /chains/[chain]/mempool/pending_operations
+
+    - Default [version] is [0].
+    - Default [applied] is [true].
+    - Default [branch_delayed] is [true].
+    - Default [branch_refused] is [true].
+    - Default [refused] is [true].
+    - Default [outdated] is [true]. *)
     val pending_operations :
-      #simple -> ?chain:chain -> ?version:int -> unit -> t tzresult Lwt.t
+      #simple ->
+      ?chain:chain ->
+      ?version:int ->
+      ?applied:bool ->
+      ?branch_delayed:bool ->
+      ?branch_refused:bool ->
+      ?refused:bool ->
+      ?outdated:bool ->
+      unit ->
+      t tzresult Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
     val ban_operation :
@@ -663,7 +679,12 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
         ( [`GET],
           'a,
           'b,
-          < version : int >,
+          < version : int
+          ; applied : bool
+          ; branch_delayed : bool
+          ; branch_refused : bool
+          ; refused : bool
+          ; outdated : bool >,
           unit,
           Mempool.t_with_version )
         RPC_service.t
