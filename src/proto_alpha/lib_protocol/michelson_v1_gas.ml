@@ -1444,15 +1444,13 @@ module Cost_of = struct
       compare ty x y Gas.free Return
      [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
-    let view_mem (elt : Script_string.t)
+    let view_get (elt : Script_string.t)
         (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
       let open S_syntax in
       let per_elt_cost = compare Script_typed_ir.string_key elt elt in
       let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
       let intercept = atomic_step_cost (S.safe_int 80) in
       Gas.(intercept +@ (log2 size *@ per_elt_cost))
-
-    let view_get = view_mem
 
     let view_update (elt : Script_string.t)
         (m : Script_typed_ir.view Script_typed_ir.SMap.t) =

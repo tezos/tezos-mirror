@@ -302,9 +302,6 @@ module Cost_of : sig
 
     val view : Gas.cost
 
-    val view_mem :
-      Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
-
     val view_get :
       Script_string.t -> Script_typed_ir.view Script_typed_ir.SMap.t -> Gas.cost
 
