@@ -111,14 +111,23 @@ let reporter () =
   in
   {Logs.report}
 
-let index_log_size = ref None
+(* Caps the number of entries stored in the Irmin's index. As a
+   trade-off, increasing this value will delay index merges, and thus,
+   make them more expensive in terms of disk usage, memory usage and
+   computation time.*)
+let index_log_size = ref 2_500_000
 
-let auto_flush = ref 10_000
+(* Caps the number of entries stored in the Irmin's LRU cache. As a
+   trade-off, increasing this value will increase the memory
+   consumption.*)
+let lru_size = ref 5_000
+
 (* This limit ensures that no trees with more than [auto_flush]
    mutations can exist in memory, bounding the memory usage of a
    single commit performed by a read-write process. As a trade-off,
    the intermediate flushed trees to the store might be unused and
    will have to be garbage collected later on to save space. *)
+let auto_flush = ref 10_000
 
 let () =
   let verbose_info () =
@@ -129,8 +138,9 @@ let () =
     Logs.set_level (Some Logs.Debug) ;
     Logs.set_reporter (reporter ())
   in
-  let index_log_size n = index_log_size := Some (int_of_string n) in
+  let index_log_size n = index_log_size := int_of_string n in
   let auto_flush n = auto_flush := int_of_string n in
+  let lru_size n = lru_size := int_of_string n in
   match Unix.getenv "TEZOS_CONTEXT" with
   | exception Not_found -> ()
   | v ->
@@ -143,6 +153,7 @@ let () =
               match String.split '=' v with
               | ["index-log-size"; n] -> index_log_size n
               | ["auto-flush"; n] -> auto_flush n
+              | ["lru-size"; n] -> lru_size n
               | _ -> ()))
         args
 
@@ -496,8 +507,12 @@ let add_predecessor_ops_metadata_hash v hash =
 (*-- Initialisation ----------------------------------------------------------*)
 
 let init ?patch_context ?(readonly = false) root =
-  let index_log_size = Option.value ~default:2_500_000 !index_log_size in
-  Store.Repo.v (Irmin_pack.config ~readonly ~index_log_size root)
+  Store.Repo.v
+    (Irmin_pack.config
+       ~readonly
+       ~index_log_size:!index_log_size
+       ~lru_size:!lru_size
+       root)
   >|= fun repo -> {path = root; repo; patch_context; readonly}
 
 let close index = Store.Repo.close index.repo
