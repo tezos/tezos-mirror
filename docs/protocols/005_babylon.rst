@@ -97,6 +97,7 @@ A few changes are needed as a consequence of the accounts simplification.
 - the instruction ``CREATE_ACCOUNT`` disappears,
 - the type of ``CREATE_CONTRACT`` changes.
 
+.. _proposal_quorum:
 
 Proposal quorum
 ---------------
@@ -117,6 +118,7 @@ the protocol goes back to a proposal period.
 `(MR71)
 <https://gitlab.com/nomadic-labs/tezos/-/merge_requests/71>`_
 
+.. _quorum_caps:
 
 Quorum caps
 -----------
