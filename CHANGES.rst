@@ -25,6 +25,10 @@ be documented here either.
 Node
 ----
 
+- The tezos-node configuration file parameter
+  ``shell.prevalidator.limits.max_refused_operations`` is now
+  deprecated and may be removed starting from version 13.0.
+
 - Added optional parameter ``--media-type`` and its corresponding field
   in the configuration file. It defines which format of data serialisation
   must be used for RPC requests to the node. The value can be  ``json``,
