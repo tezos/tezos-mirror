@@ -1159,7 +1159,8 @@ let apply_origination ~consume_deserialization_gas ~ctxt ~parsed_script ~script
         ~legacy:false
         ~allow_forged_in_storage:internal
         script
-  | Some parsed_script -> return (parsed_script, ctxt))
+  | Some parsed_script ->
+      return (Script_ir_translator.Ex_script parsed_script, ctxt))
   >>=? fun (Ex_script (Script parsed_script), ctxt) ->
   let views_result =
     Script_ir_translator.typecheck_views
@@ -1338,11 +1339,15 @@ let apply_internal_manager_operation_content :
         ~payer
         ~dst_rollup:dst
         ~since:before_operation
-  | Origination {delegate; script; preorigination; credit} ->
+  | Origination
+      {
+        origination = {delegate; script; preorigination; credit};
+        script = parsed_script;
+      } ->
       apply_origination
         ~consume_deserialization_gas
         ~ctxt
-        ~parsed_script:None
+        ~parsed_script:(Some parsed_script)
         ~script
         ~internal
         ~preorigination

@@ -306,7 +306,8 @@ let tickets_of_operation ctxt
               },
             ctxt )
       else return (None, ctxt)
-  | Origination {delegate = _; script; credit = _; preorigination} ->
+  | Origination
+      {origination = {delegate = _; script; credit = _; preorigination}; _} ->
       tickets_of_origination ctxt ~preorigination script
   | Delegation _ -> return (None, ctxt)
 

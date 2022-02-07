@@ -81,7 +81,7 @@ let contents_of_internal_operation (type kind)
   let operation : kind internal_manager_operation =
     match operation with
     | Transaction {transaction; _} -> Transaction transaction
-    | Origination origination -> Origination origination
+    | Origination {origination; _} -> Origination origination
     | Delegation delegate -> Delegation delegate
   in
   {source; operation; nonce}

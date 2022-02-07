@@ -1395,8 +1395,10 @@ and 'kind manager_operation =
       parameters : 'a;
     }
       -> Kind.transaction manager_operation
-  | Origination :
-      Alpha_context.origination
+  | Origination : {
+      origination : Alpha_context.origination;
+      script : ('arg, 'storage) script;
+    }
       -> Kind.origination manager_operation
   | Delegation :
       Signature.Public_key_hash.t option
