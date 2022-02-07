@@ -78,6 +78,7 @@ let flat_pp pp o =
       ())
 
 let commands () =
+  let open Lwt_tzresult_syntax in
   let open Clic in
   let command ~desc = command ~group ~desc in
   [
@@ -134,9 +135,11 @@ let commands () =
             let script_row kind date evname data () =
               [kind; date; evname; data]
             in
-            Scriptable.output_for_human scriptable (fun () ->
-                cctxt#message "### Events" >>= fun () -> return_unit)
-            >>=? fun () ->
+            let* () =
+              Scriptable.output_for_human scriptable (fun () ->
+                  let*! () = cctxt#message "### Events" in
+                  return_unit)
+            in
             let on_unknown =
               if not dump_unknown then None
               else
@@ -145,74 +148,83 @@ let commands () =
                     Scriptable.output_row
                       scriptable
                       ~for_human:(fun () ->
-                        cctxt#error "Unknown: %s" path >>= fun () ->
-                        Lwt_stream.iter_s
-                          (fun line -> cctxt#message "    |%s" line)
-                          (Lwt_io.lines_of_file path)
-                        >>= fun () -> return_unit)
+                        let*! () = cctxt#error "Unknown: %s" path in
+                        let*! () =
+                          Lwt_stream.iter_s
+                            (fun line -> cctxt#message "    |%s" line)
+                            (Lwt_io.lines_of_file path)
+                        in
+                        return_unit)
                       ~for_script:(script_row "unknown-event" "-" "-" path))
             in
             let time_query =
               Option.merge (fun a b -> `And (a, b)) since until
             in
-            File_event_sink.Query.fold
-              ?only_names
-              ?on_unknown
-              ?only_sections
-              ?time_query
-              uri
-              ~init:()
-              ~f:(fun () ~time_stamp ev ->
-                let o = Internal_event.Generic.explode_event ev in
-                let time_string time_value =
-                  let open Unix in
-                  let tm = gmtime time_value in
-                  Printf.sprintf
-                    "%04d%02d%02d-%02d%02d%02d-%04d"
-                    (1900 + tm.tm_year)
-                    (tm.tm_mon + 1)
-                    tm.tm_mday
-                    tm.tm_hour
-                    tm.tm_min
-                    tm.tm_sec
-                    ((time_value -. floor time_value) *. 10_000. |> int_of_float)
-                in
-                let pp fmt o =
-                  if as_json then Data_encoding.Json.pp fmt o#json
-                  else o#pp fmt ()
-                in
-                Scriptable.output_row
-                  scriptable
-                  ~for_human:(fun () ->
-                    cctxt#message
-                      "@[<2>* [%s %s]@ %a@]"
-                      (time_string time_stamp)
-                      o#name
-                      pp
-                      o
-                    >>= fun () -> return_unit)
-                  ~for_script:(fun () ->
-                    let text = flat_pp pp o in
-                    script_row "event" (time_string time_stamp) o#name text ()))
-            >>=? function
-            | ([], ()) -> return_unit
-            | (errors_and_warnings, ()) ->
+            let* (errors_and_warnings, ()) =
+              File_event_sink.Query.fold
+                ?only_names
+                ?on_unknown
+                ?only_sections
+                ?time_query
+                uri
+                ~init:()
+                ~f:(fun () ~time_stamp ev ->
+                  let o = Internal_event.Generic.explode_event ev in
+                  let time_string time_value =
+                    let open Unix in
+                    let tm = gmtime time_value in
+                    Printf.sprintf
+                      "%04d%02d%02d-%02d%02d%02d-%04d"
+                      (1900 + tm.tm_year)
+                      (tm.tm_mon + 1)
+                      tm.tm_mday
+                      tm.tm_hour
+                      tm.tm_min
+                      tm.tm_sec
+                      ((time_value -. floor time_value) *. 10_000.
+                      |> int_of_float)
+                  in
+                  let pp fmt o =
+                    if as_json then Data_encoding.Json.pp fmt o#json
+                    else o#pp fmt ()
+                  in
+                  Scriptable.output_row
+                    scriptable
+                    ~for_human:(fun () ->
+                      let*! () =
+                        cctxt#message
+                          "@[<2>* [%s %s]@ %a@]"
+                          (time_string time_stamp)
+                          o#name
+                          pp
+                          o
+                      in
+                      return_unit)
+                    ~for_script:(fun () ->
+                      let text = flat_pp pp o in
+                      script_row "event" (time_string time_stamp) o#name text ()))
+            in
+            match errors_and_warnings with
+            | [] -> return_unit
+            | errors_and_warnings ->
                 let open Format in
                 Scriptable.output
                   scriptable
                   ~for_human:(fun () ->
-                    cctxt#warning
-                      "### Some things were not perfect:@.@[<2>%a@]"
-                      (pp_print_list
-                         ~pp_sep:(fun fmt () -> fprintf fmt "@.")
-                         (fun fmt item ->
-                           fprintf
-                             fmt
-                             "* %a"
-                             File_event_sink.Query.Report.pp
-                             item))
-                      errors_and_warnings
-                    >>= fun () -> return_unit)
+                    let*! () =
+                      cctxt#warning
+                        "### Some things were not perfect:@.@[<2>%a@]"
+                        (pp_print_list
+                           ~pp_sep:(fun fmt () -> fprintf fmt "@.")
+                           (fun fmt item ->
+                             fprintf
+                               fmt
+                               "* %a"
+                               File_event_sink.Query.Report.pp
+                               item))
+                        errors_and_warnings
+                    in
+                    return_unit)
                   ~for_script:(fun () ->
                     let make_row e =
                       let text = flat_pp File_event_sink.Query.Report.pp e in
@@ -225,8 +237,10 @@ let commands () =
                     in
                     List.map make_row errors_and_warnings))
         | Some other ->
-            cctxt#message "URI scheme %S not handled as of now." other
-            >>= fun () -> return_unit);
+            let*! () =
+              cctxt#message "URI scheme %S not handled as of now." other
+            in
+            return_unit);
     command
       ~desc:
         "Display configuration/state information about the internal-event \
@@ -248,14 +262,16 @@ let commands () =
             schs ;
           pp_close_box fmt ()
         in
-        cctxt#message
-          "Event logging framework:@.Sinks state:@ %a@.Events registered:@ %a"
-          Internal_event.All_sinks.pp_state
-          ()
-          pp_event_definitions
-          Internal_event.(
-            All_definitions.get () |> List.map Generic.json_schema)
-        >>= fun () -> return_unit);
+        let*! () =
+          cctxt#message
+            "Event logging framework:@.Sinks state:@ %a@.Events registered:@ %a"
+            Internal_event.All_sinks.pp_state
+            ()
+            pp_event_definitions
+            Internal_event.(
+              All_definitions.get () |> List.map Generic.json_schema)
+        in
+        return_unit);
     command
       ~desc:"Output the JSON schema of an internal-event."
       no_options
@@ -276,10 +292,11 @@ let commands () =
         | None -> failwith "Event %S not found" event
         | Some ev ->
             let o = Generic.json_schema ev in
-            Lwt_io.with_file ~mode:Lwt_io.output path (fun chan ->
-                let v = Format.asprintf "%a" Json_schema.pp o#schema in
-                Lwt_io.write chan v)
-            >>= fun () ->
-            cctxt#message "Wrote schema of %s to %s" event path >>= fun () ->
+            let*! () =
+              Lwt_io.with_file ~mode:Lwt_io.output path (fun chan ->
+                  let v = Format.asprintf "%a" Json_schema.pp o#schema in
+                  Lwt_io.write chan v)
+            in
+            let*! () = cctxt#message "Wrote schema of %s to %s" event path in
             return_unit);
   ]

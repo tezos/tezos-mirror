@@ -48,6 +48,7 @@ let p2p_peer_id_param ~name ~desc t =
     t
 
 let commands () =
+  let open Lwt_tzresult_syntax in
   let open Clic in
   [
     command
@@ -56,77 +57,82 @@ let commands () =
       no_options
       (prefixes ["p2p"; "stat"] stop)
       (fun () (cctxt : #Client_context.full) ->
-        Shell_services.P2p.stat cctxt >>=? fun stat ->
-        Shell_services.P2p.Connections.list cctxt >>=? fun conns ->
-        Shell_services.P2p.Peers.list cctxt >>=? fun peers ->
-        Shell_services.P2p.Points.list cctxt >>=? fun points ->
-        cctxt#message "GLOBAL STATS" >>= fun () ->
-        cctxt#message "  %a" P2p_stat.pp stat >>= fun () ->
-        cctxt#message "CONNECTIONS" >>= fun () ->
+        let* stat = Shell_services.P2p.stat cctxt in
+        let* conns = Shell_services.P2p.Connections.list cctxt in
+        let* peers = Shell_services.P2p.Peers.list cctxt in
+        let* points = Shell_services.P2p.Points.list cctxt in
+        let*! () = cctxt#message "GLOBAL STATS" in
+        let*! () = cctxt#message "  %a" P2p_stat.pp stat in
+        let*! () = cctxt#message "CONNECTIONS" in
         let (incoming, outgoing) =
           List.partition (fun c -> c.P2p_connection.Info.incoming) conns
         in
-        List.iter_s
-          (fun conn -> cctxt#message "  %a" pp_connection_info conn)
-          incoming
-        >>= fun () ->
-        List.iter_s
-          (fun conn -> cctxt#message "  %a" pp_connection_info conn)
-          outgoing
-        >>= fun () ->
-        cctxt#message "KNOWN PEERS" >>= fun () ->
-        List.iter_s
-          (fun (p, pi) ->
-            cctxt#message
-              "  %a  %.0f %a %a %s"
-              P2p_peer.State.pp_digram
-              pi.P2p_peer.Info.state
-              pi.score
-              P2p_peer.Id.pp
-              p
-              P2p_stat.pp
-              pi.stat
-              (if pi.trusted then "★" else " "))
-          peers
-        >>= fun () ->
-        cctxt#message "KNOWN POINTS" >>= fun () ->
-        List.iter_s
-          (fun (p, pi) ->
-            match pi.P2p_point.Info.state with
-            | Running peer_id ->
-                cctxt#message
-                  "  %a  %a %a %s"
-                  P2p_point.State.pp_digram
-                  pi.state
-                  P2p_point.Id.pp
-                  p
-                  P2p_peer.Id.pp
-                  peer_id
-                  (if pi.trusted then "★" else " ")
-            | _ -> (
-                match pi.last_seen with
-                | Some (peer_id, ts) ->
-                    cctxt#message
-                      "  %a  %a (last seen: %a %a) %s"
-                      P2p_point.State.pp_digram
-                      pi.state
-                      P2p_point.Id.pp
-                      p
-                      P2p_peer.Id.pp
-                      peer_id
-                      Time.System.pp_hum
-                      ts
-                      (if pi.trusted then "★" else " ")
-                | None ->
-                    cctxt#message
-                      "  %a  %a %s"
-                      P2p_point.State.pp_digram
-                      pi.state
-                      P2p_point.Id.pp
-                      p
-                      (if pi.trusted then "★" else " ")))
-          points
-        >>= fun () -> return_unit);
+        let*! () =
+          List.iter_s
+            (fun conn -> cctxt#message "  %a" pp_connection_info conn)
+            incoming
+        in
+        let*! () =
+          List.iter_s
+            (fun conn -> cctxt#message "  %a" pp_connection_info conn)
+            outgoing
+        in
+        let*! () = cctxt#message "KNOWN PEERS" in
+        let*! () =
+          List.iter_s
+            (fun (p, pi) ->
+              cctxt#message
+                "  %a  %.0f %a %a %s"
+                P2p_peer.State.pp_digram
+                pi.P2p_peer.Info.state
+                pi.score
+                P2p_peer.Id.pp
+                p
+                P2p_stat.pp
+                pi.stat
+                (if pi.trusted then "★" else " "))
+            peers
+        in
+        let*! () = cctxt#message "KNOWN POINTS" in
+        let*! () =
+          List.iter_s
+            (fun (p, pi) ->
+              match pi.P2p_point.Info.state with
+              | Running peer_id ->
+                  cctxt#message
+                    "  %a  %a %a %s"
+                    P2p_point.State.pp_digram
+                    pi.state
+                    P2p_point.Id.pp
+                    p
+                    P2p_peer.Id.pp
+                    peer_id
+                    (if pi.trusted then "★" else " ")
+              | _ -> (
+                  match pi.last_seen with
+                  | Some (peer_id, ts) ->
+                      cctxt#message
+                        "  %a  %a (last seen: %a %a) %s"
+                        P2p_point.State.pp_digram
+                        pi.state
+                        P2p_point.Id.pp
+                        p
+                        P2p_peer.Id.pp
+                        peer_id
+                        Time.System.pp_hum
+                        ts
+                        (if pi.trusted then "★" else " ")
+                  | None ->
+                      cctxt#message
+                        "  %a  %a %s"
+                        P2p_point.State.pp_digram
+                        pi.state
+                        P2p_point.Id.pp
+                        p
+                        (if pi.trusted then "★" else " ")))
+            points
+        in
+        return_unit);
     command
       ~group
       ~desc:"Connect to a new point."
@@ -134,20 +140,27 @@ let commands () =
       (prefixes ["connect"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
         let timeout = Time.System.Span.of_seconds_exn 10. in
-        P2p_services.connect cctxt ~timeout (address, port) >>= function
+        let*! r = P2p_services.connect cctxt ~timeout (address, port) in
+        match r with
         | Ok () ->
-            cctxt#message
-              "Connection to %a:%d established."
-              P2p_addr.pp
-              address
-              port
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#message
+                "Connection to %a:%d established."
+                P2p_addr.pp
+                address
+                port
+            in
+            return_unit
         | Error (P2p_errors.Pending_connection :: _) ->
-            cctxt#warning "Already connecting to peer %a" P2p_addr.pp address
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#warning "Already connecting to peer %a" P2p_addr.pp address
+            in
+            return_unit
         | Error (P2p_errors.Connected :: _) ->
-            cctxt#warning "Already connected to peer %a" P2p_addr.pp address
-            >>= fun () -> return_unit
+            let*! () =
+              cctxt#warning "Already connected to peer %a" P2p_addr.pp address
+            in
+            return_unit
         | Error _ as e -> Lwt.return e);
     command
       ~group
@@ -157,9 +170,11 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Connections.kick cctxt peer >>=? fun () ->
-        cctxt#message "Connection to %a interrupted." P2p_peer.Id.pp peer
-        >>= fun () -> return_unit);
+        let* () = P2p_services.Connections.kick cctxt peer in
+        let*! () =
+          cctxt#message "Connection to %a interrupted." P2p_peer.Id.pp peer
+        in
+        return_unit);
     command
       ~group
       ~desc:
@@ -168,20 +183,26 @@ let commands () =
       no_options
       (prefixes ["ban"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, _port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.patch cctxt (address, 0) (Some `Ban, None)
-        >>=? fun _ ->
-        cctxt#message "Address %a:* is now banned." P2p_addr.pp address
-        >>= fun () -> return_unit);
+        let* _ =
+          P2p_services.Points.patch cctxt (address, 0) (Some `Ban, None)
+        in
+        let*! () =
+          cctxt#message "Address %a:* is now banned." P2p_addr.pp address
+        in
+        return_unit);
     command
       ~group
       ~desc:"Remove an IP address and all its ports from the blacklist."
       no_options
       (prefixes ["unban"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, _port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.patch cctxt (address, 0) (Some `Open, None)
-        >>=? fun _ ->
-        cctxt#message "Address %a:* is now unbanned." P2p_addr.pp address
-        >>= fun () -> return_unit);
+        let* _ =
+          P2p_services.Points.patch cctxt (address, 0) (Some `Open, None)
+        in
+        let*! () =
+          cctxt#message "Address %a:* is now unbanned." P2p_addr.pp address
+        in
+        return_unit);
     command
       ~group
       ~desc:
@@ -190,31 +211,43 @@ let commands () =
       no_options
       (prefixes ["trust"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.patch cctxt (address, port) (Some `Trust, None)
-        >>=? fun _ ->
-        cctxt#message "Address %a:%d is now trusted." P2p_addr.pp address port
-        >>= fun () -> return_unit);
+        let* _ =
+          P2p_services.Points.patch cctxt (address, port) (Some `Trust, None)
+        in
+        let*! () =
+          cctxt#message "Address %a:%d is now trusted." P2p_addr.pp address port
+        in
+        return_unit);
     command
       ~group
       ~desc:"Removes an IP address from the whitelist."
       no_options
       (prefixes ["untrust"; "address"] @@ addr_parameter @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.patch cctxt (address, port) (Some `Open, None)
-        >>=? fun _ ->
-        cctxt#message "Address %a:%d is now untrusted." P2p_addr.pp address port
-        >>= fun () -> return_unit);
+        let* _ =
+          P2p_services.Points.patch cctxt (address, port) (Some `Open, None)
+        in
+        let*! () =
+          cctxt#message
+            "Address %a:%d is now untrusted."
+            P2p_addr.pp
+            address
+            port
+        in
+        return_unit);
     command
       ~group
       ~desc:"Check if an IP address is banned."
       no_options
       (prefixes ["is"; "address"; "banned"] @@ addr_parameter @@ stop)
       (fun () (address, port) (cctxt : #Client_context.full) ->
-        P2p_services.Points.banned cctxt (address, port) >>=? fun banned ->
-        cctxt#message
-          "The given ip address is %s"
-          (if banned then "banned" else "not banned")
-        >>= fun () -> return_unit);
+        let* banned = P2p_services.Points.banned cctxt (address, port) in
+        let*! () =
+          cctxt#message
+            "The given ip address is %s"
+            (if banned then "banned" else "not banned")
+        in
+        return_unit);
     command
       ~group
       ~desc:"Check if a peer ID is banned."
@@ -223,11 +256,13 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.banned cctxt peer >>=? fun banned ->
-        cctxt#message
-          "The given peer ID is %s"
-          (if banned then "banned" else "not banned")
-        >>= fun () -> return_unit);
+        let* banned = P2p_services.Peers.banned cctxt peer in
+        let*! () =
+          cctxt#message
+            "The given peer ID is %s"
+            (if banned then "banned" else "not banned")
+        in
+        return_unit);
     command
       ~group
       ~desc:
@@ -238,9 +273,11 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.patch cctxt peer (Some `Ban) >>=? fun _ ->
-        cctxt#message "The peer %a is now banned." P2p_peer.Id.pp_short peer
-        >>= fun () -> return_unit);
+        let* _ = P2p_services.Peers.patch cctxt peer (Some `Ban) in
+        let*! () =
+          cctxt#message "The peer %a is now banned." P2p_peer.Id.pp_short peer
+        in
+        return_unit);
     command
       ~group
       ~desc:"Removes a peer ID from the blacklist."
@@ -249,9 +286,11 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.patch cctxt peer (Some `Open) >>=? fun _ ->
-        cctxt#message "The peer %a is now unbanned." P2p_peer.Id.pp_short peer
-        >>= fun () -> return_unit);
+        let* _ = P2p_services.Peers.patch cctxt peer (Some `Open) in
+        let*! () =
+          cctxt#message "The peer %a is now unbanned." P2p_peer.Id.pp_short peer
+        in
+        return_unit);
     command
       ~group
       ~desc:
@@ -262,9 +301,11 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.patch cctxt peer (Some `Trust) >>=? fun _ ->
-        cctxt#message "The peer %a is now trusted." P2p_peer.Id.pp_short peer
-        >>= fun () -> return_unit);
+        let* _ = P2p_services.Peers.patch cctxt peer (Some `Trust) in
+        let*! () =
+          cctxt#message "The peer %a is now trusted." P2p_peer.Id.pp_short peer
+        in
+        return_unit);
     command
       ~group
       ~desc:"Remove a peer ID from the whitelist."
@@ -273,16 +314,21 @@ let commands () =
       @@ p2p_peer_id_param ~name:"peer" ~desc:"peer network identity"
       @@ stop)
       (fun () peer (cctxt : #Client_context.full) ->
-        P2p_services.Peers.patch cctxt peer (Some `Open) >>=? fun _ ->
-        cctxt#message "The peer %a is now untrusted." P2p_peer.Id.pp_short peer
-        >>= fun () -> return_unit);
+        let* _ = P2p_services.Peers.patch cctxt peer (Some `Open) in
+        let*! () =
+          cctxt#message
+            "The peer %a is now untrusted."
+            P2p_peer.Id.pp_short
+            peer
+        in
+        return_unit);
     command
       ~group
       ~desc:"Clear all access control rules."
       no_options
       (prefixes ["clear"; "acls"] @@ stop)
       (fun () (cctxt : #Client_context.full) ->
-        P2p_services.ACL.clear cctxt () >>=? fun () ->
-        cctxt#message "The access control rules are now cleared." >>= fun () ->
+        let* () = P2p_services.ACL.clear cctxt () in
+        let*! () = cctxt#message "The access control rules are now cleared." in
         return_unit);
   ]
