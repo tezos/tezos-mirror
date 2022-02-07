@@ -61,6 +61,8 @@ build_x86_64:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_dependencies_template
+  variables:
+    ARCH: ""
   before_script:
     - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
     # dune build @install make ocamlopt stack overflow when compiling
@@ -71,12 +73,12 @@ build_x86_64:
       @src/lib_protocol_compiler/install
       $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done)
       --profile static
-    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
+    - mkdir -p "tezos-binaries/$ARCH" && install -t "tezos-binaries/$ARCH" _build/install/default/bin/*
     # Strip debug symbols in binaries
-    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+    - find "tezos-binaries/$ARCH" -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
   artifacts:
     paths:
-      - tezos-binaries/*
+      - "tezos-binaries/$ARCH/*"
 
 # Static binaries for x86_64 are necessary for development branches, as we want to make
 # sure the build does not break. We also need it for release tags, to as its artifacts
@@ -88,13 +90,17 @@ build:static-x86_64-linux-binaries:
   script:
     - sudo apk --no-cache --virtual add upx
     # Compress resulting binaries
-    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+    - find tezos-binaries/x86_64 -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+  variables:
+    ARCH: "x86_64"
   stage: build
 
 build:static-arm64-linux-binaries:
   extends:
       - .build_static_binaries_template
       - .rules_template__master_and_releases
+  variables:
+    ARCH: "arm64"
   stage: build
   script:
     - echo "No compression for now"

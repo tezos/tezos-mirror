@@ -77,6 +77,9 @@ upload-gitlab-packages:
     - build:static-x86_64-linux-binaries
   script:
     - apk --no-cache --virtual add jq curl git
-    - scripts/release/upload-static-binaries-to-package-registry.sh "x86_64-"
-    - scripts/release/upload-static-binaries-to-package-registry.sh "arm64-"
+      # we run the smoketest only for x86_64 since this job is executed
+      # on x86_64
+    - scripts/ci/static_smoke_test.sh x86_64 version
+    - scripts/release/upload-static-binaries-to-package-registry.sh x86_64
+    - scripts/release/upload-static-binaries-to-package-registry.sh arm64
     - scripts/release/upload-tarball-to-package-registry.sh
