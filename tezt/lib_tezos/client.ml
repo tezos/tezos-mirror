@@ -922,7 +922,7 @@ let stresstest_estimate_gas ?endpoint client =
     |> Process.check_and_read_stdout
   in
   let json = JSON.parse ~origin:"transaction_costs" output in
-  let regular = JSON.get "regular" json |> JSON.as_int in
+  let regular = (JSON.get "regular" json |> JSON.as_int) / 1000 in
   Lwt.return {regular}
 
 let run_script ?hooks ?balance ?self_address ?source ?payer ~prg ~storage ~input
