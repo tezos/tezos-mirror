@@ -2043,7 +2043,9 @@ module Tx_rollup_message : sig
 
   type t = private Batch of string | Deposit of deposit
 
-  val make_batch : context -> string -> t tzresult
+  type size = int
+
+  val make_batch : context -> string -> (t * size) tzresult
 
   val size : t -> int
 
@@ -2074,7 +2076,7 @@ module Tx_rollup_inbox : sig
     Tx_rollup.t ->
     Tx_rollup_state.t ->
     Tx_rollup_message.t ->
-    (context * Tx_rollup_state.t * int) tzresult Lwt.t
+    (context * Tx_rollup_state.t) tzresult Lwt.t
 
   val messages :
     context ->

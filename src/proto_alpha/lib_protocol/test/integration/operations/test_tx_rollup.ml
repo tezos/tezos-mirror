@@ -90,7 +90,7 @@ let check_batch_in_inbox :
  fun ctxt inbox n expected ->
   Lwt.return
   @@ Environment.wrap_tzresult (Tx_rollup_message.make_batch ctxt expected)
-  >>=? fun expected_batch->
+  >>=? fun (expected_batch, _) ->
   let expected_hash = Tx_rollup_message.hash expected_batch in
   match List.nth inbox.contents n with
   | Some content ->

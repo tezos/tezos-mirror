@@ -75,7 +75,7 @@ let append_message :
     Tx_rollup_repr.t ->
     Tx_rollup_state_repr.t ->
     Tx_rollup_message_repr.t ->
-    (Raw_context.t * Tx_rollup_state_repr.t * int) tzresult Lwt.t =
+    (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
  fun ctxt rollup state message ->
   let level = (Raw_context.current_level ctxt).level in
   prepare_metadata ctxt rollup state level
@@ -112,7 +112,7 @@ let append_message :
     (ctxt, level)
     rollup
     (Tx_rollup_message_repr.hash message :: Option.value ~default:[] mcontents)
-  >>=? fun (ctxt, _, _) -> return (ctxt, new_state, message_size)
+  >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
 let get_level :
     Raw_context.t -> [`Current | `Level of Raw_level_repr.t] -> Raw_level_repr.t

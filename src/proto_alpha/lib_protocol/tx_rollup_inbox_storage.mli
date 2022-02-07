@@ -60,7 +60,7 @@ val append_message :
   Tx_rollup_repr.t ->
   Tx_rollup_state_repr.t ->
   Tx_rollup_message_repr.t ->
-  (Raw_context.t * Tx_rollup_state_repr.t * int) tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
 (** [messages ctxt ~level tx_rollup] returns the list of messages
     hashes stored in the inbox of [tx_rollup] at level [level].
