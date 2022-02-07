@@ -212,6 +212,14 @@ class TestVotingFull:
         print(f"level before {level_before}")
         assert utils.check_level_greater_than(client, level_before + 1)
 
+    def test_submit_again(self, sandbox: Sandbox):
+        # check that the voting procedure can still be initiated
+        # after the migration
+        client = sandbox.client(0)
+        proposals = client.submit_proposals(BAKER, [PROTO_B])
+        tenderbake(client)
+        client.wait_for_inclusion(proposals.operation_hash, check_previous=1)
+
     @pytest.mark.xfail
     def test_check_logs(self, sandbox: Sandbox):
         assert utils.check_logs(sandbox.logs, ERROR_PATTERN)
