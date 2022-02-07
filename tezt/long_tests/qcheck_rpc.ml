@@ -180,9 +180,9 @@ module RPC_Index = struct
     | Ref "micheline.alpha.michelson_v1.expression" -> Ok Mich_exp
     | Ref str -> parse_input env @@ String_map.find str env
     | Other {kind = Boolean; _} -> Ok Boolean
-    | Other {kind = Integer {minimum; maximum; enum = []}; _} ->
+    | Other {kind = Integer {minimum; maximum; enum = None}; _} ->
         Ok (Integer {min = minimum; max = maximum})
-    | Other {kind = Integer {enum; _}; _} -> Ok (Int_enum enum)
+    | Other {kind = Integer {enum = Some enum; _}; _} -> Ok (Int_enum enum)
     | Other {kind = Number {minimum; maximum}; _} ->
         Ok (Float {min = minimum; max = maximum})
     | Other {kind = String {pattern = Some s; _}; _} -> (
@@ -190,8 +190,8 @@ module RPC_Index = struct
         match s with
         | "^([a-zA-Z0-9][a-zA-Z0-9])*$" -> Ok Even_alphanum
         | _ -> Error ("Unexpected regexp: " ^ s))
-    | Other {kind = String {enum = []; _}; _} -> Ok Rand_string
-    | Other {kind = String {enum; _}; _} -> Ok (String_enum enum)
+    | Other {kind = String {enum = None; _}; _} -> Ok Rand_string
+    | Other {kind = String {enum = Some enum; _}; _} -> Ok (String_enum enum)
     | Other {kind = Array schema'; _} -> (
         match parse_input env schema' with Ok x -> Ok (Array x) | err -> err)
     | Other {kind = Object {additional_properties = Some _; _}; _} ->
