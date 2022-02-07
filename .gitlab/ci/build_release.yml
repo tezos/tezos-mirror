@@ -1,12 +1,9 @@
 .build_docker_release_template:
   extends:
     - .default_settings_template
-    - .image_template__latest
+    - .image_template__latest # Docker-in-Docker (dind)
     - .docker_registry_auth # this setup a before_script for the auth
-  services:
-    - docker:dind
   variables:
-    DOCKER_DRIVER: overlay2
     IMAGE_ARCH_PREFIX: ""
   script:
     - apk --no-cache --virtual add git
