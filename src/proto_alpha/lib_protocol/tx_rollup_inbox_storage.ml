@@ -78,9 +78,16 @@ let append_message :
     (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
  fun ctxt rollup state message ->
   let level = (Raw_context.current_level ctxt).level in
+  let message_size = Tx_rollup_message_repr.size message in
+  let message_limit =
+    Constants_storage.tx_rollup_hard_size_limit_per_message ctxt
+  in
+  fail_unless
+    Compare.Int.(message_size < message_limit)
+    Tx_rollup_message_size_exceeds_limit
+  >>=? fun () ->
   prepare_metadata ctxt rollup state level
   >>=? fun (ctxt, new_state, new_metadata) ->
-  let message_size = Tx_rollup_message_repr.size message in
   let new_metadata =
     {
       new_metadata with
@@ -93,16 +100,9 @@ let append_message :
   let inbox_limit =
     Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
   in
-  let message_limit =
-    Constants_storage.tx_rollup_hard_size_limit_per_message ctxt
-  in
   fail_unless
     Compare.Int.(new_size < inbox_limit)
     (Tx_rollup_inbox_size_would_exceed_limit rollup)
-  >>=? fun () ->
-  fail_unless
-    Compare.Int.(message_size < message_limit)
-    Tx_rollup_message_size_exceeds_limit
   >>=? fun () ->
   Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) rollup
   >>=? fun (ctxt, mcontents) ->
