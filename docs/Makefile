@@ -1,5 +1,5 @@
 # You can set these variables from the command line.
-SPHINXOPTS    = -aE -n -W --keep-going
+SPHINXOPTS    = -j auto -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
