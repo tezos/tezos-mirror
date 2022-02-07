@@ -73,6 +73,10 @@ Breaking Changes
   the RPC ``/chains/<chain_id>/blocks/<block>/votes/listings``, the
   field ``rolls`` has been replaced by the field ``voting_power``.
 
+- Encoding of transaction and origination operations no longer contains
+  deprecated `big_map_diff` field. `lazy_storage_diff` should be used
+  instead. (MR: :gl:`!4387`)
+
 Bug Fixes
 ---------
 
