@@ -3,6 +3,7 @@
  (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmarks-proto-012-Psithaca)
  (libraries
+  str
   tezos-base
   tezos-protocol-012-Psithaca
   tezos-protocol-012-Psithaca-parameters

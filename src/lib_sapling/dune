@@ -8,7 +8,6 @@
  (libraries
   integers
   ctypes
-  ctypes.stubs
   data-encoding
   tezos-stdlib
   tezos-crypto

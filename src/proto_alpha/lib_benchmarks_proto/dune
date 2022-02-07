@@ -2,6 +2,7 @@
  (name tezos_benchmarks_proto_alpha)
  (public_name tezos-benchmarks-proto-alpha)
  (libraries
+  str
   tezos-base
   tezos-protocol-alpha
   tezos-protocol-alpha-parameters
