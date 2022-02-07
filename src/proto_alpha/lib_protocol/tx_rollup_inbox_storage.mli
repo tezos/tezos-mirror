@@ -35,11 +35,12 @@ type error +=
   | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup_repr.t
   | Tx_rollup_message_size_exceeds_limit
 
-(** [append_message ctxt tx_rollup message] tries to append message to
-    the inbox of [tx_rollup] at the current level, creating it in the
-    process if need be. This function returns the size of the appended
-    message (in bytes), in order for the appropriate fees to be taken
-    from the message author.
+(** [append_message ctxt tx_rollup state message] tries to append
+    [message] to the inbox of [tx_rollup] at the current level, creating
+    it in theprocess if need be. This function returns the size of the
+    appended message (in bytes), in order for the appropriate fees to be
+    taken from the message author, as well as the new state.  It
+    is the caller's responsibility to store the returned state.
 
     {b Note:} [tx_rollup] needs to be a valid transaction address. It
     is the responsibility of the caller to assert it.
@@ -57,8 +58,9 @@ type error +=
 val append_message :
   Raw_context.t ->
   Tx_rollup_repr.t ->
+  Tx_rollup_state_repr.t ->
   Tx_rollup_message_repr.t ->
-  (int * Raw_context.t) tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t
 
 (** [messages ctxt ~level tx_rollup] returns the list of messages
     hashes stored in the inbox of [tx_rollup] at level [level].
@@ -124,3 +126,15 @@ val find :
   level:[`Current | `Level of Raw_level_repr.t] ->
   Tx_rollup_repr.t ->
   (Raw_context.t * Tx_rollup_inbox_repr.t option) tzresult Lwt.t
+
+(** [get_adjacent_levels ctxt level tx_rollup] returns the first level
+    before [level] that has a non-empty inbox, if any, and the first
+    level after [level] that has a non-empty inbox, if any. It is
+    assumed that [level] itself has a non-empty inbox, and if it does
+    not, or if [tx_rollup] does not exist, the result is an error. *)
+val get_adjacent_levels :
+  Raw_context.t ->
+  Raw_level_repr.t ->
+  Tx_rollup_repr.t ->
+  (Raw_context.t * Raw_level_repr.t option * Raw_level_repr.t option) tzresult
+  Lwt.t

@@ -2016,7 +2016,11 @@ module Tx_rollup_state : sig
 
   val get : context -> Tx_rollup.t -> (context * t) tzresult Lwt.t
 
+  val update : context -> Tx_rollup.t -> t -> context tzresult Lwt.t
+
   val fees : t -> int -> Tez.t tzresult
+
+  val last_inbox_level : t -> Raw_level.t option
 
   type error +=
     | Tx_rollup_already_exists of Tx_rollup.t
@@ -2037,7 +2041,11 @@ module Tx_rollup_message : sig
     amount : int64;
   }
 
-  type t = Batch of string | Deposit of deposit
+  type t = private Batch of string | Deposit of deposit
+
+  type size = int
+
+  val make_batch : context -> string -> (t * size) tzresult
 
   val size : t -> int
 
@@ -2066,8 +2074,9 @@ module Tx_rollup_inbox : sig
   val append_message :
     context ->
     Tx_rollup.t ->
+    Tx_rollup_state.t ->
     Tx_rollup_message.t ->
-    (int * context) tzresult Lwt.t
+    (context * Tx_rollup_state.t) tzresult Lwt.t
 
   val messages :
     context ->
@@ -2092,6 +2101,12 @@ module Tx_rollup_inbox : sig
     level:[`Current | `Level of Raw_level.t] ->
     Tx_rollup.t ->
     (context * t option) tzresult Lwt.t
+
+  val get_adjacent_levels :
+    context ->
+    Raw_level.t ->
+    Tx_rollup.t ->
+    (context * Raw_level.t option * Raw_level.t option) tzresult Lwt.t
 
   type error +=
     | Tx_rollup_inbox_does_not_exist of Tx_rollup.t * Raw_level.t

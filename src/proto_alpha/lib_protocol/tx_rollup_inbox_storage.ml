@@ -30,30 +30,79 @@ type error +=
   | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup_repr.t
   | Tx_rollup_message_size_exceeds_limit
 
+(** [prepare_metadata ctxt rollup state level] prepares the metadata for
+    an inbox at [level]. This may involve updating the predecessor's
+    successor pointer.  It also returns a new state which point
+    the tail of the linked list of inboxes to this inbox. *)
+let prepare_metadata :
+    Raw_context.t ->
+    Tx_rollup_repr.t ->
+    Tx_rollup_state_repr.t ->
+    Raw_level_repr.t ->
+    (Raw_context.t * Tx_rollup_state_repr.t * Tx_rollup_inbox_repr.metadata)
+    tzresult
+    Lwt.t =
+ fun ctxt rollup state level ->
+  Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) rollup
+  >>=? fun (ctxt, metadata) ->
+  match metadata with
+  | Some metadata -> return (ctxt, state, metadata)
+  | None ->
+      (* First message in inbox: need to update linked list and pending
+         inbox count *)
+      let predecessor = Tx_rollup_state_repr.last_inbox_level state in
+      let new_state = Tx_rollup_state_repr.append_inbox state level in
+      (match predecessor with
+      | None -> return ctxt
+      | Some predecessor_level ->
+          Storage.Tx_rollup.Inbox_metadata.get (ctxt, predecessor_level) rollup
+          >>=? fun (ctxt, predecessor_metadata) ->
+          (* Here, we update the predecessor inbox's successor to point
+             to this inbox. *)
+          Storage.Tx_rollup.Inbox_metadata.add
+            (ctxt, predecessor_level)
+            rollup
+            {predecessor_metadata with successor = Some level}
+          >|=? fun (ctxt, _, _) -> ctxt)
+      >>=? fun ctxt ->
+      let new_metadata : Tx_rollup_inbox_repr.metadata =
+        {cumulated_size = 0; predecessor; successor = None}
+      in
+      return (ctxt, new_state, new_metadata)
+
 let append_message :
     Raw_context.t ->
     Tx_rollup_repr.t ->
+    Tx_rollup_state_repr.t ->
     Tx_rollup_message_repr.t ->
-    (int * Raw_context.t) tzresult Lwt.t =
- fun ctxt rollup message ->
+    (Raw_context.t * Tx_rollup_state_repr.t) tzresult Lwt.t =
+ fun ctxt rollup state message ->
   let level = (Raw_context.current_level ctxt).level in
-  Storage.Tx_rollup.Inbox_cumulated_size.find (ctxt, level) rollup
-  >>=? fun (ctxt, msize) ->
   let message_size = Tx_rollup_message_repr.size message in
-  let new_size = Option.value ~default:0 msize + message_size in
-  let inbox_limit =
-    Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
-  in
   let message_limit =
     Constants_storage.tx_rollup_hard_size_limit_per_message ctxt
   in
   fail_unless
-    Compare.Int.(new_size < inbox_limit)
-    (Tx_rollup_inbox_size_would_exceed_limit rollup)
-  >>=? fun () ->
-  fail_unless
     Compare.Int.(message_size < message_limit)
     Tx_rollup_message_size_exceeds_limit
+  >>=? fun () ->
+  prepare_metadata ctxt rollup state level
+  >>=? fun (ctxt, new_state, new_metadata) ->
+  let new_metadata =
+    {
+      new_metadata with
+      cumulated_size = message_size + new_metadata.cumulated_size;
+    }
+  in
+  Storage.Tx_rollup.Inbox_metadata.add (ctxt, level) rollup new_metadata
+  >>=? fun (ctxt, _, _) ->
+  let new_size = new_metadata.cumulated_size in
+  let inbox_limit =
+    Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
+  in
+  fail_unless
+    Compare.Int.(new_size < inbox_limit)
+    (Tx_rollup_inbox_size_would_exceed_limit rollup)
   >>=? fun () ->
   Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) rollup
   >>=? fun (ctxt, mcontents) ->
@@ -63,9 +112,7 @@ let append_message :
     (ctxt, level)
     rollup
     (Tx_rollup_message_repr.hash message :: Option.value ~default:[] mcontents)
-  >>=? fun (ctxt, _, _) ->
-  Storage.Tx_rollup.Inbox_cumulated_size.add (ctxt, level) rollup new_size
-  >>=? fun (ctxt, _, _) -> return (message_size, ctxt)
+  >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
 let get_level :
     Raw_context.t -> [`Current | `Level of Raw_level_repr.t] -> Raw_level_repr.t
@@ -111,9 +158,8 @@ let size :
     (Raw_context.t * int) tzresult Lwt.t =
  fun ctxt ~level tx_rollup ->
   let level = get_level ctxt level in
-  Storage.Tx_rollup.Inbox_cumulated_size.find (ctxt, level) tx_rollup
-  >>=? function
-  | (ctxt, Some cumulated_size) -> return (ctxt, cumulated_size)
+  Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) tx_rollup >>=? function
+  | (ctxt, Some {cumulated_size; _}) -> return (ctxt, cumulated_size)
   | (ctxt, None) ->
       (*
         Prior to raising an error related to the missing inbox, we
@@ -154,6 +200,18 @@ let get :
   | (ctxt, Some res) -> return (ctxt, res)
   | (_, None) ->
       fail (Tx_rollup_inbox_does_not_exist (tx_rollup, get_level ctxt level))
+
+let get_adjacent_levels :
+    Raw_context.t ->
+    Raw_level_repr.t ->
+    Tx_rollup_repr.t ->
+    (Raw_context.t * Raw_level_repr.t option * Raw_level_repr.t option) tzresult
+    Lwt.t =
+ fun ctxt level tx_rollup ->
+  Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) tx_rollup >>=? function
+  | (ctxt, Some {predecessor; successor; _}) ->
+      return (ctxt, predecessor, successor)
+  | (_, None) -> fail @@ Tx_rollup_inbox_does_not_exist (tx_rollup, level)
 
 (* Error registration *)
 

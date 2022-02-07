@@ -55,6 +55,14 @@ val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
     bytes in the inbox of the transactional rollup. *)
 val fees : t -> int -> Tez_repr.t tzresult
 
+(** [last_inbox_level state] returns the last level for which any messages
+     have been submitted, or None if no messages have been submitted. *)
+val last_inbox_level : t -> Raw_level_repr.t option
+
+(** [append_inbox state level] updates the newest inbox field for a
+    [state] when messages have been added at a level. *)
+val append_inbox : t -> Raw_level_repr.t -> t
+
 module Internal_for_tests : sig
   (** [initial_state_with_fees_per_byte fees] returns [initial_state], but
       wherein it costs [fees] per byte to add a message to an inbox. *)

@@ -1666,15 +1666,15 @@ module Tx_rollup = struct
   let fold ctxt level =
     Level_tx_rollup_context.fold_keys (ctxt, level) ~order:`Undefined
 
-  module Inbox_cumulated_size =
+  module Inbox_metadata =
     Level_tx_rollup_context.Make_carbonated_map
       (struct
         let name = ["inbox_size"]
       end)
       (struct
-        type t = int
+        type t = Tx_rollup_inbox_repr.metadata
 
-        let encoding = Data_encoding.int31
+        let encoding = Tx_rollup_inbox_repr.metadata_encoding
       end)
 
   module Inbox_rev_contents =
