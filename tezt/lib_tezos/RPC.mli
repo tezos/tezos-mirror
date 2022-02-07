@@ -217,7 +217,6 @@ val get_mempool :
   ?hooks:Process.hooks ->
   ?chain:string ->
   ?applied:bool ->
-  ?prechecked:bool ->
   ?branch_delayed:bool ->
   ?branch_refused:bool ->
   ?refused:bool ->

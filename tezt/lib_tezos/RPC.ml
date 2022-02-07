@@ -118,7 +118,7 @@ let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
   in
   Client.rpc ?endpoint ?hooks ~query_string GET path client
 
-let get_mempool ?endpoint ?hooks ?chain ?(applied = true) ?(prechecked = true)
+let get_mempool ?endpoint ?hooks ?chain ?(applied = true)
     ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
     ?(outdated = true) client =
   let* pending_ops =
@@ -128,7 +128,6 @@ let get_mempool ?endpoint ?hooks ?chain ?(applied = true) ?(prechecked = true)
       ?chain
       ~version:"1"
       ~applied
-      ~prechecked
       ~branch_delayed
       ~branch_refused
       ~refused
