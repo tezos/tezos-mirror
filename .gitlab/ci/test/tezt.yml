@@ -18,7 +18,7 @@
   variables:
     TESTS: ""
   script:
-    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json
+    - dune exec tezt/tests/main.exe -- $TESTS --color --log-buffer-size 5000 --log-file tezt.log --global-timeout 3300 --junit tezt-junit.xml --from-record tezt/records --job $CI_NODE_INDEX/$CI_NODE_TOTAL --record tezt-results-$CI_NODE_INDEX.json -j 4
 
 tezt:
   extends:
