@@ -41,6 +41,12 @@ include
       let size = Some address_size
     end)
 
+include Compare.Make (struct
+  type nonrec t = t
+
+  let compare = compare
+end)
+
 let () = Base58.check_encoded_prefix b58check_encoding "tru2" 37
 
 let of_bls_pk : Bls_signature.pk -> t =

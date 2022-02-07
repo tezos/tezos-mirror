@@ -46,7 +46,7 @@ val of_bytes_exn : bytes -> t
 
 val of_bytes_opt : bytes -> t option
 
-val compare : t -> t -> int
+include Compare.S with type t := t
 
 (** [of_bls_pk pk] computes the address of the L2 tickets holder
     authentified by [pk]. *)
