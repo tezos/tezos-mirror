@@ -40,8 +40,6 @@ open Tx_rollup_l2_context
 
 (** {1. Storage and context tests. } *)
 
-(** {3. Utils wrapping tztest. } *)
-
 let wrap_test t () =
   t () >|= function
   | Ok x -> Ok x
@@ -95,36 +93,15 @@ let test_irmin_storage () =
 
 (** {3. Utils } *)
 
-let expect_error f err =
-  let open Context_l2.Syntax in
-  catch
-    f
-    (fun _ -> assert false)
-    (fun err' -> if err = err' then return () else assert false)
-
-let rng_state = Random.State.make_self_init ()
-
-let gen_l2_address () =
-  let seed =
-    Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
-  in
-  let secret_key = Bls12_381.Signature.generate_sk seed in
-  let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
-  (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
-
-let gen_n_address n =
-  WithExceptions.List.init ~loc:__LOC__ n (fun _ -> gen_l2_address ())
-
-let nth_exn l i = match List.nth l i with Some x -> x | None -> assert false
-
-let ((_, pk, addr1) as l2_addr) = gen_l2_address ()
-
 let context_with_one_addr =
   let open Context_l2 in
   let open Syntax in
   let ctxt = empty_context in
+  let (_, _, addr1) = gen_l2_address () in
   let+ (ctxt, _, idx1) = Address_index.get_or_associate_index ctxt addr1 in
   (ctxt, idx1)
+
+let ((_, pk, addr) as l2_addr1) = gen_l2_address ()
 
 (** {3. Test Address_metadata.} *)
 
