@@ -363,9 +363,77 @@ module Make_proof (Store : DB) = struct
       Data_encoding.uint8
 
     let segment_encoding =
-      assert (Tezos_context_encoding.Context.Conf.entries <= 256) ;
+      assert (Tezos_context_encoding.Context.Conf.entries <= 32) ;
       (* The segment int is in 5bits.  We may express them in bytes *)
-      Data_encoding.(list uint8)
+      (* Format
+
+         * Required bytes = (n * 5 + 8) / 8
+         * 10* is filled at the end of the bytes
+
+         ex: Encoding of [aaaaa; bbbbb; ccccc; ddddd; eeeee; ..; zzzzz]
+
+                 |76543210|76543210|7654.. ..       |76543210|
+                 |aaaaabbb|bbcccccd|ddde.. ..        zzzzz100|
+
+                 |76543210|76543210|7654.. ..  43210|76543210|
+                 |aaaaabbb|bbcccccd|ddde.. ..  yzzzz|z1000000|
+
+                 |76543210|76543210|7654.. .. 543210|76543210|
+                 |aaaaabbb|bbcccccd|ddde.. .. yzzzzz|10000000|
+      *)
+      let encode is =
+        let buf = Buffer.create 0 in
+        let push c = Buffer.add_char buf @@ Char.chr c in
+        let close c bit =
+          push (c lor (1 lsl (7 - bit)))
+        in
+        let write c bit i =
+          if bit < 3 then (c lor (i lsl (3 - bit)), bit + 5)
+          else
+            let i = i lsl (11 - bit) in
+            push (c lor (i / 256)) ;
+            (i land 255, bit - 3)
+        in
+        let rec f c bit = function
+          | [] -> close c bit
+          | i :: is ->
+              let (c, bit) = write c bit i in
+              f c bit is
+        in
+        f 0 0 is ;
+        Buffer.to_bytes buf
+      in
+      let decode b =
+        let l =
+          let sl = Bytes.length b in
+          let c = Char.code @@ Bytes.get b (sl - 1) in
+          let rec aux i = if c land (1 lsl i) = 0 then aux (i + 1) else i + 1 in
+          let last_bit = aux 0 in
+          let bn = ((sl - 1) * 8) + 8 - last_bit in
+          assert (bn mod 5 = 0) ;
+          bn / 5
+        in
+        let s = Bytes.to_seq b in
+        let head s =
+          match s () with Seq.Nil -> assert false | Seq.Cons (c, s) -> (c, s)
+        in
+        let rec read c rembit l s =
+          if l = 0 then []
+          else
+            let (c, s, rembit) =
+              if rembit >= 5 then (c, s, rembit)
+              else
+                let (c', s) = head s in
+                ((c * 256) + Char.code c', s, rembit + 8)
+            in
+            let rembit = rembit - 5 in
+            let i = c lsr rembit in
+            let c = c land ((1 lsl rembit) - 1) in
+            i :: read c rembit (l - 1) s
+        in
+        read 0 0 l s
+      in
+      Data_encoding.(conv encode decode bytes)
 
     let inode_encoding a =
       let open Data_encoding in

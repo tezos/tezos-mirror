@@ -197,7 +197,11 @@ let test_sample () =
         {
           length = 10;
           segment = [0; 1; 0; 1];
-          proof = Inode_tree {length = 8; proofs = [(0, Blinded_inode ch)]};
+          proof = Inode_tree {length = 8; proofs = [
+            (0, Blinded_inode ch);
+            (1, Inode_extender {
+              length=3; segment = [1;2;3;4;5;6;7;8]; proof = Blinded_inode ch})
+          ]};
         }
     in
     let inode_tree : inode_tree = Inode_values [("a", tree_a); ("b", tree_b)] in
