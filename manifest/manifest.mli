@@ -592,9 +592,17 @@ val test_exes : string list maker
     [main_module] is the name of the main module provided by the library (see [open_]).
 
     [js_compatible]: whether the library can be compiled to JavaScript.
-    Default value for [js_compatible] is false. *)
+    Default value for [js_compatible] is false.
+
+    [node_wrapper_flags]: flags to add to the [node_wrapper] executable
+    command in [runtest_js] aliases. Only used for test and executable test targets.
+ *)
 val vendored_lib :
-  ?main_module:string -> ?js_compatible:bool -> string -> target
+  ?main_module:string ->
+  ?js_compatible:bool ->
+  ?node_wrapper_flags:string list ->
+  string ->
+  target
 
 (** Make an external library, for use in internal target dependencies.
 
@@ -606,11 +614,16 @@ val vendored_lib :
     [main_module] is the name of the main module provided by the library (see [open_]).
 
     [js_compatible]: whether the library can be compiled to JavaScript.
-    Default value for [js_compatible] is false.  *)
+    Default value for [js_compatible] is false.
+
+    [node_wrapper_flags]: flags to add to the [node_wrapper] executable
+    command in [runtest_js] aliases. Only used for test and executable test targets.
+  *)
 val external_lib :
   ?main_module:string ->
   ?opam:string ->
   ?js_compatible:bool ->
+  ?node_wrapper_flags:string list ->
   string ->
   Version.constraints ->
   target
@@ -629,9 +642,17 @@ val external_lib :
     [js_compatible]: whether the library can be compiled to JavaScript.
     Default value for [js_compatible] is false.
 
+    [node_wrapper_flags]: flags to add to the [node_wrapper] executable
+    command in [runtest_js] aliases. Only used for test and executable test targets.
+
     @raise [Invalid_arg] if [main_lib] was not built with [external_lib]. *)
 val external_sublib :
-  ?main_module:string -> ?js_compatible:bool -> target -> string -> target
+  ?main_module:string ->
+  ?js_compatible:bool ->
+  ?node_wrapper_flags:string list ->
+  target ->
+  string ->
+  target
 
 (** Make an external library that is to only appear in [.opam] dependencies.
 
