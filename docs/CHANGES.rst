@@ -46,6 +46,10 @@ Node
 - Fixed an issue where storage failed to restore its consistency after
   corrupted metadata files.
 
+- Added an optional field, ``max_prechecked_manager_operations`` to
+  ``/chains/<chain_id>/mempool/filter`` in order to control how many manager
+  operations are kept in the prechecked classification.
+
 Client
 ------
 
@@ -188,10 +192,9 @@ Node
 
 - Added the ``ithacanet`` built-in network alias.
 
-- Added two optional fields, ``replace_by_fee_factor`` and
-  ``max_prechecked_manager_operations`` to ``/chains/<chain_id>/mempool/filter``
-  in order to control when the mempool accepts a manager operation replacement,
-  and how many manager operations we keep in the prechecked classification.
+- Added an optional field, ``replace_by_fee_factor`` to
+  ``/chains/<chain_id>/mempool/filter`` in order to control when the mempool
+  accepts a manager operation replacement.
 
 Client
 ------
