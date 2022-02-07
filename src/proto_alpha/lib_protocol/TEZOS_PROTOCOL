@@ -117,6 +117,7 @@
         "Tx_rollup_l2_context_sig",
         "Tx_rollup_l2_context",
         "Tx_rollup_l2_batch",
+        "Tx_rollup_l2_apply",
 
         "Local_gas_counter",
         "Script_tc_errors",

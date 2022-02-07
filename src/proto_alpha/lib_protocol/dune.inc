@@ -134,6 +134,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
+   tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
@@ -292,6 +293,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
+   tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
@@ -450,6 +452,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
+   tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
@@ -630,6 +633,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_l2_context_sig
    Tx_rollup_l2_context
    Tx_rollup_l2_batch
+   Tx_rollup_l2_apply
    Local_gas_counter
    Script_tc_errors
    Gas_monad
@@ -829,6 +833,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_l2_context_sig.ml
    tx_rollup_l2_context.ml
    tx_rollup_l2_batch.mli tx_rollup_l2_batch.ml
+   tx_rollup_l2_apply.mli tx_rollup_l2_apply.ml
    local_gas_counter.mli local_gas_counter.ml
    script_tc_errors.ml
    gas_monad.mli gas_monad.ml
