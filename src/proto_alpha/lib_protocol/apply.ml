@@ -1169,8 +1169,9 @@ let apply_manager_operation_content :
       return (ctxt, result, [])
   | Tx_rollup_submit_batch {tx_rollup; content} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+      Tx_rollup_message.make_batch ctxt content >>?= fun message ->
       Tx_rollup_state.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-      Tx_rollup_inbox.append_message ctxt tx_rollup state (Batch content)
+      Tx_rollup_inbox.append_message ctxt tx_rollup state message
       >>=? fun (ctxt, state, message_size) ->
       Tx_rollup_state.fees state message_size >>?= fun cost ->
       Token.transfer ctxt (`Contract source) `Burned cost

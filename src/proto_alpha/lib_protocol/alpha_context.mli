@@ -2041,7 +2041,9 @@ module Tx_rollup_message : sig
     amount : int64;
   }
 
-  type t = Batch of string | Deposit of deposit
+  type t = private Batch of string | Deposit of deposit
+
+  val make_batch : context -> string -> t tzresult
 
   val size : t -> int
 
