@@ -129,6 +129,10 @@ module Encoding = struct
     | Value value -> fun_value value
     | Bytes bytes -> fun_bytes bytes
     | Both (bytes, value) -> fun_combine (fun_value value) (fun_bytes bytes)
+
+  module Compact = Compact
+
+  type 'a compact = 'a Compact.t
 end
 
 include Encoding
