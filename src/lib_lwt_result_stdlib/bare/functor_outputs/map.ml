@@ -149,6 +149,8 @@ let* acc = f k3 d3 acc in
 
   val filter : (key -> 'a -> bool) -> 'a t -> 'a t
 
+  val filter_map : (key -> 'a -> 'b option) -> 'a t -> 'b t
+
   val partition : (key -> 'a -> bool) -> 'a t -> 'a t * 'a t
 
   val cardinal : 'a t -> int
@@ -157,23 +159,49 @@ let* acc = f k3 d3 acc in
 
   val min_binding : 'a t -> (key * 'a) option
 
+  (** [min_binding_opt] is an alias for [min_binding] included for compatibility
+      with the Stdlib. *)
+  val min_binding_opt : 'a t -> (key * 'a) option
+
   val max_binding : 'a t -> (key * 'a) option
 
+  (** [max_binding_opt] is an alias for [max_binding] included for compatibility
+      with the Stdlib. *)
+  val max_binding_opt : 'a t -> (key * 'a) option
+
   val choose : 'a t -> (key * 'a) option
+
+  (** [choose_opt] is an alias for [choose] included for compatibility with the
+      Stdlib. *)
+  val choose_opt : 'a t -> (key * 'a) option
 
   val split : key -> 'a t -> 'a t * 'a option * 'a t
 
   val find : key -> 'a t -> 'a option
 
+  (** [find_opt] is an alias for [find] included for compatibility with the
+      Stdlib. *)
+  val find_opt : key -> 'a t -> 'a option
+
   val find_first : (key -> bool) -> 'a t -> (key * 'a) option
 
+  (** [find_first_opt] is an alias for [find_first] included for compatibility
+      with the Stdlib. *)
+  val find_first_opt : (key -> bool) -> 'a t -> (key * 'a) option
+
   val find_last : (key -> bool) -> 'a t -> (key * 'a) option
+
+  (** [find_last_opt] is an alias for [find_last] included for compatibility
+      with the Stdlib. *)
+  val find_last_opt : (key -> bool) -> 'a t -> (key * 'a) option
 
   val map : ('a -> 'b) -> 'a t -> 'b t
 
   val mapi : (key -> 'a -> 'b) -> 'a t -> 'b t
 
   val to_seq : 'a t -> (key * 'a) Stdlib.Seq.t
+
+  val to_rev_seq : 'a t -> (key * 'a) Stdlib.Seq.t
 
   val to_seq_from : key -> 'a t -> (key * 'a) Stdlib.Seq.t
 

@@ -341,6 +341,39 @@ module type FILTER_PARALLEL = sig
     ('a t, 'error trace) result Lwt.t
 end
 
+module type FILTERI_VANILLA = sig
+  type 'a elt
+
+  type 'a t
+
+  val filteri : (int -> 'a -> bool) -> 'a t -> 'a t
+end
+
+module type FILTERI_SEQUENTIAL = sig
+  include FILTERI_VANILLA
+
+  val filteri_e :
+    (int -> 'a -> (bool, 'trace) result) -> 'a t -> ('a t, 'trace) result
+
+  val filteri_s : (int -> 'a -> bool Lwt.t) -> 'a t -> 'a t Lwt.t
+
+  val filteri_es :
+    (int -> 'a -> (bool, 'trace) result Lwt.t) ->
+    'a t ->
+    ('a t, 'trace) result Lwt.t
+end
+
+module type FILTERI_PARALLEL = sig
+  type 'a t
+
+  val filteri_p : (int -> 'a -> bool Lwt.t) -> 'a t -> 'a t Lwt.t
+
+  val filteri_ep :
+    (int -> 'a -> (bool, 'error trace) result Lwt.t) ->
+    'a t ->
+    ('a t, 'error trace) result Lwt.t
+end
+
 module type FILTERMAP_VANILLA = sig
   type 'a t
 
@@ -421,6 +454,26 @@ module type FIND_SEQUENTIAL = sig
     ('a option, 'trace) result Lwt.t
 end
 
+module type FINDMAP_VANILLA = sig
+  type 'a t
+
+  val find_map : ('a -> 'b option) -> 'a t -> 'b option
+end
+
+module type FINDMAP_SEQUENTIAL = sig
+  include FINDMAP_VANILLA
+
+  val find_map_e :
+    ('a -> ('b option, 'trace) result) -> 'a t -> ('b option, 'trace) result
+
+  val find_map_s : ('a -> 'b option Lwt.t) -> 'a t -> 'b option Lwt.t
+
+  val find_map_es :
+    ('a -> ('b option, 'trace) result Lwt.t) ->
+    'a t ->
+    ('b option, 'trace) result Lwt.t
+end
+
 module type PARTITION_VANILLA = sig
   type 'a t
 
@@ -458,6 +511,41 @@ module type PARTITION_PARALLEL = sig
     ('a -> (bool, 'error trace) result Lwt.t) ->
     'a t ->
     ('a t * 'a t, 'error trace) result Lwt.t
+end
+
+module type PARTITIONMAP_VANILLA = sig
+  type 'a t
+
+  val partition_map : ('a -> ('b, 'c) Either.t) -> 'a t -> 'b t * 'c t
+end
+
+module type PARTITIONMAP_SEQUENTIAL = sig
+  include PARTITIONMAP_VANILLA
+
+  val partition_map_e :
+    ('a -> (('b, 'c) Either.t, 'trace) result) ->
+    'a t ->
+    ('b t * 'c t, 'trace) result
+
+  val partition_map_s :
+    ('a -> ('b, 'c) Either.t Lwt.t) -> 'a t -> ('b t * 'c t) Lwt.t
+
+  val partition_map_es :
+    ('a -> (('b, 'c) Either.t, 'trace) result Lwt.t) ->
+    'a t ->
+    ('b t * 'c t, 'trace) result Lwt.t
+end
+
+module type PARTITIONMAP_PARALLEL = sig
+  include PARTITIONMAP_SEQUENTIAL
+
+  val partition_map_p :
+    ('a -> ('b, 'c) Either.t Lwt.t) -> 'a t -> ('b t * 'c t) Lwt.t
+
+  val partition_map_ep :
+    ('a -> (('b, 'c) Either.t, 'error trace) result Lwt.t) ->
+    'a t ->
+    ('b t * 'c t, 'error trace) result Lwt.t
 end
 
 module type COMBINE_VANILLA = sig

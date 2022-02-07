@@ -102,6 +102,9 @@ module type S = sig
   (** [nil_es] is [Lwt.return (Ok [])] *)
   val nil_es : ('a list, 'trace) result Lwt.t
 
+  (** [cons x xs] is [x :: xs] *)
+  val cons : 'a -> 'a list -> 'a list
+
   (** {3 Safe wrappers}
 
       This part of the module simply shadows some functions from {!Stdlib.List}
@@ -153,9 +156,23 @@ module type S = sig
       {!Stdlib.List}. *)
   val find_opt : ('a -> bool) -> 'a list -> 'a option
 
+  (** [find_map f xs] applies [f] to each of the elements of [xs] until it
+      returns [Some _] at which point it is returned. If no such elements are
+      found then it returns [None].
+
+      Note that it only applies [f] to a prefix of [xs]. It doesn't apply [f] to
+      the elements of [xs] which are after the found element. Consequently,
+      [find_map f xs] has better performance and a different semantic than
+      calling [map] and [find] separately. *)
+  val find_map : ('a -> 'b option) -> 'a list -> 'b option
+
   (** [mem ~equal a l] is [true] iff there is an element [e] of [l] such that
       [equal a e]. *)
   val mem : equal:('a -> 'a -> bool) -> 'a -> 'a list -> bool
+
+  (** [memq a l] is the same as [mem ~equal:Stdlib.( == ) a l]: it uses the
+      physical equality. *)
+  val memq : 'a -> 'a list -> bool
 
   (** [assoc ~equal k kvs] is [Some v] such that [(k', v)] is the first pair in
       the list such that [equal k' k] or [None] if the list contains no such
@@ -239,7 +256,7 @@ module type S = sig
       say, [append (map f xs) ys] with [rev_append (rev_map f xs) ys]. *)
   val rev_append : 'a list -> 'a list -> 'a list
 
-  (** [flatten xs] is an alias for {!concat}. *)
+  (** [flatten] is an alias for {!concat}. *)
   val flatten : 'a list list -> 'a list
 
   (** {3 Double-list traversals}
@@ -492,14 +509,37 @@ module type S = sig
     'a list ->
     ('a option, 'trace) result Lwt.t
 
+  (** [find_map_e] is a Result-aware variant of {!find_map}. *)
+  val find_map_e :
+    ('a -> ('b option, 'trace) result) -> 'a list -> ('b option, 'trace) result
+
+  (** [find_map_s] is an Lwt-aware variant of {!find_map}. *)
+  val find_map_s : ('a -> 'b option Lwt.t) -> 'a list -> 'b option Lwt.t
+
+  (** [find_map_es] is an Lwt-Result-aware variant of {!find_map}. *)
+  val find_map_es :
+    ('a -> ('b option, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b option, 'trace) result Lwt.t
+
   (** [filter f xs] is the list of all the elements [xn] of [xs] such that
       [f xn] is [true].
 
       [filter (fun x -> x > 10) [0; 2; 19; 22; -1; 3; 11]] is [[19; 22; 11]] *)
   val filter : ('a -> bool) -> 'a list -> 'a list
 
+  (** [filteri] is similar to {!filter} but the predicate also receives the
+      element's index as an argument. *)
+  val filteri : (int -> 'a -> bool) -> 'a list -> 'a list
+
+  (** [find_all] is an alias for {!filter}. *)
+  val find_all : ('a -> bool) -> 'a list -> 'a list
+
   (** [rev_filter f l] is [rev (filter f l)] but more efficient. *)
   val rev_filter : ('a -> bool) -> 'a list -> 'a list
+
+  (** [rev_filteri f l] is [rev (filteri f l)] but more efficient. *)
+  val rev_filteri : (int -> 'a -> bool) -> 'a list -> 'a list
 
   (** [rev_filter_some xs] is [rev @@ filter_some xs] but more efficient. *)
   val rev_filter_some : 'a option list -> 'a list
@@ -588,6 +628,43 @@ module type S = sig
       concurrently. *)
   val filter_p : ('a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
 
+  (** [rev_filteri_e] is a Result-aware variant of {!rev_filteri}. *)
+  val rev_filteri_e :
+    (int -> 'a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
+
+  (** [filteri_e] is a Result-aware variant of {!filteri}. *)
+  val filteri_e :
+    (int -> 'a -> (bool, 'trace) result) -> 'a list -> ('a list, 'trace) result
+
+  (** [rev_filteri_s] is an Lwt-aware variant of {!rev_filteri}. *)
+  val rev_filteri_s : (int -> 'a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
+
+  (** [filteri_s] is an Lwt-aware variant of {!filteri}. *)
+  val filteri_s : (int -> 'a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
+
+  (** [rev_filteri_es] is an Lwt-Result-aware variant of {!rev_filteri}. *)
+  val rev_filteri_es :
+    (int -> 'a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'trace) result Lwt.t
+
+  (** [filteri_es] is an Lwt-Result-aware variant of {!filteri}. *)
+  val filteri_es :
+    (int -> 'a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'trace) result Lwt.t
+
+  (** [filteri_ep] is a variant of {!filteri_es} where the promises are evaluated
+      concurrently. *)
+  val filteri_ep :
+    (int -> 'a -> (bool, 'trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'trace list) result Lwt.t
+
+  (** [filteri_p] is a variant of {!filteri_s} where the promises are evaluated
+      concurrently. *)
+  val filteri_p : (int -> 'a -> bool Lwt.t) -> 'a list -> 'a list Lwt.t
+
   (** [rev_partition f xs] is [let rt, rf = partition f xs in (rev rt, rev rf)]
       but more efficient. *)
   val rev_partition : ('a -> bool) -> 'a list -> 'a list * 'a list
@@ -598,6 +675,18 @@ module type S = sig
 
       The function [f] is applied once to each element of [xs]. *)
   val partition : ('a -> bool) -> 'a list -> 'a list * 'a list
+
+  (** [rev_partition_map f xs] is
+      [let rt, rf = partition_map f xs in (rev rt, rev rf)]
+      but more efficient. *)
+  val rev_partition_map :
+    ('a -> ('b, 'c) Either.t) -> 'a list -> 'b list * 'c list
+
+  (** [partition_map f xs] applies [f] to each of the element of [xs] and
+      returns a couple of lists [(ls, rs)] where [ls] contains all
+      the [l] such that [f x] is [Left l] and [rs] contains all
+      the [r] such that [f x] is [Right r]. *)
+  val partition_map : ('a -> ('b, 'c) Either.t) -> 'a list -> 'b list * 'c list
 
   (** [rev_partition_result rs] is [partition_result @@ rev rs] but more
       efficient. *)
@@ -664,6 +753,51 @@ module type S = sig
   (** [partition_p] is a variant of {!partition_s} where the promises are
       evaluated concurrently. *)
   val partition_p : ('a -> bool Lwt.t) -> 'a list -> ('a list * 'a list) Lwt.t
+
+  (** [rev_partition_map_e] is a Result-aware variant of {!rev_partition_map}. *)
+  val rev_partition_map_e :
+    ('a -> (('b, 'c) Either.t, 'trace) result) ->
+    'a list ->
+    ('b list * 'c list, 'trace) result
+
+  (** [partition_map_e] is a Result-aware variant of {!partition_map}. *)
+  val partition_map_e :
+    ('a -> (('b, 'c) Either.t, 'trace) result) ->
+    'a list ->
+    ('b list * 'c list, 'trace) result
+
+  (** [rev_partition_map_s] is an Lwt-aware variant of {!rev_partition_map}. *)
+  val rev_partition_map_s :
+    ('a -> ('b, 'c) Either.t Lwt.t) -> 'a list -> ('b list * 'c list) Lwt.t
+
+  (** [partition_map_s] is an Lwt-aware variant of {!partition_map}. *)
+  val partition_map_s :
+    ('a -> ('b, 'c) Either.t Lwt.t) -> 'a list -> ('b list * 'c list) Lwt.t
+
+  (** [rev_partition_map_es] is an Lwt-Result-aware variant of
+    {!rev_partition_map}. *)
+  val rev_partition_map_es :
+    ('a -> (('b, 'c) Either.t, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list * 'c list, 'trace) result Lwt.t
+
+  (** [partition_map_es] is an Lwt-Result-aware variant of {!partition_map}. *)
+  val partition_map_es :
+    ('a -> (('b, 'c) Either.t, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list * 'c list, 'trace) result Lwt.t
+
+  (** [partition_map_ep] is a variant of {!partition_map_es} where the promises are
+      evaluated concurrently. *)
+  val partition_map_ep :
+    ('a -> (('b, 'c) Either.t, 'trace) result Lwt.t) ->
+    'a list ->
+    ('b list * 'c list, 'trace list) result Lwt.t
+
+  (** [partition_map_p] is a variant of {!partition_map_s} where the promises are
+      evaluated concurrently. *)
+  val partition_map_p :
+    ('a -> ('b, 'c) Either.t Lwt.t) -> 'a list -> ('b list * 'c list) Lwt.t
 
   (** {3 Traversal variants} *)
 
@@ -1207,7 +1341,9 @@ module type S = sig
   val combine_with_leftovers :
     'a list -> 'b list -> ('a * 'b) list * ('a list, 'b list) Either.t option
 
-  (** {3 Comparison and equality} *)
+  (** {3 Comparison and equality}
+
+      The comparison and equality functions are those of the OCaml [Stdlib]. *)
 
   val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
 
@@ -1217,7 +1353,9 @@ module type S = sig
 
   val equal : ('a -> 'a -> bool) -> 'a list -> 'a list -> bool
 
-  (** {3 Sorting} *)
+  (** {3 Sorting}
+
+      The sorting functions are those of the OCaml [Stdlib]. *)
 
   val sort : ('a -> 'a -> int) -> 'a list -> 'a list
 
@@ -1227,7 +1365,22 @@ module type S = sig
 
   val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 
-  (** {3 Conversion} *)
+  (** [merge compare xs ys] merges the lists [xs] and [ys].
+
+      [merge] assumes that [xs] and [ys] are sorted according to the order
+      defined by [compare]. If [xs] and [ys] are not sorted,
+      the returned value of [merge compare xs ys] is unspecified.
+
+      Assuming that [xs] and [ys] are sorted, [merge compare xs ys] is a list
+      - containing all the elements of [xs] and of [ys], and
+      - sorted according to the order defined by [compare].
+
+      [merge] is not tail-recursive. *)
+  val merge : ('a -> 'a -> int) -> 'a list -> 'a list -> 'a list
+
+  (** {3 Conversion}
+
+      The conversion functions are those of the OCaml [Stdlib]. *)
 
   val to_seq : 'a list -> 'a Stdlib.Seq.t
 

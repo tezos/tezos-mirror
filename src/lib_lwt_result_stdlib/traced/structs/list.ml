@@ -61,6 +61,15 @@ module Make (Monad : Traced_sigs.Monad.S) :
       l
     |> Lwt_result.map rev_filter_some
 
+  let filteri_ep f l =
+    rev_mapi_ep
+      (fun i x ->
+        let open Lwt_traced_result_syntax in
+        let* b = f i x in
+        if b then return_some x else return_none)
+      l
+    |> Lwt_result.map rev_filter_some
+
   let filter_map_ep f l = rev_map_ep f l |> Lwt_result.map rev_filter_some
 
   let concat_map_ep f xs =
@@ -87,4 +96,10 @@ module Make (Monad : Traced_sigs.Monad.S) :
            if b then (x :: trues, falses) else (trues, x :: falses))
          ([], [])
          bxs
+
+  let partition_map_ep f l =
+    let open Lwt_result_syntax in
+    let* es = rev_map_ep f l in
+    let r = rev_partition_either es in
+    return r
 end

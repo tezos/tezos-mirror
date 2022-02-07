@@ -51,10 +51,20 @@ module type S = sig
     'a list ->
     ('a list, 'error trace) result Lwt.t
 
+  val filteri_ep :
+    (int -> 'a -> (bool, 'error trace) result Lwt.t) ->
+    'a list ->
+    ('a list, 'error trace) result Lwt.t
+
   val partition_ep :
     ('a -> (bool, 'error trace) result Lwt.t) ->
     'a list ->
     ('a list * 'a list, 'error trace) result Lwt.t
+
+  val partition_map_ep :
+    ('a -> (('b, 'c) Either.t, 'error trace) result Lwt.t) ->
+    'a list ->
+    ('b list * 'c list, 'error trace) result Lwt.t
 
   val iter_ep :
     ('a -> (unit, 'error trace) result Lwt.t) ->

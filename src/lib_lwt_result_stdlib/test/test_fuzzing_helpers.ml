@@ -57,8 +57,11 @@ module Fn = struct
 
   let arith =
     let open QCheck in
-    let module O = Observable in
-    fun2 O.int O.int int
+    fun2 Observable.int Observable.int int
+
+  let predarith =
+    let open QCheck in
+    fun2 Observable.int Observable.int (option int)
 
   (* combinators *)
   let e (cond, QCheck.Fun (_, ok), QCheck.Fun (_, error)) x y =
@@ -116,6 +119,7 @@ end
 
 module Map2Of = Apply
 module CondOf = Apply
+module CondMapOf = Apply
 module Cond2Of = Apply
 
 module FilterMapOf = struct
@@ -198,6 +202,12 @@ module Map2EOf = struct
 end
 
 module CondEOf = struct
+  let fn fn const elt = Ok (fn const elt)
+
+  let fn_e fn const elt = fn const elt
+end
+
+module CondMapEOf = struct
   let fn fn const elt = Ok (fn const elt)
 
   let fn_e fn const elt = fn const elt
@@ -300,6 +310,12 @@ module Map2SOf = struct
 end
 
 module CondSOf = struct
+  let fn fn const elt = Lwt.return (fn const elt)
+
+  let fn_s fn const elt = fn const elt
+end
+
+module CondMapSOf = struct
   let fn fn const elt = Lwt.return (fn const elt)
 
   let fn_s fn const elt = fn const elt
@@ -486,6 +502,12 @@ module Map2ESOf = struct
 end
 
 module CondESOf = struct
+  let fn fn const elt = Lwt_result_syntax.return (fn const elt)
+
+  let fn_es fn const elt = fn const elt
+end
+
+module CondMapESOf = struct
   let fn fn const elt = Lwt_result_syntax.return (fn const elt)
 
   let fn_es fn const elt = fn const elt

@@ -126,7 +126,10 @@ end) : Test = struct
       (fun (Fun (_, fn), const, input) ->
         let input = M.of_list input in
         let fn = MapOf.fn const fn in
-        eq (M.map fn input |> M.rev) (M.rev_map fn input))
+        eq
+          (let r = M.map fn input in
+           M.rev r)
+          (M.rev_map fn input))
 
   let rev_map_e =
     Test.make
@@ -344,11 +347,14 @@ end) : Test = struct
       (fun (init, Fun (_, fn), const, input) ->
         eq
           (let acc = ref init in
-           M.iter
-             (fun elt ->
-               MapOf.fn const fn elt |> fun delta -> acc := !acc + delta)
-             (M.of_list input)
-           |> fun () -> !acc)
+           let () =
+             M.iter
+               (fun elt ->
+                 let delta = MapOf.fn const fn elt in
+                 acc := !acc + delta)
+               (M.of_list input)
+           in
+           !acc)
           (with_stdlib_iter init (fn, const, input)))
 
   let iter_s =
@@ -639,7 +645,9 @@ end) : Test = struct
       (fun (const, Fun (_, fn), init, input) ->
         eq
           (M.fold
-             (fun x acc -> FoldOf.fn fn const x |> fun delta -> acc + delta)
+             (fun x acc ->
+               let delta = FoldOf.fn fn const x in
+               acc + delta)
              (M.of_list input)
              init)
           (with_stdlib_fold_left const (fn, init, input)))
@@ -888,7 +896,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
         eq
-          (M.filter (CondOf.fn fn const) (M.of_list input) |> M.to_list)
+          (let r = M.filter (CondOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (with_stdlib_filter (fn, const, input)))
 
   let filter_e =
@@ -962,6 +971,95 @@ end) : Test = struct
   let tests = [filter_p; filter_ep]
 end
 
+module TestFilteriAgainstStdlibList (M : sig
+  include BASE
+
+  include Traits.FILTERI_SEQUENTIAL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_filteri (fn, input) = Stdlib.List.filteri (CondOf.fn fn) input
+
+  let filteri =
+    Test.make
+      ~name:(Format.asprintf "%s.filteri, Stdlib.List.filteri" M.name)
+      (pair Test_fuzzing_helpers.Fn.pred many)
+      (fun (fn, input) ->
+        eq
+          (let r = M.filteri (CondOf.fn fn) (M.of_list input) in
+           M.to_list r)
+          (with_stdlib_filteri (fn, input)))
+
+  let filteri_e =
+    Test.make
+      ~name:(Format.asprintf "%s.filteri_e, Stdlib.List.filteri" M.name)
+      (pair Test_fuzzing_helpers.Fn.pred many)
+      (fun (fn, input) ->
+        let open Result_syntax in
+        eq_e
+          (let+ r = M.filteri_e (CondEOf.fn fn) (M.of_list input) in
+           M.to_list r)
+          (Ok (with_stdlib_filteri (fn, input))))
+
+  let filteri_s =
+    Test.make
+      ~name:(Format.asprintf "%s.filteri_s, Stdlib.List.filteri" M.name)
+      (pair Test_fuzzing_helpers.Fn.pred many)
+      (fun (fn, input) ->
+        let open Lwt_syntax in
+        eq_s
+          (let+ r = M.filteri_s (CondSOf.fn fn) (M.of_list input) in
+           M.to_list r)
+          (Lwt.return @@ with_stdlib_filteri (fn, input)))
+
+  let filteri_es =
+    Test.make
+      ~name:(Format.asprintf "%s.filteri_es, Stdlib.List.filteri" M.name)
+      (pair Test_fuzzing_helpers.Fn.pred many)
+      (fun (fn, input) ->
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r = M.filteri_es (CondESOf.fn fn) (M.of_list input) in
+           M.to_list r)
+          (Lwt.return_ok @@ with_stdlib_filteri (fn, input)))
+
+  let tests = [filteri; filteri_e; filteri_s; filteri_es]
+end
+
+module TestFilteripAgainstStdlibList (M : sig
+  include BASE
+
+  include Traits.FILTERI_PARALLEL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_filteri (fn, input) = Stdlib.List.filteri (CondOf.fn fn) input
+
+  let filteri_p =
+    Test.make
+      ~name:(Format.asprintf "%s.filteri_p, Stdlib.List.filteri" M.name)
+      (pair Test_fuzzing_helpers.Fn.pred many)
+      (fun (fn, input) ->
+        let open Lwt_syntax in
+        eq_s
+          (let+ r = M.filteri_p (CondSOf.fn fn) (M.of_list input) in
+           M.to_list r)
+          (Lwt.return @@ with_stdlib_filteri (fn, input)))
+
+  let filteri_ep =
+    Test.make
+      ~name:(Format.asprintf "%s.filteri_ep, Stdlib.List.filteri" M.name)
+      (pair Test_fuzzing_helpers.Fn.pred many)
+      (fun (fn, input) ->
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r = M.filteri_ep (CondESOf.fn fn) (M.of_list input) in
+           M.to_list r)
+          (Lwt.return_ok @@ with_stdlib_filteri (fn, input)))
+
+  let tests = [filteri_p; filteri_ep]
+end
+
 module TestFiltermapAgainstStdlibList (M : sig
   include BASE
 
@@ -978,8 +1076,10 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
         eq
-          (M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
-          |> M.to_list)
+          (let r =
+             M.filter_map (FilterMapOf.fns pred arith const) (M.of_list input)
+           in
+           M.to_list r)
           (with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_e =
@@ -1089,10 +1189,12 @@ end) : Test = struct
       (quad Test_fuzzing_helpers.Fn.arith one one many)
       (fun (Fun (_, arith), consta, constb, input) ->
         eq
-          (M.concat_map
-             (ConcatMapOf.fns M.of_list arith consta constb)
-             (M.of_list input)
-          |> M.to_list)
+          (let r =
+             M.concat_map
+               (ConcatMapOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
           (with_stdlib_concat_map (arith, consta, constb, input)))
 
   let concat_map_e =
@@ -1237,6 +1339,55 @@ end) : Test = struct
   let tests = [find; find_e; find_s; find_es]
 end
 
+module TestFindMapStdlibList (M : sig
+  include BASE
+
+  include Traits.FINDMAP_SEQUENTIAL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_find_map (fn, const, input) =
+    Stdlib.List.find_map (CondMapOf.fn fn const) input
+
+  let find_map =
+    Test.make
+      ~name:(Format.asprintf "%s.find_map, Stdlib.List.find_map" M.name)
+      (triple Test_fuzzing_helpers.Fn.predarith one many)
+      (fun (Fun (_, fn), const, input) ->
+        eq
+          (M.find_map (CondMapOf.fn fn const) (M.of_list input))
+          (with_stdlib_find_map (fn, const, input)))
+
+  let find_map_e =
+    Test.make
+      ~name:(Format.asprintf "%s.find_map_e, Stdlib.List.find" M.name)
+      (triple Test_fuzzing_helpers.Fn.predarith one many)
+      (fun (Fun (_, fn), const, input) ->
+        eq
+          (M.find_map_e (CondMapEOf.fn fn const) (M.of_list input))
+          (Ok (with_stdlib_find_map (fn, const, input))))
+
+  let find_map_s =
+    Test.make
+      ~name:(Format.asprintf "%s.find_map_s, Stdlib.List.find_opt" M.name)
+      (triple Test_fuzzing_helpers.Fn.predarith one many)
+      (fun (Fun (_, fn), const, input) ->
+        eq_s
+          (M.find_map_s (CondMapSOf.fn fn const) (M.of_list input))
+          (Lwt.return @@ with_stdlib_find_map (fn, const, input)))
+
+  let find_map_es =
+    Test.make
+      ~name:(Format.asprintf "%s.find_map_es, Stdlib.List.find_opt" M.name)
+      (triple Test_fuzzing_helpers.Fn.predarith one many)
+      (fun (Fun (_, fn), const, input) ->
+        eq_s
+          (M.find_map_es (CondMapESOf.fn fn const) (M.of_list input))
+          (Lwt.return_ok @@ with_stdlib_find_map (fn, const, input)))
+
+  let tests = [find_map; find_map_e; find_map_s; find_map_es]
+end
+
 module TestPartitions (M : sig
   include BASE
 
@@ -1275,6 +1426,38 @@ end) : Test = struct
   let tests = [partition_either; partition_result]
 end
 
+module TestPartitionMap (M : sig
+  include BASE
+
+  include Traits.PARTITIONMAP_VANILLA with type 'a t := 'a t
+
+  include Traits.MAP_VANILLA with type 'a t := 'a t
+
+  include Traits.PARTITION_VANILLA with type 'a t := 'a t
+
+  include Traits.PARTITION_EXTRAS with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let mapper_of_fns pred fn const x =
+    if pred const x then Either.Left (fn const x) else Either.Right (fn x const)
+
+  let g =
+    quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many
+
+  let partition_map =
+    Test.make
+      ~name:(Format.asprintf "%s.partition_map, %s.partition+map" M.name M.name)
+      g
+      (fun (pred, Fun (_, arith), const, input) ->
+        let mapper = mapper_of_fns pred arith const in
+        eq
+          (M.partition_map mapper (M.of_list input))
+          (M.partition_either (M.map mapper (M.of_list input))))
+
+  let tests = [partition_map]
+end
+
 module TestPartitionStdlibList (M : sig
   include BASE
 
@@ -1293,7 +1476,8 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
         eq
-          (M.partition (CondOf.fn pred const) (M.of_list input) |> to_list_pair)
+          (let r = M.partition (CondOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (with_stdlib_partition (pred, const, input)))
 
   let partition_e =

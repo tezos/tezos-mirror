@@ -42,11 +42,15 @@ module type S = sig
 
   val reset : 'a t -> unit
 
+  val copy : 'a t -> 'a t
+
   val add : 'a t -> key -> 'a -> unit
 
   val remove : 'a t -> key -> unit
 
   val find : 'a t -> key -> 'a option
+
+  val find_opt : 'a t -> key -> 'a option
 
   val find_all : 'a t -> key -> 'a list
 
@@ -129,11 +133,15 @@ module type SeededS = sig
 
   val reset : 'a t -> unit
 
+  val copy : 'a t -> 'a t
+
   val add : 'a t -> key -> 'a -> unit
 
   val remove : 'a t -> key -> unit
 
   val find : 'a t -> key -> 'a option
+
+  val find_opt : 'a t -> key -> 'a option
 
   val find_all : 'a t -> key -> 'a list
 
