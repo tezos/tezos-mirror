@@ -1773,26 +1773,28 @@ let block_metadata_encoding =
               liquidity_baking_escape_ema;
               implicit_operations_results;
             } ->
-         ( proposer,
-           baker,
-           level_info,
-           voting_period_info,
-           nonce_hash,
-           consumed_gas,
-           deactivated,
-           balance_updates,
-           liquidity_baking_escape_ema,
-           implicit_operations_results ))
-       (fun ( proposer,
-              baker,
-              level_info,
-              voting_period_info,
-              nonce_hash,
-              consumed_gas,
-              deactivated,
-              balance_updates,
-              liquidity_baking_escape_ema,
-              implicit_operations_results ) ->
+         ( ( proposer,
+             baker,
+             level_info,
+             voting_period_info,
+             nonce_hash,
+             consumed_gas,
+             deactivated,
+             balance_updates,
+             liquidity_baking_escape_ema,
+             implicit_operations_results ),
+           consumed_gas ))
+       (fun ( ( proposer,
+                baker,
+                level_info,
+                voting_period_info,
+                nonce_hash,
+                consumed_gas,
+                deactivated,
+                balance_updates,
+                liquidity_baking_escape_ema,
+                implicit_operations_results ),
+              _consumed_millgas ) ->
          {
            proposer;
            baker;
@@ -1805,19 +1807,21 @@ let block_metadata_encoding =
            liquidity_baking_escape_ema;
            implicit_operations_results;
          })
-       (obj10
-          (req "proposer" Signature.Public_key_hash.encoding)
-          (req "baker" Signature.Public_key_hash.encoding)
-          (req "level_info" Level.encoding)
-          (req "voting_period_info" Voting_period.info_encoding)
-          (req "nonce_hash" (option Nonce_hash.encoding))
-          (req "consumed_gas" Gas.Arith.n_fp_encoding)
-          (req "deactivated" (list Signature.Public_key_hash.encoding))
-          (dft "balance_updates" Receipt.balance_updates_encoding [])
-          (req "liquidity_baking_escape_ema" int32)
-          (req
-             "implicit_operations_results"
-             (list successful_manager_operation_result_encoding)))
+       (merge_objs
+          (obj10
+             (req "proposer" Signature.Public_key_hash.encoding)
+             (req "baker" Signature.Public_key_hash.encoding)
+             (req "level_info" Level.encoding)
+             (req "voting_period_info" Voting_period.info_encoding)
+             (req "nonce_hash" (option Nonce_hash.encoding))
+             (req "consumed_gas" Gas.Arith.n_fp_encoding)
+             (req "deactivated" (list Signature.Public_key_hash.encoding))
+             (dft "balance_updates" Receipt.balance_updates_encoding [])
+             (req "liquidity_baking_escape_ema" int32)
+             (req
+                "implicit_operations_results"
+                (list successful_manager_operation_result_encoding)))
+          (obj1 (req "consumed_milligas" Gas.Arith.n_fp_encoding)))
 
 type precheck_result = {
   consumed_gas : Gas.Arith.fp;
