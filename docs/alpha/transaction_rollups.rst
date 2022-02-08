@@ -174,9 +174,10 @@ is a pair of
    which can either be a natural number or a base58 encoded public key
    hash.
 
-Only smart contracts can emit transactions targeting a transaction
-rollup. An example of a minimal smart contract depositing ``unit``
-tickets to a transaction rollup is::
+Only smart contracts can send tickets to rollups. 
+
+Here is a minimal example of a smart contract depositing ``unit``
+tickets to a Transaction Rollup::
 
     parameter (pair address tx_rollup_l2_address);
     storage (unit);
