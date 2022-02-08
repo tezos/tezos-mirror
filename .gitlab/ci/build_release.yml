@@ -10,7 +10,7 @@
     - apk --no-cache --virtual add git
     # Environment variables from before_script
     - . ./scripts/ci/docker.env
-    # Build normal, bare and debug image
+    # Build minimal, bare and debug images
     - ./scripts/create_docker_image.sh
         "${DOCKER_IMAGE_NAME}"
         "${DOCKER_IMAGE_TAG}"
@@ -19,11 +19,10 @@
         "${CI_COMMIT_SHORT_SHA}"
     # auth gitlab or dockerhub registry
     # notice the different namespace for gitlab and that we remove the `-`
-    # Test the bare image
+    # Test bare image
     - ./scripts/ci/docker_smoke_test.sh "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" "${CI_COMMIT_SHORT_SHA}" version
-    - docker push "${DOCKER_IMAGE_NAME%?}:${DOCKER_IMAGE_TAG}" ;
-    - docker push "${DOCKER_IMAGE_NAME}bare:${DOCKER_IMAGE_TAG}" ;
-    - docker push "${DOCKER_IMAGE_NAME}debug:${DOCKER_IMAGE_TAG}" ;
+    # Push minimal, bare and debug images
+    - ./scripts/ci/docker_push_all.sh
 
 docker:manual_build_amd64:
   extends:
