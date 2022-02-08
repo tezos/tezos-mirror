@@ -5182,7 +5182,7 @@ and parse_toplevel :
       | (Some _, Some _, None, _) -> error (Missing_field K_code)
       | ( Some (p, ploc, pannot),
           Some (s, sloc, sannot),
-          Some (c, cloc, carrot),
+          Some (c, cloc, cannot),
           views ) ->
           let p_pannot =
             (* root name can be attached to either the parameter
@@ -5208,7 +5208,7 @@ and parse_toplevel :
           (* only one field annot is allowed to set the root entrypoint name *)
           p_pannot >>? fun (arg_type, pannot) ->
           Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
-          Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
+          Script_ir_annot.error_unexpected_annot cloc cannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
           ({code_field = c; arg_type; views; storage_type = s}, ctxt))
 
