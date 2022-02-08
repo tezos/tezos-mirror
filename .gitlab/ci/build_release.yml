@@ -1,12 +1,15 @@
+---
 .build_docker_release_template:
   extends:
     - .default_settings_template
     - .image_template__latest # Docker-in-Docker (dind)
-    - .docker_registry_auth # this setup a before_script for the auth
+    - .docker_registry_auth # Sets up a before_script
   variables:
     IMAGE_ARCH_PREFIX: ""
   script:
     - apk --no-cache --virtual add git
+    # Environment variables from before_script
+    - . ./scripts/ci/docker.env
     # Build normal, bare and debug image
     - ./scripts/create_docker_image.sh
         "${DOCKER_IMAGE_NAME}"

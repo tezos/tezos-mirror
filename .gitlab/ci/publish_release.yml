@@ -1,4 +1,4 @@
-
+---
 release-on-gitlab:
   image: registry.gitlab.com/gitlab-org/release-cli
   extends:
@@ -21,10 +21,12 @@ docker:merge_manifests:
   extends:
     - .rules_template__master_and_releases
     - .image_template__latest # Docker-in-Docker (dind)
-    - .docker_registry_auth
+    - .docker_registry_auth # Sets up a before_script
   stage: publish_release
   script:
     - apk add git
+    # Environment variables from before_script
+    - . ./scripts/ci/docker.env
     - LAST_COMMIT_DATE_TIME=$(git log --pretty=format:"%cd" -1 --date="format:%Y%m%d%H%M%S" 2>&1)
 
     - docker pull "${DOCKER_IMAGE_NAME}bare:amd64_${DOCKER_IMAGE_TAG}"
