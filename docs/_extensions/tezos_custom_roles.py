@@ -5,6 +5,7 @@ import os
 import os.path
 import re
 from pathlib import Path
+from typing import Tuple
 
 from docutils import nodes
 from gitlab_custom_role import gitlab_role
@@ -40,18 +41,24 @@ def find_dot_opam(name):
     raise ValueError('opam file ' + name + '.opam does not exist in the odoc')
 
 
+def parse_role(text: str) -> Tuple[str, str]:
+    parts = re.match(r"^([^<>]*)<([^<>]*)>$", text)
+    if parts:
+        description = parts.group(1)
+        obj = parts.group(2)
+    else:
+        description = text
+        obj = text
+    return (description, obj)
+
+
 def package_role(
     name, rawtext, text, _lineno, inliner, options={}, _content=[]
 ):
     rel_lvl = inliner.document.current_source.replace(os.getcwd(), '').count(
         '/'
     )
-    parts = re.match("^([^<>]*)<([^<>]*)>$", text)
-    if parts:
-        text = parts.group(2)
-        lib = parts.group(1)
-    else:
-        lib = text
+    (text, lib) = parse_role(text)
     src = find_dot_opam(lib)
     branch = os.environ.get('CI_COMMIT_REF_NAME', 'master')
     project_url = os.environ.get(
@@ -88,12 +95,7 @@ def opam_role(_name, rawtext, text, _lineno, inliner, options={}, _content=[]):
     _rel_lvl = inliner.document.current_source.replace(os.getcwd(), '').count(
         '/'
     )
-    parts = re.match("^([^<>]*)<([^<>]*)>$", text)
-    if parts:
-        text = parts.group(2)
-        lib = parts.group(1)
-    else:
-        lib = text
+    (text, lib) = parse_role(text)
     tagged = re.match('([^.]+)[.].*', lib)
     if tagged:
         url = "https://opam.ocaml.org/packages/" + tagged.group(1) + "/" + lib
@@ -107,14 +109,7 @@ def src_role(_name, rawtext, text, lineno, inliner, options={}, _content=[]):
     _rel_lvl = inliner.document.current_source.replace(os.getcwd(), '').count(
         '/'
     )
-    parts = re.match("^([^<>]*)<([^<>]*)>$", text)
-    # pylint: disable=self-assigning-variable
-    if parts:
-        text = parts.group(1)
-        src = parts.group(2)
-    else:
-        src = text
-        text = text
+    (text, src) = parse_role(text)
 
     # raise a warning if the file does not exist
     file = src
