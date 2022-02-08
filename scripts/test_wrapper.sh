@@ -1,4 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/sh
+
+set -eu
 
 if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: $0 <test-package> <test-name> [<additional dune options>]"
