@@ -79,7 +79,6 @@ let collect_error_locations errs =
     | Environment.Ecoproto_error
         ( Invalid_arity (loc, _, _, _)
         | Invalid_seq_arity (loc, _, _)
-        | Inconsistent_type_annotations (loc, _, _)
         | Unexpected_annotation loc
         | Ungrouped_annotations loc
         | Type_too_large (loc, _)
@@ -618,26 +617,6 @@ let report_errors ~details ~show_source ?parsed ppf errs =
               "@[<v 2> A view name, \"%s\", exceeds the maximum length of 31 \
                characters."
               name
-        | Inconsistent_annotations (annot1, annot2) ->
-            Format.fprintf
-              ppf
-              "@[<v 2>The two annotations do not match:@,\
-               - @[<v>%s@]@,\
-               - @[<v>%s@]@]"
-              annot1
-              annot2
-        | Inconsistent_type_annotations (loc, ty1, ty2) ->
-            Format.fprintf
-              ppf
-              "@[<v 2>%athe two types contain incompatible annotations:@,\
-               - @[<hov>%a@]@,\
-               - @[<hov>%a@]@]"
-              print_loc
-              loc
-              print_ty
-              ty1
-              print_ty
-              ty2
         | Inconsistent_type_sizes (size1, size2) ->
             Format.fprintf
               ppf

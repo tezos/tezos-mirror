@@ -32,23 +32,6 @@ module FOR_TESTS : sig
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
-(** Converts a field annot option to an entrypoint.
-    An error is returned if the field annot is too long or is "default".
-    [None] is converted to [Some default].
-*)
-val field_annot_opt_to_entrypoint_strict :
-  loc:Script.location -> field_annot option -> Entrypoint.t tzresult
-
-(** Merge field annotations.
-    @return an error {!Inconsistent_type_annotations} if they are both present
-    and different, unless [legacy] *)
-val merge_field_annot :
-  legacy:bool ->
-  error_details:'error_trace Script_tc_errors.error_details ->
-  field_annot option ->
-  field_annot option ->
-  (field_annot option, 'error_trace) result
-
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 
@@ -70,9 +53,11 @@ val is_field_annot : Script.location -> string -> bool tzresult
     [:ty_name %field1 %field2] in any order. *)
 val check_composed_type_annot : Script.location -> string list -> unit tzresult
 
-(** Extract and remove a field annotation from a node *)
-val extract_field_annot :
-  Script.node -> (Script.node * field_annot option) tzresult
+(** Checks whether a node has a field annotation. *)
+val has_field_annot : Script.node -> bool tzresult
+
+(** Removes a field annotation from a node. *)
+val remove_field_annot : Script.node -> Script.node tzresult
 
 (** Extract and remove a field annotation as an entrypoint from a node *)
 val extract_entrypoint_annot :
@@ -85,10 +70,7 @@ val check_var_annot : Script.location -> string list -> unit tzresult
 
 val is_allowed_char : char -> bool
 
-val parse_constr_annot :
-  Script.location ->
-  string list ->
-  (field_annot option * field_annot option) tzresult
+val check_constr_annot : Script.location -> string list -> unit tzresult
 
 val check_two_var_annot : Script.location -> string list -> unit tzresult
 
@@ -96,7 +78,16 @@ val check_destr_annot : Script.location -> string list -> unit tzresult
 
 val check_unpair_annot : Script.location -> string list -> unit tzresult
 
-val parse_entrypoint_annot :
-  Script.location -> string list -> field_annot option tzresult
+(** Parses a field annotation and converts it to an entrypoint.
+    An error is returned if the annotation is too long or is "default".
+    An empty annotation is converted to "default". *)
+val parse_entrypoint_annot_strict :
+  Script.location -> string list -> Entrypoint.t tzresult
+
+(** Parse a field annotation and convert it to an entrypoint.
+    An error is returned if the field annot is too long.
+    An empty annotation is converted to "default". *)
+val parse_entrypoint_annot_lax :
+  Script.location -> string list -> Entrypoint.t tzresult
 
 val check_var_type_annot : Script.location -> string list -> unit tzresult

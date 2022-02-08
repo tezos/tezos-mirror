@@ -103,8 +103,7 @@ let print_type_map ppf (parsed, type_map) =
 let first_error_location errs =
   let rec find = function
     | [] -> 0
-    | ( Inconsistent_type_annotations (loc, _, _)
-      | Unexpected_annotation loc
+    | ( Unexpected_annotation loc
       | Ill_formed_type (_, _, loc)
       | Invalid_arity (loc, _, _, _)
       | Invalid_seq_arity (loc, _, _)

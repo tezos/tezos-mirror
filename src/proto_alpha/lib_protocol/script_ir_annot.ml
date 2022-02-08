@@ -39,31 +39,6 @@ module FOR_TESTS = struct
     Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let field_annot_opt_to_entrypoint_strict ~loc = function
-  | None -> Ok Entrypoint.default
-  | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
-
-let merge_field_annot :
-    type error_trace.
-    legacy:bool ->
-    error_details:error_trace error_details ->
-    field_annot option ->
-    field_annot option ->
-    (field_annot option, error_trace) result =
- fun ~legacy ~error_details annot1 annot2 ->
-  match (annot1, annot2) with
-  | (None, None) | (Some _, None) | (None, Some _) -> Result.return_none
-  | (Some (Field_annot a1), Some (Field_annot a2)) ->
-      if legacy || Non_empty_string.(a1 = a2) then ok annot1
-      else
-        Error
-          (match error_details with
-          | Fast -> Inconsistent_types_fast
-          | Informative ->
-              trace_of_error
-              @@ Inconsistent_annotations
-                   ("%" ^ (a1 :> string), "%" ^ (a2 :> string)))
-
 let error_unexpected_annot loc annot =
   match annot with
   | [] -> Result.return_unit
@@ -224,6 +199,14 @@ let extract_field_annot :
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr -> ok (expr, None)
 
+let has_field_annot node =
+  extract_field_annot node >|? function
+  | (_node, Some _) -> true
+  | (_node, None) -> false
+
+let remove_field_annot node =
+  extract_field_annot node >|? fun (node, _a) -> node
+
 let extract_entrypoint_annot :
     Script.node -> (Script.node * Entrypoint.t option) tzresult =
  fun node ->
@@ -239,23 +222,13 @@ let check_var_annot : Script.location -> string list -> unit tzresult =
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc vars >|? fun (_a : var_annot option) -> ()
 
-let ignore_special f =
-  match f with
-  | Some (Field_annot fa) when Non_empty_string.(fa = at) -> ok None
-  | _ -> ok f
-
-let parse_constr_annot :
-    Script.location ->
-    string list ->
-    (field_annot option * field_annot option) tzresult =
+let check_constr_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
   parse_annots ~allow_special_field:true loc annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
   get_one_annot loc types >>? fun (_t : type_annot option) ->
-  get_two_annot loc fields >>? fun (f1, f2) ->
-  ignore_special f1 >>? fun f1 ->
-  ignore_special f2 >|? fun f2 -> (f1, f2)
+  get_two_annot loc fields >|? fun (_f1, _f2) -> ()
 
 let check_two_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
@@ -287,6 +260,16 @@ let parse_entrypoint_annot :
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc fields >>? fun f ->
   get_one_annot loc vars >|? fun (_v : var_annot option) -> f
+
+let parse_entrypoint_annot_strict loc annot =
+  parse_entrypoint_annot loc annot >>? function
+  | None -> Ok Entrypoint.default
+  | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
+
+let parse_entrypoint_annot_lax loc annot =
+  parse_entrypoint_annot loc annot >>? function
+  | None -> Ok Entrypoint.default
+  | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot
 
 let check_var_type_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->
