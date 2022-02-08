@@ -109,16 +109,25 @@ let endpoint_arb =
   let protocol_gen = oneofl ["http"; "https"] in
   let path_gen =
     (* Specify the characters to use, to have valid URLs *)
-    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
-    >|= String.concat "."
+    let+ path_chunks =
+      list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
+    in
+    String.concat "." path_chunks
   in
-  let port_arb = 1 -- 32768 >|= fun port -> ":" ^ Int.to_string port in
+  let port_arb =
+    let+ port = 1 -- 32768 in
+    ":" ^ Int.to_string port
+  in
   let url_string_gen =
-    triple protocol_gen path_gen (opt port_arb)
-    >|= fun (protocol, path, opt_part) ->
+    let+ (protocol, path, opt_part) =
+      triple protocol_gen path_gen (opt port_arb)
+    in
     String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]
   in
-  let url_gen = url_string_gen >|= Uri.of_string in
+  let url_gen =
+    let+ s = url_string_gen in
+    Uri.of_string s
+  in
   let print = Uri.to_string in
   make ~print url_gen
 
