@@ -300,7 +300,7 @@ let tezos_stdlib =
     ~ocaml:V.(at_least "4.08")
     ~js_compatible:true
     ~inline_tests:true
-    ~preprocess:[PPS ppx_inline_test]
+    ~preprocess:[pps ppx_inline_test]
 
 let _tezos_stdlib_tests =
   tests
@@ -788,7 +788,7 @@ let tezos_micheline =
       ]
     ~js_compatible:true
     ~inline_tests:true
-    ~preprocess:[PPS ppx_inline_test]
+    ~preprocess:[pps ppx_inline_test]
 
 let _tezos_micheline_tests =
   tests
@@ -1079,7 +1079,7 @@ let _tezos_p2p_tests =
       ]
     ~opam_only_deps:[tezos_tooling]
     ~linkall:true
-    ~preprocess:[PPS_args (bisect_ppx, ["--bisect-sigterm"])]
+    ~preprocess:[pps bisect_ppx ~args:["--bisect-sigterm"]]
     ~dune:
       Dune.
         [
@@ -3155,7 +3155,7 @@ let _tezos_tps_evaluation =
         tezt |> open_ |> open_ ~m:"Base";
         tezt_tezos |> open_;
       ]
-    ~preprocess:[PPS ppx_blob]
+    ~preprocess:[pps ppx_blob]
     ~preprocessor_deps:[File "./sql/get_all_operations.sql"]
     ~static:false
     ~release:false
