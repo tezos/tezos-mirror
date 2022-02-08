@@ -1618,7 +1618,7 @@ module Registration_section = struct
   end
 
   module Timestamps = struct
-    let zero_timestamp = Alpha_context.Script_timestamp.of_zint Z.zero
+    let zero_timestamp = Script_timestamp.of_zint Z.zero
 
     let zero_int = Alpha_context.Script_int.zero
 

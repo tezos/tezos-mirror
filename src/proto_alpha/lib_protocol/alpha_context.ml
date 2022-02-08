@@ -95,16 +95,6 @@ module Cycle = Cycle_repr
 module Script_string = Script_string_repr
 module Script_int = Script_int_repr
 
-module Script_timestamp = struct
-  include Script_timestamp_repr
-
-  let now ctxt =
-    let {Constants_repr.minimal_block_delay; _} = Raw_context.constants ctxt in
-    let first_delay = Period_repr.to_seconds minimal_block_delay in
-    let current_timestamp = Raw_context.predecessor_timestamp ctxt in
-    Time.add current_timestamp first_delay |> Timestamp.to_seconds |> of_int64
-end
-
 module Script = struct
   include Michelson_v1_primitives
   include Script_repr

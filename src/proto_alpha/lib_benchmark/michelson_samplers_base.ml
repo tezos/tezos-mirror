@@ -61,7 +61,7 @@ module type S = sig
 
   val tez : Alpha_context.Tez.tez sampler
 
-  val timestamp : Alpha_context.Script_timestamp.t sampler
+  val timestamp : Script_timestamp.t sampler
 end
 
 (* Samplers for basic Michelson types. *)
@@ -123,5 +123,5 @@ end) : S = struct
 
   let timestamp rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
-    Protocol.Alpha_context.Script_timestamp.of_zint i
+    Script_timestamp.of_zint i
 end

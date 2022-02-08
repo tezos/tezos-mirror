@@ -27,7 +27,7 @@
 (** Defines the internal Michelson representation for timestamps and basic
     operations that can be performed on it. *)
 
-open Script_int_repr
+open Alpha_context.Script_int
 
 type repr
 
@@ -71,3 +71,5 @@ val of_zint : Z.t -> t
 
 (* Timestamps are encoded exactly as Z. *)
 val encoding : t Data_encoding.encoding
+
+val now : Alpha_context.t -> t

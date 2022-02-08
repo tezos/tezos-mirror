@@ -68,6 +68,6 @@ val bytes : Bytes.t -> t
 
 val mutez : Alpha_context.Tez.tez -> t
 
-val timestamp : Alpha_context.Script_timestamp.t -> t
+val timestamp : Script_timestamp.t -> t
 
 val size_of_comparable_value : 'a Script_typed_ir.comparable_ty -> 'a -> t

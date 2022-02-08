@@ -241,7 +241,7 @@ module Mempool = struct
   end)
 
   type state = {
-    grandparent_level_start : Alpha_context.Timestamp.t option;
+    grandparent_level_start : Timestamp.t option;
     round_zero_duration : Period.t option;
     op_prechecked_managers : manager_op_info Signature.Public_key_hash.Map.t;
         (** All managers that are the source of manager operations
@@ -296,26 +296,25 @@ module Mempool = struct
         >>?= fun grandparent_round ->
         Alpha_context.Fitness.round_from_raw predecessor_fitness
         >>?= fun predecessor_round ->
-        Alpha_context.(
-          let round_durations = Constants.round_durations ctxt in
-          let round_zero_duration =
-            Round.round_duration round_durations Round.zero
-          in
-          Round.level_offset_of_round
-            round_durations
-            ~round:Round.(succ grandparent_round)
-          >>?= fun proposal_level_offset ->
-          Round.level_offset_of_round round_durations ~round:predecessor_round
-          >>?= fun proposal_round_offset ->
-          Period.(add proposal_level_offset proposal_round_offset)
-          >>?= fun proposal_offset ->
-          return
-            {
-              empty with
-              grandparent_level_start =
-                Some Timestamp.(predecessor_timestamp - proposal_offset);
-              round_zero_duration = Some round_zero_duration;
-            }))
+        let round_durations = Constants.round_durations ctxt in
+        let round_zero_duration =
+          Round.round_duration round_durations Round.zero
+        in
+        Round.level_offset_of_round
+          round_durations
+          ~round:Round.(succ grandparent_round)
+        >>?= fun proposal_level_offset ->
+        Round.level_offset_of_round round_durations ~round:predecessor_round
+        >>?= fun proposal_round_offset ->
+        Period.(add proposal_level_offset proposal_round_offset)
+        >>?= fun proposal_offset ->
+        return
+          {
+            empty with
+            grandparent_level_start =
+              Some Timestamp.(predecessor_timestamp - proposal_offset);
+            round_zero_duration = Some round_zero_duration;
+          })
     >|= Environment.wrap_tzresult
 
   let manager_prio p = `Low p

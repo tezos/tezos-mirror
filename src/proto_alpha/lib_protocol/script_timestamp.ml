@@ -46,16 +46,24 @@ let to_num_str (Timestamp_tag x) = Z.to_string x
 let to_string x = match to_notation x with None -> to_num_str x | Some s -> s
 
 let diff (Timestamp_tag x) (Timestamp_tag y) =
-  Script_int_repr.of_zint @@ Z.sub x y
+  Alpha_context.Script_int.of_zint @@ Z.sub x y
 
 let sub_delta (Timestamp_tag t) delta =
-  Timestamp_tag (Z.sub t (Script_int_repr.to_zint delta))
+  Timestamp_tag (Z.sub t (Alpha_context.Script_int.to_zint delta))
 
 let add_delta (Timestamp_tag t) delta =
-  Timestamp_tag (Z.add t (Script_int_repr.to_zint delta))
+  Timestamp_tag (Z.add t (Alpha_context.Script_int.to_zint delta))
 
 let to_zint (Timestamp_tag x) = x
 
 let of_zint x = Timestamp_tag x
 
 let encoding = Data_encoding.(conv to_zint of_zint z)
+
+let now ctxt =
+  let open Alpha_context in
+  let first_delay =
+    Period.to_seconds (Constants.minimal_block_delay ctxt)
+  in
+  let current_timestamp = Timestamp.predecessor ctxt in
+  Time.add current_timestamp first_delay |> Timestamp.to_seconds |> of_int64

@@ -51,7 +51,7 @@ let dummy_map =
   let open Script_map in
   update forty_two (Some forty_two) (empty Script_typed_ir.int_key)
 
-let dummy_timestamp = Alpha_context.Script_timestamp.of_zint (Z.of_int 42)
+let dummy_timestamp = Script_timestamp.of_zint (Z.of_int 42)
 
 let dummy_pk =
   Signature.Public_key.of_b58check_exn

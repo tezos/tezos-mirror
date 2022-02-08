@@ -55,7 +55,7 @@ module type S = sig
 
   val tez : Alpha_context.Tez.tez sampler
 
-  val timestamp : Alpha_context.Script_timestamp.t sampler
+  val timestamp : Script_timestamp.t sampler
 end
 
 (** The [Make] functor instantiates a module of type [S], where the

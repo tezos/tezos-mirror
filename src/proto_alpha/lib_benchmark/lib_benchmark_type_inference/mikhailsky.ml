@@ -377,7 +377,7 @@ module Data = struct
   let map elts = prim A_Map [seq elts] []
 
   let timestamp ts =
-    let z = Protocol.Alpha_context.Script_timestamp.to_zint ts in
+    let z = Protocol.Script_timestamp.to_zint ts in
     prim A_Timestamp [int z] []
 
   let mutez (tz : Protocol.Alpha_context.Tez.tez) =

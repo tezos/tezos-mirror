@@ -481,38 +481,6 @@ module Script_string : module type of Script_string_repr
 
 module Script_int : module type of Script_int_repr
 
-module Script_timestamp : sig
-  open Script_int
-
-  type repr
-
-  type t = Timestamp_tag of repr [@@ocaml.unboxed]
-
-  val compare : t -> t -> int
-
-  val to_string : t -> string
-
-  val to_notation : t -> string option
-
-  val to_num_str : t -> string
-
-  val of_string : string -> t option
-
-  val diff : t -> t -> z num
-
-  val add_delta : t -> z num -> t
-
-  val sub_delta : t -> z num -> t
-
-  val now : context -> t
-
-  val to_zint : t -> Z.t
-
-  val of_zint : Z.t -> t
-
-  val encoding : t Data_encoding.encoding
-end
-
 module Script : sig
   type prim = Michelson_v1_primitives.prim =
     | K_parameter

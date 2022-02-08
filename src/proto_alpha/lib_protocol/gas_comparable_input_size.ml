@@ -103,8 +103,8 @@ let address (addr : Script_typed_ir.address) : t =
 let tx_rollup_l2_address x =
   Tx_rollup_l2_address.Indexable.size @@ Indexable.forget x
 
-let timestamp (tstamp : Alpha_context.Script_timestamp.t) : t =
-  Z.numbits (Alpha_context.Script_timestamp.to_zint tstamp) / 8
+let timestamp (tstamp : Script_timestamp.t) : t =
+  Z.numbits (Script_timestamp.to_zint tstamp) / 8
 
 let rec size_of_comparable_value :
     type a. a Script_typed_ir.comparable_ty -> a -> t =
