@@ -3,10 +3,10 @@ Transaction Rollups
 
 High-frequency transactions are hard to achieve on a blockchain that
 is decentralized and open. For this reason, many blockchains offer the
-possibility to define **layer-2** solutions that relax some
+possibility to define "layer-2" solutions that relax some
 constraints in terms of consensus to increase transaction
 throughput. The **layer-1** (the main blockchain) acts as a gatekeeper
-for several layer-2 (secondary blockchains), and provides economic
+for several **layer-2** (secondary blockchains), and provides economic
 incentives to prevent attacks.
 
 Introduction to Optimistic Rollups
@@ -22,15 +22,16 @@ context** thereafter) that participants of the network can update
 thanks to authenticated layer-1 operations. These operations are
 grouped together in **layer-1 blocks** (hence the name “blockchain”).
 
-Similarly, the layer-2 is characterized by a set of **messages**
-stored in the layer-1 context in an **inbox**, a ledger (the **layer-2
-context**), and a semantics for the interpretation of messages on top
+Similarly, the layer-2 implements a ledger (called the **layer-2
+context**), that participants can update by sending **messages**
+stored in the layer-1 context in an **inbox**, with a precise
+semantics for the interpretation of messages on top
 of a layer-2 context, resulting in the production of a new layer-2
 context.
 
 More precisely, an optimistic rollup works as follows:
 
-#. Certain layer-1 operations will append messages to the layer-2
+#. Certain layer-1 operations will append messages to the
    inbox. The inbox is analogous to the layer-1 blocks. As such, the
    consensus of the layer-1 decides which messages the layer-2 has to
    consume, and in which order.
@@ -60,31 +61,33 @@ messages (as stored in the inbox) onto the layer-2 context, and for
 posting the resulting hashes in the layer-1. In “optimistic rollup”,
 the word “optimistic” refers to the assumption that at least one
 honest transaction rollup node will always have to be active to reject
-erroneous hashes. In its absence, a rogue node can post the hash of a
+erroneous hash. 
+The presence of a single honest node is sufficient to guarantee the correct application of the layer-2 operations in the rollup.
+In its absence, nothing prevents a rogue node to post a
 maliciously tampered layer-2 context.
 
 Introduction to Transaction Rollups
 -----------------------------------
 
-The **transaction rollups** are an implementation of optimistic
+**Transaction Rollups** are an implementation of optimistic
 rollups in Tezos, characterized by the following principles:
 
 #. The semantics of the messages is limited to the transfer of assets.
 #. The procedure to reject erroneous hashes allows for a short
    finality period of 30 blocks.
 #. They are implemented as part of the economic protocol of Tezos
-   directly, not as smart contracts like in Arbitrum for instance.
+   directly, not as smart contracts.
 
 The latter design choice, made possible by the amendment feature of
 Tezos, allows for a specialized, gas- and storage-efficient
 implementation of optimistic rollups.
 
-Note that it is possible to create more than one transaction rollup on
+Note that it is possible to create any number of transaction rollups on
 Tezos. They are identified with **transaction rollup addresses**,
 assigned by the layer-1 at their respective creation (called
 origination in Tezos to mimic the terminology used for smart
 contract).  They are prefixed by ``tru1`` when encoded in a base58
-alphabet.
+alphabet (see also the :ref:`kinds of address prefixes in Tezos <address_prefixes>`).
 
 Workflow Overview
 -----------------
@@ -244,7 +247,7 @@ given ticket in a given quantity for the benefit of a given
 address. More precisely, the payload consists in
 
 #. A destination address. It can either be a layer-1 address, that is
-   a ``tz1``, or a layer-2 address, that is a ``tru2``` or the integer
+   a ``tz1``, or a layer-2 address, that is a ``tru2`` or the integer
    associated with this address by the layer-2.
 #. A ticket hash identifying the asset to exchange, or the integer
    associated with this ticket hash by the layer-2.
@@ -266,7 +269,7 @@ cases:
    bound the size of the rejection payload so that it can fit in a
    layer-1 operation.
 
-Transfers can be grouped inside a *transaction**. A transaction is
+Transfers can be grouped inside a **transaction**. A transaction is
 atomic: if any transfer of the transaction fails, then the whole
 transaction fails and leaves the balances of the related addresses
 unchanged. This can be useful to implement trades. For instance, two
@@ -275,9 +278,8 @@ each other for the emission of the counter-part transfer. For a
 transaction to be valid, it needs to be signed by the authors of the
 transfers it encompasses.
 
-To emphasize, the interpretation of a transaction fails if and only if
-the interpretation of a transfer within that transaction fails. If
-this happens, the transfers are ignored, but the counters of their
+If a transaction fails (because a transfer within that transaction fails),
+the transfers are ignored, but the counters of their
 signers are updated nonetheless. This means the transaction will need
 to be submitted again, with updated counters, if the error is
 involuntary.
@@ -309,13 +311,13 @@ can use to originate a transaction rollup.
 
     tezos-client originate tx rollup from <implicit account address>
 
-where `tx` is an abbreviation for transaction.
+where ``tx`` is an abbreviation for transaction.
 
 .. TODO: https://gitlab.com/tezos/tezos/-/issues/2152
 
 The origination of a transaction rollup burns ꜩ15.
 
-A **transaction rollup address** is attributed to the new transaction
+A transaction rollup address is attributed to the new transaction
 rollup. This address is derived from the hash of the Tezos operation with the
 origination operation similarly to the smart contract origination. It is always
 prefixed by ``tru1``. For instance,::
