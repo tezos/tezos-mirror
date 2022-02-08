@@ -1,6 +1,6 @@
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: 4138659057683d257e65ba887dd2e65cee9e37dc
+  build_deps_image_version: ddd4c86b2a2b0a1a64255c30bde25739273c64e1
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
