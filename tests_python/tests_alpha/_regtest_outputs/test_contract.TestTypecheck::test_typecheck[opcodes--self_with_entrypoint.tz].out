@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_with_entrypoint.tz]
 
 Well typed
-Gas remaining: 1039965.676 units remaining
+Gas remaining: 1039965.501 units remaining
 { parameter (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ;
   storage unit ;
   code { DROP
@@ -11,8 +11,7 @@ Gas remaining: 1039965.676 units remaining
          PACK @Apacked
          /* [ bytes ] */ ;
          SELF %default
-         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))
-            : bytes ] */ ;
+         /* [ contract (or (or nat bool) (or unit string)) : bytes ] */ ;
          PACK @defpacked
          /* [ bytes : bytes ] */ ;
          DUP
@@ -21,8 +20,7 @@ Gas remaining: 1039965.676 units remaining
          /* [ bytes : bytes : bytes ] */ ;
          ASSERT_CMPNEQ ;
          SELF
-         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C)))
-            : bytes ] */ ;
+         /* [ contract (or (or nat bool) (or unit string)) : bytes ] */ ;
          PACK @selfpacked
          /* [ bytes : bytes ] */ ;
          ASSERT_CMPEQ ;
@@ -39,7 +37,7 @@ Gas remaining: 1039965.676 units remaining
          DROP
          /* [] */ ;
          SELF %maybe_C
-         /* [ contract (or (unit %Z) (string %C)) ] */ ;
+         /* [ contract (or unit string) ] */ ;
          CAST (contract (or unit string))
          /* [ contract (or unit string) ] */ ;
          DROP
@@ -51,15 +49,15 @@ Gas remaining: 1039965.676 units remaining
          DROP
          /* [] */ ;
          SELF
-         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or nat bool) (or unit string)) ] */ ;
          CAST (contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))))
-         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or nat bool) (or unit string)) ] */ ;
          DROP
          /* [] */ ;
          SELF %default
-         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or nat bool) (or unit string)) ] */ ;
          CAST (contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))))
-         /* [ contract (or (or (nat %A) (bool %B)) (or %maybe_C (unit %Z) (string %C))) ] */ ;
+         /* [ contract (or (or nat bool) (or unit string)) ] */ ;
          DROP
          /* [] */ ;
          UNIT

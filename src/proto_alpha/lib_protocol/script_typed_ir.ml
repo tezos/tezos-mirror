@@ -509,13 +509,28 @@ type view = {
   view_code : Script.node;
 }
 
+type 'arg entrypoints = {
+  name : Entrypoint.t option;
+  nested : 'arg nested_entrypoints;
+}
+
+and 'arg nested_entrypoints =
+  | Entrypoints_Union : {
+      left : 'l entrypoints;
+      right : 'r entrypoints;
+    }
+      -> ('l, 'r) union nested_entrypoints
+  | Entrypoints_None : _ nested_entrypoints
+
+let no_entrypoints = {name = None; nested = Entrypoints_None}
+
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
   views : view SMap.t;
-  root_name : field_annot option;
+  entrypoints : 'arg entrypoints;
   code_size : Cache_memory_helpers.sint;
       (* This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
@@ -971,7 +986,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
       views : view SMap.t;
-      root_name : field_annot option;
+      entrypoints : 'b entrypoints;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
       -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr
@@ -1706,10 +1721,10 @@ let kinstr_rewritek :
   | IView (kinfo, view_signature, k) -> IView (kinfo, view_signature, f.apply k)
   | IImplicit_account (kinfo, k) -> IImplicit_account (kinfo, f.apply k)
   | ICreate_contract
-      {kinfo; storage_type; arg_type; lambda; views; root_name; k} ->
+      {kinfo; storage_type; arg_type; lambda; views; entrypoints; k} ->
       let k = f.apply k in
       ICreate_contract
-        {kinfo; storage_type; arg_type; lambda; views; root_name; k}
+        {kinfo; storage_type; arg_type; lambda; views; entrypoints; k}
   | ISet_delegate (kinfo, k) -> ISet_delegate (kinfo, f.apply k)
   | INow (kinfo, k) -> INow (kinfo, f.apply k)
   | IBalance (kinfo, k) -> IBalance (kinfo, f.apply k)

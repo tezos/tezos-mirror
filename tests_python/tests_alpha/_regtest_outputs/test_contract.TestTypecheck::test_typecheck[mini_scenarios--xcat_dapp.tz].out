@@ -16,13 +16,11 @@ Gas remaining: 1039911.852 units remaining
   code { NIL @operations
            operation
          /* [ list operation
-            : pair (or (pair %fund address bytes timestamp)
-                     (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
+            : pair (or (pair address bytes timestamp) (or bytes bytes))
                  (big_map bytes (pair (pair address address) mutez timestamp))
                  unit ] */ ;
          SWAP
-         /* [ pair (or (pair %fund address bytes timestamp)
-                     (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash)))
+         /* [ pair (or (pair address bytes timestamp) (or bytes bytes))
                  (big_map bytes (pair (pair address address) mutez timestamp))
                  unit : list operation ] */ ;
          UNPAPAIR @% @% @% ;
@@ -30,8 +28,7 @@ Gas remaining: 1039911.852 units remaining
                /* [ big_map bytes (pair (pair address address) mutez timestamp)
                   : big_map bytes (pair (pair address address) mutez timestamp) : unit
                   : list operation ] */ }
-         /* [ or (pair %fund address bytes timestamp)
-               (or %claim_refund (bytes %preimage_claim) (bytes %refund_hash))
+         /* [ or (pair address bytes timestamp) (or bytes bytes)
             : big_map bytes (pair (pair address address) mutez timestamp)
             : big_map bytes (pair (pair address address) mutez timestamp) : unit
             : list operation ] */ ;

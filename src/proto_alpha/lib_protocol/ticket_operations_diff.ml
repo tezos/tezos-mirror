@@ -209,7 +209,7 @@ let tickets_of_origination ctxt ~preorigination script =
                      code = _;
                      arg_type = _;
                      views = _;
-                     root_name = _;
+                     entrypoints = _;
                      code_size = _;
                    },
                  ctxt ) ->

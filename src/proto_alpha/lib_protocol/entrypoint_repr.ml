@@ -157,10 +157,16 @@ let set_delegate = of_string_strict_exn "set_delegate"
 
 let remove_delegate = of_string_strict_exn "remove_delegate"
 
+let is_root = ( = ) root
+
+let to_non_empty_string (name : t) = (name :> Non_empty_string.t)
+
 let to_string (name : t) = (name :> string)
 
 let to_address_suffix (name : t) =
   if is_default name then "" else "%" ^ (name :> string)
+
+let unparse_as_field_annot (name : t) = "%" ^ (name :> string)
 
 let of_string_lax_exn str =
   match of_string_lax' str with Ok name -> name | Error err -> invalid_arg err

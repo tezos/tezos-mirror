@@ -39,21 +39,9 @@ module FOR_TESTS = struct
     Field_annot (Non_empty_string.of_string_exn s)
 end
 
-let unparse_field_annot : field_annot option -> string list = function
-  | None -> []
-  | Some (Field_annot a) -> ["%" ^ (a :> string)]
-
 let field_annot_opt_to_entrypoint_strict ~loc = function
   | None -> Ok Entrypoint.default
   | Some (Field_annot a) -> Entrypoint.of_annot_strict ~loc a
-
-let field_annot_opt_eq_entrypoint_lax field_annot_opt entrypoint =
-  match field_annot_opt with
-  | None -> false
-  | Some (Field_annot a) -> (
-      match Entrypoint.of_annot_lax_opt a with
-      | None -> false
-      | Some a' -> Entrypoint.(a' = entrypoint))
 
 let merge_field_annot :
     type error_trace.
@@ -214,6 +202,11 @@ let parse_field_annot :
   error_unexpected_annot loc vars >>? fun () ->
   error_unexpected_annot loc types >>? fun () -> get_one_annot loc fields
 
+let is_field_annot loc a =
+  parse_field_annot loc [a] >|? function
+  | Some (_a : field_annot) -> true
+  | None -> false
+
 let extract_field_annot :
     Script.node -> (Script.node * field_annot option) tzresult = function
   | Prim (loc, prim, args, annot) ->
@@ -230,6 +223,14 @@ let extract_field_annot :
       | Some field_annot -> parse_field_annot loc [field_annot])
       >|? fun field_annot -> (Prim (loc, prim, args, annot), field_annot)
   | expr -> ok (expr, None)
+
+let extract_entrypoint_annot :
+    Script.node -> (Script.node * Entrypoint.t option) tzresult =
+ fun node ->
+  extract_field_annot node >|? fun (node, field_annot_opt) ->
+  ( node,
+    Option.bind field_annot_opt (fun (Field_annot field_annot) ->
+        Entrypoint.of_annot_lax_opt field_annot) )
 
 let check_var_annot : Script.location -> string list -> unit tzresult =
  fun loc annot ->

@@ -9,10 +9,10 @@ Gas remaining: 1039941.750 units remaining
             (or (pair %import (list (pair string string)) (list (pair string string)))
                 (or (list %add (pair string string)) (list %rem string))))) ;
   code { UNPAIR
-         /* [ or (unit %swap)
-               (or (or %reset (pair (big_map string string) (big_map string string)) unit)
-                   (or (pair %import (list (pair string string)) (list (pair string string)))
-                       (or (list %add (pair string string)) (list %rem string))))
+         /* [ or unit
+               (or (or (pair (big_map string string) (big_map string string)) unit)
+                   (or (pair (list (pair string string)) (list (pair string string)))
+                       (or (list (pair string string)) (list string))))
             : or (pair (big_map string string) (big_map string string)) unit ] */ ;
          IF_LEFT
            { DROP

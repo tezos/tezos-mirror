@@ -50,7 +50,7 @@ type callsite =
   | Toplevel : {
       storage_type : 'sto ty;
       param_type : 'param ty;
-      root_name : Script_ir_annot.field_annot option;
+      entrypoints : 'param Script_typed_ir.entrypoints;
     }
       -> callsite
   | View : callsite
@@ -63,7 +63,7 @@ val init : callsite -> t
 val toplevel :
   storage_type:'sto ty ->
   param_type:'param ty ->
-  Script_ir_annot.field_annot option ->
+  entrypoints:'param Script_typed_ir.entrypoints ->
   t
 
 val view : t

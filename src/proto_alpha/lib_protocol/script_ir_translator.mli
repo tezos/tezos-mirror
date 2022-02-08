@@ -71,6 +71,13 @@ type ex_comparable_ty =
 
 type ex_ty = Ex_ty : 'a Script_typed_ir.ty -> ex_ty
 
+type ex_parameter_ty_and_entrypoints =
+  | Ex_parameter_ty_and_entrypoints : {
+      arg_type : 'a Script_typed_ir.ty;
+      entrypoints : 'a Script_typed_ir.entrypoints;
+    }
+      -> ex_parameter_ty_and_entrypoints
+
 type ex_stack_ty =
   | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
@@ -81,7 +88,6 @@ type toplevel = {
   arg_type : Script.node;
   storage_type : Script.node;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Script_ir_annot.field_annot option;
 }
 
 type ('arg, 'storage) code = {
@@ -94,7 +100,7 @@ type ('arg, 'storage) code = {
   arg_type : 'arg Script_typed_ir.ty;
   storage_type : 'storage Script_typed_ir.ty;
   views : Script_typed_ir.view Script_typed_ir.SMap.t;
-  root_name : Script_ir_annot.field_annot option;
+  entrypoints : 'arg Script_typed_ir.entrypoints;
   code_size : Cache_memory_helpers.sint;
       (** This is an over-approximation of the value size in memory, in
          bytes, of the contract's static part, that is its source
@@ -263,11 +269,17 @@ val parse_big_map_value_ty :
 val parse_packable_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
-val parse_parameter_ty :
+val parse_passable_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
 val parse_comparable_ty :
   context -> Script.node -> (ex_comparable_ty * context) tzresult
+
+val parse_parameter_ty_and_entrypoints :
+  context ->
+  legacy:bool ->
+  Script.node ->
+  (ex_parameter_ty_and_entrypoints * context) tzresult
 
 val parse_view_input_ty :
   context ->
@@ -306,7 +318,7 @@ val parse_any_ty :
   context -> legacy:bool -> Script.node -> (ex_ty * context) tzresult
 
 (** We expose [parse_ty] for convenience to external tools. Please use
-    specialized versions such as [parse_packable_ty], [parse_parameter_ty],
+    specialized versions such as [parse_packable_ty], [parse_passable_ty],
     [parse_comparable_ty], or [parse_big_map_value_ty] if possible. *)
 val parse_ty :
   context ->
@@ -336,10 +348,12 @@ val ty_of_comparable_ty :
 val parse_toplevel :
   context -> legacy:bool -> Script.expr -> (toplevel * context) tzresult Lwt.t
 
-val add_field_annot :
-  Script_ir_annot.field_annot option ->
-  ('loc, 'prim) Micheline.node ->
-  ('loc, 'prim) Micheline.node
+val unparse_parameter_ty :
+  loc:'loc ->
+  context ->
+  'a Script_typed_ir.ty ->
+  entrypoints:'a Script_typed_ir.entrypoints ->
+  ('loc Script.michelson_node * context) tzresult
 
 (** High-level function to typecheck a Michelson script. This function is not
     used for validating operations but only for the [typecheck_code] RPC.
@@ -407,14 +421,14 @@ val parse_contract_for_script :
 val find_entrypoint :
   error_details:'error_trace error_details ->
   't Script_typed_ir.ty ->
-  root_name:Script_ir_annot.field_annot option ->
+  't Script_typed_ir.entrypoints ->
   Entrypoint.t ->
   ((Script.node -> Script.node) * ex_ty, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
-  't Script_typed_ir.ty ->
   context ->
-  root_name:Script_ir_annot.field_annot option ->
+  't Script_typed_ir.ty ->
+  't Script_typed_ir.entrypoints ->
   (Michelson_v1_primitives.prim list list
   * (Michelson_v1_primitives.prim list * Script.unlocated_michelson_node)
     Entrypoint.Map.t)

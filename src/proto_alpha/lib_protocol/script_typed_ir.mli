@@ -357,13 +357,37 @@ type view = {
   view_code : Script.node;
 }
 
+(** ['arg entrypoints] represents the tree of entrypoints of a parameter type
+    ['arg].
+    [name] is the name of the entrypoint at that node if it is not [None].
+    [nested] are the entrypoints below the node in the tree.
+      It is always [Entrypoints_None] for non-union nodes.
+      But it is also ok to have [Entrypoints_None] for a union node, it just
+      means that there are no entrypoints below that node in the tree.
+*)
+type 'arg entrypoints = {
+  name : Entrypoint.t option;
+  nested : 'arg nested_entrypoints;
+}
+
+and 'arg nested_entrypoints =
+  | Entrypoints_Union : {
+      left : 'l entrypoints;
+      right : 'r entrypoints;
+    }
+      -> ('l, 'r) union nested_entrypoints
+  | Entrypoints_None : _ nested_entrypoints
+
+(** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
+val no_entrypoints : _ entrypoints
+
 type ('arg, 'storage) script = {
   code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
   views : view SMap.t;
-  root_name : field_annot option;
+  entrypoints : 'arg entrypoints;
   code_size : Cache_memory_helpers.sint;
 }
 
@@ -910,7 +934,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
       views : view SMap.t;
-      root_name : field_annot option;
+      entrypoints : 'b entrypoints;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }
       -> (public_key_hash option, Tez.t * ('a * 's), 'r, 'f) kinstr

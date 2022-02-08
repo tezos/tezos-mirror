@@ -364,16 +364,16 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ctxt
             expr
           >>?= fun (expr, _) ->
-          parse_toplevel ctxt ~legacy expr
-          >>=? fun ({arg_type; root_name; _}, ctxt) ->
+          parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( parse_parameter_ty ctxt ~legacy arg_type
-            >>? fun (Ex_ty arg_type, _) ->
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+              ->
               Gas_monad.run ctxt
               @@ Script_ir_translator.find_entrypoint
                    ~error_details:Informative
-                   ~root_name
                    arg_type
+                   entrypoints
                    entrypoint
               >>? fun (r, ctxt) ->
               r |> function
@@ -394,12 +394,12 @@ let[@coq_axiom_with_reason "gadt"] register () =
             ctxt
             expr
           >>?= fun (expr, _) ->
-          parse_toplevel ctxt ~legacy expr
-          >>=? fun ({arg_type; root_name; _}, ctxt) ->
+          parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( ( parse_parameter_ty ctxt ~legacy arg_type
-              >>? fun (Ex_ty arg_type, _) ->
-                Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+            ( ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+              >>? fun ( Ex_parameter_ty_and_entrypoints {arg_type; entrypoints},
+                        _ ) ->
+                Script_ir_translator.list_entrypoints ctxt arg_type entrypoints
               )
             >|? fun (unreachable_entrypoint, map) ->
               Some

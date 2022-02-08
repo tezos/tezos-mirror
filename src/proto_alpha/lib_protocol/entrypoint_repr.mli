@@ -41,6 +41,9 @@ val is_default : t -> bool
 (** Root entrypoint "root" *)
 val root : t
 
+(** Checks whether an entrypoint is the root entrypoint *)
+val is_root : t -> bool
+
 (** Entrypoint "do" *)
 val do_ : t
 
@@ -80,6 +83,10 @@ val of_annot_lax_opt : Non_empty_string.t -> t option
     Accepts "default" and converts "" to "default". *)
 val of_string_lax : string -> t tzresult
 
+(** Converts an entrypoint to a non-empty string.
+    "default" is kept as is. *)
+val to_non_empty_string : t -> Non_empty_string.t
+
 (** Converts an entrypoint to a string.
     "default" is kept as is. *)
 val to_string : t -> string
@@ -88,6 +95,11 @@ val to_string : t -> string
     For the default entrypoint, the result is the empty string.
     Otherwise it is "%" followed by the entrypoint. *)
 val to_address_suffix : t -> string
+
+(** Converts an entrypoint to a string used as a field annotation of a
+    parameter union type. It is "%" followed by the entrypoint.
+    The default entrypoint is converted to "%default". *)
+val unparse_as_field_annot : t -> string
 
 (** Pretty-print an entrypoint *)
 val pp : Format.formatter -> t -> unit

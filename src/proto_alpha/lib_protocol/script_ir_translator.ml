@@ -179,11 +179,6 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
         ((ty_of_comparable_ty l, None), (ty_of_comparable_ty r, None), tname)
   | Option_key (t, tname) -> Option_t (ty_of_comparable_ty t, tname)
 
-let add_field_annot a = function
-  | Prim (loc, prim, args, annots) ->
-      Prim (loc, prim, args, annots @ unparse_field_annot a)
-  | expr -> expr
-
 let rec unparse_comparable_ty_uncarbonated :
     type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
  fun ~loc -> function
@@ -221,81 +216,90 @@ let unparse_memo_size ~loc memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
   Int (loc, z)
 
-let rec unparse_ty_uncarbonated :
-    type a loc. loc:loc -> a ty -> loc Script.michelson_node =
- fun ~loc ty ->
-  let prim (name, args, annot) = Prim (loc, name, args, annot) in
-  match ty with
-  | Unit_t _meta -> prim (T_unit, [], [])
-  | Int_t _meta -> prim (T_int, [], [])
-  | Nat_t _meta -> prim (T_nat, [], [])
-  | Signature_t _meta -> prim (T_signature, [], [])
-  | String_t _meta -> prim (T_string, [], [])
-  | Bytes_t _meta -> prim (T_bytes, [], [])
-  | Mutez_t _meta -> prim (T_mutez, [], [])
-  | Bool_t _meta -> prim (T_bool, [], [])
-  | Key_hash_t _meta -> prim (T_key_hash, [], [])
-  | Key_t _meta -> prim (T_key, [], [])
-  | Timestamp_t _meta -> prim (T_timestamp, [], [])
-  | Address_t _meta -> prim (T_address, [], [])
-  | Operation_t _meta -> prim (T_operation, [], [])
-  | Chain_id_t _meta -> prim (T_chain_id, [], [])
-  | Never_t _meta -> prim (T_never, [], [])
-  | Bls12_381_g1_t _meta -> prim (T_bls12_381_g1, [], [])
-  | Bls12_381_g2_t _meta -> prim (T_bls12_381_g2, [], [])
-  | Bls12_381_fr_t _meta -> prim (T_bls12_381_fr, [], [])
-  | Contract_t (ut, _meta) ->
-      let t = unparse_ty_uncarbonated ~loc ut in
-      prim (T_contract, [t], [])
-  | Pair_t (utl, utr, _meta) ->
-      let annot = [] in
-      let tl = unparse_ty_uncarbonated ~loc utl in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
-      (* Note that the folding does not happen if the pair on the right has an
-         annotation because this annotation would be lost *)
-      prim
-        (match tr with
-        | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts, annot)
-        | _ -> (T_pair, [tl; tr], annot))
-  | Union_t ((utl, l_field), (utr, r_field), _meta) ->
-      let annot = [] in
-      let utl = unparse_ty_uncarbonated ~loc utl in
-      let tl = add_field_annot l_field utl in
-      let utr = unparse_ty_uncarbonated ~loc utr in
-      let tr = add_field_annot r_field utr in
-      prim (T_or, [tl; tr], annot)
-  | Lambda_t (uta, utr, _meta) ->
-      let ta = unparse_ty_uncarbonated ~loc uta in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_lambda, [ta; tr], [])
-  | Option_t (ut, _meta) ->
-      let annot = [] in
-      let ut = unparse_ty_uncarbonated ~loc ut in
-      prim (T_option, [ut], annot)
-  | List_t (ut, _meta) ->
-      let t = unparse_ty_uncarbonated ~loc ut in
-      prim (T_list, [t], [])
-  | Ticket_t (ut, _meta) ->
-      let t = unparse_comparable_ty_uncarbonated ~loc ut in
-      prim (T_ticket, [t], [])
-  | Set_t (ut, _meta) ->
-      let t = unparse_comparable_ty_uncarbonated ~loc ut in
-      prim (T_set, [t], [])
-  | Map_t (uta, utr, _meta) ->
-      let ta = unparse_comparable_ty_uncarbonated ~loc uta in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_map, [ta; tr], [])
-  | Big_map_t (uta, utr, _meta) ->
-      let ta = unparse_comparable_ty_uncarbonated ~loc uta in
-      let tr = unparse_ty_uncarbonated ~loc utr in
-      prim (T_big_map, [ta; tr], [])
-  | Sapling_transaction_t (memo_size, _meta) ->
-      prim (T_sapling_transaction, [unparse_memo_size ~loc memo_size], [])
-  | Sapling_state_t (memo_size, _meta) ->
-      prim (T_sapling_state, [unparse_memo_size ~loc memo_size], [])
-  | Chest_key_t _meta -> prim (T_chest_key, [], [])
-  | Chest_t _meta -> prim (T_chest, [], [])
+let rec unparse_ty_entrypoints_uncarbonated :
+    type a loc. loc:loc -> a ty -> a entrypoints -> loc Script.michelson_node =
+ fun ~loc ty {nested = nested_entrypoints; name = entrypoint_name} ->
+  let (name, args) =
+    match ty with
+    | Unit_t _meta -> (T_unit, [])
+    | Int_t _meta -> (T_int, [])
+    | Nat_t _meta -> (T_nat, [])
+    | Signature_t _meta -> (T_signature, [])
+    | String_t _meta -> (T_string, [])
+    | Bytes_t _meta -> (T_bytes, [])
+    | Mutez_t _meta -> (T_mutez, [])
+    | Bool_t _meta -> (T_bool, [])
+    | Key_hash_t _meta -> (T_key_hash, [])
+    | Key_t _meta -> (T_key, [])
+    | Timestamp_t _meta -> (T_timestamp, [])
+    | Address_t _meta -> (T_address, [])
+    | Operation_t _meta -> (T_operation, [])
+    | Chain_id_t _meta -> (T_chain_id, [])
+    | Never_t _meta -> (T_never, [])
+    | Bls12_381_g1_t _meta -> (T_bls12_381_g1, [])
+    | Bls12_381_g2_t _meta -> (T_bls12_381_g2, [])
+    | Bls12_381_fr_t _meta -> (T_bls12_381_fr, [])
+    | Contract_t (ut, _meta) ->
+        let t = unparse_ty_entrypoints_uncarbonated ~loc ut no_entrypoints in
+        (T_contract, [t])
+    | Pair_t (utl, utr, _meta) -> (
+        let tl = unparse_ty_entrypoints_uncarbonated ~loc utl no_entrypoints in
+        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
+        (* Note that the folding does not happen if the pair on the right has an
+           annotation because this annotation would be lost *)
+        match tr with
+        | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts)
+        | _ -> (T_pair, [tl; tr]))
+    | Union_t ((utl, _l_field), (utr, _r_field), _meta) ->
+        let (entrypoints_l, entrypoints_r) =
+          match nested_entrypoints with
+          | Entrypoints_None -> (no_entrypoints, no_entrypoints)
+          | Entrypoints_Union {left; right} -> (left, right)
+        in
+        let tl = unparse_ty_entrypoints_uncarbonated ~loc utl entrypoints_l in
+        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr entrypoints_r in
+        (T_or, [tl; tr])
+    | Lambda_t (uta, utr, _meta) ->
+        let ta = unparse_ty_entrypoints_uncarbonated ~loc uta no_entrypoints in
+        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        (T_lambda, [ta; tr])
+    | Option_t (ut, _meta) ->
+        let ut = unparse_ty_entrypoints_uncarbonated ~loc ut no_entrypoints in
+        (T_option, [ut])
+    | List_t (ut, _meta) ->
+        let t = unparse_ty_entrypoints_uncarbonated ~loc ut no_entrypoints in
+        (T_list, [t])
+    | Ticket_t (ut, _meta) ->
+        let t = unparse_comparable_ty_uncarbonated ~loc ut in
+        (T_ticket, [t])
+    | Set_t (ut, _meta) ->
+        let t = unparse_comparable_ty_uncarbonated ~loc ut in
+        (T_set, [t])
+    | Map_t (uta, utr, _meta) ->
+        let ta = unparse_comparable_ty_uncarbonated ~loc uta in
+        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        (T_map, [ta; tr])
+    | Big_map_t (uta, utr, _meta) ->
+        let ta = unparse_comparable_ty_uncarbonated ~loc uta in
+        let tr = unparse_ty_entrypoints_uncarbonated ~loc utr no_entrypoints in
+        (T_big_map, [ta; tr])
+    | Sapling_transaction_t (memo_size, _meta) ->
+        (T_sapling_transaction, [unparse_memo_size ~loc memo_size])
+    | Sapling_state_t (memo_size, _meta) ->
+        (T_sapling_state, [unparse_memo_size ~loc memo_size])
+    | Chest_key_t _meta -> (T_chest_key, [])
+    | Chest_t _meta -> (T_chest, [])
+  in
+  let annot =
+    match entrypoint_name with
+    | None -> []
+    | Some name -> [Entrypoint.unparse_as_field_annot name]
+  in
+  Prim (loc, name, args, annot)
+
+let unparse_ty_uncarbonated ~loc ty =
+  unparse_ty_entrypoints_uncarbonated ~loc ty no_entrypoints
 
 let unparse_ty ~loc ctxt ty =
   Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
@@ -304,6 +308,10 @@ let unparse_ty ~loc ctxt ty =
 let unparse_comparable_ty ~loc ctxt comp_ty =
   Gas.consume ctxt (Unparse_costs.unparse_comparable_type comp_ty)
   >|? fun ctxt -> (unparse_comparable_ty_uncarbonated ~loc comp_ty, ctxt)
+
+let unparse_parameter_ty ~loc ctxt ty ~entrypoints =
+  Gas.consume ctxt (Unparse_costs.unparse_type ty) >|? fun ctxt ->
+  (unparse_ty_entrypoints_uncarbonated ~loc ty entrypoints, ctxt)
 
 let[@coq_struct "function_parameter"] rec strip_var_annots = function
   | (Int _ | String _ | Bytes _) as atom -> atom
@@ -1244,110 +1252,29 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
 
 type ex_ty = Ex_ty : 'a ty -> ex_ty
 
-let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_packable_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:false
-    ~allow_operation:false
-    ~allow_contract:
-      legacy
-      (* type contract is forbidden in UNPACK because of
-         https://gitlab.com/tezos/tezos/-/issues/301 *)
-    ~allow_ticket:false
+type ex_parameter_ty_and_entrypoints =
+  | Ex_parameter_ty_and_entrypoints : {
+      arg_type : 'a ty;
+      entrypoints : 'a entrypoints;
+    }
+      -> ex_parameter_ty_and_entrypoints
 
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_parameter_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:true
-    ~allow_operation:false
-    ~allow_contract:true
-    ~allow_ticket:true
+(** [parse_ty] can be used to parse regular types as well as parameter types
+    together with their entrypoints.
 
-and parse_view_input_ty :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:false
-    ~allow_operation:false
-    ~allow_contract:true
-    ~allow_ticket:false
+    In the first case, use [~ret:Don't_parse_entrypoints], [parse_ty] will
+    return an [ex_ty].
 
-and parse_view_output_ty :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:false
-    ~allow_operation:false
-    ~allow_contract:true
-    ~allow_ticket:false
+    In the second case, use [~ret:Parse_entrypoints], [parse_ty] will return
+    an [ex_parameter_ty_and_entrypoints].
+*)
+type ('ret, 'name) parse_ty_ret =
+  | Don't_parse_entrypoints : (ex_ty, unit) parse_ty_ret
+  | Parse_entrypoints
+      : (ex_parameter_ty_and_entrypoints, Entrypoint.t option) parse_ty_ret
 
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_normal_storage_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:true
-    ~allow_operation:false
-    ~allow_contract:legacy
-    ~allow_ticket:true
-
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_any_ty
-    :
-    context ->
-    stack_depth:int ->
-    legacy:bool ->
-    Script.node ->
-    (ex_ty * context) tzresult =
- fun ctxt ~stack_depth ~legacy ->
-  (parse_ty [@tailcall])
-    ctxt
-    ~stack_depth
-    ~legacy
-    ~allow_lazy_storage:true
-    ~allow_operation:true
-    ~allow_contract:true
-    ~allow_ticket:true
-
-and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
+let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty :
+    type ret name.
     context ->
     stack_depth:int ->
     legacy:bool ->
@@ -1355,8 +1282,9 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
     allow_operation:bool ->
     allow_contract:bool ->
     allow_ticket:bool ->
+    ret:(ret, name) parse_ty_ret ->
     Script.node ->
-    (ex_ty * context) tzresult =
+    (ret * context) tzresult =
  fun ctxt
      ~stack_depth
      ~legacy
@@ -1364,60 +1292,78 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
      ~allow_operation
      ~allow_contract
      ~allow_ticket
+     ~ret
      node ->
   Gas.consume ctxt Typecheck_costs.parse_type_cycle >>? fun ctxt ->
   if Compare.Int.(stack_depth > 10000) then
     error Typechecking_too_many_recursive_calls
   else
+    (match ret with
+    | Don't_parse_entrypoints -> ok (node, (() : name))
+    | Parse_entrypoints -> extract_entrypoint_annot node)
+    >>? fun (node, name) ->
+    let return ctxt ty : ret * context =
+      match ret with
+      | Don't_parse_entrypoints -> (Ex_ty ty, ctxt)
+      | Parse_entrypoints ->
+          ( Ex_parameter_ty_and_entrypoints
+              {arg_type = ty; entrypoints = {name; nested = Entrypoints_None}},
+            ctxt )
+    in
     match node with
     | Prim (loc, T_unit, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty unit_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt unit_t
     | Prim (loc, T_int, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty int_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt int_t
     | Prim (loc, T_nat, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty nat_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt nat_t
     | Prim (loc, T_string, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty string_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt string_t
     | Prim (loc, T_bytes, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bytes_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bytes_t
     | Prim (loc, T_mutez, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty mutez_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt mutez_t
     | Prim (loc, T_bool, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bool_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bool_t
     | Prim (loc, T_key, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty key_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt key_t
     | Prim (loc, T_key_hash, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty key_hash_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt key_hash_t
     | Prim (loc, T_chest_key, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty chest_key_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt chest_key_t
     | Prim (loc, T_chest, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty chest_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt chest_t
     | Prim (loc, T_timestamp, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty timestamp_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt timestamp_t
     | Prim (loc, T_address, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty address_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt address_t
     | Prim (loc, T_signature, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty signature_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt signature_t
     | Prim (loc, T_operation, [], annot) ->
         if allow_operation then
-          check_type_annot loc annot >>? fun () -> ok (Ex_ty operation_t, ctxt)
+          check_type_annot loc annot >|? fun () -> return ctxt operation_t
         else error (Unexpected_operation loc)
     | Prim (loc, T_chain_id, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty chain_id_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt chain_id_t
     | Prim (loc, T_never, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty never_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt never_t
     | Prim (loc, T_bls12_381_g1, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g1_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bls12_381_g1_t
     | Prim (loc, T_bls12_381_g2, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_g2_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bls12_381_g2_t
     | Prim (loc, T_bls12_381_fr, [], annot) ->
-        check_type_annot loc annot >>? fun () -> ok (Ex_ty bls12_381_fr_t, ctxt)
+        check_type_annot loc annot >|? fun () -> return ctxt bls12_381_fr_t
     | Prim (loc, T_contract, [utl], annot) ->
         if allow_contract then
-          parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utl
+          parse_passable_ty
+            ctxt
+            ~stack_depth:(stack_depth + 1)
+            ~legacy
+            utl
+            ~ret:Don't_parse_entrypoints
           >>? fun (Ex_ty tl, ctxt) ->
           check_type_annot loc annot >>? fun () ->
-          contract_t loc tl >|? fun ty -> (Ex_ty ty, ctxt)
+          contract_t loc tl >|? fun ty -> return ctxt ty
         else error (Unexpected_contract loc)
     | Prim (loc, T_pair, utl :: utr, annot) ->
         extract_field_annot utl >>? fun (utl, _left_field) ->
@@ -1429,6 +1375,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           utl
         >>? fun (Ex_ty tl, ctxt) ->
         (match utr with
@@ -1445,13 +1392,18 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        pair_t loc tl tr >|? fun ty -> (Ex_ty ty, ctxt)
-    | Prim (loc, T_or, [utl; utr], annot) ->
-        extract_field_annot utl >>? fun (utl, left_constr) ->
-        extract_field_annot utr >>? fun (utr, right_constr) ->
+        pair_t loc tl tr >|? fun ty -> return ctxt ty
+    | Prim (loc, T_or, [utl; utr], annot) -> (
+        (match ret with
+        | Don't_parse_entrypoints ->
+            extract_field_annot utl >>? fun (utl, _left_constr) ->
+            extract_field_annot utr >|? fun (utr, _right_constr) -> (utl, utr)
+        | Parse_entrypoints -> ok (utl, utr))
+        >>? fun (utl, utr) ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1460,8 +1412,9 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret
           utl
-        >>? fun (Ex_ty tl, ctxt) ->
+        >>? fun (parsed_l, ctxt) ->
         parse_ty
           ctxt
           ~stack_depth:(stack_depth + 1)
@@ -1470,18 +1423,37 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret
           utr
-        >>? fun (Ex_ty tr, ctxt) ->
+        >>? fun (parsed_r, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        union_t loc (tl, left_constr) (tr, right_constr) >|? fun ty ->
-        (Ex_ty ty, ctxt)
+        match ret with
+        | Don't_parse_entrypoints ->
+            let (Ex_ty tl) = parsed_l in
+            let (Ex_ty tr) = parsed_r in
+            union_t loc (tl, None) (tr, None) >|? fun ty ->
+            ((Ex_ty ty : ret), ctxt)
+        | Parse_entrypoints ->
+            let (Ex_parameter_ty_and_entrypoints
+                  {arg_type = tl; entrypoints = left}) =
+              parsed_l
+            in
+            let (Ex_parameter_ty_and_entrypoints
+                  {arg_type = tr; entrypoints = right}) =
+              parsed_r
+            in
+            union_t loc (tl, None) (tr, None) >|? fun arg_type ->
+            let entrypoints =
+              {name; nested = Entrypoints_Union {left; right}}
+            in
+            (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt))
     | Prim (loc, T_lambda, [uta; utr], annot) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy uta
         >>? fun (Ex_ty ta, ctxt) ->
         parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        lambda_t loc ta tr >|? fun ty -> (Ex_ty ty, ctxt)
+        lambda_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_option, [ut], annot) ->
         (if legacy then
          (* legacy semantics with (broken) field annotations *)
@@ -1497,9 +1469,10 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           ut
         >>? fun (Ex_ty t, ctxt) ->
-        option_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+        option_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_list, [ut], annot) ->
         parse_ty
           ctxt
@@ -1509,22 +1482,23 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           ut
         >>? fun (Ex_ty t, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        list_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+        list_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_ticket, [ut], annot) ->
         if allow_ticket then
           parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
           >>? fun (Ex_comparable_ty t, ctxt) ->
           check_type_annot loc annot >>? fun () ->
-          ticket_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+          ticket_t loc t >|? fun ty -> return ctxt ty
         else error (Unexpected_ticket loc)
     | Prim (loc, T_set, [ut], annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt ut
         >>? fun (Ex_comparable_ty t, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        set_t loc t >|? fun ty -> (Ex_ty ty, ctxt)
+        set_t loc t >|? fun ty -> return ctxt ty
     | Prim (loc, T_map, [uta; utr], annot) ->
         parse_comparable_ty ~stack_depth:(stack_depth + 1) ctxt uta
         >>? fun (Ex_comparable_ty ta, ctxt) ->
@@ -1536,14 +1510,15 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
           ~allow_operation
           ~allow_contract
           ~allow_ticket
+          ~ret:Don't_parse_entrypoints
           utr
         >>? fun (Ex_ty tr, ctxt) ->
         check_type_annot loc annot >>? fun () ->
-        map_t loc ta tr >|? fun ty -> (Ex_ty ty, ctxt)
+        map_t loc ta tr >|? fun ty -> return ctxt ty
     | Prim (loc, T_sapling_transaction, [memo_size], annot) ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
-        (Ex_ty (sapling_transaction_t ~memo_size), ctxt)
+        return ctxt (sapling_transaction_t ~memo_size)
     (*
     /!\ When adding new lazy storage kinds, be careful to use
     [when allow_lazy_storage] /!\
@@ -1551,11 +1526,18 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
     from another contract with `PUSH t id` or `UNPACK`.
   *)
     | Prim (loc, T_big_map, args, annot) when allow_lazy_storage ->
-        (parse_big_map_ty [@tailcall]) ctxt ~stack_depth ~legacy loc args annot
+        parse_big_map_ty
+          ctxt
+          ~stack_depth:(stack_depth + 1)
+          ~legacy
+          loc
+          args
+          annot
+        >|? fun (Ex_ty ty, ctxt) -> return ctxt ty
     | Prim (loc, T_sapling_state, [memo_size], annot) when allow_lazy_storage ->
         check_type_annot loc annot >>? fun () ->
         parse_memo_size memo_size >|? fun memo_size ->
-        (Ex_ty (sapling_state_t ~memo_size), ctxt)
+        return ctxt (sapling_state_t ~memo_size)
     | Prim (loc, (T_big_map | T_sapling_state), _, _) ->
         error (Unexpected_lazy_storage loc)
     | Prim
@@ -1609,6 +1591,42 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_ty :
                T_ticket;
              ]
 
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_passable_ty :
+    type ret name.
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    ret:(ret, name) parse_ty_ret ->
+    Script.node ->
+    (ret * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:true
+    ~allow_operation:false
+    ~allow_contract:true
+    ~allow_ticket:true
+
+and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_any_ty
+    :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_ty * context) tzresult =
+ fun ctxt ~stack_depth ~legacy ->
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:true
+    ~allow_operation:true
+    ~allow_contract:true
+    ~allow_ticket:true
+    ~ret:Don't_parse_entrypoints
+
 and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_map_ty
     ctxt ~stack_depth ~legacy big_map_loc args map_annot =
   Gas.consume ctxt Typecheck_costs.parse_type_cycle >>? fun ctxt ->
@@ -1637,7 +1655,59 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_big_ma
     ~allow_operation:false
     ~allow_contract:legacy
     ~allow_ticket:true
+    ~ret:Don't_parse_entrypoints
     value_ty
+
+let parse_packable_ty ctxt ~stack_depth ~legacy node =
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:
+      legacy
+      (* type contract is forbidden in UNPACK because of
+         https://gitlab.com/tezos/tezos/-/issues/301 *)
+    ~allow_ticket:false
+    ~ret:Don't_parse_entrypoints
+    node
+
+let parse_view_input_ty ctxt ~stack_depth ~legacy node =
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:true
+    ~allow_ticket:false
+    ~ret:Don't_parse_entrypoints
+    node
+
+let parse_view_output_ty ctxt ~stack_depth ~legacy node =
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:false
+    ~allow_operation:false
+    ~allow_contract:true
+    ~allow_ticket:false
+    ~ret:Don't_parse_entrypoints
+    node
+
+let parse_normal_storage_ty ctxt ~stack_depth ~legacy node =
+  (parse_ty [@tailcall])
+    ctxt
+    ~stack_depth
+    ~legacy
+    ~allow_lazy_storage:true
+    ~allow_operation:false
+    ~allow_contract:legacy
+    ~allow_ticket:true
+    ~ret:Don't_parse_entrypoints
+    node
 
 let parse_storage_ty :
     context ->
@@ -1727,7 +1797,6 @@ type toplevel = {
   arg_type : Script.node;
   storage_type : Script.node;
   views : view SMap.t;
-  root_name : field_annot option;
 }
 
 type ('arg, 'storage) code = {
@@ -1735,7 +1804,7 @@ type ('arg, 'storage) code = {
   arg_type : 'arg ty;
   storage_type : 'storage ty;
   views : view SMap.t;
-  root_name : field_annot option;
+  entrypoints : 'arg entrypoints;
   code_size : Cache_memory_helpers.sint;
 }
 
@@ -1801,58 +1870,51 @@ type 'before dup_n_proof_argument =
       -> 'before dup_n_proof_argument
 
 let find_entrypoint (type full error_trace)
-    ~(error_details : error_trace error_details) (full : full ty) ~root_name
-    entrypoint : ((Script.node -> Script.node) * ex_ty, error_trace) Gas_monad.t
-    =
+    ~(error_details : error_trace error_details) (full : full ty)
+    (entrypoints : full entrypoints) entrypoint :
+    ((Script.node -> Script.node) * ex_ty, error_trace) Gas_monad.t =
   let open Gas_monad in
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t.
       t ty ->
+      t entrypoints ->
       Entrypoint.t ->
       ((Script.node -> Script.node) * ex_ty, unit) Gas_monad.t =
-   fun t entrypoint ->
-    match t with
-    | Union_t ((tl, al), (tr, ar), _) -> (
-        consume_gas Typecheck_costs.find_entrypoint_cycle >>$ fun () ->
-        if field_annot_opt_eq_entrypoint_lax al entrypoint then
-          return ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
-        else if field_annot_opt_eq_entrypoint_lax ar entrypoint then
-          return ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
-        else
-          find_entrypoint tl entrypoint >??$ function
-          | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
-          | Error () ->
-              find_entrypoint tr entrypoint >|$ fun (f, t) ->
-              ((fun e -> Prim (loc, D_Right, [f e], [])), t))
-    | _ -> of_result (Error ())
+   fun ty entrypoints entrypoint ->
+    consume_gas Typecheck_costs.find_entrypoint_cycle >>$ fun () ->
+    match (ty, entrypoints) with
+    | (_, {name = Some name; _}) when Entrypoint.(name = entrypoint) ->
+        return ((fun e -> e), Ex_ty ty)
+    | ( Union_t ((tl, _al), (tr, _ar), _),
+        {nested = Entrypoints_Union {left; right}; _} ) -> (
+        find_entrypoint tl left entrypoint >??$ function
+        | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
+        | Error () ->
+            find_entrypoint tr right entrypoint >|$ fun (f, t) ->
+            ((fun e -> Prim (loc, D_Right, [f e], [])), t))
+    | (_, {nested = Entrypoints_None; _}) -> of_result (Error ())
   in
-  (* This comparison should be taken into account by the caller. *)
-  if field_annot_opt_eq_entrypoint_lax root_name entrypoint then
-    return ((fun e -> e), Ex_ty full)
-  else
-    find_entrypoint full entrypoint >??$ function
-    | Ok result -> return result
-    | Error () ->
-        if Entrypoint.is_default entrypoint then
-          return ((fun e -> e), Ex_ty full)
-        else
-          of_result
-          @@ Error
-               (match error_details with
-               | Fast -> (Inconsistent_types_fast : error_trace)
-               | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
+  find_entrypoint full entrypoints entrypoint >??$ function
+  | Ok f_t -> return f_t
+  | Error () ->
+      if Entrypoint.is_default entrypoint then return ((fun e -> e), Ex_ty full)
+      else
+        of_result
+        @@ Error
+             (match error_details with
+             | Fast -> (Inconsistent_types_fast : error_trace)
+             | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
 
 let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
-    ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
+    ~(full : full ty) ~(expected : exp ty) entrypoints entrypoint loc :
     (Entrypoint.t * exp ty, error_trace) Gas_monad.t =
   let open Gas_monad in
-  find_entrypoint ~error_details full ~root_name entrypoint >>$ function
+  find_entrypoint ~error_details full entrypoints entrypoint >>$ function
   | (_, Ex_ty ty) -> (
-      match root_name with
-      | Some (Field_annot fa)
-        when Compare.String.((fa :> string) = "root")
-             && Entrypoint.is_default entrypoint -> (
+      match entrypoints.name with
+      | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint
+        -> (
           merge_types ~legacy ~error_details:Fast loc ty expected >??$ function
           | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
           | Error Inconsistent_types_fast ->
@@ -1862,64 +1924,79 @@ let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
           merge_types ~legacy ~error_details loc ty expected >|$ fun (Eq, ty) ->
           (entrypoint, (ty : exp ty)))
 
-let well_formed_entrypoints (type full) (full : full ty) ~root_name =
-  let merge path annot (type t) (ty : t ty) reachable
+let well_formed_entrypoints (type full) (full : full ty) entrypoints =
+  let merge path (type t) (ty : t ty) (entrypoints : t entrypoints) reachable
       ((first_unreachable, all) as acc) =
-    match annot with
+    match entrypoints.name with
     | None ->
         ok
-          (if reachable then acc
-          else
-            match ty with
-            | Union_t _ -> acc
-            | _ -> (
-                match first_unreachable with
-                | None -> (Some (List.rev path), all)
-                | Some _ -> acc))
-    | Some (Field_annot name) ->
-        Entrypoint.of_annot_lax name >>? fun name ->
+          ( (if reachable then acc
+            else
+              match ty with
+              | Union_t _ -> acc
+              | _ -> (
+                  match first_unreachable with
+                  | None -> (Some (List.rev path), all)
+                  | Some _ -> acc)),
+            reachable )
+    | Some name ->
         if Entrypoint.Set.mem name all then error (Duplicate_entrypoint name)
-        else ok (first_unreachable, Entrypoint.Set.add name all)
+        else ok ((first_unreachable, Entrypoint.Set.add name all), true)
   in
   let rec check :
       type t.
       t ty ->
+      t entrypoints ->
       prim list ->
       bool ->
       prim list option * Entrypoint.Set.t ->
       (prim list option * Entrypoint.Set.t) tzresult =
-   fun t path reachable acc ->
-    match t with
-    | Union_t ((tl, al), (tr, ar), _) ->
-        merge (D_Left :: path) al tl reachable acc >>? fun acc ->
-        merge (D_Right :: path) ar tr reachable acc >>? fun acc ->
-        check
-          tl
-          (D_Left :: path)
-          (match al with Some _ -> true | None -> reachable)
-          acc
-        >>? fun acc ->
-        check
-          tr
-          (D_Right :: path)
-          (match ar with Some _ -> true | None -> reachable)
-          acc
+   fun t entrypoints path reachable acc ->
+    match (t, entrypoints) with
+    | ( Union_t ((tl, _al), (tr, _ar), _),
+        {nested = Entrypoints_Union {left; right}; _} ) ->
+        merge (D_Left :: path) tl left reachable acc
+        >>? fun (acc, l_reachable) ->
+        merge (D_Right :: path) tr right reachable acc
+        >>? fun (acc, r_reachable) ->
+        check tl left (D_Left :: path) l_reachable acc >>? fun acc ->
+        check tr right (D_Right :: path) r_reachable acc
     | _ -> ok acc
   in
   let (init, reachable) =
-    match root_name with
+    match entrypoints.name with
     | None -> (Entrypoint.Set.empty, false)
-    | Some (Field_annot name) -> (
-        match Entrypoint.of_annot_lax_opt name with
-        | None -> (Entrypoint.Set.empty, false)
-        | Some name -> (Entrypoint.Set.singleton name, true))
+    | Some name -> (Entrypoint.Set.singleton name, true)
   in
-  check full [] reachable (None, init) >>? fun (first_unreachable, all) ->
+  check full entrypoints [] reachable (None, init)
+  >>? fun (first_unreachable, all) ->
   if not (Entrypoint.Set.mem Entrypoint.default all) then Result.return_unit
   else
     match first_unreachable with
     | None -> Result.return_unit
     | Some path -> error (Unreachable_entrypoint path)
+
+let parse_parameter_ty_and_entrypoints :
+    context ->
+    stack_depth:int ->
+    legacy:bool ->
+    Script.node ->
+    (ex_parameter_ty_and_entrypoints * context) tzresult =
+ fun ctxt ~stack_depth ~legacy node ->
+  parse_passable_ty
+    ctxt
+    ~stack_depth:(stack_depth + 1)
+    ~legacy
+    node
+    ~ret:Parse_entrypoints
+  >>? fun (res, ctxt) ->
+  (if legacy then Result.return_unit
+  else
+    let (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}) = res in
+    well_formed_entrypoints arg_type entrypoints)
+  >|? fun () -> (res, ctxt)
+
+let parse_passable_ty = parse_passable_ty ~ret:Don't_parse_entrypoints
 
 let parse_uint ~nb_bits =
   assert (Compare.Int.(nb_bits >= 0 && nb_bits <= 30)) ;
@@ -4399,7 +4476,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (address_t, rest) in
       typed ctxt loc instr stack
   | (Prim (loc, I_CONTRACT, [ty], annot), Item_t (Address_t _, rest)) ->
-      parse_parameter_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
+      parse_passable_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy ty
       >>?= fun (Ex_ty t, ctxt) ->
       contract_t loc t >>?= fun contract_ty ->
       option_t loc contract_ty >>?= fun res_ty ->
@@ -4458,18 +4535,16 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_two_var_annot loc annot >>?= fun () ->
       let canonical_code = Micheline.strip_locations code in
       parse_toplevel ctxt ~legacy canonical_code
-      >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
+      >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
       record_trace
         (Ill_formed_type (Some "parameter", canonical_code, location arg_type))
-        (parse_parameter_ty
+        (parse_parameter_ty_and_entrypoints
            ctxt
            ~stack_depth:(stack_depth + 1)
            ~legacy
            arg_type)
-      >>?= fun (Ex_ty arg_type, ctxt) ->
-      (if legacy then Result.return_unit
-      else well_formed_entrypoints ~root_name arg_type)
-      >>?= fun () ->
+      >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt)
+        ->
       record_trace
         (Ill_formed_type (Some "storage", canonical_code, location storage_type))
         (parse_storage_ty
@@ -4483,7 +4558,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       trace
         (Ill_typed_contract (canonical_code, []))
         (parse_returning
-           (Tc_context.toplevel ~storage_type ~param_type:arg_type root_name)
+           (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
            ctxt
            ~legacy
            ?type_logger
@@ -4508,7 +4583,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           apply =
             (fun kinfo k ->
               ICreate_contract
-                {kinfo; storage_type; arg_type; lambda; views; root_name; k});
+                {kinfo; storage_type; arg_type; lambda; views; entrypoints; k});
         }
       in
       let stack = Item_t (operation_t, Item_t (address_t, rest)) in
@@ -4579,12 +4654,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           | View ->
               error
                 (Forbidden_instr_in_context (loc, Script_tc_errors.View, prim))
-          | Toplevel {param_type; root_name; storage_type = _} ->
+          | Toplevel {param_type; entrypoints; storage_type = _} ->
               Gas_monad.run ctxt
               @@ find_entrypoint
                    ~error_details:Informative
                    param_type
-                   ~root_name
+                   entrypoints
                    entrypoint
               >>? fun (r, ctxt) ->
               r >>? fun (_, Ex_ty param_type) ->
@@ -5017,13 +5092,15 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                 >>? fun (code, ctxt) ->
                   (* can only fail because of gas *)
                   parse_toplevel ctxt ~legacy:true code
-                  >>? fun ({arg_type; root_name; _}, ctxt) ->
-                  parse_parameter_ty
+                  >>? fun ({arg_type; _}, ctxt) ->
+                  parse_parameter_ty_and_entrypoints
                     ctxt
                     ~stack_depth:(stack_depth + 1)
                     ~legacy:true
                     arg_type
-                  >>? fun (Ex_ty targ, ctxt) ->
+                  >>? fun ( Ex_parameter_ty_and_entrypoints
+                              {arg_type = targ; entrypoints},
+                            ctxt ) ->
                   (* we don't check targ size here because it's a legacy contract code *)
                   Gas_monad.run ctxt
                   @@ find_entrypoint_for_type
@@ -5031,7 +5108,7 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                        ~error_details:Informative
                        ~full:targ
                        ~expected:arg
-                       ~root_name
+                       entrypoints
                        entrypoint
                        loc
                   >>? fun (entrypoint_arg, ctxt) ->
@@ -5125,29 +5202,34 @@ and parse_toplevel :
           Some (s, sloc, sannot),
           Some (c, cloc, carrot),
           views ) ->
-          let maybe_root_name =
+          let p_pannot =
             (* root name can be attached to either the parameter
-               primitive or the toplevel constructor (legacy only) *)
-            Script_ir_annot.extract_field_annot p >>? fun (p, root_name) ->
+               primitive or the toplevel constructor (legacy only).
+
+               In the latter case we move it to the parameter type.
+            *)
+            Script_ir_annot.extract_field_annot p >>? fun (_p, root_name) ->
             match root_name with
-            | Some _ -> ok (p, pannot, root_name)
+            | Some _ -> ok (p, pannot)
             | None -> (
                 match pannot with
                 | [single]
                   when legacy
                        && Compare.Int.(String.length single > 0)
-                       && Compare.Char.(single.[0] = '%') ->
-                    parse_field_annot ploc [single] >>? fun pannot ->
-                    ok (p, [], pannot)
-                | _ -> ok (p, pannot, None))
+                       && Compare.Char.(single.[0] = '%') -> (
+                    is_field_annot ploc single >|? fun is_field_annot ->
+                    match (is_field_annot, p) with
+                    | (true, Prim (loc, prim, args, annots)) ->
+                        (Prim (loc, prim, args, single :: annots), [])
+                    | _ -> (p, []))
+                | _ -> ok (p, pannot))
           in
           (* only one field annot is allowed to set the root entrypoint name *)
-          maybe_root_name >>? fun (arg_type, pannot, root_name) ->
+          p_pannot >>? fun (arg_type, pannot) ->
           Script_ir_annot.error_unexpected_annot ploc pannot >>? fun () ->
           Script_ir_annot.error_unexpected_annot cloc carrot >>? fun () ->
           Script_ir_annot.error_unexpected_annot sloc sannot >|? fun () ->
-          ({code_field = c; arg_type; root_name; views; storage_type = s}, ctxt)
-      )
+          ({code_field = c; arg_type; views; storage_type = s}, ctxt))
 
 (* Same as [parse_contract], but does not fail when the contact is missing or
    if the expected type doesn't match the actual one. In that case None is
@@ -5203,16 +5285,19 @@ let parse_contract_for_script :
                   (* can only fail because of gas *)
                   match parse_toplevel ctxt ~legacy:true code with
                   | Error _ -> error (Invalid_contract (loc, contract))
-                  | Ok ({arg_type; root_name; _}, ctxt) -> (
+                  | Ok ({arg_type; _}, ctxt) -> (
                       match
-                        parse_parameter_ty
+                        parse_parameter_ty_and_entrypoints
                           ctxt
                           ~stack_depth:0
                           ~legacy:true
                           arg_type
                       with
                       | Error _ -> error (Invalid_contract (loc, contract))
-                      | Ok (Ex_ty targ, ctxt) -> (
+                      | Ok
+                          ( Ex_parameter_ty_and_entrypoints
+                              {arg_type = targ; entrypoints},
+                            ctxt ) -> (
                           (* we don't check targ size here because it's a legacy contract code *)
                           Gas_monad.run ctxt
                           @@ find_entrypoint_for_type
@@ -5220,7 +5305,7 @@ let parse_contract_for_script :
                                ~error_details:Fast
                                ~full:targ
                                ~expected:arg
-                               ~root_name
+                               entrypoints
                                entrypoint
                                loc
                           >|? fun (entrypoint_arg, ctxt) ->
@@ -5247,15 +5332,12 @@ let parse_code :
   >>?= fun (code, ctxt) ->
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
-  >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
+  >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
-    (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
-  >>?= fun (Ex_ty arg_type, ctxt) ->
-  (if legacy then Result.return_unit
-  else well_formed_entrypoints ~root_name arg_type)
-  >>?= fun () ->
+    (parse_parameter_ty_and_entrypoints ctxt ~stack_depth:0 ~legacy arg_type)
+  >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt) ->
   let storage_type_loc = location storage_type in
   record_trace
     (Ill_formed_type (Some "storage", code, storage_type_loc))
@@ -5267,7 +5349,7 @@ let parse_code :
   trace
     (Ill_typed_contract (code, []))
     (parse_returning
-       Tc_context.(toplevel ~storage_type ~param_type:arg_type root_name)
+       Tc_context.(toplevel ~storage_type ~param_type:arg_type ~entrypoints)
        ctxt
        ~legacy
        ~stack_depth:0
@@ -5294,7 +5376,8 @@ let parse_code :
     Gas.consume ctxt (Script_typed_ir_size_costs.nodes_cost ~nodes)
     >>? fun ctxt ->
     ok
-      (Ex_code {code; arg_type; storage_type; views; root_name; code_size}, ctxt))
+      ( Ex_code {code; arg_type; storage_type; views; entrypoints; code_size},
+        ctxt ))
 
 let parse_storage :
     ?type_logger:type_logger ->
@@ -5332,7 +5415,8 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     (ex_script * context) tzresult Lwt.t =
  fun ?type_logger ctxt ~legacy ~allow_forged_in_storage {code; storage} ->
   parse_code ~legacy ctxt ?type_logger ~code
-  >>=? fun ( Ex_code {code; arg_type; storage_type; views; root_name; code_size},
+  >>=? fun ( Ex_code
+               {code; arg_type; storage_type; views; entrypoints; code_size},
              ctxt ) ->
   parse_storage
     ?type_logger
@@ -5343,7 +5427,7 @@ let[@coq_axiom_with_reason "gadt"] parse_script :
     ~storage
   >|=? fun (storage, ctxt) ->
   ( Ex_script
-      {code_size; code; arg_type; storage; storage_type; views; root_name},
+      {code_size; code; arg_type; storage; storage_type; views; entrypoints},
     ctxt )
 
 let typecheck_code :
@@ -5356,16 +5440,13 @@ let typecheck_code :
   (* Constants need to be expanded or [parse_toplevel] may fail. *)
   Global_constants_storage.expand ctxt code >>=? fun (ctxt, code) ->
   parse_toplevel ctxt ~legacy code
-  >>?= fun ({arg_type; storage_type; code_field; views; root_name}, ctxt) ->
+  >>?= fun ({arg_type; storage_type; code_field; views}, ctxt) ->
   let type_map = ref [] in
   let arg_type_loc = location arg_type in
   record_trace
     (Ill_formed_type (Some "parameter", code, arg_type_loc))
-    (parse_parameter_ty ctxt ~stack_depth:0 ~legacy arg_type)
-  >>?= fun (Ex_ty arg_type, ctxt) ->
-  (if legacy then Result.return_unit
-  else well_formed_entrypoints ~root_name arg_type)
-  >>?= fun () ->
+    (parse_parameter_ty_and_entrypoints ctxt ~stack_depth:0 ~legacy arg_type)
+  >>?= fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt) ->
   let storage_type_loc = location storage_type in
   record_trace
     (Ill_formed_type (Some "storage", code, storage_type_loc))
@@ -5378,7 +5459,7 @@ let typecheck_code :
   let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
-      (Tc_context.toplevel ~storage_type ~param_type:arg_type root_name)
+      (Tc_context.toplevel ~storage_type ~param_type:arg_type ~entrypoints)
       ctxt
       ~legacy
       ~stack_depth:0
@@ -5400,33 +5481,32 @@ let typecheck_code :
   trace (Ill_typed_contract (code, !type_map)) views_result >|=? fun ctxt ->
   (!type_map, ctxt)
 
-let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
-  let merge path annot (type t) (ty : t ty) reachable
+let list_entrypoints ctxt (type full) (full : full ty)
+    (entrypoints : full entrypoints) =
+  let merge path (type t) (ty : t ty) (entrypoints : t entrypoints) reachable
       ((unreachables, all) as acc) =
-    match annot with
-    | None -> (
+    match entrypoints.name with
+    | None ->
         ok
-        @@
-        if reachable then acc
-        else
-          match ty with
-          | Union_t _ -> acc
-          | _ -> (List.rev path :: unreachables, all))
-    | Some (Field_annot name) -> (
-        match Entrypoint.of_annot_lax_opt name with
-        | None -> ok (List.rev path :: unreachables, all)
-        | Some name ->
-            if Entrypoint.Map.mem name all then
-              ok (List.rev path :: unreachables, all)
+          ( (if reachable then acc
             else
-              unparse_ty ~loc:() ctxt ty >>? fun (unparsed_ty, _) ->
-              ok
-                ( unreachables,
-                  Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
+              match ty with
+              | Union_t _ -> acc
+              | _ -> (List.rev path :: unreachables, all)),
+            reachable )
+    | Some name ->
+        (if Entrypoint.Map.mem name all then
+         ok (List.rev path :: unreachables, all)
+        else
+          unparse_ty ~loc:() ctxt ty >|? fun (unparsed_ty, _) ->
+          ( unreachables,
+            Entrypoint.Map.add name (List.rev path, unparsed_ty) all ))
+        >|? fun unreachable_all -> (unreachable_all, true)
   in
   let rec fold_tree :
       type t.
       t ty ->
+      t entrypoints ->
       prim list ->
       bool ->
       prim list list
@@ -5434,35 +5514,25 @@ let list_entrypoints (type full) (full : full ty) ctxt ~root_name =
       (prim list list
       * (prim list * Script.unlocated_michelson_node) Entrypoint.Map.t)
       tzresult =
-   fun t path reachable acc ->
-    match t with
-    | Union_t ((tl, al), (tr, ar), _) ->
-        merge (D_Left :: path) al tl reachable acc >>? fun acc ->
-        merge (D_Right :: path) ar tr reachable acc >>? fun acc ->
-        fold_tree
-          tl
-          (D_Left :: path)
-          (match al with Some _ -> true | None -> reachable)
-          acc
-        >>? fun acc ->
-        fold_tree
-          tr
-          (D_Right :: path)
-          (match ar with Some _ -> true | None -> reachable)
-          acc
+   fun t entrypoints path reachable acc ->
+    match (t, entrypoints) with
+    | ( Union_t ((tl, _al), (tr, _ar), _),
+        {nested = Entrypoints_Union {left; right}; _} ) ->
+        merge (D_Left :: path) tl left reachable acc
+        >>? fun (acc, l_reachable) ->
+        merge (D_Right :: path) tr right reachable acc
+        >>? fun (acc, r_reachable) ->
+        fold_tree tl left (D_Left :: path) l_reachable acc >>? fun acc ->
+        fold_tree tr right (D_Right :: path) r_reachable acc
     | _ -> ok acc
   in
   unparse_ty ~loc:() ctxt full >>? fun (unparsed_full, _) ->
   let (init, reachable) =
-    match root_name with
+    match entrypoints.name with
     | None -> (Entrypoint.Map.empty, false)
-    | Some (Field_annot name) -> (
-        match Entrypoint.of_annot_lax_opt name with
-        | None -> (Entrypoint.Map.empty, false)
-        | Some name -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
-        )
+    | Some name -> (Entrypoint.Map.singleton name ([], unparsed_full), true)
   in
-  fold_tree full [] reachable ([], init)
+  fold_tree full entrypoints [] reachable ([], init)
   [@@coq_axiom_with_reason "unsupported syntax"]
 
 (* ---- Unparsing (Typed IR -> Untyped expressions) --------------------------*)
@@ -5723,16 +5793,16 @@ and[@coq_axiom_with_reason "gadt"] unparse_code ctxt ~stack_depth mode code =
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
    Refactor the sharing part of unparse_script and create_contract *)
 let unparse_script ctxt mode
-    {code; arg_type; storage; storage_type; root_name; views; _} =
+    {code; arg_type; storage; storage_type; entrypoints; views; _} =
   let (Lam (_, original_code)) = code in
   unparse_code ctxt ~stack_depth:0 mode original_code >>=? fun (code, ctxt) ->
   unparse_data ctxt ~stack_depth:0 mode storage_type storage
   >>=? fun (storage, ctxt) ->
   Lwt.return
     (let loc = Micheline.dummy_location in
-     unparse_ty ~loc ctxt arg_type >>? fun (arg_type, ctxt) ->
+     unparse_parameter_ty ~loc ctxt arg_type ~entrypoints
+     >>? fun (arg_type, ctxt) ->
      unparse_ty ~loc ctxt storage_type >>? fun (storage_type, ctxt) ->
-     let arg_type = add_field_annot root_name arg_type in
      let open Micheline in
      let view name {input_ty; output_ty; view_code} views =
        Prim
@@ -6257,11 +6327,14 @@ let parse_big_map_value_ty = parse_big_map_value_ty ~stack_depth:0
 
 let parse_packable_ty = parse_packable_ty ~stack_depth:0
 
-let parse_parameter_ty = parse_parameter_ty ~stack_depth:0
+let parse_passable_ty = parse_passable_ty ~stack_depth:0
 
 let parse_any_ty = parse_any_ty ~stack_depth:0
 
-let parse_ty = parse_ty ~stack_depth:0
+let parse_ty = parse_ty ~stack_depth:0 ~ret:Don't_parse_entrypoints
+
+let parse_parameter_ty_and_entrypoints =
+  parse_parameter_ty_and_entrypoints ~stack_depth:0
 
 let ty_eq ctxt = ty_eq ~legacy:true ctxt
 
@@ -6319,7 +6392,7 @@ let script_size
         arg_type = _;
         storage;
         storage_type;
-        root_name = _;
+        entrypoints = _;
         views = _;
       }) =
   let (nodes, storage_size) =

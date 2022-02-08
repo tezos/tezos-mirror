@@ -1908,7 +1908,7 @@ module RPC = struct
      fun ~legacy ctxt (data, exp_ty) ->
       record_trace
         (Script_tc_errors.Ill_formed_type (None, exp_ty, 0))
-        (Script_ir_translator.parse_parameter_ty
+        (Script_ir_translator.parse_passable_ty
            ctxt
            ~legacy
            (Micheline.root exp_ty))
@@ -1933,7 +1933,6 @@ module RPC = struct
       (* Same as the unparsing functions for types in Script_ir_translator but
          does not consume gas and never folds (pair a (pair b c)) *)
 
-      open Script_ir_translator
       open Micheline
       open Michelson_v1_primitives
       open Script_typed_ir
@@ -2002,12 +2001,10 @@ module RPC = struct
             let tl = unparse_ty ~loc utl in
             let tr = unparse_ty ~loc utr in
             return (T_pair, [tl; tr], annot)
-        | Union_t ((utl, l_field), (utr, r_field), _meta) ->
+        | Union_t ((utl, _l_field), (utr, _r_field), _meta) ->
             let annot = [] in
-            let utl = unparse_ty ~loc utl in
-            let tl = add_field_annot l_field utl in
-            let utr = unparse_ty ~loc utr in
-            let tr = add_field_annot r_field utr in
+            let tl = unparse_ty ~loc utl in
+            let tr = unparse_ty ~loc utr in
             return (T_or, [tl; tr], annot)
         | Lambda_t (uta, utr, _meta) ->
             let ta = unparse_ty ~loc uta in
@@ -2179,16 +2176,16 @@ module RPC = struct
         let ctxt = Gas.set_unlimited ctxt in
         let legacy = false in
         let open Script_ir_translator in
-        parse_toplevel ctxt ~legacy expr
-        >>=? fun ({arg_type; root_name; _}, ctxt) ->
+        parse_toplevel ctxt ~legacy expr >>=? fun ({arg_type; _}, ctxt) ->
         Lwt.return
-          ( parse_parameter_ty ctxt ~legacy arg_type
-          >>? fun (Ex_ty arg_type, _) ->
+          ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+          >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+            ->
             Gas_monad.run ctxt
             @@ Script_ir_translator.find_entrypoint
                  ~error_details:Informative
-                 ~root_name
                  arg_type
+                 entrypoints
                  entrypoint
             >>? fun (r, ctxt) ->
             r >>? fun (_f, Ex_ty ty) ->
@@ -2448,7 +2445,7 @@ module RPC = struct
                          arg_type;
                          storage_type;
                          views;
-                         root_name;
+                         entrypoints;
                          code_size;
                        },
                      ctxt ) ->
@@ -2466,7 +2463,7 @@ module RPC = struct
                 arg_type;
                 storage_type;
                 views;
-                root_name;
+                entrypoints;
                 code_size;
                 storage;
               }
@@ -2561,12 +2558,12 @@ module RPC = struct
           let ctxt = Gas.set_unlimited ctxt in
           let legacy = false in
           let open Script_ir_translator in
-          parse_toplevel ~legacy ctxt expr
-          >>=? fun ({arg_type; root_name; _}, ctxt) ->
+          parse_toplevel ~legacy ctxt expr >>=? fun ({arg_type; _}, ctxt) ->
           Lwt.return
-            ( parse_parameter_ty ctxt ~legacy arg_type
-            >>? fun (Ex_ty arg_type, _) ->
-              Script_ir_translator.list_entrypoints ~root_name arg_type ctxt
+            ( parse_parameter_ty_and_entrypoints ctxt ~legacy arg_type
+            >>? fun (Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, _)
+              ->
+              Script_ir_translator.list_entrypoints ctxt arg_type entrypoints
               >|? fun (unreachable_entrypoint, map) ->
               ( unreachable_entrypoint,
                 Entrypoint.Map.fold

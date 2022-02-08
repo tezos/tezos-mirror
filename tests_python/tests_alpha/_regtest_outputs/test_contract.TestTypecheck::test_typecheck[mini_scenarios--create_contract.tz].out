@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/create_contract.tz]
 
 Well typed
-Gas remaining: 1039968.907 units remaining
+Gas remaining: 1039968.837 units remaining
 { parameter (option address) ;
   storage unit ;
   code { /* [ pair string string ] */

@@ -112,7 +112,7 @@ New contract [CONTRACT_HASH] originated.
 Contract memorized as store_input.
 Injected block at minimal timestamp
 Node is bootstrapped.
-Estimated gas: 2049.248 units (will add 100 for safety)
+Estimated gas: 2049.283 units (will add 100 for safety)
 Estimated storage: 7 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -139,7 +139,7 @@ This sequence of operations was run:
       Updated storage: "abcdefg"
       Storage size: 48 bytes
       Paid storage size diff: 7 bytes
-      Consumed gas: 2049.248
+      Consumed gas: 2049.283
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.00175
         storage fees ........................... +ꜩ0.00175
@@ -150,7 +150,7 @@ Injected block at minimal timestamp
 200 ꜩ
 "abcdefg"
 Node is bootstrapped.
-Estimated gas: 1202.528 units (will add 100 for safety)
+Estimated gas: 1202.563 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -176,7 +176,7 @@ This sequence of operations was run:
       This transaction was successfully applied
       Updated storage: "xyz"
       Storage size: 44 bytes
-      Consumed gas: 1202.528
+      Consumed gas: 1202.563
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ100
         [CONTRACT_HASH] ... +ꜩ100

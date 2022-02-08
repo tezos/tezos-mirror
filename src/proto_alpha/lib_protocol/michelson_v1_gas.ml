@@ -952,7 +952,7 @@ module Cost_of = struct
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
        Benchmark.
        Currently approximated by 2 comparisons of the longest entrypoint. *)
-    let cost_FIND_ENTRYPOINT = S.mul (S.safe_int 2) (cost_N_ICompare 31 31)
+    let cost_FIND_ENTRYPOINT = cost_N_ICompare 31 31
 
     (* model SAPLING_TRANSACTION_ENCODING *)
     let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs =

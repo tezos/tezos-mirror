@@ -5,11 +5,10 @@ Gas remaining: 1039984.347 units remaining
 { parameter (or (pair %have_fun (big_map string nat) unit) (unit %default)) ;
   storage (big_map string nat) ;
   code { UNPAIR
-         /* [ or (pair %have_fun (big_map string nat) unit) (unit %default)
-            : big_map string nat ] */ ;
+         /* [ or (pair (big_map string nat) unit) unit : big_map string nat ] */ ;
          DIP { NIL operation /* [ list operation : big_map string nat ] */ }
-         /* [ or (pair %have_fun (big_map string nat) unit) (unit %default)
-            : list operation : big_map string nat ] */ ;
+         /* [ or (pair (big_map string nat) unit) unit : list operation
+            : big_map string nat ] */ ;
          IF_LEFT
            { DROP /* [ list operation : big_map string nat ] */ }
            { DROP

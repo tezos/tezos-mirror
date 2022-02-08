@@ -32,21 +32,12 @@ module FOR_TESTS : sig
   val unsafe_field_annot_of_string : string -> field_annot
 end
 
-(** Unparse annotations to their string representation *)
-
-val unparse_field_annot : field_annot option -> string list
-
 (** Converts a field annot option to an entrypoint.
     An error is returned if the field annot is too long or is "default".
     [None] is converted to [Some default].
 *)
 val field_annot_opt_to_entrypoint_strict :
   loc:Script.location -> field_annot option -> Entrypoint.t tzresult
-
-(** Checks whether a field annot option equals an entrypoint.
-    When the field annot option is [None], the result is always [false]. *)
-val field_annot_opt_eq_entrypoint_lax :
-  field_annot option -> Entrypoint.t -> bool
 
 (** Merge field annotations.
     @return an error {!Inconsistent_type_annotations} if they are both present
@@ -72,9 +63,8 @@ val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 (** Check a type annotation only. *)
 val check_type_annot : Script.location -> string list -> unit tzresult
 
-(** Parse a field annotation only. *)
-val parse_field_annot :
-  Script.location -> string list -> field_annot option tzresult
+(** Check a field annotation only. *)
+val is_field_annot : Script.location -> string -> bool tzresult
 
 (** Check an annotation for composed types, of the form
     [:ty_name %field1 %field2] in any order. *)
@@ -83,6 +73,10 @@ val check_composed_type_annot : Script.location -> string list -> unit tzresult
 (** Extract and remove a field annotation from a node *)
 val extract_field_annot :
   Script.node -> (Script.node * field_annot option) tzresult
+
+(** Extract and remove a field annotation as an entrypoint from a node *)
+val extract_entrypoint_annot :
+  Script.node -> (Script.node * Entrypoint.t option) tzresult
 
 (** Instruction annotations parsing *)
 

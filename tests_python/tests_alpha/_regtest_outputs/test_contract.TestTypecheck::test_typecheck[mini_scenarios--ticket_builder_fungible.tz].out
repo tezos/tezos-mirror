@@ -8,15 +8,14 @@ Gas remaining: 1039973.685 units remaining
   storage address ;
   code { AMOUNT
          /* [ mutez
-            : pair (or (ticket %burn unit) (pair %mint (contract (ticket unit)) nat)) address ] */ ;
+            : pair (or (ticket unit) (pair (contract (ticket unit)) nat)) address ] */ ;
          PUSH mutez
               0
          /* [ mutez : mutez
-            : pair (or (ticket %burn unit) (pair %mint (contract (ticket unit)) nat)) address ] */ ;
+            : pair (or (ticket unit) (pair (contract (ticket unit)) nat)) address ] */ ;
          ASSERT_CMPEQ ;
          UNPAIR
-         /* [ or (ticket %burn unit) (pair %mint (contract (ticket unit)) nat)
-            : address ] */ ;
+         /* [ or (ticket unit) (pair (contract (ticket unit)) nat) : address ] */ ;
          IF_LEFT
            { READ_TICKET
              /* [ pair address unit nat : ticket unit : address ] */ ;
