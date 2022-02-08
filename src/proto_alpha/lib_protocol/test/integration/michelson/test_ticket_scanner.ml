@@ -185,7 +185,7 @@ let tickets_from_big_map_ref ~pre_populated value_exp =
             @@ Script_ir_translator.hash_comparable_data
                  ctxt
                  Script_typed_ir.int_key
-                 (Script_int_repr.of_int key)
+                 (Script_int.of_int key)
           in
           return
             ( {

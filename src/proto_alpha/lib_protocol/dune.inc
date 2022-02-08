@@ -63,7 +63,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
-   script_int_repr.mli script_int_repr.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
@@ -148,6 +147,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
+   script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
@@ -250,7 +250,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
-   script_int_repr.mli script_int_repr.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
@@ -335,6 +334,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
+   script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
@@ -437,7 +437,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
-   script_int_repr.mli script_int_repr.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
@@ -522,6 +521,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
+   script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml
@@ -646,7 +646,6 @@ include Tezos_raw_protocol_alpha.Main
    Sampler
    Voting_period_repr
    Script_string_repr
-   Script_int_repr
    Ticket_hash_repr
    Michelson_v1_primitives
    Script_repr
@@ -731,6 +730,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_storage
    Sc_rollup_storage
    Alpha_context
+   Script_int
    Script_timestamp
    Carbonated_map_costs
    Carbonated_map
@@ -874,7 +874,6 @@ include Tezos_raw_protocol_alpha.Main
    sampler.mli sampler.ml
    voting_period_repr.mli voting_period_repr.ml
    script_string_repr.mli script_string_repr.ml
-   script_int_repr.mli script_int_repr.ml
    ticket_hash_repr.mli ticket_hash_repr.ml
    michelson_v1_primitives.mli michelson_v1_primitives.ml
    script_repr.mli script_repr.ml
@@ -959,6 +958,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_storage.mli tx_rollup_storage.ml
    sc_rollup_storage.mli sc_rollup_storage.ml
    alpha_context.mli alpha_context.ml
+   script_int.mli script_int.ml
    script_timestamp.mli script_timestamp.ml
    carbonated_map_costs.mli carbonated_map_costs.ml
    carbonated_map.mli carbonated_map.ml

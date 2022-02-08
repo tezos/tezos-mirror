@@ -43,9 +43,9 @@ val parameters_encoding : parameters Data_encoding.t
 
 (** A module of type [S] packs samplers used to construct basic Michelson values. *)
 module type S = sig
-  val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
+  val int : Script_int.z Script_int.num sampler
 
-  val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
+  val nat : Script_int.n Script_int.num sampler
 
   val signature : Tezos_crypto.Signature.t sampler
 

@@ -58,7 +58,7 @@ val to_int : t -> int
 
 val of_int : int -> t
 
-val integer : 'a Alpha_context.Script_int.num -> t
+val integer : 'a Script_int.num -> t
 
 val string : string -> t
 

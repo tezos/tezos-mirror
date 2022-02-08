@@ -86,8 +86,7 @@ let find ctxt addr =
       return (ctxt, identifier, script, Ex_script ir)
 
 let value_as_int :
-    type a ac.
-    (a, ac) Script_typed_ir.ty -> a -> Script_int_repr.z Script_int_repr.num =
+    type a ac. (a, ac) Script_typed_ir.ty -> a -> Script_int.z Script_int.num =
  fun ty v -> match ty with Int_t -> v | _ -> Stdlib.failwith "value_as_int"
 
 let add_some_contracts k src block baker =

@@ -68,8 +68,7 @@ let of_int x = x
 
 let unit : t = 1
 
-let integer (i : 'a Alpha_context.Script_int.num) : t =
-  Z.numbits (Alpha_context.Script_int.to_zint i) / 8
+let integer (i : 'a Script_int.num) : t = Z.numbits (Script_int.to_zint i) / 8
 
 let string = String.length
 

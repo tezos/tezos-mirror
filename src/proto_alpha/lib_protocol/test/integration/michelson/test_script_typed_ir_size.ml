@@ -76,7 +76,7 @@ let boxed_map_bindings s = Script_map.fold (fun k v s -> (k, v) :: s) s []
 
 let big_map_bindings (Big_map s) = Big_map_overlay.bindings s.diff.map
 
-let show_script_int fmt x = Z.pp_print fmt (Script_int_repr.to_zint x)
+let show_script_int fmt x = Z.pp_print fmt (Script_int.to_zint x)
 
 let show_bool fmt b = Format.fprintf fmt "%B" b
 
@@ -189,23 +189,23 @@ let check_value_size () =
     *)
     @ (let error = 8 in
        [
-         ex ~error "0 : int" Int_t Script_int_repr.zero;
-         ex ~error "2^63 : int" Int_t (Script_int_repr.of_int max_int);
+         ex ~error "0 : int" Int_t Script_int.zero;
+         ex ~error "2^63 : int" Int_t (Script_int.of_int max_int);
          ex
            ~error
            "37^73 : int"
            Int_t
-           (Script_int_repr.of_zint Z.(pow (of_int 37) 73));
+           (Script_int.of_zint Z.(pow (of_int 37) 73));
          ex
            ~error
            "-37^73 : int"
            Int_t
-           (Script_int_repr.of_zint Z.(neg (pow (of_int 37) 73)));
+           (Script_int.of_zint Z.(neg (pow (of_int 37) 73)));
          ex
            ~error
            "13270006022583112970 : int"
            Int_t
-           (get @@ Script_int_repr.of_string "13270006022583112970");
+           (get @@ Script_int.of_string "13270006022583112970");
        ]
        @ exs ~error nsample show_script_int Int_t ": int")
     (*
@@ -214,17 +214,17 @@ let check_value_size () =
     *)
     @ (let error = 8 in
        [
-         ex ~error "0 : nat" Nat_t Script_int_repr.zero_n;
+         ex ~error "0 : nat" Nat_t Script_int.zero_n;
          ex
            ~error
            "2^63 : nat"
            Nat_t
-           (get Script_int_repr.(is_nat @@ of_int max_int));
+           (get Script_int.(is_nat @@ of_int max_int));
          ex
            ~error
            "37^73 : int"
            Nat_t
-           (get Script_int_repr.(is_nat @@ of_zint Z.(pow (of_int 37) 73)));
+           (get Script_int.(is_nat @@ of_zint Z.(pow (of_int 37) 73)));
        ]
        @ exs ~error nsample show_script_int Nat_t ": nat")
     (*
@@ -303,7 +303,7 @@ let check_value_size () =
         let (Ty_ex_c ty) = is_ok @@ pair_t dummy_loc ty1 ty2 in
         f.apply ty
       in
-      let open Script_int_repr in
+      let open Script_int in
       [
         (* "int * int" *)
         on_pair
@@ -361,7 +361,7 @@ let check_value_size () =
         let (Ty_ex_c ty) = is_ok @@ union_t dummy_loc ty1 ty2 in
         f.apply ty
       in
-      let open Script_int_repr in
+      let open Script_int in
       [
         (* "int + int" *)
         on_union
@@ -457,7 +457,7 @@ let check_value_size () =
       let on_option : type a. (a, _) ty -> a P.f -> ex =
        fun ty f -> f.apply @@ is_ok @@ option_t dummy_loc ty
       in
-      let open Script_int_repr in
+      let open Script_int in
       [
         (* "option int" *)
         on_option int_t {apply = (fun ty -> ex "None : option int" ty None)};

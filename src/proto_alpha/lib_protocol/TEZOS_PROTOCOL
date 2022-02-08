@@ -38,7 +38,6 @@
         "Sampler",
         "Voting_period_repr",
         "Script_string_repr",
-        "Script_int_repr",
         "Ticket_hash_repr",
         "Michelson_v1_primitives",
         "Script_repr",
@@ -131,6 +130,7 @@
         "Sc_rollup_storage",
 
         "Alpha_context",
+        "Script_int",
         "Script_timestamp",
         "Carbonated_map_costs",
         "Carbonated_map",

@@ -479,8 +479,6 @@ module Entrypoint : module type of Entrypoint_repr
 
 module Script_string : module type of Script_string_repr
 
-module Script_int : module type of Script_int_repr
-
 module Script : sig
   type prim = Michelson_v1_primitives.prim =
     | K_parameter

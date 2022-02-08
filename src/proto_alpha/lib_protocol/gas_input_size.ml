@@ -29,11 +29,11 @@ let list (list : 'a Script_typed_ir.boxed_list) : t =
   list.Script_typed_ir.length
 
 let set (set : 'a Script_typed_ir.set) : t =
-  let res = Alpha_context.Script_int.to_int (Script_set.size set) in
+  let res = Script_int.to_int (Script_set.size set) in
   match res with None -> assert false | Some x -> x
 
 let map (map : ('a, 'b) Script_typed_ir.map) : t =
-  let res = Alpha_context.Script_int.to_int (Script_map.size map) in
+  let res = Script_int.to_int (Script_map.size map) in
   match res with None -> assert false | Some x -> x
 
 (* ------------------------------------------------------------------------- *)
@@ -55,7 +55,7 @@ let node leaves =
 let rec of_micheline (x : ('a, 'b) Micheline.node) =
   match x with
   | Micheline.Int (_loc, z) ->
-      let int_bytes = integer (Alpha_context.Script_int.of_zint z) in
+      let int_bytes = integer (Script_int.of_zint z) in
       {traversal = 1; int_bytes; string_bytes = 0}
   | Micheline.String (_loc, s) ->
       let string_bytes = String.length s in

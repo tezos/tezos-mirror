@@ -549,7 +549,7 @@ let continuation_benchmark ?amplification ?intercept ?salt ?more_tags ~name
 (* Sampling helpers *)
 
 let nat_of_positive_int (i : int) =
-  let open Alpha_context.Script_int in
+  let open Script_int in
   match is_nat (of_int i) with None -> assert false | Some x -> x
 
 let adversarial_ints rng_state (cfg : Default_config.config) n =
@@ -559,7 +559,7 @@ let adversarial_ints rng_state (cfg : Default_config.config) n =
       ~card:n
       rng_state
   in
-  List.map Script_int_repr.of_zint ls
+  List.map Script_int.of_zint ls
 
 (* ------------------------------------------------------------------------- *)
 (* Error helpers *)
@@ -1152,8 +1152,7 @@ module Registration_section = struct
           (ISet_mem
              ( kinfo (int @$ set int_cmp @$ unit @$ bot),
                halt (bool @$ unit @$ bot) ))
-        ~intercept_stack:
-          (Alpha_context.Script_int.zero, (Script_set.empty int_cmp, ((), eos)))
+        ~intercept_stack:(Script_int.zero, (Script_set.empty int_cmp, ((), eos)))
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 1) ;
           let n =
@@ -1183,8 +1182,7 @@ module Registration_section = struct
              ( kinfo (int @$ bool @$ set int_cmp @$ bot),
                halt (set int_cmp @$ bot) ))
         ~intercept_stack:
-          ( Alpha_context.Script_int.zero,
-            (false, (Script_set.empty int_cmp, eos)) )
+          (Script_int.zero, (false, (Script_set.empty int_cmp, eos)))
         ~stack_sampler:(fun cfg rng_state () ->
           assert (cfg.sampler.set_size.min >= 2) ;
           let n =
@@ -1314,7 +1312,7 @@ module Registration_section = struct
                halt (bool @$ unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_map.empty int_cmp in
-           (Alpha_context.Script_int.zero, (map, ((), eos))))
+           (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1334,7 +1332,7 @@ module Registration_section = struct
                halt (option unit @$ unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_map.empty int_cmp in
-           (Alpha_context.Script_int.zero, (map, ((), eos))))
+           (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1354,7 +1352,7 @@ module Registration_section = struct
                halt (map int_cmp unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_map.empty int_cmp in
-           (Alpha_context.Script_int.zero, (None, (map, eos))))
+           (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
           (key, (Some (), (map, eos))))
@@ -1375,7 +1373,7 @@ module Registration_section = struct
                halt (option unit @$ map int_cmp unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_map.empty int_cmp in
-           (Alpha_context.Script_int.zero, (None, (map, eos))))
+           (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_map_and_key_in_map cfg rng_state in
           (key, (Some (), (map, eos))))
@@ -1476,7 +1474,7 @@ module Registration_section = struct
                halt (option unit @$ unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_ir_translator.empty_big_map int_cmp unit in
-           (Alpha_context.Script_int.zero, (map, ((), eos))))
+           (Script_int.zero, (map, ((), eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
           (key, (map, ((), eos))))
@@ -1496,7 +1494,7 @@ module Registration_section = struct
                halt (big_map int_cmp unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_ir_translator.empty_big_map int_cmp unit in
-           (Alpha_context.Script_int.zero, (None, (map, eos))))
+           (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
           (key, (Some (), (map, eos))))
@@ -1517,7 +1515,7 @@ module Registration_section = struct
                halt (option unit @$ big_map int_cmp unit @$ bot) ))
         ~intercept_stack:
           (let map = Script_ir_translator.empty_big_map int_cmp unit in
-           (Alpha_context.Script_int.zero, (None, (map, eos))))
+           (Script_int.zero, (None, (map, eos))))
         ~stack_sampler:(fun cfg rng_state () ->
           let (key, map) = generate_big_map_and_key_in_map cfg rng_state in
           (key, (Some (), (map, eos))))
@@ -1551,7 +1549,7 @@ module Registration_section = struct
           (ISlice_string
              (kinfo (nat @$ nat @$ string @$ bot), halt (option string @$ bot)))
         ~intercept_stack:
-          (let z = Alpha_context.Script_int.zero_n in
+          (let z = Script_int.zero_n in
            (z, (z, (empty, eos))))
         ~stack_sampler:(fun cfg rng_state ->
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
@@ -1597,7 +1595,7 @@ module Registration_section = struct
           (ISlice_bytes
              (kinfo (nat @$ nat @$ bytes @$ bot), halt (option bytes @$ bot)))
         ~intercept_stack:
-          (let z = Alpha_context.Script_int.zero_n in
+          (let z = Script_int.zero_n in
            (z, (z, (Bytes.empty, eos))))
         ~stack_sampler:(fun cfg rng_state ->
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
@@ -1620,7 +1618,7 @@ module Registration_section = struct
   module Timestamps = struct
     let zero_timestamp = Script_timestamp.of_zint Z.zero
 
-    let zero_int = Alpha_context.Script_int.zero
+    let zero_int = Script_int.zero
 
     let () =
       simple_benchmark
@@ -1709,7 +1707,7 @@ module Registration_section = struct
       let mutez_int64 = Alpha_context.Tez.to_mutez mutez in
       let int64 = Int64.(div max_int (mul mutez_int64 2L)) in
       let nat =
-        match Alpha_context.Script_int.(is_nat (of_int64 int64)) with
+        match Script_int.(is_nat (of_int64 int64)) with
         | None -> assert false
         | Some nat -> nat
       in
@@ -1740,8 +1738,7 @@ module Registration_section = struct
     let () =
       simple_benchmark_with_stack_sampler
         ~name:Interpreter_workload.N_IEdiv_teznat
-        ~intercept_stack:
-          (Alpha_context.Tez.zero, (Alpha_context.Script_int.zero_n, eos))
+        ~intercept_stack:(Alpha_context.Tez.zero, (Script_int.zero_n, eos))
         ~kinstr:
           (IEdiv_teznat
              ( kinfo (mutez @$ nat @$ bot),
@@ -1791,9 +1788,9 @@ module Registration_section = struct
   end
 
   module Integers = struct
-    let zero = Alpha_context.Script_int.zero
+    let zero = Script_int.zero
 
-    let zero_n = Alpha_context.Script_int.zero_n
+    let zero_n = Script_int.zero_n
 
     let () =
       simple_benchmark
@@ -1818,7 +1815,7 @@ module Registration_section = struct
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
           fun () ->
             let x = Samplers.Michelson_base.nat rng_state in
-            let neg_x = Alpha_context.Script_int.neg x in
+            let neg_x = Script_int.neg x in
             (neg_x, eos))
         ()
 
@@ -1893,7 +1890,7 @@ module Registration_section = struct
             let x = Samplers.Michelson_base.nat rng_state in
             (* shift must be in [0;256]: 1 byte max *)
             let shift =
-              Script_int_repr.(abs (of_int (Random.State.int rng_state 256)))
+              Script_int.(abs (of_int (Random.State.int rng_state 256)))
             in
             (x, (shift, eos)))
         ()
@@ -1909,7 +1906,7 @@ module Registration_section = struct
             let x = Samplers.Michelson_base.nat rng_state in
             (* shift must be in [0;256]: 1 byte max *)
             let shift =
-              Script_int_repr.(abs (of_int (Random.State.int rng_state 256)))
+              Script_int.(abs (of_int (Random.State.int rng_state 256)))
             in
             (x, (shift, eos)))
         ()
@@ -2589,7 +2586,7 @@ module Registration_section = struct
         ~stack_sampler:(fun cfg rng_state ->
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
           let fr_sampler = Samplers.Random_value.value bls12_381_fr in
-          let zero = Alpha_context.Script_int.zero in
+          let zero = Script_int.zero in
           fun () -> (fr_sampler rng_state, (zero, eos)))
         ()
 
@@ -2611,7 +2608,7 @@ module Registration_section = struct
         ~stack_sampler:(fun cfg rng_state ->
           let (_, (module Samplers)) = make_default_samplers cfg.sampler in
           let fr_sampler = Samplers.Random_value.value bls12_381_fr in
-          let zero = Alpha_context.Script_int.zero in
+          let zero = Script_int.zero in
           fun () -> (zero, (fr_sampler rng_state, eos)))
         ()
 
@@ -2684,7 +2681,7 @@ module Registration_section = struct
           halt (option pair_ticket_unit_ticket_unit @$ bot) )
 
     let () =
-      let zero = Alpha_context.Script_int.zero_n in
+      let zero = Script_int.zero_n in
       let ticket =
         {
           ticketer =
@@ -2710,9 +2707,7 @@ module Registration_section = struct
           in
           fun () ->
             let half_amount = Samplers.Random_value.value nat rng_state in
-            let amount =
-              Alpha_context.Script_int.add_n half_amount half_amount
-            in
+            let amount = Script_int.add_n half_amount half_amount in
             let ticket =
               Samplers.Random_value.value (ticket unit_cmp) rng_state
             in
@@ -2748,7 +2743,7 @@ module Registration_section = struct
               {
                 ticket with
                 contents = Alpha_context.Script_string.empty;
-                amount = Script_int_repr.zero_n;
+                amount = Script_int.zero_n;
               }
             in
             Ex_stack_and_kinstr
@@ -2787,7 +2782,7 @@ module Registration_section = struct
       let chest_key = Script_timelock.make_chest_key chest_key in
       ( chest_key,
         ( chest,
-          ( Script_int_repr.is_nat (Script_int_repr.of_int time)
+          ( Script_int.is_nat (Script_int.of_int time)
             |> WithExceptions.Option.get ~loc:"Timelock:gas benchmarks",
             eos ) ) )
 
@@ -3094,7 +3089,7 @@ module Registration_section = struct
           Ex_stack_and_cont
             {
               stack = ((), eos);
-              cont = map_enter_body_code [(Script_int_repr.zero, ())];
+              cont = map_enter_body_code [(Script_int.zero, ())];
             })
         ()
 

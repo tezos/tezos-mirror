@@ -718,7 +718,7 @@ struct
         Context_blind
           (fun () ->
             Mikhailsky.Data.big_integer
-              (Protocol.Script_int_repr.to_zint (Michelson_base.int rng_state)))
+              (Protocol.Script_int.to_zint (Michelson_base.int rng_state)))
       in
       {type_constraint; replacement = [replacement]}
     in

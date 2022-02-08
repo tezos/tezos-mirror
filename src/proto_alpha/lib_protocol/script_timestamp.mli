@@ -27,7 +27,7 @@
 (** Defines the internal Michelson representation for timestamps and basic
     operations that can be performed on it. *)
 
-open Alpha_context.Script_int
+open Script_int
 
 type repr
 

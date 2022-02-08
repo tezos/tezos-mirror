@@ -49,9 +49,9 @@ let parameters_encoding =
 
 (** A module of type [S] packs samplers used to construct basic Michelson values. *)
 module type S = sig
-  val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
+  val int : Script_int.z Script_int.num sampler
 
-  val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
+  val nat : Script_int.n Script_int.num sampler
 
   val signature : Tezos_crypto.Signature.t sampler
 
@@ -71,11 +71,11 @@ module Make (P : sig
 end) : S = struct
   let int rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
-    Alpha_context.Script_int.of_zint i
+    Script_int.of_zint i
 
   let nat rng_state =
     let i = Base_samplers.nat ~size:P.parameters.int_size rng_state in
-    Alpha_context.Script_int.abs (Alpha_context.Script_int.of_zint i)
+    Script_int.abs (Script_int.of_zint i)
 
   let signature rng_state =
     let i = Random.State.int rng_state 4 in
