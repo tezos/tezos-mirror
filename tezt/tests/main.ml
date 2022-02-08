@@ -111,6 +111,7 @@ let () =
   Sc_rollup.register ~protocols:[Alpha] ;
   Views.register ~protocols:[Alpha] () ;
   Runtime_script_failure.register ~protocols ;
+  Deposits_limit.register ~protocols:[Ithaca; Alpha] ;
   (* Relies on a feature only available since J. *)
   Run_script.register ~protocols:[Alpha] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
