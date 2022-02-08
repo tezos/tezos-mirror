@@ -189,6 +189,7 @@ in the :ref:`introduction <howtoget>`.
    developer/data_encoding
    developer/gadt
    developer/error_monad
+   developer/clic
    developer/michelson_anti_patterns
    developer/michelson_instructions
    developer/entering_alpha

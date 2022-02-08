@@ -763,6 +763,15 @@ let _tezos_clic_tests =
     ~opam:"src/lib_clic/tezos-clic"
     ~deps:[tezos_stdlib |> open_; tezos_clic |> open_; alcotest_lwt]
 
+let _tezos_clic_example =
+  private_exe
+    "clic_example"
+    ~path:"src/lib_clic/examples"
+    ~opam:""
+    ~deps:[tezos_clic; lwt_unix]
+    ~bisect_ppx:false
+    ~static:false
+
 let tezos_micheline =
   public_lib
     "tezos-micheline"
