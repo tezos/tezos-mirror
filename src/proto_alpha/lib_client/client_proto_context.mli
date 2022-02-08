@@ -200,6 +200,36 @@ val build_transaction_operation :
   Destination.t ->
   Kind.transaction Annotated_manager_operation.t
 
+(** Same as {!transfer}, but takes parameters as {!Script.lazy_expr} instead of
+    a raw string. This can be useful for commands that elaborate Micheline parameters,
+    such as Multisigs or FA1.2 operations. *)
+val transfer_with_script :
+  #Protocol_client_context.full ->
+  chain:Shell_services.chain ->
+  block:Shell_services.block ->
+  ?confirmations:int ->
+  ?dry_run:bool ->
+  ?verbose_signing:bool ->
+  ?simulation:bool ->
+  ?force:bool ->
+  ?branch:int ->
+  source:public_key_hash ->
+  src_pk:public_key ->
+  src_sk:Client_keys.sk_uri ->
+  destination:Destination.t ->
+  ?entrypoint:Entrypoint.t ->
+  parameters:Script.lazy_expr ->
+  amount:Tez.t ->
+  ?fee:Tez.t ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  ?counter:Z.t ->
+  fee_parameter:Injection.fee_parameter ->
+  ?replace_by_fees:bool ->
+  unit ->
+  (Kind.transaction Kind.manager Injection.result * Contract.t list) tzresult
+  Lwt.t
+
 val transfer :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->

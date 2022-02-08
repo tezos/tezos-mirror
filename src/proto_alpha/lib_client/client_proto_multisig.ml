@@ -883,10 +883,9 @@ let multisig_create_param ~counter ~generic ~action ~optional_signatures () :
   return @@ strip_locations
   @@ pair ~loc (pair ~loc (int ~loc counter) expr) (Seq (loc, l))
 
-let multisig_param_string ~counter ~action ~optional_signatures ~generic () =
+let multisig_param ~counter ~action ~optional_signatures ~generic () =
   multisig_create_param ~counter ~action ~optional_signatures ~generic ()
-  >>=? fun expr ->
-  return @@ Format.asprintf "%a" Michelson_v1_printer.print_expr expr
+  >>=? fun expr -> return @@ Script.lazy_expr expr
 
 let get_contract_address_maybe_chain_id ~descr ~loc ~chain_id contract =
   let address =
@@ -1078,14 +1077,14 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
            } ->
   check_multisig_signatures ~bytes ~threshold ~keys signatures
   >>=? fun optional_signatures ->
-  multisig_param_string
+  multisig_param
     ~counter:stored_counter
     ~action
     ~optional_signatures
     ~generic
     ()
-  >>=? fun arg ->
-  Client_proto_context.transfer
+  >>=? fun parameters ->
+  Client_proto_context.transfer_with_script
     cctxt
     ~chain
     ~block
@@ -1097,7 +1096,7 @@ let call_multisig (cctxt : #Protocol_client_context.full) ~chain ~block
     ~src_sk
     ~destination:(Contract multisig_contract)
     ?entrypoint
-    ~arg
+    ~parameters
     ~amount
     ?fee
     ?gas_limit
