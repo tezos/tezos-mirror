@@ -1852,6 +1852,121 @@ module Revamped = struct
         Mempool.classified_typ
         ~error_msg:"mempool expected to be %L, got %R") ;
     unit
+
+  let test_prefiltered_limit_remove =
+    Protocol.register_test
+      ~__FILE__
+      ~title:"Test prefiltered limits of mempool after a remove/replace"
+      ~tags:["mempool"; "gc"; "limit"; "replace"; "remove"]
+    @@ fun protocol ->
+    log_step 0 "Connect and initialise two nodes." ;
+    (* We configure the filter with a limit of 1 *)
+    let max_prechecked_manager_operations = 1 in
+    (* Control fees and gas limits to easily influence weight (i.e. ratio) *)
+    let fee = 1000 in
+    let gas_limit = 1500 in
+    let* node1 =
+      Node.init
+        ~event_sections_levels:[("prevalidator", `Debug)]
+        [Synchronisation_threshold 0; Private_mode]
+    and* node2 = Node.init [Synchronisation_threshold 0; Private_mode] in
+    let* client1 = Client.init ~endpoint:(Node node1) ()
+    and* client2 = Client.init ~endpoint:(Node node2) () in
+    let* () = Client.Admin.trust_address client1 ~peer:node2
+    and* () = Client.Admin.trust_address client2 ~peer:node1 in
+    let* () = Client.Admin.connect_address client1 ~peer:node2 in
+    let* () = Client.activate_protocol ~protocol client1 in
+    let* _ = Node.wait_for_level node1 1 and* _ = Node.wait_for_level node2 1 in
+
+    log_step
+      1
+      "Update the nodes filter to allow only %d prechecked manager operations."
+      max_prechecked_manager_operations ;
+    let* _ =
+      set_filter
+        ~log:true
+        (sf
+           {|{ "max_prechecked_manager_operations" : %d }|}
+           max_prechecked_manager_operations)
+        client1
+    and* _ =
+      set_filter
+        ~log:true
+        (sf
+           {|{ "max_prechecked_manager_operations" : %d }|}
+           max_prechecked_manager_operations)
+        client2
+    in
+
+    log_step 2 "Inject an operation" ;
+    let* (`OpHash oph1) =
+      Operation.inject_transfer
+        ~force:true
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        ~wait_for_injection:node1
+        ~amount:1
+        ~fee
+        ~gas_limit
+        client1
+    in
+    let* () = check_mempool ~applied:[oph1] client1 in
+
+    log_step 3 "Inject an operation with more fees, with different source" ;
+    let* (`OpHash oph2) =
+      Operation.inject_transfer
+        ~force:true
+        ~source:Constant.bootstrap3
+        ~dest:Constant.bootstrap2
+        ~wait_for_injection:node1
+        ~amount:1
+        ~fee:(fee + 1)
+        ~gas_limit
+        client1
+    in
+    let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph1] client1 in
+
+    log_step
+      4
+      "Inject an operation with more fees, with same source as the first one \
+       (removed)" ;
+    let* (`OpHash oph3) =
+      Operation.inject_transfer
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        ~wait_for_injection:node1
+        ~amount:1
+        ~fee:(fee + 2)
+        ~gas_limit
+        client1
+    in
+    let* () =
+      check_mempool ~applied:[oph3] ~branch_delayed:[oph1; oph2] client1
+    in
+
+    log_step
+      5
+      "Inject an operation with more than 5%% more fees, to replace previous \
+       one" ;
+    let* (`OpHash oph4) =
+      Operation.inject_transfer
+        ~source:Constant.bootstrap1
+        ~dest:Constant.bootstrap2
+        ~wait_for_injection:node1
+        ~amount:1
+        ~fee:(fee * 2)
+        ~gas_limit
+        client1
+    in
+    let* () =
+      check_mempool
+        ~applied:[oph4]
+        ~branch_delayed:[oph1; oph2]
+        ~outdated:[oph3]
+        client1
+    in
+
+    unit
 end
 
 let check_operation_is_in_applied_mempool ops oph =
@@ -4023,6 +4138,7 @@ let register ~protocols =
   Revamped.unban_operation_and_reinject ~protocols ;
   Revamped.unban_all_operations ~protocols ;
   Revamped.test_prefiltered_limit ~protocols ;
+  Revamped.test_prefiltered_limit_remove ~protocols ;
   run_batched_operation ~protocols ;
   propagation_future_endorsement ~protocols ;
   forge_pre_filtered_operation ~protocols ;
