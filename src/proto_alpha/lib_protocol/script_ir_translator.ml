@@ -1802,48 +1802,53 @@ type 'before dup_n_proof_argument =
 
 let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty) ~root_name
-    entrypoint : ((Script.node -> Script.node) * ex_ty, error_trace) result =
+    entrypoint : ((Script.node -> Script.node) * ex_ty, error_trace) Gas_monad.t
+    =
+  let open Gas_monad in
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t.
-      t ty -> Entrypoint.t -> ((Script.node -> Script.node) * ex_ty) option =
+      t ty ->
+      Entrypoint.t ->
+      ((Script.node -> Script.node) * ex_ty, unit) Gas_monad.t =
    fun t entrypoint ->
     match t with
     | Union_t ((tl, al), (tr, ar), _) -> (
+        consume_gas Typecheck_costs.find_entrypoint_cycle >>$ fun () ->
         if field_annot_opt_eq_entrypoint_lax al entrypoint then
-          Some ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
+          return ((fun e -> Prim (loc, D_Left, [e], [])), Ex_ty tl)
         else if field_annot_opt_eq_entrypoint_lax ar entrypoint then
-          Some ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
+          return ((fun e -> Prim (loc, D_Right, [e], [])), Ex_ty tr)
         else
-          match find_entrypoint tl entrypoint with
-          | Some (f, t) -> Some ((fun e -> Prim (loc, D_Left, [f e], [])), t)
-          | None -> (
-              match find_entrypoint tr entrypoint with
-              | Some (f, t) ->
-                  Some ((fun e -> Prim (loc, D_Right, [f e], [])), t)
-              | None -> None))
-    | _ -> None
+          find_entrypoint tl entrypoint >??$ function
+          | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
+          | Error () ->
+              find_entrypoint tr entrypoint >|$ fun (f, t) ->
+              ((fun e -> Prim (loc, D_Right, [f e], [])), t))
+    | _ -> of_result (Error ())
   in
+  (* This comparison should be taken into account by the caller. *)
   if field_annot_opt_eq_entrypoint_lax root_name entrypoint then
-    ok ((fun e -> e), Ex_ty full)
+    return ((fun e -> e), Ex_ty full)
   else
-    match find_entrypoint full entrypoint with
-    | Some result -> ok result
-    | None ->
-        if Entrypoint.is_default entrypoint then ok ((fun e -> e), Ex_ty full)
+    find_entrypoint full entrypoint >??$ function
+    | Ok result -> return result
+    | Error () ->
+        if Entrypoint.is_default entrypoint then
+          return ((fun e -> e), Ex_ty full)
         else
-          Error
-            (match error_details with
-            | Fast -> (Inconsistent_types_fast : error_trace)
-            | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
+          of_result
+          @@ Error
+               (match error_details with
+               | Fast -> (Inconsistent_types_fast : error_trace)
+               | Informative -> trace_of_error @@ No_such_entrypoint entrypoint)
 
 let find_entrypoint_for_type (type full exp error_trace) ~legacy ~error_details
     ~(full : full ty) ~(expected : exp ty) ~root_name entrypoint loc :
     (Entrypoint.t * exp ty, error_trace) Gas_monad.t =
   let open Gas_monad in
-  match find_entrypoint ~error_details full ~root_name entrypoint with
-  | Error _ as err -> of_result err
-  | Ok (_, Ex_ty ty) -> (
+  find_entrypoint ~error_details full ~root_name entrypoint >>$ function
+  | (_, Ex_ty ty) -> (
       match root_name with
       | Some (Field_annot fa)
         when Compare.String.((fa :> string) = "root")
@@ -4575,12 +4580,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
               error
                 (Forbidden_instr_in_context (loc, Script_tc_errors.View, prim))
           | Toplevel {param_type; root_name; storage_type = _} ->
-              find_entrypoint
-                ~error_details:Informative
-                param_type
-                ~root_name
-                entrypoint
-              >>? fun (_, Ex_ty param_type) ->
+              Gas_monad.run ctxt
+              @@ find_entrypoint
+                   ~error_details:Informative
+                   param_type
+                   ~root_name
+                   entrypoint
+              >>? fun (r, ctxt) ->
+              r >>? fun (_, Ex_ty param_type) ->
               contract_t loc param_type >>? fun res_ty ->
               let instr =
                 {

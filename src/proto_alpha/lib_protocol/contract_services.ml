@@ -367,18 +367,20 @@ let[@coq_axiom_with_reason "gadt"] register () =
           parse_toplevel ctxt ~legacy expr
           >>=? fun ({arg_type; root_name; _}, ctxt) ->
           Lwt.return
-            (( parse_parameter_ty ctxt ~legacy arg_type
-             >>? fun (Ex_ty arg_type, _) ->
-               Script_ir_translator.find_entrypoint
-                 ~error_details:Informative
-                 ~root_name
-                 arg_type
-                 entrypoint )
-             |> function
-             | Ok (_f, Ex_ty ty) ->
-                 unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
-                 Some (Micheline.strip_locations ty_node)
-             | Error _ -> Result.return_none)) ;
+            ( parse_parameter_ty ctxt ~legacy arg_type
+            >>? fun (Ex_ty arg_type, _) ->
+              Gas_monad.run ctxt
+              @@ Script_ir_translator.find_entrypoint
+                   ~error_details:Informative
+                   ~root_name
+                   arg_type
+                   entrypoint
+              >>? fun (r, ctxt) ->
+              r |> function
+              | Ok (_f, Ex_ty ty) ->
+                  unparse_ty ~loc:() ctxt ty >|? fun (ty_node, _) ->
+                  Some (Micheline.strip_locations ty_node)
+              | Error _ -> Result.return_none )) ;
   opt_register1 ~chunked:true S.list_entrypoints (fun ctxt v () () ->
       Contract.get_script_code ctxt v >>=? fun (_, expr) ->
       match expr with

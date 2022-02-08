@@ -409,7 +409,7 @@ val find_entrypoint :
   't Script_typed_ir.ty ->
   root_name:Script_ir_annot.field_annot option ->
   Entrypoint.t ->
-  ((Script.node -> Script.node) * ex_ty, 'error_trace) result
+  ((Script.node -> Script.node) * ex_ty, 'error_trace) Gas_monad.t
 
 val list_entrypoints :
   't Script_typed_ir.ty ->

@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestAddApproveTransferRemove::test_remove_liquidity
 
 Node is bootstrapped.
-Estimated gas: 10533.836 units (will add 100 for safety)
+Estimated gas: 10535.516 units (will add 100 for safety)
 Estimated storage: 67 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -14,7 +14,7 @@ This sequence of operations was run:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.001416
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 10634
+    Gas limit: 10636
     Storage limit: 87 bytes
     Balance updates:
       [CONTRACT_HASH] ... -ꜩ0.001416
@@ -33,7 +33,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
-      Consumed gas: 2913.981
+      Consumed gas: 2914.961
     Internal operations:
       Transaction:
         Amount: ꜩ0
@@ -47,7 +47,7 @@ This sequence of operations was run:
         Updated big_maps:
           Unset map(2)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c]
         Storage size: 2048 bytes
-        Consumed gas: 2522.649
+        Consumed gas: 2522.999
       Transaction:
         Amount: ꜩ0
         From: [CONTRACT_HASH]
@@ -63,7 +63,7 @@ This sequence of operations was run:
           Set map(0)[0x0000e7670f32038107a59a2b9cfefae36ea21f5aa63c] to 10
         Storage size: 2330 bytes
         Paid storage size diff: 67 bytes
-        Consumed gas: 3677.206
+        Consumed gas: 3677.556
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.01675
           storage fees ........................... +ꜩ0.01675

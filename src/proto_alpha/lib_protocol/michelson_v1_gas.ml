@@ -949,6 +949,11 @@ module Cost_of = struct
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
 
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2264
+       Benchmark.
+       Currently approximated by 2 comparisons of the longest entrypoint. *)
+    let cost_FIND_ENTRYPOINT = S.mul (S.safe_int 2) (cost_N_ICompare 31 31)
+
     (* model SAPLING_TRANSACTION_ENCODING *)
     let cost_SAPLING_TRANSACTION_ENCODING ~inputs ~outputs =
       S.safe_int (1500 + (inputs * 160) + (outputs * 320))
@@ -1676,6 +1681,8 @@ module Cost_of = struct
     (* Cost of a cycle of checking that a type is dupable *)
     (* TODO: bench *)
     let check_dupable_cycle = atomic_step_cost cost_TYPECHECKING_DATA
+
+    let find_entrypoint_cycle = atomic_step_cost cost_FIND_ENTRYPOINT
 
     let bool = free
 
