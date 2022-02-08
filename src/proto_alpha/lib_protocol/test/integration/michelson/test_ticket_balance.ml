@@ -89,8 +89,7 @@ let assert_token_balance ~loc block token owner expected =
 
 let string_token ~ticketer content =
   let contents =
-    WithExceptions.Result.get_ok ~loc:__LOC__
-    @@ Alpha_context.Script_string.of_string content
+    WithExceptions.Result.get_ok ~loc:__LOC__ @@ Script_string.of_string content
   in
   Ticket_token.Ex_token
     {ticketer; contents_type = Script_typed_ir.string_key; contents}

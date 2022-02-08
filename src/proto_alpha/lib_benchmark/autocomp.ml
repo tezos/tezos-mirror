@@ -184,7 +184,7 @@ struct
         else return Mikhailsky.Data.false_
     | String_t ->
         sample Michelson_base.string >>= fun str ->
-        let str = Protocol.Script_string_repr.to_string str in
+        let str = Protocol.Script_string.to_string str in
         return (Mikhailsky.Data.string str)
     | Bytes_t ->
         sample Michelson_base.bytes >>= fun bytes ->

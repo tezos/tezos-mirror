@@ -173,7 +173,7 @@ let assert_equal_ticket_token_diffs ctxt ~loc ticket_diffs
 let string_token ~ticketer content =
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
-    @@ Alpha_context.Script_string.of_string content
+    @@ Script_string.of_string content
   in
   Ticket_token.Ex_token
     {ticketer; contents_type = Script_typed_ir.string_key; contents}

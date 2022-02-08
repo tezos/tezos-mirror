@@ -72,7 +72,7 @@ let integer (i : 'a Script_int.num) : t = Z.numbits (Script_int.to_zint i) / 8
 
 let string = String.length
 
-let script_string = Alpha_context.Script_string.length
+let script_string = Script_string.length
 
 let bytes (b : Bytes.t) : t = Bytes.length b
 

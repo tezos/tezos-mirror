@@ -92,7 +92,6 @@ end
 
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
-module Script_string = Script_string_repr
 
 module Script = struct
   include Michelson_v1_primitives

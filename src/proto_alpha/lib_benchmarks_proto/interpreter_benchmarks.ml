@@ -1523,7 +1523,7 @@ module Registration_section = struct
   end
 
   module Strings = struct
-    open Alpha_context.Script_string
+    open Script_string
 
     let () =
       simple_benchmark
@@ -2187,7 +2187,7 @@ module Registration_section = struct
 
     let () =
       let name =
-        match Protocol.Alpha_context.Script_string.of_string "view" with
+        match Protocol.Script_string.of_string "view" with
         | Ok s -> s
         | Error _ -> assert false
       in
@@ -2742,7 +2742,7 @@ module Registration_section = struct
             let ticket =
               {
                 ticket with
-                contents = Alpha_context.Script_string.empty;
+                contents = Script_string.empty;
                 amount = Script_int.zero_n;
               }
             in

@@ -62,7 +62,7 @@ val integer : 'a Script_int.num -> t
 
 val string : string -> t
 
-val script_string : Alpha_context.Script_string.t -> t
+val script_string : Script_string.t -> t
 
 val bytes : Bytes.t -> t
 

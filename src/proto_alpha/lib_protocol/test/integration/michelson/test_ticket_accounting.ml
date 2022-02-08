@@ -468,7 +468,7 @@ let string_ticket ticketer contents amount =
   in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
-    @@ Script_string_repr.of_string contents
+    @@ Script_string.of_string contents
   in
   Script_typed_ir.{ticketer; contents; amount}
 
@@ -476,7 +476,7 @@ let string_ticket_token ticketer content =
   let open Lwt_tzresult_syntax in
   let contents =
     Result.value_f ~default:(fun _ -> assert false)
-    @@ Alpha_context.Script_string.of_string content
+    @@ Script_string.of_string content
   in
   let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
   return

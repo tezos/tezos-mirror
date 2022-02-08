@@ -68,7 +68,7 @@ let footprint v =
     and is therefore not counted by [Obj.reachable_words]. *)
 let gen_string s =
   let s = Bytes.of_string s |> Bytes.to_string in
-  is_ok @@ Script_string_repr.of_string s
+  is_ok @@ Script_string.of_string s
 
 let boxed_set_elements s = Script_set.fold (fun x s -> x :: s) s []
 
@@ -239,9 +239,7 @@ let check_value_size () =
        String_t
        ========
     *)
-    @ (let show fmt s =
-         Format.fprintf fmt "%s" (Script_string_repr.to_string s)
-       in
+    @ (let show fmt s = Format.fprintf fmt "%s" (Script_string.to_string s) in
        exs nsample show String_t ": string")
     (*
        Bytes_t

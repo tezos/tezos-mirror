@@ -55,7 +55,7 @@ module type S = sig
 
   val signature : Tezos_crypto.Signature.t sampler
 
-  val string : Alpha_context.Script_string.t sampler
+  val string : Script_string.t sampler
 
   val bytes : bytes sampler
 
@@ -109,7 +109,7 @@ end) : S = struct
         ~size:P.parameters.string_size
         rng_state
     in
-    match Protocol.Alpha_context.Script_string.of_string s with
+    match Protocol.Script_string.of_string s with
     | Ok s -> s
     | Error _ -> assert false
 

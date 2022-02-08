@@ -60,7 +60,7 @@ let dummy_pk =
 let dummy_bytes = Bytes.of_string "dummy"
 
 let dummy_string =
-  match Alpha_context.Script_string.of_string "dummy" with
+  match Script_string.of_string "dummy" with
   | Ok s -> s
   | Error _ -> assert false
 
