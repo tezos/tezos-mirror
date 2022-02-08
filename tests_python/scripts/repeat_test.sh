@@ -1,7 +1,7 @@
-#! /usr/bin/env bash
+#!/bin/sh
 # run test at most NUM times, exit at first failure
 
-if [ $# -ne 2 ] || [ "$1" -le 0 ] || [ ! -f $2 ]; then
+if [ $# -ne 2 ] || [ "$1" -le 0 ] || [ ! -f "$2" ]; then
     echo "Repeat a pytest test until first failure, at most N times ."
     echo
     echo "Usage: $0 NUM TEST"
@@ -14,11 +14,11 @@ NUM=$1
 TEST=$2
 
 mkdir -p tmp
-for i in $(seq 1 $NUM)
+for i in $(seq 1 "$NUM")
 do
     rm -f tmp/*
-    echo Execution $i/$NUM
-    if ! poetry run pytest $TEST --log-dir=tmp --tb=short -v; then
+    echo "Execution $i/$NUM"
+    if ! poetry run pytest "$TEST" --log-dir=tmp --tb=short -v; then
         exit 1
     fi
 done
