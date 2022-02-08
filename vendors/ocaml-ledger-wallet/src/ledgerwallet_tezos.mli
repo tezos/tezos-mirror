@@ -96,7 +96,7 @@ val deauthorize_baking :
 
 val get_high_watermark :
   ?pp:Format.formatter -> ?buf:Cstruct.t ->
-  Hidapi.t -> (int32, Transport.error) result
+  Hidapi.t -> ((int32 * int32 option), Transport.error) result
 (** [get_high_watermark ?pp ?buf ledger] is the current value of the
     high water mark for the main-chain on [ledger]. This works with
     the baking app only. See {!get_all_high_watermarks} for a more
@@ -106,7 +106,9 @@ val get_all_high_watermarks :
   ?pp:Format.formatter ->
   ?buf:Cstruct.t ->
   Hidapi.t ->
-  ([ `Main_hwm of int32 ] * [ `Test_hwm of int32 ] * [ `Chain_id of string ],
+  ([ `Main_hwm of (int32 * int32 option) ] *
+   [ `Test_hwm of (int32 * int32 option) ] *
+   [ `Chain_id of string ],
    Transport.error) result
 (** Query the high water marks for the main and test chains, as well as the ID
     of the main-chain (string of length 4) recorded by the Ledger Baking app. *)
