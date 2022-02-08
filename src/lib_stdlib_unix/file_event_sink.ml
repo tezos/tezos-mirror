@@ -515,17 +515,21 @@ module Query = struct
     let module Event = (val ev : Internal_event.EVENT_DEFINITION with type t = a)
     in
     let handle_event_file previous path =
-      Lwt_utils_unix.Json.read_file path >>= function
+      let open Lwt_result_syntax in
+      let*! r = Lwt_utils_unix.Json.read_file path in
+      match r with
       | Ok json -> (
           try
             let {time_stamp; event; _} =
               Data_encoding.Json.destruct (wrapped_encoding Event.encoding) json
             in
-            f
-              (snd previous)
-              ~time_stamp:(time_stamp :> float)
-              (Internal_event.Generic.Event (Event.name, ev, event))
-            >>=? fun user_return -> return (fst previous, user_return)
+            let* user_return =
+              f
+                (snd previous)
+                ~time_stamp:(time_stamp :> float)
+                (Internal_event.Generic.Event (Event.name, ev, event))
+            in
+            return (fst previous, user_return)
           with e ->
             return_with_error previous (`Parsing_event (`Encoding (path, e))))
       | Error el ->
