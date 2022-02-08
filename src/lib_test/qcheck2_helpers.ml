@@ -163,16 +163,23 @@ let endpoint_gen =
   let protocol_gen = oneofl ["http"; "https"] in
   let path_gen =
     (* Specify the characters to use, to have valid URLs *)
-    list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
-    >|= String.concat "."
+    let+ path_chunks =
+      list_size (1 -- 8) (string_size ~gen:(char_range 'a' 'z') (1 -- 8))
+    in
+    String.concat "." path_chunks
   in
-  let port_gen = 1 -- 32768 >|= fun port -> ":" ^ Int.to_string port in
+  let port_gen =
+    let+ port = 1 -- 32768 in
+    ":" ^ Int.to_string port
+  in
   let url_string_gen =
-    triple protocol_gen path_gen (opt port_gen)
-    >|= fun (protocol, path, opt_part) ->
+    let+ (protocol, path, opt_part) =
+      triple protocol_gen path_gen (opt port_gen)
+    in
     String.concat "" [protocol; "://"; path; Option.value ~default:"" opt_part]
   in
-  url_string_gen >|= Uri.of_string
+  let+ s = url_string_gen in
+  Uri.of_string s
 
 module MakeMapGen (Map : Stdlib.Map.S) = struct
   open QCheck2
