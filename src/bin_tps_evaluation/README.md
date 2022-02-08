@@ -69,6 +69,11 @@ be helpful for obtaining a detailed log.
 Consult `./tezos-tps-evaluation benchmark-tps --help` to see all accepted
 command line options.
 
+### Testing locally
+
+The performance regression check furnished by the PRT framework can be tested
+locally. See http://tezos.gitlab.io/developer/long-tezts.html#testing-your-benchmarks-locally
+
 ### Making sense of the results
 
 The goal of the TPS benchmark is to give a high-level estimate of the TPS

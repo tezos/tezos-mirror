@@ -54,10 +54,10 @@ let estimate_gas_tps ~average_block_path () =
   let transaction_cost =
     Gas.average_transaction_cost transaction_costs average_block
   in
-  Format.printf "Average transaction cost: %d@." transaction_cost ;
+  Log.info "Average transaction cost: %d" transaction_cost ;
   let gas_tps = Gas.deduce_tps ~protocol ~constants ~transaction_cost () in
-  Format.printf "Gas TPS: %d@." gas_tps ;
-  Lwt.return ()
+  Log.info "Gas TPS: %d" gas_tps ;
+  Lwt.return @@ float_of_int gas_tps
 
 module Term = struct
   let average_block_path_arg =
@@ -68,31 +68,54 @@ module Term = struct
 
   let tezt_args =
     let open Cmdliner in
-    let doc = "Extra arguments after -- to be passed directly to Tezt" in
+    let doc =
+      "Extra arguments after -- to be passed directly to Tezt. Contains `-i` \
+       by default to display info log level."
+    in
     let docv = "TEZT_ARGS" in
     Arg.(value & pos_all string [] & info [] ~docv ~doc)
 
+  let previous_count_arg =
+    let open Cmdliner in
+    let doc =
+      "The number of previously recorded samples that must be compared to the \
+       result of this benchmark"
+    in
+    let docv = "PREVIOUS_SAMPLE_COUNT" in
+    Arg.(
+      value & opt int 10 & info ["regression-previous-sample-count"] ~docv ~doc)
+
   let term =
-    let process average_block_path tezt_args =
+    let process average_block_path tezt_args previous_count =
       (* We are going to need to call the client stress test command here in
          order to get an estimation of gas cost of various transactions that
          stress test uses. This functionality is also protocol-dependent, so
          we need to start a node, too. Hence we use the tezt network to spin
          up the network. *)
-      (try Cli.init ~args:tezt_args ()
+      (try Cli.init ~args:("-i" :: tezt_args) ()
        with Arg.Help help_str ->
          Format.eprintf "%s@." help_str ;
          exit 0) ;
-      Test.register
+      let executors = Long_test.[x86_executor1] in
+      Long_test.register
         ~__FILE__
         ~title:"tezos_tps_gas"
         ~tags:[]
-        (estimate_gas_tps ~average_block_path) ;
+        ~timeout:(Long_test.Minutes 1)
+        ~executors
+        (fun () ->
+          Long_test.measure_and_check_regression_lwt
+            ~previous_count
+            ~minimum_previous_count:previous_count
+            ~stddev:false
+            ~repeat:1
+            "tps_evaluation"
+          @@ estimate_gas_tps ~average_block_path) ;
       Test.run () ;
       `Ok ()
     in
     let open Cmdliner.Term in
-    ret (const process $ average_block_path_arg $ tezt_args)
+    ret (const process $ average_block_path_arg $ tezt_args $ previous_count_arg)
 end
 
 module Manpage = struct

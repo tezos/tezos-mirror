@@ -256,8 +256,8 @@ References:
  - `General API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt/index.html>`_
  - `Tezos-specific API documentation <http://tezos.gitlab.io/api/odoc/_html/tezt-tezos/index.html>`_
 
-Long Tests
-""""""""""
+Long Tests and Performance regression Test Framework
+""""""""""""""""""""""""""""""""""""""""""""""""""""
 
 Tezt is also used for tests that are too long to run in the CI. Those
 tests are run on dedicated machines and can send data points to an

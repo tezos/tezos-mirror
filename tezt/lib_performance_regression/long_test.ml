@@ -630,18 +630,16 @@ let check_time_preconditions measurement =
   if String.contains measurement '\n' then
     invalid_arg "Long_test.time: newline character in measurement"
 
-let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev
-    ?(repeat = 1) measurement f =
+let measure_and_check_regression ?previous_count ?minimum_previous_count ?margin
+    ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
     let data_points = ref [] in
     for _ = 1 to repeat do
-      let start = Unix.gettimeofday () in
-      f () ;
-      let duration = Unix.gettimeofday () -. start in
+      let duration = f () in
       let data_point =
-        InfluxDB.data_point measurement ("duration", Float duration)
+        InfluxDB.data_point ~tags measurement ("duration", Float duration)
       in
       add_data_point data_point ;
       data_points := data_point :: !data_points
@@ -652,23 +650,39 @@ let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev
       ?margin
       ?check
       ?stddev
+      ~tags
       ~data_points:!data_points
       measurement
       "duration"
 
-let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
-    ?(repeat = 1) measurement f =
+let time ?previous_count ?minimum_previous_count ?margin ?check ?stddev ?repeat
+    ?tags measurement f =
+  measure_and_check_regression
+    ?previous_count
+    ?minimum_previous_count
+    ?margin
+    ?check
+    ?stddev
+    ?repeat
+    ?tags
+    measurement
+    (fun () ->
+      let start = Unix.gettimeofday () in
+      f () ;
+      let stop = Unix.gettimeofday () in
+      stop -. start)
+
+let measure_and_check_regression_lwt ?previous_count ?minimum_previous_count
+    ?margin ?check ?stddev ?(repeat = 1) ?(tags = []) measurement f =
   check_time_preconditions measurement ;
   if repeat <= 0 then unit
   else
     let data_points = ref [] in
     let* () =
       Base.repeat repeat @@ fun () ->
-      let start = Unix.gettimeofday () in
-      let* () = f () in
-      let duration = Unix.gettimeofday () -. start in
+      let* duration = f () in
       let data_point =
-        InfluxDB.data_point measurement ("duration", Float duration)
+        InfluxDB.data_point ~tags measurement ("duration", Float duration)
       in
       add_data_point data_point ;
       data_points := data_point :: !data_points ;
@@ -680,9 +694,27 @@ let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
       ?margin
       ?check
       ?stddev
+      ~tags
       ~data_points:!data_points
       measurement
       "duration"
+
+let time_lwt ?previous_count ?minimum_previous_count ?margin ?check ?stddev
+    ?repeat ?tags measurement f =
+  measure_and_check_regression_lwt
+    ?previous_count
+    ?minimum_previous_count
+    ?margin
+    ?check
+    ?stddev
+    ?repeat
+    ?tags
+    measurement
+    (fun () ->
+      let start = Unix.gettimeofday () in
+      let* () = f () in
+      let stop = Unix.gettimeofday () in
+      Lwt.return (stop -. start))
 
 (* Executors are just test tags. But the type is abstract so that users of this module
    cannot use an inexistent executor by mistake. And inside this module we use
@@ -726,19 +758,6 @@ let register ~__FILE__ ~title ~tags ?team ~executors ~timeout body =
       "Long_test.register: long test titles cannot contain newline characters" ;
   let tags = make_tags team executors tags in
   Test.register
-    ~__FILE__
-    ~title
-    ~tags
-    (wrap_body title __FILE__ team timeout body)
-
-let register_with_protocol ~__FILE__ ~title ~tags ?team ~executors ~timeout body
-    =
-  if String.contains title '\n' then
-    invalid_arg
-      "Long_test.register_with_protocol: long test titles cannot contain \
-       newline characters" ;
-  let tags = make_tags team executors tags in
-  Protocol.register_test
     ~__FILE__
     ~title
     ~tags
