@@ -99,14 +99,14 @@ Transaction rollups allow for exchanging financial assets, encoded as
 higher throughput than what is possible on Tezos natively.
 
 Analogous to layer-1 addresses, **layer-2 addresses** identify assets
-holders in the layer-2 ledger, meaning layer-2 addresses own, and
+holders in the layer-2 ledger, meaning layer-2 addresses own and
 exchange Michelson tickets.
 They are prefixed by ``tru2`` when encoded in a base58 alphabet.
 
 The expected workflow proceeds as follows.
 
-#. Layer-1 smart contracts can **deposit** tickets for the benefit of
-   a **layer-2 address** to a transaction rollup.
+#. Layer-1 smart contracts can **deposit** tickets to a transaction rollup for the benefit of
+   a layer-2 address.
 #. A layer-2 address is associated with a cryptographic public key,
    and the owner of the companion secret key (called “the owner of the
    layer-2 address” afterwards) can sign transfer orders. These orders
@@ -172,7 +172,7 @@ is empty. This ledger needs to be provisioned with tickets, which are
 deposited into layer-2 by layer-1 smart contracts. They do so by
 emitting layer-1 transactions to the transaction rollup address,
 targeting more specifically the ``deposit`` entrypoint, whose argument
-is a pair of
+is a pair consisting of:
 
 #. a ticket (of any type), and
 #. a layer-2 address (of type ``tx_rollup_l2_address`` in Michelson),
