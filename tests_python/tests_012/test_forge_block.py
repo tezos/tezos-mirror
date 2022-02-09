@@ -8,7 +8,7 @@ from launchers.sandbox import Sandbox
 @pytest.mark.slow
 @pytest.mark.incremental
 class TestForgeBlock:
-    """ Check that a block more than 5 seconds in the future is rejected """
+    """Check that a block more than 5 seconds in the future is rejected"""
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(1, params=constants.NODE_PARAMS)

@@ -1983,14 +1983,11 @@ expruat2BS4KCwn9kbopeX1ZwxtrtJbyFhpnpnG6A5KdCBCwHNsdod
     def test_contract_hashes_for_script(
         self, client: Client, for_script, display_names, results
     ):
-        assert (
-            client.hash_script(
-                [ID_SCRIPT_LITERAL],
-                display_names=display_names,
-                for_script=for_script,
-            )
-            == [results]
-        )
+        assert client.hash_script(
+            [ID_SCRIPT_LITERAL],
+            display_names=display_names,
+            for_script=for_script,
+        ) == [results]
 
 
 @pytest.mark.contract

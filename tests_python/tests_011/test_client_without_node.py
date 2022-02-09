@@ -35,7 +35,7 @@ _CONFIG_FILE_FLAG = "--config-file"
 
 @pytest.mark.client
 class TestImportKeyMnemonic:
-    """ Checks that the keys are correctly imported from a mnemonic. """
+    """Checks that the keys are correctly imported from a mnemonic."""
 
     @pytest.fixture
     def mnemonic(self):
@@ -49,7 +49,7 @@ class TestImportKeyMnemonic:
         return "very_secure_passphrase"
 
     def test_import_simple(self, client: Client):
-        """ Tests a simple import. """
+        """Tests a simple import."""
         mnemonic = "release easy pulp drop select attack false math cook \
 angry spin ostrich round dress acoustic"
         prms = ["import", "keys", "from", "mnemonic", "zebra", "--force"]
@@ -59,7 +59,7 @@ angry spin ostrich round dress acoustic"
         assert addr.wallet["zebra"] == "tz1aGUKE72eN21iWztoDEeH4FeKaxWb7SAUb"
 
     def test_import_already_present_alias(self, client: Client, mnemonic):
-        """ Tests that importing fails if the alias is already present. """
+        """Tests that importing fails if the alias is already present."""
         prms = [
             "import",
             "keys",
@@ -76,7 +76,7 @@ angry spin ostrich round dress acoustic"
             client.run_generic(prms, stdin=stdin)
 
     def test_import_passphrase(self, client: Client, mnemonic, passphrase):
-        """ Tests an import where the user specifies a passphrase. """
+        """Tests an import where the user specifies a passphrase."""
         stdin = mnemonic + "\n" + passphrase + "\n"
         prms = ["import", "keys", "from", "mnemonic", "key", "--force"]
         client.run_generic(prms, stdin=stdin)
@@ -84,7 +84,7 @@ angry spin ostrich round dress acoustic"
         assert addr.wallet["key"] == "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re"
 
     def test_encrypted(self, client: Client, mnemonic, passphrase):
-        """ Tests an import where the user wants to encrypt the key. """
+        """Tests an import where the user wants to encrypt the key."""
         encrypt_pwd = "imgonnaencryptthiskeysohard"
         stdin = (
             mnemonic
@@ -116,7 +116,7 @@ angry spin ostrich round dress acoustic"
         assert pkh == "tz1QSF4TSVzaosgbaxnFJpRbs7798Skeb8Re"
 
     def test_gen_key_from_menmonic_bad_mnemonic(self, client: Client):
-        """ Tests that the command fails if the user gives a bad mnemonic. """
+        """Tests that the command fails if the user gives a bad mnemonic."""
         prms = ["import", "keys", "from", "mnemonic", "alias", "--force"]
         stdin = "hello\n\n"
         expected_error = '"hello" is not a valid BIP39 mnemonic.'
@@ -287,7 +287,7 @@ def _cmd_line_flag_to_json_field(cmd_line_flag: str):
 @pytest.mark.client
 @pytest.mark.parametrize('config_dict', _INPUT_CONFIG_FILES)
 class TestConfigShow:
-    """ Tests of `tezos-client config show` """
+    """Tests of `tezos-client config show`"""
 
     def test_config_show(
         self, nodeless_client: Client, config_dict: Optional[dict]
@@ -380,7 +380,7 @@ class TestConfigShow:
 
 @pytest.mark.client
 class TestConfigValid:
-    """ Tests of validity of tezos-client config """
+    """Tests of validity of tezos-client config"""
 
     def test_config_node_port(self, nodeless_client: Client):
         """

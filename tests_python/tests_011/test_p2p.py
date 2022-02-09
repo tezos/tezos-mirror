@@ -28,13 +28,13 @@ class TestTrustedRing:
             )
 
     def test_no_peers(self, sandbox: Sandbox):
-        """ Initially, nobody knows other peers. """
+        """Initially, nobody knows other peers."""
         for client in sandbox.all_clients():
             res = client.p2p_stat()
             assert not res.peers
 
     def test_add_peers(self, sandbox: Sandbox):
-        """ Set up a trusted ring topology. """
+        """Set up a trusted ring topology."""
         base_p2p = sandbox.p2p
         for i in range(NUM_NODES):
             client = sandbox.client(i)

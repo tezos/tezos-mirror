@@ -37,7 +37,7 @@ class TestNonceSeedRevelation:
 
     @pytest.mark.timeout(TIMEOUT)
     def test_wait_for_two_cycles(self, sandbox: Sandbox):
-        """Poll the node until target level is reached """
+        """Poll the node until target level is reached"""
         target = FIRST_PROTOCOL_BLOCK + 2 * BLOCKS_PER_CYCLE
         while True:
             time.sleep(3)  # sleep first to avoid useless first query
@@ -47,7 +47,7 @@ class TestNonceSeedRevelation:
         sandbox.rm_baker(0, proto=protocol.DAEMON)
 
     def test_get_all_blocks(self, sandbox: Sandbox, session: dict):
-        """Retrieve all blocks for two full cycles. """
+        """Retrieve all blocks for two full cycles."""
         blocks = [
             sandbox.client(0).get_block(FIRST_PROTOCOL_BLOCK + i)
             for i in range(2 * BLOCKS_PER_CYCLE)
@@ -73,7 +73,7 @@ class TestNonceSeedRevelation:
         )
 
     def test_collect_seed_nonce_hashes(self, session):
-        """Collect nonce hashes in the block headers in the first cycle """
+        """Collect nonce hashes in the block headers in the first cycle"""
         seed_nonce_hashes = {}
         blocks = session['blocks']
         for i in range(BLOCKS_PER_CYCLE // BLOCKS_PER_COMMITMENT):

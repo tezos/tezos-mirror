@@ -120,7 +120,7 @@ class TestStuck:
         )
 
     def test_all_nodes_boostrap(self, sandbox: Sandbox):
-        """Eventually, 1 and 2 are bootstrapped with the chain stuck. """
+        """Eventually, 1 and 2 are bootstrapped with the chain stuck."""
         sandbox.client(1).bootstrapped()
         sandbox.client(2).bootstrapped()
         assert sandbox.client(1).sync_state() == 'stuck'
