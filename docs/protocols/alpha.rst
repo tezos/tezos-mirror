@@ -47,6 +47,12 @@ Breaking Changes
   destination. The default cases (implicit and smart contracts) are
   prefixed with the tag ``0``.
 
+- The `consumed_gas` field in the encoding of operations becomes
+  **deprecated** in favour of `consumed_milligas`, which contains
+  a more precise readout for the same value. `consumed_milligas`
+  field was added to the encoding of block metadata for uniformity.
+  (MR :gl:`!4388`)
+
 Bug Fixes
 ---------
 
