@@ -189,27 +189,29 @@ the ledger state and the block metadata (operation receipts, rewards
 updates, etc.) of blocks outside the offset of this sliding
 window. Depending on the network, a minimum number of cycles are
 kept. These cycles correspond to the ones above the last
-allowed fork level, that are blocks subjects to a potential chain
-reorganization (on mainnet, it corresponds to 2 cycles). However, the
+allowed fork level, containing blocks subjects to a potential chain
+reorganization (this minimal number of cycles is currently given by
+the :ref:`preserved_cycles<ps_constants>` protocol parameter, which
+on mainnet is currently set to 5 cycles). However, the
 node is able to keep an additional number of cycles that is
 configurable.
 
 By default, the number of additional cycles kept, for both ``full``
-and ``rolling`` nodes, is *5 cycles*. On mainnet, this would total *7
-cycles* of complete history (approximately three weeks), as we keep 5
-cycles beyond the minimal number of cycles, that is 2 + 5 = 7. It is
+and ``rolling`` nodes, is *5 cycles*. On mainnet, this would total *10
+cycles* of complete history (approximately four weeks), as we keep 5
+cycles beyond the minimal number of cycles, that is *5 + 5 = 10*. It is
 possible to increase this parameter to keep more history or, on the
 contrary, decrease it to reduce the storage size. For example, it is
 possible to run a baker and a delegation service on rolling mode as
-long as we keep 7 cycles (to provide two more weeks to dispatch
-rewards), meaning that at least 5 additional cycles must be kept.
+long as we keep 7 cycles (to allow for reward dispatching), meaning
+that at least 2 additional cycles must be kept.
 
 
-When initialzing your node on an empty storage, you may specify the
+When initializing your node on an empty storage, you may specify the
 history mode and number of additional cycles using ``--history-mode
 <HISTORY_MODE>:<NB_CYCLES>`` when running it. For example, running a
-node with ``--history-mode rolling:7`` would allow full RPC queries of
-the 7 previous cycles.
+node with ``--history-mode rolling:5`` would allow full RPC queries of
+the 10 previous cycles.
 
 
 It is also possible to modify the number of additional cycles kept of

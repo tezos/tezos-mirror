@@ -84,9 +84,10 @@ type 'value t
 
 (**
 
-   A layout determines the number of sub-caches as well as the limit
+   A layout determines the number of sub-caches as well as the size limit
    of those sub-caches. No assumption is made on the unit of each of
-   those size. All we use is the natural ordering of [int].
+   those sub-cache sizes. All we use is the natural ordering of [int].
+   In particular, the size units for different sub-caches need not be the same.
 
    There are only two constructors for a cache:
 

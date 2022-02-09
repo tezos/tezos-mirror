@@ -169,5 +169,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst
+	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst user/default-acl.json
 	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 011/tezos-*.html 012/tezos-*.html alpha/tezos-*.html

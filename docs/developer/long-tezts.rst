@@ -14,10 +14,10 @@ Here are the differences with regular Tezt tests:
 - long tests have easy access to a Performance Regression Test framework
   wich provides these features:
 
-  - Persist measurement samples (in an InfluxDB) such as how long it takes
+  - Persist measurement samples (in an `InfluxDB <https://github.com/influxdata/influxdb>`_ database) such as how long it takes
     to do something. These samples will be used to prevent regressions of
     performance.
-  - Provide easy access to a Grafana instance that can be updated to
+  - Provide easy access to a `Grafana <https://github.com/grafana/grafana>`_ instance that can be updated to
     create graphs displaying the samples sent to InfluxDB;
   - Call Slack webhooks to send alerts when a performance regression has
     been detected.
@@ -203,6 +203,3 @@ configuration to set up the framework with your local database:
 
 For more information about the configuration file, please refer
 to the `Long test module API <https://gitlab.com/tezos/tezos/-/blob/master/tezt/long_tests/long_test.mli>`__.
-
-
-

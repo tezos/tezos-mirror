@@ -3566,18 +3566,13 @@ module RPC = struct
       let validators =
         RPC_service.get_service
           ~description:
-            "Retrieves the delegates allowed to endorse a block.\n\
-             By default, it gives the endorsing slots for delegates that have \
-             at least one in the next block.\n\
+            "Retrieves the level, the endorsement slots and the public key \
+             hash of each delegate allowed to endorse a block.\n\
+             By default, it provides this information for the next level.\n\
              Parameter `level` can be used to specify the (valid) level(s) in \
              the past or future at which the endorsement rights have to be \
              returned. Parameter `delegate` can be used to restrict the \
-             results to the given delegates.\n\
-             Returns the list of endorsing slots. Also returns the minimal \
-             timestamps that correspond to these slots. The timestamps are \
-             omitted for levels in the past, and are only estimates for levels \
-             later that the next block, based on the hypothesis that all \
-             predecessor blocks were baked at the first round."
+             results to the given delegates.\n"
           ~query:validators_query
           ~output:(list encoding)
           path
