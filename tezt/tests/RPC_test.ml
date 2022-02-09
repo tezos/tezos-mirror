@@ -812,7 +812,7 @@ let test_mempool protocol ?endpoint client =
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
   let* _ =
-    Mempool.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
+    Prevalidator.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
   in
   let* _ = flush_waiter in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
@@ -860,7 +860,7 @@ let test_mempool protocol ?endpoint client =
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
   let* _ =
-    Mempool.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
+    Prevalidator.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
   in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
   (* Test RPCs [GET|POST /chains/main/mempool/filter] *)
