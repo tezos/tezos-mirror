@@ -109,20 +109,20 @@ module Ticket_inspection = struct
    fun key_ty k ->
     let open Script_typed_ir in
     match key_ty with
-    | Unit_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Never_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Int_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Nat_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Signature_key _ -> (k [@ocaml.tailcall]) False_ht
-    | String_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Bytes_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Mutez_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Bool_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Key_hash_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Key_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Timestamp_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Chain_id_key _ -> (k [@ocaml.tailcall]) False_ht
-    | Address_key _ -> (k [@ocaml.tailcall]) False_ht
+    | Unit_key -> (k [@ocaml.tailcall]) False_ht
+    | Never_key -> (k [@ocaml.tailcall]) False_ht
+    | Int_key -> (k [@ocaml.tailcall]) False_ht
+    | Nat_key -> (k [@ocaml.tailcall]) False_ht
+    | Signature_key -> (k [@ocaml.tailcall]) False_ht
+    | String_key -> (k [@ocaml.tailcall]) False_ht
+    | Bytes_key -> (k [@ocaml.tailcall]) False_ht
+    | Mutez_key -> (k [@ocaml.tailcall]) False_ht
+    | Bool_key -> (k [@ocaml.tailcall]) False_ht
+    | Key_hash_key -> (k [@ocaml.tailcall]) False_ht
+    | Key_key -> (k [@ocaml.tailcall]) False_ht
+    | Timestamp_key -> (k [@ocaml.tailcall]) False_ht
+    | Chain_id_key -> (k [@ocaml.tailcall]) False_ht
+    | Address_key -> (k [@ocaml.tailcall]) False_ht
     | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
     | Union_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
     | Option_key (_, _) -> (k [@ocaml.tailcall]) False_ht
@@ -149,18 +149,18 @@ module Ticket_inspection = struct
     let open Script_typed_ir in
     match ty with
     | Ticket_t _ -> (k [@ocaml.tailcall]) True_ht
-    | Unit_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Int_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Nat_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Signature_t _ -> (k [@ocaml.tailcall]) False_ht
-    | String_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Bytes_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Mutez_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Key_hash_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Key_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Timestamp_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Address_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Bool_t _ -> (k [@ocaml.tailcall]) False_ht
+    | Unit_t -> (k [@ocaml.tailcall]) False_ht
+    | Int_t -> (k [@ocaml.tailcall]) False_ht
+    | Nat_t -> (k [@ocaml.tailcall]) False_ht
+    | Signature_t -> (k [@ocaml.tailcall]) False_ht
+    | String_t -> (k [@ocaml.tailcall]) False_ht
+    | Bytes_t -> (k [@ocaml.tailcall]) False_ht
+    | Mutez_t -> (k [@ocaml.tailcall]) False_ht
+    | Key_hash_t -> (k [@ocaml.tailcall]) False_ht
+    | Key_t -> (k [@ocaml.tailcall]) False_ht
+    | Timestamp_t -> (k [@ocaml.tailcall]) False_ht
+    | Address_t -> (k [@ocaml.tailcall]) False_ht
+    | Bool_t -> (k [@ocaml.tailcall]) False_ht
     | Pair_t (ty1, ty2, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
           ty1
@@ -204,17 +204,17 @@ module Ticket_inspection = struct
     | Contract_t _ -> (k [@ocaml.tailcall]) False_ht
     | Sapling_transaction_t _ -> (k [@ocaml.tailcall]) False_ht
     | Sapling_state_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Operation_t _ ->
+    | Operation_t ->
         (* Operations may contain tickets but they should never be passed
            why we fail in this case. *)
         error Unsupported_type_operation
-    | Chain_id_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Never_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Bls12_381_g1_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Bls12_381_g2_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Bls12_381_fr_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Chest_t _ -> (k [@ocaml.tailcall]) False_ht
-    | Chest_key_t _ -> (k [@ocaml.tailcall]) False_ht
+    | Chain_id_t -> (k [@ocaml.tailcall]) False_ht
+    | Never_t -> (k [@ocaml.tailcall]) False_ht
+    | Bls12_381_g1_t -> (k [@ocaml.tailcall]) False_ht
+    | Bls12_381_g2_t -> (k [@ocaml.tailcall]) False_ht
+    | Bls12_381_fr_t -> (k [@ocaml.tailcall]) False_ht
+    | Chest_t -> (k [@ocaml.tailcall]) False_ht
+    | Chest_key_t -> (k [@ocaml.tailcall]) False_ht
 
   and has_tickets_of_pair :
       type a b c ret.
@@ -271,20 +271,20 @@ module Ticket_collection = struct
    fun ctxt comp_ty acc k ->
     let open Script_typed_ir in
     match comp_ty with
-    | Unit_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Never_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Int_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Nat_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Signature_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | String_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Bytes_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Mutez_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Bool_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Key_hash_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Key_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Timestamp_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Chain_id_key _ -> (k [@ocaml.tailcall]) ctxt acc
-    | Address_key _ -> (k [@ocaml.tailcall]) ctxt acc
+    | Unit_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Never_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Int_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Nat_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Signature_key -> (k [@ocaml.tailcall]) ctxt acc
+    | String_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Bytes_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Mutez_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Bool_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Key_hash_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Key_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Timestamp_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Chain_id_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Address_key -> (k [@ocaml.tailcall]) ctxt acc
     | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
     | Union_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
     | Option_key (_, _) -> (k [@ocaml.tailcall]) ctxt acc

@@ -1129,17 +1129,17 @@ open Script_typed_ir
 let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
   fun (type a) (wit : a comparable_ty) (v : a) ->
    match wit with
-   | Never_key _ -> Size.zero
-   | Unit_key _ -> Size.unit
-   | Int_key _ -> Size.integer v
-   | Nat_key _ -> Size.integer v
-   | String_key _ -> Size.script_string v
-   | Bytes_key _ -> Size.bytes v
-   | Mutez_key _ -> Size.mutez v
-   | Bool_key _ -> Size.bool v
-   | Key_hash_key _ -> Size.key_hash v
-   | Timestamp_key _ -> Size.timestamp v
-   | Address_key _ -> Size.address v
+   | Never_key -> Size.zero
+   | Unit_key -> Size.unit
+   | Int_key -> Size.integer v
+   | Nat_key -> Size.integer v
+   | String_key -> Size.script_string v
+   | Bytes_key -> Size.bytes v
+   | Mutez_key -> Size.mutez v
+   | Bool_key -> Size.bool v
+   | Key_hash_key -> Size.key_hash v
+   | Timestamp_key -> Size.timestamp v
+   | Address_key -> Size.address v
    | Pair_key (leaf, node, _) ->
        let (lv, rv) = v in
        let size =
@@ -1159,9 +1159,9 @@ let rec size_of_comparable_value : type a. a comparable_ty -> a -> Size.t =
        match v with
        | None -> Size.one
        | Some x -> Size.add (size_of_comparable_value ty x) Size.one)
-   | Signature_key _ -> Size.signature v
-   | Key_key _ -> Size.public_key v
-   | Chain_id_key _ -> Size.chain_id v
+   | Signature_key -> Size.signature v
+   | Key_key -> Size.public_key v
+   | Chain_id_key -> Size.chain_id v
 
 let extract_compare_sized_step :
     type a. a comparable_ty -> a -> a -> ir_sized_step =

@@ -56,18 +56,18 @@ let rec tnames_of_type :
     type a. a Script_typed_ir.ty -> type_name list -> type_name list =
  fun t acc ->
   match t with
-  | Script_typed_ir.Unit_t _ -> `TUnit :: acc
-  | Script_typed_ir.Int_t _ -> `TInt :: acc
-  | Script_typed_ir.Nat_t _ -> `TNat :: acc
-  | Script_typed_ir.Signature_t _ -> `TSignature :: acc
-  | Script_typed_ir.String_t _ -> `TString :: acc
-  | Script_typed_ir.Bytes_t _ -> `TBytes :: acc
-  | Script_typed_ir.Mutez_t _ -> `TMutez :: acc
-  | Script_typed_ir.Key_hash_t _ -> `TKey_hash :: acc
-  | Script_typed_ir.Key_t _ -> `TKey :: acc
-  | Script_typed_ir.Timestamp_t _ -> `TTimestamp :: acc
-  | Script_typed_ir.Address_t _ -> `TAddress :: acc
-  | Script_typed_ir.Bool_t _ -> `TBool :: acc
+  | Script_typed_ir.Unit_t -> `TUnit :: acc
+  | Script_typed_ir.Int_t -> `TInt :: acc
+  | Script_typed_ir.Nat_t -> `TNat :: acc
+  | Script_typed_ir.Signature_t -> `TSignature :: acc
+  | Script_typed_ir.String_t -> `TString :: acc
+  | Script_typed_ir.Bytes_t -> `TBytes :: acc
+  | Script_typed_ir.Mutez_t -> `TMutez :: acc
+  | Script_typed_ir.Key_hash_t -> `TKey_hash :: acc
+  | Script_typed_ir.Key_t -> `TKey :: acc
+  | Script_typed_ir.Timestamp_t -> `TTimestamp :: acc
+  | Script_typed_ir.Address_t -> `TAddress :: acc
+  | Script_typed_ir.Bool_t -> `TBool :: acc
   | Script_typed_ir.Pair_t (lty, rty, _) ->
       tnames_of_type lty (tnames_of_type rty (`TPair :: acc))
   | Script_typed_ir.Union_t (lty, rty, _) ->
@@ -82,38 +82,38 @@ let rec tnames_of_type :
   | Script_typed_ir.Big_map_t (kty, vty, _) ->
       tnames_of_comparable_type kty (tnames_of_type vty (`TBig_map :: acc))
   | Script_typed_ir.Contract_t (ty, _) -> tnames_of_type ty (`TContract :: acc)
-  | Script_typed_ir.Sapling_transaction_t (_, _) -> `TSapling_transaction :: acc
-  | Script_typed_ir.Sapling_state_t (_, _) -> `TSapling_state :: acc
-  | Script_typed_ir.Operation_t _ -> `TOperation :: acc
-  | Script_typed_ir.Chain_id_t _ -> `TChain_id :: acc
-  | Script_typed_ir.Never_t _ -> assert false
-  | Script_typed_ir.Bls12_381_g1_t _ -> `TBls12_381_g1 :: acc
-  | Script_typed_ir.Bls12_381_g2_t _ -> `TBls12_381_g2 :: acc
-  | Script_typed_ir.Bls12_381_fr_t _ -> `TBls12_381_fr :: acc
+  | Script_typed_ir.Sapling_transaction_t _ -> `TSapling_transaction :: acc
+  | Script_typed_ir.Sapling_state_t _ -> `TSapling_state :: acc
+  | Script_typed_ir.Operation_t -> `TOperation :: acc
+  | Script_typed_ir.Chain_id_t -> `TChain_id :: acc
+  | Script_typed_ir.Never_t -> assert false
+  | Script_typed_ir.Bls12_381_g1_t -> `TBls12_381_g1 :: acc
+  | Script_typed_ir.Bls12_381_g2_t -> `TBls12_381_g2 :: acc
+  | Script_typed_ir.Bls12_381_fr_t -> `TBls12_381_fr :: acc
   | Script_typed_ir.Ticket_t (ty, _) ->
       tnames_of_comparable_type ty (`TTicket :: acc)
-  | Script_typed_ir.Chest_key_t _ -> assert false
-  | Script_typed_ir.Chest_t _ -> assert false
+  | Script_typed_ir.Chest_key_t -> assert false
+  | Script_typed_ir.Chest_t -> assert false
 
 and tnames_of_comparable_type :
     type a. a Script_typed_ir.comparable_ty -> type_name list -> type_name list
     =
  fun t acc ->
   match t with
-  | Script_typed_ir.Unit_key _ -> `TUnit :: acc
-  | Script_typed_ir.Never_key _ -> assert false
-  | Script_typed_ir.Int_key _ -> `TInt :: acc
-  | Script_typed_ir.Nat_key _ -> `TNat :: acc
-  | Script_typed_ir.Signature_key _ -> `TSignature :: acc
-  | Script_typed_ir.String_key _ -> `TString :: acc
-  | Script_typed_ir.Bytes_key _ -> `TBytes :: acc
-  | Script_typed_ir.Mutez_key _ -> `TMutez :: acc
-  | Script_typed_ir.Bool_key _ -> `TBool :: acc
-  | Script_typed_ir.Key_hash_key _ -> `TKey_hash :: acc
-  | Script_typed_ir.Key_key _ -> `TKey :: acc
-  | Script_typed_ir.Timestamp_key _ -> `TTimestamp :: acc
-  | Script_typed_ir.Chain_id_key _ -> `TChain_id :: acc
-  | Script_typed_ir.Address_key _ -> `TAddress :: acc
+  | Script_typed_ir.Unit_key -> `TUnit :: acc
+  | Script_typed_ir.Never_key -> assert false
+  | Script_typed_ir.Int_key -> `TInt :: acc
+  | Script_typed_ir.Nat_key -> `TNat :: acc
+  | Script_typed_ir.Signature_key -> `TSignature :: acc
+  | Script_typed_ir.String_key -> `TString :: acc
+  | Script_typed_ir.Bytes_key -> `TBytes :: acc
+  | Script_typed_ir.Mutez_key -> `TMutez :: acc
+  | Script_typed_ir.Bool_key -> `TBool :: acc
+  | Script_typed_ir.Key_hash_key -> `TKey_hash :: acc
+  | Script_typed_ir.Key_key -> `TKey :: acc
+  | Script_typed_ir.Timestamp_key -> `TTimestamp :: acc
+  | Script_typed_ir.Chain_id_key -> `TChain_id :: acc
+  | Script_typed_ir.Address_key -> `TAddress :: acc
   | Script_typed_ir.Pair_key (lty, rty, _) ->
       tnames_of_comparable_type
         lty

@@ -87,7 +87,7 @@ let find ctxt addr =
 
 let value_as_int :
     type a. a Script_typed_ir.ty -> a -> Script_int_repr.z Script_int_repr.num =
- fun ty v -> match ty with Int_t _ -> v | _ -> Stdlib.failwith "value_as_int"
+ fun ty v -> match ty with Int_t -> v | _ -> Stdlib.failwith "value_as_int"
 
 let add_some_contracts k src block baker =
   ( make_block block @@ fun ctxt ->
@@ -207,7 +207,7 @@ let test_update_modifies_cached_contract () =
   ( make_block block @! fun ctxt ->
     find ctxt addr >>=? fun (ctxt, identifier, script, Ex_script ir) ->
     match ir.storage_type with
-    | Int_t _ ->
+    | Int_t ->
         let storage' = Script_int.(add ir.storage (Script_int.of_int 1)) in
         let cached_contract' =
           (script, Ex_script {ir with storage = storage'})

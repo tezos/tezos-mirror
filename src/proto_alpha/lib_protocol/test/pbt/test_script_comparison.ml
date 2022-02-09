@@ -50,22 +50,22 @@ let rec reference_compare_comparable : type a. a comparable_ty -> a -> a -> int
     =
  fun ty x y ->
   match (ty, x, y) with
-  | (Unit_key _, (), ()) -> 0
-  | (Never_key _, _, _) -> .
-  | (Signature_key _, x, y) -> normalize_compare @@ Script_signature.compare x y
-  | (String_key _, x, y) -> normalize_compare @@ Script_string.compare x y
-  | (Bool_key _, x, y) -> normalize_compare @@ Compare.Bool.compare x y
-  | (Mutez_key _, x, y) -> normalize_compare @@ Tez.compare x y
-  | (Key_hash_key _, x, y) ->
+  | (Unit_key, (), ()) -> 0
+  | (Never_key, _, _) -> .
+  | (Signature_key, x, y) -> normalize_compare @@ Script_signature.compare x y
+  | (String_key, x, y) -> normalize_compare @@ Script_string.compare x y
+  | (Bool_key, x, y) -> normalize_compare @@ Compare.Bool.compare x y
+  | (Mutez_key, x, y) -> normalize_compare @@ Tez.compare x y
+  | (Key_hash_key, x, y) ->
       normalize_compare @@ Signature.Public_key_hash.compare x y
-  | (Key_key _, x, y) -> normalize_compare @@ Signature.Public_key.compare x y
-  | (Int_key _, x, y) -> normalize_compare @@ Script_int.compare x y
-  | (Nat_key _, x, y) -> normalize_compare @@ Script_int.compare x y
-  | (Timestamp_key _, x, y) -> normalize_compare @@ Script_timestamp.compare x y
-  | (Address_key _, x, y) ->
+  | (Key_key, x, y) -> normalize_compare @@ Signature.Public_key.compare x y
+  | (Int_key, x, y) -> normalize_compare @@ Script_int.compare x y
+  | (Nat_key, x, y) -> normalize_compare @@ Script_int.compare x y
+  | (Timestamp_key, x, y) -> normalize_compare @@ Script_timestamp.compare x y
+  | (Address_key, x, y) ->
       normalize_compare @@ Script_comparable.compare_address x y
-  | (Bytes_key _, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
-  | (Chain_id_key _, x, y) -> normalize_compare @@ Script_chain_id.compare x y
+  | (Bytes_key, x, y) -> normalize_compare @@ Compare.Bytes.compare x y
+  | (Chain_id_key, x, y) -> normalize_compare @@ Script_chain_id.compare x y
   | (Pair_key (tl, tr, _), (lx, rx), (ly, ry)) ->
       let cl = reference_compare_comparable tl lx ly in
       if Compare.Int.(cl = 0) then reference_compare_comparable tr rx ry else cl
