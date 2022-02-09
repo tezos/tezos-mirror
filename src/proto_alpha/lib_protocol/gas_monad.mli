@@ -78,3 +78,44 @@ val record_trace_eval :
   (unit -> error) ->
   ('a, 'error_trace) t ->
   ('a, 'error_trace) t
+
+(** Syntax module for the {!Gas_monad}. This is intended to be opened locally in
+    functions. Within the scope of this module, the code can include binding
+    operators, leading to a [let]-style syntax. Similar to {!Lwt_result_syntax}
+    and other syntax modules. *)
+module Syntax : sig
+  (** [return x] returns a value in the gas-monad. *)
+  val return : 'a -> ('a, 'trace) t
+
+  (** [return_unit] is [return ()] . *)
+  val return_unit : (unit, 'trace) t
+
+  (** [return_none] is [return None] . *)
+  val return_none : ('a option, 'trace) t
+
+  (** [return_some x] is [return (Some x)] . *)
+  val return_some : 'a -> ('a option, 'trace) t
+
+  (** [return_nil] is [return []] . *)
+  val return_nil : ('a list, 'trace) t
+
+  (** [return_true] is [return true] . *)
+  val return_true : (bool, 'trace) t
+
+  (** [return_false] is [return false] . *)
+  val return_false : (bool, 'trace) t
+
+  (** [fail e] is [return (Error e)] . *)
+  val fail : 'trace -> ('a, 'trace) t
+
+  (** [let*] is a binding operator alias for {>>$}. *)
+  val ( let* ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
+
+  (** [let+] is a binding operator alias for {>|$}. *)
+  val ( let+ ) : ('a, 'trace) t -> ('a -> 'b) -> ('b, 'trace) t
+
+  (** [let*?] is for binding the value from result-only expressions into the
+      gas-monad. *)
+  val ( let*? ) :
+    ('a, 'trace) result -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
+end
