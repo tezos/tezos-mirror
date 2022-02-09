@@ -4,7 +4,7 @@ The Prevalidator
 The *prevalidator* is responsible for determining which operations to
 propagate over the gossip network. It uses the economic protocol to
 classify each operation in order to decide whether the operation should
-be propagated or not. 
+be propagated or not.
 
 The baker uses the prevalidator too, via the ``monitor_operations``
 RPC, for selecting operations that can be included in the block being
@@ -95,3 +95,14 @@ context is reset accordingly.
 
 Operations living in the prevalidator (already classified or not) can
 be accessed via the ``pending_operations`` RPC.
+
+
+Pending operations ordering and prioritization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Instead of just sorting the set of its pending operations by hash as done prior to
+version 12 of Octez, the prevalidator can now take advantage of extra
+information returned by the prevalidator filters in the protocol plugins,
+sorting by information returned by the plugin, and then by hash. This results in
+a finer-grained ordering, and thus prioritizes operations following the
+plugin's directives.

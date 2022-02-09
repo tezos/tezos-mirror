@@ -133,6 +133,61 @@ included in a block. To be able to replace the first operation, the fee and the
 by a factor (currently fixed to 5%). In case of successful replacement, the old
 operation is re-classified as ``Outdated``.
 
+
+Operations prioritization and ordering
+......................................
+
+
+In addition to quick detection of operations that have no chance to be
+prechecked or applied in the current context, the mempool's ``prefilter`` provides
+a priority for each successfully filtered operation. Concretely, the priority is
+either ``High``, ``Medium`` or ``Low`` in the current implementation, depending
+on the :ref:`validation pass<validation_passes_alpha>`.Some extra information (like the fees, or the gas/fees
+ratio of manager operations) are also provided along the priorities to enable
+fine-grained operations ordering.
+This extra information is similar to the one used by the baker's
+operations selection mechanism, that decides which operations will be included
+in the next block.
+
+
+Bounding the number of propagated manager operations
+.....................................................
+
+Up to Hangzhou protocol (see :doc:`../protocols/011_hangzhou`), the protocol plugin
+did not implement ``precheck``, so the prevalidator exclusively relies on ``apply_operation``
+to classify manager operations. As a consequence, it could also check their
+total gas consumption, and thus, naturally limit the number of successfully
+applied/propagated operations.
+
+Starting with Ithaca protocol (see :doc:`../protocols/012_ithaca`), the plugin
+implements a lightweight classification function, called ``precheck``, that
+doesn't check the total gas consumption. So with this modication and those of
+Octez 12.0, the prevalidator, would propagate any succesfully prevalidated
+operation. In order to protect nodes from potential DDoS, a new mechanism has
+been added in the plugin to bound the number of successfully prechecked
+operations. This mechanism works as follows:
+
+- Advertise the *best* ``N`` successfully prechecked manager operations
+  (where "best" is w.r.t. the priority described above, and N is a tunable parameter)
+  found in the set of pending operations to the network after a new head is
+  chosen and operations' classification reset. All other pending operations that
+  should have been prechecked are instead classified as ``Branch_delayed``;
+- Once the limit ``N`` is reached, the node may still receive additional manager
+  operations (via the network or RPC injection) with higher priorities than
+  those previously prechecked/advertised. Any such operation that is
+  successfully prechecked is advertised, and, in turn, the previously prechecked/advertised
+  manager operation with the lowest priority (not necessarily from the same
+  source) is reclassified as ``Branch_delayed``.
+
+The default value of the parameter ``N`` is chosen such that a node will always propagate enough
+manager operations to allow the next baker to produce a filled block (if there are
+enough operations in the network). Its value is currently fixed to 5000.
+Indeed, the total size occupied by manager operations in a
+block is currently bounded by 512 KibiBytes, and ``unset deposits limit`` seems
+to be the smallest manager operation, with 126 Bytes, so there are at most
+512 * 1024 / 126 = 4161 manager operations per block.
+
+
 .. _active_filter_rpc_alpha:
 
 Filters RPCs
@@ -152,12 +207,15 @@ The following parameters can be thus inspected and modified:
 - ``minimal_nanotez_per_byte``: type ``int``, default ``1000``
 - ``allow_script_failure``: type ``bool``, default ``true``
 - ``clock_drift`` : type ``Period.t option``, default ``None``
+- ``max_prechecked_manager_operations`` : type ``int``, default ``5000``
+- ``replace_by_fee_factor`` : type ``rational``, default ``21/20`` (ie. ``1.05%``)
 
-For example, the following command modifies the ``minimal_fees``
-parameter (and resets all the other parameters to their default
-values)::
+For example, each command below modifies the provided parameter and resets all
+the others to their default values::
 
    tezos-client rpc post /chains/main/mempool/filter with '{ "minimal_fees": "42" }'
+   tezos-client rpc post /chains/main/mempool/filter with '{ "replace_by_fee_factor": [ "23", "20" ] }'
+   tezos-client rpc post /chains/main/mempool/filter with '{ "max_prechecked_manager_operations": 7500 }'
 
 Changing filters default configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

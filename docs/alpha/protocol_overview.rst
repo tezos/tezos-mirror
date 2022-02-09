@@ -81,8 +81,10 @@ and :ref:`the protocol-specific part<shell_proto_revisit_alpha>`.
 This separation enables the shell to interact with different
 protocols.
 
-Operations
-~~~~~~~~~~
+.. _validation_passes_alpha:
+
+Operations & Validation Passes
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The different kinds of operations are grouped in classes, such that operations belonging to different classes may be validated independently, and/or with different priorities.
 Each class has an associated index, called a :ref:`validation pass<shell_header>`.
