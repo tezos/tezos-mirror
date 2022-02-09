@@ -75,8 +75,7 @@ module S = struct
 
   let listings =
     RPC_service.get_service
-      ~description:
-        "List of delegates with their voting weight, in number of rolls."
+      ~description:"List of delegates with their voting power."
       ~query:RPC_query.empty
       ~output:Vote.listings_encoding
       RPC_path.(path / "listings")
@@ -85,7 +84,7 @@ module S = struct
     RPC_service.get_service
       ~description:"List of proposals with number of supporters."
       ~query:RPC_query.empty
-      ~output:(Protocol_hash.Map.encoding Data_encoding.int32)
+      ~output:(Protocol_hash.Map.encoding Data_encoding.int64)
       RPC_path.(path / "proposals")
 
   let current_proposal =
@@ -97,10 +96,9 @@ module S = struct
 
   let total_voting_power =
     RPC_service.get_service
-      ~description:
-        "Total number of rolls for the delegates in the voting listings."
+      ~description:"Total voting power in the voting listings."
       ~query:RPC_query.empty
-      ~output:Data_encoding.int32
+      ~output:Data_encoding.int64
       RPC_path.(path / "total_voting_power")
 end
 

@@ -119,6 +119,7 @@ val genesis :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
   ?sc_rollup_enable:bool ->
   (Account.t * Tez.tez) list ->
@@ -253,6 +254,7 @@ val prepare_initial_context_params :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
   ?sc_rollup_enable:bool ->
   (Account.t * Tez.t) list ->

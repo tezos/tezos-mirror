@@ -59,7 +59,7 @@ type info = {
   delegated_balance : Tez.t;
   deactivated : bool;
   grace_period : Cycle.t;
-  voting_power : int32;
+  voting_power : int64;
 }
 
 let info_encoding =
@@ -119,7 +119,7 @@ let info_encoding =
        (req "delegated_balance" Tez.encoding)
        (req "deactivated" bool)
        (req "grace_period" Cycle.encoding)
-       (req "voting_power" int32))
+       (req "voting_power" int64))
 
 let participation_info_encoding =
   let open Data_encoding in
@@ -291,10 +291,9 @@ module S = struct
 
   let voting_power =
     RPC_service.get_service
-      ~description:
-        "The number of rolls in the vote listings for a given delegate"
+      ~description:"The voting power in the vote listings for a given delegate."
       ~query:RPC_query.empty
-      ~output:Data_encoding.int32
+      ~output:Data_encoding.int64
       RPC_path.(path / "voting_power")
 
   let participation =

@@ -43,10 +43,10 @@ val get_endorsing_power_for_delegate :
   t -> ?levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
 
 val get_voting_power :
-  t -> public_key_hash -> int32 Environment.Error_monad.shell_tzresult Lwt.t
+  t -> public_key_hash -> int64 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_total_voting_power :
-  t -> int32 Environment.Error_monad.shell_tzresult Lwt.t
+  t -> int64 Environment.Error_monad.shell_tzresult Lwt.t
 
 val get_bakers :
   ?filter:(Plugin.RPC.Baking_rights.t -> bool) ->
@@ -87,9 +87,9 @@ module Vote : sig
   val get_participation_ema : Block.t -> int32 tzresult Lwt.t
 
   val get_listings :
-    t -> (Signature.Public_key_hash.t * int32) list tzresult Lwt.t
+    t -> (Signature.Public_key_hash.t * int64) list tzresult Lwt.t
 
-  val get_proposals : t -> int32 Protocol_hash.Map.t tzresult Lwt.t
+  val get_proposals : t -> int64 Protocol_hash.Map.t tzresult Lwt.t
 
   val get_current_proposal : t -> Protocol_hash.t option tzresult Lwt.t
 
@@ -138,7 +138,7 @@ module Delegate : sig
     delegated_balance : Tez.t;
     deactivated : bool;
     grace_period : Cycle.t;
-    voting_power : int32;
+    voting_power : int64;
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
@@ -188,6 +188,7 @@ val init :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
   ?sc_rollup_enable:bool ->
   int ->
@@ -209,6 +210,7 @@ val init1 :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   unit ->
   (Block.t * Alpha_context.Contract.t) tzresult Lwt.t
 
@@ -228,6 +230,7 @@ val init2 :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
+  ?blocks_per_voting_period:int32 ->
   unit ->
   (Block.t * Alpha_context.Contract.t * Alpha_context.Contract.t) tzresult Lwt.t
 

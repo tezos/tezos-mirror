@@ -97,48 +97,52 @@ let test_voting_power_cache () =
     Int64.of_int (n * Int32.to_int blocks_per_voting_period)
   in
   Context.get_baking_reward_fixed_portion (B genesis) >>=? fun baking_reward ->
-  let tokens_per_roll = csts.parametric.tokens_per_roll in
-  let rolls_from_tez amount =
-    Test_tez.(amount /! Tez.to_mutez tokens_per_roll)
-    |> Tez.to_mutez |> Int64.to_int
-  in
   Context.get_bakers (B genesis) >>=? fun bakers ->
   let baker = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd bakers in
   Context.Delegate.full_balance (B genesis) baker >>=? fun full_balance ->
-  let assert_voting_power n block =
+  let assert_voting_power ~loc n block =
     Context.get_voting_power (B block) baker >>=? fun voting_power ->
-    Assert.equal_int ~loc:__LOC__ n (Int32.to_int voting_power)
+    Assert.equal_int64 ~loc n voting_power
   in
-  (* the voting power is the number of rolls *)
-  let initial_voting_power_at_genesis = rolls_from_tez full_balance in
-  assert_voting_power initial_voting_power_at_genesis genesis >>=? fun () ->
+  (* the voting power is the full staking balance *)
+  let initial_voting_power_at_genesis = Tez.to_mutez full_balance in
+  assert_voting_power ~loc:__LOC__ initial_voting_power_at_genesis genesis
+  >>=? fun () ->
   let rewards_after_one_voting_period =
-    Test_tez.(baking_reward *! blocks_per_voting_periods 1)
+    Test_tez.(baking_reward *! Int64.pred (blocks_per_voting_periods 1))
   in
   let expected_delta_voting_power_after_one_voting_period =
-    rolls_from_tez rewards_after_one_voting_period
+    Tez.to_mutez rewards_after_one_voting_period
   in
-  Block.bake_n ~policy (Int32.to_int blocks_per_voting_period) genesis
+  Block.bake_n ~policy (Int32.to_int blocks_per_voting_period - 1) genesis
   >>=? fun block ->
   let expected_voting_power_after_one_voting_period =
-    initial_voting_power_at_genesis
-    + expected_delta_voting_power_after_one_voting_period
+    Int64.add
+      initial_voting_power_at_genesis
+      expected_delta_voting_power_after_one_voting_period
   in
-  assert_voting_power expected_voting_power_after_one_voting_period block
+  assert_voting_power
+    ~loc:__LOC__
+    expected_voting_power_after_one_voting_period
+    block
   >>=? fun () ->
   let rewards_after_two_voting_periods =
-    Test_tez.(baking_reward *! blocks_per_voting_periods 2)
+    Test_tez.(baking_reward *! Int64.pred (blocks_per_voting_periods 2))
   in
   let expected_delta_voting_power_after_two_voting_periods =
-    rolls_from_tez rewards_after_two_voting_periods
+    Tez.to_mutez rewards_after_two_voting_periods
   in
   Block.bake_n ~policy (Int32.to_int blocks_per_voting_period) block
   >>=? fun block ->
   let expected_voting_power_after_two_voting_periods =
-    initial_voting_power_at_genesis
-    + expected_delta_voting_power_after_two_voting_periods
+    Int64.add
+      initial_voting_power_at_genesis
+      expected_delta_voting_power_after_two_voting_periods
   in
-  assert_voting_power expected_voting_power_after_two_voting_periods block
+  assert_voting_power
+    ~loc:__LOC__
+    expected_voting_power_after_two_voting_periods
+    block
 
 (** test that after baking, one gets the baking reward fixed portion. *)
 let test_basic_baking_reward () =

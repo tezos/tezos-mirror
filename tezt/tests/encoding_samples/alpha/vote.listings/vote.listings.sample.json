@@ -1,9 +1,9 @@
 [{
     "pkh": "tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx",
-    "rolls": 20115
+    "voting_power": "20115"
   },
   {
     "pkh": "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
-    "rolls": 9000
+    "voting_power": "9000"
   }
 ]

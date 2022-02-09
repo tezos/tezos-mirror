@@ -410,7 +410,8 @@ let validate_initial_accounts (initial_accounts : (Account.t * Tez.t) list)
 let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
     ?level ?cost_per_byte ?liquidity_baking_subsidy ?endorsing_reward_per_slot
     ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
-    ?blocks_per_cycle ?tx_rollup_enable ?sc_rollup_enable initial_accounts =
+    ?blocks_per_cycle ?blocks_per_voting_period ?tx_rollup_enable
+    ?sc_rollup_enable initial_accounts =
   let open Tezos_protocol_alpha_parameters in
   let constants = Default_parameters.constants_test in
   let min_proposal_quorum =
@@ -445,6 +446,11 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
   let blocks_per_cycle =
     Option.value ~default:constants.blocks_per_cycle blocks_per_cycle
   in
+  let blocks_per_voting_period =
+    Option.value
+      ~default:constants.blocks_per_voting_period
+      blocks_per_voting_period
+  in
   (* ?origination_size *)
   let consensus_threshold =
     Option.value ~default:constants.consensus_threshold consensus_threshold
@@ -463,6 +469,7 @@ let prepare_initial_context_params ?consensus_threshold ?min_proposal_quorum
       baking_reward_fixed_portion;
       origination_size;
       blocks_per_cycle;
+      blocks_per_voting_period;
       min_proposal_quorum;
       cost_per_byte;
       liquidity_baking_subsidy;
@@ -515,7 +522,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy
     ?endorsing_reward_per_slot ?baking_reward_bonus_per_slot
     ?baking_reward_fixed_portion ?origination_size ?blocks_per_cycle
-    ?tx_rollup_enable ?sc_rollup_enable
+    ?blocks_per_voting_period ?tx_rollup_enable ?sc_rollup_enable
     (initial_accounts : (Account.t * Tez.t) list) =
   prepare_initial_context_params
     ?consensus_threshold
@@ -528,6 +535,7 @@ let genesis ?commitments ?consensus_threshold ?min_proposal_quorum
     ?baking_reward_fixed_portion
     ?origination_size
     ?blocks_per_cycle
+    ?blocks_per_voting_period
     ?tx_rollup_enable
     ?sc_rollup_enable
     initial_accounts

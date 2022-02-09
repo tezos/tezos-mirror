@@ -335,7 +335,7 @@ type period_info = {
 type ballots_info = {
   current_quorum : Int32.t;
   participation : Int32.t;
-  supermajority : Int32.t;
+  supermajority : Int64.t;
   ballots : Vote.ballots;
 }
 
@@ -356,7 +356,7 @@ val get_proposals :
   #Protocol_client_context.full ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  Int32.t Environment.Protocol_hash.Map.t tzresult Lwt.t
+  Int64.t Environment.Protocol_hash.Map.t tzresult Lwt.t
 
 val submit_proposals :
   ?dry_run:bool ->

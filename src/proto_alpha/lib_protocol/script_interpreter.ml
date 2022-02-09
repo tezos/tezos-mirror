@@ -1277,14 +1277,14 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | IVoting_power (_, k) ->
           let key_hash = accu in
           let ctxt = update_context gas ctxt in
-          Vote.get_voting_power ctxt key_hash >>=? fun (ctxt, rolls) ->
-          let power = Script_int.(abs (of_int32 rolls)) in
+          Vote.get_voting_power ctxt key_hash >>=? fun (ctxt, power) ->
+          let power = Script_int.(abs (of_int64 power)) in
           let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks power stack
       | ITotal_voting_power (_, k) ->
           let ctxt = update_context gas ctxt in
-          Vote.get_total_voting_power ctxt >>=? fun (ctxt, rolls) ->
-          let power = Script_int.(abs (of_int32 rolls)) in
+          Vote.get_total_voting_power ctxt >>=? fun (ctxt, power) ->
+          let power = Script_int.(abs (of_int64 power)) in
           let (gas, ctxt) = local_gas_counter_and_outdated_context ctxt in
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks power (accu, stack)

@@ -507,15 +507,19 @@ module Vote : sig
       with type value = Protocol_hash.t
        and type t := Raw_context.t
 
-  (** Sum of all rolls of all delegates. *)
-  module Listings_size :
+  (* To be removed when removing migration from Ithaca *)
+  module Legacy_listings_size :
     Single_data_storage with type value = int32 and type t := Raw_context.t
 
-  (** Contains all delegates with their assigned number of rolls. *)
+  (** Sum of voting weights of all delegates. *)
+  module Voting_power_in_listings :
+    Single_data_storage with type value = int64 and type t := Raw_context.t
+
+  (** Contains all delegates with their assigned voting weight. *)
   module Listings :
     Indexed_data_storage
       with type key = Signature.Public_key_hash.t
-       and type value = int32
+       and type value = int64
        and type t := Raw_context.t
 
   (** Set of protocol proposal with corresponding proposer delegate *)

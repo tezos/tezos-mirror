@@ -44,12 +44,12 @@ val current_quorum :
 val listings :
   'a #RPC_context.simple ->
   'a ->
-  (Signature.Public_key_hash.t * int32) list shell_tzresult Lwt.t
+  (Signature.Public_key_hash.t * int64) list shell_tzresult Lwt.t
 
 val proposals :
   'a #RPC_context.simple ->
   'a ->
-  Int32.t Protocol_hash.Map.t shell_tzresult Lwt.t
+  Int64.t Protocol_hash.Map.t shell_tzresult Lwt.t
 
 val current_proposal :
   'a #RPC_context.simple -> 'a -> Protocol_hash.t option shell_tzresult Lwt.t
@@ -57,4 +57,4 @@ val current_proposal :
 val register : unit -> unit
 
 val total_voting_power :
-  'a #RPC_context.simple -> 'a -> Int32.t shell_tzresult Lwt.t
+  'a #RPC_context.simple -> 'a -> Int64.t shell_tzresult Lwt.t

@@ -6,7 +6,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "yay": 0, "nay": 0, "pass": 0 }
+{ "yay": "0", "nay": "0", "pass": "0" }
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -23,15 +23,20 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" } ]
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 666 ] ]
+[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", "4000000000000" ] ]
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/successor_period
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -40,7 +45,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-3330
+"20000000000000"
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballot_list
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -50,7 +55,7 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/ballots
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "yay": 666, "nay": 666, "pass": 666 }
+{ "yay": "4000001978209", "nay": "4000000000000", "pass": "4000000000000" }
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/current_period
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -67,11 +72,16 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/listings
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000000000000" },
+  { "pkh": "[PUBLIC_KEY_HASH]",
+    "voting_power": "4000001978209" } ]
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/proposals
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -84,4 +94,4 @@ protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaAL
 
 ./tezos-client --mode proxy rpc get /chains/main/blocks/head/votes/total_voting_power
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-3330
+"20000001978209"

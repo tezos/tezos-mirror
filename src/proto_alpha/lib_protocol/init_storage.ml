@@ -115,7 +115,8 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
       (* TODO (#2233): fix endorsement of migration block in Ithaca baker *)
       Raw_level_repr.of_int32 level >>?= fun first_level ->
       Storage.Tenderbake.First_level.update ctxt first_level >>=? fun ctxt ->
-      return (ctxt, []))
+      Storage.Vote.Legacy_listings_size.remove ctxt >>= fun ctxt ->
+      Vote_storage.update_listings ctxt >>=? fun ctxt -> return (ctxt, []))
   >>=? fun (ctxt, balance_updates) ->
   Receipt_repr.group_balance_updates balance_updates >>?= fun balance_updates ->
   Storage.Pending_migration.Balance_updates.add ctxt balance_updates

@@ -33,24 +33,18 @@
 
 *)
 
-(* Note that some of these tests assume (more or less) that the
-   accounts remain active during a voting period, which roughly
-   translates to the following condition being assumed to hold:
-   `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
-   *)
-
 open Protocol
 open Alpha_context
 
 (* missing stuff in Vote *)
-let ballots_zero = Vote.{yay = 0l; nay = 0l; pass = 0l}
+let ballots_zero = Vote.{yay = 0L; nay = 0L; pass = 0L}
 
 let ballots_equal b1 b2 =
   Vote.(b1.yay = b2.yay && b1.nay = b2.nay && b1.pass = b2.pass)
 
 let ballots_pp ppf v =
   Vote.(
-    Format.fprintf ppf "{ yay = %ld ; nay = %ld ; pass = %ld" v.yay v.nay v.pass)
+    Format.fprintf ppf "{ yay = %Ld ; nay = %Ld ; pass = %Ld" v.yay v.nay v.pass)
 
 (* constants and ratios used in voting:
    percent_mul denotes the percent multiplier
@@ -188,23 +182,39 @@ let assert_period ?expected_kind ?expected_index ?expected_position
       loc
   else return_unit
 
+let assert_ballots expected_ballots b loc =
+  Context.Vote.get_ballots (B b) >>=? fun ballots ->
+  Assert.equal
+    ~loc
+    ballots_equal
+    "Unexpected ballots"
+    ballots_pp
+    ballots
+    expected_ballots
+
+let assert_empty_ballots b loc =
+  assert_ballots ballots_zero b loc >>=? fun () ->
+  Context.Vote.get_ballot_list (B b) >>=? function
+  | [] -> return_unit
+  | _ -> failwith "%s - Unexpected ballot list" loc
+
 let mk_contracts_from_pkh pkh_list =
   List.map Contract.implicit_contract pkh_list
 
-(* get the list of delegates and the list of their rolls from listings *)
-let get_delegates_and_rolls_from_listings b =
+(* get the list of delegates and the list of their voting power from listings *)
+let get_delegates_and_power_from_listings b =
   Context.Vote.get_listings (B b) >|=? fun l ->
   (mk_contracts_from_pkh (List.map fst l), List.map snd l)
 
-(* compute the rolls of each delegate *)
-let get_rolls b delegates loc =
+(* compute the voting power of each delegate *)
+let get_power b delegates loc =
   Context.Vote.get_listings (B b) >>=? fun l ->
   List.map_es
     (fun delegate ->
       Context.Contract.pkh delegate >>=? fun pkh ->
       match List.find_opt (fun (del, _) -> del = pkh) l with
       | None -> failwith "%s - Missing delegate" loc
-      | Some (_, rolls) -> return rolls)
+      | Some (_, power) -> return power)
     delegates
 
 (* Checks that the listings are populated *)
@@ -213,31 +223,32 @@ let assert_listings_not_empty b ~loc =
   | [] -> failwith "Unexpected empty listings (%s)" loc
   | _ -> return_unit
 
-let bake_until_first_block_of_next_period b =
+let bake_until_first_block_of_next_period ?policy b =
   Context.Vote.get_current_period (B b) >>=? fun {remaining; _} ->
-  Block.bake_n Int32.(add remaining one |> to_int) b
+  Block.bake_n ?policy Int32.(add remaining one |> to_int) b
+
+let context_init =
+  (* Note that some of these tests assume (more or less) that the
+     accounts remain active during a voting period, which roughly
+     translates to the following condition being assumed to hold:
+     `blocks_per_voting_period <= preserved_cycles * blocks_per_cycle.`
+     We also set baking and endorsing rewards to zero in order to
+     ease accounting of exact baker stake. *)
+  Context.init
+    ~blocks_per_cycle:4l
+    ~blocks_per_voting_period:4l
+    ~consensus_threshold:0
+    ~endorsing_reward_per_slot:Tez.zero
+    ~baking_reward_bonus_per_slot:Tez.zero
+    ~baking_reward_fixed_portion:Tez.zero
 
 (** A normal and successful vote sequence. *)
 let test_successful_vote num_delegates () =
   let open Alpha_context in
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
-  >>=? fun (b, _) ->
+  context_init ~min_proposal_quorum num_delegates >>=? fun (b, _) ->
   (* no ballots in proposal period *)
-  Context.Vote.get_ballots (B b) >>=? fun v ->
-  Assert.equal
-    ~loc:__LOC__
-    ballots_equal
-    "Unexpected ballots"
-    ballots_pp
-    v
-    ballots_zero
-  >>=? fun () ->
-  (* no ballots in proposal period *)
-  (Context.Vote.get_ballot_list (B b) >>=? function
-   | [] -> return_unit
-   | _ -> failwith "%s - Unexpected ballot list" __LOC__)
-  >>=? fun () ->
+  assert_empty_ballots b __LOC__ >>=? fun () ->
   (* Last baked block is first block of period Proposal *)
   assert_period
     ~expected_kind:Proposal
@@ -254,8 +265,8 @@ let test_successful_vote num_delegates () =
   (* listings must be populated in proposal period *)
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () ->
   (* beginning of proposal, denoted by _p1;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p1, rolls_p1) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p1, power_p1) ->
   (* no proposals at the beginning of proposal period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (if Environment.Protocol_hash.Map.is_empty ps then return_unit
@@ -282,14 +293,14 @@ let test_successful_vote num_delegates () =
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (* correctly count the double proposal for zero *)
   (let weight =
-     Int32.add
-       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth rolls_p1 0)
-       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth rolls_p1 1)
+     Int64.add
+       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth power_p1 0)
+       (WithExceptions.Option.get ~loc:__LOC__ @@ List.nth power_p1 1)
    in
    match Environment.Protocol_hash.(Map.find zero ps) with
    | Some v ->
        if v = weight then return_unit
-       else failwith "%s - Wrong count %ld is not %ld" __LOC__ v weight
+       else failwith "%s - Wrong count %Ld is not %Ld" __LOC__ v weight
    | None -> failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
   (* proposing more than maximum_proposals fails *)
@@ -315,8 +326,8 @@ let test_successful_vote num_delegates () =
   (* listings must be populated in proposal period before moving to exploration period *)
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () ->
   (* beginning of exploration period, denoted by _p2;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p2, rolls_p2) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p2, power_p2) ->
   (* no proposals during exploration period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (if Environment.Protocol_hash.Map.is_empty ps then return_unit
@@ -341,18 +352,11 @@ let test_successful_vote num_delegates () =
       | Amendment.Duplicate_ballot -> true
       | _ -> false)
   >>=? fun () ->
-  (* Allocate votes from weight (rolls) of active delegates *)
-  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls_p2
-  |> fun rolls_sum ->
-  (* # of Yay rolls in ballots matches votes of the delegates *)
-  Context.Vote.get_ballots (B b) >>=? fun v ->
-  Assert.equal
-    ~loc:__LOC__
-    ballots_equal
-    "Unexpected ballots"
-    ballots_pp
-    v
-    Vote.{yay = rolls_sum; nay = 0l; pass = 0l}
+  (* Allocate votes from weight of active delegates *)
+  List.fold_left (fun acc v -> Int64.(add v acc)) 0L power_p2
+  |> fun power_sum ->
+  (* # of Yay in ballots matches votes of the delegates *)
+  assert_ballots Vote.{yay = power_sum; nay = 0L; pass = 0L} b __LOC__
   >>=? fun () ->
   (* One Yay ballot per delegate *)
   (Context.Vote.get_ballot_list (B b) >>=? function
@@ -372,15 +376,7 @@ let test_successful_vote num_delegates () =
   assert_period ~expected_index:2l ~expected_kind:Cooldown b __LOC__
   >>=? fun () ->
   (* no ballots in cooldown period *)
-  Context.Vote.get_ballots (B b) >>=? fun v ->
-  Assert.equal
-    ~loc:__LOC__
-    ballots_equal
-    "Unexpected ballots"
-    ballots_pp
-    v
-    ballots_zero
-  >>=? fun () ->
+  assert_empty_ballots b __LOC__ >>=? fun () ->
   (* listings must be populated in cooldown period before moving to promotion_vote period *)
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () ->
   (* skip to promotion period *)
@@ -392,8 +388,8 @@ let test_successful_vote num_delegates () =
   (* listings must be populated in promotion period *)
   assert_listings_not_empty b ~loc:__LOC__ >>=? fun () ->
   (* beginning of promotion period, denoted by _p4;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p4, rolls_p4) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p4, power_p4) ->
   (* no proposals during promotion period *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
   (if Environment.Protocol_hash.Map.is_empty ps then return_unit
@@ -412,17 +408,10 @@ let test_successful_vote num_delegates () =
     delegates_p4
   >>=? fun operations ->
   Block.bake ~operations b >>=? fun b ->
-  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls_p4
-  |> fun rolls_sum ->
-  (* # of Yays in ballots matches rolls of the delegate *)
-  Context.Vote.get_ballots (B b) >>=? fun v ->
-  Assert.equal
-    ~loc:__LOC__
-    ballots_equal
-    "Unexpected ballots"
-    ballots_pp
-    v
-    Vote.{yay = rolls_sum; nay = 0l; pass = 0l}
+  List.fold_left (fun acc v -> Int64.(add v acc)) 0L power_p4
+  |> fun power_sum ->
+  (* # of Yays in ballots matches voting power of the delegate *)
+  assert_ballots Vote.{yay = power_sum; nay = 0L; pass = 0L} b __LOC__
   >>=? fun () ->
   (* One Yay ballot per delegate *)
   (Context.Vote.get_ballot_list (B b) >>=? function
@@ -459,38 +448,38 @@ let test_successful_vote num_delegates () =
 
 (* given a list of active delegates,
    return the first k active delegates with which one can have quorum, that is:
-   their roll sum divided by the total roll sum is bigger than pr_ema_weight/den *)
-let get_smallest_prefix_voters_for_quorum active_delegates active_rolls
+   their voting power divided by the total voting power is bigger than pr_ema_weight/den *)
+let get_smallest_prefix_voters_for_quorum active_delegates active_power
     participation_ema =
   let expected_quorum = expected_qr_num participation_ema in
-  List.fold_left (fun acc v -> Int32.(add v acc)) 0l active_rolls
-  |> fun active_rolls_sum ->
-  let rec loop delegates rolls sum selected =
-    match (delegates, rolls) with
+  List.fold_left (fun acc v -> Int64.(add v acc)) 0L active_power
+  |> fun active_power_sum ->
+  let rec loop delegates power sum selected =
+    match (delegates, power) with
     | ([], []) -> selected
-    | (del :: delegates, del_rolls :: rolls) ->
+    | (del :: delegates, del_power :: power) ->
         if
           den * sum
-          < Float.to_int (expected_quorum *. Int32.to_float active_rolls_sum)
+          < Float.to_int (expected_quorum *. Int64.to_float active_power_sum)
         then
-          loop delegates rolls (sum + Int32.to_int del_rolls) (del :: selected)
+          loop delegates power (sum + Int64.to_int del_power) (del :: selected)
         else selected
     | (_, _) -> []
   in
-  loop active_delegates active_rolls 0 []
+  loop active_delegates active_power 0 []
 
-let get_expected_participation_ema rolls voter_rolls old_participation_ema =
+let get_expected_participation_ema power voter_power old_participation_ema =
   (* formula to compute the updated participation_ema *)
   let get_updated_participation_ema old_participation_ema participation =
     ((pr_ema_weight * Int32.to_int old_participation_ema)
     + (pr_num * participation))
     / den
   in
-  List.fold_left (fun acc v -> Int32.(add v acc)) 0l rolls |> fun rolls_sum ->
-  List.fold_left (fun acc v -> Int32.(add v acc)) 0l voter_rolls
-  |> fun voter_rolls_sum ->
+  List.fold_left (fun acc v -> Int64.(add v acc)) 0L power |> fun power_sum ->
+  List.fold_left (fun acc v -> Int64.(add v acc)) 0L voter_power
+  |> fun voter_power_sum ->
   let participation =
-    Int32.to_int voter_rolls_sum * percent_mul / Int32.to_int rolls_sum
+    Int64.(to_int (div (mul voter_power_sum (of_int percent_mul)) power_sum))
   in
   get_updated_participation_ema old_participation_ema participation
 
@@ -499,8 +488,7 @@ let get_expected_participation_ema rolls voter_rolls old_participation_ema =
     in exploration, go back to proposal period. *)
 let test_not_enough_quorum_in_exploration num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
-  >>=? fun (b, delegates) ->
+  context_init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
   (* proposal period *)
   let open Alpha_context in
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
@@ -515,17 +503,17 @@ let test_not_enough_quorum_in_exploration num_delegates () =
   assert_period ~expected_kind:Exploration b __LOC__ >>=? fun () ->
   Context.Vote.get_participation_ema b >>=? fun initial_participation_ema ->
   (* beginning of exploration period, denoted by _p2;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p2, rolls_p2) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p2, power_p2) ->
   Context.Vote.get_participation_ema b >>=? fun participation_ema ->
-  get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
+  get_smallest_prefix_voters_for_quorum delegates_p2 power_p2 participation_ema
   |> fun voters ->
   (* take the first two voters out so there cannot be quorum *)
   let voters_without_quorum =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.tl voters
   in
-  get_rolls b voters_without_quorum __LOC__
-  >>=? fun voters_rolls_in_exploration ->
+  get_power b voters_without_quorum __LOC__
+  >>=? fun voters_power_in_exploration ->
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
   List.map_es
@@ -539,8 +527,8 @@ let test_not_enough_quorum_in_exploration num_delegates () =
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   (* check participation_ema update *)
   get_expected_participation_ema
-    rolls_p2
-    voters_rolls_in_exploration
+    power_p2
+    voters_power_in_exploration
     initial_participation_ema
   |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b >>=? fun new_participation_ema ->
@@ -556,8 +544,7 @@ let test_not_enough_quorum_in_exploration num_delegates () =
    In promotion period, go back to proposal period. *)
 let test_not_enough_quorum_in_promotion num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
-  >>=? fun (b, delegates) ->
+  context_init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   let proposer =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0
@@ -569,10 +556,10 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   (* we moved to an exploration period with one proposal *)
   assert_period ~expected_kind:Exploration b __LOC__ >>=? fun () ->
   (* beginning of exploration period, denoted by _p2;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p2, rolls_p2) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p2, power_p2) ->
   Context.Vote.get_participation_ema b >>=? fun participation_ema ->
-  get_smallest_prefix_voters_for_quorum delegates_p2 rolls_p2 participation_ema
+  get_smallest_prefix_voters_for_quorum delegates_p2 power_p2 participation_ema
   |> fun voters ->
   let open Alpha_context in
   (* all voters vote, for yays;
@@ -596,16 +583,16 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   fun () ->
   Context.Vote.get_participation_ema b >>=? fun initial_participation_ema ->
   (* beginning of promotion period, denoted by _p4;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p4, rolls_p4) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p4, power_p4) ->
   Context.Vote.get_participation_ema b >>=? fun participation_ema ->
-  get_smallest_prefix_voters_for_quorum delegates_p4 rolls_p4 participation_ema
+  get_smallest_prefix_voters_for_quorum delegates_p4 power_p4 participation_ema
   |> fun voters ->
   (* take the first voter out so there cannot be quorum *)
   let voters_without_quorum =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.tl voters
   in
-  get_rolls b voters_without_quorum __LOC__ >>=? fun voter_rolls ->
+  get_power b voters_without_quorum __LOC__ >>=? fun voter_power ->
   (* all voters_without_quorum vote, for yays;
      no nays, so supermajority is satisfied *)
   List.map_es
@@ -615,7 +602,7 @@ let test_not_enough_quorum_in_promotion num_delegates () =
   Block.bake ~operations b >>=? fun b ->
   (* skip to end of promotion period *)
   bake_until_first_block_of_next_period b >>=? fun b ->
-  get_expected_participation_ema rolls_p4 voter_rolls initial_participation_ema
+  get_expected_participation_ema power_p4 voter_power initial_participation_ema
   |> fun expected_participation_ema ->
   Context.Vote.get_participation_ema b >>=? fun new_participation_ema ->
   (* assert the formula to calculate participation_ema is correct *)
@@ -631,7 +618,7 @@ let test_not_enough_quorum_in_promotion num_delegates () =
 (** Identical proposals (identified by their hash) must be counted as
     one. *)
 let test_multiple_identical_proposals_count_as_one () =
-  Context.init 1 >>=? fun (b, delegates) ->
+  context_init 1 >>=? fun (b, delegates) ->
   assert_period ~expected_kind:Proposal b __LOC__ >>=? fun () ->
   let proposer = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd delegates in
   Op.proposals (B b) proposer [Protocol_hash.zero; Protocol_hash.zero]
@@ -639,42 +626,37 @@ let test_multiple_identical_proposals_count_as_one () =
   Block.bake ~operations:[ops] b >>=? fun b ->
   (* compute the weight of proposals *)
   Context.Vote.get_proposals (B b) >>=? fun ps ->
-  (* compute the rolls of proposer *)
+  (* compute the voting power of proposer *)
   Context.Contract.pkh proposer >>=? fun pkh ->
   Context.Vote.get_listings (B b) >>=? fun l ->
   (match List.find_opt (fun (del, _) -> del = pkh) l with
   | None -> failwith "%s - Missing delegate" __LOC__
-  | Some (_, proposer_rolls) -> return proposer_rolls)
-  >>=? fun proposer_rolls ->
+  | Some (_, proposer_power) -> return proposer_power)
+  >>=? fun proposer_power ->
   (* correctly count the double proposal for zero as one proposal *)
-  let expected_weight_proposer = proposer_rolls in
+  let expected_weight_proposer = proposer_power in
   match Environment.Protocol_hash.(Map.find zero ps) with
   | Some v ->
       if v = expected_weight_proposer then return_unit
       else
         failwith
-          "%s - Wrong count %ld is not %ld; identical proposals count as one"
+          "%s - Wrong count %Ld is not %Ld; identical proposals count as one"
           __LOC__
           v
           expected_weight_proposer
   | None -> failwith "%s - Missing proposal" __LOC__
 
-(** Assume the initial balance of allocated by Context.init is at
+(** Assume the initial balance of accounts allocated by Context.init is at
     least 4 times the value of the tokens_per_roll constant. *)
 let test_supermajority_in_proposal there_is_a_winner () =
   let min_proposal_quorum = 0l in
-  Context.init
-    ~consensus_threshold:0
+  let initial_balance = 1L in
+  context_init
     ~min_proposal_quorum
-    ~initial_balances:[1L; 1L; 1L]
+    ~initial_balances:[initial_balance; initial_balance; initial_balance]
     10
   >>=? fun (b, delegates) ->
-  Context.get_constants (B b)
-  >>=? fun {
-             parametric =
-               {blocks_per_cycle; tokens_per_roll; blocks_per_voting_period; _};
-             _;
-           } ->
+  Context.get_constants (B b) >>=? fun {parametric = {tokens_per_roll; _}; _} ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
   let del3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 2 in
@@ -694,7 +676,9 @@ let test_supermajority_in_proposal there_is_a_winner () =
     tokens_per_roll
   >>=? fun op2 ->
   (if there_is_a_winner then Test_tez.( *? ) tokens_per_roll 3L
-  else Test_tez.( *? ) tokens_per_roll 2L)
+  else
+    Test_tez.( *? ) tokens_per_roll 2L
+    >>? Test_tez.( +? ) (Test_tez.of_mutez_exn initial_balance))
   >>?= fun bal3 ->
   Op.transaction
     (B b)
@@ -703,28 +687,13 @@ let test_supermajority_in_proposal there_is_a_winner () =
     bal3
   >>=? fun op3 ->
   Block.bake ~policy ~operations:[op1; op2; op3] b >>=? fun b ->
-  (* we let one voting period pass; we make sure that:
-     - the three selected delegates remain active by re-registering as delegates
-     - their number of rolls do not change *)
-  List.fold_left_es
-    (fun b _ ->
-      List.map_es
-        (fun del ->
-          Context.Contract.pkh del >>=? fun pkh ->
-          Op.delegation (B b) del (Some pkh))
-        delegates
-      >>=? fun ops ->
-      Block.bake ~policy ~operations:ops b >>=? fun b ->
-      Block.bake_until_cycle_end ~policy b)
-    b
-    (1 -- Int32.to_int (Int32.div blocks_per_voting_period blocks_per_cycle))
-  >>=? fun b ->
+  bake_until_first_block_of_next_period ~policy b >>=? fun b ->
   (* make the proposals *)
   Op.proposals (B b) del1 [protos.(0)] >>=? fun ops1 ->
   Op.proposals (B b) del2 [protos.(0)] >>=? fun ops2 ->
   Op.proposals (B b) del3 [protos.(1)] >>=? fun ops3 ->
   Block.bake ~policy ~operations:[ops1; ops2; ops3] b >>=? fun b ->
-  bake_until_first_block_of_next_period b >>=? fun b ->
+  bake_until_first_block_of_next_period ~policy b >>=? fun b ->
   (* we remain in the proposal period when there is no winner,
      otherwise we move to the exploration period *)
   (if there_is_a_winner then assert_period ~expected_kind:Exploration b __LOC__
@@ -737,22 +706,10 @@ let test_supermajority_in_proposal there_is_a_winner () =
 let test_quorum_in_proposal has_quorum () =
   let total_tokens = 32_000_000_000_000L in
   let half_tokens = Int64.div total_tokens 2L in
-  Context.init
-    ~consensus_threshold:0
-    ~initial_balances:[1L; half_tokens; half_tokens]
-    3
+  context_init ~initial_balances:[1L; half_tokens; half_tokens] 3
   >>=? fun (b, delegates) ->
   Context.get_constants (B b)
-  >>=? fun {
-             parametric =
-               {
-                 blocks_per_cycle;
-                 min_proposal_quorum;
-                 blocks_per_voting_period;
-                 _;
-               };
-             _;
-           } ->
+  >>=? fun {parametric = {min_proposal_quorum; _}; _} ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let del2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 1 in
   List.map_es (fun del -> Context.Contract.pkh del) [del1; del2]
@@ -767,22 +724,7 @@ let test_quorum_in_proposal has_quorum () =
   in
   Op.transaction (B b) del2 del1 bal >>=? fun op2 ->
   Block.bake ~policy ~operations:[op2] b >>=? fun b ->
-  (* we let one voting period pass; we make sure that:
-     - the two selected delegates remain active by re-registering as delegates
-     - their number of rolls do not change *)
-  List.fold_left_es
-    (fun b _ ->
-      List.map_es
-        (fun del ->
-          Context.Contract.pkh del >>=? fun pkh ->
-          Op.delegation (B b) del (Some pkh))
-        [del1; del2]
-      >>=? fun ops ->
-      Block.bake ~policy ~operations:ops b >>=? fun b ->
-      Block.bake_until_cycle_end ~policy b)
-    b
-    (1 -- Int32.to_int (Int32.div blocks_per_voting_period blocks_per_cycle))
-  >>=? fun b ->
+  bake_until_first_block_of_next_period b >>=? fun b ->
   (* make the proposal *)
   Op.proposals (B b) del1 [protos.(0)] >>=? fun ops ->
   Block.bake ~policy ~operations:[ops] b >>=? fun b ->
@@ -797,8 +739,7 @@ let test_quorum_in_proposal has_quorum () =
     reached. Otherwise, it remains in proposal period. *)
 let test_supermajority_in_exploration supermajority () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / 100)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum 100
-  >>=? fun (b, delegates) ->
+  context_init ~min_proposal_quorum 100 >>=? fun (b, delegates) ->
   let del1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth delegates 0 in
   let proposal = protos.(0) in
   Op.proposals (B b) del1 [proposal] >>=? fun ops1 ->
@@ -814,8 +755,8 @@ let test_supermajority_in_exploration supermajority () =
    | None -> failwith "%s - Missing proposal" __LOC__)
   >>=? fun () ->
   (* beginning of exploration period, denoted by _p2;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p2, _rolls_p2) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p2, _power_p2) ->
   (* supermajority means [num_yays / (num_yays + num_nays) >= s_num / s_den],
      which is equivalent with [num_yays >= num_nays * s_num / (s_den - s_num)] *)
   let num_delegates = List.length delegates_p2 in
@@ -842,11 +783,10 @@ let test_supermajority_in_exploration supermajority () =
     proposals. *)
 let test_no_winning_proposal num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
-  >>=? fun (b, _) ->
+  context_init ~min_proposal_quorum num_delegates >>=? fun (b, _) ->
   (* beginning of proposal, denoted by _p1;
-     take a snapshot of the active delegates and their rolls from listings *)
-  get_delegates_and_rolls_from_listings b >>=? fun (delegates_p1, _rolls_p1) ->
+     take a snapshot of the active delegates and their voting power from listings *)
+  get_delegates_and_power_from_listings b >>=? fun (delegates_p1, _power_p1) ->
   let open Alpha_context in
   let props =
     List.map (fun i -> protos.(i)) (1 -- Constants.max_proposals_per_delegate)
@@ -865,8 +805,7 @@ let test_no_winning_proposal num_delegates () =
     maximum quorum cap. *)
 let test_quorum_capped_maximum num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
-  >>=? fun (b, delegates) ->
+  context_init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
   (* set the participation EMA to 100% *)
   Context.Vote.set_participation_ema b 100_00l >>= fun b ->
   Context.get_constants (B b) >>=? fun {parametric = {quorum_max; _}; _} ->
@@ -906,8 +845,7 @@ let test_quorum_capped_maximum num_delegates () =
     minimum quorum cap. *)
 let test_quorum_capped_minimum num_delegates () =
   let min_proposal_quorum = Int32.(of_int @@ (100_00 / num_delegates)) in
-  Context.init ~consensus_threshold:0 ~min_proposal_quorum num_delegates
-  >>=? fun (b, delegates) ->
+  context_init ~min_proposal_quorum num_delegates >>=? fun (b, delegates) ->
   (* set the participation EMA to 0% *)
   Context.Vote.set_participation_ema b 0l >>= fun b ->
   Context.get_constants (B b) >>=? fun {parametric = {quorum_min; _}; _} ->
@@ -956,13 +894,8 @@ let test_voting_power_updated_each_voting_period () =
   let init_bal2 = 48_000_000_000L in
   let init_bal3 = 40_000_000_000L in
   (* Create three accounts with different amounts *)
-  Context.init
-    ~consensus_threshold:0
-    ~initial_balances:[init_bal1; init_bal2; init_bal3]
-    3
+  context_init ~initial_balances:[init_bal1; init_bal2; init_bal3] 3
   >>=? fun (genesis, contracts) ->
-  Context.get_constants (B genesis)
-  >>=? fun {parametric = {tokens_per_roll; _}; _} ->
   let con1 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
   let con2 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1 in
   let con3 = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 2 in
@@ -995,32 +928,24 @@ let test_voting_power_updated_each_voting_period () =
   (* Auxiliary assert_voting_power *)
   let assert_voting_power ~loc n block baker =
     get_voting_power block baker >>=? fun voting_power ->
-    Assert.equal_int ~loc n (Int32.to_int voting_power)
+    Assert.equal_int64 ~loc n voting_power
   in
   (* Auxiliary assert_total_voting_power *)
   let assert_total_voting_power ~loc n block =
     Context.get_total_voting_power (B block) >>=? fun total_voting_power ->
-    Assert.equal_int ~loc n (Int32.to_int total_voting_power)
+    Assert.equal_int64 ~loc n total_voting_power
   in
-  (* Assert voting power is equal to the balance divided by tokens_per_roll *)
-  let expected_power_of_baker_1 =
-    Int64.(to_int (div (to_mutez full_balance1) (to_mutez tokens_per_roll)))
-  in
+  let expected_power_of_baker_1 = Tez.to_mutez full_balance1 in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 genesis baker1
   >>=? fun () ->
-  (* Assert voting power is equal to the balance divided by tokens_per_roll *)
-  let expected_power_of_baker_2 =
-    Int64.(to_int (div (to_mutez full_balance2) (to_mutez tokens_per_roll)))
-  in
+  let expected_power_of_baker_2 = Tez.to_mutez full_balance2 in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 genesis baker2
   >>=? fun () ->
   (* Assert total voting power *)
-  let expected_power_of_baker_3 =
-    Int64.(to_int (div (to_mutez full_balance3) (to_mutez tokens_per_roll)))
-  in
+  let expected_power_of_baker_3 = Tez.to_mutez full_balance3 in
   assert_total_voting_power
     ~loc:__LOC__
-    Int.(
+    Int64.(
       add
         (add expected_power_of_baker_1 expected_power_of_baker_2)
         expected_power_of_baker_3)
@@ -1028,9 +953,8 @@ let test_voting_power_updated_each_voting_period () =
   >>=? fun () ->
   (* Create policy that excludes baker1 and baker2 from baking *)
   let policy = Block.Excluding [baker1; baker2] in
-  (* Transfer tokens_per_roll * num_rolls from baker1 to baker2 *)
-  let num_rolls = 5L in
-  tokens_per_roll *? num_rolls >>?= fun amount ->
+  (* Transfer 30,000 tez from baker1 to baker2 *)
+  let amount = Tez.of_mutez_exn 30_000_000_000L in
   Op.transaction (B genesis) con1 con2 amount >>=? fun op ->
   (* Bake the block containing the transaction *)
   Block.bake ~policy ~operations:[op] genesis >>=? fun block ->
@@ -1062,32 +986,32 @@ let test_voting_power_updated_each_voting_period () =
   >>=? fun () ->
   assert_total_voting_power
     ~loc:__LOC__
-    Int.(
+    Int64.(
       add
         (add expected_power_of_baker_1 expected_power_of_baker_2)
         expected_power_of_baker_3)
     block
   >>=? fun () ->
   bake_until_first_block_of_next_period block >>=? fun block ->
-  (* Assert voting power of baker1 has decreased by num_rolls *)
+  (* Assert voting power of baker1 has decreased by [amount] *)
   let expected_power_of_baker_1 =
-    Int.sub expected_power_of_baker_1 (Int64.to_int num_rolls)
+    Int64.sub expected_power_of_baker_1 (Tez.to_mutez amount)
   in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_1 block baker1
   >>=? fun _ ->
-  (* Assert voting power of baker2 has increased by num_rolls *)
+  (* Assert voting power of baker2 has increased by [amount] *)
   let expected_power_of_baker_2 =
-    Int.add expected_power_of_baker_2 (Int64.to_int num_rolls)
+    Int64.add expected_power_of_baker_2 (Tez.to_mutez amount)
   in
   assert_voting_power ~loc:__LOC__ expected_power_of_baker_2 block baker2
   >>=? fun _ ->
   (* Retrieve voting power of baker3 *)
   get_voting_power block baker3 >>=? fun power ->
-  let power_of_baker_3 = Int32.to_int power in
+  let power_of_baker_3 = power in
   (* Assert total voting power *)
   assert_total_voting_power
     ~loc:__LOC__
-    Int.(
+    Int64.(
       add
         (add expected_power_of_baker_1 expected_power_of_baker_2)
         power_of_baker_3)

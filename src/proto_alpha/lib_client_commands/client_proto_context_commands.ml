@@ -497,7 +497,7 @@ let commands_ro () =
         >>=? fun props ->
         let ranks =
           Environment.Protocol_hash.Map.bindings props
-          |> List.sort (fun (_, v1) (_, v2) -> Int32.(compare v2 v1))
+          |> List.sort (fun (_, v1) (_, v2) -> Int64.(compare v2 v1))
         in
         let print_proposal = function
           | None ->
@@ -523,10 +523,12 @@ let commands_ro () =
                       (fun (p, w) ->
                         fprintf
                           ppf
-                          "* %a %ld (%sknown by the node)@."
+                          "* %a %a %s (%sknown by the node)@."
                           Protocol_hash.pp
                           p
-                          w
+                          Tez.pp
+                          (Tez.of_mutez_exn w)
+                          Client_proto_args.tez_sym
                           (if List.mem ~equal:Protocol_hash.equal p known_protos
                           then ""
                           else "not "))
@@ -543,17 +545,29 @@ let commands_ro () =
               get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt
               >>=? fun ballots_info ->
               cctxt#answer
-                "Ballots: %a@,\
+                "@[<v>Ballots:@,\
+                \  Yay: %a %s@,\
+                \  Nay: %a %s@,\
+                \  Pass: %a %s@,\
                  Current participation %.2f%%, necessary quorum %.2f%%@,\
-                 Current in favor %ld, needed supermajority %ld"
-                Data_encoding.Json.pp
-                (Data_encoding.Json.construct
-                   Vote.ballots_encoding
-                   ballots_info.ballots)
+                 Current in favor %a %s, needed supermajority %a %s@]"
+                Tez.pp
+                (Tez.of_mutez_exn ballots_info.ballots.yay)
+                Client_proto_args.tez_sym
+                Tez.pp
+                (Tez.of_mutez_exn ballots_info.ballots.nay)
+                Client_proto_args.tez_sym
+                Tez.pp
+                (Tez.of_mutez_exn ballots_info.ballots.pass)
+                Client_proto_args.tez_sym
                 (Int32.to_float ballots_info.participation /. 100.)
                 (Int32.to_float ballots_info.current_quorum /. 100.)
-                ballots_info.ballots.yay
-                ballots_info.supermajority
+                Tez.pp
+                (Tez.of_mutez_exn ballots_info.ballots.yay)
+                Client_proto_args.tez_sym
+                Tez.pp
+                (Tez.of_mutez_exn ballots_info.supermajority)
+                Client_proto_args.tez_sym
               >>= fun () -> return_unit
             else
               cctxt#message "The ballots have already been cleared."

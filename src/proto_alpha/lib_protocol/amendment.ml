@@ -34,19 +34,23 @@ let select_winning_proposal ctxt =
     match winners with
     | None -> Some ([proposal], vote)
     | Some (winners, winners_vote) as previous ->
-        if Compare.Int32.(vote = winners_vote) then
+        if Compare.Int64.(vote = winners_vote) then
           Some (proposal :: winners, winners_vote)
-        else if Compare.Int32.(vote > winners_vote) then Some ([proposal], vote)
+        else if Compare.Int64.(vote > winners_vote) then Some ([proposal], vote)
         else previous
   in
   match Protocol_hash.Map.fold merge proposals None with
   | Some ([proposal], vote) ->
-      Vote.listing_size ctxt >>=? fun max_vote ->
-      let min_proposal_quorum = Constants.min_proposal_quorum ctxt in
-      let min_vote_to_pass =
-        Int32.div (Int32.mul min_proposal_quorum max_vote) 100_00l
+      Vote.get_total_voting_power_free ctxt >>=? fun max_vote ->
+      let min_proposal_quorum =
+        Z.of_int32 (Constants.min_proposal_quorum ctxt)
       in
-      if Compare.Int32.(vote >= min_vote_to_pass) then return_some proposal
+      let min_vote_to_pass =
+        Z.(
+          to_int64
+            (div (mul min_proposal_quorum (of_int64 max_vote)) (of_int 100_00)))
+      in
+      if Compare.Int64.(vote >= min_vote_to_pass) then return_some proposal
       else return_none
   | _ -> return_none
 
@@ -63,22 +67,25 @@ let select_winning_proposal ctxt =
     by the min/max quorum protocol constants. *)
 let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
     ~participation_ema ~expected_quorum =
-  (* Note overflows: considering a maximum of 8e8 tokens, with roll size as
-     small as 1e3, there is a maximum of 8e5 rolls and thus votes.
-     In 'participation' an Int64 is used because in the worst case 'all_votes is
-     8e5 and after the multiplication is 8e9, making it potentially overflow a
-     signed Int32 which is 2e9. *)
-  let casted_votes = Int32.add ballots.yay ballots.nay in
-  let all_votes = Int32.add casted_votes ballots.pass in
-  let supermajority = Int32.div (Int32.mul 8l casted_votes) 10l in
+  (* Note overflows: considering a maximum of 1e9 tokens (around 2^30),
+     hence 1e15 mutez (around 2^50)
+     In 'participation' a Z is used because in the worst case 'all_votes is
+     1e15 and after the multiplication is 1e19 (around 2^64).
+  *)
+  let casted_votes = Int64.add ballots.yay ballots.nay in
+  let all_votes = Int64.add casted_votes ballots.pass in
+  let supermajority = Int64.div (Int64.mul 8L casted_votes) 10L in
   let participation =
     (* in centile of percentage *)
-    Int64.(
-      to_int32 (div (mul (of_int32 all_votes) 100_00L) (of_int32 maximum_vote)))
+    Z.(
+      to_int32
+        (div
+           (mul (Z.of_int64 all_votes) (Z.of_int 100_00))
+           (Z.of_int64 maximum_vote)))
   in
   let approval =
-    Compare.Int32.(
-      participation >= expected_quorum && ballots.yay >= supermajority)
+    Compare.Int32.(participation >= expected_quorum)
+    && Compare.Int64.(ballots.yay >= supermajority)
   in
   let new_participation_ema =
     Int32.(div (add (mul 8l participation_ema) (mul 2l participation)) 10l)
@@ -87,7 +94,7 @@ let approval_and_participation_ema (ballots : Vote.ballots) ~maximum_vote
 
 let get_approval_and_update_participation_ema ctxt =
   Vote.get_ballots ctxt >>=? fun ballots ->
-  Vote.listing_size ctxt >>=? fun maximum_vote ->
+  Vote.get_total_voting_power_free ctxt >>=? fun maximum_vote ->
   Vote.get_participation_ema ctxt >>=? fun participation_ema ->
   Vote.get_current_quorum ctxt >>=? fun expected_quorum ->
   Vote.clear_ballots ctxt >>= fun ctxt ->
