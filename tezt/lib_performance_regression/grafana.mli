@@ -98,16 +98,22 @@ val update_dashboard : config -> dashboard -> unit Lwt.t
 
 (** Make a simple SELECT query for a graph panel.
 
-    Usage: [simple_query measurement field]
+    Usage: [simple_query ~tags:[("tag1", "value1"), ("tag2", "value2")] measurement field]
+
+    Default [tags] is an empty list.
 
     This returns the following query:
     [
       SELECT MEAN(field)
       FROM measurement
-      WHERE $timeFilter
+      WHERE $timeFilter AND tag1 = value1 AND tag2 = value2
       GROUP BY time($__interval) fill(previous)
     ] *)
-val simple_query : InfluxDB.measurement -> InfluxDB.field -> InfluxDB.select
+val simple_query :
+  ?tags:(InfluxDB.tag * string) list ->
+  InfluxDB.measurement ->
+  InfluxDB.field ->
+  InfluxDB.select
 
 (** Make a graph panel from a simple query.
 
@@ -115,11 +121,13 @@ val simple_query : InfluxDB.measurement -> InfluxDB.field -> InfluxDB.select
 
     Default [title] is the measurement name.
     Default [description] is [""].
-    Default [yaxis_format] is [s] (seconds). *)
+    Default [yaxis_format] is [s] (seconds).
+    Default [tags] is an empty list. *)
 val simple_graph :
   ?title:string ->
   ?description:string ->
   ?yaxis_format:string ->
+  ?tags:(InfluxDB.tag * string) list ->
   InfluxDB.measurement ->
   InfluxDB.field ->
   panel
