@@ -79,13 +79,6 @@ let append_message :
  fun ctxt rollup state message ->
   let level = (Raw_context.current_level ctxt).level in
   let message_size = Tx_rollup_message_repr.size message in
-  let message_limit =
-    Constants_storage.tx_rollup_hard_size_limit_per_message ctxt
-  in
-  fail_unless
-    Compare.Int.(message_size < message_limit)
-    Tx_rollup_message_size_exceeds_limit
-  >>=? fun () ->
   prepare_metadata ctxt rollup state level
   >>=? fun (ctxt, new_state, new_metadata) ->
   let new_metadata =
