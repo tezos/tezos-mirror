@@ -2102,6 +2102,12 @@ module Destination : sig
   type error += Invalid_destination_b58check of string
 end
 
+module Bond_id : sig
+  type t = Tx_rollup_bond_id of Tx_rollup.t
+
+  val pp : Format.formatter -> t -> unit
+end
+
 module Receipt : sig
   type balance =
     | Contract of Contract.t
@@ -2122,6 +2128,7 @@ module Receipt : sig
     | Invoice
     | Initial_commitments
     | Minted
+    | Frozen_bonds of Contract.t * Bond_id.t
 
   val compare_balance : balance -> balance -> int
 
@@ -3239,7 +3246,8 @@ module Token : sig
     | `Collected_commitments of Blinded_public_key_hash.t
     | `Delegate_balance of Signature.Public_key_hash.t
     | `Frozen_deposits of Signature.Public_key_hash.t
-    | `Block_fees ]
+    | `Block_fees
+    | `Frozen_bonds of Contract.t * Bond_id.t ]
 
   type source =
     [ `Invoice

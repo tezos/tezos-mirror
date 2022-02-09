@@ -57,6 +57,7 @@
         "Tx_rollup_commitment_repr",
         "Tx_rollup_errors_repr",
         "Tx_rollup_state_repr",
+        "Bond_id_repr",
         "Vote_repr",
         "Liquidity_baking_repr",
         "Block_header_repr",

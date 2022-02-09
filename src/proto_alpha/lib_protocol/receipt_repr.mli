@@ -44,6 +44,7 @@ type balance =
   | Invoice
   | Initial_commitments
   | Minted
+  | Frozen_bonds of Contract_repr.t * Bond_id_repr.t
 
 (** Compares two balances. *)
 val compare_balance : balance -> balance -> int

@@ -44,6 +44,11 @@ type error +=
       Signature.Public_key.t * Signature.Public_key.t
   | (* `Permanent *) Failure of string
 
+type error +=
+  | (* `Permanent *)
+      Frozen_bonds_must_be_spent_at_once of
+      Contract_repr.t * Bond_id_repr.t
+
 let () =
   register_error_kind
     `Temporary
@@ -179,7 +184,29 @@ let () =
         implicit)
     Data_encoding.(obj1 (req "implicit" Signature.Public_key_hash.encoding))
     (function Empty_implicit_delegated_contract c -> Some c | _ -> None)
-    (fun c -> Empty_implicit_delegated_contract c)
+    (fun c -> Empty_implicit_delegated_contract c) ;
+  register_error_kind
+    `Permanent
+    ~id:"frozen_bonds.must_be_spent_at_once"
+    ~title:"Partial spending of frozen bonds"
+    ~description:"Frozen bonds must be spent at once."
+    ~pp:(fun ppf (contract, bond_id) ->
+      Format.fprintf
+        ppf
+        "The frozen funds for contract (%a) and bond (%a) are not allowed to \
+         be partially withdrawn. The amount withdrawn must be equal to the \
+         entire deposit for the said bond."
+        Contract_repr.pp
+        contract
+        Bond_id_repr.pp
+        bond_id)
+    Data_encoding.(
+      obj2
+        (req "contract" Contract_repr.encoding)
+        (req "bond_id" Bond_id_repr.encoding))
+    (function
+      | Frozen_bonds_must_be_spent_at_once (c, b) -> Some (c, b) | _ -> None)
+    (fun (c, b) -> Frozen_bonds_must_be_spent_at_once (c, b))
 
 let failwith msg = fail (Failure msg)
 
@@ -630,3 +657,31 @@ let decrease_balance_only_call_from_token ctxt contract amount =
   update_balance ctxt contract Tez_repr.( -? ) amount
 
 let get_full_balance = Storage.Contract.Spendable_balance.get
+
+let bond_allocated ctxt contract bond_id =
+  Storage.Contract.Frozen_bonds.mem (ctxt, contract) bond_id >|= ok
+
+let find_bond ctxt contract bond_id =
+  Storage.Contract.Frozen_bonds.find (ctxt, contract) bond_id
+
+(** PRE : [amount > 0], fulfilled by unique caller [Token.transfer]. *)
+let spend_bond_only_call_from_token ctxt contract bond_id amount =
+  fail_when Tez_repr.(amount = zero) (Failure "Expecting : [amount > 0]")
+  >>=? fun () ->
+  Storage.Contract.Frozen_bonds.get (ctxt, contract) bond_id
+  >>=? fun frozen_bonds ->
+  error_when
+    Tez_repr.(frozen_bonds <> amount)
+    (Frozen_bonds_must_be_spent_at_once (contract, bond_id))
+  >>?= fun () ->
+  Storage.Contract.Frozen_bonds.remove_existing (ctxt, contract) bond_id
+
+(** PRE : [amount > 0], fulfilled by unique caller [Token.transfer]. *)
+let credit_bond_only_call_from_token ctxt contract bond_id amount =
+  fail_when Tez_repr.(amount = zero) (Failure "Expecting : [amount > 0]")
+  >>=? fun () ->
+  Storage.Contract.Frozen_bonds.find (ctxt, contract) bond_id >>=? function
+  | None -> Storage.Contract.Frozen_bonds.init (ctxt, contract) bond_id amount
+  | Some frozen_bonds ->
+      Tez_repr.(frozen_bonds +? amount) >>?= fun new_amount ->
+      Storage.Contract.Frozen_bonds.update (ctxt, contract) bond_id new_amount

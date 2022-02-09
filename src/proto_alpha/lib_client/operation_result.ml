@@ -348,6 +348,13 @@ let pp_balance_updates ppf = function
               | Invoice -> "invoices"
               | Initial_commitments -> "initial commitments"
               | Minted -> "minted"
+              | Frozen_bonds (contract, bond_id) ->
+                  Format.asprintf
+                    "Frozen_bonds(%a,%a)"
+                    Contract.pp
+                    contract
+                    Bond_id.pp
+                    bond_id
             in
             let balance =
               match origin with

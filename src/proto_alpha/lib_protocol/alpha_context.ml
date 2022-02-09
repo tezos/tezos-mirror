@@ -398,6 +398,7 @@ module Sapling = struct
   end
 end
 
+module Bond_id = Bond_id_repr
 module Receipt = Receipt_repr
 
 module Delegate = struct

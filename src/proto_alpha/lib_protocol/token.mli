@@ -46,7 +46,8 @@ type container =
   | `Collected_commitments of Blinded_public_key_hash.t
   | `Delegate_balance of Signature.Public_key_hash.t
   | `Frozen_deposits of Signature.Public_key_hash.t
-  | `Block_fees ]
+  | `Block_fees
+  | `Frozen_bonds of Contract_repr.t * Bond_id_repr.t ]
 
 (** [infinite_source] defines types of tokens provides which are considered to be
  ** of infinite capacity. *)

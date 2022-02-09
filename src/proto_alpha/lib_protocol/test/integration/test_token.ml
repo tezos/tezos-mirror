@@ -52,6 +52,10 @@ let random_amount () =
   | None -> assert false
   | Some x -> x
 
+let nonce = Origination_nonce.Internal_for_tests.initial Operation_hash.zero
+
+let mk_rollup () = Tx_rollup.Internal_for_tests.originated_tx_rollup nonce
+
 (** Check balances for a simple transfer from [bootstrap] to new [Implicit]. *)
 let test_simple_balances () =
   Random.init 0 ;
@@ -133,7 +137,12 @@ let test_allocated () =
   let dest = `Frozen_deposits pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest false >>=? fun _ ->
   let dest = `Block_fees in
-  test_allocated_and_still_allocated_when_empty ctxt dest true
+  test_allocated_and_still_allocated_when_empty ctxt dest true >>=? fun _ ->
+  let dest =
+    let bond_id = Bond_id.Tx_rollup_bond_id (mk_rollup ()) in
+    `Frozen_bonds (Contract.implicit_contract pkh, bond_id)
+  in
+  test_allocated_and_deallocated_when_empty ctxt dest
 
 let check_sink_balances ctxt ctxt' dest amount =
   wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
@@ -253,6 +262,18 @@ let test_transferring_to_burned ctxt =
       ])
     true
 
+let test_transferring_to_frozen_bonds ctxt =
+  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let contract = Contract.implicit_contract pkh in
+  let tx_rollup = mk_rollup () in
+  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let amount = random_amount () in
+  test_transferring_to_sink
+    ctxt
+    (`Frozen_bonds (contract, bond_id))
+    amount
+    [(Frozen_bonds (contract, bond_id), Credited amount, Block_application)]
+
 let test_transferring_to_sink () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, _) ->
@@ -261,7 +282,8 @@ let test_transferring_to_sink () =
   test_transferring_to_delegate_balance ctxt >>=? fun _ ->
   test_transferring_to_frozen_deposits ctxt >>=? fun _ ->
   test_transferring_to_collected_fees ctxt >>=? fun _ ->
-  test_transferring_to_burned ctxt
+  test_transferring_to_burned ctxt >>=? fun _ ->
+  test_transferring_to_frozen_bonds ctxt
 
 let check_src_balances ctxt ctxt' src amount =
   wrap (Token.balance ctxt src) >>=? fun bal_src ->
@@ -351,6 +373,18 @@ let test_transferring_from_collected_fees ctxt =
     amount
     [(Block_fees, Debited amount, Block_application)]
 
+let test_transferring_from_frozen_bonds ctxt =
+  let (pkh, _pk, _sk) = Signature.generate_key () in
+  let contract = Contract.implicit_contract pkh in
+  let tx_rollup = mk_rollup () in
+  let bond_id = Bond_id.Tx_rollup_bond_id tx_rollup in
+  let amount = random_amount () in
+  test_transferring_from_bounded_source
+    ctxt
+    (`Frozen_bonds (contract, bond_id))
+    amount
+    [(Frozen_bonds (contract, bond_id), Debited amount, Block_application)]
+
 let test_transferring_from_source () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, _) ->
@@ -393,7 +427,8 @@ let test_transferring_from_source () =
   test_transferring_from_collected_commitments ctxt >>=? fun _ ->
   test_transferring_from_delegate_balance ctxt >>=? fun _ ->
   test_transferring_from_frozen_deposits ctxt >>=? fun _ ->
-  test_transferring_from_collected_fees ctxt
+  test_transferring_from_collected_fees ctxt >>=? fun _ ->
+  test_transferring_from_frozen_bonds ctxt
 
 let cast_to_container_type x =
   match x with
@@ -404,6 +439,7 @@ let cast_to_container_type x =
   | `Collected_commitments _ as x -> Some x
   | `Delegate_balance _ as x -> Some x
   | `Block_fees as x -> Some x
+  | `Frozen_bonds _ as x -> Some x
 
 (** Generates all combinations of constructors. *)
 let build_test_cases () =
@@ -437,6 +473,12 @@ let build_test_cases () =
   >>=? fun ctxt ->
   wrap (Delegate.set ctxt (Contract.implicit_contract user1) (Some baker2))
   >>=? fun ctxt ->
+  let tx_rollup1 = mk_rollup () in
+  let bond_id1 = Bond_id.Tx_rollup_bond_id tx_rollup1 in
+  let tx_rollup2 = mk_rollup () in
+  let bond_id2 = Bond_id.Tx_rollup_bond_id tx_rollup2 in
+  let user1ic = Contract.implicit_contract user1 in
+  let baker2ic = Contract.implicit_contract baker2 in
   let src_list =
     [
       (`Invoice, random_amount ());
@@ -452,6 +494,8 @@ let build_test_cases () =
       (user2c, random_amount ());
       (baker1c, random_amount ());
       (baker2c, random_amount ());
+      (`Frozen_bonds (user1ic, bond_id1), random_amount ());
+      (`Frozen_bonds (baker2ic, bond_id2), random_amount ());
     ]
   in
   let dest_list =
@@ -464,6 +508,8 @@ let build_test_cases () =
       user2c;
       baker1c;
       baker2c;
+      `Frozen_bonds (user1ic, bond_id1);
+      `Frozen_bonds (baker2ic, bond_id2);
       `Burned;
     ]
   in

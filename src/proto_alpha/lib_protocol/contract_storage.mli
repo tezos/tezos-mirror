@@ -184,3 +184,57 @@ val decrease_balance_only_call_from_token :
     balances. *)
 val get_full_balance :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** This error is raised when [spend_bond_only_call_from_token] is called with
+    an amount that is not equal to the deposit associated to the given contract
+    and bond id. *)
+type error +=
+  | (* `Permanent *)
+      Frozen_bonds_must_be_spent_at_once of
+      Contract_repr.t * Bond_id_repr.t
+
+(** [bond_allocated ctxt contract bond_id] returns [true] if there is a bond
+    associated to [contract] and [bond_id], and returns [false] otherwise. *)
+val bond_allocated :
+  Raw_context.t -> Contract_repr.t -> Bond_id_repr.t -> bool tzresult Lwt.t
+
+(** [find_bond ctxt contract bond_id] returns the bond associated to
+    [contract] and [bond_id] if there is one, and returns [None] otherwise. *)
+val find_bond :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  Tez_repr.t option tzresult Lwt.t
+
+(** [spend_bond ctxt contract bond_id amount] withdraws the given [amount] from
+    the value of the bond associated to [contract] and [bond_id].
+
+    The argument [amount] is required to be strictly positive.
+
+    @raise a [Storage_Error Missing_key] error when there is no bond associated
+    to [contract] and [bond_id].
+
+    @raise a [Frozen_bonds_must_be_spent_at_once (contract, bond_id)]
+    error when the amount is different from the bond associated to [contract]
+    and [bond_id]. *)
+val spend_bond_only_call_from_token :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
+
+(** [credit_bond ctxt contract bond_id amount] adds the given [amount] to the
+    bond associated to [contract] and [bond_id]. If no bond exists, one whose
+    value is [amount] is created.
+
+    The argument [amount] is required to be strictly positive.
+
+    @raise a [Addition_overflow] error when
+    [(find ctxt contract bond_id) + amount > Int64.max_int]. *)
+val credit_bond_only_call_from_token :
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  Tez_repr.t ->
+  Raw_context.t tzresult Lwt.t
