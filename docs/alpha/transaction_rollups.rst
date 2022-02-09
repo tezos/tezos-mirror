@@ -15,7 +15,7 @@ Introduction to Optimistic Rollups
 **Optimistic rollups** are a popular layer-2 solution, *e.g.*, on the
 Ethereum blockchain (Boba, Arbitrum, Optimism, etc.). When it comes to
 an optimistic rollup, the layer-2 operates using a logic similar to
-the layer-1.
+the layer-1, but it is updated off-chain, potentially much faster, and its changes are regularly committed to layer-1.
 
 The layer-1 implements a decentralized ledger (called the **layer-1
 context** thereafter) that participants of the network can update
@@ -35,9 +35,9 @@ More precisely, an optimistic rollup works as follows:
    inbox. The inbox is analogous to the layer-1 blocks. As such, the
    consensus of the layer-1 decides which messages the layer-2 has to
    consume, and in which order.
-#. The layer-2 context is updated off-chain, using the semantics of
+#. The layer-2 context is updated off-chain by a **rollup node**, using the semantics of
    the messages.
-#. A layer-1 operation allows to include the hash of the layer-2
+#. A layer-1 operation allows the rollup node to include the hash of the layer-2
    context after the execution of the layer-2 operations in the
    layer-1 context.
 #. The layer-1 implements a procedure to reject erroneous hashes of
@@ -47,6 +47,7 @@ More precisely, an optimistic rollup works as follows:
    become **final**, that is, they cannot be rejected. We call
    **layer-2 finality period** the time necessary for the hash of a
    layer-2 context to become final.
+   In the meantime, new layer-1 operations may have filled the inbox with new messages that call for pursuing the same workflow.
 
 The layer-2 context is encoded in a Merkle tree, an ubiquitous data
 structure in the blockchain universe with many interesting
@@ -56,11 +57,11 @@ the tree without having to share the whole tree, by means of Merkle
 proofs. This property ensures that the procedure to reject a hash does
 not require to compute the whole layer-2 context.
 
-The **transaction rollup node** is responsible for interpreting the
+The rollup node is a daemon responsible for interpreting the
 messages (as stored in the inbox) onto the layer-2 context, and for
 posting the resulting hashes in the layer-1. In “optimistic rollup”,
 the word “optimistic” refers to the assumption that at least one
-honest transaction rollup node will always have to be active to reject
+honest transaction rollup node will always be active to reject
 erroneous hash. 
 The presence of a single honest node is sufficient to guarantee the correct application of the layer-2 operations in the rollup.
 In its absence, nothing prevents a rogue node to post a
@@ -72,7 +73,7 @@ Introduction to Transaction Rollups
 **Transaction Rollups** are an implementation of optimistic
 rollups in Tezos, characterized by the following principles:
 
-#. The semantics of the messages is limited to the transfer of assets.
+#. The semantics of the messages consists of the transfer of assets represented as Michelson tickets.
 #. The procedure to reject erroneous hashes allows for a short
    finality period of 30 blocks.
 #. They are implemented as part of the economic protocol of Tezos
@@ -100,6 +101,7 @@ higher throughput than what is possible on Tezos natively.
 Analogous to layer-1 addresses, **layer-2 addresses** identify assets
 holders in the layer-2 ledger, meaning layer-2 addresses own, and
 exchange Michelson tickets.
+They are prefixed by ``tru2`` when encoded in a base58 alphabet.
 
 The expected workflow proceeds as follows.
 
@@ -292,8 +294,7 @@ contains the following pieces of information:
 #. A BLS signature that aggregates together all the signatures
    of all the transactions contained by the batch.
 
-The interpretation (in the layer-2) of a batch of transactions will
-fail if the aggregated BLS signature is incorrect. In such a case, the
+A batch of transactions is invalid if the aggregated BLS signature is incorrect (e.g., if one of the included transactions is invalid). Such an invalid
 batch is discarded by the transaction rollup node, and the counters of
 the signers are not incremented. This means they can be submitted
 again in a batch with a valid signature.
