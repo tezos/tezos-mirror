@@ -42,7 +42,7 @@ let () =
       uid = "longtezts";
       title = "Long Tezts";
       description = "Measurements from tests in tezt/long_tests.";
-      panels = Prt_client.grafana_panels;
+      panels = Prt_client.grafana_panels @ Block_validation.grafana_panels;
     }
 
 (* Executor for tests that don't take that long to run.

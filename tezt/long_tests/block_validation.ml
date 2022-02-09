@@ -306,6 +306,36 @@ end
     to perform statistical analysis and compare the obtained result with previous
     runs. *)
 module Benchmark = struct
+  (* The following block consumed the highest gas (5871442981)
+     between the 10000 blocks preceding block 1479022.
+
+     As a reminder, if the benchmark needs other high consumed
+     gas blocks later, blocks with highest gas are:
+     - level: 1470469 -> consumed gas: 5668799660
+     - level: 1478300 -> consumed gas: 5661805784
+     - level: 1478984 -> consumed gas: 4769430818
+     - level: 1478976 -> consumed gas: 3630404743
+     - level: 1478964 -> consumed gas: 3001839414 *)
+  let block_with_highest_gas = "1475742"
+
+  let chunk_title = "shell.validation.block.chunk"
+
+  let specific_title = "shell.validation.block." ^ block_with_highest_gas
+
+  let subparts_title =
+    "shell.validation.block.subpart." ^ block_with_highest_gas
+
+  let subparts_steps =
+    [
+      "operations_parsing";
+      "application_beginning";
+      "operations_application";
+      "block_finalization";
+      "metadata_serde_check";
+      "metadata_hash";
+      "context_commitment";
+    ]
+
   let influxDB_measurement = "block_validation"
 
   let mean_block_validation_duration ~repeat dry_run_blocks blocks datadir =
@@ -369,27 +399,27 @@ module Benchmark = struct
     Measurement.register_map_as_datapoints influxDB_measurement measurements
 end
 
-(* TODO do register *)
+let grafana_panels =
+  [
+    Grafana.Row "Block Validation";
+    Grafana.simple_graph Benchmark.chunk_title "duration";
+    Grafana.simple_graph Benchmark.specific_title "duration";
+  ]
+  @ List.map
+      (fun label ->
+        Grafana.simple_graph
+          ~tags:[("step", label)]
+          Benchmark.subparts_title
+          "duration")
+      Benchmark.subparts_steps
 
 let register ~executors () =
-  (* The following block consumed the highest gas (5871442981)
-     between the 10000 blocks preceding block 1479022.
-
-     As a reminder, if the benchmark needs other high consumed
-     gas blocks later, blocks with highest gas are:
-     - level: 1470469 -> consumed gas: 5668799660
-     - level: 1478300 -> consumed gas: 5661805784
-     - level: 1478984 -> consumed gas: 4769430818
-     - level: 1478976 -> consumed gas: 3630404743
-     - level: 1478964 -> consumed gas: 3001839414 *)
-  let block_with_highest_gas = "1475742" in
-
   let datadir = Fixture.datadir () in
 
   Long_test.register
     ~__FILE__
-    ~title:"shell.validation.block.batch"
-    ~tags:["shell"; "validation"; "block"; "batch"]
+    ~title:Benchmark.chunk_title
+    ~tags:["shell"; "validation"; "block"; "chunk"]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
@@ -397,7 +427,7 @@ let register ~executors () =
 
   Long_test.register
     ~__FILE__
-    ~title:("shell.validation.block." ^ block_with_highest_gas)
+    ~title:Benchmark.specific_title
     ~tags:["shell"; "validation"; "block"; "specific"]
     ~timeout:(Long_test.Minutes 20)
     ~executors
@@ -405,13 +435,15 @@ let register ~executors () =
   @@ Benchmark.batch_of_same_block_total
        ~size:10
        ~repeat:30
-       block_with_highest_gas ;
+       Benchmark.block_with_highest_gas ;
 
   Long_test.register
     ~__FILE__
-    ~title:("shell.validation.subpart." ^ block_with_highest_gas)
+    ~title:Benchmark.subparts_title
     ~tags:["shell"; "validation"; "block"; "subpart"]
     ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
-  @@ Benchmark.batch_of_same_block_subparts ~size:30 block_with_highest_gas
+  @@ Benchmark.batch_of_same_block_subparts
+       ~size:30
+       Benchmark.block_with_highest_gas
