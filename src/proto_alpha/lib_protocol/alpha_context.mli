@@ -2040,11 +2040,10 @@ module Tx_rollup_message : sig
 
   type t = private Batch of string | Deposit of deposit
 
-  type size = int
-
-  val make_batch : context -> string -> (t * size) tzresult
-
-  val size : t -> int
+  (** [make_batch batch] creates a new message to be added that can be
+      added to an inbox, along with its size in bytes. See
+      {!Tx_rollup_message_repr.size}. *)
+  val make_batch : string -> t * int
 
   val encoding : t Data_encoding.t
 

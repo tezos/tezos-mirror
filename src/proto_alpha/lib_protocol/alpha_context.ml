@@ -266,18 +266,9 @@ end
 module Tx_rollup_message = struct
   include Tx_rollup_message_repr
 
-  type size = int
-
-  let make_batch ctxt string =
+  let make_batch string =
     let message = Batch string in
-    let message_limit =
-      Constants_storage.tx_rollup_hard_size_limit_per_message ctxt
-    in
-    let message_size = size message in
-    error_unless
-      Compare.Int.(message_size < message_limit)
-      Tx_rollup_inbox_storage.Tx_rollup_message_size_exceeds_limit
-    >>? fun () -> Ok (message, message_size)
+    (message, size message)
 end
 
 module Tx_rollup_inbox = struct

@@ -86,11 +86,9 @@ let fees_per_byte state = inbox_fees state 1
 (** [check_batch_in_inbox inbox n expected] checks that the [n]th
     element of [inbox] is a batch equal to [expected]. *)
 let check_batch_in_inbox :
-    context -> Tx_rollup_inbox.t -> int -> string -> unit tzresult Lwt.t =
- fun ctxt inbox n expected ->
-  Lwt.return
-  @@ Environment.wrap_tzresult (Tx_rollup_message.make_batch ctxt expected)
-  >>=? fun (expected_batch, _) ->
+    Tx_rollup_inbox.t -> int -> string -> unit tzresult Lwt.t =
+ fun inbox n expected ->
+  let (expected_batch, _) = Tx_rollup_message.make_batch expected in
   let expected_hash = Tx_rollup_message.hash expected_batch in
   match List.nth inbox.contents n with
   | Some content ->
@@ -296,10 +294,8 @@ let test_add_two_batches () =
 
   Context.Tx_rollup.inbox (B b) tx_rollup >>=? fun {contents; _} ->
   Alcotest.(check int "Expect an inbox with two items" 2 (List.length contents)) ;
-  Incremental.begin_construction b >>=? fun i ->
-  let ctxt = Incremental.alpha_ctxt i in
-  check_batch_in_inbox ctxt inbox 0 contents1 >>=? fun () ->
-  check_batch_in_inbox ctxt inbox 1 contents2 >>=? fun () ->
+  check_batch_in_inbox inbox 0 contents1 >>=? fun () ->
+  check_batch_in_inbox inbox 1 contents2 >>=? fun () ->
   inbox_fees state expected_cumulated_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
