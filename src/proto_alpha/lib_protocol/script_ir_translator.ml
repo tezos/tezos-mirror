@@ -4728,20 +4728,23 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (res_ty, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_JOIN_TICKETS, [], annot),
-      Item_t (Pair_t ((Ticket_t _ as ty_a), (Ticket_t _ as ty_b), _), rest) )
-    -> (
+      Item_t
+        ( Pair_t
+            ( (Ticket_t (contents_ty_a, _) as ty_a),
+              Ticket_t (contents_ty_b, _),
+              _ ),
+          rest ) ) ->
       check_var_annot loc annot >>?= fun () ->
-      Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc ty_a ty_b
+      Gas_monad.run ctxt
+      @@ comparable_ty_eq ~error_details:Informative contents_ty_a contents_ty_b
       >>?= fun (eq, ctxt) ->
       eq >>?= fun Eq ->
-      match ty_a with
-      | Ticket_t (contents_ty, _) ->
-          option_t loc ty_a >>?= fun res_ty ->
-          let instr =
-            {apply = (fun kinfo k -> IJoin_tickets (kinfo, contents_ty, k))}
-          in
-          let stack = Item_t (res_ty, rest) in
-          typed ctxt loc instr stack)
+      option_t loc ty_a >>?= fun res_ty ->
+      let instr =
+        {apply = (fun kinfo k -> IJoin_tickets (kinfo, contents_ty_a, k))}
+      in
+      let stack = Item_t (res_ty, rest) in
+      typed ctxt loc instr stack
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
