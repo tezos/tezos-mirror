@@ -29,6 +29,8 @@ the specification. The document also starts with a less formal
 explanation of the context: how Michelson code interacts with the
 blockchain.
 
+.. _address_prefixes:
+
 Semantics of smart contracts and transactions
 ---------------------------------------------
 
@@ -47,6 +49,8 @@ tokens (and be the destinations of transactions).
 From Michelson, they are indistinguishable. A safe way to think about
 this is to consider that implicit accounts are smart contracts that
 always succeed to receive tokens, and does nothing else.
+
+Another kind of addresses, prefixed by ``tru1`` and ``tru2``, are related to :doc:`transaction rollups <./transaction_rollups>`.
 
 Intra-transaction semantics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
