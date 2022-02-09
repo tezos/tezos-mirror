@@ -118,36 +118,6 @@ let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
   in
   Client.rpc ?endpoint ?hooks ~query_string GET path client
 
-let get_mempool ?endpoint ?hooks ?chain ?(applied = true)
-    ?(branch_delayed = true) ?(branch_refused = true) ?(refused = true)
-    ?(outdated = true) client =
-  let* pending_ops =
-    get_mempool_pending_operations
-      ?endpoint
-      ?hooks
-      ?chain
-      ~version:"1"
-      ~applied
-      ~branch_delayed
-      ~branch_refused
-      ~refused
-      ~outdated
-      client
-  in
-  let get_hash op = JSON.(op |-> "hash" |> as_string) in
-  let get_hashes classification =
-    List.map get_hash JSON.(pending_ops |-> classification |> as_list)
-  in
-  let applied = get_hashes "applied" in
-  let branch_delayed = get_hashes "branch_delayed" in
-  let branch_refused = get_hashes "branch_refused" in
-  let refused = get_hashes "refused" in
-  let outdated = get_hashes "outdated" in
-  let unprocessed = get_hashes "unprocessed" in
-  return
-    Mempool.
-      {applied; branch_delayed; branch_refused; refused; outdated; unprocessed}
-
 let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
   let path = ["chains"; chain; "mempool"; "request_operations"] in
   Client.rpc

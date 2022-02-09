@@ -817,13 +817,13 @@ let test_mempool protocol ?endpoint client =
   let* _ = flush_waiter in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
   let* complete_mempool =
-    RPC.get_mempool ?endpoint ~hooks:mempool_hooks client
+    Mempool.get_mempool ?endpoint ~hooks:mempool_hooks client
   in
   let* _ =
     Lwt_list.iter_s
       (fun i ->
         let* mempool =
-          RPC.get_mempool
+          Mempool.get_mempool
             ?endpoint
             ~hooks:mempool_hooks
             ~applied:(i = `Applied)

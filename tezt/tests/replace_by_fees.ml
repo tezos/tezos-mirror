@@ -78,7 +78,7 @@ let check_refused ~__LOC__ nodes inject =
 let op_is_applied ~__LOC__ nodes opH =
   Lwt_list.iter_s
     (fun client ->
-      let* mempool = RPC.get_mempool client in
+      let* mempool = Mempool.get_mempool client in
       Memchecks.check_operation_is_in_mempool ~__LOC__ `Applied mempool opH ;
       unit)
     [nodes.main.client; nodes.observer.client]
@@ -86,7 +86,7 @@ let op_is_applied ~__LOC__ nodes opH =
 let op_is_outdated ~__LOC__ nodes opH =
   Lwt_list.iter_s
     (fun client ->
-      let* mempool = RPC.get_mempool client in
+      let* mempool = Mempool.get_mempool client in
       Memchecks.check_operation_is_in_mempool ~__LOC__ `Outdated mempool opH ;
       unit)
     [nodes.main.client; nodes.observer.client]
