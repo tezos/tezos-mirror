@@ -25,6 +25,14 @@ be documented here either.
 Node
 ----
 
+- Add optional query parameters ``applied``, ``refused``, ``outdated``,
+  ``branch_refused``, and ``branch_delayed`` to RPC
+  ``GET /chains/main/mempool/pending_operations``.
+  These new parameters indicate the classifications for which the RPC should
+  or shouldn't return the corresponding operations. If no option is given, all
+  the parameters are assumed to be ``true``, making this extension
+  backward-compatible (i.e. and all operations are returned).
+
 - The tezos-node configuration file parameter
   ``shell.prevalidator.limits.max_refused_operations`` is now
   deprecated and may be removed starting from version 13.0.

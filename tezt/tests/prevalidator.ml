@@ -115,7 +115,7 @@ module Revamped = struct
   let check_mempool ?(applied = []) ?(branch_delayed = [])
       ?(branch_refused = []) ?(refused = []) ?(outdated = [])
       ?(unprocessed = []) client =
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     let expected_mempool =
       Mempool.
         {
@@ -191,7 +191,7 @@ module Revamped = struct
     in
 
     log_step 3 "Check operations are all classified as 'Applied'." ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     let error_msg =
       "some operations not classified as 'applied: expected length %R, got %L"
     in
@@ -199,7 +199,7 @@ module Revamped = struct
 
     log_step 4 "Bake a block with an empty mempool." ;
     let* _ = bake_for ~wait_for_flush:true ~empty:true ~protocol node client in
-    let* mempool_after_empty_block = RPC.get_mempool client in
+    let* mempool_after_empty_block = Mempool.get_mempool client in
 
     log_step 5 "Check that we did not lose any operation." ;
     let error_msg =
@@ -209,7 +209,7 @@ module Revamped = struct
 
     log_step 6 "Inject endorsement operations." ;
     let* () = Client.endorse_for client ~protocol ~force:true in
-    let* mempool_with_endorsement = RPC.get_mempool client in
+    let* mempool_with_endorsement = Mempool.get_mempool client in
 
     log_step 7 "Check endorsement is applied." ;
     let mempool_diff =
@@ -232,7 +232,7 @@ module Revamped = struct
           in
           unit)
     in
-    let* last_mempool = RPC.get_mempool client in
+    let* last_mempool = Mempool.get_mempool client in
 
     log_step 9 "Check endorsement is classified 'Outdated'." ;
     let error_msg = "one applied operation was lost: expected %L, got %R" in
@@ -281,17 +281,7 @@ module Revamped = struct
     Log.info "%s injected on node1." oph ;
 
     log_step 3 "Check that the operation %s is classified as 'Applied'." oph ;
-    let* mempool_after_injection = RPC.get_mempool client1 in
-    let expected_mempool_after_injection =
-      Mempool.{empty with applied = [oph]}
-    in
-    let error_msg =
-      "expected mempool from node1 after injection was %L got %R"
-    in
-    Check.(
-      (expected_mempool_after_injection = mempool_after_injection)
-        Mempool.classified_typ
-        ~error_msg) ;
+    let* () = check_mempool ~applied:[oph] client1 in
 
     log_step
       4
@@ -335,7 +325,7 @@ module Revamped = struct
     Log.info "%s injected on node1." oph2 ;
 
     log_step 7 "Check that the operation %s is branch_refused." oph2 ;
-    let* mempool_after_second_injection = RPC.get_mempool client1 in
+    let* mempool_after_second_injection = Mempool.get_mempool client1 in
     let expected_mempool_after_second_injection =
       let open Mempool in
       {empty with branch_refused = [oph2]}
@@ -366,7 +356,7 @@ module Revamped = struct
       10
       "Check that %s is still branch_refused after head increment."
       oph2 ;
-    let* mempool_after_head_increment = RPC.get_mempool client1 in
+    let* mempool_after_head_increment = Mempool.get_mempool client1 in
     let error_msg =
       "expected mempool from node1 after head increment was %L got %R"
     in
@@ -409,7 +399,7 @@ module Revamped = struct
        operation and that the endorsement from the head increment block is now \
        outdated."
       oph2 ;
-    let* mempool = RPC.get_mempool client1 in
+    let* mempool = Mempool.get_mempool client1 in
     let expected_mempool =
       let open Mempool in
       let outdated =
@@ -447,12 +437,7 @@ module Revamped = struct
       3
       "Check that the operation %s is applied in the node's mempool."
       oph1 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool = {Mempool.empty with applied = [oph1]} in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] client in
 
     log_step 4 "Forge and inject an operation with the same manager." ;
     let* (`OpHash oph2) =
@@ -469,18 +454,13 @@ module Revamped = struct
       5
       "Check that the operation %s is branch_delayed in the node's mempool."
       oph2 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool = {expected_mempool with branch_delayed = [oph2]} in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client in
 
     log_step 6 "Ban the operation %s." oph1 ;
     let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
 
     log_step 7 "Check that the node's mempool contains %s as applied." oph2 ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     let expected_mempool = {Mempool.empty with applied = [oph2]} in
     Check.(
       (expected_mempool = mempool)
@@ -543,25 +523,13 @@ module Revamped = struct
       4
       "Ensure that the first operation is applied and that the second is \
        branch_delayed on node1." ;
-    let* mempool = RPC.get_mempool client1 in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph1]; branch_delayed = [oph2]}
-    in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"node1 mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client1 in
 
     log_step
       5
       "Ensure that the first operation is applied on node2 and that no other \
        operation is in the mempool." ;
-    let* mempool = RPC.get_mempool client2 in
-    let expected_mempool = {Mempool.empty with applied = [oph1]} in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"node2 mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] client2 in
 
     log_step 6 "Bake a block on node2." ;
     let* _ = bake_for ~empty:false ~protocol node1 client2 in
@@ -571,13 +539,7 @@ module Revamped = struct
       "Check that the second operation has not been baked because it was not \
        propagated to node2. And check that it is now branch_refused in node1 \
        because it used the same counter as the applied operation." ;
-    let* mempool = RPC.get_mempool client1 in
-    let expected_mempool = {Mempool.empty with branch_refused = [oph2]} in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"node1 mempool expected to be %L, got %R") ;
-    unit
+    check_mempool ~branch_refused:[oph2] client1
 
   (** This test checks the one operation per manager per block restriction on
       propagation.
@@ -646,14 +608,7 @@ module Revamped = struct
     and* () = Client.Admin.trust_address client1 ~peer:node3 in
     let* () = Client.Admin.connect_address ~peer:node1 client3 in
     let* () = synchronize_mempool client3 node3 in
-    let* mempool_first_injection = RPC.get_mempool client3 in
-    let expected_mempool_first_injection =
-      {Mempool.empty with applied = [oph1]}
-    in
-    Check.(
-      (expected_mempool_first_injection = mempool_first_injection)
-        Mempool.classified_typ
-        ~error_msg:"node3 mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] client3 in
 
     log_step
       5
@@ -664,15 +619,7 @@ module Revamped = struct
     and* () = Client.Admin.trust_address client2 ~peer:node3 in
     let* () = Client.Admin.connect_address ~peer:node2 client3 in
     let* () = synchronize_mempool client3 node3 in
-    let* mempool_second_injection = RPC.get_mempool client3 in
-    let expected_mempool_second_injection =
-      {expected_mempool_first_injection with branch_delayed = [oph2]}
-    in
-    Check.(
-      (expected_mempool_second_injection = mempool_second_injection)
-        Mempool.classified_typ
-        ~error_msg:"node3 mempool expected to be %L, got %R") ;
-    unit
+    check_mempool ~applied:[oph1] ~branch_delayed:[oph2] client3
 
   (** This test checks that one operation per manager per block is not enabled
       if precheck is disabled. *)
@@ -714,12 +661,7 @@ module Revamped = struct
       3
       "Check that the operation %s is applied in the node's mempool."
       oph1 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool = {Mempool.empty with applied = [oph1]} in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] client in
 
     log_step
       4
@@ -742,14 +684,7 @@ module Revamped = struct
        the node's mempool."
       oph1
       oph2 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph1]; branch_refused = [oph2]}
-    in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph1] ~branch_refused:[oph2] client in
 
     log_step
       6
@@ -772,15 +707,7 @@ module Revamped = struct
       oph1
       oph3
       oph2 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph1; oph3]; branch_refused = [oph2]}
-    in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
-    unit
+    check_mempool ~applied:[oph1; oph3] ~branch_refused:[oph2] client
 
   (** This test checks that an operation branch_delayed is still branch_delayed
       after a flush either because of the one operation per manager per block or
@@ -846,14 +773,9 @@ module Revamped = struct
       "Check that the mempool contains %s as applied and %s as branch_delayed."
       oph2
       oph1 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph2]; branch_delayed = [oph1; oph3]}
+    let* () =
+      check_mempool ~applied:[oph2] ~branch_delayed:[oph1; oph3] client
     in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 6 "Flush the mempool." ;
     let* _ = bake_for ~wait_for_flush:true ~empty:true ~protocol node client in
@@ -863,7 +785,7 @@ module Revamped = struct
       "Check that the mempool still contains %s as branch_delayed after the \
        flush."
       oph1 ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     Check.(
       (List.mem oph1 mempool.branch_delayed = true)
         bool
@@ -875,7 +797,7 @@ module Revamped = struct
        around."
       oph2
       oph3 ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     Check.(
       (((List.mem oph2 mempool.branch_delayed && List.mem oph3 mempool.applied)
        || (List.mem oph3 mempool.branch_delayed && List.mem oph2 mempool.applied)
@@ -959,15 +881,7 @@ module Revamped = struct
       "Check that the mempool contains %s as applied and no op as \
        branch_delayed."
       oph1 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph1]; branch_delayed = []}
-    in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
-    unit
+    check_mempool ~applied:[oph1] client
 
   (** This test checks that an operation with a wrong signature that is
       initially branch_delayed (1 M) will be correctly
@@ -1119,14 +1033,7 @@ module Revamped = struct
       "Check that the mempool contains %s as applied and %s as branch_delayed."
       oph2
       oph1 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph2]; branch_delayed = [oph1]}
-    in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph2] ~branch_delayed:[oph1] client in
 
     log_step 5 "Ban the operation %s." oph1 ;
     let to_reclassified = ref false in
@@ -1143,12 +1050,7 @@ module Revamped = struct
        mempool anymore."
       oph2
       oph1 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool = {Mempool.empty with applied = [oph2]} in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:[oph2] client in
 
     log_step 7 "Check that no flush have been triggered after the ban." ;
     Check.(
@@ -1214,14 +1116,9 @@ module Revamped = struct
       oph1
       oph2
       oph3 ;
-    let* mempool = RPC.get_mempool client in
-    let expected_mempool =
-      {Mempool.empty with applied = [oph1; oph2]; branch_delayed = [oph3]}
+    let* () =
+      check_mempool ~applied:[oph1; oph2] ~branch_delayed:[oph3] client
     in
-    Check.(
-      (expected_mempool = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 5 "Ban the operation %s." oph1 ;
     let* _ = RPC.mempool_ban_operation ~data:(`String oph1) client in
@@ -1233,7 +1130,7 @@ module Revamped = struct
       oph1
       oph2
       oph3 ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     Check.(
       (List.length mempool.applied = 1)
         int
@@ -1329,7 +1226,7 @@ module Revamped = struct
       oph1
       string_of_classification ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     let expected_mempool =
       match classification with
       | `Branch_delayed -> {Mempool.empty with branch_delayed = [oph1]}
@@ -1368,7 +1265,7 @@ module Revamped = struct
       string_of_classification
       string_of_classification ;
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     let (mempool_classification, mempool_without_classification) =
       match classification with
       | `Branch_delayed ->
@@ -1456,7 +1353,7 @@ module Revamped = struct
     in
 
     log_step 4 "Check that both endorsements are in the applied mempool." ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     Check.(
       (2 = List.length mempool.applied)
         int
@@ -1468,7 +1365,7 @@ module Revamped = struct
     let* _ = bake_for ~empty:true ~protocol ~wait_for_flush:true node client in
 
     log_step 4 "Check that only one endorsement is in the outdated mempool." ;
-    let* mempool = RPC.get_mempool client in
+    let* mempool = Mempool.get_mempool client in
     Check.(
       (max_refused_operations = List.length mempool.outdated)
         int
@@ -1801,12 +1698,7 @@ module Revamped = struct
     in
 
     log_step 3 "Check these operations are applied in mempool." ;
-    let* mempool = RPC.get_mempool client1 in
-    let expected_mempool0 = {Mempool.empty with applied = ops} in
-    Check.(
-      (expected_mempool0 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:ops client1 in
 
     log_step
       4
@@ -1850,21 +1742,12 @@ module Revamped = struct
     in
 
     log_step 6 "Check that this extra operation is branch_delayed." ;
-    let* mempool = RPC.get_mempool client1 in
-    let expected_mempool1 = {expected_mempool0 with branch_delayed = [oph5]} in
-    Check.(
-      (expected_mempool1 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:ops ~branch_delayed:[oph5] client1 in
 
     log_step
       7
       "Check that the new operation is not propagated as part of a mempool." ;
-    let* mempool = RPC.get_mempool client2 in
-    Check.(
-      (expected_mempool0 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
+    let* () = check_mempool ~applied:ops client2 in
 
     log_step 8 "Inject an extra operation with more fees for same gas." ;
     let* (`OpHash oph6) =
@@ -1882,36 +1765,25 @@ module Revamped = struct
       9
       "Check that this extra operation is applied and replaces one with lower \
        fees." ;
-    let* mempool = RPC.get_mempool client1 in
     let (removed_oph, kept_ops) =
-      match expected_mempool1.applied with
+      match ops with
       | [] -> assert false
       | removed :: applied -> (removed, applied)
     in
-    let expected_mempool2 =
-      {
-        expected_mempool1 with
-        applied = oph6 :: kept_ops;
-        branch_delayed = removed_oph :: expected_mempool1.branch_delayed;
-      }
+    let* () =
+      check_mempool
+        ~applied:(oph6 :: kept_ops)
+        ~branch_delayed:[removed_oph; oph5]
+        client1
     in
-    Check.(
-      (expected_mempool2 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 10 "Check that this new operation is propagated." ;
-    let* mempool = RPC.get_mempool client2 in
-    let expected_mempool3 =
-      {
-        expected_mempool2 with
-        branch_delayed = [removed_oph] (* The other one was never propagated *);
-      }
+    let* () =
+      check_mempool
+        ~applied:(oph6 :: kept_ops)
+        ~branch_delayed:[removed_oph]
+        client2
     in
-    Check.(
-      (expected_mempool3 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 11 "Check reclassification after flush." ;
     let* _level =
@@ -1922,20 +1794,12 @@ module Revamped = struct
         node1
         client1
     in
-    let* mempool = RPC.get_mempool client1 in
-    let expected_mempool4 =
-      {
-        expected_mempool2 with
-        (* oph6 is reconsidered before oph5 (more fees), which has same
-           manager/counter *)
-        applied = oph6 :: kept_ops;
-        branch_delayed = [removed_oph; oph5];
-      }
+    let* () =
+      check_mempool
+        ~applied:(oph6 :: kept_ops)
+        ~branch_delayed:[removed_oph; oph5]
+        client1
     in
-    Check.(
-      (expected_mempool4 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
     let* _level =
       bake_for
         ~keys:[Constant.bootstrap1.public_key_hash]
@@ -1946,13 +1810,7 @@ module Revamped = struct
     in
 
     log_step 12 "Check mempool after flush." ;
-    let* mempool = RPC.get_mempool client1 in
-    let expected_mempool5 = {Mempool.empty with branch_refused = [oph5]} in
-    Check.(
-      (expected_mempool5 = mempool)
-        Mempool.classified_typ
-        ~error_msg:"mempool expected to be %L, got %R") ;
-    unit
+    check_mempool ~branch_refused:[oph5] client1
 
   let test_prefiltered_limit_remove =
     Protocol.register_test

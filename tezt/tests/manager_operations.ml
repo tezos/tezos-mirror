@@ -547,7 +547,7 @@ module Memchecks = struct
     let wait_observer = Events.wait_for_notify nodes.observer.node in
     Log.info "- Injecting operation." ;
     let* (`OpHash oph) = inject () in
-    let* mempool_after_injection = RPC.get_mempool client in
+    let* mempool_after_injection = Mempool.get_mempool client in
     check_operation_is_in_mempool
       `Applied
       ~__LOC__
@@ -562,7 +562,7 @@ module Memchecks = struct
       Log.ok "  - %s was propagated to observer node as valid." oph
     else if List.mem oph pending then
       Test.fail ~__LOC__ "%s was propagated to observer node as pending" oph ;
-    let* mempool_observer = RPC.get_mempool nodes.observer.client in
+    let* mempool_observer = Mempool.get_mempool nodes.observer.client in
     let check_observer_mempool =
       match observer_classification with
       | ( `Applied | `Refused | `Branch_refused | `Branch_delayed | `Outdated
@@ -583,7 +583,7 @@ module Memchecks = struct
           ~who:"main"
           client
       in
-      let* mempool_after_baking = RPC.get_mempool client in
+      let* mempool_after_baking = Mempool.get_mempool client in
       check_operation_not_in_mempool
         ~__LOC__
         ~classification:`Applied
@@ -606,7 +606,7 @@ module Memchecks = struct
     in
     Log.info "- Injecting operation." ;
     let* (`OpHash oph) = inject () in
-    let* mempool_after_injection = RPC.get_mempool client in
+    let* mempool_after_injection = Mempool.get_mempool client in
     check_operation_classification
       classification
       ~__LOC__
@@ -623,7 +623,7 @@ module Memchecks = struct
       Log.info "- Waiting for observer to see operation or block." ;
       let* observer_result = wait_observer in
       Log.info "- Checking mempool of main node." ;
-      let* mempool_after_baking = RPC.get_mempool client in
+      let* mempool_after_baking = Mempool.get_mempool client in
       check_operation_classification
         classification_after_flush
         ~__LOC__

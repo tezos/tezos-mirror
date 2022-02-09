@@ -812,12 +812,47 @@ let test_mempool protocol ?endpoint client =
   let* () = Client.Admin.connect_address ?endpoint ~peer:node client in
   let flush_waiter = Node_event_level.wait_for_flush node in
   let* _ =
-    Mempool.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
+    Prevalidator.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
   in
   let* _ = flush_waiter in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
+  let* complete_mempool =
+    Mempool.get_mempool ?endpoint ~hooks:mempool_hooks client
+  in
   let* _ =
-    RPC.get_mempool_pending_operations ?endpoint ~hooks:mempool_hooks client
+    Lwt_list.iter_s
+      (fun i ->
+        let* mempool =
+          Mempool.get_mempool
+            ?endpoint
+            ~hooks:mempool_hooks
+            ~applied:(i = `Applied)
+            ~refused:(i = `Refused)
+            ~branch_delayed:(i = `Branch_delayed)
+            ~branch_refused:(i = `Branch_refused)
+            ~outdated:(i = `Outdated)
+            client
+        in
+        let may_get_field field ophs = if i = field then ophs else [] in
+        let expected_mempool =
+          Mempool.
+            {
+              applied = may_get_field `Applied complete_mempool.applied;
+              refused = may_get_field `Refused complete_mempool.refused;
+              outdated = may_get_field `Outdated complete_mempool.outdated;
+              branch_refused =
+                may_get_field `Branch_refused complete_mempool.branch_refused;
+              branch_delayed =
+                may_get_field `Branch_delayed complete_mempool.branch_delayed;
+              unprocessed = [];
+            }
+        in
+        Check.(
+          (expected_mempool = mempool)
+            Mempool.classified_typ
+            ~error_msg:"Expected mempool %L, got %R") ;
+        unit)
+      [`Applied; `Refused; `Branch_delayed; `Branch_refused; `Outdated]
   in
   (* We spawn a second monitor_operation RPC that monitor operations
      reclassified with errors. *)
@@ -825,7 +860,7 @@ let test_mempool protocol ?endpoint client =
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
   let* _ =
-    Mempool.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
+    Prevalidator.bake_empty_block ~protocol ~endpoint:(Client.Node node) client
   in
   let* _output_monitor = Process.check_and_read_stdout proc_monitor in
   (* Test RPCs [GET|POST /chains/main/mempool/filter] *)

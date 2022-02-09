@@ -545,7 +545,7 @@ let wrong_branch_operation_dismissal =
       ~dest:Constant.bootstrap2
       client
   in
-  let* current_mempool = RPC.get_mempool client in
+  let* current_mempool = Mempool.get_mempool client in
   Check.(
     (current_mempool <> Tezt_tezos.Mempool.empty)
       Tezt_tezos.Mempool.typ
@@ -555,7 +555,7 @@ let wrong_branch_operation_dismissal =
   Log.info "Bake a second proposal at a different round." ;
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   Log.info "Checking that the transfer is dismissed from the current mempool." ;
-  let* current_mempool = RPC.get_mempool client in
+  let* current_mempool = Mempool.get_mempool client in
   Check.(
     (current_mempool = Tezt_tezos.Mempool.empty)
       Tezt_tezos.Mempool.typ

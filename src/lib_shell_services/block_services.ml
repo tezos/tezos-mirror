@@ -1081,15 +1081,56 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
 
       let pending_query =
         let open RPC_query in
-        query (fun version ->
+        query
+          (fun version applied refused outdated branch_refused branch_delayed ->
             object
               method version = version
+
+              method applied = applied
+
+              method refused = refused
+
+              method outdated = outdated
+
+              method branch_refused = branch_refused
+
+              method branch_delayed = branch_delayed
             end)
         |+ field
              "version"
              RPC_arg.int
              default_pending_operations_version
              (fun t -> t#version)
+        |+ field
+             ~descr:"Include applied operations (true by default)"
+             "applied"
+             RPC_arg.bool
+             true
+             (fun t -> t#applied)
+        |+ field
+             ~descr:"Include refused operations (true by default)"
+             "refused"
+             RPC_arg.bool
+             true
+             (fun t -> t#refused)
+        |+ field
+             ~descr:"Include outdated operations (true by default)"
+             "outdated"
+             RPC_arg.bool
+             true
+             (fun t -> t#outdated)
+        |+ field
+             ~descr:"Include branch refused operations (true by default)"
+             "branch_refused"
+             RPC_arg.bool
+             true
+             (fun t -> t#branch_refused)
+        |+ field
+             ~descr:"Include branch delayed operations (true by default)"
+             "branch_delayed"
+             RPC_arg.bool
+             true
+             (fun t -> t#branch_delayed)
         |> seal
 
       (* If you update this datatype, please update also [supported_version]. *)
@@ -1490,13 +1531,25 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
       S.Mempool.pending_operations_version_dispatcher
 
     let pending_operations ctxt ?(chain = `Main)
-        ?(version = S.Mempool.default_pending_operations_version) () =
+        ?(version = S.Mempool.default_pending_operations_version)
+        ?(applied = true) ?(branch_delayed = true) ?(branch_refused = true)
+        ?(refused = true) ?(outdated = true) () =
       RPC_context.make_call1
         (S.Mempool.pending_operations (mempool_path chain_path))
         ctxt
         chain
         (object
            method version = version
+
+           method applied = applied
+
+           method refused = refused
+
+           method outdated = outdated
+
+           method branch_refused = branch_refused
+
+           method branch_delayed = branch_delayed
         end)
         ()
       >>=? function
