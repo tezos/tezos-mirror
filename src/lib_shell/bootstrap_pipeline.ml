@@ -268,10 +268,7 @@ let headers_fetch_worker_loop pipeline =
      match savepoint with
      | None -> Block_locator.to_steps seed pipeline.locator
      | Some (savepoint_hash, savepoint_level) ->
-         let (head, _) =
-           (pipeline.locator : Block_locator.t :> Block_header.t * _)
-         in
-         let head_level = head.shell.level in
+         let head_level = pipeline.locator.head_header.shell.level in
          let truncate_limit = Int32.(sub head_level savepoint_level) in
          Block_locator.to_steps_truncate
            ~limit:(Int32.to_int truncate_limit)
@@ -514,8 +511,6 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
       Lwt_pipe.Bounded.close fetched_headers ;
       (* TODO proper cleanup of resources... *)
       Lwt.return_unit) ;
-  let (head, _) = (pipeline.locator : Block_locator.t :> _ * _) in
-  let hash = Block_header.hash head in
   pipeline.headers_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf
@@ -523,7 +518,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          P2p_peer.Id.pp_short
          peer_id
          Block_hash.pp_short
-         hash)
+         locator.Block_locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
@@ -534,7 +529,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          P2p_peer.Id.pp_short
          peer_id
          Block_hash.pp_short
-         hash)
+         locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
@@ -545,7 +540,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          P2p_peer.Id.pp_short
          peer_id
          Block_hash.pp_short
-         hash)
+         locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> validation_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;

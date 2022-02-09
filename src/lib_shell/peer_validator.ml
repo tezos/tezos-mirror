@@ -46,15 +46,16 @@ module Request = struct
 
   type _ t =
     | New_head : Block_hash.t * Block_header.t -> unit t
-    | New_branch : Block_hash.t * Block_locator.t * Block_locator.seed -> unit t
+    | New_branch : Block_locator.t * Block_locator.seed -> unit t
 
   let view (type a) (req : a t) : view =
     match req with
     | New_head (hash, _) -> New_head hash
-    | New_branch (hash, locator, seed) ->
+    | New_branch (locator, seed) ->
         (* the seed is associated to each locator
            w.r.t. the peer_id of the sender *)
-        New_branch (hash, Block_locator.estimated_length seed locator)
+        New_branch
+          (locator.head_hash, Block_locator.estimated_length seed locator)
 end
 
 type limits = {
@@ -98,7 +99,7 @@ open Types
 
 type t = Worker.dropbox Worker.t
 
-let bootstrap_new_branch w head unknown_prefix =
+let bootstrap_new_branch w unknown_prefix =
   let pv = Worker.state w in
   let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
   (* sender and receiver are inverted here because they are from
@@ -131,7 +132,7 @@ let bootstrap_new_branch w head unknown_prefix =
   pv.pipeline <- None ;
   Worker.log_event
     w
-    (New_branch_validated {peer = pv.peer_id; hash = Block_header.hash head})
+    (New_branch_validated {peer = pv.peer_id; hash = unknown_prefix.head_hash})
   >>= fun () -> return_unit
 
 let validate_new_head w hash (header : Block_header.t) =
@@ -181,10 +182,9 @@ let validate_new_head w hash (header : Block_header.t) =
       Peer_metadata.incr meta Valid_blocks ;
       return_unit
 
-let only_if_fitness_increases w distant_header cont =
+let only_if_fitness_increases w distant_header hash cont =
   let pv = Worker.state w in
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
-  let hash = Block_header.hash distant_header in
   Store.Block.is_known_valid chain_store hash >>= fun known_valid ->
   if known_valid then (
     pv.last_validated_head <- distant_header ;
@@ -248,17 +248,19 @@ let may_validate_new_head w hash (header : Block_header.t) =
       () ;
     return_unit)
   else
-    only_if_fitness_increases w header @@ fun () ->
+    only_if_fitness_increases w header hash @@ fun () ->
     assert_acceptable_head w hash header >>=? fun () ->
     validate_new_head w hash header
 
-let may_validate_new_branch w distant_hash locator =
+let may_validate_new_branch w locator =
   (* Make sure this is still ok w.r.t @phink fix *)
   let pv = Worker.state w in
-  let (distant_header, _) = (locator : Block_locator.t :> Block_header.t * _) in
-  only_if_fitness_increases w distant_header @@ fun () ->
-  assert_acceptable_head w (Block_header.hash distant_header) distant_header
-  >>=? fun () ->
+  let {Block_locator.head_header = distant_header; head_hash = distant_hash; _}
+      =
+    locator
+  in
+  only_if_fitness_increases w distant_header distant_hash @@ fun () ->
+  assert_acceptable_head w distant_hash distant_header >>=? fun () ->
   let chain_store = Distributed_db.chain_store pv.parameters.chain_db in
   (* TODO: should we consider level as well ? Rolling could have
      difficulties boostrapping. *)
@@ -268,10 +270,8 @@ let may_validate_new_branch w distant_hash locator =
     locator
   >>= function
   | (Known_valid, prefix_locator) ->
-      let (_, history) =
-        (prefix_locator : Block_locator.t :> Block_header.t * _)
-      in
-      if history <> [] then bootstrap_new_branch w distant_header prefix_locator
+      if prefix_locator.Block_locator.history <> [] then
+        bootstrap_new_branch w prefix_locator
       else return_unit
   | (Unknown, _) ->
       (* May happen when:
@@ -303,10 +303,12 @@ let on_request (type a) w (req : a Request.t) : a tzresult Lwt.t =
   | Request.New_head (hash, header) ->
       Worker.log_event w (Processing_new_head {peer = pv.peer_id; hash})
       >>= fun () -> may_validate_new_head w hash header
-  | Request.New_branch (hash, locator, _seed) ->
+  | Request.New_branch (locator, _seed) ->
       (* TODO penalize empty locator... ?? *)
-      Worker.log_event w (Processing_new_branch {peer = pv.peer_id; hash})
-      >>= fun () -> may_validate_new_branch w hash locator
+      Worker.log_event
+        w
+        (Processing_new_branch {peer = pv.peer_id; hash = locator.head_hash})
+      >>= fun () -> may_validate_new_branch w locator
 
 let on_completion w r _ st =
   Worker.log_event w (Event.Request (Request.view r, st, None)) >>= fun () ->
@@ -418,9 +420,8 @@ let table =
   let merge w (Worker.Any_request neu) old =
     let pv = Worker.state w in
     match neu with
-    | Request.New_branch (_, locator, _) ->
-        let (header, _) = (locator : Block_locator.t :> _ * _) in
-        pv.last_advertised_head <- header ;
+    | Request.New_branch (locator, _) ->
+        pv.last_advertised_head <- locator.Block_locator.head_header ;
         Some (Worker.Any_request neu)
     | Request.New_head (_, header) -> (
         pv.last_advertised_head <- header ;
@@ -465,17 +466,14 @@ let create ?(notify_new_block = fun _ -> ()) ?(notify_termination = fun _ -> ())
     (module Handlers)
 
 let notify_branch w locator =
-  let (header, _) = (locator : Block_locator.t :> _ * _) in
-  let hash = Block_header.hash header in
   let pv = Worker.state w in
   let sender_id = Distributed_db.my_peer_id pv.parameters.chain_db in
   (* sender and receiver are inverted here because they are from
      the point of view of the node sending the locator *)
   let seed = {Block_locator.sender_id = pv.peer_id; receiver_id = sender_id} in
-  Worker.Dropbox.put_request w (New_branch (hash, locator, seed))
+  Worker.Dropbox.put_request w (New_branch (locator, seed))
 
-let notify_head w header =
-  let hash = Block_header.hash header in
+let notify_head w hash header =
   Worker.Dropbox.put_request w (New_head (hash, header))
 
 let shutdown w = Worker.shutdown w

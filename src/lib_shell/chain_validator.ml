@@ -49,14 +49,16 @@ module Request = struct
       }
         -> Event.update t
     | Notify_branch : P2p_peer.Id.t * Block_locator.t -> unit t
-    | Notify_head : P2p_peer.Id.t * Block_header.t * Mempool.t -> unit t
+    | Notify_head :
+        P2p_peer.Id.t * Block_hash.t * Block_header.t * Mempool.t
+        -> unit t
     | Disconnection : P2p_peer.Id.t -> unit t
 
   let view (type a) (req : a t) : view =
     match req with
     | Validated {block; _} -> Hash (Store.Block.hash block)
     | Notify_branch (peer_id, _) -> PeerId peer_id
-    | Notify_head (peer_id, _, _) -> PeerId peer_id
+    | Notify_head (peer_id, _, _, _) -> PeerId peer_id
     | Disconnection peer_id -> PeerId peer_id
 end
 
@@ -148,9 +150,9 @@ let update_synchronisation_state w block peer_id =
    valid. Assume:
 
    - [peer_id] is not us *)
-let check_and_update_synchronisation_state w (block, peer_id) : unit Lwt.t =
+let check_and_update_synchronisation_state w (hash, block) peer_id : unit Lwt.t
+    =
   let nv = Worker.state w in
-  let hash = Block_header.hash block in
   Store.Block.is_known_valid nv.parameters.chain_store hash
   >>= fun known_valid ->
   if known_valid then update_synchronisation_state w block peer_id
@@ -429,17 +431,18 @@ let on_validation_request w peer start_testchain active_chains spawn_child block
         >|=? fun () -> event
 
 let on_notify_branch w peer_id locator =
-  let (block, _) = (locator : Block_locator.t :> _ * _) in
-  check_and_update_synchronisation_state w (block, peer_id) >>= fun () ->
+  let {Block_locator.head_hash; head_header; _} = locator in
+  check_and_update_synchronisation_state w (head_hash, head_header) peer_id
+  >>= fun () ->
   with_activated_peer_validator w peer_id (fun pv ->
       Peer_validator.notify_branch pv locator ;
       return_unit)
 
-let on_notify_head w peer_id header mempool =
+let on_notify_head w peer_id (hash, header) mempool =
   let nv = Worker.state w in
-  check_and_update_synchronisation_state w (header, peer_id) >>= fun () ->
+  check_and_update_synchronisation_state w (hash, header) peer_id >>= fun () ->
   with_activated_peer_validator w peer_id (fun pv ->
-      Peer_validator.notify_head pv header ;
+      Peer_validator.notify_head pv hash header ;
       return_unit)
   >>=? fun () ->
   match !(nv.prevalidator) with
@@ -469,8 +472,8 @@ let on_request (type a) w start_testchain active_chains spawn_child
         block
   | Request.Notify_branch (peer_id, locator) ->
       on_notify_branch w peer_id locator
-  | Request.Notify_head (peer_id, header, mempool) ->
-      on_notify_head w peer_id header mempool
+  | Request.Notify_head (peer_id, hash, header, mempool) ->
+      on_notify_head w peer_id (hash, header) mempool
   | Request.Disconnection peer_id -> on_disconnection w peer_id
 
 let on_completion (type a) w (req : a Request.t) (update : a) request_status =
@@ -485,7 +488,7 @@ let on_completion (type a) w (req : a Request.t) (update : a) request_status =
         (Processed_block
            {request; request_status; update; fitness; level; timestamp}) ;
       Lwt.return_unit
-  | Request.Notify_head (peer_id, _, _) ->
+  | Request.Notify_head (peer_id, _, _, _) ->
       Worker.record_event w (Event.Notify_head peer_id) ;
       Lwt.return_unit
   | Request.Notify_branch (peer_id, _) ->
@@ -541,8 +544,8 @@ let on_launch w _ parameters =
   let notify_branch peer_id locator =
     Worker.Queue.push_request_now w (Notify_branch (peer_id, locator))
   in
-  let notify_head peer_id header ops =
-    Worker.Queue.push_request_now w (Notify_head (peer_id, header, ops))
+  let notify_head peer_id hash header ops =
+    Worker.Queue.push_request_now w (Notify_head (peer_id, hash, header, ops))
   in
   let disconnection peer_id =
     Worker.Queue.push_request_now w (Disconnection peer_id)
@@ -753,8 +756,6 @@ let assert_checkpoint w ((hash, _) as block_descr) =
 
 let validate_block w ?force hash block operations =
   let nv = Worker.state w in
-  let hash' = Block_header.hash block in
-  assert (Block_hash.equal hash hash') ;
   assert_fitness_increases ?force w block >>=? fun () ->
   assert_checkpoint w (hash, block.Block_header.shell.level) >>=? fun () ->
   Block_validator.validate

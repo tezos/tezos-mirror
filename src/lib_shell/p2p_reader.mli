@@ -151,7 +151,8 @@ type connection =
 type callback = {
   notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
       (** callback function called on reception of a [Current_branch] message *)
-  notify_head : P2p_peer.Id.t -> Block_header.t -> Mempool.t -> unit;
+  notify_head :
+    P2p_peer.Id.t -> Block_hash.t -> Block_header.t -> Mempool.t -> unit;
       (** callback function called on reception of a [Current_head] message *)
   disconnection : P2p_peer.Id.t -> unit;
 }
