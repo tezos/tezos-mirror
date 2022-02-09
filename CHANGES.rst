@@ -140,6 +140,9 @@ Baker / Endorser / Accuser
   migration block to its successor. This necessary mechanism was
   present in all bakers except for the Ithaca baker of Octez 12.0~rc1.
 
+- Improved the log messages of the Ithaca baker for the default
+  (`Notice`) and `Info` logging levels.
+
 Version 12.0~rc1
 ================
 
