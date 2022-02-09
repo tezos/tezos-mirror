@@ -1496,6 +1496,10 @@ module Contract : sig
   val originated_from_current_nonce :
     since:context -> until:context -> contract list tzresult Lwt.t
 
+  val frozen_balance : context -> contract -> Tez.t tzresult Lwt.t
+
+  val get_full_balance : context -> contract -> Tez.t tzresult Lwt.t
+
   module Legacy_big_map_diff : sig
     type item = private
       | Update of {
