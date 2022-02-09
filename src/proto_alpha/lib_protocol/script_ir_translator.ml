@@ -777,49 +777,68 @@ let rec comparable_ty_eq :
     let type_metadata_eq meta_a meta_b =
       of_result @@ type_metadata_eq ~error_details meta_a meta_b
     in
+    let not_equal () =
+      of_result
+      @@ Error
+           (match error_details with
+           | Fast -> (Inconsistent_types_fast : error_trace)
+           | Informative ->
+               trace_of_error
+               @@ default_ty_eq_error
+                    (ty_of_comparable_ty ta)
+                    (ty_of_comparable_ty tb))
+    in
     match (ta, tb) with
     | (Unit_key, Unit_key) ->
         return (Eq : (ta comparable_ty, tb comparable_ty) eq)
+    | (Unit_key, _) -> not_equal ()
     | (Never_key, Never_key) -> return Eq
+    | (Never_key, _) -> not_equal ()
     | (Int_key, Int_key) -> return Eq
+    | (Int_key, _) -> not_equal ()
     | (Nat_key, Nat_key) -> return Eq
+    | (Nat_key, _) -> not_equal ()
     | (Signature_key, Signature_key) -> return Eq
+    | (Signature_key, _) -> not_equal ()
     | (String_key, String_key) -> return Eq
+    | (String_key, _) -> not_equal ()
     | (Bytes_key, Bytes_key) -> return Eq
+    | (Bytes_key, _) -> not_equal ()
     | (Mutez_key, Mutez_key) -> return Eq
+    | (Mutez_key, _) -> not_equal ()
     | (Bool_key, Bool_key) -> return Eq
+    | (Bool_key, _) -> not_equal ()
     | (Key_hash_key, Key_hash_key) -> return Eq
+    | (Key_hash_key, _) -> not_equal ()
     | (Key_key, Key_key) -> return Eq
+    | (Key_key, _) -> not_equal ()
     | (Timestamp_key, Timestamp_key) -> return Eq
+    | (Timestamp_key, _) -> not_equal ()
     | (Chain_id_key, Chain_id_key) -> return Eq
+    | (Chain_id_key, _) -> not_equal ()
     | (Address_key, Address_key) -> return Eq
+    | (Address_key, _) -> not_equal ()
     | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) -> return Eq
+    | (Tx_rollup_l2_address_key, _) -> not_equal ()
     | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
         let* () = type_metadata_eq meta_a meta_b in
         let* Eq = comparable_ty_eq ~error_details left_a left_b in
         let+ Eq = comparable_ty_eq ~error_details right_a right_b in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
+    | (Pair_key _, _) -> not_equal ()
     | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
       ->
         let* () = type_metadata_eq meta_a meta_b in
         let* Eq = comparable_ty_eq ~error_details left_a left_b in
         let+ Eq = comparable_ty_eq ~error_details right_a right_b in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
+    | (Union_key _, _) -> not_equal ()
     | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
         let* () = type_metadata_eq meta_a meta_b in
         let+ Eq = comparable_ty_eq ~error_details ta tb in
         (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (_, _) ->
-        of_result
-        @@ Error
-             (match error_details with
-             | Fast -> (Inconsistent_types_fast : error_trace)
-             | Informative ->
-                 trace_of_error
-                 @@ default_ty_eq_error
-                      (ty_of_comparable_ty ta)
-                      (ty_of_comparable_ty tb))
+    | (Option_key _, _) -> not_equal ()
 
 let memo_size_eq :
     type error_trace.
