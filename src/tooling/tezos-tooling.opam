@@ -10,8 +10,9 @@ license: "MIT"
 depends: [
   "dune" { >= "2.9" }
   "coq-of-ocaml" { = "2.5.0" }
-  "ocamlformat" { = "0.18.0" }
   "bisect_ppx" { >= "2.7.0" }
+  "ocamlformat" { = "0.18.0" }
+  "ometrics" { >= "0.1.1" }
   "parsexp" {with-test}
   "base-unix" {with-test}
   "tezos-protocol-compiler"
