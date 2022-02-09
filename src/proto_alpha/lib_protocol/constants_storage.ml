@@ -217,3 +217,7 @@ let sc_rollup_origination_size c =
 let sc_rollup_challenge_window_in_blocks c =
   let constants = Raw_context.constants c in
   constants.sc_rollup_challenge_window_in_blocks
+
+let sc_rollup_max_available_messages c =
+  let constants = Raw_context.constants c in
+  constants.sc_rollup_max_available_messages

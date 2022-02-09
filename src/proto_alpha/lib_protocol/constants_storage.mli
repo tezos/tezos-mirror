@@ -124,3 +124,5 @@ val sc_rollup_enable : Raw_context.t -> bool
 val sc_rollup_origination_size : Raw_context.t -> int
 
 val sc_rollup_challenge_window_in_blocks : Raw_context.t -> int
+
+val sc_rollup_max_available_messages : Raw_context.t -> int

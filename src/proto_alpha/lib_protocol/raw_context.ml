@@ -927,6 +927,11 @@ let prepare_first_block ~level ~timestamp ctxt =
             (* The following value is chosen to prevent spam. *)
             sc_rollup_origination_size = 6_314;
             sc_rollup_challenge_window_in_blocks = 20_160;
+            (* The following value is chosen to limit the maximal
+               length of an inbox refutation proof. *)
+            (* TODO: https://gitlab.com/tezos/tezos/-/issues/2556
+               The follow constants need to be refined. *)
+            sc_rollup_max_available_messages = 1_000_000;
           }
       in
       add_constants ctxt constants >>= fun ctxt -> return ctxt)
