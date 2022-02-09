@@ -17,7 +17,7 @@ depends: [
   "tezos-micheline"
   "ptime" { >= "0.8.4" }
   "ezjsonm" { >= "0.5.0" }
-  "lwt" { >= "5.4.0" }
+  "lwt" { >= "5.4.0" & < "5.5.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "bls12-381-unix"
   "tezos-hacl-glue-unix"

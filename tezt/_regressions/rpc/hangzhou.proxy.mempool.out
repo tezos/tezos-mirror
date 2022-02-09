@@ -179,12 +179,9 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "input": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/Operation_hash",
+                    "title": "A Tezos operation ID (Base58Check-encoded)",
+                    "$ref": "#/definitions/unistring",
                     "definitions": {
-                      "Operation_hash": {
-                        "title": "A Tezos operation ID (Base58Check-encoded)",
-                        "$ref": "#/definitions/unistring"
-                      },
                       "unistring": {
                         "title": "Universal string representation",
                         "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
@@ -257,12 +254,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -341,12 +333,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -433,12 +420,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -3734,12 +3716,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -5640,12 +5617,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -5699,7 +5671,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
                     "type": "object",
-                    "properties": {},
                     "additionalProperties": false
                   },
                   "binary_schema": {
@@ -5724,7 +5695,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
                     "type": "object",
-                    "properties": {},
                     "additionalProperties": false
                   },
                   "binary_schema": {
@@ -5748,12 +5718,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -5796,7 +5761,6 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
                     "type": "object",
-                    "properties": {},
                     "additionalProperties": false
                   },
                   "binary_schema": {
@@ -5842,12 +5806,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
@@ -5889,12 +5848,9 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "input": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/Operation_hash",
+                    "title": "A Tezos operation ID (Base58Check-encoded)",
+                    "$ref": "#/definitions/unistring",
                     "definitions": {
-                      "Operation_hash": {
-                        "title": "A Tezos operation ID (Base58Check-encoded)",
-                        "$ref": "#/definitions/unistring"
-                      },
                       "unistring": {
                         "title": "Universal string representation",
                         "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
@@ -5967,12 +5923,7 @@ curl -s 'http://localhost:16385/describe/chains/main/mempool?recurse=yes'
                 "error": {
                   "json_schema": {
                     "$schema": "http://json-schema.org/draft-04/schema#",
-                    "$ref": "#/definitions/error",
-                    "definitions": {
-                      "error": {
-                        "description": "The full list of errors is available with the global RPC `GET errors`"
-                      }
-                    }
+                    "description": "The full list of errors is available with the global RPC `GET errors`"
                   },
                   "binary_schema": {
                     "toplevel": {
