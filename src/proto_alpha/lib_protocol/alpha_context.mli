@@ -2058,7 +2058,7 @@ module Tx_rollup_message : sig
       along with its size in bytes. See
       {!Tx_rollup_message_repr.size}. *)
   val make_deposit :
-    Tx_rollup_l2_address.Indexable.value ->
+    Tx_rollup_l2_address.t Indexable.either ->
     Ticket_hash.t ->
     Tx_rollup_l2_qty.t ->
     t * int
