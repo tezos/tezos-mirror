@@ -12,7 +12,7 @@ Here are the differences with regular Tezt tests:
 - long tests are registered with ``Long_test.register`` instead
   of ``Test.register``;
 - long tests have easy access to a Performance Regression Test framework
-  wich provides these features:
+  which provides these features:
 
   - Persist measurement samples (in an `InfluxDB <https://github.com/influxdata/influxdb>`_ database) such as how long it takes
     to do something. These samples will be used to prevent regressions of
