@@ -298,30 +298,9 @@ variables:
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
 
-# Setup authentication for either Docker Hub (release) or GitLab registry (dev).
-# Also setup Docker names such that they are valid for the target (Docker Hub or GitLab).
-# Docker constraints on tags: https://docs.docker.com/engine/reference/commandline/tag/
-#
-#   A tag name must be valid ASCII and may contain lowercase and
-#   uppercase letters, digits, underscores, periods and dashes. A tag
-#   name may not start with a period or a dash and may contain a maximum
-#   of 128 characters.
-#
-# To detect dev mode we test the value of $CI_REGISTRY.
-# GitLab image name must follow this format:
-# https://docs.gitlab.com/ee/user/packages/container_registry/#image-naming-convention
 .docker_registry_auth:
   before_script:
-    - mkdir ~/.docker || true
-    - if [ "$MASTER_OR_RELEASE" = "true" ] && [ "$TEZOS_DEFAULT_NAMESPACE/$TEZOS_DEFAULT_BRANCH" = "tezos/tezos" ]; then
-        export DOCKER_IMAGE_NAME="docker.io/${CI_PROJECT_PATH}-" ;
-        echo "{ \"auths\":{ \"https://index.docker.io/v1/\":{ \"auth\":\"${CI_DOCKER_AUTH}\" } } }" > ~/.docker/config.json ;
-      else
-        docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY ;
-        export DOCKER_IMAGE_NAME="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/" ;
-      fi
-    - DOCKER_IMAGE_TAG=$(echo "${IMAGE_ARCH_PREFIX}${CI_COMMIT_REF_NAME}" | tr -c -- '-._\n[:alnum:]' '_')
-    - echo "Building images ${DOCKER_IMAGE_NAME%?} ( /bare & /debug ) ${DOCKER_IMAGE_TAG}"
+    - ./scripts/ci/docker_registry_auth.sh
 
 .template__code_quality:
   variables:
