@@ -59,7 +59,31 @@ module Char : S with type t = char
 
 module Bool : S with type t = bool
 
-module Int : S with type t = int
+(** [Int] is a comparison module. Out of performance concerns, the signature
+    actually contains compiler builtins ([external]) rather than [val]. *)
+module Int : sig
+  type t = int
+
+  external ( = ) : int -> int -> bool = "%equal"
+
+  external ( <> ) : int -> int -> bool = "%notequal"
+
+  external ( < ) : int -> int -> bool = "%lessthan"
+
+  external ( > ) : int -> int -> bool = "%greaterthan"
+
+  external ( <= ) : int -> int -> bool = "%lessequal"
+
+  external ( >= ) : int -> int -> bool = "%greaterequal"
+
+  external compare : int -> int -> int = "%compare"
+
+  val max : int -> int -> int
+
+  val min : int -> int -> int
+
+  external equal : int -> int -> bool = "%equal"
+end
 
 module Int32 : S with type t = int32
 
