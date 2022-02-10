@@ -122,5 +122,7 @@ val find_selected_distribution :
    context. *)
 val prepare_stake_distribution : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+(** [get_total_active_stake ctxt cycle] retrieves the amount in Tez of the
+    active stake at [cycle] from [ctxt]. *)
 val get_total_active_stake :
   Raw_context.t -> Cycle_repr.t -> Tez_repr.t tzresult Lwt.t
