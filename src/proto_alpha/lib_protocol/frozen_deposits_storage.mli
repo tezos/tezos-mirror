@@ -23,27 +23,46 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Simple abstraction from low-level storage to handle frozen deposits *)
+
+(** [init ctxt delegate] returns a new context from [ctxt] where the frozen
+   deposits of the implicit contract represented by [delegate] have been initialized to
+   {!val:Tez_repr.zero}. *)
 val init :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
+(** [allocated ctxt contract] checks whether [contract] has frozen deposits in
+    [ctxt]. *)
 val allocated : Raw_context.t -> Contract_repr.t -> bool Lwt.t
 
+(** [get ctxt contract] retrieves the frozen deposits of [contract] in [ctxt]. *)
 val get : Raw_context.t -> Contract_repr.t -> Storage.deposits tzresult Lwt.t
 
+(** [find ctxt contract] retrieves the frozen deposits of [contract] in
+    [ctxt], if any. *)
 val find :
   Raw_context.t -> Contract_repr.t -> Storage.deposits option tzresult Lwt.t
 
+(** [credit_only_call_from_token ctxt delegate tez] returns a new context from
+   [ctxt] where the amount of frozen deposits for the implicit contract
+   represented by [delegate] increases by [tez]. *)
 val credit_only_call_from_token :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
+(** [spend_only_call_from_token ctxt delegate tez] returns a new context from
+   [ctxt] where the amount of frozen deposits for the implicit contract
+   represented by [delegate] decreases by [tez].*)
 val spend_only_call_from_token :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
+(** [update_initial_amount ctxt contract tez] returns a new context from [ctxt]
+   where the initial_amount of the frozen deposits for [contract] is set to
+   [tez]. *)
 val update_initial_amount :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
