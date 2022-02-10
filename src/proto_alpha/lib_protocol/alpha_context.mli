@@ -2039,7 +2039,7 @@ end
 (** This module re-exports definitions from {!Tx_rollup_message_repr}. *)
 module Tx_rollup_message : sig
   type deposit = {
-    destination : Tx_rollup_l2_address.Indexable.t;
+    destination : Tx_rollup_l2_address.Indexable.either;
     ticket_hash : Ticket_hash.t;
     amount : int64;
   }

@@ -23,23 +23,74 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type ('state, 'a) indexable =
-  | Value : 'a -> ([> `Value], 'a) indexable
-  | Index : int32 -> ([> `Id], 'a) indexable
+type (_, 'a) t =
+  | Value : 'a -> ([> `Value], 'a) t
+  | Index : int32 -> ([> `Id], 'a) t
 
-type unknown = [`Value | `Id]
+type error += Index_cannot_be_negative of int32
+
+let () =
+  let open Data_encoding in
+  register_error_kind
+    `Permanent
+    ~id:"indexable.index_cannot_be_negative"
+    ~title:"Index of values cannot be negative"
+    ~description:"A negative integer cannot be used as an index for a value."
+    ~pp:(fun ppf wrong_id ->
+      Format.fprintf
+        ppf
+        "%ld cannot be used as an index because it is negative."
+        wrong_id)
+    (obj1 (req "wrong_index" int32))
+    (function Index_cannot_be_negative wrong_id -> Some wrong_id | _ -> None)
+    (fun wrong_id -> Index_cannot_be_negative wrong_id)
+
+type value_only = [`Value]
+
+type id_only = [`Id]
+
+type unknown = [value_only | id_only]
+
+type 'a value = (value_only, 'a) t
+
+type 'a index = (id_only, 'a) t
+
+type 'a either = (unknown, 'a) t
+
+let forget_index : 'a index -> 'a either = function Index _ as id -> id
+
+let forget_value : 'a value -> 'a either = function Value _ as v -> v
 
 type index_only = [`Id]
 
-type 'a t = (unknown, 'a) indexable
+let value : 'a -> 'a value = fun v -> Value v
 
-type 'a index = (index_only, 'a) indexable
+let from_value : 'a -> 'a either = fun x -> value x |> forget_value
 
-let index h : 'a t -> 'a index tzresult Lwt.t = function
-  | Value x -> h x >|=? fun x -> Index x
+let index : int32 -> 'a index tzresult =
+ fun i ->
+  if Compare.Int32.(0l <= i) then ok (Index i)
+  else error (Index_cannot_be_negative i)
+
+let index_exn : int32 -> 'a index =
+ fun i ->
+  match index i with
+  | Ok x -> x
+  | Error _ -> raise (Invalid_argument "Indexable.index_exn")
+
+let from_index : int32 -> 'a either tzresult = fun x -> index x >|? forget_index
+
+let from_index_exn : int32 -> 'a either = fun x -> index_exn x |> forget_index
+
+let prepare_index h : 'a either -> 'a index tzresult Lwt.t = function
+  | Value x -> ( h x >|= function Ok x -> index x | Error e -> Error e)
   | Index x -> return (Index x)
 
-let encoding : 'a Data_encoding.t -> 'a t Data_encoding.t =
+let prepare_value h : 'a either -> 'a value tzresult Lwt.t = function
+  | Index x -> h x >|=? fun x -> Value x
+  | Value x -> return (Value x)
+
+let encoding : 'a Data_encoding.t -> 'a either Data_encoding.t =
  fun val_encoding ->
   Data_encoding.(
     union
@@ -58,7 +109,8 @@ let encoding : 'a Data_encoding.t -> 'a t Data_encoding.t =
           (fun x -> Value x);
       ])
 
-let pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit =
+let pp :
+    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a either -> unit =
  fun ppv fmt -> function
   | Index x -> Format.(fprintf fmt "#%ld" x)
   | Value x -> Format.(fprintf fmt "%a" ppv x)
@@ -90,13 +142,42 @@ module type VALUE = sig
 end
 
 module Make (V : VALUE) = struct
-  type nonrec 'state indexable = ('state, V.t) indexable
+  type nonrec 'state t = ('state, V.t) t
 
-  type nonrec t = V.t t
+  type nonrec either = V.t either
 
   type nonrec index = V.t index
 
+  type nonrec value = V.t value
+
+  let prepare_index = prepare_index
+
+  let prepare_value = prepare_value
+
+  let forget_value = forget_value
+
+  let forget_index = forget_index
+
+  let value = value
+
+  let from_value = from_value
+
+  let index = index
+
+  let index_exn = index_exn
+
+  let from_index = from_index
+
+  let from_index_exn = from_index_exn
+
   let encoding = encoding V.encoding
+
+  let index_encoding : index Data_encoding.t =
+    Data_encoding.(
+      conv
+        (fun (Index x : index) -> x)
+        (fun x : index -> Index x)
+        Data_encoding.int32)
 
   let pp = pp V.pp
 
