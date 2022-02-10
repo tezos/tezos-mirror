@@ -1490,16 +1490,13 @@ end
 module Receipt : sig
   type balance =
     | Contract of Contract.t
-    | Legacy_rewards of Signature.Public_key_hash.t * Cycle.t
     | Block_fees
-    | Legacy_deposits of Signature.Public_key_hash.t * Cycle.t
     | Deposits of public_key_hash
     | Nonce_revelation_rewards
     | Double_signing_evidence_rewards
     | Endorsing_rewards
     | Baking_rewards
     | Baking_bonuses
-    | Legacy_fees of Signature.Public_key_hash.t * Cycle.t
     | Storage_fees
     | Double_signing_punishments
     | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
@@ -2721,10 +2718,7 @@ module Token : sig
     | `Collected_commitments of Blinded_public_key_hash.t
     | `Delegate_balance of Signature.Public_key_hash.t
     | `Frozen_deposits of Signature.Public_key_hash.t
-    | `Block_fees
-    | `Legacy_deposits of Signature.Public_key_hash.t * Cycle.t
-    | `Legacy_fees of Signature.Public_key_hash.t * Cycle.t
-    | `Legacy_rewards of Signature.Public_key_hash.t * Cycle.t ]
+    | `Block_fees ]
 
   type source =
     [ `Invoice

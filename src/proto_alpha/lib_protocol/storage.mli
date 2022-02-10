@@ -47,73 +47,7 @@ module type Simple_single_data_storage = sig
   val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
 end
 
-module Legacy_block_priority : Simple_single_data_storage with type value = int
-
 module Block_round : Simple_single_data_storage with type value = Round_repr.t
-
-module Roll_legacy : sig
-  (** Storage from this submodule must only be accessed through the
-      module `Roll_legacy`. *)
-
-  module Owner :
-    Indexed_data_snapshotable_storage
-      with type key = Roll_repr_legacy.t
-       and type snapshot = Cycle_repr.t * int
-       and type value = Signature.Public_key.t
-       and type t := Raw_context.t
-
-  val clear : Raw_context.t -> Raw_context.t Lwt.t
-
-  (** The next roll to be allocated. *)
-  module Next :
-    Single_data_storage
-      with type value = Roll_repr_legacy.t
-       and type t := Raw_context.t
-
-  (** Rolls linked lists represent both account owned and free rolls.
-      All rolls belongs either to the limbo list or to an owned list. *)
-
-  (** Head of the linked list of rolls in limbo *)
-  module Limbo :
-    Single_data_storage
-      with type value = Roll_repr_legacy.t
-       and type t := Raw_context.t
-
-  (** Rolls associated to contracts, a linked list per contract *)
-  module Delegate_roll_list :
-    Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Roll_repr_legacy.t
-       and type t := Raw_context.t
-
-  (** Use this to iter on a linked list of rolls *)
-  module Successor :
-    Indexed_data_storage
-      with type key = Roll_repr_legacy.t
-       and type value = Roll_repr_legacy.t
-       and type t := Raw_context.t
-
-  (** The tez of a contract that are not assigned to rolls *)
-  module Delegate_change :
-    Indexed_data_storage
-      with type key = Signature.Public_key_hash.t
-       and type value = Tez_repr.t
-       and type t := Raw_context.t
-
-  (** Index of the randomly selected roll snapshot of a given cycle. *)
-  module Snapshot_for_cycle :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = int
-       and type t := Raw_context.t
-
-  (** Last roll in the snapshoted roll allocation of a given cycle. *)
-  module Last_for_snapshot :
-    Indexed_data_storage
-      with type key = int
-       and type value = Roll_repr_legacy.t
-       and type t = Raw_context.t * Cycle_repr.t
-end
 
 type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
 
@@ -162,31 +96,6 @@ module Contract : sig
       with type key = Contract_repr.t
        and type value = missed_endorsements_info
        and type t := Raw_context.t
-
-  (** Frozen balance, see 'delegate_storage.mli' for more explanation.
-      Always update `Delegates_with_frozen_balance` accordingly.
-
-      Deprecated only used for migration
-  *)
-  module Legacy_frozen_deposits :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Tez_repr.t
-       and type t = Raw_context.t * Contract_repr.t
-
-  (** Deprecated only used for migration *)
-  module Legacy_frozen_fees :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Tez_repr.t
-       and type t = Raw_context.t * Contract_repr.t
-
-  (** Deprecated only used for migration *)
-  module Legacy_frozen_rewards :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Tez_repr.t
-       and type t = Raw_context.t * Contract_repr.t
 
   (** The manager of a contract *)
   module Manager :
@@ -423,12 +332,6 @@ module Slashed_deposits :
      and type key = Raw_level_repr.t * Signature.Public_key_hash.t
      and type value = slashed_level
 
-(** Set of all active delegates with rolls. *)
-module Legacy_active_delegates_with_rolls :
-  Data_set_storage
-    with type t := Raw_context.t
-     and type elt = Signature.Public_key_hash.t
-
 module Stake : sig
   (** The map of all the staking balances of all delegates, including
      those with less than one roll. It might be large *)
@@ -474,16 +377,6 @@ module Delegate_sampler_state :
      and type value =
           (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
      and type t := Raw_context.t
-
-(** Set of all the delegates with frozen rewards/deposits/fees for a given cycle.
-    Deprecated: This is now only used for stitching while migrating from an
-    emmy protocol. This is to be removed in the next version.
-
-    This table must be cleaned after migration. *)
-module Legacy_delegates_with_frozen_balance :
-  Data_set_storage
-    with type t = Raw_context.t * Cycle_repr.t
-     and type elt = Signature.Public_key_hash.t
 
 (** Votes *)
 
@@ -574,12 +467,6 @@ module Seed : sig
     | Revealed of Seed_repr.nonce
 
   module Nonce :
-    Non_iterable_indexed_data_storage
-      with type key := Level_repr.t
-       and type value := nonce_status
-       and type t := Raw_context.t
-
-  module Nonce_legacy :
     Non_iterable_indexed_data_storage
       with type key := Level_repr.t
        and type value := nonce_status

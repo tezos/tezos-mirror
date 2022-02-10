@@ -28,10 +28,7 @@ type container =
   | `Collected_commitments of Blinded_public_key_hash.t
   | `Delegate_balance of Signature.Public_key_hash.t
   | `Frozen_deposits of Signature.Public_key_hash.t
-  | `Block_fees
-  | `Legacy_deposits of Signature.Public_key_hash.t * Cycle_repr.t
-  | `Legacy_fees of Signature.Public_key_hash.t * Cycle_repr.t
-  | `Legacy_rewards of Signature.Public_key_hash.t * Cycle_repr.t ]
+  | `Block_fees ]
 
 type source =
   [ `Invoice
@@ -64,16 +61,6 @@ let allocated ctxt stored =
       let contract = Contract_repr.implicit_contract delegate in
       Frozen_deposits_storage.allocated ctxt contract >|= ok
   | `Block_fees -> return_true
-  (* TODO: remove in J *)
-  | `Legacy_deposits (delegate, cycle) ->
-      let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Legacy_frozen_deposits.mem (ctxt, contract) cycle >|= ok
-  | `Legacy_fees (delegate, cycle) ->
-      let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Legacy_frozen_fees.mem (ctxt, contract) cycle >|= ok
-  | `Legacy_rewards (delegate, cycle) ->
-      let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Legacy_frozen_rewards.mem (ctxt, contract) cycle >|= ok
 
 let balance ctxt stored =
   match stored with
@@ -89,19 +76,6 @@ let balance ctxt stored =
       | None -> Tez_repr.zero
       | Some frozen_deposits -> frozen_deposits.current_amount)
   | `Block_fees -> return (Raw_context.get_collected_fees ctxt)
-  (* TODO: remove in J *)
-  | `Legacy_deposits (delegate, cycle) ->
-      let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Legacy_frozen_deposits.find (ctxt, contract) cycle
-      >|=? Option.value ~default:Tez_repr.zero
-  | `Legacy_fees (delegate, cycle) ->
-      let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Legacy_frozen_fees.find (ctxt, contract) cycle
-      >|=? Option.value ~default:Tez_repr.zero
-  | `Legacy_rewards (delegate, cycle) ->
-      let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Legacy_frozen_rewards.find (ctxt, contract) cycle
-      >|=? Option.value ~default:Tez_repr.zero
 
 let credit ctxt dest amount origin =
   let open Receipt_repr in
@@ -136,32 +110,7 @@ let credit ctxt dest amount origin =
       >|=? fun ctxt -> (ctxt, Deposits delegate)
   | `Block_fees ->
       Raw_context.credit_collected_fees_only_call_from_token ctxt amount
-      >>?= fun ctxt -> return (ctxt, Block_fees)
-  (* TODO: remove in J *)
-  | `Legacy_deposits (delegate, cycle) as dest ->
-      let contract = Contract_repr.implicit_contract delegate in
-      balance ctxt dest >>=? fun old_amount ->
-      Tez_repr.(old_amount +? amount) >>?= fun new_amount ->
-      Storage.Contract.Legacy_frozen_deposits.add
-        (ctxt, contract)
-        cycle
-        new_amount
-      >>= fun ctxt -> return (ctxt, Legacy_deposits (delegate, cycle))
-  | `Legacy_fees (delegate, cycle) as dest ->
-      let contract = Contract_repr.implicit_contract delegate in
-      balance ctxt dest >>=? fun old_amount ->
-      Tez_repr.(old_amount +? amount) >>?= fun new_amount ->
-      Storage.Contract.Legacy_frozen_fees.add (ctxt, contract) cycle new_amount
-      >>= fun ctxt -> return (ctxt, Legacy_fees (delegate, cycle))
-  | `Legacy_rewards (delegate, cycle) as dest ->
-      let contract = Contract_repr.implicit_contract delegate in
-      balance ctxt dest >>=? fun old_amount ->
-      Tez_repr.(old_amount +? amount) >>?= fun new_amount ->
-      Storage.Contract.Legacy_frozen_rewards.add
-        (ctxt, contract)
-        cycle
-        new_amount
-      >>= fun ctxt -> return (ctxt, Legacy_rewards (delegate, cycle)))
+      >>?= fun ctxt -> return (ctxt, Block_fees))
   >|=? fun (ctxt, balance) -> (ctxt, (balance, Credited amount, origin))
 
 let spend ctxt src amount origin =
@@ -201,44 +150,7 @@ let spend ctxt src amount origin =
       >>=? fun ctxt -> return (ctxt, Deposits delegate)
   | `Block_fees ->
       Raw_context.spend_collected_fees_only_call_from_token ctxt amount
-      >>?= fun ctxt -> return (ctxt, Block_fees)
-  (* TODO: remove in J *)
-  | `Legacy_deposits (delegate, cycle) as src ->
-      balance ctxt src >>=? fun old_amount ->
-      Tez_repr.(old_amount -? amount) >>?= fun new_amount ->
-      let contract = Contract_repr.implicit_contract delegate in
-      (if Tez_repr.(new_amount = zero) then
-       Storage.Contract.Legacy_frozen_deposits.remove (ctxt, contract) cycle
-      else
-        Storage.Contract.Legacy_frozen_deposits.add
-          (ctxt, contract)
-          cycle
-          new_amount)
-      >>= fun ctxt -> return (ctxt, Legacy_deposits (delegate, cycle))
-  | `Legacy_fees (delegate, cycle) as src ->
-      balance ctxt src >>=? fun old_amount ->
-      Tez_repr.(old_amount -? amount) >>?= fun new_amount ->
-      let contract = Contract_repr.implicit_contract delegate in
-      (if Tez_repr.(new_amount = zero) then
-       Storage.Contract.Legacy_frozen_fees.remove (ctxt, contract) cycle
-      else
-        Storage.Contract.Legacy_frozen_fees.add
-          (ctxt, contract)
-          cycle
-          new_amount)
-      >>= fun ctxt -> return (ctxt, Legacy_fees (delegate, cycle))
-  | `Legacy_rewards (delegate, cycle) as src ->
-      balance ctxt src >>=? fun old_amount ->
-      Tez_repr.(old_amount -? amount) >>?= fun new_amount ->
-      let contract = Contract_repr.implicit_contract delegate in
-      (if Tez_repr.(new_amount = zero) then
-       Storage.Contract.Legacy_frozen_rewards.remove (ctxt, contract) cycle
-      else
-        Storage.Contract.Legacy_frozen_rewards.add
-          (ctxt, contract)
-          cycle
-          new_amount)
-      >>= fun ctxt -> return (ctxt, Legacy_rewards (delegate, cycle)))
+      >>?= fun ctxt -> return (ctxt, Block_fees))
   >|=? fun (ctxt, balance) -> (ctxt, (balance, Debited amount, origin))
 
 let transfer_n ?(origin = Receipt_repr.Block_application) ctxt src dest =

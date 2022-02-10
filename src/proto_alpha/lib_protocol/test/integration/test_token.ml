@@ -132,12 +132,6 @@ let test_allocated () =
   test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
   let dest = `Frozen_deposits pkh in
   test_allocated_and_still_allocated_when_empty ctxt dest false >>=? fun _ ->
-  let dest = `Legacy_deposits (pkh, Cycle.root) in
-  test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
-  let dest = `Legacy_fees (pkh, Cycle.root) in
-  test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
-  let dest = `Legacy_rewards (pkh, Cycle.root) in
-  test_allocated_and_deallocated_when_empty ctxt dest >>=? fun _ ->
   let dest = `Block_fees in
   test_allocated_and_still_allocated_when_empty ctxt dest true
 
@@ -219,36 +213,6 @@ let test_transferring_to_collected_fees ctxt =
     amount
     [(Block_fees, Credited amount, Block_application)]
 
-let test_transferring_to_legacy_deposits ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
-  let amount = random_amount () in
-  let cycle = Cycle.(add root (Random.int 10)) in
-  test_transferring_to_sink
-    ctxt
-    (`Legacy_deposits (pkh, cycle))
-    amount
-    [(Legacy_deposits (pkh, cycle), Credited amount, Block_application)]
-
-let test_transferring_to_legacy_fees ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
-  let amount = random_amount () in
-  let cycle = Cycle.(add root (Random.int 10)) in
-  test_transferring_to_sink
-    ctxt
-    (`Legacy_fees (pkh, cycle))
-    amount
-    [(Legacy_fees (pkh, cycle), Credited amount, Block_application)]
-
-let test_transferring_to_legacy_rewards ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
-  let amount = random_amount () in
-  let cycle = Cycle.(add root (Random.int 10)) in
-  test_transferring_to_sink
-    ctxt
-    (`Legacy_rewards (pkh, cycle))
-    amount
-    [(Legacy_rewards (pkh, cycle), Credited amount, Block_application)]
-
 let test_transferring_to_burned ctxt =
   let amount = random_amount () in
   let minted_bupd = Receipt.(Minted, Debited amount, Block_application) in
@@ -297,10 +261,7 @@ let test_transferring_to_sink () =
   test_transferring_to_delegate_balance ctxt >>=? fun _ ->
   test_transferring_to_frozen_deposits ctxt >>=? fun _ ->
   test_transferring_to_collected_fees ctxt >>=? fun _ ->
-  test_transferring_to_burned ctxt >>=? fun _ ->
-  test_transferring_to_legacy_deposits ctxt >>=? fun _ ->
-  test_transferring_to_legacy_fees ctxt >>=? fun _ ->
-  test_transferring_to_legacy_rewards ctxt
+  test_transferring_to_burned ctxt
 
 let check_src_balances ctxt ctxt' src amount =
   wrap (Token.balance ctxt src) >>=? fun bal_src ->
@@ -390,36 +351,6 @@ let test_transferring_from_collected_fees ctxt =
     amount
     [(Block_fees, Debited amount, Block_application)]
 
-let test_transferring_from_legacy_deposits ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
-  let amount = random_amount () in
-  let cycle = Cycle.(add root (Random.int 10)) in
-  test_transferring_from_bounded_source
-    ctxt
-    (`Legacy_deposits (pkh, cycle))
-    amount
-    [(Legacy_deposits (pkh, cycle), Debited amount, Block_application)]
-
-let test_transferring_from_legacy_fees ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
-  let amount = random_amount () in
-  let cycle = Cycle.(add root (Random.int 10)) in
-  test_transferring_from_bounded_source
-    ctxt
-    (`Legacy_fees (pkh, cycle))
-    amount
-    [(Legacy_fees (pkh, cycle), Debited amount, Block_application)]
-
-let test_transferring_from_legacy_rewards ctxt =
-  let (pkh, _pk, _sk) = Signature.generate_key () in
-  let amount = random_amount () in
-  let cycle = Cycle.(add root (Random.int 10)) in
-  test_transferring_from_bounded_source
-    ctxt
-    (`Legacy_rewards (pkh, cycle))
-    amount
-    [(Legacy_rewards (pkh, cycle), Debited amount, Block_application)]
-
 let test_transferring_from_source () =
   Random.init 0 ;
   create_context () >>=? fun (ctxt, _) ->
@@ -462,10 +393,7 @@ let test_transferring_from_source () =
   test_transferring_from_collected_commitments ctxt >>=? fun _ ->
   test_transferring_from_delegate_balance ctxt >>=? fun _ ->
   test_transferring_from_frozen_deposits ctxt >>=? fun _ ->
-  test_transferring_from_collected_fees ctxt >>=? fun _ ->
-  test_transferring_from_legacy_deposits ctxt >>=? fun _ ->
-  test_transferring_from_legacy_fees ctxt >>=? fun _ ->
-  test_transferring_from_legacy_rewards ctxt
+  test_transferring_from_collected_fees ctxt
 
 let cast_to_container_type x =
   match x with
