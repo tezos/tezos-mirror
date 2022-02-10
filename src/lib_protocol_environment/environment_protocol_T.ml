@@ -181,12 +181,13 @@ struct
     init context header
 
   let begin_partial_application ~chain_id ~ancestor_context
-      ~predecessor_timestamp ~predecessor_fitness raw_block =
+      ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_
+      (raw_block : block_header) =
     begin_partial_application
       ~chain_id
       ~ancestor_context
-      ~predecessor_timestamp
-      ~predecessor_fitness
+      ~predecessor_timestamp:predecessor.shell.timestamp
+      ~predecessor_fitness:predecessor.shell.fitness
       raw_block
 
   let begin_application ~chain_id ~predecessor_context ~predecessor_timestamp
