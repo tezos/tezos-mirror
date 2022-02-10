@@ -36,6 +36,11 @@ val last_cycle_before_deactivation :
 val set_inactive :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t Lwt.t
 
+(** [set_active ctxt delegate] returns a pair [(new_ctxt, is_inactive)] where:
+    - [new_ctxt] is a new context, updated from [ctxt], where the [delegate]'s
+    last active cycle has been updated
+    - [is_inactive] represents the state of [delegate], prior to the update.
+  *)
 val set_active :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
