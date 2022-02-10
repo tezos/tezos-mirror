@@ -409,6 +409,10 @@ val pps : ?args:string list -> target -> preprocessor
       for all libraries and executables except those that are only used for tests
       (and thus are never run by users).
 
+    - [time_measurement_ppx]: if [true], the target's [dune] file is generated
+      with [(instrumentation (backend time_measurement_ppx))] for this target.
+      This makes it possible to add time measurement tooling for the target.
+
     - [c_library_flags]: specifies a [(c_library_flags ...)] stanza.
       Those flags are passed to the C compiler when constructing the library archive
       for the foreign stubs.
@@ -547,6 +551,7 @@ type 'a maker =
   ?static:bool ->
   ?static_cclibs:string list ->
   ?synopsis:string ->
+  ?time_measurement_ppx:bool ->
   ?virtual_modules:string list ->
   ?wrapped:bool ->
   path:string ->

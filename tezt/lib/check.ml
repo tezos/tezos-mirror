@@ -351,6 +351,19 @@ let list_not_mem typ ?__LOC__ a l ~error_msg =
     let pp_list = get_pp (list typ) in
     fail ?__LOC__ error_msg pp a pp_list l
 
+let pp_exn fmt exn = Format.pp_print_string fmt (Printexc.to_string exn)
+
+let pp_exn_option fmt = function
+  | None -> Format.pp_print_string fmt "no exception"
+  | Some exn -> pp_exn fmt exn
+
+let raises ?__LOC__ expected_exn f ~error_msg =
+  match f () with
+  | exception exn when exn = expected_exn -> ()
+  | exception exn ->
+      fail ?__LOC__ error_msg pp_exn expected_exn pp_exn_option (Some exn)
+  | _ -> fail ?__LOC__ error_msg pp_exn expected_exn pp_exn_option None
+
 (* We define infix operators at the end to avoid using them accidentally. *)
 
 let ( = ) = eq

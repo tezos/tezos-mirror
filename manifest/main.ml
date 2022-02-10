@@ -1638,6 +1638,7 @@ let tezos_validation =
     "tezos-validation"
     ~path:"src/lib_validation"
     ~synopsis:"Tezos: library for blocks validation"
+    ~time_measurement_ppx:true
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";

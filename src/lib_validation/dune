@@ -5,6 +5,7 @@
  (name tezos_validation)
  (public_name tezos-validation)
  (instrumentation (backend bisect_ppx))
+ (instrumentation (backend tezos-time-measurement))
  (libraries
   tezos-base
   tezos-context

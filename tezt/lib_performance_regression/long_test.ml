@@ -36,7 +36,10 @@ type config = {
   alerts : alert_config option;
   influxdb : InfluxDB.config option;
   grafana : Grafana.config option;
+  test_data_path : string;
 }
+
+let default_test_data_path = "/s3data/"
 
 let default default = Option.value ~default
 
@@ -61,8 +64,7 @@ let as_alert_config json =
       JSON.(
         json |-> "gitlab_project_url" |> as_string_opt
         |> Option.map Uri.of_string);
-    timeout =
-      JSON.(json |-> "timeout" |> as_float_opt |> Option.value ~default:20.);
+    timeout = JSON.(json |-> "timeout" |> as_float_opt |> default 20.);
   }
 
 let read_config_file filename =
@@ -73,6 +75,10 @@ let read_config_file filename =
       JSON.(json |-> "influxdb" |> as_opt |> Option.map InfluxDB.config_of_json);
     grafana =
       JSON.(json |-> "grafana" |> as_opt |> Option.map Grafana.config_of_json);
+    test_data_path =
+      JSON.(
+        json |-> "test_data_path" |> as_string_opt
+        |> default default_test_data_path);
   }
 
 let config =
@@ -90,7 +96,12 @@ let config =
   with
   | None ->
       Log.warn "No configuration file found, using default configuration." ;
-      {alerts = None; influxdb = None; grafana = None}
+      {
+        alerts = None;
+        influxdb = None;
+        grafana = None;
+        test_data_path = default_test_data_path;
+      }
   | Some filename -> (
       Log.info "Using configuration file: %s" filename ;
       try read_config_file filename
@@ -99,6 +110,8 @@ let config =
           "Failed to read configuration file: %s"
           (JSON.show_error error) ;
         exit 1)
+
+let test_data_path = config.test_data_path
 
 let () =
   if config.alerts = None then

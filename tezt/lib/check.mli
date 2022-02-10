@@ -194,6 +194,8 @@ val comparable_module : (module COMPARABLE with type t = 'a) -> 'a typ
     - ["expected list size >= %R, got %L"]
     - ["expected f to be monotonous, got f x = %L and f y = %R with x < y"] *)
 
+(** {2 Comparison Operators} *)
+
 (** Check that a value is equal to another.
 
     Example: [Check.((value = expected) int ~error_msg:"expected value = %R, got %L")] *)
@@ -234,6 +236,8 @@ val ( =~ ) : string -> rex -> error_msg:string -> unit
     Example: [Check.((value =~! rex) ~error_msg:"expected value =~! %R, got %L")] *)
 val ( =~! ) : string -> rex -> error_msg:string -> unit
 
+(** {2 Predicates on Lists} *)
+
 (** Check that a value belongs to a list.
 
     Example: [Check.list_mem ~__LOC__ int i list int ~error_msg:"expected %L to be in the
@@ -247,3 +251,11 @@ val list_mem :
     be in the list")] * *)
 val list_not_mem :
   'a typ -> ?__LOC__:string -> 'a -> 'a list -> error_msg:string -> unit
+
+(** {2 Predicates on Exceptions} *)
+
+(** Check that evaluating the given function raises the expected exception.
+
+    Example: [Check.raises f exn ~error_msg:"expected f to raise %L, got %R"] *)
+val raises :
+  ?__LOC__:string -> exn -> (unit -> unit) -> error_msg:string -> unit

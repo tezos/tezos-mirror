@@ -79,3 +79,8 @@ let value_encoding = Data_encoding.float
 let measurement_encoding = Data_encoding.tup2 key_encoding value_encoding
 
 let measurements_encoding = Data_encoding.list measurement_encoding
+
+(* Helpers *)
+
+let compare_keys a b =
+  List.compare String.compare (fst a :: snd a) (fst b :: snd b)

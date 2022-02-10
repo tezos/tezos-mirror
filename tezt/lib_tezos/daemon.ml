@@ -27,20 +27,12 @@
     endorser and accuser. Handles event handling in particular. *)
 
 module type PARAMETERS = sig
-  (** Parameters of the [Daemon.Make] functor. *)
-
-  (** Data to store whether a daemon is running or not. *)
   type persistent_state
 
-  (** Data to store when a daemon is running. *)
   type session_state
 
-  (** Basis for the default value for the [?name] argument of [create].
-
-      Examples: ["node"] or ["accuser"]. *)
   val base_default_name : string
 
-  (** Cycle of default values for the [?color] argument of [create]. *)
   val default_colors : Log.Color.t array
 end
 
@@ -79,18 +71,6 @@ module Make (X : PARAMETERS) = struct
              where)
     | _ -> None
 
-  (* When a daemon is running, we store:
-     - its process, so that we can terminate it for instance;
-     - the event loop promise, which reads events and cleans them up when
-       the daemon terminates;
-     - some information about the state of the daemon so that users can query them.
-
-     The event loop promise is particularly important as when we terminate
-     the daemon we must also wait for the event loop to finish cleaning up before
-     we start the daemon again. The event loop is also responsible to set the status
-     of the daemon to [Not_running], which is another reason to wait for it to
-     finish before restarting a daemon. Otherwise we could have a [Not_running]
-     daemon which would be actually running. *)
   type session_status = {
     process : Process.t;
     session_state : X.session_state;
@@ -368,16 +348,16 @@ module Make (X : PARAMETERS) = struct
           (Terminated_before_event {daemon = daemon.name; event = name; where})
     | Some x -> return x
 
+  let event_from_full_event_filter filter json =
+    let raw = get_event_from_full_event json in
+    (* If [json] does not match the correct JSON structure, it
+       will be filtered out, which will result in ignoring
+       the current event.
+       @see raw_event_from_event *)
+    Option.bind raw (fun {value; _} -> filter value)
+
   let wait_for ?where daemon name filter =
-    let filter json =
-      let raw = get_event_from_full_event json in
-      (* If [json] does not match the correct JSON structure, it
-         will be filtered out, which will result in ignoring
-         the current event.
-         @see raw_event_from_event *)
-      Option.bind raw (fun {value; _} -> filter value)
-    in
-    wait_for_full ?where daemon name filter
+    wait_for_full ?where daemon name (event_from_full_event_filter filter)
 
   let on_event daemon handler =
     daemon.persistent_event_handlers <-
@@ -455,3 +435,27 @@ module Make (X : PARAMETERS) = struct
                 "failed to set up memory consumption measurement: %s"
                 (Printexc.to_string exn)))
 end
+
+let n_events_rev n filter =
+  if n <= 0 then invalid_arg "Base.n_events_rev: n must be > 0." ;
+  let acc = ref [] in
+  let size = ref 0 in
+  let accumulation_threshold value =
+    acc := value :: !acc ;
+    incr size ;
+    if !size >= n then Some !acc else None
+  in
+  let accumulating_filter json =
+    Option.bind (filter json) accumulation_threshold
+  in
+  accumulating_filter
+
+let n_events n filter =
+  let accumulating_filter = n_events_rev n filter in
+  let inverting_filter json = Option.map List.rev @@ accumulating_filter json in
+  inverting_filter
+
+let nth_event n filter =
+  let accumulating_filter = n_events_rev n filter in
+  let nth_filter json = Option.map List.hd @@ accumulating_filter json in
+  nth_filter

@@ -95,11 +95,20 @@ val kill : t -> unit
 (** Wait until a process terminates and return its status. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Wait until a process terminates and check its status.
+(** Check the exit status of a process.
 
     If [not expect_failure] and exit code is not 0,
     or if [expect_failure] and exit code is 0,
-    or if the process was killed, fail the test. *)
+    or if the process was killed, return [Error (`Invalid_status reason)].
+    Else, return [Ok ()]. *)
+val validate_status :
+  ?expect_failure:bool ->
+  Unix.process_status ->
+  (unit, [`Invalid_status of string]) result
+
+(** Wait until a process terminates and check its status.
+
+    See [validate_status] to see status validation rules. *)
 val check : ?expect_failure:bool -> t -> unit Lwt.t
 
 (** Wait until a process terminates and check its status.

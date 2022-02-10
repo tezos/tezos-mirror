@@ -408,7 +408,11 @@ module Make (Proto : Registered_protocol.T) = struct
             ~predecessor_hash
             block_header.shell.timestamp
         in
-        let* operations = parse_operations block_hash operations in
+        let* operations =
+          (parse_operations
+             block_hash
+             operations [@time.duration_lwt operations_parsing])
+        in
         let*! context =
           match predecessor_block_metadata_hash with
           | None -> Lwt.return context
@@ -424,34 +428,37 @@ module Make (Proto : Registered_protocol.T) = struct
         let* (validation_result, block_data, ops_metadata) =
           let*! r =
             let* state =
-              Proto.begin_application
-                ~chain_id
-                ~predecessor_context:context
-                ~predecessor_timestamp:predecessor_block_header.shell.timestamp
-                ~predecessor_fitness:predecessor_block_header.shell.fitness
-                block_header
-                ~cache
+              (Proto.begin_application
+                 ~chain_id
+                 ~predecessor_context:context
+                 ~predecessor_timestamp:predecessor_block_header.shell.timestamp
+                 ~predecessor_fitness:predecessor_block_header.shell.fitness
+                 ~cache
+                 block_header [@time.duration_lwt application_beginning])
             in
             let* (state, ops_metadata) =
-              List.fold_left_es
-                (fun (state, acc) ops ->
-                  let* (state, ops_metadata) =
-                    List.fold_left_es
-                      (fun (state, acc) op ->
-                        let* (state, op_metadata) =
-                          Proto.apply_operation state op
-                        in
-                        return (state, op_metadata :: acc))
-                      (state, [])
-                      ops
-                  in
-                  return (state, List.rev ops_metadata :: acc))
-                (state, [])
-                operations
+              (List.fold_left_es
+                 (fun (state, acc) ops ->
+                   let* (state, ops_metadata) =
+                     List.fold_left_es
+                       (fun (state, acc) op ->
+                         let* (state, op_metadata) =
+                           Proto.apply_operation state op
+                         in
+                         return (state, op_metadata :: acc))
+                       (state, [])
+                       ops
+                   in
+                   return (state, List.rev ops_metadata :: acc))
+                 (state, [])
+                 operations [@time.duration_lwt operations_application])
             in
             let ops_metadata = List.rev ops_metadata in
             let* (validation_result, block_data) =
-              Proto.finalize_block state (Some block_header.shell)
+              (Proto.finalize_block
+                 state
+                 (Some block_header.shell)
+               [@time.duration_lwt block_finalization])
             in
             return (validation_result, block_data, ops_metadata)
           in
@@ -534,7 +541,7 @@ module Make (Proto : Registered_protocol.T) = struct
             block_data
         in
         let* ops_metadata =
-          try
+          try[@time.duration_lwt metadata_serde_check]
             return
               (List.map
                  (List.map (fun receipt ->
@@ -562,7 +569,7 @@ module Make (Proto : Registered_protocol.T) = struct
           Shell_context.unwrap_disk_context validation_result.context
         in
         let*! (ops_metadata_hashes, block_metadata_hash) =
-          match new_protocol_env_version with
+          match[@time.duration_lwt metadata_hash] new_protocol_env_version with
           | Protocol.V0 -> Lwt.return (None, None)
           | Protocol.(V1 | V2 | V3 | V4 | V5) ->
               Lwt.return
@@ -574,10 +581,10 @@ module Make (Proto : Registered_protocol.T) = struct
                   Some (Block_metadata_hash.hash_bytes [block_metadata]) )
         in
         let*! context_hash =
-          Context.commit
-            ~time:block_header.shell.timestamp
-            ?message:validation_result.message
-            context
+          (Context.commit
+             ~time:block_header.shell.timestamp
+             ?message:validation_result.message
+             context [@time.duration_lwt context_commitment] [@time.flush])
         in
         let* () =
           fail_unless
