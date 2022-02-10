@@ -45,17 +45,17 @@ val init :
   Signature.Public_key_hash.t ->
   Raw_context.t tzresult Lwt.t
 
-(** [remove ctxt contract] removes contract from the list of contracts that
+(** [unlink ctxt contract] removes [contract] from the list of contracts that
     delegated to [find ctxt contract], i.e. the output of [delegated_contracts].
     This function does not affect the value of the expression
     [find ctxt contract].
 
     This function is undefined if [contract] is not allocated. *)
-val remove : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
+val unlink : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
 
-(** [delete ctxt contract] behaves as [remove ctxt contract], but in addition
+(** [delete ctxt contract] behaves as [unlink ctxt contract], but in addition
     removes the association of the [contract] to its current delegate, leaving
-    the former with no delegate.
+    the former without delegate.
 
     This function is undefined if [contract] is not allocated. *)
 val delete : Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t

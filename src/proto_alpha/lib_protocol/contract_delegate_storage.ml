@@ -71,8 +71,6 @@ let delete ctxt contract =
   unlink ctxt contract >>=? fun ctxt ->
   Storage.Contract.Delegate.remove ctxt contract >|= ok
 
-let remove ctxt contract = unlink ctxt contract
-
 let set ctxt contract delegate =
   unlink ctxt contract >>=? fun ctxt ->
   Storage.Contract.Delegate.add ctxt contract delegate >>= fun ctxt ->
