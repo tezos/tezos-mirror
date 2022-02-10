@@ -456,6 +456,17 @@ let check_constants constants =
      Compare.Int32.(remainder = 0l))
     (Invalid_protocol_constants
        "blocks_per_voting_period should be a multiple of blocks_per_cycle.")
+  >>? fun () ->
+  error_unless
+    (let snapshot_frequence =
+       Int32.div constants.blocks_per_cycle constants.blocks_per_stake_snapshot
+     in
+     Compare.Int32.(
+       snapshot_frequence > Int32.zero
+       && snapshot_frequence < Int32.of_int (1 lsl 16)))
+    (Invalid_protocol_constants
+       "The ratio blocks_per_cycle per blocks_per_stake_snapshot should be \
+        between 1 and 65535")
   >>? fun () -> Result.return_unit
 
 module Generated = struct
