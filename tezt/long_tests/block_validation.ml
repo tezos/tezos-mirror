@@ -91,7 +91,7 @@ module Fixture = struct
       then, evaluates in a result of either the path of the datadir or
       the cause of the error if the datadir could not be found or uncompressed. *)
   let datadir () =
-    let dst = Long_test.test_data_path in
+    let dst = Long_test.test_data_path () in
     let output = dst // datadir_name in
     let src = output ^ ".tar.gz" in
     try

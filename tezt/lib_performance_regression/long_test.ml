@@ -95,47 +95,51 @@ let read_config_file filename =
         |> default default_test_data_path);
   }
 
-let config =
-  match
-    match Sys.getenv_opt "TEZT_CONFIG" with
-    | Some "" | None -> (
-        if Sys.file_exists "tezt_config.json" then Some "tezt_config.json"
-        else
-          match Sys.getenv_opt "HOME" with
-          | Some home ->
-              let filename = home // ".tezt_config.json" in
-              if Sys.file_exists filename then Some filename else None
-          | None -> None)
-    | Some _ as x -> x
-  with
-  | None ->
-      Log.warn "No configuration file found, using default configuration." ;
-      {
-        alerts = None;
-        influxdb = None;
-        grafana = None;
-        test_data_path = default_test_data_path;
-      }
-  | Some filename -> (
-      Log.info "Using configuration file: %s" filename ;
-      try read_config_file filename
-      with JSON.Error error ->
-        Log.error
-          "Failed to read configuration file: %s"
-          (JSON.show_error error) ;
-        exit 1)
+let default_config =
+  {
+    alerts = None;
+    influxdb = None;
+    grafana = None;
+    test_data_path = default_test_data_path;
+  }
 
-let test_data_path = config.test_data_path
+let config = ref default_config
 
-let () =
-  if config.alerts = None then
+let test_data_path () = !config.test_data_path
+
+let init () =
+  (config :=
+     match
+       match Sys.getenv_opt "TEZT_CONFIG" with
+       | Some "" | None -> (
+           if Sys.file_exists "tezt_config.json" then Some "tezt_config.json"
+           else
+             match Sys.getenv_opt "HOME" with
+             | Some home ->
+                 let filename = home // ".tezt_config.json" in
+                 if Sys.file_exists filename then Some filename else None
+             | None -> None)
+       | Some _ as x -> x
+     with
+     | None ->
+         Log.warn "No configuration file found, using default configuration." ;
+         default_config
+     | Some filename -> (
+         Log.info "Using configuration file: %s" filename ;
+         try read_config_file filename
+         with JSON.Error error ->
+           Log.error
+             "Failed to read configuration file: %s"
+             (JSON.show_error error) ;
+           exit 1)) ;
+  if !config.alerts = None then
     Log.warn "Alerts are not configured and will thus not be sent." ;
-  if config.influxdb = None then
+  if !config.influxdb = None then
     Log.warn
       "InfluxDB is not configured: data points will not be sent and previous \
        data points will not be read. Also, Grafana dashboards will not be \
        updated." ;
-  if config.grafana = None then
+  if !config.grafana = None then
     Log.warn
       "Grafana is not configured: Grafana dashboards will not be updated."
 
@@ -325,7 +329,7 @@ end
 
 let alert_s ?category ~log message =
   if log then Log.error "Alert: %s" message ;
-  match config.alerts with
+  match !config.alerts with
   | None -> ()
   | Some alert_cfg ->
       let may_send_rate_limit = Alerts.may_send_rate_limit alert_cfg category in
@@ -431,7 +435,7 @@ let add_data_point data_point =
           test.data_points
 
 let send_data_points () =
-  match (!current_test, config.influxdb) with
+  match (!current_test, !config.influxdb) with
   | (None, _) | (_, None) -> unit
   | (Some test, Some config) ->
       let write () =
@@ -454,7 +458,7 @@ let send_data_points () =
           unit)
 
 let unsafe_query select extract_data =
-  match config.influxdb with
+  match !config.influxdb with
   | None ->
       Log.debug
         "InfluxDB is not configured, will not perform query: %s"
@@ -848,7 +852,7 @@ let wrap_body title filename team timeout body argument =
     {title; filename; team; data_points = String_map.empty; alert_count = 0}
   in
   current_test := Some test ;
-  Option.iter Alerts.load config.alerts ;
+  Option.iter Alerts.load !config.alerts ;
   Lwt.finalize
     (fun () ->
       Lwt.catch
@@ -878,7 +882,7 @@ let register ~__FILE__ ~title ~tags ?team ~executors ~timeout body =
 let update_grafana_dashboard (dashboard : Grafana.dashboard) =
   Lwt_main.run
   @@
-  match config with
+  match !config with
   | {influxdb = Some influxdb_config; grafana = Some grafana_config; _} ->
       let dashboard =
         (* Prefix measurements in queries with the InfluxDB measurement prefix. *)
