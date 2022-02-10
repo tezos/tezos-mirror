@@ -182,7 +182,7 @@ The default value of the parameter ``N`` is chosen such that a node will always 
 manager operations to allow the next baker to produce a filled block (if there are
 enough operations in the network). Its value is currently fixed to 5000.
 Indeed, the total size occupied by manager operations in a
-block is currently bounded by 512 KibiBytes, and ``unset deposits limit`` seems
+block is currently bounded by 512 `KiB <https://en.wikipedia.org/wiki/Kilobyte>`_, and ``unset deposits limit`` seems
 to be the smallest manager operation, with 126 Bytes, so there are at most
 512 * 1024 / 126 = 4161 manager operations per block.
 
