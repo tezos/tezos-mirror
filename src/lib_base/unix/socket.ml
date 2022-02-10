@@ -164,7 +164,7 @@ let send fd encoding message =
      offset + the state's allowed_length. As a result, we are within the range
      of valid parameter for [make_writer_state]. *)
   assert (Option.is_some serialisation_state) ;
-  let serialisation_state = Option.get serialisation_state in
+  let serialisation_state = Stdlib.Option.get serialisation_state in
   match Data_encoding.Binary.write encoding message serialisation_state with
   | Error we -> fail (Encoding_error we)
   | Ok last ->

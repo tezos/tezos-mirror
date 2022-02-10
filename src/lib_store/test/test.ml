@@ -34,7 +34,7 @@ let () =
   in
   let open Lwt_syntax in
   Lwt_main.run
-    (let* () = Internal_event_unix.init () in
+    (let* () = Tezos_base_unix.Internal_event_unix.init () in
      Alcotest_lwt.run
        "tezos-store"
        [

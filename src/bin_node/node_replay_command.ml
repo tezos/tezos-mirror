@@ -379,7 +379,7 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
     | Some default_level -> {config.log with default_level}
   in
   let*! () =
-    Internal_event_unix.init
+    Tezos_base_unix.Internal_event_unix.init
       ~lwt_log_sink:log_cfg
       ~configuration:config.internal_events
       ()
@@ -388,7 +388,7 @@ let run ?verbosity ~singleprocess (config : Node_config_file.t) block =
   Lwt_exit.(
     wrap_and_exit
     @@ let*! res = protect (fun () -> replay ~singleprocess config block) in
-       let*! () = Internal_event_unix.close () in
+       let*! () = Tezos_base_unix.Internal_event_unix.close () in
        Lwt.return res)
 
 let check_data_dir dir =

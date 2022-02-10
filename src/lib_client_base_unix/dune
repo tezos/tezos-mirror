@@ -7,6 +7,7 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base
+  tezos-base.unix
   tezos-rpc-http
   tezos-rpc-http-client-unix
   tezos-shell-services

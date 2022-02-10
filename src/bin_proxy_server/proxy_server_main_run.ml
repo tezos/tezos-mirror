@@ -77,7 +77,9 @@ let launch_rpc_server dir {address; port; tls_cert_and_key} =
 let run dir ({address; port; _} as args) =
   let open Lwt_result_syntax in
   let log_cfg = Lwt_log_sink_unix.create_cfg () in
-  let*! () = Internal_event_unix.init ~lwt_log_sink:log_cfg () in
+  let*! () =
+    Tezos_base_unix.Internal_event_unix.init ~lwt_log_sink:log_cfg ()
+  in
   let node_downer =
     Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
         Events.(emit shutting_down_proxy_server) ())
@@ -98,6 +100,6 @@ let run dir ({address; port; _} as args) =
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
       ~after:[rpc_downer]
-      (fun _exit_status -> Internal_event_unix.close ())
+      (fun _exit_status -> Tezos_base_unix.Internal_event_unix.close ())
   in
   Lwt_utils.never_ending ()

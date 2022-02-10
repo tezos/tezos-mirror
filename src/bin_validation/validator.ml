@@ -448,7 +448,9 @@ let run input output =
         let*! () = Lwt_io.flush_all () in
         Events.(emit termination_request ())
     | External_validation.Reconfigure_event_logging config ->
-        let*! res = Internal_event_unix.Configuration.reapply config in
+        let*! res =
+          Tezos_base_unix.Internal_event_unix.Configuration.reapply config
+        in
         let*! () =
           External_validation.send
             output
@@ -466,7 +468,7 @@ let main ?socket_dir () =
   let*! (in_channel, out_channel) =
     match socket_dir with
     | Some socket_dir ->
-        let*! () = Internal_event_unix.init () in
+        let*! () = Tezos_base_unix.Internal_event_unix.init () in
         let pid = Unix.getpid () in
         let socket_path = External_validation.socket_path ~socket_dir ~pid in
         let*! socket_process =

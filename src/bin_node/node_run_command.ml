@@ -428,7 +428,7 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
     | Some default_level -> {config.log with default_level}
   in
   let*! () =
-    Internal_event_unix.init
+    Tezos_base_unix.Internal_event_unix.init
       ~lwt_log_sink:log_cfg
       ~configuration:config.internal_events
       ()
@@ -482,7 +482,7 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
       ~after:[rpc_downer]
       (fun exit_status ->
         let*! () = Event.(emit bye) exit_status in
-        Internal_event_unix.close ())
+        Tezos_base_unix.Internal_event_unix.close ())
   in
   let _ = Prometheus_unix.serve prometheus_config in
   Lwt_utils.never_ending ()

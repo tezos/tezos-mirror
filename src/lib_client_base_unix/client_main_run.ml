@@ -336,7 +336,7 @@ let main (module C : M) ~select_commands =
         Format.err_formatter
         (if Unix.isatty Unix.stderr then Ansi else Plain)
         Short) ;
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let*! retcode =
     Lwt.catch
       (fun () ->
@@ -486,7 +486,7 @@ let main (module C : M) ~select_commands =
   in
   Format.pp_print_flush Format.err_formatter () ;
   Format.pp_print_flush Format.std_formatter () ;
-  let*! () = Internal_event_unix.close () in
+  let*! () = Tezos_base_unix.Internal_event_unix.close () in
   Lwt.return retcode
 
 (* Where all the user friendliness starts *)

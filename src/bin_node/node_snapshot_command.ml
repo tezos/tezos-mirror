@@ -123,7 +123,7 @@ module Term = struct
       rolling reconstruct sandbox_file =
     let run =
       let open Lwt_tzresult_syntax in
-      let*! () = Internal_event_unix.init () in
+      let*! () = Tezos_base_unix.Internal_event_unix.init () in
       match subcommand with
       | Export ->
           let* data_dir = Node_shared_arg.read_data_dir args in

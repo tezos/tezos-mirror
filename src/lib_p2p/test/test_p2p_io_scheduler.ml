@@ -187,7 +187,7 @@ let client ?max_upload_speed ?write_queue_size addr port time _n =
 let run ?display_client_stat ?max_download_speed ?max_upload_speed
     ~read_buffer_size ?read_queue_size ?write_queue_size addr port time n =
   let open Lwt_result_syntax in
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   let*! (main_socket, port) = listen ?port addr in
   let* server_node =
     Process.detach
@@ -275,7 +275,7 @@ let () =
   let usage_msg = "Usage: %s <num_peers>.\nArguments are:" in
   Arg.parse spec anon_fun usage_msg
 
-let init_logs = lazy (Internal_event_unix.init ())
+let init_logs = lazy (Tezos_base_unix.Internal_event_unix.init ())
 
 let wrap n f =
   Alcotest_lwt.test_case n `Quick (fun _lwt_switch () ->

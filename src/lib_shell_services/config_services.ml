@@ -56,7 +56,7 @@ module Logging = struct
     RPC_service.put_service
       ~description:"Replace the logging configuration of the node."
       ~query:RPC_query.empty
-      ~input:Tezos_stdlib_unix.Internal_event_unix.Configuration.encoding
+      ~input:Tezos_base.Internal_event_config.encoding
       ~output:Data_encoding.empty
       RPC_path.(root / "config" / "logging")
 end

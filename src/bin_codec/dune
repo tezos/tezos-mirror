@@ -11,6 +11,7 @@
  (libraries
   data-encoding
   tezos-base
+  tezos-base.unix
   tezos-client-base-unix
   tezos-client-base
   tezos-clic

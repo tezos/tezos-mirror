@@ -28,7 +28,7 @@
 
 let show (args : Node_shared_arg.t) =
   let open Lwt_result_syntax in
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   if not @@ Sys.file_exists args.config_file then
     Format.eprintf
       "@[<v>@[<v 9>Warning: no configuration file found at %s@,\
@@ -40,7 +40,7 @@ let show (args : Node_shared_arg.t) =
 
 let reset (args : Node_shared_arg.t) =
   let open Lwt_result_syntax in
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   if Sys.file_exists args.config_file then
     Format.eprintf
       "Ignoring previous configuration file: %s.@."
@@ -51,7 +51,7 @@ let reset (args : Node_shared_arg.t) =
 
 let init (args : Node_shared_arg.t) =
   let open Lwt_result_syntax in
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   if Sys.file_exists args.config_file then
     failwith
       "Pre-existing configuration file at %s, use `reset`."
@@ -79,7 +79,7 @@ let init (args : Node_shared_arg.t) =
 
 let update (args : Node_shared_arg.t) =
   let open Lwt_result_syntax in
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   if not (Sys.file_exists args.config_file) then
     failwith
       "Missing configuration file at %s. Use `%s config init [options]` to \
@@ -93,7 +93,7 @@ let update (args : Node_shared_arg.t) =
 
 let validate (args : Node_shared_arg.t) =
   let open Lwt_result_syntax in
-  let*! () = Internal_event_unix.init () in
+  let*! () = Tezos_base_unix.Internal_event_unix.init () in
   if not (Sys.file_exists args.config_file) then
     Format.eprintf
       "@[<v>@[<v 9>Warning: no configuration file found at %s@,\

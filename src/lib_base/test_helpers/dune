@@ -6,6 +6,7 @@
  (public_name tezos-base-test-helpers)
  (libraries
   tezos-base
+  tezos-base.unix
   tezos-stdlib-unix
   tezos-event-logging-test-helpers
   tezos-test-helpers

@@ -888,6 +888,7 @@ let tezos_base_test_helpers =
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
+        tezos_base_unix;
         tezos_stdlib_unix;
         tezos_event_logging_test_helpers;
         tezos_test_helpers;
@@ -952,7 +953,6 @@ let tezos_shell_services =
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives" |> open_;
-        tezos_stdlib_unix;
         tezos_p2p_services |> open_;
         tezos_version |> open_;
       ]
@@ -1715,6 +1715,7 @@ let tezos_shell =
         lwt_watcher;
         lwt_canceler;
         tezos_base |> open_ ~m:"TzPervasives" |> open_;
+        tezos_base_unix |> open_;
         tezos_context |> open_;
         tezos_store |> open_;
         tezos_shell_context |> open_;
@@ -2149,6 +2150,7 @@ let tezos_client_base_unix =
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
+        tezos_base_unix;
         tezos_rpc_http |> open_;
         tezos_rpc_http_client_unix |> open_;
         tezos_shell_services |> open_;
@@ -3012,6 +3014,7 @@ let _tezos_codec =
       ([
          data_encoding |> open_;
          tezos_base |> open_ ~m:"TzPervasives";
+         tezos_base_unix;
          tezos_client_base_unix |> open_;
          tezos_client_base |> open_;
          tezos_clic |> open_;
