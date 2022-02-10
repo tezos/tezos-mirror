@@ -61,7 +61,7 @@ end
 module Make_raw
     (Hash : Requester.HASH)
     (Disk_table : Requester.DISK_TABLE with type key := Hash.t)
-    (Memory_table : Requester.MEMORY_TABLE with type key := Hash.t)
+    (Memory_table : Hashtbl.SeededS with type key := Hash.t)
     (Request_message : REQUEST_MESSAGE with type hash := Hash.t)
     (Probe : Requester.PROBE
                with type key := Hash.t
@@ -100,8 +100,27 @@ module Make_raw
       if keys <> [] then send state gid keys
   end
 
+  module Monitored_memory_table = struct
+    type 'a t = 'a Memory_table.t
+
+    let create ~entry_type:_ ?random s = Memory_table.create ?random s
+
+    let find = Memory_table.find
+
+    let add = Memory_table.add
+
+    let replace = Memory_table.replace
+
+    let remove = Memory_table.remove
+
+    let length = Memory_table.length
+
+    let fold = Memory_table.fold
+  end
+
   module Table =
-    Requester.Make (Hash) (Disk_table) (Memory_table) (Request) (Probe)
+    Requester.Make (Hash) (Disk_table) (Monitored_memory_table) (Request)
+      (Probe)
   include Table
 
   let state_of_t t =

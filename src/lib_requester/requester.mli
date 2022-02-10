@@ -195,7 +195,7 @@ module type MEMORY_TABLE = sig
 
   type key
 
-  val create : ?random:bool -> int -> 'a t
+  val create : entry_type:string -> ?random:bool -> int -> 'a t
 
   val find : 'a t -> key -> 'a option
 

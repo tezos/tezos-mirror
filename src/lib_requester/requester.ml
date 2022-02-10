@@ -106,7 +106,7 @@ module type MEMORY_TABLE = sig
 
   type key
 
-  val create : ?random:bool -> int -> 'a t
+  val create : entry_type:string -> ?random:bool -> int -> 'a t
 
   val find : 'a t -> key -> 'a option
 
@@ -398,7 +398,7 @@ end = struct
       {
         param;
         queue = Lwt_pipe.Unbounded.create ();
-        pending = Table.create ~random:true 17;
+        pending = Table.create ~entry_type:"pending_requests" ~random:true 17;
         events = Lwt.return_nil;
         canceler = Lwt_canceler.create ();
         worker = Lwt.return_unit;
@@ -638,7 +638,7 @@ module Make
 
   let create ?random_table:random ?global_input request_param disk =
     let scheduler = Scheduler.create request_param in
-    let memory = Memory_table.create ?random 17 in
+    let memory = Memory_table.create ~entry_type:"entries" ?random 17 in
     let input = Lwt_watcher.create_input () in
     {scheduler; disk; memory; input; global_input}
 
