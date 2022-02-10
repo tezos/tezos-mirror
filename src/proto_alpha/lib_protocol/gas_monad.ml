@@ -45,18 +45,18 @@ let ( >>?? ) m f =
   match m with None -> None | Some x -> f x
   [@@ocaml.inline always]
 
-let ( >>$ ) m f gas =
+let bind m f gas =
   m gas >>?? fun (res, gas) ->
   match res with Ok y -> f y gas | Error _ as err -> of_result err gas
   [@@ocaml.inline always]
 
-let ( >|$ ) m f gas =
+let map f m gas =
   m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
   [@@ocaml.inline always]
 
-let ( >?$ ) m f = m >>$ fun x -> of_result (f x) [@@ocaml.inline always]
+let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
-let ( >??$ ) m f gas =
+let bind_recover m f gas =
   m gas >>?? fun (x, gas) -> f x gas
   [@@ocaml.inline always]
 
@@ -95,6 +95,8 @@ let record_trace_eval :
       fun f m gas ->
         m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
 
+let fail e = of_result (Error e) [@@ocaml.inline always]
+
 module Syntax = struct
   let return = return
 
@@ -110,11 +112,11 @@ module Syntax = struct
 
   let return_false = return false
 
-  let fail e = of_result (Error e)
+  let fail = fail
 
-  let ( let* ) = ( >>$ )
+  let ( let* ) = bind
 
-  let ( let+ ) = ( >|$ )
+  let ( let+ ) m f = map f m
 
-  let ( let*? ) m f = of_result m >>$ f
+  let ( let*? ) = bind_result
 end

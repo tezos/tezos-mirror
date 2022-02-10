@@ -1073,16 +1073,23 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                             },
                             _script_view ) -> (
                           pair_t kloc input_ty storage_type >>?= fun pair_ty ->
-                          let open Gas_monad in
                           let io_ty =
-                            Script_ir_translator.merge_types
-                              ~error_details:Fast
-                              kloc
-                              aft_ty
-                              output_ty
-                            >>$ fun (out_eq, _ty) ->
-                            merge_types ~error_details:Fast kloc bef_ty pair_ty
-                            >|$ fun (in_eq, _ty) -> (out_eq, in_eq)
+                            let open Gas_monad.Syntax in
+                            let* (out_eq, _ty) =
+                              Script_ir_translator.merge_types
+                                ~error_details:Fast
+                                kloc
+                                aft_ty
+                                output_ty
+                            in
+                            let+ (in_eq, _ty) =
+                              merge_types
+                                ~error_details:Fast
+                                kloc
+                                bef_ty
+                                pair_ty
+                            in
+                            (out_eq, in_eq)
                           in
                           Gas_monad.run ctxt io_ty >>?= fun (eq, ctxt) ->
                           match eq with

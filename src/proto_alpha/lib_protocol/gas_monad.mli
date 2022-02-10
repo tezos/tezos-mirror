@@ -23,8 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-
 (** This monad combines:
     - a state monad where the state is the context
     - two levels of error monad to distinguish gas exhaustion from other errors
@@ -37,47 +35,47 @@ type ('a, 'trace) t
 (** Alias of [('a, 'trace) t] to avoid confusion when the module is open *)
 type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-(** monadic return operator of the gas monad *)
+(** [return x] returns a value in the gas-monad. *)
 val return : 'a -> ('a, 'trace) t
 
-(** Specialized monadic return operator for unit value, strictly equivalent to
-    [return ()]. *)
-val return_unit : (unit, 'trace) t
+(** [map f m] maps over successful results of [m] using [f]. *)
+val map : ('a -> 'b) -> ('a, 'trace) t -> ('b, 'trace) t
 
-(** Binding operator for the gas monad *)
-val ( >>$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
+(** [bind m f] binds successful results of [m] and feeds it to [f]. *)
+val bind : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
 
-(** Mapping operator for the gas monad, [m >|$ f] is equivalent to
-    [m >>$ fun x -> return (f x)] *)
-val ( >|$ ) : ('a, 'trace) t -> ('a -> 'b) -> ('b, 'trace) t
-
-(** Variant of [( >>$ )] to bind uncarbonated functions *)
-val ( >?$ ) : ('a, 'trace) t -> ('a -> ('b, 'trace) result) -> ('b, 'trace) t
-
-(** Another variant of [( >>$ )] that lets recover from inner errors *)
-val ( >??$ ) :
+(** [bind_recover m f] binds the result of [m] and feeds it to [f]. It's another
+    variant of [bind] that allows recovery from inner errors. *)
+val bind_recover :
   ('a, 'trace) t -> (('a, 'trace) result -> ('b, 'trace') t) -> ('b, 'trace') t
 
-(** gas-free embedding of tzresult values. [of_result x] is equivalent to [return () >?$ fun () -> x] *)
+(** [of_result r] is a gas-free embedding of the result [r] into the gas monad. *)
 val of_result : ('a, 'trace) result -> ('a, 'trace) t
 
-(** A wrapper around Gas.consume. If that fails, the whole computation
-    within the Gas_monad returns an error. See the Alpha_context.Gas module
-    for details.*)
-val consume_gas : Gas.cost -> (unit, 'trace) t
+(** [consume_gas c] consumes c amounts of gas. It's a wrapper around
+    [Gas.consume]. If that fails, the whole computation within the gas-monad
+    returns an error. See the {!Alpha_context.Gas module} for details.*)
+val consume_gas : Alpha_context.Gas.cost -> (unit, 'trace) t
 
-(** Escaping the gas monad. If the given context has [unlimited] mode enabled,
-    through [Gas.set_unlimited], no gas is consumed. *)
-val run : context -> ('a, 'trace) t -> (('a, 'trace) result * context) tzresult
+(** [run ctxt m] runs [m] using the given context and returns the result along
+    with the new context with updated gas. The given context has [unlimited]
+    mode enabled, through [Gas.set_unlimited], no gas is consumed. *)
+val run :
+  Alpha_context.context ->
+  ('a, 'trace) t ->
+  (('a, 'trace) result * Alpha_context.context) tzresult
 
-(** re-export of [Error_monad.record_trace_eval]. This function has no
-    effect in the case of a gas-exhaustion error
-    or if [error_details] is [Fast]. *)
+(** [record_trace_level ~error_details f m] returns a new gas-monad value that
+     when run, records trace levels using [f]. This function has no effect in
+    the case of a gas-exhaustion error or if [error_details] is [Fast]. *)
 val record_trace_eval :
   error_details:'error_trace Script_tc_errors.error_details ->
   (unit -> error) ->
   ('a, 'error_trace) t ->
   ('a, 'error_trace) t
+
+(** [fail e] is [return (Error e)] . *)
+val fail : 'trace -> ('a, 'trace) t
 
 (** Syntax module for the {!Gas_monad}. This is intended to be opened locally in
     functions. Within the scope of this module, the code can include binding
@@ -108,10 +106,10 @@ module Syntax : sig
   (** [fail e] is [return (Error e)] . *)
   val fail : 'trace -> ('a, 'trace) t
 
-  (** [let*] is a binding operator alias for {>>$}. *)
+  (** [let*] is a binding operator alias for {!bind}. *)
   val ( let* ) : ('a, 'trace) t -> ('a -> ('b, 'trace) t) -> ('b, 'trace) t
 
-  (** [let+] is a binding operator alias for {>|$}. *)
+  (** [let+] is a binding operator alias for {!map}. *)
   val ( let+ ) : ('a, 'trace) t -> ('a -> 'b) -> ('b, 'trace) t
 
   (** [let*?] is for binding the value from result-only expressions into the
