@@ -150,11 +150,23 @@ let check_sink_balances ctxt ctxt' dest amount =
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
 
+(* Accounts of the form (`DelegateBalance pkh) are not allocated when they
+   receive funds for the first time. To force allocation, we transfer to
+   (`Contract pkh) instead. *)
+let force_allocation_if_need_be ctxt account =
+  match account with
+  | `Delegate_balance pkh ->
+      let account = `Contract (Contract.implicit_contract pkh) in
+      wrap (Token.transfer ctxt `Minted account Tez.one_mutez) >|=? fst
+  | _ -> return ctxt
+
 let test_transferring_to_sink ctxt sink amount expected_bupds =
   (* Transferring zero must be a noop, and must not return balance updates. *)
   wrap (Token.transfer ctxt `Minted sink Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
+  (* Force the allocation of [dest] if need be. *)
+  force_allocation_if_need_be ctxt sink >>=? fun ctxt ->
   (* Test transferring a non null amount. *)
   wrap (Token.transfer ctxt `Minted sink amount) >>=? fun (ctxt', bupds) ->
   check_sink_balances ctxt ctxt' sink amount >>=? fun _ ->
@@ -187,11 +199,6 @@ let test_transferring_to_collected_commitments ctxt =
 let test_transferring_to_delegate_balance ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
   let dest = Contract.implicit_contract pkh in
-  (* First we need to force the allocation of [dest]. *)
-  wrap (Token.transfer ctxt `Minted (`Contract dest) Tez.one)
-  >>=? fun (ctxt, _) ->
-  wrap (Token.allocated ctxt (`Delegate_balance pkh)) >>=? fun allocated ->
-  Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
   let amount = random_amount () in
   test_transferring_to_sink
     ctxt
@@ -304,6 +311,8 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
+  (* Force the allocation of [dest] if need be. *)
+  force_allocation_if_need_be ctxt src >>=? fun ctxt ->
   (* Test transferring a non null amount. *)
   wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
   wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
@@ -336,9 +345,6 @@ let test_transferring_from_delegate_balance ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
   let amount = random_amount () in
   let src = Contract.implicit_contract pkh in
-  (* First we need to force the allocation of [dest]. *)
-  wrap (Token.transfer ctxt `Minted (`Contract src) Tez.one)
-  >>=? fun (ctxt, _) ->
   test_transferring_from_bounded_source
     ctxt
     (`Delegate_balance pkh)
