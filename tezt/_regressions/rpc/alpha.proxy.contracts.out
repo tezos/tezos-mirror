@@ -86,12 +86,12 @@ Fatal error:
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "balance": "99999383", "delegate": "[PUBLIC_KEY_HASH]",
+{ "balance": "99999393", "delegate": "[PUBLIC_KEY_HASH]",
   "counter": "4" }
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-"99999383"
+"99999393"
 
 ./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 protocol of proxy unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
