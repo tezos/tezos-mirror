@@ -287,16 +287,13 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       predecessor_block
       chain_id
     >>=? fun incremental ->
-    let operations = Operation_pool.ordered_to_list_list ordered_pool in
-    (* We must make sure that the given consensus operations are
-       pre-checked/pre-filtered before calling this function,
-       otherwise, these will fail *)
-    List.fold_left_es
-      (fun inc op ->
-        Baking_simulator.add_operation inc op >>=? fun (inc, _) -> return inc)
+    (* We still need to filter endorsements. Two endorsements could be
+       referring to the same slot. *)
+    Operation_selection.filter_consensus_operations_only
       incremental
-      (List.flatten operations)
-    >>=? fun incremental ->
+      ordered_pool
+    >>=? fun (incremental, ordered_pool) ->
+    let operations = Operation_pool.ordered_to_list_list ordered_pool in
     let operations_hash =
       Operation_list_list_hash.compute
         (List.map
