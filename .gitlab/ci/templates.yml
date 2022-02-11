@@ -271,8 +271,6 @@ variables:
 # Merge coverage files after the execution
 .template__coverage_files:
   extends: .template__coverage
-  after_script:
-    - ./scripts/ci/merge_coverage.sh
   artifacts:
     name: "coverage-files-$CI_JOB_ID"
     paths:
