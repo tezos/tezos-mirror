@@ -151,15 +151,9 @@ let check_sink_balances ctxt ctxt' dest amount =
   Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
 
 let test_transferring_to_sink ctxt sink amount expected_bupds =
-  (* Transferring zero must not return balance updates. *)
-  (match sink with
-  | `Contract _ | `Delegate_balance _ ->
-      return_unit (* Transaction of 0tz is forbidden. *)
-  | _ ->
-      wrap (Token.transfer ctxt `Minted sink Tez.zero)
-      >>=? fun (ctxt', bupds) ->
-      check_sink_balances ctxt ctxt' sink Tez.zero >>=? fun _ ->
-      Assert.equal_bool ~loc:__LOC__ (bupds = []) true)
+  (* Transferring zero must be a noop, and must not return balance updates. *)
+  wrap (Token.transfer ctxt `Minted sink Tez.zero) >>=? fun (ctxt', bupds) ->
+  Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
   (* Test transferring a non null amount. *)
   wrap (Token.transfer ctxt `Minted sink amount) >>=? fun (ctxt', bupds) ->
@@ -306,14 +300,9 @@ let test_transferring_from_unbounded_source ctxt src expected_bupds =
   return_unit
 
 let test_transferring_from_bounded_source ctxt src amount expected_bupds =
-  (* Transferring zero must not return balance updates. *)
-  (match src with
-  | `Contract _ | `Delegate_balance _ ->
-      return_unit (* Transaction of 0tz is forbidden. *)
-  | _ ->
-      wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
-      check_src_balances ctxt ctxt' src Tez.zero >>=? fun _ ->
-      Assert.equal_bool ~loc:__LOC__ (bupds = []) true)
+  (* Transferring zero must be a noop, and must not return balance updates. *)
+  wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
+  Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
   (* Test transferring a non null amount. *)
   wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
