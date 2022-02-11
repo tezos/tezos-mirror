@@ -326,3 +326,21 @@ let filter_operations_without_simulation fees_config ~hard_gas_limit_per_block
   in
   let operations = [consensus; votes; anonymous; managers] in
   operations
+
+let filter_consensus_operations_only inc
+    ({consensus; votes; anonymous; managers} as ordered_pool) =
+  filter_valid_operations_up_to_quota inc (consensus, consensus_quota)
+  >>= fun (incremental, filtered_consensus) ->
+  let payload = Operation_pool.payload_of_ordered_pool ordered_pool in
+  List.fold_left_es
+    (fun inc op ->
+      Baking_simulator.add_operation inc op >>=? fun (inc, _) -> return inc)
+    incremental
+    (List.flatten [votes; anonymous; managers])
+  >>=? fun incremental ->
+  let filtered_pool =
+    Operation_pool.ordered_pool_of_payload
+      ~consensus_operations:filtered_consensus
+      payload
+  in
+  return (incremental, filtered_pool)
