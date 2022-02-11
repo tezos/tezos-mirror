@@ -2,11 +2,11 @@ tezt/_regressions/tx_rollup_simple_use_case.out
 tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz
 
 ./tezos-client rpc get /chains/main/blocks/head/context/tx_rollup/tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz/state
-{ "last_inbox_level": null, "fees_per_byte": "0" }
+{ "last_inbox_level": null, "fees_per_byte": "0", "inbox_ema": 0 }
 
 ./tezos-client --wait none submit tx rollup batch 74657a6f73 to tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2440.196 units (will add 100 for safety)
+Estimated gas: 2440.220 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -28,7 +28,7 @@ This sequence of operations was run:
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2440.196
+      Consumed gas: 2440.220
 
 
 ./tezos-client rpc get /chains/main/blocks/head/context/tx_rollup/tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz/inbox

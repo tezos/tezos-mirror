@@ -64,7 +64,12 @@ val last_inbox_level : t -> Raw_level_repr.t option
 val append_inbox : t -> Raw_level_repr.t -> t
 
 module Internal_for_tests : sig
-  (** [initial_state_with_fees_per_byte fees] returns [initial_state], but
-      wherein it costs [fees] per byte to add a message to an inbox. *)
-  val initial_state_with_fees_per_byte : Tez_repr.t -> t
+  (** [make] returns a state for tests *)
+  val make :
+    fees_per_byte:Tez_repr.t ->
+    inbox_ema:int ->
+    last_inbox_level:Raw_level_repr.t option ->
+    t
+
+  val get_inbox_ema : t -> int
 end

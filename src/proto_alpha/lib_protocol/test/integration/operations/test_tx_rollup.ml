@@ -206,13 +206,14 @@ let test_two_originations () =
 (** [test_fees_per_byte_update] checks [update_fees_per_byte] behaves
     according to its docstring. *)
 let test_fees_per_byte_update () =
-  let test ~fees_per_byte ~final_size ~hard_limit ~result =
+  let test ~inbox_ema ~fees_per_byte ~final_size ~hard_limit ~result =
     let fees_per_byte = Tez.of_mutez_exn fees_per_byte in
     let result = Tez.of_mutez_exn result in
     let state =
-      Alpha_context.Tx_rollup_state.Internal_for_tests
-      .initial_state_with_fees_per_byte
-        fees_per_byte
+      Alpha_context.Tx_rollup_state.Internal_for_tests.make
+        ~fees_per_byte
+        ~inbox_ema
+        ~last_inbox_level:None
     in
     let state =
       Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
@@ -230,16 +231,36 @@ let test_fees_per_byte_update () =
   in
 
   (* Fees per byte should remain constant *)
-  test ~fees_per_byte:1_000L ~final_size:1_000 ~hard_limit:1_100 ~result:1_000L
+  test
+    ~inbox_ema:1_000
+    ~fees_per_byte:1_000L
+    ~final_size:1_000
+    ~hard_limit:1_100
+    ~result:1_000L
   >>=? fun () ->
   (* Fees per byte should increase *)
-  test ~fees_per_byte:1_000L ~final_size:1_000 ~hard_limit:1_000 ~result:1_050L
+  test
+    ~inbox_ema:1_000
+    ~fees_per_byte:1_000L
+    ~final_size:1_000
+    ~hard_limit:1_000
+    ~result:1_050L
   >>=? fun () ->
   (* Fees per byte should decrease *)
-  test ~fees_per_byte:1_000L ~final_size:1_000 ~hard_limit:1_500 ~result:950L
+  test
+    ~inbox_ema:1_000
+    ~fees_per_byte:1_000L
+    ~final_size:1_000
+    ~hard_limit:1_500
+    ~result:950L
   >>=? fun () ->
   (* Fees per byte should increase even with [0] as its initial value *)
-  test ~fees_per_byte:0L ~final_size:1_000 ~hard_limit:1_000 ~result:1L
+  test
+    ~inbox_ema:1_000
+    ~fees_per_byte:0L
+    ~final_size:1_000
+    ~hard_limit:1_000
+    ~result:1L
   >>=? fun () -> return_unit
 
 (** [test_add_batch] originates a tx rollup and fills one of its inbox
@@ -389,7 +410,6 @@ let test_finalization () =
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {tx_rollup_hard_size_limit_per_inbox; _}; _} ->
-  Context.Contract.balance (B b) contract >>=? fun balance ->
   (* Get the initial fees_per_byte. *)
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   fees_per_byte state >>?= fun cost ->
@@ -400,21 +420,38 @@ let test_finalization () =
     constant.parametric.tx_rollup_hard_size_limit_per_message - 1
   in
   let contents = String.make tx_rollup_batch_limit 'd' in
-  fill_inbox b tx_rollup filler contents (fun i size _ -> return (size, i))
-  >>=? fun (inbox_size, i) ->
-  (* Assert we have filled the inbox enough to provoke a change of fees. *)
-  assert (tx_rollup_hard_size_limit_per_inbox * 90 / 100 < inbox_size) ;
-  (* Finalize the block and check fees per byte has increased. *)
-  Incremental.finalize_block i >>=? fun b ->
+
+  (* Repeating fill inbox and finalize block to increase EMA
+     until EMA is enough to provoke a change of fees. *)
+  let rec increase_ema n b tx_rollup f =
+    f b tx_rollup >>=? fun (inbox_size, i) ->
+    Incremental.finalize_block i >>=? fun b ->
+    Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
+    let inbox_ema =
+      Alpha_context.Tx_rollup_state.Internal_for_tests.get_inbox_ema state
+    in
+    if tx_rollup_hard_size_limit_per_inbox * 91 / 100 < inbox_ema then
+      return (b, n, inbox_size)
+    else increase_ema (n + 1) b tx_rollup f
+  in
+  ( increase_ema 1 b tx_rollup @@ fun b tx_rollup ->
+    fill_inbox b tx_rollup filler contents (fun i size _ -> return (size, i)) )
+  >>=? fun (b, n, inbox_size) ->
+  let rec update_fees_per_byte_n_time n state =
+    if n > 0 then
+      let state =
+        Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
+          state
+          ~final_size:inbox_size
+          ~hard_limit:tx_rollup_hard_size_limit_per_inbox
+      in
+      update_fees_per_byte_n_time (n - 1) state
+    else state
+  in
   (* Check the fees we are getting after finalization are (1) strictly
      positive, and (2) the one we can predict with
      [update_fees_per_byte]. *)
-  let expected_state =
-    Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
-      state
-      ~final_size:inbox_size
-      ~hard_limit:tx_rollup_hard_size_limit_per_inbox
-  in
+  let expected_state = update_fees_per_byte_n_time n state in
   fees_per_byte expected_state >>?= fun expected_fees_per_byte ->
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
   fees_per_byte state >>?= fun fees_per_byte ->
@@ -424,6 +461,7 @@ let test_finalization () =
   (* Insert a small batch in a new block *)
   let contents_size = 5 in
   let contents = String.make contents_size 'c' in
+  Context.Contract.balance (B b) contract >>=? fun balance ->
   Context.Contract.counter (B b) contract >>=? fun counter ->
   Op.tx_rollup_submit_batch ~counter (B b) contract tx_rollup contents
   >>=? fun op ->
