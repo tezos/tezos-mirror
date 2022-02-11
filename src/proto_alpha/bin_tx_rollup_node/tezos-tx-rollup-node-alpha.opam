@@ -11,6 +11,14 @@ depends: [
   "tezos-client-alpha"
   "tezos-client-commands"
   "tezos-client-base-unix"
+  "tezos-rpc-http"
+  "tezos-rpc-http-server"
+  "tezos-sc-rollup-alpha"
+  "tezos-protocol-alpha"
+  "tezos-baking-alpha-commands"
+  "data-encoding"
+  "irmin"
+  "irmin-pack"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]
