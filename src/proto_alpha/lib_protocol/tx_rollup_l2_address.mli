@@ -59,19 +59,45 @@ val in_memory_size : t -> Cache_memory_helpers.sint
 val size : t -> int
 
 module Indexable : sig
-  type nonrec 'state indexable = ('state, t) Indexable.indexable
-
   type nonrec index = t Indexable.index
 
-  type nonrec t = t Indexable.t
+  type nonrec value = t Indexable.value
 
-  val encoding : t Data_encoding.t
+  type nonrec either = t Indexable.either
 
-  val compare : t -> t -> int
+  val encoding : either Data_encoding.t
 
-  val pp : Format.formatter -> t -> unit
+  val index_encoding : index Data_encoding.t
 
-  val size : t -> int
+  val compare : either -> either -> int
 
-  val in_memory_size : t -> Cache_memory_helpers.sint
+  val forget_value : value -> either
+
+  val forget_index : index -> either
+
+  val value : t -> value
+
+  val index : int32 -> index tzresult
+
+  val index_exn : int32 -> index
+
+  val from_value : t -> either
+
+  val from_index : int32 -> either tzresult
+
+  val from_index_exn : int32 -> either
+
+  val prepare_index :
+    (t -> int32 tzresult Lwt.t) -> either -> index tzresult Lwt.t
+
+  val prepare_value :
+    (int32 -> t tzresult Lwt.t) -> either -> value tzresult Lwt.t
+
+  val pp : Format.formatter -> either -> unit
+
+  val size : either -> int
+
+  val in_memory_size : either -> Cache_memory_helpers.sint
+
+  type nonrec 'state t = ('state, t) Indexable.t
 end

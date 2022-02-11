@@ -26,7 +26,7 @@
 (*****************************************************************************)
 
 type deposit = {
-  destination : Tx_rollup_l2_address.Indexable.t;
+  destination : Tx_rollup_l2_address.Indexable.either;
   ticket_hash : Ticket_hash_repr.t;
   amount : int64;
 }

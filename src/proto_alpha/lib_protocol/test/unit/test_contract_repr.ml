@@ -110,15 +110,20 @@ module Test_contract_repr = struct
       (to_b58check dummy_originated_contract)
       Contract_hash.(to_b58check @@ dummy_contract_hash)
 
-  let test_originated_contracts_basic () =
+  let create_dummy_contracts n =
     let since = dummy_origination_nonce in
     let rec incr_n_times nonce = function
       | 0 -> nonce
       | n -> incr_n_times (Origination_nonce.incr nonce) (n - 1)
     in
-    let until = incr_n_times since 5 in
+    let until = incr_n_times since n in
     let contracts = originated_contracts ~since ~until in
-    Assert.equal_int ~loc:__LOC__ (List.length contracts) 5
+    contracts
+
+  let test_originated_contracts_basic () =
+    let n = 5 in
+    let contracts = create_dummy_contracts n in
+    Assert.equal_int ~loc:__LOC__ (List.length contracts) n
 end
 
 let tests =
