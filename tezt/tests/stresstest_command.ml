@@ -30,21 +30,19 @@
    Subject:      Test the [stresstest] client command
 *)
 
-(** Waits for [n] injection request events. *)
-let wait_for_n_injections ?(log = false) n node =
-  if log then Log.info "Waiting for %d injections." n ;
-  let seen = ref 0 in
+(** Wait for [n] injection request events. *)
+let wait_for_n_injections n node =
   let filter json =
     match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
-    | Some s when s = "inject" ->
-        if log then Log.info "Injection %d witnessed." !seen ;
-        incr seen ;
-        if !seen >= n then Some () else None
+    | Some s when s = "inject" -> Some ()
     | Some _ | None -> None
   in
-  Node.wait_for node "request_completed_notice.v0" filter
+  let* _ =
+    Node.wait_for node "request_completed_notice.v0" (Daemon.n_events n filter)
+  in
+  unit
 
-(** Tests the various possible formats to provide sources to the
+(** Test the various possible formats to provide sources to the
     [stresstest] command: alias, public key hash, or explicit key. *)
 let test_stresstest_sources_format =
   Protocol.register_test
@@ -135,23 +133,9 @@ let check_n_applied_operations ?(log = false) ~expected client =
       (Client.name client) ;
   unit
 
-(** Waits for either [waiter] to resolve or [timeout] seconds.
-    If [sleep_at_resolution] is set, then also sleeps this amount
-    of seconds upon resolution of [waiter]. *)
-let wait_or_timeout ?(timeout = 30.) ?sleep_at_resolution (waiter : unit Lwt.t)
-    =
-  Lwt.pick
-    [
-      (let* () = waiter in
-       match sleep_at_resolution with
-       | None -> unit
-       | Some delay -> Lwt_unix.sleep delay);
-      Lwt_unix.sleep timeout;
-    ]
-
-(** Initializes a single node and runs the [stresstest] command.
-    Waits for it to inject the requested number of transfers
-    (argument [transfers]), and checks that the node's mempool
+(** Initialize a single node and run the [stresstest] command.
+    Wait for it to inject the requested number of transfers
+    (argument [transfers]), and check that the node's mempool
     contains this many applied operations. *)
 let test_stresstest_applied =
   Protocol.register_test
@@ -182,7 +166,7 @@ let test_stresstest_applied =
   in
   let waiter = wait_for_n_injections transfers node in
   let* () = Client.stresstest ~transfers client in
-  let* () = wait_or_timeout waiter in
+  let* () = waiter in
   check_n_applied_operations ~log:true ~expected:transfers client
 
 (** Similar to {!test_stresstest_applied}, but instead of the
@@ -226,14 +210,14 @@ let test_stresstest_applied_new_bootstraps =
   let source_aliases = List.map (sf "bootstrap%d") bootstrap_nums in
   let waiter = wait_for_n_injections transfers node in
   let* () = Client.stresstest ~source_aliases ~transfers client in
-  let* () = wait_or_timeout waiter in
+  let* () = waiter in
   check_n_applied_operations ~log:true ~expected:transfers client
 
-(** Does nothing, but means that we have spawned a [process] that we
-    don't expect to terminate. *)
+(** Do nothing, but emphasize that we have spawned a [process] that we
+    do not expect to terminate. *)
 let non_terminating_process (_process : Process.t) = ()
 
-(** Tests the [stresstest] client command with the
+(** Test the [stresstest] client command with the
     [--single-op-per-pkh-per-block] flag. We do not provide a
     [transfers] argument, so the command never stops trying to
     craft transfers. But as we do not bake any block, it runs out
@@ -265,17 +249,13 @@ let test_stresstest_applied_1op =
        ~source_aliases
        ~single_op_per_pkh_per_block:true
        client ;
-  (* When [waiter] resolves, wait a little longer to check that the command
-     has not issued more operations than expected. *)
-  let* () =
-    wait_or_timeout
-      ~timeout:(Int.to_float target_transfers)
-      ~sleep_at_resolution:5.
-      waiter
-  in
+  let* () = waiter in
+  (* Wait a little longer to check that the command has not issued
+     more operations than expected. *)
+  let* () = Lwt_unix.sleep 5. in
   check_n_applied_operations ~log:true ~expected:target_transfers client
 
-(** Initializes [n_nodes] nodes with mode [Client] and with disjoint
+(** Initialize [n_nodes] nodes with mode [Client] and with disjoint
     sets of [accounts_per_nodes] accounts each. The first node activates
     the [protocol]. Each other node is connected exclusively with the
     first node. For each node, returns the node together with the
@@ -331,11 +311,11 @@ let init_nodes_star ~protocol ~n_nodes ~accounts_per_node
     ( (first_node, first_client, first_node_accounts),
       other_nodes_clients_accounts )
 
-(** Runs the [stresstest] command on multiple connected nodes
+(** Run the [stresstest] command on multiple connected nodes
     (see {!init_nodes_star}). Each node calls it with a distinct
     set of source accounts and the same target number of transfers.
-    Waits for this number of injections in the first node, then
-    checks that all transfers from all nodes are applied in its
+    Wait for this number of injections in the first node, then
+    check that all transfers from all nodes are applied in its
     mempool. *)
 let test_stresstest_applied_multiple_nodes =
   Protocol.register_test
@@ -375,12 +355,8 @@ let test_stresstest_applied_multiple_nodes =
            ~transfers:transfers_per_node
            client)
     nodes_clients_accounts ;
-  let* () =
-    wait_or_timeout
-      ~timeout:(Int.to_float transfers_per_node)
-      ~sleep_at_resolution:2.
-      waiter
-  in
+  let* () = waiter in
+  let* () = Lwt_unix.sleep 2. in
   check_n_applied_operations
     ~log:true
     ~expected:(n_nodes * transfers_per_node)
@@ -414,15 +390,11 @@ let test_stresstest_applied_multiple_nodes_1op =
            ~single_op_per_pkh_per_block:true
            client)
     nodes_clients_accounts ;
-  (* When [waiter] resolves, wait a little longer for operations from
-     other nodes to arrive, and also to check that the command
-     has not issued more operations than expected. *)
-  let* () =
-    wait_or_timeout
-      ~timeout:(Int.to_float target_transfers_per_node)
-      ~sleep_at_resolution:5.
-      waiter
-  in
+  let* () = waiter in
+  (* Wait a little longer for operations from other nodes to arrive,
+     and also to check that the command has not issued more operations
+     than expected. *)
+  let* () = Lwt_unix.sleep 5. in
   check_n_applied_operations
     ~log:true
     ~expected:(n_nodes * target_transfers_per_node)
