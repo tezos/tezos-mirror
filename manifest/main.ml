@@ -26,12 +26,11 @@
 open Manifest
 module V = Version
 
-module JS = struct
-  let secp256k1_version = "1.1.1"
+module Node_wrapper_flags = struct
+  let secp256k1 = ["--secp256k1"; "1.1.1"]
 
-  let hacl_version = "1.1.0"
+  let hacl = ["--hacl"; "1.1.0"]
 end
-
 (* EXTERNAL LIBS *)
 
 let alcotest = external_lib ~js_compatible:true "alcotest" V.(at_least "1.5.0")
@@ -111,7 +110,7 @@ let fmt_tty = external_sublib fmt "fmt.tty"
 let hacl_star =
   external_lib
     ~js_compatible:true
-    ~node_wrapper_flags:["--hacl"; JS.hacl_version]
+    ~node_wrapper_flags:Node_wrapper_flags.hacl
     "hacl-star"
     V.(at_least "0.4.2" && less_than "0.5")
 
@@ -245,7 +244,7 @@ let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
 
 let secp256k1_internal =
   external_lib
-    ~node_wrapper_flags:["--secp256k1"; JS.secp256k1_version]
+    ~node_wrapper_flags:Node_wrapper_flags.secp256k1
     "secp256k1-internal"
     V.True
 
@@ -566,7 +565,7 @@ let _tezos_hacl_gen =
                [
                  S "run";
                  S "%{dep:../../tooling/node_wrapper.exe}";
-                 H [S "--hacl"; S JS.hacl_version];
+                 H (of_atom_list Node_wrapper_flags.hacl);
                  S "%{dep:./check-api.js}";
                ];
              ];
