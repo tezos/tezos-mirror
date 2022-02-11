@@ -32,8 +32,9 @@ TEZOS_BIN=tezos-node tezos-validator tezos-client tezos-admin-client tezos-signe
 		  $(shell if [ -f $(call directory_of_version,$p)/bin_endorser/dune ]; then \
 		             echo tezos-endorser-$(p); fi)) \
     $(shell if [ ${PROFILE} = "dev" ]; then echo \
-	tezos-sc-rollup-node-alpha \
-	tezos-sc-rollup-client-alpha; \
+  tezos-sc-rollup-node-alpha \
+  tezos-sc-rollup-client-alpha \
+  tezos-tx-rollup-node-alpha; \
     fi)
     # TODO: <https://gitlab.com/tezos/tezos/-/issues/2305>
     # Build sc rollup binaries for all the active protocols, not just alpha,
