@@ -1330,7 +1330,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_origination ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Tx_rollup_submit_batch {content; _} ->
-      (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2408
+      (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2408
          Do we need to take into account the carbonation of hasing
          [content] here? *)
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
@@ -1344,6 +1344,10 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       >|=? fun () -> ctxt
   | Tx_rollup_commit {commitment; _} ->
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
+      (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2469
+
+         We should think harder about the semantics of commitments
+         application. *)
       let current_level = (Level.current ctxt).level in
       fail_when
         Raw_level.(current_level <= Raw_level.succ commitment.level)

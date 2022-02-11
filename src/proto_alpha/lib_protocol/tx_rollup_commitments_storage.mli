@@ -29,7 +29,11 @@
     to commitments for transaction rollups. *)
 
 (** [add_commitment context tx_rollup contract commitment] adds a
-   commitment to a rollup. *)
+    commitment to a rollup. *)
+
+(** FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2468 
+
+    We should document better the invariants. *)
 val add_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->

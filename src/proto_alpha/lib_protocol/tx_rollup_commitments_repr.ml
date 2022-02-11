@@ -195,6 +195,9 @@ module Commitment = struct
       (Format.pp_print_option Commitment_hash.pp)
       t.predecessor
 
+  (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2470
+
+     This encoding is not bounded, and maybe it is an issue. *)
   let encoding =
     let open Data_encoding in
     conv
