@@ -175,7 +175,12 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
   in
   Alcotest.(
     check bool "Balance updates do not match." (bupds = expected_bupds) true) ;
-  return_unit
+  (* Test transferring to go beyond capacity. *)
+  wrap (Token.balance ctxt' sink) >>=? fun bal ->
+  let amount = Tez.of_mutez_exn Int64.max_int -! bal +! Tez.one_mutez in
+  wrap (Token.transfer ctxt' `Minted sink amount) >>= function
+  | Error _ -> return_unit
+  | Ok _ -> failwith "Transferring (Int64.max - balance + 1) should fail."
 
 let test_transferring_to_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
@@ -306,21 +311,52 @@ let test_transferring_from_unbounded_source ctxt src expected_bupds =
   Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true >>=? fun () ->
   return_unit
 
+(* Returns the balance of [account] if [account] is allocated, and returns
+   [Tez.zero] otherwise. *)
+let balance_no_fail ctxt account =
+  wrap (Token.allocated ctxt account) >>=? fun allocated ->
+  if allocated then wrap (Token.balance ctxt account) else return Tez.zero
+
 let test_transferring_from_bounded_source ctxt src amount expected_bupds =
+  balance_no_fail ctxt src >>=? fun balance ->
+  Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
+  (* Test transferring from an empty account. *)
+  (wrap (Token.transfer ctxt src `Burned Tez.one) >>= function
+   | Error _ -> return_unit
+   | Ok _ -> failwith "Transferring from an empty account should fail.")
+  >>=? fun () ->
   (* Transferring zero must be a noop, and must not return balance updates. *)
   wrap (Token.transfer ctxt src `Burned Tez.zero) >>=? fun (ctxt', bupds) ->
   Assert.equal_bool ~loc:__LOC__ (ctxt == ctxt' && bupds = []) true
   >>=? fun _ ->
   (* Force the allocation of [dest] if need be. *)
   force_allocation_if_need_be ctxt src >>=? fun ctxt ->
-  (* Test transferring a non null amount. *)
+  (* Test transferring everything. *)
   wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
   wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
   check_src_balances ctxt ctxt' src amount >>=? fun _ ->
   let expected_bupds =
     expected_bupds @ Receipt.[(Burned, Credited amount, Block_application)]
   in
-  Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true
+  Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true >>=? fun () ->
+  (* Test transferring a smaller amount. *)
+  wrap (Token.transfer ctxt `Minted src amount) >>=? fun (ctxt, _) ->
+  (match src with
+  | `Frozen_bonds _ -> (
+      wrap (Token.transfer ctxt src `Burned amount) >>= function
+      | Ok _ ->
+          failwith "Partial withdrawals are forbidden for frozen bonds."
+      | Error _ -> return_unit)
+  | _ ->
+      wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
+      check_src_balances ctxt ctxt' src amount >>=? fun _ ->
+      Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true)
+  >>=? fun () ->
+  (* Test transferring more than available. *)
+  wrap (Token.balance ctxt src) >>=? fun balance ->
+  wrap (Token.transfer ctxt src `Burned (balance +! Tez.one)) >>= function
+  | Error _ -> return_unit
+  | Ok _ -> failwith "Transferring more than available should fail."
 
 let test_transferring_from_contract ctxt =
   let (pkh, _pk, _sk) = Signature.generate_key () in
