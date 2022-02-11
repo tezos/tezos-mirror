@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,29 +25,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** This module introduces various functions to manipulate the storage related
+    to commitments for transaction rollups. *)
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+(** [add_commitment context tx_rollup contract commitment] adds a
+    commitment to a rollup. *)
 
-(** Returns the inbox for a transaction rollup for current level.
+(** FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2468 
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+    We should document better the invariants. *)
+val add_commitment :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Signature.Public_key_hash.t ->
+  Tx_rollup_commitments_repr.Commitment.t ->
+  Raw_context.t tzresult Lwt.t
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
-
-val register : unit -> unit
+(** [get_commitments context tx_rollup level] returns the list of
+   non-rejected commitments for a rollup at a level, first-submitted
+   first. *)
+val get_commitments :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  Raw_level_repr.t ->
+  (Raw_context.t * Tx_rollup_commitments_repr.t) tzresult Lwt.t

@@ -1695,6 +1695,24 @@ module Tx_rollup = struct
 
         let encoding = Data_encoding.list Tx_rollup_message_repr.hash_encoding
       end)
+
+  module Level_indexed_context =
+    Make_indexed_subcontext
+      (Make_subcontext (Registered) (Raw_context)
+         (struct
+           let name = ["tx_rollup_level"]
+         end))
+         (Pair
+            (Make_index
+               (Raw_level_repr.Index))
+               (Make_index (Tx_rollup_repr.Index)))
+
+  module Commitment_list =
+    Level_indexed_context.Make_carbonated_map
+      (struct
+        let name = ["commitment_list"]
+      end)
+      (Tx_rollup_commitments_repr)
 end
 
 module Sc_rollup = struct

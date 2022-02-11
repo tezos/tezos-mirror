@@ -700,8 +700,9 @@ let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
               match r with
               | Reveal_result _ | Delegation_result _
               | Set_deposits_limit_result _ | Tx_rollup_origination_result _
-              | Tx_rollup_submit_batch_result _ | Sc_rollup_originate_result _
-              | Sc_rollup_add_messages_result _ ->
+              | Tx_rollup_submit_batch_result _ | Tx_rollup_commit_result _
+              | Sc_rollup_originate_result _ | Sc_rollup_add_messages_result _
+                ->
                   balance_updates_rev
               | Transaction_result
                   (Transaction_to_contract_result {balance_updates; _})
@@ -732,6 +733,7 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
             | Successful_manager_result (Set_deposits_limit_result _)
             | Successful_manager_result (Tx_rollup_origination_result _)
             | Successful_manager_result (Tx_rollup_submit_batch_result _)
+            | Successful_manager_result (Tx_rollup_commit_result _)
             | Successful_manager_result (Sc_rollup_originate_result _)
             | Successful_manager_result (Sc_rollup_add_messages_result _) ->
                 origination_results_rev

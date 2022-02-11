@@ -44,6 +44,13 @@ module S = struct
       ~query:RPC_query.empty
       ~output:Tx_rollup_inbox.encoding
       RPC_path.(custom_root /: Tx_rollup.rpc_arg / "inbox")
+
+  let commitments =
+    RPC_service.get_service
+      ~description:"."
+      ~query:RPC_query.empty
+      ~output:Tx_rollup_commitments.encoding
+      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "commitments")
 end
 
 let register () =
@@ -51,10 +58,16 @@ let register () =
   opt_register1 ~chunked:false S.state (fun ctxt tx_rollup () () ->
       Tx_rollup_state.find ctxt tx_rollup >|=? snd) ;
   opt_register1 ~chunked:false S.inbox (fun ctxt tx_rollup () () ->
-      Tx_rollup_inbox.find ctxt tx_rollup ~level:`Current >|=? snd)
+      Tx_rollup_inbox.find ctxt tx_rollup ~level:`Current >|=? snd) ;
+  register1 ~chunked:false S.commitments (fun ctxt tx_rollup () () ->
+      let level = (Level.current ctxt).level in
+      Tx_rollup_commitments.get_commitments ctxt tx_rollup level >|=? snd)
 
 let state ctxt block tx_rollup =
   RPC_context.make_call1 S.state ctxt block tx_rollup () ()
 
 let inbox ctxt block tx_rollup =
   RPC_context.make_call1 S.inbox ctxt block tx_rollup () ()
+
+let commitments ctxt block tx_rollup =
+  RPC_context.make_call1 S.commitments ctxt block tx_rollup () ()

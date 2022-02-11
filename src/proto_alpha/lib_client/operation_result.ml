@@ -187,6 +187,20 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         pp_result
         result
+  | Tx_rollup_commit {tx_rollup; commitment} ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:%a, %a@,From: %a%a@]"
+        (if internal then "Internal tx rollup commitment"
+        else "Tx rollup commitment")
+        Tx_rollup.pp
+        tx_rollup
+        Tx_rollup_commitments.Commitment.pp
+        commitment
+        Contract.pp
+        source
+        pp_result
+        result
   | Sc_rollup_originate {kind; boot_sector} ->
       let (module R : Sc_rollups.PVM.S) = Sc_rollups.of_kind kind in
       Format.fprintf
@@ -451,6 +465,15 @@ let pp_manager_operation_contents_and_result ppf
       balance_updates ;
     Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
   in
+  let pp_tx_rollup_commit_result
+      (Tx_rollup_commit_result {balance_updates; consumed_gas}) =
+    Format.fprintf
+      ppf
+      "@,Balance updates:@,  %a"
+      pp_balance_updates
+      balance_updates ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+  in
   let pp_sc_rollup_originate_result
       (Sc_rollup_originate_result
         {address; consumed_gas; size; balance_updates}) =
@@ -548,6 +571,17 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This rollup submit operation was BACKTRACKED, its expected \
            effects (as follow) were NOT applied.@]" ;
         pp_tx_rollup_submit_batch_result op
+    | Applied (Tx_rollup_commit_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This tx rollup commit operation was successfully applied" ;
+        pp_tx_rollup_commit_result op
+    | Backtracked ((Tx_rollup_commit_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This tx rollup commit rollup operation was BACKTRACKED, its \
+           expected effects (as follow) were NOT applied.@]" ;
+        pp_tx_rollup_commit_result op
     | Applied (Sc_rollup_originate_result _ as op) ->
         Format.fprintf
           ppf

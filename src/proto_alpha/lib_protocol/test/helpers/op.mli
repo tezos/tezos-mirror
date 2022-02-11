@@ -230,3 +230,16 @@ val sc_rollup_origination :
   Sc_rollup.Kind.t ->
   Sc_rollup.PVM.boot_sector ->
   packed_operation tzresult Lwt.t
+
+(** [tx_rollup_commit ctxt source tx_rollup commitment] Commits to a tx
+    rollup state. *)
+val tx_rollup_commit :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  Tx_rollup_commitments.Commitment.t ->
+  Operation.packed tzresult Lwt.t

@@ -657,6 +657,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       "additionalProperties": false
                     },
                     "definitions": {
+                      "Commitment_hash": {
+                        "title": "A commitment ID (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "Context_hash": {
                         "title": "A hash of context (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
@@ -1878,6 +1882,91 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "additionalProperties": false
                           },
                           {
+                            "title": "Tx_rollup_commit",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "tx_rollup_commit"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "rollup": {
+                                "$ref": "#/definitions/alpha.tx_rollup_id"
+                              },
+                              "commitment": {
+                                "type": "object",
+                                "properties": {
+                                  "level": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "batches": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "root": {
+                                          "type": "string",
+                                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                        }
+                                      },
+                                      "required": [
+                                        "root"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "predecessor": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Some",
+                                        "$ref": "#/definitions/Commitment_hash"
+                                      },
+                                      {
+                                        "title": "None",
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "predecessor",
+                                  "batches",
+                                  "level"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "commitment",
+                              "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
                             "title": "Sc_rollup_originate",
                             "type": "object",
                             "properties": {
@@ -2387,6 +2476,127 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
+                          "title": "X_5"
+                        },
+                        "encoding": {
+                          "tag_size": "Uint8",
+                          "kind": {
+                            "kind": "Dynamic"
+                          },
+                          "cases": [
+                            {
+                              "tag": 0,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "layout": {
+                                    "kind": "Zero_width"
+                                  },
+                                  "kind": "anon",
+                                  "data_kind": {
+                                    "size": 0,
+                                    "kind": "Float"
+                                  }
+                                }
+                              ],
+                              "name": "None"
+                            },
+                            {
+                              "tag": 1,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "Commitment_hash",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 32,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Some"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
+                          "title": "X_3"
+                        },
+                        "encoding": {
+                          "fields": [
+                            {
+                              "name": "level",
+                              "layout": {
+                                "size": "Int32",
+                                "kind": "Int"
+                              },
+                              "data_kind": {
+                                "size": 4,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "kind": "dyn",
+                              "num_fields": 1,
+                              "size": "Uint30"
+                            },
+                            {
+                              "name": "batches",
+                              "layout": {
+                                "layout": {
+                                  "name": "fitness.elem",
+                                  "kind": "Ref"
+                                },
+                                "kind": "Seq"
+                              },
+                              "data_kind": {
+                                "kind": "Variable"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "predecessor",
+                              "layout": {
+                                "name": "X_5",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            }
+                          ]
+                        }
+                      },
+                      {
+                        "description": {
                           "title": "alpha.scripted.contracts"
                         },
                         "encoding": {
@@ -2695,7 +2905,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       },
                       {
                         "description": {
-                          "title": "X_3"
+                          "title": "X_6"
                         },
                         "encoding": {
                           "fields": [
@@ -4110,7 +4320,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 {
                                   "name": "parameters",
                                   "layout": {
-                                    "name": "X_3",
+                                    "name": "X_6",
                                     "kind": "Ref"
                                   },
                                   "data_kind": {
@@ -4674,6 +4884,102 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 }
                               ],
                               "name": "Tx_rollup_submit_batch"
+                            },
+                            {
+                              "tag": 152,
+                              "fields": [
+                                {
+                                  "name": "Tag",
+                                  "layout": {
+                                    "size": "Uint8",
+                                    "kind": "Int"
+                                  },
+                                  "data_kind": {
+                                    "size": 1,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "source",
+                                  "layout": {
+                                    "name": "public_key_hash",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "size": 21,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "fee",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "counter",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "gas_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "storage_limit",
+                                  "layout": {
+                                    "name": "N.t",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "rollup",
+                                  "layout": {
+                                    "kind": "Bytes"
+                                  },
+                                  "data_kind": {
+                                    "size": 20,
+                                    "kind": "Float"
+                                  },
+                                  "kind": "named"
+                                },
+                                {
+                                  "name": "commitment",
+                                  "layout": {
+                                    "name": "X_3",
+                                    "kind": "Ref"
+                                  },
+                                  "data_kind": {
+                                    "kind": "Dynamic"
+                                  },
+                                  "kind": "named"
+                                }
+                              ],
+                              "name": "Tx_rollup_commit"
                             },
                             {
                               "tag": 200,
@@ -5587,6 +5893,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                       }
                     ],
                     "definitions": {
+                      "Commitment_hash": {
+                        "title": "A commitment ID (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "Context_hash": {
                         "title": "A hash of context (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
@@ -6797,6 +7107,91 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             },
                             "required": [
                               "content",
+                              "rollup",
+                              "storage_limit",
+                              "gas_limit",
+                              "counter",
+                              "fee",
+                              "source",
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "title": "Tx_rollup_commit",
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "tx_rollup_commit"
+                                ]
+                              },
+                              "source": {
+                                "$ref": "#/definitions/Signature.Public_key_hash"
+                              },
+                              "fee": {
+                                "$ref": "#/definitions/alpha.mutez"
+                              },
+                              "counter": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "gas_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "storage_limit": {
+                                "$ref": "#/definitions/positive_bignum"
+                              },
+                              "rollup": {
+                                "$ref": "#/definitions/alpha.tx_rollup_id"
+                              },
+                              "commitment": {
+                                "type": "object",
+                                "properties": {
+                                  "level": {
+                                    "type": "integer",
+                                    "minimum": -2147483648,
+                                    "maximum": 2147483647
+                                  },
+                                  "batches": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "root": {
+                                          "type": "string",
+                                          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                                        }
+                                      },
+                                      "required": [
+                                        "root"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  },
+                                  "predecessor": {
+                                    "oneOf": [
+                                      {
+                                        "title": "Some",
+                                        "$ref": "#/definitions/Commitment_hash"
+                                      },
+                                      {
+                                        "title": "None",
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "predecessor",
+                                  "batches",
+                                  "level"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "commitment",
                               "rollup",
                               "storage_limit",
                               "gas_limit",
