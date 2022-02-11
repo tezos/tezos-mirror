@@ -104,6 +104,9 @@ val register :
 
 (** {2 Alerts} *)
 
+(** category of an alert message *)
+type category = string
+
 (** Emit an alert.
 
     The alert is sent to a Slack channel.
@@ -112,8 +115,15 @@ val register :
     Be careful with alert fatigue: only send alerts that really need to be acted on.
     Each test can only send a maximum of 2 alerts, and the total number of alerts
     for all tests cannot exceed 100. Alerts can be sent outside of tests, in which
-    case only the global limit applies. *)
-val alert : ('a, unit, string, unit) format4 -> 'a
+    case only the global limit applies.
+
+    If an alert for [category] was already sent less than [rate_limit_per_category]
+    seconds ago, the alert will not be sent. See the Configuration section for
+    documentation about [rate_limit_per_category].
+
+    Default [category] is [""].
+*)
+val alert : ?category:category -> ('a, unit, string, unit) format4 -> 'a
 
 (** Same as [alert], but also log an exception.
 
@@ -414,7 +424,9 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
             "max_total": 100,
             "max_by_test": 2,
             "gitlab_project_url": "https://gitlab.com/org/repo",
-            "timeout": 20
+            "timeout": 20,
+            "rate_limit_per_category": 84600,
+            "last_alerts_filename", "last_alerts.json"
         },
         "influxdb": {
             "url": "https://localhost:8086",
@@ -450,8 +462,13 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
       - [gitlab_project_url], is used to add, in Slack alerts,
         a link to create a GitLab issue to fix the alert
         (optional, links are not added if not specified);
-      - [timeout] is how long, in seconds, to wait when sending alerts before giving up
-        (optional, default value is 20);
+      - [timeout] is how long, in seconds, to wait when sending alerts before
+        giving up (optional, default value is 20);
+      - [rate_limit_per_category] is the minimum delay between two alerts
+        for the same category, in seconds (optional, default value is one day);
+      - [last_alerts_filename] is the name of the file where to store the
+        last time an alert was sent for each category
+        (optional, default value is ["last_alerts.json"]);
 
     - [influxdb] configures how to send and query data points
       (optional, data points are not sent nor queried if not specified);
