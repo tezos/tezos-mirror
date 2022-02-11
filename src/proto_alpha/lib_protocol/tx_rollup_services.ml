@@ -23,7 +23,6 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
-
 open Alpha_context
 
 let custom_root =
@@ -71,3 +70,17 @@ let inbox ctxt block tx_rollup =
 
 let commitments ctxt block tx_rollup =
   RPC_context.make_call1 S.commitments ctxt block tx_rollup () ()
+
+let current_tezos_head () =
+  RPC_service.get_service
+    ~description:"Get the current head stored in the node"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.option Block_hash.encoding)
+    RPC_path.(open_root / "tezos_head")
+
+let current_inbox () =
+  RPC_service.get_service
+    ~description:"Get the current inbox stored in the node"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.option Tx_rollup_inbox.encoding)
+    RPC_path.(open_root / "current_inbox")

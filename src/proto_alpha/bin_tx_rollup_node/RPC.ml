@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,36 +24,42 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+open Protocol
+open Tezos_rpc
+open Tezos_rpc_http
+open Tezos_rpc_http_server
 
-open Alpha_context
+let register_current_tezos_head state dir =
+  RPC_directory.register0
+    dir
+    (Tx_rollup_services.current_tezos_head ())
+    (fun () () -> State.get_head state >|= ok)
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+let register_current_inbox state dir =
+  RPC_directory.register0
+    dir
+    (Tx_rollup_services.current_inbox ())
+    (fun () () ->
+      State.get_head state >|= ok >>=? function
+      | None -> return None
+      | Some hash ->
+          State.find_inbox state hash >|= fun x ->
+          ok (Option.map Inbox.to_protocol_inbox x))
 
-(** Returns the inbox for a transaction rollup for current level.
+let register state =
+  RPC_directory.empty
+  |> register_current_tezos_head state
+  |> register_current_inbox state
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+let launch ~host ~acl ~node ~dir () =
+  RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
+  >>= return
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
-
-val register : unit -> unit
-
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
-
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
+let start configuration state =
+  let Configuration.{rpc_addr; rpc_port; _} = configuration in
+  let addr = P2p_addr.of_string_exn rpc_addr in
+  let host = Ipaddr.V6.to_string addr in
+  let dir = register state in
+  let node = `TCP (`Port rpc_port) in
+  let acl = RPC_server.Acl.default addr in
+  Lwt.catch (launch ~host ~acl ~node ~dir) fail_with_exn
