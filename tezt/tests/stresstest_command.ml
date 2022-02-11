@@ -289,90 +289,6 @@ let test_stresstest_n_transfers =
   let* _ = check_n_manager_operations_in_head n_transfers client in
   unit
 
-(** Similar to {!test_stresstest_applied}, but instead of the
-    default five bootstrap accounts, provide the command with
-    fresh accounts generated during the node's initialization. *)
-let test_stresstest_applied_new_bootstraps =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"stresstest applied new bootstraps"
-    ~tags:["client"; "stresstest"; "applied"]
-  @@ fun protocol ->
-  let transfers = 30 in
-  let n_new_accounts = 10 in
-  let* (node, client) =
-    Client.init_with_protocol
-      ~nodes_args:
-        [
-          Synchronisation_threshold 0;
-          Connections 0;
-          Disable_operations_precheck;
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-             Stresstest command uses counters to inject a lot of operations with limited
-             number of bootstrap accounts. With precheck these operations are mostly
-             rejected because we don't apply the effect of operations in the
-             prevalidation context in mempool mode anymore. So, only the operation with
-             the correct counter is considered as Applied (without incrementing the
-             counter in the context). Once the issue is fixed, the
-             [Disable_operations_precheck] flag above can be removed. *)
-        ]
-      ~additional_bootstrap_account_count:n_new_accounts
-      `Client
-      ~protocol
-      ()
-  in
-  let bootstrap_nums =
-    Constant.(
-      range
-        (default_bootstrap_count + 1)
-        (default_bootstrap_count + n_new_accounts))
-  in
-  let source_aliases = List.map (sf "bootstrap%d") bootstrap_nums in
-  let waiter = wait_for_n_injections transfers node in
-  let* () = Client.stresstest ~source_aliases ~transfers client in
-  let* () = waiter in
-  let* _ = check_n_applied_operations_in_mempool transfers client in
-  unit
-
-(** Test the [stresstest] client command with the
-    [--single-op-per-pkh-per-block] flag. We do not provide a
-    [transfers] argument, so the command never stops trying to
-    craft transfers. But as we do not bake any block, it runs out
-    of distinct accounts to use. Therefore, we expect it to inject
-    exactly [target_transfers] operations, all of which should be
-    applied in the node's mempool. *)
-let test_stresstest_applied_1op =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"stresstest applied 1op"
-    ~tags:["client"; "stresstest"; "stresstest_1op"; "applied"]
-  @@ fun protocol ->
-  let target_transfers = 10 in
-  let n_accounts = target_transfers in
-  let* (node, client) =
-    Client.init_with_protocol
-      ~nodes_args:[Synchronisation_threshold 0; Connections 0]
-      ~additional_bootstrap_account_count:
-        (n_accounts - Constant.default_bootstrap_count)
-      `Client
-      ~protocol
-      ()
-  in
-  let bootstrap_nums = range 1 n_accounts in
-  let source_aliases = List.map (sf "bootstrap%d") bootstrap_nums in
-  let waiter = wait_for_n_injections target_transfers node in
-  non_terminating_process
-  @@ Client.spawn_stresstest
-       ~source_aliases
-       ~single_op_per_pkh_per_block:true
-       client ;
-  let* () = waiter in
-  (* Wait a little longer to check that the command has not issued
-     more operations than expected. *)
-  let* () = Lwt_unix.sleep 5. in
-  let* _ = check_n_applied_operations_in_mempool target_transfers client in
-  unit
-
 (** Initialize [n_nodes] nodes with mode [Client] and with disjoint
     sets of [accounts_per_nodes] accounts each. The first node activates
     the [protocol]. Each other node is connected exclusively with the
@@ -525,7 +441,5 @@ let test_stresstest_applied_multiple_nodes_1op =
 let register ~protocols =
   test_stresstest_sources_format protocols ;
   test_stresstest_n_transfers protocols ;
-  test_stresstest_applied_new_bootstraps protocols ;
-  test_stresstest_applied_1op protocols ;
   test_stresstest_applied_multiple_nodes protocols ;
   test_stresstest_applied_multiple_nodes_1op protocols
