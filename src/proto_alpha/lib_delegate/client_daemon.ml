@@ -115,12 +115,6 @@ module Accuser = struct
   let run (cctxt : #Protocol_client_context.full) ~chain ~preserved_levels
       ~keep_alive =
     let process () =
-      Client_baking_blocks.monitor_valid_blocks
-        ~next_protocols:(Some [Protocol.hash])
-        cctxt
-        ~chains:[chain]
-        ()
-      >>=? fun valid_blocks_stream ->
       cctxt#message
         "Accuser v%s (%s) for %a started."
         Tezos_version.Version.current_string
@@ -128,6 +122,12 @@ module Accuser = struct
         Protocol_hash.pp_short
         Protocol.hash
       >>= fun () ->
+      Client_baking_blocks.monitor_valid_blocks
+        ~next_protocols:(Some [Protocol.hash])
+        cctxt
+        ~chains:[chain]
+        ()
+      >>=? fun valid_blocks_stream ->
       let canceler = Lwt_canceler.create () in
       let _ =
         Lwt_exit.register_clean_up_callback ~loc:__LOC__ (fun _ ->
