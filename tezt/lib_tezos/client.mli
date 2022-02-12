@@ -562,6 +562,25 @@ val submit_ballot :
 val spawn_submit_ballot :
   ?key:string -> ?wait:string -> proto_hash:string -> ballot -> t -> Process.t
 
+(** Run [tezos-client set deposits limit for <src> to <limit>] *)
+val set_deposits_limit :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  src:string ->
+  limit:string ->
+  t ->
+  string Lwt.t
+
+(** Run [tezos-client unset deposits limit for <src>] *)
+val unset_deposits_limit :
+  ?hooks:Process.hooks ->
+  ?endpoint:endpoint ->
+  ?wait:string ->
+  src:string ->
+  t ->
+  string Lwt.t
+
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336
    [amount] should be named [transferring] *)
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/2336

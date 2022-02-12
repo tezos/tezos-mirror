@@ -666,10 +666,20 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
                 (Limit.known Gas.Arith.zero)
                 op)
          else
+           let safety_guard =
+             match c.operation with
+             | Transaction {destination; _}
+               when Option.is_some (Contract.is_implicit destination) ->
+                 Gas.Arith.zero
+             | Reveal _ | Delegation _ | Set_deposits_limit _ -> Gas.Arith.zero
+             | _ -> safety_guard
+           in
            cctxt#message
-             "Estimated gas: %a units (will add 100 for safety)"
+             "Estimated gas: %a units (will add %a for safety)"
              Gas.Arith.pp
              gas
+             Gas.Arith.pp
+             safety_guard
            >>= fun () ->
            let safe_gas = Gas.Arith.(add (ceil gas) safety_guard) in
            let patched_gas =

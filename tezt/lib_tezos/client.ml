@@ -753,6 +753,22 @@ let spawn_submit_ballot ?(key = Constant.bootstrap1.alias) ?(wait = "none")
 let submit_ballot ?key ?wait ~proto_hash vote client =
   spawn_submit_ballot ?key ?wait ~proto_hash vote client |> Process.check
 
+let set_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src ~limit client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait] @ ["set"; "deposits"; "limit"; "for"; src; "to"; limit])
+  |> Process.check_and_read_stdout
+
+let unset_deposits_limit ?hooks ?endpoint ?(wait = "none") ~src client =
+  spawn_command
+    ?hooks
+    ?endpoint
+    client
+    (["--wait"; wait] @ ["unset"; "deposits"; "limit"; "for"; src])
+  |> Process.check_and_read_stdout
+
 let spawn_originate_contract ?hooks ?endpoint ?(wait = "none") ?init ?burn_cap
     ~alias ~amount ~src ~prg client =
   spawn_command
