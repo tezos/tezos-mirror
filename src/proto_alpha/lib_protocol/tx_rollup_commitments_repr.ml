@@ -42,7 +42,7 @@ let () =
   (* Commitment_hash_already_submitted *)
   register_error_kind
     `Temporary
-    ~id:"Commitment_hash_already_submitted"
+    ~id:"tx_rollup_commit_hash_already_submitted"
     ~title:"Someone already made this commitment"
     ~description:"The requested commitment is a duplicate"
     unit
@@ -51,7 +51,7 @@ let () =
   (* Two_commitments_from_one_committer *)
   register_error_kind
     `Temporary
-    ~id:"Two_commitments_from_one_committer"
+    ~id:"tx_rollup_two_commitments_from_one_committer"
     ~title:"This contract already made a different commitment at this level"
     ~description:
       "This contract already made a different commitment at this level"
@@ -61,7 +61,7 @@ let () =
   (* Wrong_commitment_predecessor_level *)
   register_error_kind
     `Temporary
-    ~id:"Wrong_commitment_predecessor_level"
+    ~id:"tx_rollup_wrong_commitment_predecessor_level"
     ~title:"This commitment's predecessor is invalid"
     ~description:
       "This commitment has predecessor but shouldn't, or doesn't but should"
@@ -71,7 +71,7 @@ let () =
   (* Missing_commitment_predecessor *)
   register_error_kind
     `Temporary
-    ~id:"Missing_commitment_predecessor"
+    ~id:"tx_rollup_missing_commitment_predecessor"
     ~title:"This commitment refers to a predecessor that doesn't exist"
     ~description:"This commitment refers to a predecessor that doesn't exist"
     unit
@@ -80,7 +80,7 @@ let () =
   (* Wrong_batch_count *)
   register_error_kind
     `Temporary
-    ~id:"Wrong_batch_count"
+    ~id:"tx_rollup_wrong_batch_count"
     ~title:"This commitment has the wrong number of batches"
     ~description:
       "This commitment has a different number of batches than its inbox"
@@ -90,7 +90,7 @@ let () =
   (* Commitment_too_early *)
   register_error_kind
     `Temporary
-    ~id:"Commitment_too_early"
+    ~id:"tx_rollup_commitment_too_early"
     ~title:"This commitment is for a level that hasn't finished yet"
     ~description:"This commitment is for a level that hasn't finished yet"
     unit

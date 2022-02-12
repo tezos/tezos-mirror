@@ -372,6 +372,8 @@ let tx_rollup_operation_origination_tag = tx_rollup_operation_tag_offset + 0
 
 let tx_rollup_operation_submit_batch_tag = tx_rollup_operation_tag_offset + 1
 
+let tx_rollup_operation_commit_tag = tx_rollup_operation_tag_offset + 2
+
 let sc_rollup_operation_tag_offset = 200
 
 let sc_rollup_operation_origination_tag = sc_rollup_operation_tag_offset + 0
@@ -555,7 +557,7 @@ module Encoding = struct
     let[@coq_axiom_with_reason "gadt"] tx_rollup_commit_case =
       MCase
         {
-          tag = tx_rollup_operation_tag_offset + 2;
+          tag = tx_rollup_operation_commit_tag;
           name = "tx_rollup_commit";
           encoding =
             obj2
@@ -940,12 +942,12 @@ module Encoding = struct
 
   let tx_rollup_submit_batch_case =
     make_manager_case
-      (tx_rollup_operation_tag_offset + 1)
+      tx_rollup_operation_submit_batch_tag
       Manager_operations.tx_rollup_submit_batch_case
 
   let tx_rollup_commit_case =
     make_manager_case
-      (tx_rollup_operation_tag_offset + 2)
+      tx_rollup_operation_commit_tag
       Manager_operations.tx_rollup_commit_case
 
   let sc_rollup_originate_case =

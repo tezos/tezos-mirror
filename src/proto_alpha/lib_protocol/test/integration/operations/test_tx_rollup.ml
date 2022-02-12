@@ -571,7 +571,7 @@ let test_inbox_linked_list () =
 
 (** [test_commitment_duplication] originates a rollup, and makes a
    commitment. It attempts to have a second contract make the same
-   ommitment, and ensures that this fails (and the second contract is
+   commitment, and ensures that this fails (and the second contract is
    not charged). It also tests that the same contract can't submit
    a different commitment*)
 let test_commitment_duplication () =

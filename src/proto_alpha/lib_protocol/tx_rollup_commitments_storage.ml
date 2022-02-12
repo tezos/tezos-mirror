@@ -29,7 +29,7 @@ let just_ctxt (ctxt, _, _) = ctxt
 
 open Tx_rollup_commitments_repr
 
-(** Return commitments in the order that they werre submitted *)
+(** Return commitments in the order that they were submitted *)
 let get_or_empty_commitments :
     Raw_context.t ->
     Raw_level_repr.t * Tx_rollup_repr.t ->

@@ -109,6 +109,8 @@ type error +=
       Sc_rollup_feature_disabled
   | (* `Permanent *)
       Inconsistent_counters
+  | (* `Permanent *)
+      Tx_rollup_commit_with_non_implicit_contract
 
 let () =
   register_error_kind
@@ -493,6 +495,20 @@ let () =
     Data_encoding.unit
     (function Tx_rollup_feature_disabled -> Some () | _ -> None)
     (fun () -> Tx_rollup_feature_disabled) ;
+
+  register_error_kind
+    `Permanent
+    ~id:"operation.commit_with_non_implicit_source"
+    ~title:"Submitted a commit with a non-implicit source"
+    ~description:"Submitting a commit must be with implicit contracts."
+    ~pp:(fun ppf () ->
+      Format.pp_print_string
+        ppf
+        "Submitting a commit must be with implicit contracts.")
+    Data_encoding.empty
+    (function
+      | Tx_rollup_commit_with_non_implicit_contract -> Some () | _ -> None)
+    (fun () -> Tx_rollup_commit_with_non_implicit_contract) ;
 
   let description =
     "Smart contract rollups will be enabled in a future proposal."
@@ -1188,7 +1204,9 @@ let apply_manager_operation_content :
   | Tx_rollup_commit {tx_rollup; commitment} -> (
       (* TODO: bonds https://gitlab.com/tezos/tezos/-/issues/2459 *)
       match Contract.is_implicit source with
-      | None -> assert false (* This is only called with implicit contracts *)
+      | None ->
+          fail Tx_rollup_commit_with_non_implicit_contract
+          (* This is only called with implicit contracts *)
       | Some key ->
           Tx_rollup_commitments.add_commitment ctxt tx_rollup key commitment
           >>=? fun ctxt ->
@@ -1453,13 +1471,21 @@ let burn_storage_fees :
         ( ctxt,
           storage_limit,
           Tx_rollup_origination_result {payload with balance_updates} )
-  | Tx_rollup_submit_batch_result payload ->
+  | Tx_rollup_submit_batch_result
+      {
+        balance_updates = (_ : Receipt.balance_updates);
+        consumed_gas = (_ : Gas.Arith.fp);
+      } ->
       (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
           We need to charge for newly allocated storage (as we do for
           Michelson’s big map). *)
-      return (ctxt, storage_limit, Tx_rollup_submit_batch_result payload)
-  | Tx_rollup_commit_result payload ->
-      return (ctxt, storage_limit, Tx_rollup_commit_result payload)
+      return (ctxt, storage_limit, smopr)
+  | Tx_rollup_commit_result
+      {
+        balance_updates = (_ : Receipt.balance_updates);
+        consumed_gas = (_ : Gas.Arith.fp);
+      } ->
+      return (ctxt, storage_limit, smopr)
   | Sc_rollup_originate_result payload ->
       let payer = `Contract payer in
       Fees.burn_sc_rollup_origination_fees
