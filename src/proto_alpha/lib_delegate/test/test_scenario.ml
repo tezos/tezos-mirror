@@ -953,6 +953,16 @@ let test_scenario_m5 () =
       default_config with
       initial_seed =
         some_seed "rngGJmwLi7kPvGwV2LR3kjNQ6xamGPCZ9ooep9QcafbqRXZhYEciT";
+      delegate_selection =
+        [
+          ( 1l,
+            [
+              (0l, bootstrap1);
+              (1l, bootstrap2);
+              (2l, bootstrap3);
+              (3l, bootstrap4);
+            ] );
+        ];
       round0 = 3L;
       round1 = 4L;
     }

@@ -920,7 +920,7 @@ let make_genesis_context ~delegate_selection ~initial_seed ~round0 ~round1
   |> Environment.wrap_tzresult
   >>?= fun delegate_selection ->
   (match (delegate_selection, constants.initial_seed) with
-  | ([], _) -> return_none
+  | ([], seed_opt) -> return seed_opt
   | (selection, (Some _ as seed)) -> (
       Faked_client_context.logger#warning "Checking provided seed."
       >>= fun () ->
