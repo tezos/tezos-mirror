@@ -16,6 +16,15 @@ local logs = import './logs.jsonnet';
 
 local boardtitle = 'Tezos branch: ' + std.extVar('branch');
 
+
+#Position variables
+local node_hardware_y = 47;
+local p2p_y = 72;
+local worker_y = 89;
+local misc_y = 114;
+local delegate_hardware_y = 123;
+local logs_y = 132;
+
 //###
 // Grafana main stuffs
 //##
@@ -28,7 +37,6 @@ dashboard.new(
   refresh='',
 )
 
-
 #Node a grid is 24 slots wide
 .addPanels(
   [
@@ -38,101 +46,100 @@ dashboard.new(
       repeat='',
       showTitle=true,
     ) ,
-    node.buildInfo           + {gridPos: {h: 4, w: 4, x: 0, y: 0}},
+    node.bootstrapStatus     + {gridPos: {h: 3, w: 2, x: 0, y: 1}},
+    node.syncStatus          + {gridPos: {h: 3, w: 2, x: 2, y: 1}},
+    node.chainNameInfo       + {gridPos: {h: 3, w: 4, x: 4, y: 1}},
+    node.releaseVersionInfo  + {gridPos: {h: 3, w: 3, x: 8, y: 1}},
+    node.releaseCommitInfo   + {gridPos: {h: 3, w: 3, x: 11, y: 1}},
     node.uptime              + {gridPos: {h: 3, w: 4, x: 0, y: 4}},
     node.headLevel           + {gridPos: {h: 3, w: 4, x: 0, y: 7}},
-    node.savepointLevel      + {gridPos: {h: 3, w: 2, x: 0, y: 9}},
-    node.cabooseLevel        + {gridPos: {h: 3, w: 2, x: 2, y: 9}},
-    node.headCycleLevel      + {gridPos: {h: 3, w: 4, x: 0, y: 10}},
-    p2p.trustedPoints        + {gridPos: {h: 2, w: 2, x: 0, y: 13}},
-    p2p.privateConnections   + {gridPos: {h: 2, w: 2, x: 2, y: 13}},
-
-
-    node.headHistory                                                + {gridPos: {h: 10, w: 10, x: 4, y: 0}},
-
-    node.blocksPerSecond                                            + {gridPos: {h: 8, w: 10, x: 4, y: 10 }},
-
-    logs.nodelogs                                                                                               + {gridPos: {h: 18, w: 10, x: 14, y: 0}},
-
-
-    node.headOperations { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.invalidBlocksHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
-
-    node.gasConsumedHistory { gridPos: { h: 8, w: 14, x: 0, y: 14 } }, node.roundHistory {gridPos: {h: 8, w: 10, x: 14, y: 14}},
+    node.p2pVersion          + {gridPos: {h: 3, w: 2, x: 0, y: 10}},
+    node.distributedDbVersion+ {gridPos: {h: 3, w: 2, x: 2, y: 10}},
+    node.savepointLevel      + {gridPos: {h: 3, w: 2, x: 0, y: 13}},
+    node.checkpointLevel     + {gridPos: {h: 3, w: 2, x: 2, y: 13}},
+    node.cabooseLevel        + {gridPos: {h: 3, w: 2, x: 0, y: 16}},
+    node.headCycleLevel      + {gridPos: {h: 3, w: 2, x: 2, y: 16}},
+    p2p.trustedPoints        + {gridPos: {h: 3, w: 2, x: 0, y: 19}},
+    p2p.privateConnections   + {gridPos: {h: 3, w: 2, x: 2, y: 19}},
+    node.headHistory         + {gridPos: {h: 10, w: 10, x: 4, y: 3}},
+    node.blocksValidationTime+ {gridPos: {h: 8, w: 10, x: 4, y: 10 }},
+    logs.nodelogs            + {gridPos: {h: 21, w: 10, x: 14, y: 0}},
+    node.headOperations      + {gridPos: {h: 8, w: 14, x: 0, y: 14 } },
+    node.invalidBlocksHistory+ {gridPos: {h: 8, w: 10, x: 14, y: 14}},
+    node.gasConsumedHistory  + {gridPos: {h: 8, w: 14, x: 0, y: 14 } },
+    node.roundHistory        + {gridPos: {h: 8, w: 10, x: 14, y: 14}},
+    node.storeMergeTime      + {gridPos: {h: 8, w: 14, x: 0, y: 22}},
 
     //#######
     row.new(
       title='Node Hardware stats',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 22 } },
-    node_hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: 22 } },
-    node_hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: 22 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: node_hardware_y } },
+    node_hardware.cpu { gridPos: { h: 8, w: 12, x: 0, y: node_hardware_y } },
+    node_hardware.memory { gridPos: { h: 8, w: 12, x: 12, y: node_hardware_y } },
 
 
-    node_hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: 30 } },
-    node_hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: 30 } },
-    node_hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: 30 } },
+    node_hardware.diskFreeSpace { gridPos: { h: 8, w: 2, x: 0, y: node_hardware_y + 8 } },
+    node_hardware.storage { gridPos: { h: 8, w: 11, x: 2, y: node_hardware_y + 8 } },
+    node_hardware.ios { gridPos: { h: 8, w: 11, x: 13, y: node_hardware_y + 8 } },
 
-    node_hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: 38 } },
-    node_hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: 38 } },
+    node_hardware.networkIOS { gridPos: { h: 8, w: 12, x: 0, y: node_hardware_y + 16 } },
+    node_hardware.fileDescriptors { gridPos: { h: 8, w: 12, x: 12, y: node_hardware_y + 16 } },
 
     //#######
     row.new(
       title='P2P stats',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 46 } },
-    p2p.mempoolPending { gridPos: { h: 8, w: 12, x: 0, y: 46 } },
-    p2p.totalConnections { gridPos: { h: 8, w: 12, x: 12, y: 46 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: p2p_y } },
+    p2p.mempoolPending { gridPos: { h: 8, w: 12, x: 0, y: p2p_y } },
+    p2p.totalConnections { gridPos: { h: 8, w: 12, x: 12, y: p2p_y } },
 
-    p2p.peers { gridPos: { h: 8, w: 12, x: 0, y: 54 } },
-    p2p.points { gridPos: { h: 8, w: 12, x: 12, y: 54 } },
+    p2p.peers { gridPos: { h: 8, w: 12, x: 0, y: p2p_y + 8 } },
+    p2p.points { gridPos: { h: 8, w: 12, x: 12, y: p2p_y + 8 } },
 
     //#######
     row.new(
       title='Workers stats',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 62 } },
-    workers.requests { gridPos: { h: 8, w: 12, x: 12, y: 62 } },
-    workers.distributedDB { gridPos: { h: 8, w: 12, x: 0, y: 62 } },
-
-    workers.prevalidators { gridPos: { h: 8, w: 12, x: 12, y: 70 } },
-    workers.peerValidators { gridPos: { h: 8, w: 12, x: 0, y: 70 } },
-
-    workers.peerValidatorsFetchedBlockPipelines { gridPos: { h: 8, w: 12, x: 12, y: 78 } },
-    workers.peerValidatorsFetchedHeaderPipelines { gridPos: { h: 8, w: 12, x: 0, y: 78 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: worker_y } },
+    workers.requests { gridPos: { h: 8, w: 12, x: 0, y: worker_y } },
+    workers.distributedDB { gridPos: { h: 8, w: 12, x: 12, y: worker_y } },
+    workers.validatorTreatmentRequests{ gridPos: { h: 8, w: 12, x: 0, y: worker_y + 16} },
+    workers.validatorCompletionRequests{ gridPos: { h: 8, w: 12, x: 12, y: worker_y + 16 } },
+    workers.peerValidators { gridPos: { h: 8, w: 12, x: 0, y: worker_y + 24 } },
 
     //#######
     row.new(
       title='Miscellaneous',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 86 } },
-    node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: 86 } },
-    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: 86 } },
+    ) + { gridPos: { h: 8, w: 8, x: 0, y: misc_y } },
+    node.gcOperations { gridPos: { h: 8, w: 12, x: 0, y: misc_y } },
+    node.gcMajorHeap { gridPos: { h: 8, w: 12, x: 12, y: misc_y } },
 
     //#######
     row.new(
       title='Delegates Hardware stats',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 94 } },
-    delegate_hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: 94 } },
-    delegate_hardware.memory { gridPos: { h: 8, w: 8, x: 8, y: 94 } },
-    delegate_hardware.ios { gridPos: { h: 8, w: 8, x: 16, y: 94 } },
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: delegate_hardware_y } },
+    delegate_hardware.cpu { gridPos: { h: 8, w: 8, x: 0, y: delegate_hardware_y } },
+    delegate_hardware.memory { gridPos: { h: 8, w: 8, x: 8, y: delegate_hardware_y } },
+    delegate_hardware.ios { gridPos: { h: 8, w: 8, x: 16, y: delegate_hardware_y } },
 
     //#######
     row.new(
       title='Logs',
       repeat='',
       showTitle=true,
-    ) + { gridPos: { h: 0, w: 8, x: 0, y: 102 } },
-     logs.bakerlogs {gridPos: {h: 10, w: 8, x: 0, y: 102}},
-     logs.endorserlogs {gridPos: {h: 10, w: 8, x: 8, y: 102}},
-     logs.accuserlogs {gridPos: {h: 10, w: 8, x: 16, y: 102}},
-     logs.systemlogs {gridPos: {h: 14, w: 12, x: 0, y: 112}},
-     logs.metricslogs {gridPos: {h:14, w:12, x:12, y:112}},
+    ) + { gridPos: { h: 0, w: 8, x: 0, y: logs_y } },
+    logs.nodelogs {gridPos: {h: 10, w: 8, x: 0, y: logs_y}},
+    logs.bakerlogs {gridPos: {h: 10, w: 8, x: 8, y: logs_y}},
+    logs.accuserlogs {gridPos: {h: 10, w: 8, x: 16, y: logs_y}},
+    logs.systemlogs {gridPos: {h: 14, w: 12, x: 0, y: logs_y + 10 }},
 
   ]
 )

@@ -2,6 +2,7 @@ local grafana = import '../vendors/grafonnet-lib/grafonnet/grafana.libsonnet';
 local singlestat = grafana.singlestat;
 local graphPanel = grafana.graphPanel;
 local prometheus = grafana.prometheus;
+local namespace = 'octez';
 
 //##
 // Workers
@@ -9,34 +10,28 @@ local prometheus = grafana.prometheus;
 {
   requests:
     local blockvalidator = 'Block validator';
-    local chainprevalidator = 'Chain prevalidator';
     local chainvalidators = 'Chain validators';
     graphPanel.new(
       title='Pending workers requests',
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      legend_alignAsTable=true,
+      legend_avg=true,
       aliasColors={
         [blockvalidator]: 'light-green',
-        [chainprevalidator]: 'light-yellow',
         [chainvalidators]: 'light-blue',
       },
-    ).addTarget(
+    ).addTargets([
       prometheus.target(
-        'tezos_metrics_stats_block_validator_pending_requests',
+        namespace + '_validator_block_pending_requests',
         legendFormat=blockvalidator,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_prevalidators_pending_requests',
-        legendFormat=chainprevalidator,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_pending_requests',
+        namespace + '_validator_chain_pending_requests',
         legendFormat=chainvalidators,
       )
-    ),
+    ]),
 
   distributedDB:
     local headers_table = 'headers table';
@@ -61,165 +56,199 @@ local prometheus = grafana.prometheus;
       legend_values=true,
       aliasColors={
       },
-    ).addTarget(
+    ).addTargets([
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_ddb_block_header_db_table_length',
+        namespace + '_distributed_db_requester_table_length{requester_kind="block_header"}',
         legendFormat=headers_table,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_ddb_block_header_db_scheduler_length',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="block_header"}',
         legendFormat=headers_scheduler,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_ddb_operations_db_table_length',
+        namespace + '_distributed_db_requester_table_length{requester_kind="operations"}',
         legendFormat=operations_table,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_ddb_operations_db_scheduler_length',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operations"}',
         legendFormat=operations_scheduler,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_ddb_operation_db_table_length',
+	namespace + '_distributed_db_requester_table_length{requester_kind="operation"}',
         legendFormat=operation_table,
-      )
-    ).addTarget(
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_ddb_operation_db_scheduler_length',
+        namespace + '_distributed_db_requester_scheduler_length{requester_kind="operation"}',
         legendFormat=operation_scheduler,
       )
-    ),
-
-  prevalidators:
-    local closed = 'closed';
-    local closing = 'closing';
-    local launching = 'launching';
-    local running = 'running';
-    graphPanel.new(
-      title='Main chain prevalidators workers',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      aliasColors={
-      },
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_prevalidators_workers_closed',
-        legendFormat=closed,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_prevalidators_workers_closing',
-        legendFormat=closing,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_prevalidators_workers_launching',
-        legendFormat=launching,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_prevalidators_workers_running',
-        legendFormat=running,
-      )
-    ),
+    ]),
 
   peerValidators:
-    local closed = 'closed';
-    local closing = 'closing';
-    local launching = 'launching';
-    local running = 'running';
+    local connections = 'connections';
+    local invalid_blocks = 'invalid blocks';
+    local invalid_locator = 'invalid locator';
+    local new_branch_completed = 'new branch completed';
+    local new_head_completed = 'new head completed';
+    local on_no_request = 'on no request count';
+    local new_branch = 'fetching canceled new branch';
+    local new_known_valid_head = 'fetching canceled new known valid head';
+    local new_unknown_head = 'fetching canceled knew unknown head';
+    local system_error = 'system error';
+    local too_short_locator = 'too short locator';
+    local unavailable_protocol = 'unavailable protocol';
+    local unknown_ancestor = 'unknown ancestor';
+    local unknown_error = 'unknown error';
     graphPanel.new(
-      title='Main chain peer validators workers',
+      title='Peer validators',
       datasource='Prometheus',
       linewidth=1,
       format='none',
+      logBase1Y=10,
       aliasColors={
+	[connections]: 'light-green',
+	[invalid_blocks]: 'light-red',
+	[invalid_locator]: 'light-orange',
+	[new_branch_completed]: 'light-blue',
+	[new_head_completed]: 'blue',
+	[on_no_request]: 'white',
+	[new_branch]: 'green',
+	[new_known_valid_head]: 'light-yellow',
+	[new_unknown_head]: 'light-orange',
+	[system_error]: 'orange',
+	[too_short_locator]: 'brown',
+	[unavailable_protocol]: 'light-red',
+	[unknown_ancestor]: 'yellow',
+	[unknown_error]: 'red',
       },
-    ).addTarget(
+    ).addTargets(
+      [prometheus.target(
+        namespace + '_validator_peer_connections',
+        legendFormat=connections,
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_closed',
-        legendFormat=closed,
-      )
-    ).addTarget(
+        namespace + '_validator_peer_invalid_block',
+        legendFormat=invalid_blocks,
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_closing',
-        legendFormat=closing,
-      )
-    ).addTarget(
+        namespace + '_validator_peer_invalid_locator',
+        legendFormat=invalid_locator
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_launching',
-        legendFormat=launching,
-      )
-    ).addTarget(
+        namespace + '_validator_peer_new_branch_completed',
+        legendFormat=new_branch_completed,
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_running',
-        legendFormat=running,
-      )
-    ),
+        namespace + '_validator_peer_new_head_completed',
+        legendFormat=new_head_completed,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_on_no_request_count',
+        legendFormat=on_no_request,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_operations_fetching_canceled_new_branch',
+        legendFormat=new_branch,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_operations_fetching_canceled_new_known_valid_head',
+        legendFormat=new_known_valid_head,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_operations_fetching_canceled_new_unknown_head',
+        legendFormat=new_unknown_head,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_system_error',
+        legendFormat=system_error,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_too_short_locator',
+        legendFormat=too_short_locator,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_unavailable_protocol',
+        legendFormat=unavailable_protocol,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_unknown_ancestor',
+        legendFormat=unknown_ancestor,
+      ),
+      prometheus.target(
+        namespace + '_validator_peer_unknown_error',
+        legendFormat=unknown_error,
+      )]
+    )
+    ,
 
-  peerValidatorsFetchedBlockPipelines:
-    local avg = 'fetched blocks avg';
-    local max = 'fetched blocks max';
-    local min = 'fetched blocks min';
-    graphPanel.new(
-      title='Peer validators fetched block pipelines',
-      datasource='Prometheus',
-      linewidth=1,
-      format='none',
-      aliasColors={
-        [avg]: 'light-green',
-        [max]: 'light-red',
-        [min]: 'light-yellow',
-      },
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_fetched_block_avg',
-        legendFormat=avg,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_fetched_block_max',
-        legendFormat=max,
-      )
-    ).addTarget(
-      prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_fetched_block_min',
-        legendFormat=min,
-      )
-    ),
 
-  peerValidatorsFetchedHeaderPipelines:
-    local avg = 'fetched blocks avg';
-    local max = 'fetched blocks max';
-    local min = 'fetched blocks min';
+  validatorTreatmentRequests:
+    local chainPush = namespace + '_validator_chain_last_finished_request_push_timestamp';
+    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp';
+    local blockPush = namespace + '_validator_block_last_finished_request_push_timestamp';
+    local blockTreatment = namespace + '_validator_block_last_finished_request_treatment_timestamp';
+    local chainTreatmentTime = chainTreatment + ' - ' + chainPush;
+    local blockTreatmentTime = blockTreatment + ' - ' + blockPush;
+    local chain = 'chain validator';
+    local block = 'block validator';
     graphPanel.new(
-      title='Peer validators fetched header pipelines',
+      title='Validators Requests Treatments',
       datasource='Prometheus',
       linewidth=1,
-      format='none',
+      format='s',
+      legend_alignAsTable=true,
+      legend_current=false,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_values=true,
       aliasColors={
-        [avg]: 'light-green',
-        [max]: 'light-red',
-        [min]: 'light-yellow',
+        [chain]: 'light-green',
+        [block]: 'light-red',
       },
-    ).addTarget(
+    ).addTargets([
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_fetched_block_avg',
-        legendFormat=avg,
-      )
-    ).addTarget(
+	chainTreatmentTime,
+        legendFormat=chain,
+      ),
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_fetched_block_max',
-        legendFormat=max,
+        blockTreatmentTime,
+        legendFormat=block,
       )
-    ).addTarget(
+    ]),
+
+  validatorCompletionRequests:
+    local chainTreatment = namespace + '_validator_chain_last_finished_request_treatment_timestamp';
+    local chainCompletion = namespace + '_validator_chain_last_finished_request_completion_timestamp';
+    local blockTreatment = namespace + '_validator_block_last_finished_request_treatment_timestamp';
+    local blockCompletion = namespace + '_validator_block_last_finished_request_completion_timestamp';
+    local chainCompletionTime = chainCompletion + ' - ' + chainTreatment;
+    local blockCompletionTime = blockCompletion + ' - ' + blockTreatment;
+    local chain = 'chain validator';
+    local block = 'block validator';
+    graphPanel.new(
+      title='Validators Requests Completion',
+      datasource='Prometheus',
+      linewidth=1,
+      format='s',
+      legend_alignAsTable=true,
+      legend_current=false,
+      legend_avg=true,
+      legend_min=true,
+      legend_max=true,
+      legend_values=true,
+      aliasColors={
+        [chain]: 'light-green',
+        [block]: 'light-red',
+      },
+    ).addTargets([
       prometheus.target(
-        'tezos_metrics_stats_main_chain_validators_peer_validators_fetched_block_min',
-        legendFormat=min,
+	chainCompletionTime,
+        legendFormat=chain,
+      ),
+      prometheus.target(
+        blockCompletionTime,
+        legendFormat=block,
       )
-    ),
+    ])
+
 }

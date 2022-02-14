@@ -3,6 +3,7 @@ local stat = grafana.statPanel;
 local loki = grafana.loki;
 local prometheus = grafana.prometheus;
 local logPanel = grafana.logPanel;
+local namespace = 'octez';
 
 //##
 // Logs
@@ -15,7 +16,7 @@ local logPanel = grafana.logPanel;
       datasource='Loki'
     ).addTarget(
       prometheus.target(
-        '{job="tezos-node"}',
+        '{job="' + namespace + '-node"}',
         legendFormat='Node logs',
       )
     ),
@@ -26,7 +27,7 @@ local logPanel = grafana.logPanel;
       datasource='Loki'
     ).addTarget(
       prometheus.target(
-        '{job="tezos-baker"}',
+        '{job="' + namespace + '-baker"}',
         legendFormat='Baker logs',
       )
     ),
@@ -37,30 +38,8 @@ local logPanel = grafana.logPanel;
       datasource='Loki'
     ).addTarget(
       prometheus.target(
-        '{job="tezos-accuser"}',
+        '{job="' + namespace + '-accuser"}',
         legendFormat='Accuser logs',
-      )
-    ),
-
-  endorserlogs:
-    logPanel.new(
-      title='Endorser logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="tezos-endorser"}',
-        legendFormat='Endorser logs',
-      )
-    ),
-
-  metricslogs:
-    logPanel.new(
-      title='Metrics logs',
-      datasource='Loki'
-    ).addTarget(
-      prometheus.target(
-        '{job="tezos-metrics"}',
-        legendFormat='Metrics logs',
       )
     ),
 
