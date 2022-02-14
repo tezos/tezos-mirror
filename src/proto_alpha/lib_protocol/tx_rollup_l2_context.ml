@@ -281,7 +281,13 @@ struct
   let bls_verify : (Bls_signature.pk * bytes) list -> signature -> bool m =
    fun accounts aggregated_signature ->
     let open Syntax in
-    return (Bls_signature.aggregate_verify accounts aggregated_signature)
+    let aggregated_signature_opt =
+      Bls_signature.signature_of_bytes_opt aggregated_signature
+    in
+    match aggregated_signature_opt with
+    | None -> return false
+    | Some aggregated_signature ->
+        return (Bls_signature.aggregate_verify accounts aggregated_signature)
 
   let unwrap_or : type a. a option -> error -> a S.m =
    fun opt err ->
