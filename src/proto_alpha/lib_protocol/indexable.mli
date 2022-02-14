@@ -29,18 +29,20 @@
     This module provides various type-safe helpers to manipulate these
     particular values. *)
 
+type value_only = Value_only
+
+type index_only = Index_only
+
+type unknown = Unknown
+
 (** An indexable value is a value which can be replaced by an
     integer. The first type parameter determines whether or not this
     replacement has happened already. *)
 type (_, 'a) t = private
-  | Value : 'a -> ([> `Value], 'a) t
-  | Index : int32 -> ([> `Id], 'a) t
-
-type value_only = [`Value]
-
-type index_only = [`Id]
-
-type unknown = [value_only | index_only]
+  | Value : 'a -> (value_only, 'a) t
+  | Hidden_value : 'a -> (unknown, 'a) t
+  | Index : int32 -> (index_only, 'a) t
+  | Hidden_index : int32 -> (unknown, 'a) t
 
 (** The type of indexable values identified as not being indexes. *)
 type 'a value = (value_only, 'a) t
@@ -65,17 +67,17 @@ val from_value : 'a -> 'a either
     Returns the error [Index_cannot_be_negative] iff [i <= 0l]. *)
 val index : int32 -> 'a index tzresult
 
-(** [index_exn i] wraps [i] into an indexable value identified as
-    being an index.
-
-    @raise Invalid_argument iff [i <= 0l]. *)
-val index_exn : int32 -> 'a index
-
 (** [from_index i] wraps [i] into an indexable value, but forget about the
     nature of the content of the result.
 
     Returns the error [Index_cannot_be_negative] iff [i <= 0l]. *)
 val from_index : int32 -> 'a either tzresult
+
+(** [index_exn i] wraps [i] into an indexable value identified as
+    being an index.
+
+    @raise Invalid_argument iff [i <= 0l]. *)
+val index_exn : int32 -> 'a index
 
 (** [from_index_exn i] wraps [i] into an indexable value, but forget
     about the nature of the content of the result.
@@ -83,51 +85,44 @@ val from_index : int32 -> 'a either tzresult
     @raise Invalid_argument iff [i <= 0l]. *)
 val from_index_exn : int32 -> 'a either
 
-(** [forget_value v] returns an indexable value whose content is
-    unknown, {i i.e.}, such that the content of [v] has been forgotten
-    by the type system. *)
-val forget_value : 'a value -> 'a either
-
-(** [forget_index i] returns an indexable value whose content is
-    unknown, {i i.e.}, such that the content of [v] has been forgotten
-    by the type system. *)
-val forget_index : 'a index -> 'a either
-
 (** [compact val_encoding] is a combinator to derive a compact
     encoding for an indexable value of type ['a] from an encoding for
     ['a]. It uses two bits in the shared tag. [00] is used for indexes
     fitting in one byte, [01] for indexes fitting in two bytes, [10]
     for indexes fitting in four bytes, and [11] for the values of type
     ['a]. *)
-val compact : 'a Data_encoding.t -> 'a either Data_encoding.Compact.t
+val compact : 'a Data_encoding.t -> (unknown, 'a) t Data_encoding.Compact.t
 
-val encoding : 'a Data_encoding.t -> 'a either Data_encoding.t
+val encoding : 'a Data_encoding.t -> (unknown, 'a) t Data_encoding.t
 
 val pp :
-  (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a either -> unit
+  (Format.formatter -> 'a -> unit) -> Format.formatter -> ('state, 'a) t -> unit
 
-(** [prepare_index h v] computes the index of [v], if necessary. That
-    is, if [v] is already an index, it is returned as-is. Otherwise,
-    the index is computed by using the handler [h].
+(** [destruct x] returns either the index or the (unwrapped) value
+    contained in [x].
 
-    Returns [Index_cannot_be_negative] iff the result computed by [h]
-    is negative, or any errors returned by [h]. *)
-val prepare_index :
-  ('a -> int32 tzresult Lwt.t) -> 'a either -> 'a index tzresult Lwt.t
+    {b Note:} If you want to manipulate a value of type ['a value],
+    you can use {!value}. *)
+val destruct : ('state, 'a) t -> ('a index, 'a) Either.t
 
-(** [prepare_value h v] computes the value associated to the indexed
-    value [v], if necessary. That is, if [v] is already a value, it is
-    returned as-is. Otherwise, the value is computed by using the
-    handler [h], or any errors returned by [h]. *)
-val prepare_value :
-  (int32 -> 'a tzresult Lwt.t) -> 'a either -> 'a value tzresult Lwt.t
+(** [forget x] returns an indexable value whose kind of contents has
+    been forgotten. *)
+val forget : ('state, 'a) t -> (unknown, 'a) t
+
+(** [to_int32 x] unwraps and returns the integer behind [x]. *)
+val to_int32 : 'a index -> int32
+
+(** [to_value x] unwraps and returns the value behind [x]. *)
+val to_value : 'a value -> 'a
 
 (** [in_memory_size a] returns the number of bytes allocated in RAM for [a]. *)
 val in_memory_size :
-  ('a -> Cache_memory_helpers.sint) -> 'a either -> Cache_memory_helpers.sint
+  ('a -> Cache_memory_helpers.sint) ->
+  ('state, 'a) t ->
+  Cache_memory_helpers.sint
 
 (** [size a] returns the number of bytes allocated in an inbox to store [a]. *)
-val size : ('a -> int) -> 'a either -> int
+val size : ('a -> int) -> ('state, 'a) t -> int
 
 (** [compare f x y] is a total order on indexable values, which
     proceeds as follows.
@@ -141,7 +136,7 @@ val size : ('a -> int) -> 'a either -> int
     {b Note:} This can be dangerous, as you may end up comparing two
     things that are equivalent (a value and its index) but declare
     they are not equal. *)
-val compare : ('a -> 'a -> int) -> 'a either -> 'a either -> int
+val compare : ('a -> 'a -> int) -> ('state, 'a) t -> ('state', 'a) t -> int
 
 (** [compare_values f x y] compares the value [x] and [y] using [f],
     and relies on the type system of OCaml to ensure that [x] and [y]
@@ -167,27 +162,11 @@ module Make (V : VALUE) : sig
 
   type nonrec either = V.t either
 
-  val forget_value : value -> either
-
-  val forget_index : index -> either
-
   val value : V.t -> value
 
   val index : int32 -> index tzresult
 
   val index_exn : int32 -> index
-
-  val from_value : V.t -> either
-
-  val from_index : int32 -> either tzresult
-
-  val from_index_exn : int32 -> either
-
-  val prepare_index :
-    (V.t -> int32 tzresult Lwt.t) -> either -> index tzresult Lwt.t
-
-  val prepare_value :
-    (int32 -> V.t tzresult Lwt.t) -> either -> value tzresult Lwt.t
 
   val compact : either Data_encoding.Compact.t
 
@@ -195,11 +174,13 @@ module Make (V : VALUE) : sig
 
   val index_encoding : index Data_encoding.t
 
-  val compare : either -> either -> int
+  val value_encoding : value Data_encoding.t
+
+  val compare : 'state t -> 'state' t -> int
 
   val compare_values : value -> value -> int
 
-  val pp : Format.formatter -> either -> unit
+  val pp : Format.formatter -> 'state t -> unit
 end
 
 type error += Index_cannot_be_negative of int32

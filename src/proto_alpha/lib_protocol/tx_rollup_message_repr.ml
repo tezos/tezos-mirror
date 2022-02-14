@@ -26,7 +26,7 @@
 (*****************************************************************************)
 
 type deposit = {
-  destination : Tx_rollup_l2_address.Indexable.either;
+  destination : Tx_rollup_l2_address.Indexable.value;
   ticket_hash : Ticket_hash_repr.t;
   amount : Tx_rollup_l2_qty.t;
 }
@@ -39,7 +39,7 @@ let deposit_encoding =
     (fun (destination, ticket_hash, amount) ->
       {destination; ticket_hash; amount})
   @@ obj3
-       (req "destination" Tx_rollup_l2_address.Indexable.encoding)
+       (req "destination" Tx_rollup_l2_address.Indexable.value_encoding)
        (req "ticket_hash" Ticket_hash_repr.encoding)
        (req "amount" Tx_rollup_l2_qty.encoding)
 

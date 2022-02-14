@@ -47,6 +47,8 @@ include Compare.Make (struct
   let compare = compare
 end)
 
+type address = t
+
 let () = Base58.check_encoded_prefix b58check_encoding "tru2" 37
 
 let of_bls_pk : Bls_signature.pk -> t =
@@ -70,7 +72,7 @@ module Indexable = struct
     let pp = pp
   end)
 
-  let in_memory_size = Indexable.in_memory_size in_memory_size
+  let in_memory_size x = Indexable.in_memory_size in_memory_size x
 
-  let size = Indexable.size size
+  let size x = Indexable.size size x
 end

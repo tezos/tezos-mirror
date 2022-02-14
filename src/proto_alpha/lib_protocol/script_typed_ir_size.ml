@@ -161,7 +161,7 @@ let address_size addr =
   +! Entrypoint.in_memory_size addr.entrypoint
 
 let tx_rollup_l2_address_size (tx : tx_rollup_l2_address) =
-  Tx_rollup_l2_address.Indexable.(in_memory_size @@ forget_value tx)
+  Tx_rollup_l2_address.Indexable.in_memory_size @@ Indexable.forget tx
 
 let view_signature_size (View_signature {name; input_ty; output_ty}) =
   ret_adding

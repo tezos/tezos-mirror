@@ -23,9 +23,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type index_only = Index_only
+
+type value_only = Value_only
+
+type unknown = Unknown
+
 type (_, 'a) t =
-  | Value : 'a -> ([> `Value], 'a) t
-  | Index : int32 -> ([> `Id], 'a) t
+  | Value : 'a -> (value_only, 'a) t
+  | Hidden_value : 'a -> (unknown, 'a) t
+  | Index : int32 -> (index_only, 'a) t
+  | Hidden_index : int32 -> (unknown, 'a) t
 
 type error += Index_cannot_be_negative of int32
 
@@ -45,31 +53,24 @@ let () =
     (function Index_cannot_be_negative wrong_id -> Some wrong_id | _ -> None)
     (fun wrong_id -> Index_cannot_be_negative wrong_id)
 
-type value_only = [`Value]
-
-type id_only = [`Id]
-
-type unknown = [value_only | id_only]
-
 type 'a value = (value_only, 'a) t
 
-type 'a index = (id_only, 'a) t
+type 'a index = (index_only, 'a) t
 
 type 'a either = (unknown, 'a) t
 
-let forget_index : 'a index -> 'a either = function Index _ as id -> id
-
-let forget_value : 'a value -> 'a either = function Value _ as v -> v
-
-type index_only = [`Id]
-
 let value : 'a -> 'a value = fun v -> Value v
 
-let from_value : 'a -> 'a either = fun x -> value x |> forget_value
+let from_value : 'a -> 'a either = fun v -> Hidden_value v
 
 let index : int32 -> 'a index tzresult =
  fun i ->
   if Compare.Int32.(0l <= i) then ok (Index i)
+  else error (Index_cannot_be_negative i)
+
+let from_index : int32 -> 'a either tzresult =
+ fun i ->
+  if Compare.Int32.(0l <= i) then ok (Hidden_index i)
   else error (Index_cannot_be_negative i)
 
 let index_exn : int32 -> 'a index =
@@ -78,23 +79,29 @@ let index_exn : int32 -> 'a index =
   | Ok x -> x
   | Error _ -> raise (Invalid_argument "Indexable.index_exn")
 
-let from_index : int32 -> 'a either tzresult = fun x -> index x >|? forget_index
+let from_index_exn : int32 -> 'a either =
+ fun i ->
+  match from_index i with
+  | Ok x -> x
+  | Error _ -> raise (Invalid_argument "Indexable.from_index_exn")
 
-let from_index_exn : int32 -> 'a either = fun x -> index_exn x |> forget_index
+let destruct : type state a. (state, a) t -> (a index, a) Either.t = function
+  | Hidden_value x | Value x -> Right x
+  | Hidden_index x | Index x -> Left (Index x)
 
-let prepare_index h : 'a either -> 'a index tzresult Lwt.t = function
-  | Value x -> ( h x >|= function Ok x -> index x | Error e -> Error e)
-  | Index x -> return (Index x)
+let forget : type state a. (state, a) t -> (unknown, a) t = function
+  | Hidden_value x | Value x -> Hidden_value x
+  | Hidden_index x | Index x -> Hidden_index x
 
-let prepare_value h : 'a either -> 'a value tzresult Lwt.t = function
-  | Index x -> h x >|=? fun x -> Value x
-  | Value x -> return (Value x)
+let to_int32 = function Index x -> x
+
+let to_value = function Value x -> x
 
 let compact val_encoding =
   Data_encoding.Compact.(
     conv
-      (function Index x -> Either.Left x | Value x -> Right x)
-      (function Left x -> Index x | Right x -> Value x)
+      (function Hidden_index x -> Either.Left x | Hidden_value x -> Right x)
+      (function Left x -> Hidden_index x | Right x -> Hidden_value x)
     @@ or_int32 ~int32_kind:"index" ~alt_kind:"value" val_encoding)
 
 let encoding : 'a Data_encoding.t -> 'a either Data_encoding.t =
@@ -102,26 +109,39 @@ let encoding : 'a Data_encoding.t -> 'a either Data_encoding.t =
   Data_encoding.Compact.make ~tag_size:`Uint8 @@ compact val_encoding
 
 let pp :
-    (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a either -> unit =
+    type state a.
+    (Format.formatter -> a -> unit) -> Format.formatter -> (state, a) t -> unit
+    =
  fun ppv fmt -> function
-  | Index x -> Format.(fprintf fmt "#%ld" x)
-  | Value x -> Format.(fprintf fmt "%a" ppv x)
+  | Hidden_index x | Index x -> Format.(fprintf fmt "#%ld" x)
+  | Hidden_value x | Value x -> Format.(fprintf fmt "%a" ppv x)
 
-let in_memory_size ims =
+let in_memory_size :
+    type state a.
+    (a -> Cache_memory_helpers.sint) ->
+    (state, a) t ->
+    Cache_memory_helpers.sint =
+ fun ims ->
   let open Cache_memory_helpers in
   function
-  | Value x -> header_size +! word_size +! ims x
-  | Index _ -> header_size +! word_size +! int32_size
+  | Hidden_value x | Value x -> header_size +! word_size +! ims x
+  | Hidden_index _ | Index _ -> header_size +! word_size +! int32_size
 
-let size s = function Value x -> 1 + s x | Index _ -> 1 (* tag *) + 4
-(* int32 *)
+let size : type state a. (a -> int) -> (state, a) t -> int =
+ fun s -> function
+  | Hidden_value x | Value x -> 1 + s x
+  | Hidden_index _ | Index _ -> (* tag + int32 *) 1 + 4
 
-let compare c x y =
+let compare :
+    type state state' a. (a -> a -> int) -> (state, a) t -> (state', a) t -> int
+    =
+ fun c x y ->
   match (x, y) with
-  | (Index x, Index y) -> Compare.Int32.compare x y
-  | (Value x, Value y) -> c x y
-  | (Index _, Value _) -> -1
-  | (Value _, Index _) -> 1
+  | ((Hidden_index x | Index x), (Hidden_index y | Index y)) ->
+      Compare.Int32.compare x y
+  | ((Hidden_value x | Value x), (Hidden_value y | Value y)) -> c x y
+  | ((Hidden_index _ | Index _), (Hidden_value _ | Value _)) -> -1
+  | ((Hidden_value _ | Value _), (Hidden_index _ | Index _)) -> 1
 
 let compare_values c : 'a value -> 'a value -> int =
  fun x y -> match (x, y) with (Value x, Value y) -> c x y
@@ -139,31 +159,17 @@ end
 module Make (V : VALUE) = struct
   type nonrec 'state t = ('state, V.t) t
 
-  type nonrec either = V.t either
-
   type nonrec index = V.t index
 
   type nonrec value = V.t value
 
-  let prepare_index = prepare_index
-
-  let prepare_value = prepare_value
-
-  let forget_value = forget_value
-
-  let forget_index = forget_index
+  type nonrec either = V.t either
 
   let value = value
-
-  let from_value = from_value
 
   let index = index
 
   let index_exn = index_exn
-
-  let from_index = from_index
-
-  let from_index_exn = from_index_exn
 
   let compact = compact V.encoding
 
@@ -171,14 +177,14 @@ module Make (V : VALUE) = struct
 
   let index_encoding : index Data_encoding.t =
     Data_encoding.(
-      conv
-        (fun (Index x : index) -> x)
-        (fun x : index -> Index x)
-        Data_encoding.int32)
+      conv (fun (Index x) -> x) (fun x -> Index x) Data_encoding.int32)
 
-  let pp = pp V.pp
+  let value_encoding : value Data_encoding.t =
+    Data_encoding.(conv (fun (Value x) -> x) (fun x -> Value x) V.encoding)
 
-  let compare = compare V.compare
+  let pp : Format.formatter -> 'state t -> unit = fun fmt x -> pp V.pp fmt x
 
   let compare_values = compare_values V.compare
+
+  let compare : 'state t -> 'state' t -> int = fun x y -> compare V.compare x y
 end

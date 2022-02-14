@@ -101,7 +101,7 @@ let address (addr : Script_typed_ir.address) : t =
   + String.length (Alpha_context.Entrypoint.to_string entrypoint)
 
 let tx_rollup_l2_address x =
-  Tx_rollup_l2_address.Indexable.(size @@ forget_value x)
+  Tx_rollup_l2_address.Indexable.size @@ Indexable.forget x
 
 let list (list : 'a Script_typed_ir.boxed_list) : t =
   list.Script_typed_ir.length
