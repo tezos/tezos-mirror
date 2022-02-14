@@ -60,8 +60,8 @@ This sequence of operations was run:
       Consumed gas: 2870.480
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitment?offset=3'
+./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitment?offset=2'
 { "commitment":
     { "level": 3, "batches": [ { "root": "726f6f74" } ], "predecessor": null,
       "inbox_hash": "i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5" },
-  "committer": "[PUBLIC_KEY_HASH]", "submitted_at": 6 }
+  "committer": "[PUBLIC_KEY_HASH]", "submitted_at": 5 }
