@@ -138,3 +138,11 @@ val get_adjacent_levels :
   Tx_rollup_repr.t ->
   (Raw_context.t * Raw_level_repr.t option * Raw_level_repr.t option) tzresult
   Lwt.t
+
+(* [get_metadata ctxt level tx_rollup] returns the metadata for an inbox:
+    its count, byte size, next and previous levels, and hash *)
+val get_metadata :
+  Raw_context.t ->
+  Raw_level_repr.t ->
+  Tx_rollup_repr.t ->
+  (Raw_context.t * Tx_rollup_inbox_repr.metadata) tzresult Lwt.t

@@ -43,13 +43,14 @@ let node_rpc node service =
 let get_node_inbox node =
   let* json = node_rpc node "current_inbox" in
   match json with
-  | None -> return Rollup.{cumulated_size = 0; contents = []}
+  | None -> return Rollup.{cumulated_size = 0; contents = []; hash = ""}
   | Some json ->
       let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
       let contents =
         JSON.(json |-> "contents" |> as_list |> List.map as_string)
       in
-      return Rollup.{cumulated_size; contents}
+      let hash = JSON.(json |-> "hash" |> as_string) in
+      return Rollup.{cumulated_size; contents; hash}
 
 let test ~__FILE__ ?output_file ?(tags = []) title k =
   match output_file with
@@ -195,7 +196,7 @@ let test_tx_node_store_inbox =
           inbox.contents
           ~error_msg:
             "Content of inboxes computed by the rollup node should be equal to \
-             the cumulated size given by the RPC"
+             the contents given by the RPC"
           (list string)) ;
       let snd_batch = "tezos_tezos" in
       let*! () =

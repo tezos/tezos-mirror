@@ -36,7 +36,8 @@ let messages_to_inbox messages =
   in
   let make_batch msg = fst @@ Tx_rollup_message.make_batch msg in
   let contents = List.map make_batch messages in
-  Inbox.{contents; cumulated_size}
+  let hash = Tx_rollup_inbox.hash_inbox contents in
+  Inbox.{contents; cumulated_size; hash}
 
 let compute_messages block_info rollup_id =
   let managed_operation =

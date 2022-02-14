@@ -860,8 +860,8 @@ let submit_tx_rollup_batch (cctxt : #full) ~chain ~block ?confirmations ?dry_run
 
 let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
     ?dry_run ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit
-    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~batches ~predecessor
-    ~tx_rollup () =
+    ?counter ~source ~src_pk ~src_sk ~fee_parameter ~level ~inbox_hash ~batches
+    ~predecessor ~tx_rollup () =
   Environment.wrap_tzresult (Raw_level.of_int32 level) >>?= fun level ->
   List.map_es
     (fun root ->
@@ -881,7 +881,10 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
           (Bytes.of_string pred_str))
       predecessor
   in
-  let commitment : Tx_rollup_commitment.t = {level; batches; predecessor} in
+  let inbox_hash = Tx_rollup_inbox.hash_of_b58check_exn inbox_hash in
+  let commitment : Tx_rollup_commitment.t =
+    {level; batches; predecessor; inbox_hash}
+  in
   let contents :
       Kind.tx_rollup_commit Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager

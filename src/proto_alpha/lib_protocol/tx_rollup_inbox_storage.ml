@@ -78,7 +78,7 @@ let prepare_metadata :
           >|=? fun (ctxt, _, _) -> ctxt)
       >>=? fun ctxt ->
       let new_metadata : Tx_rollup_inbox_repr.metadata =
-        {inbox_length = 0l; cumulated_size = 0; predecessor; successor = None}
+        Tx_rollup_inbox_repr.empty_metadata predecessor
       in
       return (ctxt, new_state, new_metadata))
   >>=? fun (ctxt, new_state, new_metadata) ->
@@ -94,13 +94,19 @@ let prepare_metadata :
 (** [update_metadata metadata msg_size] updates [metadata] to account
     for a new message of [msg_size] bytes. *)
 let update_metadata :
-    Tx_rollup_inbox_repr.metadata -> int -> Tx_rollup_inbox_repr.metadata =
- fun metadata msg_size ->
-  {
-    metadata with
-    inbox_length = Int32.succ metadata.inbox_length;
-    cumulated_size = msg_size + metadata.cumulated_size;
-  }
+    Tx_rollup_inbox_repr.metadata ->
+    Tx_rollup_message_repr.hash ->
+    int ->
+    Tx_rollup_inbox_repr.metadata tzresult =
+ fun metadata msg_hash msg_size ->
+  let hash = Tx_rollup_inbox_repr.extend_hash metadata.hash msg_hash in
+  ok
+    {
+      metadata with
+      inbox_length = Int32.succ metadata.inbox_length;
+      cumulated_size = msg_size + metadata.cumulated_size;
+      hash;
+    }
 
 let append_message :
     Raw_context.t ->
@@ -113,7 +119,8 @@ let append_message :
   let message_size = Tx_rollup_message_repr.size message in
   prepare_metadata ctxt rollup state level
   >>=? fun (ctxt, new_state, metadata) ->
-  let new_metadata = update_metadata metadata message_size in
+  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, message_hash) ->
+  update_metadata metadata message_hash message_size >>?= fun new_metadata ->
   Storage.Tx_rollup.Inbox_metadata.add (ctxt, level) rollup new_metadata
   >>=? fun (ctxt, _, _) ->
   let new_size = new_metadata.cumulated_size in
@@ -124,11 +131,10 @@ let append_message :
     Compare.Int.(new_size < inbox_limit)
     (Tx_rollup_inbox_size_would_exceed_limit rollup)
   >>=? fun () ->
-  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, hash) ->
   Storage.Tx_rollup.Inbox_contents.add
     ((ctxt, level), rollup)
     metadata.inbox_length
-    hash
+    message_hash
   >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
 let get_level :
@@ -200,7 +206,8 @@ let find :
   messages_opt ctxt ~level tx_rollup >>=? function
   | (ctxt, Some contents) ->
       size ctxt ~level tx_rollup >>=? fun (ctxt, cumulated_size) ->
-      return (ctxt, Some {cumulated_size; contents})
+      let hash = Tx_rollup_inbox_repr.hash_hashed_inbox contents in
+      return (ctxt, Some {cumulated_size; contents; hash})
   | (ctxt, None) -> return (ctxt, None)
 
 let get :
@@ -229,6 +236,16 @@ let get_adjacent_levels :
   | (ctxt, Some {predecessor; successor; _}) ->
       return (ctxt, predecessor, successor)
   | (_, None) -> fail @@ Tx_rollup_inbox_does_not_exist (tx_rollup, level)
+
+let get_metadata :
+    Raw_context.t ->
+    Raw_level_repr.t ->
+    Tx_rollup_repr.t ->
+    (Raw_context.t * Tx_rollup_inbox_repr.metadata) tzresult Lwt.t =
+ fun ctxt level tx_rollup ->
+  Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) tx_rollup >>=? function
+  | (_, None) -> fail (Tx_rollup_inbox_does_not_exist (tx_rollup, level))
+  | (ctxt, Some metadata) -> return (ctxt, metadata)
 
 (* Error registration *)
 

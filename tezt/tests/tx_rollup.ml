@@ -106,12 +106,14 @@ module Regressions = struct
     let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
     unit
 
-  let submit_commitment ~level ~roots ~predecessor {rollup; client; node} =
+  let submit_commitment ~level ~roots ~inbox_hash ~predecessor
+      {rollup; client; node} =
     let*! () =
       Client.Tx_rollup.submit_commitment
         ~hooks
         ~level
         ~roots
+        ~inbox_hash
         ~predecessor
         ~rollup
         ~src:Constant.bootstrap1.public_key_hash
@@ -135,12 +137,16 @@ module Regressions = struct
     let batch = "blob" in
     let* () = submit_batch ~batch state in
     let batch_level = Node.get_level node in
+
+    let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
+
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
        we introduce two bakes to ensure the block is finalised. This
        should be removed once we do not rely on Tenderbake anymore. *)
     let* () = Client.bake_for client in
     let* () = Client.bake_for client in
+
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
        At the same time we remove the dependency to Tenderbake for
@@ -151,6 +157,7 @@ module Regressions = struct
       submit_commitment
         ~level:batch_level
         ~roots:["root"]
+        ~inbox_hash:inbox.hash
         ~predecessor:None
         state
     in
@@ -228,12 +235,13 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
             0
             batches;
         contents = List.map (fun (_, _, batch) -> batch) batches;
+        hash = "i3VPWHwmJwHeGv86J3KnKAnFBfyXLB6nvYcwaFdnwwMBePDeo57";
       }
   in
   let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
   Check.(
     ((inbox = expected_inbox)
-       ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.")
+       ~error_msg:"Unexpected inbox. Got: %L. Expected: %R.")
       Rollup.Check.inbox) ;
   return ()
 

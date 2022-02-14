@@ -272,6 +272,11 @@ end
 module Tx_rollup_inbox = struct
   include Tx_rollup_inbox_repr
   include Tx_rollup_inbox_storage
+
+  module Internal_for_tests = struct
+    include Tx_rollup_inbox_repr
+    include Tx_rollup_inbox_storage
+  end
 end
 
 module Tx_rollup_commitment = struct

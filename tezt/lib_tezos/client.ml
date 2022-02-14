@@ -1230,7 +1230,7 @@ module Tx_rollup = struct
     {value = process; run = parse}
 
   let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
-      ~roots ~predecessor ~rollup ~src client =
+      ~roots ~predecessor ~inbox_hash ~rollup ~src client =
     let process =
       let predecessor = Option.value ~default:"" predecessor in
 
@@ -1244,6 +1244,7 @@ module Tx_rollup = struct
             "rollup";
             "commitment";
             Int.to_string level;
+            inbox_hash;
             Hex.(of_string predecessor |> show);
           ]
         @ [
