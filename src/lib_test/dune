@@ -14,6 +14,6 @@
   pure-splitmix
   data-encoding)
  (js_of_ocaml)
- (flags (:standard -linkall)))
+ (library_flags (:standard -linkall)))
 
 (rule (alias runtest_js) (action progn))

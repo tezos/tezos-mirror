@@ -174,7 +174,7 @@ module Dune = struct
 
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
-      ?(inline_tests = false) ?(preprocess = Stdlib.List.[])
+      ?library_flags ?(inline_tests = false) ?(preprocess = Stdlib.List.[])
       ?(preprocessor_deps = Stdlib.List.[]) ?(virtual_modules = Stdlib.List.[])
       ?implements ?(wrapped = true) ?modules ?modes ?foreign_stubs
       ?c_library_flags ?(private_modules = Stdlib.List.[])
@@ -224,6 +224,7 @@ module Dune = struct
           (match js_of_ocaml with
           | None -> E
           | Some flags -> S "js_of_ocaml" :: flags);
+          opt library_flags (fun x -> [S "library_flags"; x]);
           opt flags (fun x -> [S "flags"; x]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
           (match virtual_modules with
@@ -1289,19 +1290,32 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     let libraries = List.map get_library internal.deps |> Dune.of_list in
     (libraries, List.rev !empty_files_to_create)
   in
-  let flags = List.map (fun m -> Dune.(G [S "-open"; S m])) internal.opens in
-  let flags = if internal.linkall then Dune.S "-linkall" :: flags else flags in
-  let flags =
-    if internal.nopervasives then Dune.S "-nopervasives" :: flags else flags
+  let cons_if p x xs = if p then x :: xs else xs in
+  let is_lib =
+    match internal.kind with
+    | Public_library _ | Private_library _ -> true
+    | Public_executable _ | Private_executable _ | Test _ | Test_executable _ ->
+        false
   in
-  let flags = if internal.opaque then Dune.S "-opaque" :: flags else flags in
+  let library_flags =
+    if internal.linkall && is_lib then Some Dune.[S ":standard"; S "-linkall"]
+    else None
+  in
   let flags =
+    internal.opens
+    |> List.map (fun m -> Dune.(G [S "-open"; S m]))
+    |> cons_if (internal.linkall && not is_lib) (Dune.S "-linkall")
+    |> cons_if internal.nopervasives (Dune.S "-nopervasives")
+    |> cons_if internal.opaque (Dune.S "-opaque")
+    |> fun flags ->
+    flags
+    @
     if dune_file_has_static_profile && not internal.static then
       (* Disable static compilation for this particular target
          (the static profile is global for the dune file).
          This must be at the end of the flag list. *)
-      flags @ [Dune.(G [S "\\"; S "-ccopt"; S "-static"])]
-    else flags
+      [Dune.(G [S "\\"; S "-ccopt"; S "-static"])]
+    else []
   in
   let flags =
     match flags with
@@ -1398,6 +1412,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       ?package
       ~instrumentation
       ~libraries
+      ?library_flags
       ?flags
       ~inline_tests:internal.inline_tests
       ~preprocess

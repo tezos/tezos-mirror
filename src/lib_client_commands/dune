@@ -15,9 +15,9 @@
   tezos-stdlib-unix
   tezos-signer-backends
   data-encoding)
+ (library_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_base.TzPervasives
    -open Tezos_rpc
    -open Tezos_clic_unix

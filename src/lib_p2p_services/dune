@@ -7,4 +7,5 @@
  (instrumentation (backend bisect_ppx))
  (libraries
   tezos-base)
- (flags (:standard -linkall -open Tezos_base.TzPervasives)))
+ (library_flags (:standard -linkall))
+ (flags (:standard -open Tezos_base.TzPervasives)))

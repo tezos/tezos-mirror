@@ -13,9 +13,9 @@
   tezos-test-helpers
   alcotest)
  (js_of_ocaml)
+ (library_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_error_monad
    -open Tezos_error_monad.TzLwtreslib
    -open Tezos_event_logging)))

@@ -14,9 +14,9 @@
   tezos-context
   tezos-shell-context
   tezos-micheline)
+ (library_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_stdlib
    -open Tezos_base
    -open Tezos_base.TzPervasives
