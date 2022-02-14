@@ -442,7 +442,6 @@ val pps : ?args:string list -> target -> preprocessor
       [false] if [js_of_ocaml] is [None],
       [true] otherwise.
 
-
     - [js_of_ocaml]: specifies a [(js_of_ocaml ...)] stanza for the [dune] target,
       where [...] is the value of the parameter. The toplevel parentheses are removed.
       For instance, [~js_of_ocaml:Dune.[[S "javascript_files"; S "file.js"]]]
