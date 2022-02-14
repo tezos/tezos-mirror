@@ -262,15 +262,8 @@ module Manager_result = struct
         case
           ~title:"To_contract"
           (Tag 0)
-          (obj10
+          (obj9
              (opt "storage" Script.expr_encoding)
-             (opt
-                (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                   It is kept here for a transitional period, for tools like indexers to update. *)
-                (* TODO: https://gitlab.com/tezos/tezos/-/issues/1948
-                   Remove it in 009 or later. *)
-                "big_map_diff"
-                Lazy_storage.legacy_big_map_diff_encoding)
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (dft "originated_contracts" (list Contract.encoding) [])
              (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
@@ -293,7 +286,6 @@ module Manager_result = struct
                 } ->
                 Some
                   ( storage,
-                    lazy_storage_diff,
                     balance_updates,
                     originated_contracts,
                     Gas.Arith.ceil consumed_gas,
@@ -303,7 +295,6 @@ module Manager_result = struct
                     allocated_destination_contract,
                     lazy_storage_diff ))
           (fun ( storage,
-                 legacy_lazy_storage_diff,
                  balance_updates,
                  originated_contracts,
                  consumed_gas,
@@ -313,9 +304,6 @@ module Manager_result = struct
                  allocated_destination_contract,
                  lazy_storage_diff ) ->
             assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-            let lazy_storage_diff =
-              Option.either lazy_storage_diff legacy_lazy_storage_diff
-            in
             Transaction_to_contract_result
               {
                 storage;
@@ -349,14 +337,7 @@ module Manager_result = struct
     make
       ~op_case:Operation.Encoding.Manager_operations.origination_case
       ~encoding:
-        (obj8
-           (opt
-              (* The field [big_map_diff] is deprecated since 008, use [lazy_storage_diff] instead.
-                 It is kept here for a transitional period, for tools like indexers to update. *)
-              (* TODO: https://gitlab.com/tezos/tezos/-/issues/1948
-                 Remove it in 009 or later. *)
-              "big_map_diff"
-              Lazy_storage.legacy_big_map_diff_encoding)
+        (obj7
            (dft "balance_updates" Receipt.balance_updates_encoding [])
            (dft "originated_contracts" (list Contract.encoding) [])
            (dft "consumed_gas" Gas.Arith.n_integral_encoding Gas.Arith.zero)
@@ -382,8 +363,7 @@ module Manager_result = struct
               storage_size;
               paid_storage_size_diff;
             } ->
-            ( lazy_storage_diff,
-              balance_updates,
+            ( balance_updates,
               originated_contracts,
               Gas.Arith.ceil consumed_gas,
               consumed_gas,
@@ -392,8 +372,7 @@ module Manager_result = struct
               lazy_storage_diff ))
       ~kind:Kind.Origination_manager_kind
       ~inj:
-        (fun ( legacy_lazy_storage_diff,
-               balance_updates,
+        (fun ( balance_updates,
                originated_contracts,
                consumed_gas,
                consumed_milligas,
@@ -401,9 +380,6 @@ module Manager_result = struct
                paid_storage_size_diff,
                lazy_storage_diff ) ->
         assert (Gas.Arith.(equal (ceil consumed_milligas) consumed_gas)) ;
-        let lazy_storage_diff =
-          Option.either lazy_storage_diff legacy_lazy_storage_diff
-        in
         Origination_result
           {
             lazy_storage_diff;

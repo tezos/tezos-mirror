@@ -179,11 +179,6 @@ let () =
   @@ def "contract" [] Protocol.Alpha_context.Contract.encoding ;
   register
   @@ def
-       "contract"
-       ["big_map_diff"]
-       Protocol.Alpha_context.Lazy_storage.legacy_big_map_diff_encoding ;
-  register
-  @@ def
        "receipt"
        ["balance_updates"]
        Protocol.Alpha_context.Receipt.balance_updates_encoding ;
