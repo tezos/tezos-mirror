@@ -569,7 +569,12 @@ let test_drag_after_import () =
   let open Lwt_result_syntax in
   let constants =
     Default_parameters.
-      {constants_test with blocks_per_cycle = 256l; consensus_threshold = 0}
+      {
+        constants_test with
+        blocks_per_cycle = 256l;
+        blocks_per_voting_period = 256l;
+        consensus_threshold = 0;
+      }
   in
   let patch_context ctxt =
     let test_parameters =

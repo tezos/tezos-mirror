@@ -448,6 +448,14 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The ratio of frozen deposits ratio slashed per double endorsement must \
         be a non-negative valid ratio.")
+  >>? fun () ->
+  error_unless
+    (let remainder =
+       Int32.rem constants.blocks_per_voting_period constants.blocks_per_cycle
+     in
+     Compare.Int32.(remainder = 0l))
+    (Invalid_protocol_constants
+       "blocks_per_voting_period should be a multiple of blocks_per_cycle.")
   >>? fun () -> Result.return_unit
 
 module Generated = struct
