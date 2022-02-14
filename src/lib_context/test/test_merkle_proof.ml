@@ -54,10 +54,30 @@ module Gen = struct
     let+ s = string_size ~gen:char (return Context_hash.size) in
     Context_hash.of_string_exn s
 
-  let inode gen_a =
-    let* length = int_range 1 10 in
+  let rec comb n xs =
+    match (n, xs) with
+    | (0, _) -> Gen.return []
+    | (_, []) -> assert false
+    | (1, [x]) -> Gen.return [x]
+    | (n, x :: xs) ->
+        (* prob.  n / length xs *)
+        let* m = int_bound (List.length (x :: xs) - 1) in
+        if m < n then
+          let+ ys = comb (n - 1) xs in
+          x :: ys
+        else comb n xs
+
+  let inode width gen_a =
+    let* length = int_range 1 1000_000 in
     let+ proofs =
-      list_size (int_bound 3 >|= ( + ) 1) (pair (int_bound 10) gen_a)
+      let* n = int_bound (min 32 (max 5 width) - 1) >|= ( + ) 1 in
+      let* indices = comb n (Stdlib.List.init 32 (fun x -> x)) in
+      flatten_l
+      @@ List.map
+           (fun i ->
+             let+ a = gen_a in
+             (i, a))
+           indices
     in
     (* no invariant assurance at all :-P *)
     {length; proofs}
@@ -68,7 +88,7 @@ module Gen = struct
     let+ proof = gen_a in
     {length; segment; proof}
 
-  let rec inode_tree depth =
+  let rec inode_tree (depth, width) =
     if depth <= 0 then
       let+ hash = hash in
       Blinded_inode hash
@@ -81,18 +101,18 @@ module Gen = struct
           let+ xs =
             list_size
               (int_bound 3 >|= ( + ) 1)
-              (pair step (tree (depth - 1)))
+              (pair step (tree (depth - 1, width)))
           in
           Inode_values xs
       | 2 ->
-          let+ i = inode (inode_tree (depth - 1)) in
+          let+ i = inode width (inode_tree (depth - 1, width / 2)) in
           Inode_tree i
       | 3 ->
-          let+ i = inode_extender (inode_tree (depth - 1)) in
+          let+ i = inode_extender (inode_tree (depth - 1, width)) in
           (Inode_extender i : inode_tree)
       | _ -> assert false
 
-  and tree depth : tree t =
+  and tree (depth, width) : tree t =
     if depth <= 0 then
       int_bound 2 >>= function
       | 0 ->
@@ -116,17 +136,17 @@ module Gen = struct
       | 2 ->
           let+ xs =
             list_size (int_bound 4 >|= ( + ) 1)
-            @@ pair step (tree (depth - 1))
+            @@ pair step (tree (depth - 1, width))
           in
           (Node xs : tree)
       | 3 ->
           let+ h = hash in
           Blinded_node h
       | 4 ->
-          let+ i = inode (inode_tree (depth - 1)) in
+          let+ i = inode width (inode_tree (depth - 1, width / 2)) in
           (Inode i : tree)
       | 5 ->
-          let+ i = inode_extender (inode_tree (depth - 1)) in
+          let+ i = inode_extender (inode_tree (depth - 1, width)) in
           Extender i
       | _ -> assert false
 
@@ -138,7 +158,7 @@ module Gen = struct
     let* version = int_bound 3 in
     let* kh1 = kinded_hash in
     let* kh2 = kinded_hash in
-    let+ state = tree 8 in
+    let+ state = tree (5, 64) in
     {version; before = kh1; after = kh2; state}
 
   module Stream = struct
@@ -155,7 +175,8 @@ module Gen = struct
           in
           Node sks
       | 2 ->
-          let+ i = inode hash in
+          let max_indices = 5 in
+          let+ i = inode max_indices hash in
           Inode i
       | 3 ->
           let+ i = inode_extender hash in
@@ -181,7 +202,7 @@ let encoding_test enc eq data =
   if not @@ eq data data' then false
   else
     let j = Data_encoding.Json.construct enc data in
-    Format.eprintf "%a@." Data_encoding.Json.pp j ;
+    (* Format.eprintf "%a@." Data_encoding.Json.pp j ; *)
     let data' = Data_encoding.Json.destruct enc j in
     eq data data'
 
@@ -197,18 +218,45 @@ let test_sample () =
         {
           length = 10;
           segment = [0; 1; 0; 1];
-          proof = Inode_tree {length = 8; proofs = [
-            (0, Blinded_inode ch);
-            (1, Inode_extender {
-              length=3; segment = [1;2;3;4;5;6;7;8]; proof = Blinded_inode ch})
-          ]};
+          proof = Inode_tree {length = 8; proofs = [(0, Blinded_inode ch)]};
         }
     in
-    let inode_tree : inode_tree = Inode_values [("a", tree_a); ("b", tree_b)] in
+    let tree_c =
+      Extender
+        {
+          length = 10;
+          segment = [1; 2; 3; 4; 5; 6; 7; 8];
+          proof = Inode_values [("z", tree_b)];
+        }
+    in
+    let inode_tree : inode_tree = Inode_values [("a", tree_a); ("b", tree_b); ("c", tree_c)] in
     let tree = Inode {length = 100; proofs = [(0, inode_tree)]} in
     {version = 1; before = `Value ch; after = `Node ch; state = tree}
   in
-  assert (encoding_test tree_proof_encoding ( = ) sample)
+  assert (encoding_test tree_proof_encoding ( = ) sample) ;
+
+  let sample_large_inode_tree inode_proof_size =
+    let bytes s = Bytes.of_string s in
+    let tree_a c : tree = Value (bytes @@ "a" ^ c) in
+    let ch =
+      Context_hash.of_bytes_exn (bytes "01234567890123456789012345678901")
+    in
+    let inode_tree i : inode_tree =
+      let c = string_of_int i in
+      Inode_values [(c ^ "a", tree_a c)]
+    in
+    let proofs =
+      let rec aux i acc =
+        if i >= inode_proof_size then acc
+        else aux (i + 1) ((i * 15 mod 32, inode_tree i) :: acc)
+      in
+      List.sort (fun (i, _) (j, _) -> compare i j) (aux 0 [])
+    in
+    let tree = Inode {length = 100; proofs} in
+    {version = 1; before = `Value ch; after = `Node ch; state = tree}
+  in
+  assert (encoding_test tree_proof_encoding ( = ) (sample_large_inode_tree 20)) ;
+  assert (encoding_test tree_proof_encoding ( = ) (sample_large_inode_tree 32))
 
 let test_random_tree_proof =
   QCheck2.Test.make

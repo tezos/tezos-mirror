@@ -435,16 +435,55 @@ module Make_proof (Store : DB) = struct
       in
       Data_encoding.(conv encode decode bytes)
 
+    let inode_proofs_encoding a =
+      (* When the number of proofs is large enough (>= Context.Conf.entries / 2),
+         proofs are encoded as `array` instead of `list` for compactness. *)
+      (* This encode assumes that proofs are ordered by its index. *)
+      let entries = Tezos_context_encoding.Context.Conf.entries in
+      let encode_type =
+        if entries <= 2 then fun _ -> `List
+        else fun v ->
+          if Compare.List_length_with.(v >= entries / 2) then `Array else `List
+      in
+      let open Data_encoding in
+      union
+        ~tag_size:`Uint8
+        [
+          case
+            ~title:"small_proof"
+            (Tag 0)
+            (obj1 (req "small_proof" (list (tup2 index_encoding a))))
+            (fun v -> if encode_type v = `List then
+              let v = List.map (fun (i,d) -> (i,Some d)) v in
+              Some v else None)
+            (fun v -> List.map (fun (i,d) ->
+              (i,match d with None -> assert false | Some d -> d)) v);
+          case
+            ~title:"large_proof"
+            (Tag 1)
+            (obj1 (req "large_proof" (array ~max_length:entries a)))
+            (fun v ->
+              if encode_type v = `Array then
+                let arr = Array.make entries None in
+                List.iter (fun (i, d) -> arr.(i) <- Some d) v ;
+                Some arr
+              else None)
+            (fun v ->
+              let res = ref [] in
+              Array.iteri
+                (fun i -> function
+                  | None -> ()
+                  | Some d -> res := (i, d) :: !res)
+                v ;
+              List.rev !res);
+        ]
+
     let inode_encoding a =
       let open Data_encoding in
       conv
         (fun {length; proofs} -> (length, proofs))
         (fun (length, proofs) -> {length; proofs})
-      @@ obj2
-           length_field
-           (* Proofs are often full: all the index from 0 to 31 (=Context.Conf.entries - 1) has bindings.
-              Then we can have a better encoding without the indices. *)
-           (req "proofs" (list (tup2 index_encoding a)))
+      @@ obj2 length_field (req "proofs" (inode_proofs_encoding a))
 
     let inode_extender_encoding a =
       let open Data_encoding in
@@ -456,16 +495,22 @@ module Make_proof (Store : DB) = struct
     (* data-encoding.0.4/test/mu.ml for building mutually recursive data_encodings *)
     let (_inode_tree_encoding, tree_encoding) =
       let open Data_encoding in
-      let mu_inode_tree_encoding tree_encoding =
-        mu "inode_tree" (fun inode_tree_encoding ->
+      let unoptionize enc =
+        conv
+            (fun v -> Some v)
+            (function Some v -> v | None -> assert false) enc
+      in
+      let mu_option_inode_tree_encoding tree_encoding =
+        mu "inode_tree" (fun option_inode_tree_encoding ->
+            let inode_tree_encoding = unoptionize option_inode_tree_encoding in
             union
               [
                 case
                   ~title:"Blinded_inode"
                   (Tag 0)
                   (obj1 (req "blinded_inode" hash_encoding))
-                  (function Blinded_inode h -> Some h | _ -> None)
-                  (fun h -> Blinded_inode h);
+                  (function Some (Blinded_inode h) -> Some h | _ -> None)
+                  (fun h -> Some (Blinded_inode h));
                 case
                   ~title:"Inode_values"
                   (Tag 1)
@@ -473,14 +518,14 @@ module Make_proof (Store : DB) = struct
                      (req
                         "inode_values"
                         (list (tup2 step_encoding tree_encoding))))
-                  (function Inode_values xs -> Some xs | _ -> None)
-                  (fun xs -> Inode_values xs);
+                  (function Some (Inode_values xs) -> Some xs | _ -> None)
+                  (fun xs -> Some (Inode_values xs));
                 case
                   ~title:"Inode_tree"
                   (Tag 2)
-                  (obj1 (req "inode_tree" (inode_encoding inode_tree_encoding)))
-                  (function Inode_tree i -> Some i | _ -> None)
-                  (fun i -> Inode_tree i);
+                  (obj1 (req "inode_tree" (inode_encoding option_inode_tree_encoding)))
+                  (function Some (Inode_tree i) -> Some i | _ -> None)
+                  (fun i -> Some (Inode_tree i));
                 case
                   ~title:"Inode_extender"
                   (Tag 3)
@@ -489,60 +534,76 @@ module Make_proof (Store : DB) = struct
                         "inode_extender"
                         (inode_extender_encoding inode_tree_encoding)))
                   (function
-                    | (Inode_extender i : inode_tree) -> Some i | _ -> None)
-                  (fun i : inode_tree -> Inode_extender i);
+                    | Some(Inode_extender i : inode_tree) -> Some i | _ -> None)
+                  (fun i : inode_tree option -> Some (Inode_extender i));
+                case
+                  ~title:"Dummy"
+                  (Tag 4)
+                  (obj1 (req "dummy" null))
+                  (function None -> Some () | Some _ -> None)
+                  (fun () -> None);
               ])
       in
-      let mu_tree_encoding =
-        mu "tree_encoding" (fun tree_encoding ->
+      let mu_option_tree_encoding : tree option encoding =
+        mu "tree_encoding" (fun option_tree_encoding ->
+          let tree_encoding = unoptionize option_tree_encoding in
+            let option_inode_tree_encoding = mu_option_inode_tree_encoding tree_encoding in
+            let inode_tree_encoding = unoptionize option_inode_tree_encoding in
             union
               [
                 case
                   ~title:"Value"
                   (Tag 0)
                   (obj1 (req "value" value_encoding))
-                  (function (Value v : tree) -> Some v | _ -> None)
-                  (fun v -> Value v);
+                  (function (Some (Value v : tree)) -> Some v | _ -> None)
+                  (fun v -> Some (Value v));
                 case
                   ~title:"Blinded_value"
                   (Tag 1)
                   (obj1 (req "blinded_value" hash_encoding))
-                  (function Blinded_value hash -> Some hash | _ -> None)
-                  (fun hash -> Blinded_value hash);
+                  (function Some (Blinded_value hash) -> Some hash | _ -> None)
+                  (fun hash -> Some (Blinded_value hash));
                 case
                   ~title:"Node"
                   (Tag 2)
                   (obj1 (req "node" (list (tup2 step_encoding tree_encoding))))
-                  (function (Node sts : tree) -> Some sts | _ -> None)
-                  (fun sts -> Node sts);
+                  (function Some (Node sts : tree) -> Some sts | _ -> None)
+                  (fun sts -> Some (Node sts));
                 case
                   ~title:"Blinded_node"
                   (Tag 3)
                   (obj1 (req "blinded_node" hash_encoding))
-                  (function Blinded_node hash -> Some hash | _ -> None)
-                  (fun hash -> Blinded_node hash);
+                  (function Some (Blinded_node hash) -> Some hash | _ -> None)
+                  (fun hash -> Some (Blinded_node hash));
                 case
                   ~title:"Inode"
                   (Tag 4)
                   (obj1
                      (req
                         "inode"
-                        (inode_encoding (mu_inode_tree_encoding tree_encoding))))
-                  (function (Inode i : tree) -> Some i | _ -> None)
-                  (fun i -> Inode i);
+                        (inode_encoding option_inode_tree_encoding)))
+                  (function Some (Inode i : tree) -> Some i | _ -> None)
+                  (fun i -> Some (Inode i));
                 case
                   ~title:"Extender"
                   (Tag 5)
                   (obj1
                      (req
                         "extender"
-                        (inode_extender_encoding
-                           (mu_inode_tree_encoding tree_encoding))))
-                  (function Extender i -> Some i | _ -> None)
-                  (fun i -> Extender i);
+                        (inode_extender_encoding inode_tree_encoding)))
+                  (function Some (Extender i) -> Some i | _ -> None)
+                  (fun i -> Some (Extender i));
+                case
+                  ~title:"Dummy"
+                  (Tag 6)
+                  (obj1 (req "dummy" null))
+                  (function None -> Some () | Some _ -> None)
+                  (fun () -> None);
               ])
       in
-      (mu_inode_tree_encoding mu_tree_encoding, mu_tree_encoding)
+      let tree_encoding = unoptionize mu_option_tree_encoding in
+      let inode_tree_encoding = unoptionize @@ mu_option_inode_tree_encoding tree_encoding in
+      (inode_tree_encoding, tree_encoding)
 
     let kinded_hash_encoding =
       let open Data_encoding in
@@ -582,7 +643,7 @@ module Make_proof (Store : DB) = struct
           case
             ~title:"Inode"
             (Tag 2)
-            (obj1 (req "inode" (inode_encoding hash_encoding)))
+            (obj1 (req "inode" (inode_encoding (option hash_encoding))))
             (function Inode hinode -> Some hinode | _ -> None)
             (fun hinode -> Inode hinode);
           case
