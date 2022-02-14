@@ -137,7 +137,7 @@ module Measurement = struct
       [map] of [Measurement.value] list indexed by [Measurement.key]
       and creates a new influxDB datapoints serie inside the given
       [influxDB_measurement] for each of them. *)
-  let register_map_as_datapoints influxDB_measurement =
+  let register_map_as_datapoints ?margin influxDB_measurement =
     Map.iter_s (fun (label, _) durations ->
         let tags = [("step", label)] in
         let data_points =
@@ -156,6 +156,7 @@ module Measurement = struct
           ~stddev:true
           ~data_points
           ~tags
+          ?margin
           influxDB_measurement
           "duration")
 end
@@ -306,6 +307,36 @@ end
     to perform statistical analysis and compare the obtained result with previous
     runs. *)
 module Benchmark = struct
+  (* The following block consumed the highest gas (5871442981)
+     between the 10000 blocks preceding block 1479022.
+
+     As a reminder, if the benchmark needs other high consumed
+     gas blocks later, blocks with highest gas are:
+     - level: 1470469 -> consumed gas: 5668799660
+     - level: 1478300 -> consumed gas: 5661805784
+     - level: 1478984 -> consumed gas: 4769430818
+     - level: 1478976 -> consumed gas: 3630404743
+     - level: 1478964 -> consumed gas: 3001839414 *)
+  let block_with_highest_gas = "1475742"
+
+  let chunk_title = "shell.validation.block.chunk"
+
+  let specific_title = "shell.validation.block." ^ block_with_highest_gas
+
+  let subparts_title =
+    "shell.validation.block.subpart." ^ block_with_highest_gas
+
+  let subparts_steps =
+    [
+      "operations_parsing";
+      "application_beginning";
+      "operations_application";
+      "block_finalization";
+      "metadata_serde_check";
+      "metadata_hash";
+      "context_commitment";
+    ]
+
   let influxDB_measurement = "block_validation"
 
   let mean_block_validation_duration ~repeat dry_run_blocks blocks datadir =
@@ -327,8 +358,15 @@ module Benchmark = struct
     if size <= 0 then
       invalid_arg "chunk_of_consecutive_blocks_total: size must be > 0" ;
     let open List in
-    let blocks = init size (fun i -> "head~" ^ string_of_int i) |> rev in
-    mean_block_validation_duration ~repeat blocks blocks datadir
+    let init_blocks size offset =
+      init size (fun i -> "head~" ^ string_of_int (offset - i - 1))
+    in
+    (* Dry running on the 50 first blocks seems to be enough as it
+       permit to initiate most relevant disk pages and only takes
+       1 minute when disk pages are not yet pre-loaded. *)
+    let dry_run_blocks = init_blocks (min size 50) size in
+    let blocks = init_blocks size size in
+    mean_block_validation_duration ~repeat dry_run_blocks blocks datadir
 
   (** [batch_of_same_block_total ~size ~repeat block datadir]
       is a benchmark that measures the total time taken by the
@@ -349,7 +387,7 @@ module Benchmark = struct
       substep of the validation of the given [block]. The benchmark
       is performed [size] time to collect several measurements for each substep.
       Then, it performs some statistical analysis by substep. *)
-  let batch_of_same_block_subparts ~size block datadir =
+  let batch_of_same_block_subparts ?margin ~size block datadir =
     if size <= 0 then
       invalid_arg "batch_of_same_block_subparts: size must be > 0" ;
     let blocks = List.init size (fun _ -> block) in
@@ -359,52 +397,58 @@ module Benchmark = struct
     let* measurements =
       Validation.run_and_measure_subparts_duration blocks datadir
     in
-    Measurement.register_map_as_datapoints influxDB_measurement measurements
+    Measurement.register_map_as_datapoints
+      ?margin
+      influxDB_measurement
+      measurements
 end
 
-(* TODO do register *)
+let grafana_panels =
+  [
+    Grafana.Row "Block Validation";
+    Grafana.simple_graph Benchmark.chunk_title "duration";
+    Grafana.simple_graph Benchmark.specific_title "duration";
+  ]
+  @ List.map
+      (fun label ->
+        Grafana.simple_graph
+          ~tags:[("step", label)]
+          Benchmark.subparts_title
+          "duration")
+      Benchmark.subparts_steps
 
 let register ~executors () =
-  (* The following block consumed the highest gas (5871442981)
-     between the 10000 blocks preceding block 1479022.
-
-     As a reminder, if the benchmark needs other high consumed
-     gas blocks later, blocks with highest gas are:
-     - level: 1470469 -> consumed gas: 5668799660
-     - level: 1478300 -> consumed gas: 5661805784
-     - level: 1478984 -> consumed gas: 4769430818
-     - level: 1478976 -> consumed gas: 3630404743
-     - level: 1478964 -> consumed gas: 3001839414 *)
-  let block_with_highest_gas = "1475742" in
-
   let datadir = Fixture.datadir () in
 
   Long_test.register
     ~__FILE__
-    ~title:"shell.validation.block.batch"
-    ~tags:["shell"; "validation"; "block"; "batch"]
-    ~timeout:(Long_test.Minutes 10)
+    ~title:Benchmark.chunk_title
+    ~tags:["shell"; "validation"; "block"; "chunk"]
+    ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
-  @@ Benchmark.chunk_of_consecutive_blocks_total ~size:10 ~repeat:3 ;
+  @@ Benchmark.chunk_of_consecutive_blocks_total ~size:1000 ~repeat:1 ;
 
   Long_test.register
     ~__FILE__
-    ~title:("shell.validation.block." ^ block_with_highest_gas)
+    ~title:Benchmark.specific_title
     ~tags:["shell"; "validation"; "block"; "specific"]
-    ~timeout:(Long_test.Minutes 10)
+    ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
   @@ Benchmark.batch_of_same_block_total
        ~size:10
-       ~repeat:3
-       block_with_highest_gas ;
+       ~repeat:30
+       Benchmark.block_with_highest_gas ;
 
   Long_test.register
     ~__FILE__
-    ~title:("shell.validation.subpart." ^ block_with_highest_gas)
+    ~title:Benchmark.subparts_title
     ~tags:["shell"; "validation"; "block"; "subpart"]
-    ~timeout:(Long_test.Minutes 10)
+    ~timeout:(Long_test.Minutes 20)
     ~executors
   @@ apply_or_raise datadir
-  @@ Benchmark.batch_of_same_block_subparts ~size:10 block_with_highest_gas
+  @@ Benchmark.batch_of_same_block_subparts
+       ~margin:0.8
+       ~size:30
+       Benchmark.block_with_highest_gas

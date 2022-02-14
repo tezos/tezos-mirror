@@ -162,7 +162,7 @@ val add_peer_with_id : t -> t -> unit Lwt.t
     In other words it is the address where [from] can contact [node]. *)
 val point_and_id : ?from:t -> t -> string Lwt.t
 
-(** Specialised version of [Daemon.Make.name] *)
+(** See [Daemon.Make.name] *)
 val name : t -> string
 
 (** Get the network port given as [--net-addr] to a node. *)
@@ -199,7 +199,7 @@ val check_error : ?exit_code:int -> ?msg:Base.rex -> t -> unit Lwt.t
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Specialised version of [Daemon.Make.terminate]. *)
+(** See [Daemon.Make.terminate]. *)
 val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
@@ -340,25 +340,25 @@ val wait_for_identity : t -> string Lwt.t
 val wait_for_request :
   request:[< `Flush | `Inject | `Notify | `Arrived] -> t -> unit Lwt.t
 
-(** Specialised version of [Daemon.Make.wait_for_full]. *)
+(** See [Daemon.Make.wait_for_full]. *)
 val wait_for_full :
   ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
-(** Specialised version of [Daemon.Make.wait_for]. *)
+(** See [Daemon.Make.wait_for]. *)
 val wait_for : ?where:string -> t -> string -> (JSON.t -> 'a option) -> 'a Lwt.t
 
 (** Raw events. *)
 type event = {name : string; value : JSON.t}
 
-(** Specialised version of [Daemon.Make.on_event]. *)
+(** See [Daemon.Make.on_event]. *)
 val on_event : t -> (event -> unit) -> unit
 
-(** Specialised version of [Daemon.Make.log_events]. *)
+(** See [Daemon.Make.log_events]. *)
 val log_events : t -> unit
 
 type observe_memory_consumption = Observe of (unit -> int option Lwt.t)
 
-(** Specialised version of [Daemon.Make.memory_consumption]. *)
+(** See [Daemon.Make.memory_consumption]. *)
 val memory_consumption : t -> observe_memory_consumption Lwt.t
 
 (** {2 High-Level Functions} *)

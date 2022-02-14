@@ -200,22 +200,36 @@ let update_dashboard config dashboard =
            (Cohttp.Code.string_of_status status)
            body)
 
-let simple_query measurement field =
+let where_clause_of_tag (tag_name, tag_label) =
+  InfluxDB.Tag (tag_name, EQ, tag_label)
+
+let where_clause_of_tags hd tail =
+  List.fold_left
+    (fun clause tag -> InfluxDB.And (clause, where_clause_of_tag tag))
+    (where_clause_of_tag hd)
+    tail
+
+let simple_query ?(tags = []) measurement field =
+  let where_clause =
+    match tags with
+    | [] -> InfluxDB.Grafana_time_filter
+    | a :: xs -> InfluxDB.And (Grafana_time_filter, where_clause_of_tags a xs)
+  in
   InfluxDB.select
     [Function (MEAN, Field field)]
     ~from:(Measurement measurement)
-    ~where:Grafana_time_filter
+    ~where:where_clause
     ~group_by:
       (Time {interval = Grafana_interval; tag = None; fill = Some Previous})
 
-let simple_graph ?title ?(description = "") ?(yaxis_format = "s") measurement
-    field =
+let simple_graph ?title ?(description = "") ?(yaxis_format = "s") ?tags
+    measurement field =
   let title = Option.value title ~default:measurement in
   Graph
     {
       title;
       description;
-      queries = [simple_query measurement field];
+      queries = [simple_query ?tags measurement field];
       yaxis_1 = Some {format = yaxis_format; label = Some field};
       yaxis_2 = None;
     }
