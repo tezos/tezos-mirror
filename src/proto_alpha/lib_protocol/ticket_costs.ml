@@ -33,7 +33,7 @@ module Constants = struct
   *)
   let cost_collect_tickets_step = S.safe_int 360
 
-  (* TODO: #2315
+  (* TODO: #2499
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
@@ -45,7 +45,7 @@ module Constants = struct
   *)
   let cost_token_and_amount_of_ticket = S.safe_int 30
 
-  (* TODO: #2315
+  (* TODO: #2498
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
