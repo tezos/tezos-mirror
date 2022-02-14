@@ -35,7 +35,7 @@ let test_level_5 () =
   let config =
     {
       default_config with
-      timeout = Int32.to_int level_to_reach * 3;
+      timeout = Int32.to_int level_to_reach * 3 * 2;
       round0 = 2L;
       round1 = 3L;
     }
@@ -456,7 +456,7 @@ let test_scenario_f1 () =
             [bootstrap3; bootstrap4; bootstrap1; bootstrap2];
             [bootstrap1; bootstrap4; bootstrap2; bootstrap3];
           ];
-      timeout = 15;
+      timeout = 60;
     }
   in
   run
@@ -509,7 +509,7 @@ let test_scenario_f2 () =
             [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
             [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
           ];
-      timeout = 25;
+      timeout = 60;
       round0 = 2L;
       round1 = 3L;
     }
@@ -572,7 +572,7 @@ let test_scenario_m1 () =
       | Baking_state.New_proposal {block; _} -> block.shell.level > 4l
       | _ -> false
   end in
-  let config = {default_config with timeout = 25} in
+  let config = {default_config with timeout = 60} in
   run
     ~config
     [
@@ -618,7 +618,7 @@ let test_scenario_m2 () =
           ];
       round0 = 2L;
       round1 = 3L;
-      timeout = 20;
+      timeout = 60;
     }
   in
   run
@@ -677,7 +677,7 @@ let test_scenario_m3 () =
       delegate_selection = Round_robin_over [[bootstrap1; bootstrap2]];
       round0 = 2L;
       round1 = 3L;
-      timeout = 30;
+      timeout = 60;
     }
   in
   run
@@ -958,7 +958,7 @@ let test_scenario_m6 () =
             [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
             [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
           ];
-      timeout = 20;
+      timeout = 60;
     }
   in
   run
@@ -1152,7 +1152,7 @@ let test_scenario_m7 () =
             [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
             [bootstrap2; bootstrap1; bootstrap3; bootstrap4];
           ];
-      timeout = 20;
+      timeout = 60;
     }
   in
   run
@@ -1284,7 +1284,7 @@ let test_scenario_m8 () =
             [bootstrap1; bootstrap2; bootstrap3; bootstrap4];
             [bootstrap2; bootstrap3; bootstrap1; bootstrap4];
           ];
-      timeout = 30;
+      timeout = 60;
     }
   in
   run
