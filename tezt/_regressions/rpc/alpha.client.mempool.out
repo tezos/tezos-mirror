@@ -1869,7 +1869,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "content": {
                                 "$ref": "#/definitions/unistring"
                               },
-                              "fees_limit": {
+                              "burn_limit": {
                                 "$ref": "#/definitions/alpha.mutez"
                               }
                             },
@@ -4888,10 +4888,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                 },
                                 {
                                   "kind": "option_indicator",
-                                  "name": "fees_limit"
+                                  "name": "burn_limit"
                                 },
                                 {
-                                  "name": "fees_limit",
+                                  "name": "burn_limit",
                                   "layout": {
                                     "name": "N.t",
                                     "kind": "Ref"
@@ -7124,7 +7124,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "content": {
                                 "$ref": "#/definitions/unistring"
                               },
-                              "fees_limit": {
+                              "burn_limit": {
                                 "$ref": "#/definitions/alpha.mutez"
                               }
                             },

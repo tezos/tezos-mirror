@@ -48,7 +48,7 @@ let update_tx_rollups_at_block_finalization :
         Constants_storage.tx_rollup_hard_size_limit_per_inbox ctxt
       in
       let state =
-        Tx_rollup_state_repr.update_fees_per_byte
+        Tx_rollup_state_repr.update_burn_per_byte
           state
           ~final_size:inbox.cumulated_size
           ~hard_limit

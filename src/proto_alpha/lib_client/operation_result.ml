@@ -174,7 +174,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         source
         pp_result
         result
-  | Tx_rollup_submit_batch {tx_rollup; content; fees_limit = _} ->
+  | Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _} ->
       Format.fprintf
         ppf
         "@[<v 2>%s:%a, %d bytes, From: %a%a@]"

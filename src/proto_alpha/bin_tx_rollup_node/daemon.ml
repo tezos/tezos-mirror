@@ -51,7 +51,7 @@ let compute_messages block_info rollup_id =
         ( Manager_operation
             {
               operation =
-                Tx_rollup_submit_batch {tx_rollup; content; fees_limit = _};
+                Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _};
               _;
             },
           Manager_operation_result
@@ -62,7 +62,7 @@ let compute_messages block_info rollup_id =
         ( Manager_operation
             {
               operation =
-                Tx_rollup_submit_batch {tx_rollup; content; fees_limit = _};
+                Tx_rollup_submit_batch {tx_rollup; content; burn_limit = _};
               _;
             },
           Manager_operation_result

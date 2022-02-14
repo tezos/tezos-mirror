@@ -38,7 +38,7 @@ type error +=
 (** [append_message ctxt tx_rollup state message] tries to append
     [message] to the inbox of [tx_rollup] at the current level, creating
     it in theprocess if need be. This function returns the size of the
-    appended message (in bytes), in order for the appropriate fees to be
+    appended message (in bytes), in order for the appropriate burn to be
     taken from the message author, as well as the new state.  It
     is the caller's responsibility to store the returned state.
 

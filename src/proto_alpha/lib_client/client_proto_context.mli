@@ -449,7 +449,7 @@ val submit_tx_rollup_batch :
   ?verbose_signing:bool ->
   ?simulation:bool ->
   ?fee:Tez.tez ->
-  ?fees_limit:Tez.tez ->
+  ?burn_limit:Tez.tez ->
   ?gas_limit:Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   ?counter:Z.t ->

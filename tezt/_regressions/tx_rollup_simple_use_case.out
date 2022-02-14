@@ -2,7 +2,7 @@ tezt/_regressions/tx_rollup_simple_use_case.out
 tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz
 
 ./tezos-client rpc get /chains/main/blocks/head/context/tx_rollup/tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz/state
-{ "last_inbox_level": null, "fees_per_byte": "0", "inbox_ema": 0 }
+{ "last_inbox_level": null, "burn_per_byte": "0", "inbox_ema": 0 }
 
 ./tezos-client --wait none submit tx rollup batch 74657a6f73 to tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
