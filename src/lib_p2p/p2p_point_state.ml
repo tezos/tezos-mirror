@@ -202,10 +202,20 @@ end
 
 let get {Info.state; _} = state
 
+let is_running {Info.state; _} =
+  match state with
+  | Running _ -> true
+  | Disconnected | Requested _ | Accepted _ -> false
+
 let is_disconnected {Info.state; _} =
   match state with
   | Disconnected -> true
   | Requested _ | Accepted _ | Running _ -> false
+
+let is_accepted {Info.state; _} =
+  match state with
+  | Accepted _ -> true
+  | Disconnected | Requested _ | Running _ -> false
 
 let set_requested ~timestamp point_info cancel =
   assert (

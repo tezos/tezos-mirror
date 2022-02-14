@@ -1141,6 +1141,8 @@ let tezos_p2p =
         tezos_stdlib_unix |> open_;
         tezos_stdlib |> open_;
         tezos_p2p_services |> open_;
+        tezos_version;
+        prometheus;
       ]
 
 let _tezos_p2p_tests =

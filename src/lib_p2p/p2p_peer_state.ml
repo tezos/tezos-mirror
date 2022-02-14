@@ -223,6 +223,12 @@ let get {Info.state; _} = state
 let is_disconnected {Info.state; _} =
   match state with Disconnected -> true | Accepted _ | Running _ -> false
 
+let is_accepted {Info.state; _} =
+  match state with Accepted _ -> true | Disconnected | Running _ -> false
+
+let is_running {Info.state; _} =
+  match state with Running _ -> true | Disconnected | Accepted _ -> false
+
 let set_accepted ~timestamp peer_info current_point cancel =
   assert (
     match peer_info.Info.state with
