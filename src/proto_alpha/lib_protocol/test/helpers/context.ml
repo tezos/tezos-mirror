@@ -118,6 +118,9 @@ let rpc_ctxt =
 
 let get_endorsers ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
 
+let get_first_different_endorsers ctxt =
+  get_endorsers ctxt >|=? function x :: y :: _ -> (x, y) | _ -> assert false
+
 let get_endorser ctxt =
   get_endorsers ctxt >|=? fun endorsers ->
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
@@ -154,6 +157,18 @@ let get_baker ctxt ~round =
   get_bakers ~filter:(fun x -> x.round = round) ctxt >>=? fun bakers ->
   (* there is only one baker for a given round *)
   match bakers with [baker] -> return baker | _ -> assert false
+
+let get_first_different_baker baker bakers =
+  WithExceptions.Option.get ~loc:__LOC__
+  @@ List.find
+       (fun baker' -> Signature.Public_key_hash.( <> ) baker baker')
+       bakers
+
+let get_first_different_bakers ctxt =
+  get_bakers ctxt >|=? function
+  | [] -> assert false
+  | baker_1 :: other_bakers ->
+      (baker_1, get_first_different_baker baker_1 other_bakers)
 
 let get_seed_nonce_hash ctxt =
   let header =

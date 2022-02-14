@@ -37,7 +37,7 @@
 open Protocol
 
 (** Baking [blocks_per_commitment] blocks without a [seed_nonce_hash]
-    commitment fails with [Invalid_commitment]. *)
+    commitment fails with an "Invalid commitment in block header" error. *)
 let test_no_commitment () =
   Context.init ~consensus_threshold:0 5 >>=? fun (b, _) ->
   Context.get_constants (B b)
@@ -50,9 +50,10 @@ let test_no_commitment () =
   Block.Forge.set_seed_nonce_hash None header |> Block.Forge.sign_header
   >>=? fun header ->
   Block.apply header b >>= fun e ->
-  Assert.proto_error ~loc:__LOC__ e (function
-      | Alpha_context.Block_header.Invalid_commitment _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    e
+    "Invalid commitment in block header"
 
 (** Choose a baker, denote it by id. In the first cycle, make id bake only once.
     Check that:
@@ -97,11 +98,8 @@ let test_revelation_early_wrong_right_twice () =
     (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.bake ~policy ~operation b >>= fun e ->
-  let expected = function
-    | Nonce_storage.Too_early_revelation -> true
-    | _ -> false
-  in
-  Assert.proto_error ~loc:__LOC__ e expected >>=? fun () ->
+  Assert.proto_error_with_info ~loc:__LOC__ e "Too early nonce revelation"
+  >>=? fun () ->
   (* finish the cycle excluding the committing baker, id *)
   Block.bake_until_cycle_end ~policy b >>=? fun b ->
   (* test that revealing at the right time but the wrong value
@@ -113,9 +111,7 @@ let test_revelation_early_wrong_right_twice () =
     (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   |> fun operation ->
   Block.bake ~operation b >>= fun e ->
-  Assert.proto_error ~loc:__LOC__ e (function
-      | Nonce_storage.Inconsistent_nonce -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ e "Inconsistent nonce"
   >>=? fun () ->
   (* reveals correctly *)
   Op.seed_nonce_revelation
@@ -142,9 +138,7 @@ let test_revelation_early_wrong_right_twice () =
     (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get wrong_hash)
   |> fun operation ->
   Block.bake ~operation ~policy b >>= fun e ->
-  Assert.proto_error ~loc:__LOC__ e (function
-      | Nonce_storage.Previously_revealed_nonce -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ e "Previously revealed nonce"
 
 (** Test that revealing too late produces an error. Note that a
     committer who doesn't reveal at cycle 1 is not punished.*)
@@ -175,9 +169,7 @@ let test_revelation_missing_and_late () =
     (WithExceptions.Option.to_exn ~none:Not_found @@ Nonce.get committed_hash)
   |> fun operation ->
   Block.bake ~operation b >>= fun e ->
-  Assert.proto_error ~loc:__LOC__ e (function
-      | Nonce_storage.Too_late_revelation -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ e "Too late nonce revelation"
 
 let wrap e = e >|= Environment.wrap_tzresult
 

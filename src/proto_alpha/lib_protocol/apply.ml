@@ -114,7 +114,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"operations.wrong_slot"
-    ~title:"wrong slot"
+    ~title:"Wrong slot"
     ~description:"wrong slot"
     ~pp:(fun ppf () -> Format.fprintf ppf "wrong slot")
     Data_encoding.empty
@@ -200,7 +200,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"wrong_level_for_consensus_operation"
-    ~title:"wrong level for consensus operation"
+    ~title:"Wrong level for consensus operation"
     ~description:"Wrong level for consensus operation."
     ~pp:(fun ppf (expected, provided) ->
       Format.fprintf
@@ -223,7 +223,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"wrong_round_for_consensus_operation"
-    ~title:"wrong round for consensus operation"
+    ~title:"Wrong round for consensus operation"
     ~description:"Wrong round for consensus operation."
     ~pp:(fun ppf (expected, provided) ->
       Format.fprintf
@@ -244,7 +244,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"preendorsement_round_too_high"
-    ~title:"preendorsement round too high"
+    ~title:"Preendorsement round too high"
     ~description:"Preendorsement round too high."
     ~pp:(fun ppf (block_round, provided) ->
       Format.fprintf
@@ -265,7 +265,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"wrong_payload_hash_for_consensus_operation"
-    ~title:"wrong payload hash for consensus operation"
+    ~title:"Wrong payload hash for consensus operation"
     ~description:"Wrong payload hash for consensus operation."
     ~pp:(fun ppf (expected, provided) ->
       Format.fprintf
@@ -289,7 +289,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"unexpected_endorsement_in_block"
-    ~title:"unexpected endorsement in block"
+    ~title:"Unexpected endorsement in block"
     ~description:"Unexpected endorsement in block."
     ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected endorsement in block.")
     Data_encoding.empty
@@ -298,7 +298,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"unexpected_preendorsement_in_block"
-    ~title:"unexpected preendorsement in block"
+    ~title:"Unexpected preendorsement in block"
     ~description:"Unexpected preendorsement in block."
     ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected preendorsement in block.")
     Data_encoding.empty
@@ -780,7 +780,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"operation.failing_noop"
-    ~title:"Failing_noop operation are not executed by the protocol"
+    ~title:"Failing_noop operations are not executed by the protocol"
     ~description:
       "The failing_noop operation is an operation that is not and never will \
        be executed by the protocol."
@@ -2644,7 +2644,6 @@ let begin_application ctxt chain_id (block_header : Block_header.t) fitness
   let current_level = Level.current ctxt in
   Stake_distribution.baking_rights_owner ctxt current_level ~round
   >>=? fun (ctxt, _slot, (block_producer_pk, block_producer)) ->
-  let round_durations = Constants.round_durations ctxt in
   let timestamp = block_header.shell.timestamp in
   Block_header.begin_validate_block_header
     ~block_header
@@ -2654,7 +2653,7 @@ let begin_application ctxt chain_id (block_header : Block_header.t) fitness
     ~fitness
     ~timestamp
     ~delegate_pk:block_producer_pk
-    ~round_durations
+    ~round_durations:(Constants.round_durations ctxt)
     ~proof_of_work_threshold:(Constants.proof_of_work_threshold ctxt)
     ~expected_commitment:current_level.expected_commitment
   >>?= fun () ->

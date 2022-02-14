@@ -110,6 +110,3 @@ val first_level_in_cycle_from_eras :
 val last_of_cycle : cycle_eras:cycle_eras -> level -> bool
 
 (**/**)
-
-(* exported for unit testing only *)
-type error += Invalid_cycle_eras

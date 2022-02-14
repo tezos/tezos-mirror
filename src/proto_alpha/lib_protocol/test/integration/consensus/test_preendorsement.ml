@@ -124,7 +124,7 @@ let test_unexpected_preendorsements_in_blocks () =
     ~loc:__LOC__
     ~is_preendorsement:true
     ~endorsed_block:pred
-    ~error_title:"unexpected preendorsement in block"
+    ~error_title:"Unexpected preendorsement in block"
     ~context:(Context.B genesis)
     ()
 
@@ -140,7 +140,7 @@ let test_too_high_round () =
     ~endorsed_block:pred
     ~round
     ~level
-    ~error_title:"preendorsement round too high"
+    ~error_title:"Preendorsement round too high"
     ~context:(Context.B genesis)
     ~construction_mode:(pred, Some pred.header.protocol_data)
     ()
@@ -159,7 +159,7 @@ let test_duplicate_preendorsement () =
   Assert.proto_error_with_info
     ~loc:__LOC__
     res
-    "double inclusion of consensus operation"
+    "Double inclusion of consensus operation"
 
 (** Preendorsement for next level *)
 let test_preendorsement_for_next_level () =

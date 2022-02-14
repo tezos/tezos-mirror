@@ -96,9 +96,7 @@ let test_not_enough_found_for_reveal () =
   (* Reveal the contract *)
   Op.revelation ~fee:Tez.fifty_cents (B blk) new_c.pk >>=? fun operation ->
   Block.bake blk ~operation >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Balance_too_low _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Balance too low"
 
 let tests =
   [

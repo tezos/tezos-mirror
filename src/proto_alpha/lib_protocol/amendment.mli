@@ -59,12 +59,6 @@ open Alpha_context
     the state machine of the amendment procedure. *)
 val may_start_new_voting_period : context -> context tzresult Lwt.t
 
-type error +=
-  | Unexpected_proposal
-  | Unauthorized_proposal
-  | Too_many_proposals
-  | Empty_proposal
-
 (** Records a list of proposals for a delegate.
     @raise Unexpected_proposal if [ctxt] is not in a proposal period.
     @raise Unauthorized_proposal if [delegate] is not in the listing. *)

@@ -23,12 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Too_late_revelation
-  | Too_early_revelation
-  | Previously_revealed_nonce
-  | Inconsistent_nonce
-
 type t = Seed_repr.nonce
 
 type nonce = t

@@ -37,9 +37,10 @@ let test_create_cycle_eras () =
   let empty_cycle_eras =
     Level_repr.create_cycle_eras [] |> Environment.wrap_tzresult
   in
-  Assert.proto_error ~loc:__LOC__ empty_cycle_eras (function
-      | Level_repr.Invalid_cycle_eras -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    empty_cycle_eras
+    "Invalid cycle eras"
   >>=? fun () ->
   let increasing_first_levels =
     [
@@ -59,9 +60,10 @@ let test_create_cycle_eras () =
     ]
     |> Level_repr.create_cycle_eras |> Environment.wrap_tzresult
   in
-  Assert.proto_error ~loc:__LOC__ increasing_first_levels (function
-      | Level_repr.Invalid_cycle_eras -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    increasing_first_levels
+    "Invalid cycle eras"
   >>=? fun () ->
   let increasing_first_cycles =
     [
@@ -81,9 +83,10 @@ let test_create_cycle_eras () =
     ]
     |> Level_repr.create_cycle_eras |> Environment.wrap_tzresult
   in
-  Assert.proto_error ~loc:__LOC__ increasing_first_cycles (function
-      | Level_repr.Invalid_cycle_eras -> true
-      | _ -> false)
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    increasing_first_cycles
+    "Invalid cycle eras"
 
 let test_case_1 =
   ( [

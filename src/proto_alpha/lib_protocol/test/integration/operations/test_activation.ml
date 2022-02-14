@@ -474,9 +474,7 @@ let test_invalid_activation_with_no_commitments () =
   in
   Op.activation (B blk) account activation_code >>=? fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid activation"
 
 (** Wrong activation: wrong secret given in the operation. *)
 let test_invalid_activation_wrong_secret () =
@@ -489,9 +487,7 @@ let test_invalid_activation_wrong_secret () =
   in
   Op.activation (B blk) account activation_code >>=? fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid activation"
 
 (** Invalid pkh activation : expected to fail as the context does not
     contain an associated commitment. *)
@@ -506,9 +502,7 @@ let test_invalid_activation_inexistent_pkh () =
   in
   Op.activation (B blk) inexistent_pkh activation_code >>=? fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid activation"
 
 (** Invalid pkh activation : expected to fail as the commitment has
     already been claimed. *)
@@ -522,9 +516,7 @@ let test_invalid_double_activation () =
   Incremental.add_operation inc op >>=? fun inc ->
   Op.activation (I inc) account activation_code >>=? fun op' ->
   Incremental.add_operation inc op' >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Apply.Invalid_activation _ -> true
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Invalid activation"
 
 (** Transfer from an unactivated commitment account. *)
 let test_invalid_transfer_from_unactivated_account () =
@@ -544,10 +536,7 @@ let test_invalid_transfer_from_unactivated_account () =
     Tez.one
   >>=? fun operation ->
   Block.bake ~operation blk >>= fun res ->
-  Assert.proto_error ~loc:__LOC__ res (function
-      | Contract_storage.Empty_implicit_contract pkh ->
-          if pkh = account then true else false
-      | _ -> false)
+  Assert.proto_error_with_info ~loc:__LOC__ res "Empty implicit contract"
 
 let tests =
   [

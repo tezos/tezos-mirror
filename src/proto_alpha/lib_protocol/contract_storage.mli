@@ -24,20 +24,10 @@
 (*****************************************************************************)
 
 type error +=
-  | (* `Temporary *)
-      Balance_too_low of
-      Contract_repr.contract * Tez_repr.t * Tez_repr.t
-  | (* `Temporary *)
-      Counter_in_the_past of Contract_repr.contract * Z.t * Z.t
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
   | (* `Temporary *)
       Non_existing_contract of Contract_repr.contract
-  | (* `Branch *)
-      Empty_implicit_contract of Signature.Public_key_hash.t
-  | (* `Branch *)
-      Empty_implicit_delegated_contract of
-      Signature.Public_key_hash.t
   | (* `Permanent *)
       Inconsistent_public_key of
       Signature.Public_key.t * Signature.Public_key.t
