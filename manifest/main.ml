@@ -279,7 +279,8 @@ let tezos_test_helpers =
     ~path:"src/lib_test"
     ~internal_name:"lib_test"
     ~synopsis:"Tezos-agnostic test helpers"
-    ~deps:[uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix]
+    ~deps:
+      [uri; fmt; qcheck_alcotest; alcotest; lwt; pure_splitmix; data_encoding]
     ~js_compatible:true
     ~ocaml:V.(at_least "4.08")
     ~linkall:true
@@ -860,7 +861,8 @@ let lib_base_tests ?dep_files names =
     ~modules:names
 
 let _tezos_base_tests_1 =
-  lib_base_tests ["test_bounded"; "test_time"; "test_protocol"]
+  lib_base_tests
+    ["test_bounded"; "test_time"; "test_protocol"; "test_compact_encoding"]
 
 let _tezos_base_tests_2 =
   lib_base_tests ["test_p2p_addr"] ~dep_files:["points.ok"; "points.ko"]

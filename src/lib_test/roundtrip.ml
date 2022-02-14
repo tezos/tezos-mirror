@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,67 +23,42 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-include Tezos_stdlib
-module Error_monad = Tezos_error_monad.Error_monad
-include Tezos_rpc
-include Tezos_clic
-include Tezos_crypto
-include Tezos_micheline
+module type ROUNDTRIP = sig
+  type output
 
-module Data_encoding = struct
-  include Data_encoding
-  module Compact = Compact_encoding
+  val target : string
 
-  type 'a compact = 'a Compact_encoding.t
+  val of_input : 'a Data_encoding.t -> 'a -> output
+
+  val to_input : 'a Data_encoding.t -> output -> 'a
 end
 
-include Tezos_error_monad.TzLwtreslib
+type t = (module ROUNDTRIP)
 
-module List = struct
-  include Tezos_stdlib.TzList
-  include Tezos_error_monad.TzLwtreslib.List
-end
+let target : t -> string = fun (module R : ROUNDTRIP) -> R.target
 
-module String = struct
-  include String
-  include Tezos_stdlib.TzString
+let make : type a. a Data_encoding.t -> t -> a -> a =
+ fun encoding (module R : ROUNDTRIP) input ->
+  R.of_input encoding input |> R.to_input encoding
 
-  module Hashtbl = Tezos_error_monad.TzLwtreslib.Hashtbl.MakeSeeded (struct
-    type t = string
+let binary : t =
+  (module struct
+    type output = bytes
 
-    let equal = String.equal
+    let target = "binary"
 
-    let hash = Hashtbl.seeded_hash
+    let of_input encoding x = Data_encoding.Binary.to_bytes_exn encoding x
+
+    let to_input = Data_encoding.Binary.of_bytes_exn
   end)
-end
 
-module Time = Time
-module Fitness = Fitness
-module User_activated = User_activated
-module Block_header = Block_header
-module Genesis = Genesis
-module Operation = Operation
-module Protocol = Protocol
-module Test_chain_status = Test_chain_status
-module Block_locator = Block_locator
-module Mempool = Mempool
-module P2p_addr = P2p_addr
-module P2p_identity = P2p_identity
-module P2p_peer = P2p_peer
-module P2p_point = P2p_point
-module P2p_connection = P2p_connection
-module P2p_stat = P2p_stat
-module P2p_version = P2p_version
-module P2p_rejection = P2p_rejection
-module Distributed_db_version = Distributed_db_version
-module Network_version = Network_version
-include Utils.Infix
-include Error_monad
-module Internal_event = Internal_event
+let json : t =
+  (module struct
+    type output = Data_encoding.Json.json
 
-module Filename = struct
-  include Stdlib.Filename
-  include Tezos_stdlib.TzFilename
-end
+    let target = "json"
 
-module Bounded = Bounded
+    let of_input encoding x = Data_encoding.Json.construct encoding x
+
+    let to_input = Data_encoding.Json.destruct
+  end)

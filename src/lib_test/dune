@@ -11,7 +11,8 @@
   qcheck-alcotest
   alcotest
   lwt
-  pure-splitmix)
+  pure-splitmix
+  data-encoding)
  (js_of_ocaml)
  (flags (:standard -linkall)))
 

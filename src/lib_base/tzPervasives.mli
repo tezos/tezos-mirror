@@ -37,7 +37,12 @@ include module type of Tezos_clic
 
 include module type of Tezos_crypto
 
-module Data_encoding = Data_encoding
+module Data_encoding : module type of struct
+  include Data_encoding
+  module Compact = Compact_encoding
+
+  type 'a compact = 'a Compact.t
+end
 
 (** The following modules are part of [TzLwtreslib]. We just remove
     - the [Monad] module (already available, with some name simplifications,
