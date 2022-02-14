@@ -21,9 +21,9 @@
   tezos-proxy.rpc
   tezos-signer-backends.unix
   lwt-exit)
+ (library_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_base.TzPervasives
    -open Tezos_rpc_http
    -open Tezos_rpc_http_client_unix
