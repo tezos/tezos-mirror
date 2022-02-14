@@ -326,25 +326,25 @@ let check_existence kind known specified =
 (* Tests added using [register] and that match command-line filters. *)
 let registered : test String_map.t ref = ref String_map.empty
 
-(* Using [iter_registered] instead of [String_map.iter] allows to more easily
-   change the representation of [registered] in the future if needed. *)
-let iter_registered f =
+(* Sort registred jobs in the registration order. *)
+let list_registered () =
   let list = ref [] in
   String_map.iter (fun _ test -> list := test :: !list) !registered ;
   let by_id {id = a; _} {id = b; _} = Int.compare a b in
-  list := List.sort by_id !list ;
-  List.iter (fun test -> f test) !list
+  List.sort by_id !list
+
+(* Using [iter_registered] instead of [String_map.iter] allows to more easily
+   change the representation of [registered] in the future if needed. *)
+let iter_registered f = List.iter (fun test -> f test) (list_registered ())
 
 let fold_registered acc f =
   String_map.fold (fun _ test acc -> f acc test) !registered acc
 
 (* Map [register] as if it was a list, to obtain a list. *)
 let map_registered_list f =
-  let list = ref [] in
-  (* By using [iter_registered] we ensure the resulting list is
+  (* By using [list_registered] we ensure the resulting list is
      in order of registration. *)
-  (iter_registered @@ fun test -> list := f test :: !list) ;
-  List.rev !list
+  List.map f (list_registered ())
 
 let list_tests format =
   match format with
@@ -618,6 +618,24 @@ let select_job () =
         (fun (test : test) ->
           registered := String_map.add test.title test !registered)
         job_tests
+
+let skip_test () =
+  if Cli.options.skip > 0 || Cli.options.only <> None then (
+    (* by using [list_registered] we ensure that we sort jobs in the
+       registration order, which is also the order in which tests are
+       run. *)
+    let list = list_registered () in
+    let list = Base.drop Cli.options.skip list in
+    let list =
+      match Cli.options.only with
+      | None -> list
+      | Some only -> Base.take only list
+    in
+    registered := String_map.empty ;
+    List.iter
+      (fun (test : test) ->
+        registered := String_map.add test.title test !registered)
+      list)
 
 let suggest_jobs () =
   let jobs = split_tests_into_balanced_jobs Cli.options.job_count in
@@ -1039,6 +1057,8 @@ let run () =
     Cli.options.from_records ;
   (* Apply --job if needed. *)
   select_job () ;
+  (* Apply --skip and --only if needed. *)
+  skip_test () ;
   (* Actually run the tests (or list them). *)
   match (Cli.options.list, Cli.options.suggest_jobs) with
   | (Some format, false) -> list_tests format

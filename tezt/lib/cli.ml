@@ -60,6 +60,8 @@ type options = {
   mutable job_count : int;
   mutable suggest_jobs : bool;
   mutable junit : string option;
+  mutable skip : int;
+  mutable only : int option;
 }
 
 let options =
@@ -91,6 +93,8 @@ let options =
     job_count = 1;
     suggest_jobs = false;
     junit = None;
+    skip = 0;
+    only = None;
   }
 
 let () = at_exit @@ fun () -> Option.iter close_out options.log_file
@@ -152,6 +156,14 @@ let init ?args () =
         |> List.map (fun name -> path // name)
       in
       options.from_records <- records @ options.from_records
+  in
+  let set_skip value =
+    if value < 0 then raise (Arg.Bad "--skip must be non-negative") ;
+    options.skip <- value
+  in
+  let set_only value =
+    if value <= 0 then raise (Arg.Bad "--only must be at least one") ;
+    options.only <- Some value
   in
   let spec =
     Arg.align
@@ -349,6 +361,14 @@ let init ?args () =
            information for each test is the sum of all runs of this test for \
            the current session. Test result (success or failure) is the result \
            for the last run of the test." );
+        ( "--skip",
+          Arg.Int set_skip,
+          "<COUNT> Skip the first COUNT tests. This filter is applied after  \
+           --job and before --only." );
+        ( "--only",
+          Arg.Int set_only,
+          "<COUNT> Only run the first COUNT tests. This filter is applied \
+           after --job and --skip." );
       ]
   in
   let usage =

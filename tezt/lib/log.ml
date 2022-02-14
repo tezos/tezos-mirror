@@ -63,6 +63,8 @@ let channel =
     job_count = _;
     suggest_jobs;
     junit = _;
+    skip = _;
+    only = _;
   } =
     Cli.options
   in
