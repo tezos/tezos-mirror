@@ -4,6 +4,7 @@
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Trili Tech <contact@trili.tech>                        *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -100,7 +101,10 @@ type tc_context = Tc_context.t
 type unparsing_mode = Optimized | Readable | Optimized_legacy
 
 type type_logger =
-  Script.location -> Script.expr list -> Script.expr list -> unit
+  Script.location ->
+  stack_ty_before:Script.expr list ->
+  stack_ty_after:Script.expr list ->
+  unit
 
 (* ---- Error helpers -------------------------------------------------------*)
 
@@ -2872,9 +2876,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     | (Some log, (Prim _ | Seq _)) ->
         (* Unparsing for logging is not carbonated as this
               is used only by the client and not the protocol *)
-        let stack_ty = unparse_stack_uncarbonated stack_ty in
-        let aft = unparse_stack_uncarbonated aft in
-        log loc stack_ty aft
+        let stack_ty_before = unparse_stack_uncarbonated stack_ty in
+        let stack_ty_after = unparse_stack_uncarbonated aft in
+        log loc ~stack_ty_before ~stack_ty_after
   in
   let typed_no_lwt ctxt loc instr aft =
     log_stack loc stack_ty aft ;
@@ -5323,7 +5327,9 @@ let typecheck_code :
   pair_t storage_type_loc arg_type storage_type >>?= fun arg_type_full ->
   pair_t storage_type_loc list_operation_t storage_type
   >>?= fun ret_type_full ->
-  let type_logger loc bef aft = type_map := (loc, (bef, aft)) :: !type_map in
+  let type_logger loc ~stack_ty_before ~stack_ty_after =
+    type_map := (loc, (stack_ty_before, stack_ty_after)) :: !type_map
+  in
   let type_logger = if show_types then Some type_logger else None in
   let result =
     parse_returning
@@ -5340,8 +5346,8 @@ let typecheck_code :
   let views_result =
     typecheck_views
       ctxt
-      ~type_logger:(fun loc bef aft ->
-        type_map := (loc, (bef, aft)) :: !type_map)
+      ~type_logger:(fun loc ~stack_ty_before ~stack_ty_after ->
+        type_map := (loc, (stack_ty_before, stack_ty_after)) :: !type_map)
       ~legacy
       storage_type
       views
