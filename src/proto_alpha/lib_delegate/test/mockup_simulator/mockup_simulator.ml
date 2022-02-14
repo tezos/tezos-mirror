@@ -1053,7 +1053,7 @@ let default_config =
     (* Rounds should be long enough for the bakers to
        exchange all the necessary messages. *)
     round1 = 3L (* No real need to increase round durations. *);
-    timeout = 10;
+    timeout = 30;
     delegate_selection = [];
     initial_seed = None;
     consensus_committee_size =
