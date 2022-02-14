@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,10 +25,22 @@
 
 (* Testing
    -------
-   Component:    Client
+   Component:    [stresstest] client command
    Invocation:   dune exec tezt/tests/main.exe -- --file stresstest_command.ml
-   Subject:      Test the [stresstest] client command
-*)
+   Subject:      Test the [stresstest] client command. Even though this
+                 command is only used for testing purposes, its development
+                 is both tricky and ongoing. Moreover, it can be complex to
+                 debug when called in various contexts. That is why these
+                 tests are nice to have. *)
+
+(* FIXME: https://gitlab.com/tezos/tezos/-/issues/2522
+
+   Tests in this file call the stresstest command with
+   [~single_op_per_pkh_per_block:true] in order to be compatible with
+   [precheck]. This argument should be removed once the command has
+   been updated to inject at most one operation per manager per block
+   by default (cf
+   https://gitlab.com/tezos/tezos/-/merge_requests/4100). *)
 
 (** Wait for [n] injection request events. *)
 let wait_for_n_injections n node =
@@ -289,157 +301,149 @@ let test_stresstest_n_transfers =
   let* _ = check_n_manager_operations_in_head n_transfers client in
   unit
 
-(** Initialize [n_nodes] nodes with mode [Client] and with disjoint
-    sets of [accounts_per_nodes] accounts each. The first node activates
-    the [protocol]. Each other node is connected exclusively with the
-    first node. For each node, returns the node together with the
-    associated client and keys. The return value takes the form:
-    [((first_node, first_client, first_accounts),
-    list_of_other_nodes_clients_accounts)]. *)
-let init_nodes_star ~protocol ~n_nodes ~accounts_per_node
-    ?(additional_node_args = []) () =
-  let* (first_node, first_client) =
+(** Wait for [n] "arrived" request events.
+
+    Note that event level of section [prevalidator] should be [Debug]
+    for these events to exist. *)
+let wait_for_n_arrivals n node =
+  let filter json =
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
+    | Some s when s = "arrived" -> Some ()
+    | Some _ | None -> None
+  in
+  Node.wait_for node "request_completed_debug.v0" (Daemon.n_events n filter)
+
+(** Run the [stresstest] command on multiple connected nodes, and
+    check the number of operations in the mempool of one of these nodes,
+    as well as in subsequently baked blocks.
+
+    [n_nodes] nodes are initialized with mode [Client] and with
+    disjoint sets of [n_bootstraps_per_node] accounts each. A central
+    node is connected to all the other nodes, which are each connected
+    exclusively to the central node. This central node activates the
+    [protocol], then every node runs the [stresstest] command with its
+    own accounts.
+
+    We check that after the initial command calls and after each
+    subsequent baking, the mempool of the central node eventually
+    contains [n_nodes * n_bootstraps_per_node] applied operations. We
+    also check that the baked blocks contain the same number of manager
+    operations. *)
+let test_stresstest_multiple_nodes =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"stresstest multiple nodes"
+    ~tags:["stresstest"; "multiple_nodes"]
+  @@ fun protocol ->
+  let n_nodes = 4 in
+  let n_bootstraps_per_node = 5 in
+  let n_bootstraps_total = n_nodes * n_bootstraps_per_node in
+  let* (central_node, central_client) =
     Client.init_with_protocol
-      ~nodes_args:
-        (Node.[Synchronisation_threshold 0; Connections (n_nodes - 1)]
-        @ additional_node_args)
+      ~nodes_args:Node.[Synchronisation_threshold 0; Connections (n_nodes - 1)]
+      ~event_sections_levels:
+        [("prevalidator", `Debug)] (* for "arrived" request events *)
       ~additional_bootstrap_account_count:
-        ((n_nodes * accounts_per_node) - Constant.default_bootstrap_count)
+        (n_bootstraps_total - Constant.default_bootstrap_count)
       `Client
       ~protocol
       ()
   in
-  let accounts_of_num_range num_range =
+  let get_accounts_from_num_range (num_range : int list) =
     let aliases = List.map (sf "bootstrap%d") num_range in
     Lwt_list.map_p
-      (fun alias -> Client.show_address ~alias first_client)
+      (fun alias -> Client.show_address ~alias central_client)
       aliases
   in
-  let* first_node_accounts =
-    accounts_of_num_range (range 1 accounts_per_node)
+  let* central_node_accounts =
+    get_accounts_from_num_range (range 1 n_bootstraps_per_node)
   in
   let* other_nodes_clients_accounts =
     Lwt_list.map_p
       (fun i ->
         let* accounts =
-          accounts_of_num_range
+          get_accounts_from_num_range
           @@ range
-               (((i + 1) * accounts_per_node) + 1)
-               ((i + 2) * accounts_per_node)
+               (((i + 1) * n_bootstraps_per_node) + 1)
+               ((i + 2) * n_bootstraps_per_node)
         in
         let* (node, client) =
           Client.init_with_node
-            ~nodes_args:
-              (Node.[Synchronisation_threshold 0; Connections 1]
-              @ additional_node_args)
+            ~nodes_args:Node.[Synchronisation_threshold 0; Connections 1]
             ~keys:accounts
             `Client
             ()
         in
-        let* () = Client.Admin.connect_address first_client ~peer:node in
+        let* () = Client.Admin.connect_address central_client ~peer:node in
         let* _ = Node.wait_for_level node 1 in
         return (node, client, accounts))
       (List.init (n_nodes - 1) Fun.id)
   in
-  return
-    ( (first_node, first_client, first_node_accounts),
-      other_nodes_clients_accounts )
-
-(** Run the [stresstest] command on multiple connected nodes
-    (see {!init_nodes_star}). Each node calls it with a distinct
-    set of source accounts and the same target number of transfers.
-    Wait for this number of injections in the first node, then
-    check that all transfers from all nodes are applied in its
-    mempool. *)
-let test_stresstest_applied_multiple_nodes =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"stresstest applied multiple nodes"
-    ~tags:["client"; "stresstest"; "applied"]
-  @@ fun protocol ->
-  let n_nodes = 3 in
-  let transfers_per_node = 10 in
-  let accounts_per_node = 5 in
-  let* (((first_node, first_client, _) as first_node_client_accounts), others) =
-    init_nodes_star
-      ~protocol
-      ~n_nodes
-      ~accounts_per_node
-      ~additional_node_args:
-        [
-          Disable_operations_precheck;
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-             Stresstest command uses counters to inject a lot of operations with limited
-             number of bootstrap accounts. With precheck these operations are mostly
-             rejected because we don't apply the effect of operations in the
-             prevalidation context in mempool mode anymore. So, only the operation with
-             the correct counter is considered as Applied (without incrementing the
-             counter in the context). Once the issue is fixed, the
-             [Disable_operations_precheck] flag above can be removed. *)
-        ]
-      ()
+  let nodes_clients_accounts =
+    (central_node, central_client, central_node_accounts)
+    :: other_nodes_clients_accounts
   in
-  let nodes_clients_accounts = first_node_client_accounts :: others in
-  let waiter = wait_for_n_injections transfers_per_node first_node in
-  List.iter
-    (fun (_, client, source_accounts) ->
-      non_terminating_process
-      @@ Client.spawn_stresstest
-           ~source_accounts
-           ~transfers:transfers_per_node
-           client)
-    nodes_clients_accounts ;
-  let* () = waiter in
-  let* () = Lwt_unix.sleep 2. in
-  let* _ =
-    check_n_applied_operations_in_mempool
-      (n_nodes * transfers_per_node)
-      first_client
+  let n_expected_arrivals = (n_nodes - 1) * n_bootstraps_per_node in
+  let setup_waiter () =
+    let waiter_injection =
+      wait_for_n_injections n_bootstraps_per_node central_node
+    and waiter_arrival = wait_for_n_arrivals n_expected_arrivals central_node in
+    fun (time_start_actually_waiting : float) ->
+      let* () =
+        let* _ = waiter_injection in
+        Log.info
+          "Waiter injection: %.2fs"
+          (Unix.gettimeofday () -. time_start_actually_waiting) ;
+        unit
+      and* () =
+        let* _ = waiter_arrival in
+        Log.info
+          "Waiter arrival: %.2fs"
+          (Unix.gettimeofday () -. time_start_actually_waiting) ;
+        unit
+      in
+      unit
   in
-  unit
-
-(** Similar to {!test_stresstest_applied_multiple_nodes} but with
-    the [--single-op-per-pkh-per-block] flag. As in
-    {!test_stresstest_applied_1op}, we do not provide a [transfers]
-    argument to the command, but instead the expected number of
-    operations is tied to the number of provided accounts. *)
-let test_stresstest_applied_multiple_nodes_1op =
-  Protocol.register_test
-    ~__FILE__
-    ~title:"stresstest applied multiple nodes 1op"
-    ~tags:["client"; "stresstest"; "stresstest_1op"; "applied"]
-  @@ fun protocol ->
-  let n_nodes = 3 in
-  let target_transfers_per_node = 4 in
-  let accounts_per_node = target_transfers_per_node in
-  let* (((first_node, first_client, _) as first_node_client_accounts), others) =
-    init_nodes_star ~protocol ~n_nodes ~accounts_per_node ()
+  let rec loop ~first_iteration ~repeat =
+    let waiter = setup_waiter () in
+    let* () =
+      if first_iteration then (
+        List.iter
+          (fun (_, client, source_accounts) ->
+            non_terminating_process
+            @@ Client.spawn_stresstest
+                 ~source_accounts
+                 ~single_op_per_pkh_per_block:true
+                 ~fresh_probability:0.
+                 (* Prevent the command from randomly creating fresh
+                    accounts, as this would allow more operations than
+                    expected in the mempool / in the baked block. *)
+                 client)
+          nodes_clients_accounts ;
+        unit)
+      else
+        let* () = Client.bake_for central_client in
+        let* _ =
+          check_n_manager_operations_in_head n_bootstraps_total central_client
+        in
+        unit
+    in
+    let* () = waiter (Unix.gettimeofday ()) in
+    (* Sleep to ensure that we do not inject/receive more operations
+       than expected. Note that we spend at most around 1s waiting for
+       the [waiter] right above. The chosen delay of 5s is longer than
+       that, but not too long, considering that we will have to wait
+       for it [repeat] times. *)
+    let* () = Lwt_unix.sleep 5. in
+    let* _ =
+      check_n_applied_operations_in_mempool n_bootstraps_total central_client
+    in
+    if repeat <= 1 then unit
+    else loop ~first_iteration:false ~repeat:(repeat - 1)
   in
-  let nodes_clients_accounts = first_node_client_accounts :: others in
-  let waiter = wait_for_n_injections target_transfers_per_node first_node in
-  List.iter
-    (fun (_, client, source_accounts) ->
-      non_terminating_process
-      @@ Client.spawn_stresstest
-           ~source_accounts
-           ~transfers:(10 * target_transfers_per_node)
-           ~single_op_per_pkh_per_block:true
-           client)
-    nodes_clients_accounts ;
-  let* () = waiter in
-  (* Wait a little longer for operations from other nodes to arrive,
-     and also to check that the command has not issued more operations
-     than expected. *)
-  let* () = Lwt_unix.sleep 5. in
-  let* _ =
-    check_n_applied_operations_in_mempool
-      (n_nodes * target_transfers_per_node)
-      first_client
-  in
-  unit
+  loop ~first_iteration:true ~repeat:3
 
 let register ~protocols =
   test_stresstest_sources_format protocols ;
   test_stresstest_n_transfers protocols ;
-  test_stresstest_applied_multiple_nodes protocols ;
-  test_stresstest_applied_multiple_nodes_1op protocols
+  test_stresstest_multiple_nodes protocols
