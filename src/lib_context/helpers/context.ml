@@ -404,18 +404,30 @@ module Make_proof (Store : DB) = struct
         Buffer.to_bytes buf
       in
       let decode b =
-        let l =
+        let open Tzresult_syntax in
+        let error = Error "invalid 5bit list" in
+        let* l =
           let sl = Bytes.length b in
-          let c = Char.code @@ Bytes.get b (sl - 1) in
-          let rec aux i = if c land (1 lsl i) = 0 then aux (i + 1) else i + 1 in
-          let last_bit = aux 0 in
-          let bn = ((sl - 1) * 8) + 8 - last_bit in
-          assert (bn mod 5 = 0) ;
-          bn / 5
+          if sl = 0 then error
+          else
+            let c = Char.code @@ Bytes.get b (sl - 1) in
+            let* last_bit =
+              if c = 0 then error
+              else
+                let rec aux i =
+                  if c land (1 lsl i) = 0 then aux (i + 1) else i + 1
+                in
+                Ok (aux 0)
+            in
+            let bits = (sl * 8) - last_bit in
+            if bits mod 5 = 0 then Ok (bits / 5) else error
         in
         let s = Bytes.to_seq b in
         let head s =
-          match s () with Seq.Nil -> assert false | Seq.Cons (c, s) -> (c, s)
+          (* This assertion won't fail even with malformed input. *)
+          match s () with
+          | Seq.Nil -> assert false
+          | Seq.Cons (c, s) -> (Char.code c, s)
         in
         let rec read c rembit l s =
           if l = 0 then []
@@ -424,16 +436,16 @@ module Make_proof (Store : DB) = struct
               if rembit >= 5 then (c, s, rembit)
               else
                 let (c', s) = head s in
-                ((c * 256) + Char.code c', s, rembit + 8)
+                ((c * 256) + c', s, rembit + 8)
             in
             let rembit = rembit - 5 in
             let i = c lsr rembit in
             let c = c land ((1 lsl rembit) - 1) in
             i :: read c rembit (l - 1) s
         in
-        read 0 0 l s
+        Ok (read 0 0 l s)
       in
-      Data_encoding.(conv encode decode bytes)
+      Data_encoding.(conv_with_guard encode decode bytes)
 
     let inode_proofs_encoding a =
       (* When the number of proofs is large enough (>= Context.Conf.entries / 2),
@@ -452,21 +464,32 @@ module Make_proof (Store : DB) = struct
           case
             ~title:"small_proof"
             (Tag 0)
-            (obj1 (req "small_proof" (list (tup2 index_encoding a))))
-            (fun v -> if encode_type v = `List then
-              let v = List.map (fun (i,d) -> (i,Some d)) v in
-              Some v else None)
-            (fun v -> List.map (fun (i,d) ->
-              (i,match d with None -> assert false | Some d -> d)) v);
+            (obj1
+               (req
+                  "small_proof"
+                  (conv_with_guard
+                     (fun v -> List.map (fun (i, d) -> (i, Some d)) v)
+                     (fun v ->
+                       List.fold_right_e
+                         (fun (i, d) acc ->
+                           match d with
+                           | None ->
+                               Error "cannot decode ill-formed Merkle proof"
+                           | Some d -> Ok ((i, d) :: acc))
+                         v
+                         [])
+                     (list (tup2 index_encoding a)))))
+            (fun v -> if encode_type v = `List then Some v else None)
+            (fun v -> v);
           case
             ~title:"large_proof"
             (Tag 1)
             (obj1 (req "large_proof" (array ~max_length:entries a)))
             (fun v ->
-              if encode_type v = `Array then
+              if encode_type v = `Array then (
                 let arr = Array.make entries None in
                 List.iter (fun (i, d) -> arr.(i) <- Some d) v ;
-                Some arr
+                Some arr)
               else None)
             (fun v ->
               let res = ref [] in
@@ -496,9 +519,12 @@ module Make_proof (Store : DB) = struct
     let (_inode_tree_encoding, tree_encoding) =
       let open Data_encoding in
       let unoptionize enc =
-        conv
-            (fun v -> Some v)
-            (function Some v -> v | None -> assert false) enc
+        conv_with_guard
+          (fun v -> Some v)
+          (function
+            | Some v -> Ok v
+            | None -> Error "cannot decode ill-formed Merkle proof")
+          enc
       in
       let mu_option_inode_tree_encoding tree_encoding =
         mu "inode_tree" (fun option_inode_tree_encoding ->
@@ -523,7 +549,10 @@ module Make_proof (Store : DB) = struct
                 case
                   ~title:"Inode_tree"
                   (Tag 2)
-                  (obj1 (req "inode_tree" (inode_encoding option_inode_tree_encoding)))
+                  (obj1
+                     (req
+                        "inode_tree"
+                        (inode_encoding option_inode_tree_encoding)))
                   (function Some (Inode_tree i) -> Some i | _ -> None)
                   (fun i -> Some (Inode_tree i));
                 case
@@ -534,7 +563,7 @@ module Make_proof (Store : DB) = struct
                         "inode_extender"
                         (inode_extender_encoding inode_tree_encoding)))
                   (function
-                    | Some(Inode_extender i : inode_tree) -> Some i | _ -> None)
+                    | Some (Inode_extender i : inode_tree) -> Some i | _ -> None)
                   (fun i : inode_tree option -> Some (Inode_extender i));
                 case
                   ~title:"Dummy"
@@ -546,8 +575,10 @@ module Make_proof (Store : DB) = struct
       in
       let mu_option_tree_encoding : tree option encoding =
         mu "tree_encoding" (fun option_tree_encoding ->
-          let tree_encoding = unoptionize option_tree_encoding in
-            let option_inode_tree_encoding = mu_option_inode_tree_encoding tree_encoding in
+            let tree_encoding = unoptionize option_tree_encoding in
+            let option_inode_tree_encoding =
+              mu_option_inode_tree_encoding tree_encoding
+            in
             let inode_tree_encoding = unoptionize option_inode_tree_encoding in
             union
               [
@@ -555,13 +586,14 @@ module Make_proof (Store : DB) = struct
                   ~title:"Value"
                   (Tag 0)
                   (obj1 (req "value" value_encoding))
-                  (function (Some (Value v : tree)) -> Some v | _ -> None)
+                  (function Some (Value v : tree) -> Some v | _ -> None)
                   (fun v -> Some (Value v));
                 case
                   ~title:"Blinded_value"
                   (Tag 1)
                   (obj1 (req "blinded_value" hash_encoding))
-                  (function Some (Blinded_value hash) -> Some hash | _ -> None)
+                  (function
+                    | Some (Blinded_value hash) -> Some hash | _ -> None)
                   (fun hash -> Some (Blinded_value hash));
                 case
                   ~title:"Node"
@@ -579,9 +611,7 @@ module Make_proof (Store : DB) = struct
                   ~title:"Inode"
                   (Tag 4)
                   (obj1
-                     (req
-                        "inode"
-                        (inode_encoding option_inode_tree_encoding)))
+                     (req "inode" (inode_encoding option_inode_tree_encoding)))
                   (function Some (Inode i : tree) -> Some i | _ -> None)
                   (fun i -> Some (Inode i));
                 case
@@ -602,7 +632,9 @@ module Make_proof (Store : DB) = struct
               ])
       in
       let tree_encoding = unoptionize mu_option_tree_encoding in
-      let inode_tree_encoding = unoptionize @@ mu_option_inode_tree_encoding tree_encoding in
+      let inode_tree_encoding =
+        unoptionize @@ mu_option_inode_tree_encoding tree_encoding
+      in
       (inode_tree_encoding, tree_encoding)
 
     let kinded_hash_encoding =
