@@ -35,12 +35,6 @@ open Protocol
 open Alpha_context
 module GM = Gas_monad
 
-let ( let* ) = ( >>=? )
-
-module Gas_monad_syntax = struct
-  let ( let* ) = GM.( >>$ )
-end
-
 let ten_milligas = Gas.fp_of_milligas_int 10
 
 let new_context ~limit =
@@ -60,6 +54,7 @@ let assert_equal_gas ~loc g1 g2 =
 let assert_inner_errors ~loc ctxt gas_monad ~errors ~remaining_gas =
   match GM.run ctxt gas_monad with
   | Ok (Error e, ctxt) ->
+      let open Lwt_tzresult_syntax in
       let* () =
         Assert.assert_equal_list
           ~loc
@@ -78,6 +73,7 @@ let assert_inner_errors ~loc ctxt gas_monad ~errors ~remaining_gas =
 let assert_success ~loc ctxt gas_monad ~result ~remaining_gas =
   match GM.run ctxt gas_monad with
   | Ok (Ok x, ctxt) ->
+      let open Lwt_tzresult_syntax in
       let* () = Assert.equal_int ~loc x result in
       assert_equal_gas
         ~loc
@@ -85,12 +81,14 @@ let assert_success ~loc ctxt gas_monad ~result ~remaining_gas =
         (Gas.fp_of_milligas_int remaining_gas)
   | _ -> failwith "%s: expected successful result `%d' but got error" loc result
 
+let with_context f ~limit = new_context ~limit >>=? f
+
 (** Test that consuming more gas than remaining results in a gas-exhaustion
     error.  *)
 let test_gas_exhaustion () =
-  let* ctxt = new_context ~limit:ten_milligas in
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad_syntax in
+    let open Gas_monad.Syntax in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
@@ -102,9 +100,9 @@ let test_gas_exhaustion () =
 (** Test that consuming more gas than remaining results in a gas-exhaustion
     error before an inner error is produced. *)
 let test_gas_exhaustion_before_error () =
-  let* ctxt = new_context ~limit:ten_milligas in
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad_syntax in
+    let open Gas_monad.Syntax in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 10) in
@@ -116,9 +114,9 @@ let test_gas_exhaustion_before_error () =
 
 (** Test that consuming all remaining gas is feasible. *)
 let test_successful_with_remaining_gas () =
-  let* ctxt = new_context ~limit:ten_milligas in
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad_syntax in
+    let open Gas_monad.Syntax in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* y = GM.return 2 in
@@ -130,9 +128,9 @@ let test_successful_with_remaining_gas () =
 (** Test that the context has the expected amount of spare gas after the
     computation. *)
 let test_successful_with_spare_gas () =
-  let* ctxt = new_context ~limit:ten_milligas in
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad_syntax in
+    let open Gas_monad.Syntax in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* y = GM.return 2 in
@@ -143,9 +141,9 @@ let test_successful_with_spare_gas () =
 
 (** Test that an inner error is produced rather than a gas-exhaustion error. *)
 let test_inner_error () =
-  let* ctxt = new_context ~limit:ten_milligas in
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad_syntax in
+    let open Gas_monad.Syntax in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* () = GM.of_result (error "Oh no") in
@@ -164,9 +162,9 @@ let test_inner_error () =
    when run in unlimited mode.
  *)
 let test_unlimited () =
-  let* ctxt = new_context ~limit:ten_milligas in
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad_syntax in
+    let open Gas_monad.Syntax in
     let* x = GM.return 1 in
     let* () = GM.consume_gas (Saturation_repr.safe_int 5) in
     let* y = GM.return 2 in
@@ -181,28 +179,21 @@ let test_unlimited () =
     ~result:3
     ~remaining_gas:10
 
-(** Test operator [>?$] with successful result. *)
-let test_bind_result_ok () =
-  let* ctxt = new_context ~limit:ten_milligas in
+let test_syntax_module () =
+  with_context ~limit:ten_milligas @@ fun ctxt ->
   let gas_monad =
-    let open Gas_monad in
-    GM.consume_gas (Saturation_repr.safe_int 1) >?$ fun () -> Ok 42
+    let open Gas_monad.Syntax in
+    let* none = return_none in
+    let* nil = return_nil in
+    let* t = return_true in
+    let* f = return_false in
+    let*? one = Ok 1 in
+    let+ two = return 2 in
+    (none, nil, t, f, one, two)
   in
-  assert_success ~loc:__LOC__ ctxt gas_monad ~result:42 ~remaining_gas:9
-
-(** Test operator [>?$] with failing result. *)
-let test_bind_result_error () =
-  let* ctxt = new_context ~limit:ten_milligas in
-  let gas_monad =
-    let open Gas_monad in
-    GM.consume_gas (Saturation_repr.safe_int 1) >?$ fun () -> error "Oh no"
-  in
-  assert_inner_errors
-    ~loc:__LOC__
-    ctxt
-    gas_monad
-    ~errors:["Oh no"]
-    ~remaining_gas:9
+  match GM.run ctxt gas_monad with
+  | Ok (Ok (None, [], true, false, 1, 2), _ctxt) -> return ()
+  | _ -> failwith "Expected `Ok (None, [], true, false, 1, 2)`"
 
 let tests =
   [
@@ -218,6 +209,5 @@ let tests =
     Tztest.tztest "Test successful result" `Quick test_successful_with_spare_gas;
     Tztest.tztest "Test inner error" `Quick test_inner_error;
     Tztest.tztest "Test unlimited" `Quick test_unlimited;
-    Tztest.tztest "Test bind result ok" `Quick test_bind_result_ok;
-    Tztest.tztest "Test bind result error" `Quick test_bind_result_error;
+    Tztest.tztest "Test syntax module" `Quick test_syntax_module;
   ]

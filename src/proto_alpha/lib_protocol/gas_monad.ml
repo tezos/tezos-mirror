@@ -34,9 +34,9 @@ type ('a, 'trace) t =
 
 type ('a, 'trace) gas_monad = ('a, 'trace) t
 
-let of_result x gas = Some (x, gas)
+let of_result x gas = Some (x, gas) [@@ocaml.inline always]
 
-let return x = of_result (ok x)
+let return x = of_result (ok x) [@@ocaml.inline always]
 
 let return_unit = return ()
 
@@ -45,15 +45,20 @@ let ( >>?? ) m f =
   match m with None -> None | Some x -> f x
   [@@ocaml.inline always]
 
-let ( >>$ ) m f gas =
+let bind m f gas =
   m gas >>?? fun (res, gas) ->
   match res with Ok y -> f y gas | Error _ as err -> of_result err gas
+  [@@ocaml.inline always]
 
-let ( >|$ ) m f gas = m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
+let map f m gas =
+  m gas >>?? fun (x, gas) -> of_result (x >|? f) gas
+  [@@ocaml.inline always]
 
-let ( >?$ ) m f = m >>$ fun x -> of_result (f x)
+let bind_result m f = bind (of_result m) f [@@ocaml.inline always]
 
-let ( >??$ ) m f gas = m gas >>?? fun (x, gas) -> f x gas
+let bind_recover m f gas =
+  m gas >>?? fun (x, gas) -> f x gas
+  [@@ocaml.inline always]
 
 let consume_gas cost gas =
   match Local_gas_counter.consume_opt gas cost with
@@ -89,3 +94,29 @@ let record_trace_eval :
   | Informative ->
       fun f m gas ->
         m gas >>?? fun (x, gas) -> of_result (record_trace_eval f x) gas
+
+let fail e = of_result (Error e) [@@ocaml.inline always]
+
+module Syntax = struct
+  let return = return
+
+  let return_unit = return_unit
+
+  let return_none = return None
+
+  let return_some x = return (Some x)
+
+  let return_nil = return []
+
+  let return_true = return true
+
+  let return_false = return false
+
+  let fail = fail
+
+  let ( let* ) = bind
+
+  let ( let+ ) m f = map f m
+
+  let ( let*? ) = bind_result
+end

@@ -655,10 +655,10 @@ let check_dupable_comparable_ty : type a. a comparable_ty -> unit = function
       ()
 
 let check_dupable_ty ctxt loc ty =
-  let rec aux : type a. location -> a ty -> (unit, error trace) Gas_monad.t =
+  let rec aux : type a. location -> a ty -> (unit, error) Gas_monad.t =
    fun loc ty ->
-    let open Gas_monad in
-    consume_gas Typecheck_costs.check_dupable_cycle >>$ fun () ->
+    let open Gas_monad.Syntax in
+    let* () = Gas_monad.consume_gas Typecheck_costs.check_dupable_cycle in
     match ty with
     | Unit_t -> return_unit
     | Int_t -> return_unit
@@ -683,9 +683,13 @@ let check_dupable_ty ctxt loc ty =
     | Sapling_transaction_t _ -> return_unit
     | Chest_t -> return_unit
     | Chest_key_t -> return_unit
-    | Ticket_t _ -> of_result (error (Unexpected_ticket loc))
-    | Pair_t (ty_a, ty_b, _) -> aux loc ty_a >>$ fun () -> aux loc ty_b
-    | Union_t (ty_a, ty_b, _) -> aux loc ty_a >>$ fun () -> aux loc ty_b
+    | Ticket_t _ -> fail @@ Unexpected_ticket loc
+    | Pair_t (ty_a, ty_b, _) ->
+        let* () = aux loc ty_a in
+        aux loc ty_b
+    | Union_t (ty_a, ty_b, _) ->
+        let* () = aux loc ty_a in
+        aux loc ty_b
     | Lambda_t (_, _, _) ->
         (*
         Lambda are dupable as long as:
@@ -710,7 +714,7 @@ let check_dupable_ty ctxt loc ty =
   in
   let gas = aux loc ty in
   Gas_monad.run ctxt gas >>? fun (res, ctxt) ->
-  res >|? fun () -> ctxt
+  match res with Ok () -> ok ctxt | Error e -> error e
 
 (* ---- Equality witnesses --------------------------------------------------*)
 
@@ -755,7 +759,8 @@ let rec merge_comparable_types :
     Gas_monad.t =
   let open Gas_monad in
   fun ~error_details ta tb ->
-    consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
+    let open Gas_monad.Syntax in
+    let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
     let merge_type_metadata meta_a meta_b =
       of_result @@ merge_type_metadata ~error_details meta_a meta_b
     in
@@ -779,25 +784,25 @@ let rec merge_comparable_types :
     | (Address_key, Address_key) -> return (Eq, Address_key)
     | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
-        merge_type_metadata meta_a meta_b >>$ fun meta ->
-        merge_comparable_types ~error_details left_a left_b
-        >>$ fun (Eq, left) ->
-        merge_comparable_types ~error_details right_a right_b
-        >|$ fun (Eq, right) ->
+        let* meta = merge_type_metadata meta_a meta_b in
+        let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
+        let+ (Eq, right) =
+          merge_comparable_types ~error_details right_a right_b
+        in
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Pair_key (left, right, meta) )
     | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
       ->
-        merge_type_metadata meta_a meta_b >>$ fun meta ->
-        merge_comparable_types ~error_details left_a left_b
-        >>$ fun (Eq, left) ->
-        merge_comparable_types ~error_details right_a right_b
-        >|$ fun (Eq, right) ->
+        let* meta = merge_type_metadata meta_a meta_b in
+        let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
+        let+ (Eq, right) =
+          merge_comparable_types ~error_details right_a right_b
+        in
         ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
           Union_key (left, right, meta) )
     | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
-        merge_type_metadata meta_a meta_b >>$ fun meta ->
-        merge_comparable_types ~error_details ta tb >|$ fun (Eq, t) ->
+        let* meta = merge_type_metadata meta_a meta_b in
+        let+ (Eq, t) = merge_comparable_types ~error_details ta tb in
         ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, meta))
     | (_, _) ->
         of_result
@@ -847,110 +852,111 @@ let merge_types :
     a ty ->
     b ty ->
     ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
-  let open Gas_monad in
-  fun ~error_details loc ty1 ty2 ->
-    let merge_type_metadata meta1 meta2 =
-      of_result @@ merge_type_metadata ~error_details meta1 meta2
-      |> Gas_monad.record_trace_eval ~error_details (fun () ->
-             let ty1 = serialize_ty_for_error ty1 in
-             let ty2 = serialize_ty_for_error ty2 in
-             Inconsistent_types (Some loc, ty1, ty2))
-    in
-    let merge_memo_sizes ms1 ms2 =
-      of_result (merge_memo_sizes ~error_details ms1 ms2)
-    in
-    let rec help :
-        type ta tb.
-        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
-     fun ty1 ty2 ->
-      help0 ty1 ty2
-      |> Gas_monad.record_trace_eval ~error_details (fun () ->
-             default_merge_type_error ty1 ty2)
-    and help0 :
-        type ta tb.
-        ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) gas_monad =
-     fun ty1 ty2 ->
-      consume_gas Typecheck_costs.merge_cycle >>$ fun () ->
-      match (ty1, ty2) with
-      | (Unit_t, Unit_t) -> return ((Eq, Unit_t) : (ta ty, tb ty) eq * ta ty)
-      | (Int_t, Int_t) -> return (Eq, Int_t)
-      | (Nat_t, Nat_t) -> return (Eq, Nat_t)
-      | (Key_t, Key_t) -> return (Eq, Key_t)
-      | (Key_hash_t, Key_hash_t) -> return (Eq, Key_hash_t)
-      | (String_t, String_t) -> return (Eq, String_t)
-      | (Bytes_t, Bytes_t) -> return (Eq, Bytes_t)
-      | (Signature_t, Signature_t) -> return (Eq, Signature_t)
-      | (Mutez_t, Mutez_t) -> return (Eq, Mutez_t)
-      | (Timestamp_t, Timestamp_t) -> return (Eq, Timestamp_t)
-      | (Address_t, Address_t) -> return (Eq, Address_t)
-      | (Bool_t, Bool_t) -> return (Eq, Bool_t)
-      | (Chain_id_t, Chain_id_t) -> return (Eq, Chain_id_t)
-      | (Never_t, Never_t) -> return (Eq, Never_t)
-      | (Operation_t, Operation_t) -> return (Eq, Operation_t)
-      | (Bls12_381_g1_t, Bls12_381_g1_t) -> return (Eq, Bls12_381_g1_t)
-      | (Bls12_381_g2_t, Bls12_381_g2_t) -> return (Eq, Bls12_381_g2_t)
-      | (Bls12_381_fr_t, Bls12_381_fr_t) -> return (Eq, Bls12_381_fr_t)
-      | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~error_details tal tbl >|$ fun (Eq, tk) ->
-          ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta))
-      | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tar tbr >>$ fun (Eq, value) ->
-          merge_comparable_types ~error_details tal tbl >|$ fun (Eq, tk) ->
-          ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta))
-      | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          merge_comparable_types ~error_details ea eb >|$ fun (Eq, e) ->
-          ((Eq : (ta ty, tb ty) eq), Set_t (e, meta))
-      | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          merge_comparable_types ~error_details ea eb >|$ fun (Eq, e) ->
-          ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta))
-      | (Pair_t (tal, tar, meta1), Pair_t (tbl, tbr, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tal tbl >>$ fun (Eq, left_ty) ->
-          help tar tbr >|$ fun (Eq, right_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, meta))
-      | (Union_t (tal, tar, meta1), Union_t (tbl, tbr, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tal tbl >>$ fun (Eq, left_ty) ->
-          help tar tbr >|$ fun (Eq, right_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, meta))
-      | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tal tbl >>$ fun (Eq, left_ty) ->
-          help tar tbr >|$ fun (Eq, right_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, meta))
-      | (Contract_t (tal, meta1), Contract_t (tbl, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tal tbl >|$ fun (Eq, arg_ty) ->
-          ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, meta))
-      | (Option_t (tva, meta1), Option_t (tvb, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tva tvb >|$ fun (Eq, ty) ->
-          ((Eq : (ta ty, tb ty) eq), Option_t (ty, meta))
-      | (List_t (tva, meta1), List_t (tvb, meta2)) ->
-          merge_type_metadata meta1 meta2 >>$ fun meta ->
-          help tva tvb >|$ fun (Eq, ty) ->
-          ((Eq : (ta ty, tb ty) eq), List_t (ty, meta))
-      | (Sapling_state_t ms1, Sapling_state_t ms2) ->
-          merge_memo_sizes ms1 ms2 >|$ fun ms -> (Eq, Sapling_state_t ms)
-      | (Sapling_transaction_t ms1, Sapling_transaction_t ms2) ->
-          merge_memo_sizes ms1 ms2 >|$ fun ms -> (Eq, Sapling_transaction_t ms)
-      | (Chest_t, Chest_t) -> return (Eq, Chest_t)
-      | (Chest_key_t, Chest_key_t) -> return (Eq, Chest_key_t)
-      | (_, _) ->
-          of_result
-          @@ Error
-               (match error_details with
-               | Fast -> (Inconsistent_types_fast : error_trace)
-               | Informative ->
-                   trace_of_error @@ default_merge_type_error ty1 ty2)
-    in
-    help ty1 ty2
-  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
+ fun ~error_details loc ty1 ty2 ->
+  let merge_type_metadata meta1 meta2 =
+    Gas_monad.of_result (merge_type_metadata ~error_details meta1 meta2)
+    |> Gas_monad.record_trace_eval ~error_details (fun () ->
+           let ty1 = serialize_ty_for_error ty1 in
+           let ty2 = serialize_ty_for_error ty2 in
+           Inconsistent_types (Some loc, ty1, ty2))
+  in
+  let merge_memo_sizes ms1 ms2 =
+    Gas_monad.of_result (merge_memo_sizes ~error_details ms1 ms2)
+  in
+  let rec help :
+      type ta tb.
+      ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) Gas_monad.t =
+   fun ty1 ty2 ->
+    help0 ty1 ty2
+    |> Gas_monad.record_trace_eval ~error_details (fun () ->
+           default_merge_type_error ty1 ty2)
+  and help0 :
+      type ta tb.
+      ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) Gas_monad.t =
+   fun ty1 ty2 ->
+    let open Gas_monad.Syntax in
+    let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
+    match (ty1, ty2) with
+    | (Unit_t, Unit_t) -> return ((Eq, Unit_t) : (ta ty, tb ty) eq * ta ty)
+    | (Int_t, Int_t) -> return (Eq, Int_t)
+    | (Nat_t, Nat_t) -> return (Eq, Nat_t)
+    | (Key_t, Key_t) -> return (Eq, Key_t)
+    | (Key_hash_t, Key_hash_t) -> return (Eq, Key_hash_t)
+    | (String_t, String_t) -> return (Eq, String_t)
+    | (Bytes_t, Bytes_t) -> return (Eq, Bytes_t)
+    | (Signature_t, Signature_t) -> return (Eq, Signature_t)
+    | (Mutez_t, Mutez_t) -> return (Eq, Mutez_t)
+    | (Timestamp_t, Timestamp_t) -> return (Eq, Timestamp_t)
+    | (Address_t, Address_t) -> return (Eq, Address_t)
+    | (Bool_t, Bool_t) -> return (Eq, Bool_t)
+    | (Chain_id_t, Chain_id_t) -> return (Eq, Chain_id_t)
+    | (Never_t, Never_t) -> return (Eq, Never_t)
+    | (Operation_t, Operation_t) -> return (Eq, Operation_t)
+    | (Bls12_381_g1_t, Bls12_381_g1_t) -> return (Eq, Bls12_381_g1_t)
+    | (Bls12_381_g2_t, Bls12_381_g2_t) -> return (Eq, Bls12_381_g2_t)
+    | (Bls12_381_fr_t, Bls12_381_fr_t) -> return (Eq, Bls12_381_fr_t)
+    | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let* (Eq, value) = help tar tbr in
+        let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
+        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta))
+    | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let* (Eq, value) = help tar tbr in
+        let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
+        ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta))
+    | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
+        ((Eq : (ta ty, tb ty) eq), Set_t (e, meta))
+    | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
+        ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta))
+    | (Pair_t (tal, tar, meta1), Pair_t (tbl, tbr, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let* (Eq, left_ty) = help tal tbl in
+        let+ (Eq, right_ty) = help tar tbr in
+        ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, meta))
+    | (Union_t (tal, tar, meta1), Union_t (tbl, tbr, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let* (Eq, left_ty) = help tal tbl in
+        let+ (Eq, right_ty) = help tar tbr in
+        ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, meta))
+    | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let* (Eq, left_ty) = help tal tbl in
+        let+ (Eq, right_ty) = help tar tbr in
+        ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, meta))
+    | (Contract_t (tal, meta1), Contract_t (tbl, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let+ (Eq, arg_ty) = help tal tbl in
+        ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, meta))
+    | (Option_t (tva, meta1), Option_t (tvb, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let+ (Eq, ty) = help tva tvb in
+        ((Eq : (ta ty, tb ty) eq), Option_t (ty, meta))
+    | (List_t (tva, meta1), List_t (tvb, meta2)) ->
+        let* meta = merge_type_metadata meta1 meta2 in
+        let+ (Eq, ty) = help tva tvb in
+        ((Eq : (ta ty, tb ty) eq), List_t (ty, meta))
+    | (Sapling_state_t ms1, Sapling_state_t ms2) ->
+        let+ ms = merge_memo_sizes ms1 ms2 in
+        (Eq, Sapling_state_t ms)
+    | (Sapling_transaction_t ms1, Sapling_transaction_t ms2) ->
+        let+ ms = merge_memo_sizes ms1 ms2 in
+        (Eq, Sapling_transaction_t ms)
+    | (Chest_t, Chest_t) -> return (Eq, Chest_t)
+    | (Chest_key_t, Chest_key_t) -> return (Eq, Chest_key_t)
+    | (_, _) ->
+        Gas_monad.of_result
+        @@ Error
+             (match error_details with
+             | Fast -> (Inconsistent_types_fast : error_trace)
+             | Informative -> trace_of_error @@ default_merge_type_error ty1 ty2)
+  in
+  help ty1 ty2
+ [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
 (* This function does not distinguish gas errors from merge errors. If you need
    to recover from a type mismatch and consume the exact gas for the failed
@@ -1813,7 +1819,7 @@ let find_entrypoint (type full error_trace)
     ~(error_details : error_trace error_details) (full : full ty)
     (entrypoints : full entrypoints) entrypoint :
     ((Script.node -> Script.node) * ex_ty, error_trace) Gas_monad.t =
-  let open Gas_monad in
+  let open Gas_monad.Syntax in
   let loc = Micheline.dummy_location in
   let rec find_entrypoint :
       type t.
@@ -1822,24 +1828,25 @@ let find_entrypoint (type full error_trace)
       Entrypoint.t ->
       ((Script.node -> Script.node) * ex_ty, unit) Gas_monad.t =
    fun ty entrypoints entrypoint ->
-    consume_gas Typecheck_costs.find_entrypoint_cycle >>$ fun () ->
+    let* () = Gas_monad.consume_gas Typecheck_costs.find_entrypoint_cycle in
     match (ty, entrypoints) with
     | (_, {name = Some name; _}) when Entrypoint.(name = entrypoint) ->
         return ((fun e -> e), Ex_ty ty)
     | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) -> (
-        find_entrypoint tl left entrypoint >??$ function
+        Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
         | Ok (f, t) -> return ((fun e -> Prim (loc, D_Left, [f e], [])), t)
         | Error () ->
-            find_entrypoint tr right entrypoint >|$ fun (f, t) ->
+            let+ (f, t) = find_entrypoint tr right entrypoint in
             ((fun e -> Prim (loc, D_Right, [f e], [])), t))
-    | (_, {nested = Entrypoints_None; _}) -> of_result (Error ())
+    | (_, {nested = Entrypoints_None; _}) -> Gas_monad.of_result (Error ())
   in
-  find_entrypoint full entrypoints entrypoint >??$ function
+  Gas_monad.bind_recover (find_entrypoint full entrypoints entrypoint)
+  @@ function
   | Ok f_t -> return f_t
   | Error () ->
       if Entrypoint.is_default entrypoint then return ((fun e -> e), Ex_ty full)
       else
-        of_result
+        Gas_monad.of_result
         @@ Error
              (match error_details with
              | Fast -> (Inconsistent_types_fast : error_trace)
@@ -1848,19 +1855,23 @@ let find_entrypoint (type full error_trace)
 let find_entrypoint_for_type (type full exp error_trace) ~error_details
     ~(full : full ty) ~(expected : exp ty) entrypoints entrypoint loc :
     (Entrypoint.t * exp ty, error_trace) Gas_monad.t =
-  let open Gas_monad in
-  find_entrypoint ~error_details full entrypoints entrypoint >>$ function
+  let open Gas_monad.Syntax in
+  let* res = find_entrypoint ~error_details full entrypoints entrypoint in
+  match res with
   | (_, Ex_ty ty) -> (
       match entrypoints.name with
-      | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint
-        -> (
-          merge_types ~error_details:Fast loc ty expected >??$ function
-          | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
-          | Error Inconsistent_types_fast ->
-              merge_types ~error_details loc full expected >?$ fun (Eq, full) ->
-              ok (Entrypoint.root, (full : exp ty)))
+      | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint ->
+          Gas_monad.bind_recover
+            (merge_types ~error_details:Fast loc ty expected)
+            (function
+              | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
+              | Error Inconsistent_types_fast ->
+                  let+ (Eq, full) =
+                    merge_types ~error_details loc full expected
+                  in
+                  (Entrypoint.root, (full : exp ty)))
       | _ ->
-          merge_types ~error_details loc ty expected >|$ fun (Eq, ty) ->
+          let+ (Eq, ty) = merge_types ~error_details loc ty expected in
           (entrypoint, (ty : exp ty)))
 
 let well_formed_entrypoints (type full) (full : full ty) entrypoints =
