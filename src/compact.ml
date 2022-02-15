@@ -98,10 +98,12 @@ end
 type 'a t = (module S with type input = 'a)
 
 let make : type a. ?tag_size:[`Uint8 | `Uint16] -> a t -> a Encoding.t =
- fun ?tag_size (module C : S with type input = a) ->
+ fun ?(tag_size = `Uint8) (module C : S with type input = a) ->
+  let tag_len_limit = match tag_size with `Uint8 -> 8 | `Uint16 -> 16 in
+
   let tag layout =
     let candidate = C.tag layout in
-    if C.tag_len >= 32 || candidate >= (1l << C.tag_len) then
+    if C.tag_len >= tag_len_limit || candidate >= (1l << C.tag_len) then
       raise @@ Invalid_argument "Compact_encoding.make: tags do not fit" ;
     to_int candidate
   in
@@ -110,10 +112,10 @@ let make : type a. ?tag_size:[`Uint8 | `Uint16] -> a t -> a Encoding.t =
     raw_splitted
       ~json:(Json.convert C.json_encoding)
       ~binary:
-        (matching ?tag_size (fun x ->
+        (matching ~tag_size (fun x ->
              let layout = C.classify x in
              matched
-               ?tag_size
+               ~tag_size
                (C.tag layout |> to_int)
                (C.partial_encoding layout)
                x)
