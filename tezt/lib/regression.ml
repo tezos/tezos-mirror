@@ -78,11 +78,14 @@ let log_regression_diff diff =
         Log.log ~level:Error ~color "%s" line)
     (String.split_on_char '\n' diff)
 
+let all_output_files = ref String_set.empty
+
 let full_output_file output_file =
   (Cli.options.regression_dir // output_file) ^ ".out"
 
 let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
+  all_output_files := String_set.add output_file !all_output_files ;
   Test.register ~__FILE__ ~title ~tags (fun () ->
       (* We cannot compute [stored_output_file] before [Test.register]
          because [Cli.init] must have been called. *)
@@ -139,3 +142,24 @@ let register ~__FILE__ ~title ~tags ~output_file f =
             Buffer.reset buffer ;
             log_regression_diff diff ;
             Test.fail "The regression test output contains differences")
+
+let check_unknown_output_files () =
+  let full_output_files = String_set.map full_output_file !all_output_files in
+  let rec browse path =
+    let handle_file filename =
+      let full = path // filename in
+      if Sys.is_directory full then browse full
+      else if not (String_set.mem full full_output_files) then
+        Log.warn "%s is not used by any test and can be deleted." full
+    in
+    match Sys.readdir path with
+    | [||] -> Log.warn "%s is empty and can be deleted." path
+    | filenames -> Array.iter handle_file filenames
+  in
+  browse Cli.options.regression_dir
+
+let () =
+  (* We cannot run [check_unknown_output_files] before [Cli.init],
+     and we cannot run it from the [Test] module because it would create
+     a circular dependency. *)
+  Test.before_test_run check_unknown_output_files

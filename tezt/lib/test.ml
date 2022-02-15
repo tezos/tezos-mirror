@@ -29,6 +29,11 @@ let reset_functions = ref []
 
 let declare_reset_function f = reset_functions := f :: !reset_functions
 
+let before_test_run_functions = ref []
+
+let before_test_run f =
+  before_test_run_functions := f :: !before_test_run_functions
+
 (* Prepare a promise that will resolve on SIGINT
    (e.g. when the user presses Ctrl+C).
 
@@ -1002,6 +1007,7 @@ type test_instance = {iteration : int; index : int}
 let current_worker_id = Scheduler.get_current_worker_id
 
 let run () =
+  List.iter (fun f -> f ()) !before_test_run_functions ;
   (* Check command-line options. *)
   check_existence "--file" known_files Cli.options.files_to_run ;
   check_existence "--test" known_titles Cli.options.tests_to_run ;

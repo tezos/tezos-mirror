@@ -31,6 +31,9 @@
     choose default process names. *)
 val declare_reset_function : (unit -> unit) -> unit
 
+(** Add a function to be called by [Test.run] before it does anything. *)
+val before_test_run : (unit -> unit) -> unit
+
 (** Log an error and stop the test right here.
 
     If the optional location [__LOC__] is provided,
