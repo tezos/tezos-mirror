@@ -65,10 +65,10 @@ let test_simple_balances () =
   let dest = `Contract (Contract.implicit_contract pkh) in
   let amount = Tez.one in
   wrap (Token.transfer ctxt src dest amount) >>=? fun (ctxt', _) ->
-  wrap (Token.balance ctxt src) >>=? fun bal_src ->
-  wrap (Token.balance ctxt' src) >>=? fun bal_src' ->
-  wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
-  wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+  wrap (Token.balance ctxt src) >>=? fun (ctxt, bal_src) ->
+  wrap (Token.balance ctxt' src) >>=? fun (ctxt', bal_src') ->
+  wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
+  wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
   bal_src' +? amount >>?= fun add_bal_src'_amount ->
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount >>=? fun () ->
@@ -106,15 +106,15 @@ let test_simple_balance_updates () =
   return_unit
 
 let test_allocated_and_deallocated ctxt dest initial_status status_when_empty =
-  wrap (Token.allocated ctxt dest) >>=? fun allocated ->
+  wrap (Token.allocated ctxt dest) >>=? fun (ctxt, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated initial_status >>=? fun () ->
   let amount = Tez.one in
   wrap (Token.transfer ctxt `Minted dest amount) >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' dest) >>=? fun allocated ->
+  wrap (Token.allocated ctxt' dest) >>=? fun (ctxt', allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated true >>=? fun () ->
-  wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+  wrap (Token.balance ctxt' dest) >>=? fun (ctxt', bal_dest') ->
   wrap (Token.transfer ctxt' dest `Burned bal_dest') >>=? fun (ctxt', _) ->
-  wrap (Token.allocated ctxt' dest) >>=? fun allocated ->
+  wrap (Token.allocated ctxt' dest) >>=? fun (_, allocated) ->
   Assert.equal_bool ~loc:__LOC__ allocated status_when_empty >>=? fun () ->
   return_unit
 
@@ -145,8 +145,8 @@ let test_allocated () =
   test_allocated_and_deallocated_when_empty ctxt dest
 
 let check_sink_balances ctxt ctxt' dest amount =
-  wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
-  wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+  wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
+  wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
   bal_dest +? amount >>?= fun add_bal_dest_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_dest' add_bal_dest_amount
 
@@ -176,7 +176,7 @@ let test_transferring_to_sink ctxt sink amount expected_bupds =
   Alcotest.(
     check bool "Balance updates do not match." (bupds = expected_bupds) true) ;
   (* Test transferring to go beyond capacity. *)
-  wrap (Token.balance ctxt' sink) >>=? fun bal ->
+  wrap (Token.balance ctxt' sink) >>=? fun (ctxt', bal) ->
   let amount = Tez.of_mutez_exn Int64.max_int -! bal +! Tez.one_mutez in
   wrap (Token.transfer ctxt' `Minted sink amount) >>= function
   | Error _ -> return_unit
@@ -292,8 +292,8 @@ let test_transferring_to_sink () =
   test_transferring_to_frozen_bonds ctxt
 
 let check_src_balances ctxt ctxt' src amount =
-  wrap (Token.balance ctxt src) >>=? fun bal_src ->
-  wrap (Token.balance ctxt' src) >>=? fun bal_src' ->
+  wrap (Token.balance ctxt src) >>=? fun (_, bal_src) ->
+  wrap (Token.balance ctxt' src) >>=? fun (_, bal_src') ->
   bal_src' +? amount >>?= fun add_bal_src'_amount ->
   Assert.equal_tez ~loc:__LOC__ bal_src add_bal_src'_amount
 
@@ -314,11 +314,12 @@ let test_transferring_from_unbounded_source ctxt src expected_bupds =
 (* Returns the balance of [account] if [account] is allocated, and returns
    [Tez.zero] otherwise. *)
 let balance_no_fail ctxt account =
-  wrap (Token.allocated ctxt account) >>=? fun allocated ->
-  if allocated then wrap (Token.balance ctxt account) else return Tez.zero
+  wrap (Token.allocated ctxt account) >>=? fun (ctxt, allocated) ->
+  if allocated then wrap (Token.balance ctxt account)
+  else return (ctxt, Tez.zero)
 
 let test_transferring_from_bounded_source ctxt src amount expected_bupds =
-  balance_no_fail ctxt src >>=? fun balance ->
+  balance_no_fail ctxt src >>=? fun (ctxt, balance) ->
   Assert.equal_tez ~loc:__LOC__ balance Tez.zero >>=? fun () ->
   (* Test transferring from an empty account. *)
   (wrap (Token.transfer ctxt src `Burned Tez.one) >>= function
@@ -344,8 +345,7 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
   (match src with
   | `Frozen_bonds _ -> (
       wrap (Token.transfer ctxt src `Burned amount) >>= function
-      | Ok _ ->
-          failwith "Partial withdrawals are forbidden for frozen bonds."
+      | Ok _ -> failwith "Partial withdrawals are forbidden for frozen bonds."
       | Error _ -> return_unit)
   | _ ->
       wrap (Token.transfer ctxt src `Burned amount) >>=? fun (ctxt', bupds) ->
@@ -353,7 +353,7 @@ let test_transferring_from_bounded_source ctxt src amount expected_bupds =
       Assert.equal_bool ~loc:__LOC__ (bupds = expected_bupds) true)
   >>=? fun () ->
   (* Test transferring more than available. *)
-  wrap (Token.balance ctxt src) >>=? fun balance ->
+  wrap (Token.balance ctxt src) >>=? fun (ctxt, balance) ->
   wrap (Token.transfer ctxt src `Burned (balance +! Tez.one)) >>= function
   | Error _ -> return_unit
   | Ok _ -> failwith "Transferring more than available should fail."
@@ -569,8 +569,8 @@ let rec check_balances ctxt ctxt' src dest amount =
       check_balances ctxt ctxt' contract contract amount
   | (Some src, Some dest) when src = dest ->
       (* src and dest are the same contract *)
-      wrap (Token.balance ctxt dest) >>=? fun bal_dest ->
-      wrap (Token.balance ctxt' dest) >>=? fun bal_dest' ->
+      wrap (Token.balance ctxt dest) >>=? fun (_, bal_dest) ->
+      wrap (Token.balance ctxt' dest) >>=? fun (_, bal_dest') ->
       Assert.equal_tez ~loc:__LOC__ bal_dest bal_dest'
   | (Some src, None) -> check_src_balances ctxt ctxt' src amount
   | (None, Some dest) -> check_sink_balances ctxt ctxt' dest amount
@@ -624,8 +624,8 @@ let coalesce_balance_updates bu1 bu2 =
 let check_balances_are_consistent ctxt1 ctxt2 elt =
   match elt with
   | #Token.container as elt ->
-      Token.balance ctxt1 elt >>=? fun elt_bal1 ->
-      Token.balance ctxt2 elt >>=? fun elt_bal2 ->
+      Token.balance ctxt1 elt >>=? fun (_, elt_bal1) ->
+      Token.balance ctxt2 elt >>=? fun (_, elt_bal2) ->
       assert (elt_bal1 = elt_bal2) ;
       return_unit
   | `Invoice | `Bootstrap | `Initial_commitments | `Minted

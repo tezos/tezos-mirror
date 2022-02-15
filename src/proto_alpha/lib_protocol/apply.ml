@@ -2851,10 +2851,10 @@ let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
       let src = `Collected_commitments blinded_pkh in
-      Token.allocated ctxt src >>=? fun src_exists ->
+      Token.allocated ctxt src >>=? fun (ctxt, src_exists) ->
       fail_unless src_exists (Invalid_activation {pkh}) >>=? fun () ->
       let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
-      Token.balance ctxt src >>=? fun amount ->
+      Token.balance ctxt src >>=? fun (ctxt, amount) ->
       Token.transfer ctxt src (`Contract contract) amount
       >>=? fun (ctxt, bupds) ->
       return (ctxt, Single_result (Activate_account_result bupds))

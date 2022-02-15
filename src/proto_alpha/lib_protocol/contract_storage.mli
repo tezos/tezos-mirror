@@ -193,18 +193,23 @@ type error +=
       Frozen_bonds_must_be_spent_at_once of
       Contract_repr.t * Bond_id_repr.t
 
-(** [bond_allocated ctxt contract bond_id] returns [true] if there is a bond
-    associated to [contract] and [bond_id], and returns [false] otherwise. *)
+(** [bond_allocated ctxt contract bond_id] returns a new context because of an
+    access to carbonated data, and [true] if there is a bond associated to
+    [contract] and [bond_id], or [false] otherwise. *)
 val bond_allocated :
-  Raw_context.t -> Contract_repr.t -> Bond_id_repr.t -> bool tzresult Lwt.t
+  Raw_context.t ->
+  Contract_repr.t ->
+  Bond_id_repr.t ->
+  (Raw_context.t * bool) tzresult Lwt.t
 
-(** [find_bond ctxt contract bond_id] returns the bond associated to
-    [contract] and [bond_id] if there is one, and returns [None] otherwise. *)
+(** [find_bond ctxt contract bond_id] returns a new context because of an access
+    to carbonated data, and the bond associated to [(contract, bond_id)] if
+    there is one, or [None] otherwise. *)
 val find_bond :
   Raw_context.t ->
   Contract_repr.t ->
   Bond_id_repr.t ->
-  Tez_repr.t option tzresult Lwt.t
+  (Raw_context.t * Tez_repr.t option) tzresult Lwt.t
 
 (** [spend_bond ctxt contract bond_id amount] withdraws the given [amount] from
     the value of the bond associated to [contract] and [bond_id].
@@ -247,6 +252,16 @@ val has_frozen_bonds : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
     to [contract]. *)
 val frozen_balance :
   Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** [fold_on_bond_ids ctxt contract order init f] folds [f] on all bond
+    identifiers associated to [contract]. *)
+val fold_on_bond_ids :
+  Raw_context.t ->
+  Contract_repr.t ->
+  order:[`Sorted | `Undefined] ->
+  init:'a ->
+  f:(Bond_id_repr.t -> 'a -> 'a Lwt.t) ->
+  'a Lwt.t
 
 (** [ensure_deallocated_if_empty ctxt contract] de-allocates [contract] if its
     full balance is zero, and it does not delegate. *)

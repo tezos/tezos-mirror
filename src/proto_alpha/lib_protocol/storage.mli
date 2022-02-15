@@ -180,12 +180,22 @@ module Contract : sig
        and type value = Z.t
        and type t := Raw_context.t
 
+  (** Associates a contract and a bond_id with a bond, i.e. an amount of tez
+      that is frozen. *)
   module Frozen_bonds :
-    Indexed_data_storage
+    Non_iterable_indexed_carbonated_data_storage
       with type key = Bond_id_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t * Contract_repr.t
 
+  val fold_bond_ids :
+    Raw_context.t * Contract_repr.t ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(Bond_id_repr.t -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
+
+  (** Associates a contract with the total of all its frozen bonds. *)
   module Total_frozen_bonds :
     Indexed_data_storage
       with type key = Contract_repr.t

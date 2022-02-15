@@ -941,7 +941,7 @@ let record_baking_activity_and_pay_rewards_and_fees ctxt ~payload_producer
   >>=? fun ctxt ->
   let pay_payload_producer ctxt delegate =
     let contract = Contract_repr.implicit_contract delegate in
-    Token.balance ctxt `Block_fees >>=? fun block_fees ->
+    Token.balance ctxt `Block_fees >>=? fun (ctxt, block_fees) ->
     Token.transfer_n
       ctxt
       [(`Block_fees, block_fees); (`Baking_rewards, baking_reward)]

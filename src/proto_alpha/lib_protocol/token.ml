@@ -55,35 +55,50 @@ type sink = [infinite_sink | container]
 
 let allocated ctxt stored =
   match stored with
-  | `Contract contract -> Contract_storage.allocated ctxt contract
-  | `Collected_commitments bpkh -> Commitment_storage.exists ctxt bpkh >|= ok
+  | `Contract contract ->
+      Contract_storage.allocated ctxt contract >|=? fun allocated ->
+      (ctxt, allocated)
+  | `Collected_commitments bpkh ->
+      Commitment_storage.exists ctxt bpkh >|= ok >|=? fun allocated ->
+      (ctxt, allocated)
   | `Delegate_balance delegate ->
       let contract = Contract_repr.implicit_contract delegate in
-      Contract_storage.allocated ctxt contract
+      Contract_storage.allocated ctxt contract >|=? fun allocated ->
+      (ctxt, allocated)
   | `Frozen_deposits delegate ->
       let contract = Contract_repr.implicit_contract delegate in
-      Frozen_deposits_storage.allocated ctxt contract >|= ok
-  | `Block_fees -> return_true
+      Frozen_deposits_storage.allocated ctxt contract >|= fun allocated ->
+      ok (ctxt, allocated)
+  | `Block_fees -> return (ctxt, true)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.bond_allocated ctxt contract bond_id
 
 let balance ctxt stored =
   match stored with
-  | `Contract contract -> Contract_storage.get_balance ctxt contract
-  | `Collected_commitments bpkh -> Commitment_storage.committed_amount ctxt bpkh
+  | `Contract contract ->
+      Contract_storage.get_balance ctxt contract >|=? fun balance ->
+      (ctxt, balance)
+  | `Collected_commitments bpkh ->
+      Commitment_storage.committed_amount ctxt bpkh >|=? fun balance ->
+      (ctxt, balance)
   | `Delegate_balance delegate ->
       let contract = Contract_repr.implicit_contract delegate in
-      Storage.Contract.Spendable_balance.get ctxt contract
-  | `Frozen_deposits delegate -> (
+      Storage.Contract.Spendable_balance.get ctxt contract >|=? fun balance ->
+      (ctxt, balance)
+  | `Frozen_deposits delegate ->
       let contract = Contract_repr.implicit_contract delegate in
       Frozen_deposits_storage.find ctxt contract >|=? fun frozen_deposits ->
-      match frozen_deposits with
-      | None -> Tez_repr.zero
-      | Some frozen_deposits -> frozen_deposits.current_amount)
-  | `Block_fees -> return (Raw_context.get_collected_fees ctxt)
+      let balance =
+        match frozen_deposits with
+        | None -> Tez_repr.zero
+        | Some frozen_deposits -> frozen_deposits.current_amount
+      in
+      (ctxt, balance)
+  | `Block_fees -> return (ctxt, Raw_context.get_collected_fees ctxt)
   | `Frozen_bonds (contract, bond_id) ->
       Contract_storage.find_bond ctxt contract bond_id
-      >|=? Option.value ~default:Tez_repr.zero
+      >|=? fun (ctxt, balance_opt) ->
+      (ctxt, Option.value ~default:Tez_repr.zero balance_opt)
 
 let credit ctxt dest amount origin =
   let open Receipt_repr in
@@ -116,7 +131,7 @@ let credit ctxt dest amount origin =
             amount
           >|=? fun ctxt -> (ctxt, Contract contract)
       | `Frozen_deposits delegate as dest ->
-          allocated ctxt dest >>=? fun allocated ->
+          allocated ctxt dest >>=? fun (ctxt, allocated) ->
           (if not allocated then Frozen_deposits_storage.init ctxt delegate
           else return ctxt)
           >>=? fun ctxt ->
