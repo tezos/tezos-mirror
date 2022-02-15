@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,35 +25,19 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** A non-compact representation of inboxes that represents complete messages
+    and not their hashes. *)
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+open Protocol.Alpha_context
 
-(** Returns the inbox for a transaction rollup for current level.
+(** The type representing an inbox whose contents are the messages and not the
+    hashed messages. *)
+type t = {contents : Tx_rollup_message.t list; cumulated_size : int}
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+(** [to_protocol_inbox node_inbox] will hash the contents of [node_inbox] to
+    produces an [Tx_rollup_inbox.t]. *)
+val to_protocol_inbox : t -> Tx_rollup_inbox.t
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
+val pp : Format.formatter -> t -> unit
 
-val register : unit -> unit
-
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
-
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
+val encoding : t Data_encoding.t

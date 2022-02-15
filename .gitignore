@@ -15,6 +15,7 @@ __pycache__
 
 /manifest/manifest
 /tezos-node
+/tezos-tx-rollup-*
 /tezos-validator
 /tezos-protocol-compiler
 /tezos-client

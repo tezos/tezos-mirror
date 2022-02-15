@@ -14,6 +14,7 @@ docs/api/tezos-client.html
 docs/api/tezos-admin-client.html
 
 tezos-node
+tezos-tx-rollup-*
 tezos-validator
 tezos-protocol-compiler
 tezos-client

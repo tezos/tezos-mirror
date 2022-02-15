@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,35 +25,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(* provide a default configuration:
+   https://gitlab.com/tezos/tezos/-/issues/2458
+*)
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+type t = {
+  data_dir : string;
+  client_keys : Client_keys.Public_key_hash.t;
+  rollup_id : Protocol.Alpha_context.Tx_rollup.t;
+  rollup_genesis : Block_hash.t;
+  rpc_addr : string;
+  rpc_port : int;
+  reconnection_delay : float;
+}
 
-(** Returns the inbox for a transaction rollup for current level.
+(** [default_data_dir] is the default value for [data_dir]. *)
+val default_data_dir : string
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+(** [default_rpc_addr] is the default value for [rpc_addr]. *)
+val default_rpc_addr : string
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
+(** [default_rpc_port] is the default value for [rpc_port]. *)
+val default_rpc_port : int
 
-val register : unit -> unit
+(** [default_reconnection_delay] is the default value for [reconnection-delay]*)
+val default_reconnection_delay : float
 
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
+(** [get_configuration_filename data_dir] returns the [configuration] filename in [data_dir]. *)
+val get_configuration_filename : string -> string
 
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
+(** [save configuration] overwrites [configuration] file. *)
+val save : t -> unit tzresult Lwt.t
+
+(** [load ~data_dir] loads a configuration stored in [data_dir]. *)
+val load : data_dir:string -> t tzresult Lwt.t
+
+(** [encoding] encodes a configuration. *)
+val encoding : t Data_encoding.t

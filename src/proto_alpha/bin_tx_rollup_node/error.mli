@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,35 +25,34 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** Error issued when the rollup referenced by its hash has not been created
+    on the block referenced by its hash. The node computes a state from the
+    block that created the rollup. *)
+type error +=
+  | Tx_rollup_not_originated_in_the_given_block of
+      Protocol.Alpha_context.Tx_rollup.t
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+(** Error issued when the daemon attempts to process the operations of a block
+    for which the predecessor has not yet been processed. *)
+type error += Tx_rollup_block_predecessor_not_processed of Block_hash.t
 
-(** Returns the inbox for a transaction rollup for current level.
+(** Error issued when the encoding of a value, in order to be persisted in the
+    store, fails. *)
+type error +=
+  | Tx_rollup_unable_to_encode_storable_value of string * Data_encoding.Json.t
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+(** Error issued when decoding a persisted value in the store fails. *)
+type error += Tx_rollup_unable_to_decode_stored_value of string * string
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
+(** Error issued when an error occurs on Irmin side. *)
+type error += Tx_rollup_irmin_error of string
 
-val register : unit -> unit
+(** Error issued when the configuration file does not exists. *)
+type error += Tx_rollup_configuration_file_does_not_exists of string
 
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
+(** Error issued when the configuration file cannot be write. *)
+type error += Tx_rollup_unable_to_write_configuration_file of string
 
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
+(** Error issued when the Tezos node is not in a valid history_mode. *)
+type error +=
+  | Tx_rollup_invalid_history_mode of Tezos_shell_services.History_mode.t

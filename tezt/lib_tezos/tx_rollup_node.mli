@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,35 +25,37 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+type t
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+val create :
+  ?path:string ->
+  ?runner:Runner.t ->
+  ?data_dir:string ->
+  ?addr:string ->
+  ?port:int ->
+  ?dormant_mode:bool ->
+  ?color:Log.Color.t ->
+  ?event_pipe:string ->
+  ?name:string ->
+  rollup_id:string ->
+  rollup_genesis:string ->
+  operator:string ->
+  Client.t ->
+  Node.t ->
+  t
 
-(** Returns the inbox for a transaction rollup for current level.
+(** Returns the node's endpoint. *)
+val endpoint : t -> string
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+(** Wait until the node is ready.
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
+    More precisely, wait until a [node_is_ready] event occurs.
+    If such an event already occurred, return immediately. *)
+val wait_for_ready : t -> unit Lwt.t
 
-val register : unit -> unit
+(** Connected to a tezos node.
+    Returns the name of the configuration file. *)
+val config_init : t -> string -> string -> string Lwt.t
 
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
-
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
+(** [run node] launches the given transaction rollup node. *)
+val run : t -> unit Lwt.t

@@ -1,8 +1,9 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -24,35 +25,59 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
+(** Describes the different representations that can be stored persistently. *)
 
-val state :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_state.t shell_tzresult Lwt.t
+(** Storage. Each "table" is described under a different path. *)
+type t
 
-(** Returns the inbox for a transaction rollup for current level.
+(** [load data_dir] loads the repository (stored in [data_dir]) that persists
+    the various tables. If there no already resgistered store, a new one will
+    be created. *)
+val load : string -> t tzresult Lwt.t
 
-    Returns [Not_found] if the transaction rollup exists, but does not
-    have inbox at that level. Fails if the transaction rollup does not
-    exist. *)
-val inbox :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_inbox.t shell_tzresult Lwt.t
+(** After use [close data_dir], closes the storage. The daemon calls this function
+    during the termination callback.*)
+val close : string -> unit Lwt.t
 
-val commitments :
-  'a #RPC_context.simple ->
-  'a ->
-  Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
+(** {1 General Interfaces} *)
 
-val register : unit -> unit
+(** An interface that describes a generic Key-Value storage. *)
+module type MAP = sig
+  type t
 
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
+  type key
 
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
+  type value
+
+  val mem : t -> key -> bool Lwt.t
+
+  val find : t -> key -> value option Lwt.t
+
+  val get : t -> key -> value tzresult Lwt.t
+
+  val add : t -> key -> value -> unit tzresult Lwt.t
+end
+
+(** An interface that describes a generic value reference. *)
+module type REF = sig
+  type t
+
+  type value
+
+  val find : t -> value option Lwt.t
+
+  val get : t -> value tzresult Lwt.t
+
+  val set : t -> value -> unit tzresult Lwt.t
+end
+
+(** {1 Storages} *)
+
+(** Persistent storage for inboxes, indexed by a block hash. Each block has a
+    single inbox. *)
+module Inboxes :
+  MAP with type key = Block_hash.t and type value = Inbox.t and type t = t
+
+(** A persistent reference cell that stores the last Tezos head processed
+    by the daemon. *)
+module Tezos_head : REF with type value = Block_hash.t and type t = t
