@@ -145,18 +145,37 @@ let register ~__FILE__ ~title ~tags ~output_file f =
 
 let check_unknown_output_files () =
   let full_output_files = String_set.map full_output_file !all_output_files in
+  let explain_how_to_delete = ref false in
   let rec browse path =
     let handle_file filename =
       let full = path // filename in
       if Sys.is_directory full then browse full
       else if not (String_set.mem full full_output_files) then
-        Log.warn "%s is not used by any test and can be deleted." full
+        if Cli.options.delete_unknown_regression_files then (
+          Sys.remove full ;
+          Log.report "Deleted file: %s" full)
+        else (
+          Log.warn "%s is not used by any test and can be deleted." full ;
+          explain_how_to_delete := true)
     in
+    Array.iter handle_file (Sys.readdir path) ;
+    (* Check whether directory is empty now that we may have deleted files. *)
     match Sys.readdir path with
-    | [||] -> Log.warn "%s is empty and can be deleted." path
-    | filenames -> Array.iter handle_file filenames
+    | [||] ->
+        if Cli.options.delete_unknown_regression_files then (
+          Sys.rmdir path ;
+          Log.report "Deleted directory: %s" path)
+        else (
+          Log.warn "%s is empty and can be deleted." path ;
+          explain_how_to_delete := true)
+    | _ -> ()
   in
-  browse Cli.options.regression_dir
+  browse Cli.options.regression_dir ;
+  if !explain_how_to_delete then
+    Log.warn
+      "Use --delete-unknown-regression-files to delete those files and/or \
+       directories." ;
+  if Cli.options.delete_unknown_regression_files then exit 0
 
 let () =
   (* We cannot run [check_unknown_output_files] before [Cli.init],

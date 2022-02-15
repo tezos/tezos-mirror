@@ -86,6 +86,7 @@ type options = {
   mutable test_timeout : float option;
   mutable regression_dir : string;
   mutable reset_regressions : bool;
+  mutable delete_unknown_regression_files : bool;
   mutable loop_mode : loop_mode;
   mutable time : bool;
   mutable starting_port : int;

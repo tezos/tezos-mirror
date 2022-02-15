@@ -50,6 +50,7 @@ type options = {
   mutable test_timeout : float option;
   mutable regression_dir : string;
   mutable reset_regressions : bool;
+  mutable delete_unknown_regression_files : bool;
   mutable loop_mode : loop_mode;
   mutable time : bool;
   mutable starting_port : int;
@@ -80,6 +81,7 @@ let options =
     test_timeout = None;
     regression_dir = "tezt/_regressions";
     reset_regressions = false;
+    delete_unknown_regression_files = false;
     loop_mode = Count 1;
     time = false;
     starting_port = 16384;
@@ -267,6 +269,12 @@ let init ?args () =
           Arg.Unit (fun () -> options.reset_regressions <- true),
           " Remove regression test outputs if they exist, and regenerate them."
         );
+        ( "--delete-unknown-regression-files",
+          Arg.Unit (fun () -> options.delete_unknown_regression_files <- true),
+          " Delete regression test outputs that are not declared by any test. \
+           To check which files would be deleted, run without this option \
+           first. If there are files that would be deleted by this flag, a \
+           warning is emitted for each of them." );
         ( "--loop",
           Arg.Unit (fun () -> options.loop_mode <- Infinite),
           " Restart from the beginning once all tests are done. All tests are \
