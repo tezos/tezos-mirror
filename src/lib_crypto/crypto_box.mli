@@ -151,3 +151,10 @@ val neuterize : secret_key -> public_key
 val equal : public_key -> public_key -> bool
 
 val pp_pk : Format.formatter -> public_key -> unit
+
+(**/**)
+
+module For_testing_only : sig
+  val generate_proof_of_work_n_attempts :
+    max:int -> public_key -> pow_target -> nonce
+end
