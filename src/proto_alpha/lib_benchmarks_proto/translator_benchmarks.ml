@@ -510,7 +510,7 @@ let check_printable_benchmark =
 
 let () = Registration_helpers.register check_printable_benchmark
 
-module Merge_types : Benchmark.S = struct
+module Ty_eq : Benchmark.S = struct
   type config = {max_size : int}
 
   let config_encoding =
@@ -522,23 +522,23 @@ module Merge_types : Benchmark.S = struct
 
   let default_config = {max_size = 64}
 
-  type workload = Merge_types_workload of {nodes : int; consumed : Size.t}
+  type workload = Ty_eq_workload of {nodes : int; consumed : Size.t}
 
   let workload_encoding =
     let open Data_encoding in
     conv
-      (function Merge_types_workload {nodes; consumed} -> (nodes, consumed))
-      (fun (nodes, consumed) -> Merge_types_workload {nodes; consumed})
+      (function Ty_eq_workload {nodes; consumed} -> (nodes, consumed))
+      (fun (nodes, consumed) -> Ty_eq_workload {nodes; consumed})
       (obj2 (req "nodes" int31) (req "consumed" int31))
 
   let workload_to_vector = function
-    | Merge_types_workload {nodes; consumed} ->
+    | Ty_eq_workload {nodes; consumed} ->
         Sparse_vec.String.of_list
           [("nodes", float_of_int nodes); ("consumed", float_of_int consumed)]
 
-  let name = "MERGE_TYPES"
+  let name = "TY_EQ"
 
-  let info = "Benchmarking merging of types"
+  let info = "Benchmarking equating types"
 
   let tags = [Tags.translator]
 
@@ -548,7 +548,7 @@ module Merge_types : Benchmark.S = struct
 
   let size_model =
     Model.make
-      ~conv:(function Merge_types_workload {nodes; _} -> (nodes, ()))
+      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
       ~model:
         (Model.affine_split_const
            ~intercept1:Builtin_benchmarks.timer_variable
@@ -557,7 +557,7 @@ module Merge_types : Benchmark.S = struct
 
   let codegen_model =
     Model.make
-      ~conv:(function Merge_types_workload {nodes; _} -> (nodes, ()))
+      ~conv:(function Ty_eq_workload {nodes; _} -> (nodes, ()))
       ~model:(Model.affine ~intercept:intercept_var ~coeff:coeff_var)
 
   let () =
@@ -568,7 +568,7 @@ module Merge_types : Benchmark.S = struct
   let models =
     [("size_translator_model", size_model); ("codegen", codegen_model)]
 
-  let merge_type_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
+  let ty_eq_benchmark rng_state nodes (ty : Script_ir_translator.ex_ty) =
     let open Error_monad in
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
@@ -576,17 +576,31 @@ module Merge_types : Benchmark.S = struct
         match ty with
         | Ex_ty ty ->
             let dummy_loc = 0 in
-            Lwt.return (Script_ir_translator.ty_eq ctxt dummy_loc ty ty)
+            Lwt.return
+              (Gas_monad.run ctxt
+              @@ Script_ir_translator.ty_eq
+                   ~error_details:Informative
+                   dummy_loc
+                   ty
+                   ty)
             >|= Environment.wrap_tzresult
             >>=? fun (_, ctxt') ->
             let consumed =
               Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'
             in
             let workload =
-              Merge_types_workload
+              Ty_eq_workload
                 {nodes; consumed = Z.to_int (Gas_helpers.fp_to_z consumed)}
             in
-            let closure () = ignore (Script_ir_translator.ty_eq ctxt 0 ty ty) in
+            let closure () =
+              ignore
+                (Gas_monad.run ctxt
+                @@ Script_ir_translator.ty_eq
+                     ~error_details:Informative
+                     dummy_loc
+                     ty
+                     ty)
+            in
             return (Generator.Plain {workload; closure}) )
     |> function
     | Ok closure -> closure
@@ -600,13 +614,13 @@ module Merge_types : Benchmark.S = struct
     let ty =
       Michelson_generation.Samplers.Random_type.m_type ~size:nodes rng_state
     in
-    merge_type_benchmark rng_state nodes ty
+    ty_eq_benchmark rng_state nodes ty
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
 end
 
-let () = Registration_helpers.register (module Merge_types)
+let () = Registration_helpers.register (module Ty_eq)
 
 (* A dummy type generator, sampling linear terms of a given size.
    The generator always returns types of the shape:

@@ -745,92 +745,71 @@ let check_dupable_ty ctxt loc ty =
 
 type ('ta, 'tb) eq = Eq : ('same, 'same) eq
 
-let merge_type_metadata :
+let type_metadata_eq :
     type error_trace.
     error_details:error_trace error_details ->
     'a ty_metadata ->
     'b ty_metadata ->
-    ('a ty_metadata, error_trace) result =
+    (unit, error_trace) result =
  fun ~error_details {size = size_a} {size = size_b} ->
-  Type_size.merge ~error_details size_a size_b >|? fun size -> {size}
+  Type_size.check_eq ~error_details size_a size_b
 
-let default_merge_type_error ty1 ty2 =
+let default_ty_eq_error ty1 ty2 =
   let ty1 = serialize_ty_for_error ty1 in
   let ty2 = serialize_ty_for_error ty2 in
   Inconsistent_types (None, ty1, ty2)
 
-(* Takes two comparable types and simultaneously merge their annotations and
-   check that they represent the same type.
+(* Check that two comparable types are equal.
 
-   The result contains:
-   - an equality witness between the types of the two inputs
-   - the merged type
-   - an updated context (for gas consumption)
-
-   The tzresult monad is used at two levels: the inner tzresult
-   is used for tracking merge errors (types of different shapes
-   or annotation mismatches), the outer tzresult is used only
-   for gas consumption. Separating these two error cases like
-   this allows to recover from a type comparison error without
-   reverting the gas consumption.
+   The result is an equality witness between the types of the two inputs within
+   the gas monad (for gas consumption).
  *)
-let rec merge_comparable_types :
+let rec comparable_ty_eq :
     type ta tb error_trace.
     error_details:error_trace error_details ->
     ta comparable_ty ->
     tb comparable_ty ->
-    ( (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty,
-      error_trace )
-    Gas_monad.t =
+    ((ta comparable_ty, tb comparable_ty) eq, error_trace) Gas_monad.t =
   let open Gas_monad in
   fun ~error_details ta tb ->
     let open Gas_monad.Syntax in
     let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
-    let merge_type_metadata meta_a meta_b =
-      of_result @@ merge_type_metadata ~error_details meta_a meta_b
+    let type_metadata_eq meta_a meta_b =
+      of_result @@ type_metadata_eq ~error_details meta_a meta_b
     in
     match (ta, tb) with
     | (Unit_key, Unit_key) ->
-        return
-          ((Eq, Unit_key)
-            : (ta comparable_ty, tb comparable_ty) eq * ta comparable_ty)
-    | (Never_key, Never_key) -> return (Eq, Never_key)
-    | (Int_key, Int_key) -> return (Eq, Int_key)
-    | (Nat_key, Nat_key) -> return (Eq, Nat_key)
-    | (Signature_key, Signature_key) -> return (Eq, Signature_key)
-    | (String_key, String_key) -> return (Eq, String_key)
-    | (Bytes_key, Bytes_key) -> return (Eq, Bytes_key)
-    | (Mutez_key, Mutez_key) -> return (Eq, Mutez_key)
-    | (Bool_key, Bool_key) -> return (Eq, Bool_key)
-    | (Key_hash_key, Key_hash_key) -> return (Eq, Key_hash_key)
-    | (Key_key, Key_key) -> return (Eq, Key_key)
-    | (Timestamp_key, Timestamp_key) -> return (Eq, Timestamp_key)
-    | (Chain_id_key, Chain_id_key) -> return (Eq, Chain_id_key)
-    | (Address_key, Address_key) -> return (Eq, Address_key)
-    | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) ->
-        return (Eq, Tx_rollup_l2_address_key)
+        return (Eq : (ta comparable_ty, tb comparable_ty) eq)
+    | (Never_key, Never_key) -> return Eq
+    | (Int_key, Int_key) -> return Eq
+    | (Nat_key, Nat_key) -> return Eq
+    | (Signature_key, Signature_key) -> return Eq
+    | (String_key, String_key) -> return Eq
+    | (Bytes_key, Bytes_key) -> return Eq
+    | (Mutez_key, Mutez_key) -> return Eq
+    | (Bool_key, Bool_key) -> return Eq
+    | (Key_hash_key, Key_hash_key) -> return Eq
+    | (Key_key, Key_key) -> return Eq
+    | (Timestamp_key, Timestamp_key) -> return Eq
+    | (Chain_id_key, Chain_id_key) -> return Eq
+    | (Address_key, Address_key) -> return Eq
+    | (Tx_rollup_l2_address_key, Tx_rollup_l2_address_key) -> return Eq
     | (Pair_key (left_a, right_a, meta_a), Pair_key (left_b, right_b, meta_b))
       ->
-        let* meta = merge_type_metadata meta_a meta_b in
-        let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
-        let+ (Eq, right) =
-          merge_comparable_types ~error_details right_a right_b
-        in
-        ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Pair_key (left, right, meta) )
+        let* () = type_metadata_eq meta_a meta_b in
+        let* Eq = comparable_ty_eq ~error_details left_a left_b in
+        let+ Eq = comparable_ty_eq ~error_details right_a right_b in
+        (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (Union_key (left_a, right_a, meta_a), Union_key (left_b, right_b, meta_b))
       ->
-        let* meta = merge_type_metadata meta_a meta_b in
-        let* (Eq, left) = merge_comparable_types ~error_details left_a left_b in
-        let+ (Eq, right) =
-          merge_comparable_types ~error_details right_a right_b
-        in
-        ( (Eq : (ta comparable_ty, tb comparable_ty) eq),
-          Union_key (left, right, meta) )
+        let* () = type_metadata_eq meta_a meta_b in
+        let* Eq = comparable_ty_eq ~error_details left_a left_b in
+        let+ Eq = comparable_ty_eq ~error_details right_a right_b in
+        (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (Option_key (ta, meta_a), Option_key (tb, meta_b)) ->
-        let* meta = merge_type_metadata meta_a meta_b in
-        let+ (Eq, t) = merge_comparable_types ~error_details ta tb in
-        ((Eq : (ta comparable_ty, tb comparable_ty) eq), Option_key (t, meta))
+        let* () = type_metadata_eq meta_a meta_b in
+        let+ Eq = comparable_ty_eq ~error_details ta tb in
+        (Eq : (ta comparable_ty, tb comparable_ty) eq)
     | (_, _) ->
         of_result
         @@ Error
@@ -838,207 +817,161 @@ let rec merge_comparable_types :
              | Fast -> (Inconsistent_types_fast : error_trace)
              | Informative ->
                  trace_of_error
-                 @@ default_merge_type_error
+                 @@ default_ty_eq_error
                       (ty_of_comparable_ty ta)
                       (ty_of_comparable_ty tb))
 
-(* This function does not distinguish gas errors from merge errors. If you need
-   to recover from a type mismatch and consume the exact gas for the failed
-   comparison, use [merge_comparable_types] instead.
-*)
-let comparable_ty_eq :
-    type ta tb.
-    context ->
-    ta comparable_ty ->
-    tb comparable_ty ->
-    ((ta comparable_ty, tb comparable_ty) eq * context) tzresult =
- fun ctxt ta tb ->
-  Gas_monad.run ctxt (merge_comparable_types ~error_details:Informative ta tb)
-  >>? fun (eq_ty, ctxt) ->
-  eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
-
-let merge_memo_sizes :
+let memo_size_eq :
     type error_trace.
     error_details:error_trace error_details ->
     Sapling.Memo_size.t ->
     Sapling.Memo_size.t ->
-    (Sapling.Memo_size.t, error_trace) result =
+    (unit, error_trace) result =
  fun ~error_details ms1 ms2 ->
-  if Sapling.Memo_size.equal ms1 ms2 then ok ms1
+  if Sapling.Memo_size.equal ms1 ms2 then Result.return_unit
   else
     Error
       (match error_details with
       | Fast -> Inconsistent_types_fast
       | Informative -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
-(* Same as merge_comparable_types but for any types *)
-let merge_types :
+(** Same as comparable_ty_eq but for any types. *)
+let ty_eq :
     type a b error_trace.
     error_details:error_trace error_details ->
     Script.location ->
     a ty ->
     b ty ->
-    ((a ty, b ty) eq * a ty, error_trace) Gas_monad.t =
+    ((a ty, b ty) eq, error_trace) Gas_monad.t =
  fun ~error_details loc ty1 ty2 ->
-  let merge_type_metadata meta1 meta2 =
-    Gas_monad.of_result (merge_type_metadata ~error_details meta1 meta2)
+  let type_metadata_eq meta1 meta2 =
+    Gas_monad.of_result (type_metadata_eq ~error_details meta1 meta2)
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
            let ty1 = serialize_ty_for_error ty1 in
            let ty2 = serialize_ty_for_error ty2 in
            Inconsistent_types (Some loc, ty1, ty2))
   in
-  let merge_memo_sizes ms1 ms2 =
-    Gas_monad.of_result (merge_memo_sizes ~error_details ms1 ms2)
+  let memo_size_eq ms1 ms2 =
+    Gas_monad.of_result (memo_size_eq ~error_details ms1 ms2)
   in
   let rec help :
-      type ta tb.
-      ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) Gas_monad.t =
+      type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq, error_trace) Gas_monad.t
+      =
    fun ty1 ty2 ->
     help0 ty1 ty2
     |> Gas_monad.record_trace_eval ~error_details (fun () ->
-           default_merge_type_error ty1 ty2)
+           default_ty_eq_error ty1 ty2)
   and help0 :
-      type ta tb.
-      ta ty -> tb ty -> ((ta ty, tb ty) eq * ta ty, error_trace) Gas_monad.t =
+      type ta tb. ta ty -> tb ty -> ((ta ty, tb ty) eq, error_trace) Gas_monad.t
+      =
    fun ty1 ty2 ->
     let open Gas_monad.Syntax in
     let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
     match (ty1, ty2) with
-    | (Unit_t, Unit_t) -> return ((Eq, Unit_t) : (ta ty, tb ty) eq * ta ty)
-    | (Int_t, Int_t) -> return (Eq, Int_t)
-    | (Nat_t, Nat_t) -> return (Eq, Nat_t)
-    | (Key_t, Key_t) -> return (Eq, Key_t)
-    | (Key_hash_t, Key_hash_t) -> return (Eq, Key_hash_t)
-    | (String_t, String_t) -> return (Eq, String_t)
-    | (Bytes_t, Bytes_t) -> return (Eq, Bytes_t)
-    | (Signature_t, Signature_t) -> return (Eq, Signature_t)
-    | (Mutez_t, Mutez_t) -> return (Eq, Mutez_t)
-    | (Timestamp_t, Timestamp_t) -> return (Eq, Timestamp_t)
-    | (Address_t, Address_t) -> return (Eq, Address_t)
-    | (Tx_rollup_l2_address_t, Tx_rollup_l2_address_t) ->
-        return (Eq, Tx_rollup_l2_address_t)
-    | (Bool_t, Bool_t) -> return (Eq, Bool_t)
-    | (Chain_id_t, Chain_id_t) -> return (Eq, Chain_id_t)
-    | (Never_t, Never_t) -> return (Eq, Never_t)
-    | (Operation_t, Operation_t) -> return (Eq, Operation_t)
-    | (Bls12_381_g1_t, Bls12_381_g1_t) -> return (Eq, Bls12_381_g1_t)
-    | (Bls12_381_g2_t, Bls12_381_g2_t) -> return (Eq, Bls12_381_g2_t)
-    | (Bls12_381_fr_t, Bls12_381_fr_t) -> return (Eq, Bls12_381_fr_t)
+    | (Unit_t, Unit_t) -> return (Eq : (ta ty, tb ty) eq)
+    | (Int_t, Int_t) -> return Eq
+    | (Nat_t, Nat_t) -> return Eq
+    | (Key_t, Key_t) -> return Eq
+    | (Key_hash_t, Key_hash_t) -> return Eq
+    | (String_t, String_t) -> return Eq
+    | (Bytes_t, Bytes_t) -> return Eq
+    | (Signature_t, Signature_t) -> return Eq
+    | (Mutez_t, Mutez_t) -> return Eq
+    | (Timestamp_t, Timestamp_t) -> return Eq
+    | (Address_t, Address_t) -> return Eq
+    | (Tx_rollup_l2_address_t, Tx_rollup_l2_address_t) -> return Eq
+    | (Bool_t, Bool_t) -> return Eq
+    | (Chain_id_t, Chain_id_t) -> return Eq
+    | (Never_t, Never_t) -> return Eq
+    | (Operation_t, Operation_t) -> return Eq
+    | (Bls12_381_g1_t, Bls12_381_g1_t) -> return Eq
+    | (Bls12_381_g2_t, Bls12_381_g2_t) -> return Eq
+    | (Bls12_381_fr_t, Bls12_381_fr_t) -> return Eq
     | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let* (Eq, value) = help tar tbr in
-        let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Map_t (tk, value, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let* Eq = help tar tbr in
+        let+ Eq = comparable_ty_eq ~error_details tal tbl in
+        (Eq : (ta ty, tb ty) eq)
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let* (Eq, value) = help tar tbr in
-        let+ (Eq, tk) = merge_comparable_types ~error_details tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Big_map_t (tk, value, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let* Eq = help tar tbr in
+        let+ Eq = comparable_ty_eq ~error_details tal tbl in
+        (Eq : (ta ty, tb ty) eq)
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
-        ((Eq : (ta ty, tb ty) eq), Set_t (e, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let+ Eq = comparable_ty_eq ~error_details ea eb in
+        (Eq : (ta ty, tb ty) eq)
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let+ (Eq, e) = merge_comparable_types ~error_details ea eb in
-        ((Eq : (ta ty, tb ty) eq), Ticket_t (e, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let+ Eq = comparable_ty_eq ~error_details ea eb in
+        (Eq : (ta ty, tb ty) eq)
     | (Pair_t (tal, tar, meta1), Pair_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let* (Eq, left_ty) = help tal tbl in
-        let+ (Eq, right_ty) = help tar tbr in
-        ((Eq : (ta ty, tb ty) eq), Pair_t (left_ty, right_ty, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let* Eq = help tal tbl in
+        let+ Eq = help tar tbr in
+        (Eq : (ta ty, tb ty) eq)
     | (Union_t (tal, tar, meta1), Union_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let* (Eq, left_ty) = help tal tbl in
-        let+ (Eq, right_ty) = help tar tbr in
-        ((Eq : (ta ty, tb ty) eq), Union_t (left_ty, right_ty, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let* Eq = help tal tbl in
+        let+ Eq = help tar tbr in
+        (Eq : (ta ty, tb ty) eq)
     | (Lambda_t (tal, tar, meta1), Lambda_t (tbl, tbr, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let* (Eq, left_ty) = help tal tbl in
-        let+ (Eq, right_ty) = help tar tbr in
-        ((Eq : (ta ty, tb ty) eq), Lambda_t (left_ty, right_ty, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let* Eq = help tal tbl in
+        let+ Eq = help tar tbr in
+        (Eq : (ta ty, tb ty) eq)
     | (Contract_t (tal, meta1), Contract_t (tbl, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let+ (Eq, arg_ty) = help tal tbl in
-        ((Eq : (ta ty, tb ty) eq), Contract_t (arg_ty, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let+ Eq = help tal tbl in
+        (Eq : (ta ty, tb ty) eq)
     | (Option_t (tva, meta1), Option_t (tvb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let+ (Eq, ty) = help tva tvb in
-        ((Eq : (ta ty, tb ty) eq), Option_t (ty, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let+ Eq = help tva tvb in
+        (Eq : (ta ty, tb ty) eq)
     | (List_t (tva, meta1), List_t (tvb, meta2)) ->
-        let* meta = merge_type_metadata meta1 meta2 in
-        let+ (Eq, ty) = help tva tvb in
-        ((Eq : (ta ty, tb ty) eq), List_t (ty, meta))
+        let* () = type_metadata_eq meta1 meta2 in
+        let+ Eq = help tva tvb in
+        (Eq : (ta ty, tb ty) eq)
     | (Sapling_state_t ms1, Sapling_state_t ms2) ->
-        let+ ms = merge_memo_sizes ms1 ms2 in
-        (Eq, Sapling_state_t ms)
+        let+ () = memo_size_eq ms1 ms2 in
+        Eq
     | (Sapling_transaction_t ms1, Sapling_transaction_t ms2) ->
-        let+ ms = merge_memo_sizes ms1 ms2 in
-        (Eq, Sapling_transaction_t ms)
-    | (Chest_t, Chest_t) -> return (Eq, Chest_t)
-    | (Chest_key_t, Chest_key_t) -> return (Eq, Chest_key_t)
+        let+ () = memo_size_eq ms1 ms2 in
+        Eq
+    | (Chest_t, Chest_t) -> return Eq
+    | (Chest_key_t, Chest_key_t) -> return Eq
     | (_, _) ->
         Gas_monad.of_result
         @@ Error
              (match error_details with
              | Fast -> (Inconsistent_types_fast : error_trace)
-             | Informative -> trace_of_error @@ default_merge_type_error ty1 ty2)
+             | Informative -> trace_of_error @@ default_ty_eq_error ty1 ty2)
   in
   help ty1 ty2
  [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
-(* This function does not distinguish gas errors from merge errors. If you need
-   to recover from a type mismatch and consume the exact gas for the failed
-   comparison, use [merge_types] instead.
-*)
-let ty_eq :
-    type ta tb.
-    context ->
-    Script.location ->
-    ta ty ->
-    tb ty ->
-    ((ta ty, tb ty) eq * context) tzresult =
- fun ctxt loc ta tb ->
-  Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ta tb
-  >>? fun (eq_ty, ctxt) ->
-  eq_ty >|? fun (eq, _ty) -> (eq, ctxt)
-
-(* Same as merge_comparable_types and merge_types but for stacks.
+(* Same as ty_eq but for stacks.
    A single error monad is used here because there is no need to
    recover from stack merging errors.  *)
-let merge_stacks :
+let rec stack_eq :
     type ta tb ts tu.
     Script.location ->
     context ->
     int ->
     (ta, ts) stack_ty ->
     (tb, tu) stack_ty ->
-    (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * (ta, ts) stack_ty * context)
-    tzresult =
- fun loc ->
-  let rec help :
-      type ta tb ts tu.
-      context ->
-      int ->
-      (ta, ts) stack_ty ->
-      (tb, tu) stack_ty ->
-      (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * (ta, ts) stack_ty * context)
-      tzresult =
-   fun ctxt lvl stack1 stack2 ->
-    match (stack1, stack2) with
-    | (Bot_t, Bot_t) -> ok (Eq, Bot_t, ctxt)
-    | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
-        Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ty1 ty2
-        |> record_trace (Bad_stack_item lvl)
-        >>? fun (eq_ty, ctxt) ->
-        eq_ty >>? fun (Eq, ty) ->
-        help ctxt (lvl + 1) rest1 rest2 >|? fun (Eq, rest, ctxt) ->
-        ( (Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq),
-          Item_t (ty, rest),
-          ctxt )
-    | (_, _) -> error Bad_stack_length
-  in
-  help
+    (((ta, ts) stack_ty, (tb, tu) stack_ty) eq * context) tzresult =
+ fun loc ctxt lvl stack1 stack2 ->
+  match (stack1, stack2) with
+  | (Bot_t, Bot_t) -> ok (Eq, ctxt)
+  | (Item_t (ty1, rest1), Item_t (ty2, rest2)) ->
+      Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc ty1 ty2
+      |> record_trace (Bad_stack_item lvl)
+      >>? fun (eq, ctxt) ->
+      eq >>? fun Eq ->
+      stack_eq loc ctxt (lvl + 1) rest1 rest2 >|? fun (Eq, ctxt) ->
+      ((Eq : ((ta, ts) stack_ty, (tb, tu) stack_ty) eq), ctxt)
+  | (_, _) -> error Bad_stack_length
 
 (* ---- Type checker results -------------------------------------------------*)
 
@@ -1076,12 +1009,8 @@ let merge_branches :
       in
       record_trace_eval
         unmatched_branches
-        ( merge_stacks loc ctxt 1 aftbt aftbf >|? fun (Eq, merged_stack, ctxt) ->
-          ( Typed
-              (branch
-                 {dbt with aft = merged_stack}
-                 {dbf with aft = merged_stack}),
-            ctxt ) )
+        ( stack_eq loc ctxt 1 aftbt aftbf >|? fun (Eq, ctxt) ->
+          (Typed (branch dbt dbf), ctxt) )
   | (Failed {descr = descrt}, Failed {descr = descrf}) ->
       let descr ret = branch (descrt ret) (descrf ret) in
       ok (Failed {descr}, ctxt)
@@ -1900,16 +1829,14 @@ let find_entrypoint_for_type (type full exp error_trace) ~error_details
       match entrypoints.name with
       | Some e when Entrypoint.is_root e && Entrypoint.is_default entrypoint ->
           Gas_monad.bind_recover
-            (merge_types ~error_details:Fast loc ty expected)
+            (ty_eq ~error_details:Fast loc ty expected)
             (function
-              | Ok (Eq, ty) -> return (Entrypoint.default, (ty : exp ty))
+              | Ok Eq -> return (Entrypoint.default, (ty : exp ty))
               | Error Inconsistent_types_fast ->
-                  let+ (Eq, full) =
-                    merge_types ~error_details loc full expected
-                  in
+                  let+ Eq = ty_eq ~error_details loc full expected in
                   (Entrypoint.root, (full : exp ty)))
       | _ ->
-          let+ (Eq, ty) = merge_types ~error_details loc ty expected in
+          let+ Eq = ty_eq ~error_details loc ty expected in
           (entrypoint, (ty : exp ty)))
 
 let well_formed_entrypoints (type full) (full : full ty) entrypoints =
@@ -2716,9 +2643,15 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                       ~legacy
                       (Micheline.root btv)
                     >>? fun (Ex_ty btv, ctxt) ->
-                    comparable_ty_eq ctxt tk btk >>? fun (Eq, ctxt) ->
-                    ty_eq ctxt loc tv btv >>? fun (Eq, ctxt) ->
-                    ok (Some id, ctxt) )
+                    (Gas_monad.run ctxt
+                    @@
+                    let open Gas_monad.Syntax in
+                    let* Eq =
+                      comparable_ty_eq ~error_details:Informative tk btk
+                    in
+                    ty_eq ~error_details:Informative loc tv btv)
+                    >>? fun (eq, ctxt) ->
+                    eq >|? fun Eq -> (Some id, ctxt) )
           else traced_fail (Unexpected_forged_value loc))
       >|=? fun (id, ctxt) -> ({id; diff; key_type = tk; value_type = tv}, ctxt)
   | (Never_t, expr) -> Lwt.return @@ traced_no_lwt @@ parse_never expr
@@ -2761,11 +2694,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
           | None -> return (transaction, ctxt)
           | Some transac_memo_size ->
               Lwt.return
-                ( merge_memo_sizes
+                ( memo_size_eq
                     ~error_details:Informative
                     memo_size
                     transac_memo_size
-                >|? fun _ms -> (transaction, ctxt) ))
+                >|? fun () -> (transaction, ctxt) ))
       | None -> fail_parse_data ())
   | (Sapling_transaction_t _, expr) ->
       traced_fail (Invalid_kind (location expr, [Bytes_kind], kind expr))
@@ -2775,11 +2708,11 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
         Sapling.state_from_id ctxt id >>=? fun (state, ctxt) ->
         Lwt.return
           ( traced_no_lwt
-          @@ merge_memo_sizes
+          @@ memo_size_eq
                ~error_details:Informative
                memo_size
                state.Sapling.memo_size
-          >|? fun _memo_size -> (state, ctxt) )
+          >|? fun () -> (state, ctxt) )
       else traced_fail (Unexpected_forged_value loc)
   | (Sapling_state_t memo_size, Seq (_, [])) ->
       return (Sapling.empty_state ~memo_size (), ctxt)
@@ -2862,11 +2795,13 @@ and parse_view_returning :
       in
       match aft with
       | Item_t (ty, Bot_t) ->
-          record_trace_eval
-            (ill_type_view loc aft : unit -> _)
-            ( ty_eq ctxt loc ty output_ty' >|? fun (Eq, ctxt) ->
-              let view' = Ex_view (Lam (close_descr descr, view_code)) in
-              (view', ctxt) )
+          Gas_monad.run ctxt
+          @@ Gas_monad.record_trace_eval
+               ~error_details:Informative
+               (ill_type_view loc aft : unit -> _)
+          @@ ty_eq ~error_details:Informative loc ty output_ty'
+          >>? fun (eq, ctxt) ->
+          eq >|? fun Eq -> (Ex_view (Lam (close_descr descr, view_code)), ctxt)
       | _ -> error (ill_type_view loc aft ()))
 
 and typecheck_views :
@@ -2907,14 +2842,15 @@ and[@coq_axiom_with_reason "gadt"] parse_returning :
   >>=? function
   | (Typed ({loc; aft = Item_t (ty, Bot_t) as stack_ty; _} as descr), ctxt) ->
       Lwt.return
-      @@ record_trace_eval
-           (fun () ->
-             let ret = serialize_ty_for_error ret in
-             let stack_ty = serialize_stack_for_error ctxt stack_ty in
-             Bad_return (loc, stack_ty, ret))
-           ( ty_eq ctxt loc ty ret >|? fun (Eq, ctxt) ->
-             ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt)
-           )
+        ( Gas_monad.run ctxt
+        @@ Gas_monad.record_trace_eval ~error_details:Informative (fun () ->
+               let ret = serialize_ty_for_error ret in
+               let stack_ty = serialize_stack_for_error ctxt stack_ty in
+               Bad_return (loc, stack_ty, ret))
+        @@ ty_eq ~error_details:Informative loc ty ret
+        >>? fun (eq, ctxt) ->
+          eq >|? fun Eq ->
+          ((Lam (close_descr descr, script_instr) : (arg, ret) lambda), ctxt) )
   | (Typed {loc; aft = stack_ty; _}, ctxt) ->
       let ret = serialize_ty_for_error ret in
       let stack_ty = serialize_stack_for_error ctxt stack_ty in
@@ -2937,16 +2873,15 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     ((a, s) judgement * context) tzresult Lwt.t =
  fun ?type_logger ~stack_depth tc_context ctxt ~legacy script_instr stack_ty ->
   let check_item_ty (type a b) ctxt (exp : a ty) (got : b ty) loc name n m :
-      ((a, b) eq * a ty * context) tzresult =
+      ((a, b) eq * context) tzresult =
     record_trace_eval (fun () ->
         let stack_ty = serialize_stack_for_error ctxt stack_ty in
         Bad_stack (loc, name, m, stack_ty))
     @@ record_trace
          (Bad_stack_item n)
-         ( Gas_monad.run ctxt
-         @@ merge_types ~error_details:Informative loc exp got
-         >>? fun (eq_ty, ctxt) ->
-           eq_ty >|? fun (Eq, ty) -> ((Eq : (a, b) eq), (ty : a ty), ctxt) )
+         ( Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc exp got
+         >>? fun (eq, ctxt) ->
+           eq >|? fun Eq -> ((Eq : (a, b) eq), ctxt) )
   in
   let log_stack loc stack_ty aft =
     match (type_logger, script_instr) with
@@ -3170,7 +3105,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks loc ctxt 1 aft_rest rest >>? fun (Eq, rest, ctxt) ->
+            ( stack_eq loc ctxt 1 aft_rest rest >>? fun (Eq, ctxt) ->
               option_t loc ret >>? fun opt_ty ->
               let final_stack = Item_t (opt_ty, rest) in
               let hinfo = {iloc = loc; kstack_ty = Item_t (ret, aft_rest)} in
@@ -3404,7 +3339,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       list_t loc t >>?= fun ty -> typed ctxt loc nil (Item_t (ty, stack))
   | ( Prim (loc, I_CONS, [], annot),
       Item_t (tv, Item_t (List_t (t, ty_name), rest)) ) ->
-      check_item_ty ctxt tv t loc I_CONS 1 2 >>?= fun (Eq, t, ctxt) ->
+      check_item_ty ctxt tv t loc I_CONS 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let cons_list = {apply = (fun kinfo k -> ICons_list (kinfo, k))} in
       (typed ctxt loc cons_list (Item_t (List_t (t, ty_name), rest))
@@ -3465,8 +3400,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks loc ctxt 1 rest starting_rest
-            >>? fun (Eq, rest, ctxt) ->
+            ( stack_eq loc ctxt 1 rest starting_rest >>? fun (Eq, ctxt) ->
               let binfo = kinfo_of_descr kibody in
               let hinfo = {iloc = loc; kstack_ty = Item_t (ret, rest)} in
               let ibody = kibody.instr.apply binfo (IHalt hinfo) in
@@ -3512,8 +3446,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks loc ctxt 1 aft rest
-            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+            ( stack_eq loc ctxt 1 aft rest
+            >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (mk_list_iter ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_list_iter (descr rest)) rest
       )
@@ -3557,22 +3491,22 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks loc ctxt 1 aft rest
-            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+            ( stack_eq loc ctxt 1 aft rest
+            >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (mk_iset_iter ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (mk_iset_iter (descr rest)) rest
       )
   | (Prim (loc, I_MEM, [], annot), Item_t (v, Item_t (Set_t (elt, _), rest))) ->
       let elt = ty_of_comparable_ty elt in
       check_var_type_annot loc annot >>?= fun () ->
-      check_item_ty ctxt elt v loc I_MEM 1 2 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt elt v loc I_MEM 1 2 >>?= fun (Eq, ctxt) ->
       let instr = {apply = (fun kinfo k -> ISet_mem (kinfo, k))} in
       (typed ctxt loc instr (Item_t (bool_t, rest))
         : ((a, s) judgement * context) tzresult Lwt.t)
   | ( Prim (loc, I_UPDATE, [], annot),
       Item_t (v, Item_t (Bool_t, Item_t (Set_t (elt, meta), rest))) ) ->
       check_item_ty ctxt (ty_of_comparable_ty elt) v loc I_UPDATE 1 3
-      >>?= fun (Eq, _, ctxt) ->
+      >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ISet_update (kinfo, k))} in
       (typed ctxt loc instr (Item_t (Set_t (elt, meta), rest))
@@ -3614,8 +3548,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_map_body
-            ( merge_stacks loc ctxt 1 rest starting_rest
-            >>? fun (Eq, rest, ctxt) ->
+            ( stack_eq loc ctxt 1 rest starting_rest >>? fun (Eq, ctxt) ->
               let instr =
                 {
                   apply =
@@ -3670,14 +3603,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             invalid_iter_body
-            ( merge_stacks loc ctxt 1 aft rest
-            >>? fun (Eq, rest, ctxt) : ((a, s) judgement * context) tzresult ->
+            ( stack_eq loc ctxt 1 aft rest
+            >>? fun (Eq, ctxt) : ((a, s) judgement * context) tzresult ->
               typed_no_lwt ctxt loc (make_instr ibody) rest )
       | Failed {descr} -> typed_no_lwt ctxt loc (make_instr (descr rest)) rest)
   | (Prim (loc, I_MEM, [], annot), Item_t (vk, Item_t (Map_t (ck, _, _), rest)))
     ->
       let k = ty_of_comparable_ty ck in
-      check_item_ty ctxt vk k loc I_MEM 1 2 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt vk k loc I_MEM 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_mem (kinfo, k))} in
       (typed ctxt loc instr (Item_t (bool_t, rest))
@@ -3685,7 +3618,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_GET, [], annot),
       Item_t (vk, Item_t (Map_t (ck, elt, _), rest)) ) ->
       let k = ty_of_comparable_ty ck in
-      check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_get (kinfo, k))} in
       option_t loc elt
@@ -3696,8 +3629,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
         (vk, Item_t (Option_t (vv, _), Item_t (Map_t (ck, v, map_name), rest)))
     ) ->
       let k = ty_of_comparable_ty ck in
-      check_item_ty ctxt vk k loc I_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
-      check_item_ty ctxt vv v loc I_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
+      check_item_ty ctxt vk k loc I_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
+      check_item_ty ctxt vv v loc I_UPDATE 2 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_update (kinfo, k))} in
       (typed ctxt loc instr (Item_t (Map_t (ck, v, map_name), rest))
@@ -3708,8 +3641,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           Item_t (Option_t (vv, vname), Item_t (Map_t (ck, v, map_name), rest))
         ) ) ->
       let k = ty_of_comparable_ty ck in
-      check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
-      check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
+      check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
+      check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IMap_get_and_update (kinfo, k))} in
       let stack =
@@ -3736,7 +3669,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_MEM, [], annot),
       Item_t (set_key, Item_t (Big_map_t (map_key, _, _), rest)) ) ->
       let k = ty_of_comparable_ty map_key in
-      check_item_ty ctxt set_key k loc I_MEM 1 2 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt set_key k loc I_MEM 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_mem (kinfo, k))} in
       let stack = Item_t (bool_t, rest) in
@@ -3744,7 +3677,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, I_GET, [], annot),
       Item_t (vk, Item_t (Big_map_t (ck, elt, _), rest)) ) ->
       let k = ty_of_comparable_ty ck in
-      check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt vk k loc I_GET 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_get (kinfo, k))} in
       option_t loc elt >>?= fun ty ->
@@ -3757,9 +3690,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             ( Option_t (set_value, _),
               Item_t (Big_map_t (map_key, map_value, map_name), rest) ) ) ) ->
       let k = ty_of_comparable_ty map_key in
-      check_item_ty ctxt set_key k loc I_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt set_key k loc I_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
       check_item_ty ctxt set_value map_value loc I_UPDATE 2 3
-      >>?= fun (Eq, map_value, ctxt) ->
+      >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IBig_map_update (kinfo, k))} in
       let stack = Item_t (Big_map_t (map_key, map_value, map_name), rest) in
@@ -3771,8 +3704,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
             (Option_t (vv, vname), Item_t (Big_map_t (ck, v, map_name), rest))
         ) ) ->
       let k = ty_of_comparable_ty ck in
-      check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, _, ctxt) ->
-      check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, v, ctxt) ->
+      check_item_ty ctxt vk k loc I_GET_AND_UPDATE 1 3 >>?= fun (Eq, ctxt) ->
+      check_item_ty ctxt vv v loc I_GET_AND_UPDATE 2 3 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> IBig_map_get_and_update (kinfo, k))}
@@ -3794,11 +3727,11 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       Item_t
         ( Sapling_transaction_t transaction_memo_size,
           Item_t ((Sapling_state_t state_memo_size as state_ty), rest) ) ) ->
-      merge_memo_sizes
+      memo_size_eq
         ~error_details:Informative
         state_memo_size
         transaction_memo_size
-      >>?= fun _memo_size ->
+      >>?= fun () ->
       let instr =
         {apply = (fun kinfo k -> ISapling_verify_update (kinfo, k))}
       in
@@ -3873,8 +3806,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             unmatched_branches
-            ( merge_stacks loc ctxt 1 ibody.aft stack
-            >>? fun (Eq, _stack, ctxt) ->
+            ( stack_eq loc ctxt 1 ibody.aft stack >>? fun (Eq, ctxt) ->
               let instr =
                 {
                   apply =
@@ -3922,8 +3854,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           record_trace_eval
             unmatched_branches
-            ( merge_stacks loc ctxt 1 ibody.aft stack
-            >>? fun (Eq, _stack, ctxt) ->
+            ( stack_eq loc ctxt 1 ibody.aft stack >>? fun (Eq, ctxt) ->
               let instr =
                 {
                   apply =
@@ -3973,7 +3904,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       typed ctxt loc instr stack
   | ( Prim (loc, I_EXEC, [], annot),
       Item_t (arg, Item_t (Lambda_t (param, ret, _), rest)) ) ->
-      check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt arg param loc I_EXEC 1 2 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IExec (kinfo, k))} in
       let stack = Item_t (ret, rest) in
@@ -3985,7 +3916,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
     ->
       check_packable ~legacy:false loc capture_ty >>?= fun () ->
       check_item_ty ctxt capture capture_ty loc I_APPLY 1 2
-      >>?= fun (Eq, capture_ty, ctxt) ->
+      >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IApply (kinfo, capture_ty, k))} in
       lambda_t loc arg_ty ret
@@ -4365,8 +4296,8 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   (* comparison *)
   | (Prim (loc, I_COMPARE, [], annot), Item_t (t1, Item_t (t2, rest))) ->
       check_var_annot loc annot >>?= fun () ->
-      check_item_ty ctxt t1 t2 loc I_COMPARE 1 2 >>?= fun (Eq, t, ctxt) ->
-      comparable_ty_of_ty ctxt loc t >>?= fun (key, ctxt) ->
+      check_item_ty ctxt t1 t2 loc I_COMPARE 1 2 >>?= fun (Eq, ctxt) ->
+      comparable_ty_of_ty ctxt loc t1 >>?= fun (key, ctxt) ->
       let instr = {apply = (fun kinfo k -> ICompare (kinfo, key, k))} in
       let stack = Item_t (int_t, rest) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -4406,7 +4337,9 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       check_var_annot loc annot >>?= fun () ->
       parse_any_ty ctxt ~stack_depth:(stack_depth + 1) ~legacy cast_t
       >>?= fun (Ex_ty cast_t, ctxt) ->
-      ty_eq ctxt loc cast_t t >>?= fun (Eq, ctxt) ->
+      Gas_monad.run ctxt @@ ty_eq ~error_details:Informative loc cast_t t
+      >>?= fun (eq, ctxt) ->
+      eq >>?= fun Eq ->
       let instr = {apply = (fun _ k -> k)} in
       let stack = Item_t (cast_t, stack) in
       (typed ctxt loc instr stack : ((a, s) judgement * context) tzresult Lwt.t)
@@ -4472,7 +4405,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
   | ( Prim (loc, (I_TRANSFER_TOKENS as prim), [], annot),
       Item_t (p, Item_t (Mutez_t, Item_t (Contract_t (cp, _), rest))) ) ->
       Tc_context.check_not_in_view loc ~legacy tc_context prim >>?= fun () ->
-      check_item_ty ctxt p cp loc prim 1 4 >>?= fun (Eq, _, ctxt) ->
+      check_item_ty ctxt p cp loc prim 1 4 >>?= fun (Eq, ctxt) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> ITransfer_tokens (kinfo, k))} in
       let stack = Item_t (operation_t, rest) in
@@ -4538,9 +4471,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       in
       trace (Ill_typed_contract (canonical_code, [])) views_result
       >>=? fun ctxt ->
-      ty_eq ctxt loc arg arg_type_full >>?= fun (Eq, ctxt) ->
-      ty_eq ctxt loc ret ret_type_full >>?= fun (Eq, ctxt) ->
-      ty_eq ctxt loc storage_type ginit >>?= fun (Eq, ctxt) ->
+      (Gas_monad.run ctxt
+      @@
+      let open Gas_monad.Syntax in
+      let* Eq = ty_eq ~error_details:Informative loc arg arg_type_full in
+      let* Eq = ty_eq ~error_details:Informative loc ret ret_type_full in
+      ty_eq ~error_details:Informative loc storage_type ginit)
+      >>?= fun (storage_eq, ctxt) ->
+      storage_eq >>?= fun Eq ->
       let instr =
         {
           apply =
@@ -4790,20 +4728,23 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack = Item_t (res_ty, rest) in
       typed ctxt loc instr stack
   | ( Prim (loc, I_JOIN_TICKETS, [], annot),
-      Item_t (Pair_t ((Ticket_t _ as ty_a), (Ticket_t _ as ty_b), _), rest) )
-    -> (
+      Item_t
+        ( Pair_t
+            ( (Ticket_t (contents_ty_a, _) as ty_a),
+              Ticket_t (contents_ty_b, _),
+              _ ),
+          rest ) ) ->
       check_var_annot loc annot >>?= fun () ->
-      Gas_monad.run ctxt @@ merge_types ~error_details:Informative loc ty_a ty_b
-      >>?= fun (eq_ty, ctxt) ->
-      eq_ty >>?= fun (Eq, ty) ->
-      match ty with
-      | Ticket_t (contents_ty, _) ->
-          option_t loc ty >>?= fun res_ty ->
-          let instr =
-            {apply = (fun kinfo k -> IJoin_tickets (kinfo, contents_ty, k))}
-          in
-          let stack = Item_t (res_ty, rest) in
-          typed ctxt loc instr stack)
+      Gas_monad.run ctxt
+      @@ comparable_ty_eq ~error_details:Informative contents_ty_a contents_ty_b
+      >>?= fun (eq, ctxt) ->
+      eq >>?= fun Eq ->
+      option_t loc ty_a >>?= fun res_ty ->
+      let instr =
+        {apply = (fun kinfo k -> IJoin_tickets (kinfo, contents_ty_a, k))}
+      in
+      let stack = Item_t (res_ty, rest) in
+      typed ctxt loc instr stack
   (* Timelocks *)
   | ( Prim (loc, I_OPEN_CHEST, [], _),
       Item_t (Chest_key_t, Item_t (Chest_t, Item_t (Nat_t, rest))) ) ->
@@ -5025,7 +4966,10 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
-              ( ty_eq ctxt loc arg unit_t >|? fun (Eq, ctxt) ->
+              ( Gas_monad.run ctxt
+              @@ ty_eq ~error_details:Informative loc arg unit_t
+              >>? fun (eq, ctxt) ->
+                eq >|? fun Eq ->
                 let destination : Destination.t = Contract contract in
                 (ctxt, {arg_ty = arg; address = {destination; entrypoint}}) )
           else fail (No_such_entrypoint entrypoint)
@@ -5202,11 +5146,10 @@ let parse_contract_for_script :
           if Entrypoint.is_default entrypoint then
             (* An implicit account on the "default" entrypoint always exists and has type unit. *)
             Lwt.return
-              ( Gas_monad.run ctxt
-              @@ merge_types ~error_details:Fast loc arg unit_t
-              >|? fun (eq_ty, ctxt) ->
-                match eq_ty with
-                | Ok (Eq, _ty) ->
+              ( Gas_monad.run ctxt @@ ty_eq ~error_details:Fast loc arg unit_t
+              >|? fun (eq, ctxt) ->
+                match eq with
+                | Ok Eq ->
                     let destination : Destination.t = Contract contract in
                     let contract =
                       {arg_ty = arg; address = {destination; entrypoint}}

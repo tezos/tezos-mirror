@@ -1075,19 +1075,15 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                           pair_t kloc input_ty storage_type >>?= fun pair_ty ->
                           let io_ty =
                             let open Gas_monad.Syntax in
-                            let* (out_eq, _ty) =
-                              Script_ir_translator.merge_types
+                            let* out_eq =
+                              Script_ir_translator.ty_eq
                                 ~error_details:Fast
                                 kloc
                                 aft_ty
                                 output_ty
                             in
-                            let+ (in_eq, _ty) =
-                              merge_types
-                                ~error_details:Fast
-                                kloc
-                                bef_ty
-                                pair_ty
+                            let+ in_eq =
+                              ty_eq ~error_details:Fast kloc bef_ty pair_ty
                             in
                             (out_eq, in_eq)
                           in

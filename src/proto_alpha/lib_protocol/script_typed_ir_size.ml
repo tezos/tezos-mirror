@@ -680,10 +680,6 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
     let stack_prefix_preservation_witness_size n = ret_zero (!!24 *? n) in
     let dup_n_gadt_witness_size n = ret_zero (!!16 *? n) in
     let comb n = ret_zero (!!16 *? n) in
-    let if_join k =
-      let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-      stack_ty_size kinfo.kstack_ty
-    in
     let self_size =
       match t with
       (* Op n *)
@@ -696,43 +692,15 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | IComb_get (_, n, _, _) -> comb (n / 2)
       | IComb_set (_, n, _, _) -> comb (n / 2)
       | IDup_n (_, n, _, _) -> dup_n_gadt_witness_size n
-      (* Whole stack types after conditionals and loops. *)
-      | IIf {k; _} -> if_join k
-      | IIf_cons {k; _} -> if_join k
-      | IIf_none {k; _} -> if_join k
-      | IIf_left {k; _} -> if_join k
-      (* Every instruction whose elaboration uses [merge_types],
-         [check_item_ty], [comparable_of_ty], or [ty_of_comparable_ty]
-         to create a type that is embedded in the IR. *)
-      | IJoin_tickets (_, _, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
+      (* Every instruction whose elaboration uses [comparable_of_ty] or
+         [ty_of_comparable_ty] to create a type that is embedded in the IR. *)
       | ITicket (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | IRead_ticket (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | ICons_list (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IMap_update (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IMap_get_and_update (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IBig_map_get_and_update (_, k) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr k in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IApply (_, ty, _) -> ty_size ty
       | ICompare (_, ty, _) -> comparable_ty_size ty
-      | IList_iter (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | IList_map (_, body, _) -> (
-          let kinfo = Script_typed_ir.kinfo_of_kinstr body in
-          match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
       | ISet_iter (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
