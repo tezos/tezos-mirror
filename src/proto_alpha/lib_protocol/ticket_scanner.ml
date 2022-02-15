@@ -123,6 +123,7 @@ module Ticket_inspection = struct
     | Timestamp_key -> (k [@ocaml.tailcall]) False_ht
     | Chain_id_key -> (k [@ocaml.tailcall]) False_ht
     | Address_key -> (k [@ocaml.tailcall]) False_ht
+    | Tx_rollup_l2_address_key -> (k [@ocaml.tailcall]) False_ht
     | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
     | Union_key (_, _, _) -> (k [@ocaml.tailcall]) False_ht
     | Option_key (_, _) -> (k [@ocaml.tailcall]) False_ht
@@ -160,6 +161,7 @@ module Ticket_inspection = struct
     | Key_t -> (k [@ocaml.tailcall]) False_ht
     | Timestamp_t -> (k [@ocaml.tailcall]) False_ht
     | Address_t -> (k [@ocaml.tailcall]) False_ht
+    | Tx_rollup_l2_address_t -> (k [@ocaml.tailcall]) False_ht
     | Bool_t -> (k [@ocaml.tailcall]) False_ht
     | Pair_t (ty1, ty2, _) ->
         (has_tickets_of_pair [@ocaml.tailcall])
@@ -285,6 +287,7 @@ module Ticket_collection = struct
     | Timestamp_key -> (k [@ocaml.tailcall]) ctxt acc
     | Chain_id_key -> (k [@ocaml.tailcall]) ctxt acc
     | Address_key -> (k [@ocaml.tailcall]) ctxt acc
+    | Tx_rollup_l2_address_key -> (k [@ocaml.tailcall]) ctxt acc
     | Pair_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
     | Union_key (_, _, _) -> (k [@ocaml.tailcall]) ctxt acc
     | Option_key (_, _) -> (k [@ocaml.tailcall]) ctxt acc

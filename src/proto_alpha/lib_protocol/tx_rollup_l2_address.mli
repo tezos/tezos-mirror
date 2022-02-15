@@ -71,6 +71,8 @@ module Indexable : sig
 
   val compare : either -> either -> int
 
+  val compare_values : value -> value -> int
+
   val forget_value : value -> either
 
   val forget_index : index -> either

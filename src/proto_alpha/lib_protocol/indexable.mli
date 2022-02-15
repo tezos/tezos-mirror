@@ -121,7 +121,24 @@ val in_memory_size :
 (** [size a] returns the number of bytes allocated in an inbox to store [a]. *)
 val size : ('a -> int) -> 'a either -> int
 
+(** [compare f x y] is a total order on indexable values, which
+    proceeds as follows.
+
+    {ul {li If both [x] and [y] are a value, then use [f] to compare them.}
+        {li If both [x] and [y] are indexes, then uses the
+            [Int32.compare] function to compare them.}
+        {li Finally, if [x] and [y] have not the same kind, the logic
+            is that indexes are smaller than values.}}
+
+    {b Note:} This can be dangerous, as you may end up comparing two
+    things that are equivalent (a value and its index) but declare
+    they are not equal. *)
 val compare : ('a -> 'a -> int) -> 'a either -> 'a either -> int
+
+(** [compare_values f x y] compares the value [x] and [y] using [f],
+    and relies on the type system of OCaml to ensure that [x] and [y]
+    are indeed both values. *)
+val compare_values : ('a -> 'a -> int) -> 'a value -> 'a value -> int
 
 module type VALUE = sig
   type t
@@ -169,6 +186,8 @@ module Make (V : VALUE) : sig
   val index_encoding : index Data_encoding.t
 
   val compare : either -> either -> int
+
+  val compare_values : value -> value -> int
 
   val pp : Format.formatter -> either -> unit
 end

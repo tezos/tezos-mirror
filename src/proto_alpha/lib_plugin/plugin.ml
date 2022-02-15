@@ -1941,6 +1941,7 @@ module RPC = struct
         | Key_key -> Prim (loc, T_key, [], [])
         | Timestamp_key -> Prim (loc, T_timestamp, [], [])
         | Address_key -> Prim (loc, T_address, [], [])
+        | Tx_rollup_l2_address_key -> Prim (loc, T_tx_rollup_l2_address, [], [])
         | Chain_id_key -> Prim (loc, T_chain_id, [], [])
         | Pair_key (l, r, _meta) ->
             let tl = unparse_comparable_ty ~loc l in
@@ -1974,6 +1975,7 @@ module RPC = struct
         | Key_t -> return (T_key, [], [])
         | Timestamp_t -> return (T_timestamp, [], [])
         | Address_t -> return (T_address, [], [])
+        | Tx_rollup_l2_address_t -> return (T_tx_rollup_l2_address, [], [])
         | Operation_t -> return (T_operation, [], [])
         | Chain_id_t -> return (T_chain_id, [], [])
         | Never_t -> return (T_never, [], [])

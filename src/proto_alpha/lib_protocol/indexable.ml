@@ -131,6 +131,9 @@ let compare c x y =
   | (Index _, Value _) -> -1
   | (Value _, Index _) -> 1
 
+let compare_values c : 'a value -> 'a value -> int =
+ fun x y -> match (x, y) with (Value x, Value y) -> c x y
+
 module type VALUE = sig
   type t
 
@@ -182,4 +185,6 @@ module Make (V : VALUE) = struct
   let pp = pp V.pp
 
   let compare = compare V.compare
+
+  let compare_values = compare_values V.compare
 end
