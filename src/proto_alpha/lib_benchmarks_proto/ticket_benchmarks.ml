@@ -26,6 +26,7 @@
 open Protocol
 open Alpha_context
 
+(** A benchmark for {!Ticket_costs.Constants.cost_compare_ticket_hash}. *)
 module Compare_ticket_hash_benchmark : Benchmark.S = struct
   type config = unit
 
