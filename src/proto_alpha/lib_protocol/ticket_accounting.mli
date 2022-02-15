@@ -23,30 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** A module that provides functionality for extracting ticket-token differences
-    from a list of operations. *)
-
-(** A type representing ticket-token balance differences. Each value consists
-    of:
-    - [ticket_token] - the type of the ticket.
-    - [total_amount] - the total amount of transferred ticket-tokens.
-    - [destinations] - a list of amount and contract pairs.
-    Invariant: [total_amount] is the sum of the amounts in [destinations]. *)
-type ticket_token_diff = private {
-  ticket_token : Ticket_token.ex_token;
-  total_amount : Alpha_context.Script_int.n Alpha_context.Script_int.num;
-  destinations :
-    (Alpha_context.Contract.t
-    * Alpha_context.Script_int.n Alpha_context.Script_int.num)
-    list;
-}
-
-(** [ticket_diffs_of_operations ctxt ops] returns a list of ticket-tokens diffs
-    given a context, [ctxt], and list of packed operations, [ops]. The diffs
-    result from either a [Transaction] operation with parameters containing
-    tickets, or an [Origination] operation with the initial storage containing
-    tickets. *)
-val ticket_diffs_of_operations :
+(** [ticket_diffs ctxt ~arg_type_has_tickets ~storage_type_has_tickets arg
+       old_storage new_storage lazy_storage_diff] returns a map from
+    ticket-tokens to balance-differences that represents the change in balance
+    for a contract due to changes of tickets in the storage. The assumption is
+    that before calling [ticket_diffs], all tickets that are owned by a contract
+    exist either in the [old_storage] or the [arg]. After execution, only
+    tickets in [new_storage] are owned by the contract. Note that this function
+    avoids traversing the lazy part of the storage.
+*)
+val ticket_diffs :
   Alpha_context.context ->
+  arg_type_has_tickets:'arg Ticket_scanner.has_tickets ->
+  storage_type_has_tickets:'storage Ticket_scanner.has_tickets ->
+  arg:'arg ->
+  old_storage:'storage ->
+  new_storage:'storage ->
+  lazy_storage_diff:Alpha_context.Lazy_storage.diffs_item list ->
+  (Z.t Ticket_token_map.t * Alpha_context.t) tzresult Lwt.t
+
+(** [update_ticket_balances ctxt self ~ticket_diffs operations] updates the
+    ticket balances according to the [ticket_diffs] map and the set of
+    operations. The function also returns the storage size diff resulting from
+    updating the ticket-balance table in the context.
+
+    Invariant: this function must be called after applying the lazy-storage
+    diffs affecting any contracts in the given operations.
+
+    The function fails in case an invalid ticket-token-balance update is
+    detected. The [ticket_diffs] argument represents the change of ticket-tokens
+    for the [self] contract. It also specifies a "budget" for outgoing
+    ticket-tokens.
+*)
+val update_ticket_balances :
+  Alpha_context.context ->
+  self:Alpha_context.Contract.t ->
+  ticket_diffs:Z.t Ticket_token_map.t ->
   Alpha_context.packed_internal_operation list ->
-  (ticket_token_diff list * Alpha_context.context) tzresult Lwt.t
+  (Z.t * Alpha_context.t) tzresult Lwt.t

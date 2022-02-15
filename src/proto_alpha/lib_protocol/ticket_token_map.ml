@@ -61,3 +61,44 @@ let update ctxt key f m =
 let fold ctxt f =
   Ticket_token_map.fold ctxt (fun ctxt acc _key_hash (tkn, value) ->
       f ctxt acc tkn value)
+
+let find ctxt ticket_token map =
+  key_of_ticket_token ctxt ticket_token >>=? fun (key_hash, ctxt) ->
+  Ticket_token_map.find ctxt key_hash map >>?= fun (val_opt, ctxt) ->
+  return (Option.map snd val_opt, ctxt)
+
+let lift_merge_overlap merge_overlap ctxt (tkn1, v1) (_tkn2, v2) =
+  merge_overlap ctxt v1 v2 >|? fun (v, ctxt) -> ((tkn1, v), ctxt)
+
+let of_list ctxt ~merge_overlap token_values =
+  List.fold_left_es
+    (fun (map, ctxt) (token, value) ->
+      key_of_ticket_token ctxt token >>=? fun (key_hash, ctxt) ->
+      Lwt.return
+        (Ticket_token_map.update
+           ctxt
+           key_hash
+           (fun ctxt old_val ->
+             match old_val with
+             | None -> ok (Some (token, value), ctxt)
+             | Some old ->
+                 lift_merge_overlap merge_overlap ctxt old (token, value)
+                 >|? fun (x, ctxt) -> (Some x, ctxt))
+           map))
+    (Ticket_token_map.empty, ctxt)
+    token_values
+
+let map ctxt f =
+  Ticket_token_map.map ctxt (fun ctxt _key (tkn, value) ->
+      f ctxt tkn value >|? fun (new_value, ctxt) -> ((tkn, new_value), ctxt))
+
+let to_list ctxt map =
+  Ticket_token_map.to_list ctxt map >>? fun (list, ctxt) ->
+  (* Consume gas for traversing the list again and remove the key-hash. *)
+  Gas.consume
+    ctxt
+    (Carbonated_map_costs.fold_cost ~size:(Ticket_token_map.size map))
+  >|? fun ctxt -> (List.map snd list, ctxt)
+
+let merge ctxt ~merge_overlap =
+  Ticket_token_map.merge ctxt ~merge_overlap:(lift_merge_overlap merge_overlap)

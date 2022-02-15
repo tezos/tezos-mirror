@@ -59,8 +59,11 @@ val has_tickets_of_ty_cost :
 (** [negate_cost z] returns the cost of negating the given value [z]. *)
 val negate_cost : Z.t -> Alpha_context.Gas.cost
 
-(** [add_cost n1 n2] returns the cost of adding the values [n1] and [n2]. *)
-val add_cost :
+(** [add_int_cost n1 n2] returns the cost of adding the values [n1] and [n2]. *)
+val add_int_cost :
   Alpha_context.Script_int.n Alpha_context.Script_int.num ->
   Alpha_context.Script_int.n Alpha_context.Script_int.num ->
   Alpha_context.Gas.cost
+
+(** [add_z_cost z1 z2] returns the cost of adding the values [z1] and [z2]. *)
+val add_z_cost : Z.t -> Z.t -> Alpha_context.Gas.cost

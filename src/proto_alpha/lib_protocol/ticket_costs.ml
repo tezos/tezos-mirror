@@ -78,4 +78,8 @@ let negate_cost z =
   Gas.(S.safe_int 25 +@ S.shift_right (S.safe_int size) 4)
 
 (** Reusing the gas model from [Michelson_v1_gas.Cost_of.add] *)
-let add_cost = Michelson_v1_gas.Cost_of.Interpreter.add_int
+let add_int_cost = Michelson_v1_gas.Cost_of.Interpreter.add_int
+
+(** Reusing the gas model from [Michelson_v1_gas.Cost_of.add] *)
+let add_z_cost z1 z2 =
+  add_int_cost (Script_int.of_zint z1) (Script_int.of_zint z2)

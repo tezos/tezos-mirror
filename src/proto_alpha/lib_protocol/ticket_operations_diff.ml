@@ -118,7 +118,9 @@ module Ticket_token_map = struct
             let update ctxt prev_amt_opt =
               match prev_amt_opt with
               | Some prev_amount ->
-                  Gas.consume ctxt (Ticket_costs.add_cost prev_amount amount)
+                  Gas.consume
+                    ctxt
+                    (Ticket_costs.add_int_cost prev_amount amount)
                   >|? fun ctxt ->
                   (Some (Script_int.add_n prev_amount amount), ctxt)
               | None -> ok (Some amount, ctxt)
@@ -274,8 +276,8 @@ let ticket_token_map_of_operations ctxt ops =
     ops
 
 (** Traverses a list of operations and scans for tickets. *)
-let ticket_diffs_of_operations ctxt {Script_typed_ir.elements; length = _} =
-  ticket_token_map_of_operations ctxt elements >>=? fun (token_map, ctxt) ->
+let ticket_diffs_of_operations ctxt operations =
+  ticket_token_map_of_operations ctxt operations >>=? fun (token_map, ctxt) ->
   Ticket_token_map.fold
     ctxt
     (fun ctxt acc ticket_token destination_map ->
@@ -284,7 +286,7 @@ let ticket_diffs_of_operations ctxt {Script_typed_ir.elements; length = _} =
       Contract_map.fold
         ctxt
         (fun ctxt total_amount _destination amount ->
-          Gas.consume ctxt (Ticket_costs.add_cost total_amount amount)
+          Gas.consume ctxt (Ticket_costs.add_int_cost total_amount amount)
           >|? fun ctxt -> (Script_int.add_n total_amount amount, ctxt))
         Script_int.zero_n
         destination_map
