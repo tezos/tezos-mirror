@@ -338,3 +338,49 @@ let init ?rng_state ?endorsers_per_block ?with_commitments
     ?liquidity_baking_subsidy
     accounts
   >|=? fun blk -> (blk, contracts)
+
+let init1 ?rng_state ?endorsers_per_block ?with_commitments
+    ?(initial_balances = []) ?initial_endorsers ?min_proposal_quorum
+    ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
+    ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy () =
+  init
+    ?rng_state
+    ?endorsers_per_block
+    ?with_commitments
+    ~initial_balances
+    ?initial_endorsers
+    ?min_proposal_quorum
+    ?time_between_blocks
+    ?minimal_block_delay
+    ?delay_per_missing_endorsement
+    ?bootstrap_contracts
+    ?level
+    ?cost_per_byte
+    ?liquidity_baking_subsidy
+    1
+  >|=? function
+  | (_, []) -> assert false
+  | (b, contract_1 :: _) -> (b, contract_1)
+
+let init2 ?rng_state ?endorsers_per_block ?with_commitments
+    ?(initial_balances = []) ?initial_endorsers ?min_proposal_quorum
+    ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
+    ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy () =
+  init
+    ?rng_state
+    ?endorsers_per_block
+    ?with_commitments
+    ~initial_balances
+    ?initial_endorsers
+    ?min_proposal_quorum
+    ?time_between_blocks
+    ?minimal_block_delay
+    ?delay_per_missing_endorsement
+    ?bootstrap_contracts
+    ?level
+    ?cost_per_byte
+    ?liquidity_baking_subsidy
+    2
+  >|=? function
+  | (_, []) | (_, [_]) -> assert false
+  | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)

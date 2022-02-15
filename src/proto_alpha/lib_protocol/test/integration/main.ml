@@ -32,7 +32,7 @@
 
 let () =
   Alcotest_lwt.run
-    "protocol_alpha > integration"
+    "protocol > integration"
     [
       ("constants", Test_constants.tests);
       ("liquidity baking", Test_liquidity_baking.tests);

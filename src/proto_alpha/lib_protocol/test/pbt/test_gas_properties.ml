@@ -137,4 +137,5 @@ let tests =
       test_free_neutral;
   ]
 
-let () = Alcotest.run "gas properties" [("gas properties", qcheck_wrap tests)]
+let () =
+  Alcotest.run "protocol > pbt > gas" [("gas properties", qcheck_wrap tests)]

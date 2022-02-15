@@ -1,0 +1,16 @@
+(test
+ (name main)
+ (package tezos-protocol-012-Psithaca-tests)
+ (libraries alcotest-lwt
+            tezos-base
+            tezos-protocol-012-Psithaca
+            tezos-base-test-helpers
+            tezos-012-Psithaca-test-helpers
+            tezos-protocol-012-Psithaca-parameters
+            tezos-protocol-plugin-012-Psithaca)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_012_Psithaca
+                   -open Tezos_012_Psithaca_test_helpers
+                   -open Tezos_base_test_helpers
+                   -open Tezos_protocol_012_Psithaca_parameters
+                   -open Tezos_protocol_plugin_012_Psithaca)))

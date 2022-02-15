@@ -174,7 +174,7 @@ let tests_boundaries = [test_leq_saturated; test_geq_zero]
 
 let () =
   Alcotest.run
-    "Saturation"
+    "protocol > pbt > saturation"
     [
       ("add", qcheck_wrap tests_add);
       ("mul", qcheck_wrap tests_mul);

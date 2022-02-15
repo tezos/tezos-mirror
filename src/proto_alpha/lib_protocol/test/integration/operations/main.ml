@@ -32,7 +32,7 @@
 
 let () =
   Alcotest_lwt.run
-    "protocol_alpha > integration > operations"
+    "protocol > integration > operations"
     [
       ("voting", Test_voting.tests);
       ("origination", Test_origination.tests);
