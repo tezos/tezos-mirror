@@ -72,6 +72,14 @@ let mandatory name = function
   | None -> failwith ("no value for " ^ name)
   | Some x -> x
 
+type ('a, 'b) runnable = {value : 'a; run : 'a -> 'b Lwt.t}
+
+let ( let*! ) x f =
+  let* res = x.run x.value in
+  f res
+
+let ( let*? ) x f = f x.value
+
 let range a b =
   let rec range ?(acc = []) a b =
     if b < a then acc else range ~acc:(b :: acc) a (b - 1)
