@@ -1073,6 +1073,87 @@ let apply_transaction_to_rollup ~consume_deserialization_gas ~ctxt ~parameters
     return (ctxt, result, [])
   else fail (Script_tc_errors.No_such_entrypoint entrypoint)
 
+let apply_origination ~consume_deserialization_gas ~ctxt ~script ~internal
+    ~preorigination ~delegate ~source ~credit ~before_operation =
+  Script.force_decode_in_context
+    ~consume_deserialization_gas
+    ctxt
+    script.Script.code
+  >>?= fun (unparsed_code, ctxt) ->
+  Script_ir_translator.parse_script
+    ctxt
+    ~legacy:false
+    ~allow_forged_in_storage:internal
+    script
+  >>=? fun (Ex_script parsed_script, ctxt) ->
+  let views_result =
+    Script_ir_translator.typecheck_views
+      ctxt
+      ~legacy:false
+      parsed_script.storage_type
+      parsed_script.views
+  in
+  trace (Script_tc_errors.Ill_typed_contract (unparsed_code, [])) views_result
+  >>=? fun ctxt ->
+  Script_ir_translator.collect_lazy_storage
+    ctxt
+    parsed_script.storage_type
+    parsed_script.storage
+  >>?= fun (to_duplicate, ctxt) ->
+  let to_update = Script_ir_translator.no_lazy_storage_id in
+  Script_ir_translator.extract_lazy_storage_diff
+    ctxt
+    Optimized
+    parsed_script.storage_type
+    parsed_script.storage
+    ~to_duplicate
+    ~to_update
+    ~temporary:false
+  >>=? fun (storage, lazy_storage_diff, ctxt) ->
+  Script_ir_translator.unparse_data
+    ctxt
+    Optimized
+    parsed_script.storage_type
+    storage
+  >>=? fun (storage, ctxt) ->
+  let storage = Script.lazy_expr (Micheline.strip_locations storage) in
+  let script = {script with storage} in
+  (match preorigination with
+  | Some contract ->
+      assert internal ;
+      (* The preorigination field is only used to early return the address of
+         an originated contract in Michelson.
+         It cannot come from the outside. *)
+      ok (ctxt, contract)
+  | None -> Contract.fresh_contract_from_current_nonce ctxt)
+  >>?= fun (ctxt, contract) ->
+  Contract.raw_originate
+    ctxt
+    ~prepaid_bootstrap_storage:false
+    contract
+    ~script:(script, lazy_storage_diff)
+  >>=? fun ctxt ->
+  (match delegate with
+  | None -> return ctxt
+  | Some delegate -> Delegate.init ctxt contract delegate)
+  >>=? fun ctxt ->
+  Token.transfer ctxt (`Contract source) (`Contract contract) credit
+  >>=? fun (ctxt, balance_updates) ->
+  Fees.record_paid_storage_space ctxt contract ~ticket_table_size_diff:Z.zero
+  >|=? fun (ctxt, size, paid_storage_size_diff) ->
+  let result =
+    Origination_result
+      {
+        lazy_storage_diff;
+        balance_updates;
+        originated_contracts = [contract];
+        consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+        storage_size = size;
+        paid_storage_size_diff;
+      }
+  in
+  (ctxt, result, [])
+
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1160,91 +1241,18 @@ let apply_manager_operation_content :
       Script.force_decode_in_context
         ~consume_deserialization_gas
         ctxt
-        script.storage
+        script.Script.storage
       >>?= fun (_unparsed_storage, ctxt) ->
-      Script.force_decode_in_context
+      apply_origination
         ~consume_deserialization_gas
-        ctxt
-        script.code
-      >>?= fun (unparsed_code, ctxt) ->
-      Script_ir_translator.parse_script
-        ctxt
-        ~legacy:false
-        ~allow_forged_in_storage:internal
-        script
-      >>=? fun (Ex_script parsed_script, ctxt) ->
-      let views_result =
-        Script_ir_translator.typecheck_views
-          ctxt
-          ~legacy:false
-          parsed_script.storage_type
-          parsed_script.views
-      in
-      trace
-        (Script_tc_errors.Ill_typed_contract (unparsed_code, []))
-        views_result
-      >>=? fun ctxt ->
-      Script_ir_translator.collect_lazy_storage
-        ctxt
-        parsed_script.storage_type
-        parsed_script.storage
-      >>?= fun (to_duplicate, ctxt) ->
-      let to_update = Script_ir_translator.no_lazy_storage_id in
-      Script_ir_translator.extract_lazy_storage_diff
-        ctxt
-        Optimized
-        parsed_script.storage_type
-        parsed_script.storage
-        ~to_duplicate
-        ~to_update
-        ~temporary:false
-      >>=? fun (storage, lazy_storage_diff, ctxt) ->
-      Script_ir_translator.unparse_data
-        ctxt
-        Optimized
-        parsed_script.storage_type
-        storage
-      >>=? fun (storage, ctxt) ->
-      let storage = Script.lazy_expr (Micheline.strip_locations storage) in
-      let script = {script with storage} in
-      (match preorigination with
-      | Some contract ->
-          assert internal ;
-          (* The preorigination field is only used to early return
-                 the address of an originated contract in Michelson.
-                 It cannot come from the outside. *)
-          ok (ctxt, contract)
-      | None -> Contract.fresh_contract_from_current_nonce ctxt)
-      >>?= fun (ctxt, contract) ->
-      Contract.raw_originate
-        ctxt
-        ~prepaid_bootstrap_storage:false
-        contract
-        ~script:(script, lazy_storage_diff)
-      >>=? fun ctxt ->
-      (match delegate with
-      | None -> return ctxt
-      | Some delegate -> Delegate.init ctxt contract delegate)
-      >>=? fun ctxt ->
-      Token.transfer ctxt (`Contract source) (`Contract contract) credit
-      >>=? fun (ctxt, balance_updates) ->
-      Fees.record_paid_storage_space
-        ctxt
-        contract
-        ~ticket_table_size_diff:Z.zero
-      >|=? fun (ctxt, size, paid_storage_size_diff) ->
-      let result =
-        Origination_result
-          {
-            lazy_storage_diff;
-            balance_updates;
-            originated_contracts = [contract];
-            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
-            storage_size = size;
-            paid_storage_size_diff;
-          }
-      in
-      (ctxt, result, [])
+        ~ctxt
+        ~script
+        ~internal
+        ~preorigination
+        ~delegate
+        ~source
+        ~credit
+        ~before_operation
   | Delegation delegate ->
       apply_delegation ~ctxt ~source ~delegate ~since:before_operation
   | Register_global_constant {value} ->
