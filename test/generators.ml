@@ -102,6 +102,27 @@ type _ ty =
   | Mu_matching : 'a ty -> 'a list ty
   | Check_size : 'a ty -> 'a ty
   | StringEnum : int ty
+  | CompactMake : 'a compactty -> 'a ty
+
+and _ compactty =
+  | CmpctEmpty : unit compactty
+  | CmpctBool : bool compactty
+  | CmpctOption : 'a compactty -> 'a option compactty
+  | CmpctTup1 : 'a compactty -> 'a compactty
+  | CmpctTup2 : 'a compactty * 'b compactty -> ('a * 'b) compactty
+  | CmpctTup3 :
+      'a compactty * 'b compactty * 'c compactty
+      -> ('a * 'b * 'c) compactty
+  | CmpctTup4 :
+      'a compactty * 'b compactty * 'c compactty * 'd compactty
+      -> ('a * 'b * 'c * 'd) compactty
+  | CmpctInt32 : int32 compactty
+  | CmpctInt64 : int64 compactty
+  | CmpctList : 'a ty -> 'a list compactty
+  | CmpctUnion1 : 'a compactty -> 'a compactty
+  | CmpctUnion2 : 'a compactty * 'b compactty -> ('a, 'b) either compactty
+  | CmpctOrInt32 : 'a ty -> (int32, 'a) Either.t compactty
+  | CmpctPayload : 'a ty -> 'a compactty
 
 (* TODO:
    | Tup[5-10] : ..
@@ -152,6 +173,39 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Mu_matching ty -> Crowbar.pp ppf "mu_matching(%a)" pp_ty ty
   | Check_size ty -> Crowbar.pp ppf "check_size(%a)" pp_ty ty
   | StringEnum -> Crowbar.pp ppf "string_enum"
+  | CompactMake cty -> Crowbar.pp ppf "compact_make(%a)" pp_cty cty
+
+and pp_cty : type a. a compactty Crowbar.printer =
+ fun ppf cty ->
+  match cty with
+  | CmpctEmpty -> Crowbar.pp ppf "()"
+  | CmpctBool -> Crowbar.pp ppf "bool"
+  | CmpctOption cty -> Crowbar.pp ppf "option(%a)" pp_cty cty
+  | CmpctTup1 cty -> Crowbar.pp ppf "tup1(%a)" pp_cty cty
+  | CmpctTup2 (ctya, ctyb) ->
+      Crowbar.pp ppf "tup2(%a,%a)" pp_cty ctya pp_cty ctyb
+  | CmpctTup3 (ctya, ctyb, ctyc) ->
+      Crowbar.pp ppf "tup2(%a,%a,%a)" pp_cty ctya pp_cty ctyb pp_cty ctyc
+  | CmpctTup4 (ctya, ctyb, ctyc, ctyd) ->
+      Crowbar.pp
+        ppf
+        "tup2(%a,%a,%a,%a)"
+        pp_cty
+        ctya
+        pp_cty
+        ctyb
+        pp_cty
+        ctyc
+        pp_cty
+        ctyd
+  | CmpctInt32 -> Crowbar.pp ppf "int32"
+  | CmpctInt64 -> Crowbar.pp ppf "int32"
+  | CmpctList ty -> Crowbar.pp ppf "list(%a)" pp_ty ty
+  | CmpctUnion1 cty -> Crowbar.pp ppf "union1(%a)" pp_cty cty
+  | CmpctUnion2 (ctya, ctyb) ->
+      Crowbar.pp ppf "union2(%a,%a)" pp_cty ctya pp_cty ctyb
+  | CmpctOrInt32 ty -> Crowbar.pp ppf "orint32(%a)" pp_ty ty
+  | CmpctPayload ty -> Crowbar.pp ppf "payload(%a)" pp_ty ty
 
 let dynamic_if_needed : 'a Data_encoding.t -> 'a Data_encoding.t =
  fun e ->
@@ -163,6 +217,45 @@ type any_ty = AnyTy : _ ty -> any_ty
 
 let pp_any_ty : any_ty Crowbar.printer =
  fun ppf any_ty -> match any_ty with AnyTy ty -> pp_ty ppf ty
+
+type any_compactty = AnyCTy : _ compactty -> any_compactty
+
+let pp_any_compactty : any_compactty Crowbar.printer =
+ fun ppf any_compactty -> match any_compactty with AnyCTy ty -> pp_cty ppf ty
+
+let any_compactty_gen any_ty_gen =
+  let open Crowbar in
+  let g : any_compactty Crowbar.gen =
+    fix (fun g ->
+        choose
+          [
+            const @@ AnyCTy CmpctEmpty;
+            const @@ AnyCTy CmpctInt32;
+            const @@ AnyCTy CmpctInt64;
+            const @@ AnyCTy CmpctBool;
+            map [g] (fun (AnyCTy cty) -> AnyCTy (CmpctOption cty));
+            map [any_ty_gen] (fun (AnyTy ty) -> AnyCTy (CmpctList ty));
+            map [g] (fun (AnyCTy cty) -> AnyCTy (CmpctTup1 cty));
+            map [g; g] (fun (AnyCTy cty_a) (AnyCTy cty_b) ->
+                AnyCTy (CmpctTup2 (cty_a, cty_b)));
+            map [g] (fun (AnyCTy cty_both) ->
+                AnyCTy (CmpctTup2 (cty_both, cty_both)));
+            map [g; g; g] (fun (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) ->
+                AnyCTy (CmpctTup3 (cty_a, cty_b, cty_c)));
+            map
+              [g; g; g; g]
+              (fun (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) (AnyCTy cty_d)
+              -> AnyCTy (CmpctTup4 (cty_a, cty_b, cty_c, cty_d)));
+            map [g] (fun (AnyCTy cty_a) -> AnyCTy (CmpctUnion1 cty_a));
+            map [g; g] (fun (AnyCTy cty_a) (AnyCTy cty_b) ->
+                AnyCTy (CmpctUnion2 (cty_a, cty_b)));
+            map [g] (fun (AnyCTy cty_both) ->
+                AnyCTy (CmpctUnion2 (cty_both, cty_both)));
+            map [any_ty_gen] (fun (AnyTy ty) -> AnyCTy (CmpctOrInt32 ty));
+            map [any_ty_gen] (fun (AnyTy ty) -> AnyCTy (CmpctPayload ty));
+          ])
+  in
+  with_printer pp_any_compactty g
 
 let any_ty_gen =
   let open Crowbar in
@@ -232,6 +325,9 @@ let any_ty_gen =
             map [g] (fun (AnyTy ty) -> AnyTy (Mu_matching ty));
             map [g] (fun (AnyTy ty) -> AnyTy (Check_size ty));
             const @@ AnyTy StringEnum;
+            map
+              [any_compactty_gen g]
+              (fun (AnyCTy cty) -> AnyTy (CompactMake cty));
           ])
   in
   with_printer pp_any_ty g
@@ -455,7 +551,7 @@ let full_option : type a. a full -> a option full =
 
       let gen = Crowbar.option Full.gen
 
-      let encoding = Data_encoding.(option Full.encoding)
+      let encoding = Data_encoding.option Full.encoding
     end)
 
 let full_list : type a. a full -> a list full =
@@ -916,6 +1012,379 @@ let full_string_enum : int full =
          ("seven", 7);
        ])
 
+module type COMPACTFULL = sig
+  type t
+
+  val ty : t compactty
+
+  val eq : t -> t -> bool
+
+  val pp : t Crowbar.printer
+
+  val gen : t Crowbar.gen
+
+  val encoding : t Data_encoding.Compact.t
+end
+
+type 'a compactfull = (module COMPACTFULL with type t = 'a)
+
+let full_make_compact : type a. a compactfull -> a full =
+ fun compactfull ->
+  try
+    let module CompactFull = (val compactfull) in
+    (module struct
+      type t = CompactFull.t
+
+      let ty = CompactMake CompactFull.ty
+
+      let eq = CompactFull.eq
+
+      let pp = CompactFull.pp
+
+      let gen = CompactFull.gen
+
+      let encoding = Data_encoding.Compact.make CompactFull.encoding
+    end)
+  with Invalid_argument _ -> Crowbar.bad_test ()
+
+let compactfull_payload : type a. a full -> a compactfull =
+ fun full ->
+  let module Full = (val full) in
+  (module struct
+    type t = Full.t
+
+    let ty = CmpctPayload Full.ty
+
+    let eq = Full.eq
+
+    let pp = Full.pp
+
+    let gen = Full.gen
+
+    let encoding = Data_encoding.Compact.payload Full.encoding
+  end)
+
+let compactfull_empty : unit compactfull =
+  (module struct
+    type t = unit
+
+    let ty = CmpctEmpty
+
+    let eq () () = true
+
+    let pp ppf () = Crowbar.pp ppf "()"
+
+    let gen = Crowbar.const ()
+
+    let encoding = Data_encoding.Compact.empty
+  end)
+
+let compactfull_bool : bool compactfull =
+  (module struct
+    type t = bool
+
+    let ty = CmpctBool
+
+    let eq = Bool.equal
+
+    let pp ppf v = Crowbar.pp ppf "%b" v
+
+    let gen = Crowbar.bool
+
+    let encoding = Data_encoding.Compact.bool
+  end)
+
+let compactfull_option : type a. a compactfull -> a option compactfull =
+ fun compactfull ->
+  let module CompactFull = (val compactfull) in
+  if
+    Data_encoding__Encoding.is_nullable
+      (Data_encoding.Compact.make CompactFull.encoding)
+  then Crowbar.bad_test ()
+  else
+    (module struct
+      type t = CompactFull.t option
+
+      let ty = CmpctOption CompactFull.ty
+
+      let eq a b =
+        match (a, b) with
+        | None, None -> true
+        | Some a, Some b -> CompactFull.eq a b
+        | Some _, None | None, Some _ -> false
+
+      let pp ppf = function
+        | None -> Crowbar.pp ppf "none"
+        | Some p -> Crowbar.pp ppf "some(%a)" CompactFull.pp p
+
+      let gen = Crowbar.option CompactFull.gen
+
+      let encoding = Data_encoding.Compact.option CompactFull.encoding
+    end)
+
+let compactfull_tup1 : type a. a compactfull -> a compactfull =
+ fun compactfull ->
+  let module CompactFull = (val compactfull) in
+  (module struct
+    include CompactFull
+
+    let ty = CmpctTup1 CompactFull.ty
+
+    let pp ppf v = Crowbar.pp ppf "tup1(%a)" CompactFull.pp v
+
+    let encoding = Data_encoding.Compact.tup1 CompactFull.encoding
+  end)
+
+let compactfull_tup2 :
+    type a b. a compactfull -> b compactfull -> (a * b) compactfull =
+ fun compactfulla compactfullb ->
+  let module CompactFulla = (val compactfulla) in
+  let module CompactFullb = (val compactfullb) in
+  (module struct
+    type t = CompactFulla.t * CompactFullb.t
+
+    let ty = CmpctTup2 (CompactFulla.ty, CompactFullb.ty)
+
+    let eq (a, b) (u, v) = CompactFulla.eq a u && CompactFullb.eq b v
+
+    let pp ppf (a, b) =
+      Crowbar.pp ppf "tup2(%a,%a)" CompactFulla.pp a CompactFullb.pp b
+
+    let gen =
+      Crowbar.map [CompactFulla.gen; CompactFullb.gen] (fun a b -> (a, b))
+
+    let encoding =
+      Data_encoding.Compact.(tup2 CompactFulla.encoding CompactFullb.encoding)
+  end)
+
+let compactfull_tup3 :
+    type a b c.
+    a compactfull -> b compactfull -> c compactfull -> (a * b * c) compactfull =
+ fun compactfulla compactfullb compactfullc ->
+  let module CompactFulla = (val compactfulla) in
+  let module CompactFullb = (val compactfullb) in
+  let module CompactFullc = (val compactfullc) in
+  (module struct
+    type t = CompactFulla.t * CompactFullb.t * CompactFullc.t
+
+    let ty = CmpctTup3 (CompactFulla.ty, CompactFullb.ty, CompactFullc.ty)
+
+    let eq (a, b, c) (u, v, w) =
+      CompactFulla.eq a u && CompactFullb.eq b v && CompactFullc.eq c w
+
+    let pp ppf (a, b, c) =
+      Crowbar.pp
+        ppf
+        "tup3(%a,%a,%a)"
+        CompactFulla.pp
+        a
+        CompactFullb.pp
+        b
+        CompactFullc.pp
+        c
+
+    let gen =
+      Crowbar.map
+        [CompactFulla.gen; CompactFullb.gen; CompactFullc.gen]
+        (fun a b c -> (a, b, c))
+
+    let encoding =
+      Data_encoding.Compact.(
+        tup3 CompactFulla.encoding CompactFullb.encoding CompactFullc.encoding)
+  end)
+
+let compactfull_tup4 :
+    type a b c d.
+    a compactfull ->
+    b compactfull ->
+    c compactfull ->
+    d compactfull ->
+    (a * b * c * d) compactfull =
+ fun compactfulla compactfullb compactfullc compactfulld ->
+  let module CompactFulla = (val compactfulla) in
+  let module CompactFullb = (val compactfullb) in
+  let module CompactFullc = (val compactfullc) in
+  let module CompactFulld = (val compactfulld) in
+  (module struct
+    type t = CompactFulla.t * CompactFullb.t * CompactFullc.t * CompactFulld.t
+
+    let ty =
+      CmpctTup4
+        (CompactFulla.ty, CompactFullb.ty, CompactFullc.ty, CompactFulld.ty)
+
+    let eq (a, b, c, d) (u, v, w, z) =
+      CompactFulla.eq a u && CompactFullb.eq b v && CompactFullc.eq c w
+      && CompactFulld.eq d z
+
+    let pp ppf (a, b, c, d) =
+      Crowbar.pp
+        ppf
+        "tup4(%a,%a,%a,%a)"
+        CompactFulla.pp
+        a
+        CompactFullb.pp
+        b
+        CompactFullc.pp
+        c
+        CompactFulld.pp
+        d
+
+    let gen =
+      Crowbar.map
+        [CompactFulla.gen; CompactFullb.gen; CompactFullc.gen; CompactFulld.gen]
+        (fun a b c d -> (a, b, c, d))
+
+    let encoding =
+      Data_encoding.Compact.(
+        tup4
+          CompactFulla.encoding
+          CompactFullb.encoding
+          CompactFullc.encoding
+          CompactFulld.encoding)
+  end)
+
+let compactfull_int32 : int32 compactfull =
+  (module struct
+    type t = int32
+
+    let ty = CmpctInt32
+
+    let eq = Int32.equal
+
+    let pp ppf v = Crowbar.pp ppf "%ld" v
+
+    let gen = Crowbar.int32
+
+    let encoding = Data_encoding.Compact.int32
+  end)
+
+let compactfull_int64 : int64 compactfull =
+  (module struct
+    type t = int64
+
+    let ty = CmpctInt64
+
+    let eq = Int64.equal
+
+    let pp ppf v = Crowbar.pp ppf "%Ld" v
+
+    let gen = Crowbar.int64
+
+    let encoding = Data_encoding.Compact.int64
+  end)
+
+let compactfull_list : type a. a full -> a list compactfull =
+ fun full ->
+  let module Full = (val full) in
+  (module struct
+    type t = Full.t list
+
+    let ty = CmpctList Full.ty
+
+    let eq xs ys = List.compare_lengths xs ys = 0 && List.for_all2 Full.eq xs ys
+
+    let pp ppf v =
+      Crowbar.pp
+        ppf
+        "list(%a)"
+        Format.(
+          pp_print_list ~pp_sep:(fun fmt () -> pp_print_char fmt ',') Full.pp)
+        v
+
+    let gen = Crowbar.list Full.gen
+
+    let encoding =
+      Data_encoding.Compact.list ~bits:3 (dynamic_if_needed Full.encoding)
+  end)
+
+let compactfull_union1 : type a. a compactfull -> a compactfull =
+ fun compactfulla ->
+  let module CompactFulla = (val compactfulla) in
+  (module struct
+    type t = CompactFulla.t
+
+    let ty = CmpctUnion1 CompactFulla.ty
+
+    let eq = CompactFulla.eq
+
+    let encoding =
+      let open Data_encoding.Compact in
+      union
+        [case "A" (function v -> Some v) (fun v -> v) CompactFulla.encoding]
+
+    let gen = CompactFulla.gen
+
+    let pp ppf = function
+      | v1 -> Crowbar.pp ppf "@[<hv 1>(Union1 %a)@]" CompactFulla.pp v1
+  end)
+
+let compactfull_union2 :
+    type a b. a compactfull -> b compactfull -> (a, b) either compactfull =
+ fun compactfulla compactfullb ->
+  let module CompactFulla = (val compactfulla) in
+  let module CompactFullb = (val compactfullb) in
+  (module struct
+    type t = (CompactFulla.t, CompactFullb.t) either
+
+    let ty = CmpctUnion2 (CompactFulla.ty, CompactFullb.ty)
+
+    let eq x y =
+      match (x, y) with
+      | Left _, Right _ | Right _, Left _ -> false
+      | Left x, Left y -> CompactFulla.eq x y
+      | Right x, Right y -> CompactFullb.eq x y
+
+    let encoding =
+      let open Data_encoding.Compact in
+      union
+        [
+          case
+            "A"
+            (function Left v -> Some v | Right _ -> None)
+            (fun v -> Left v)
+            CompactFulla.encoding;
+          case
+            "B"
+            (function Left _ -> None | Right v -> Some v)
+            (fun v -> Right v)
+            CompactFullb.encoding;
+        ]
+
+    let gen =
+      let open Crowbar in
+      map [bool; CompactFulla.gen; CompactFullb.gen] (fun choice a b ->
+          if choice then Left a else Right b)
+
+    let pp ppf = function
+      | Left v1 -> Crowbar.pp ppf "@[<hv 1>(A %a)@]" CompactFulla.pp v1
+      | Right v2 -> Crowbar.pp ppf "@[<hv 1>(B %a)@]" CompactFullb.pp v2
+  end)
+
+let compactfull_orint32 : type a. a full -> (int32, a) Either.t compactfull =
+ fun full ->
+  let module Full = (val full) in
+  (module struct
+    type t = (int32, Full.t) Either.t
+
+    let ty = CmpctOrInt32 Full.ty
+
+    let eq = Either.equal ~left:Int32.equal ~right:Full.eq
+
+    let pp ppf = function
+      | Either.Left i32 -> Crowbar.pp ppf "left(%ld)" i32
+      | Either.Right p -> Crowbar.pp ppf "right(%a)" Full.pp p
+
+    let gen =
+      let open Crowbar in
+      choose [map [int32] Either.left; map [Full.gen] Either.right]
+
+    let encoding =
+      Data_encoding.Compact.or_int32
+        ~int32_kind:"thrity_two"
+        ~alt_kind:"alt"
+        Full.encoding
+  end)
+
 let rec full_of_ty : type a. a ty -> a full = function
   | Null -> full_null
   | Empty -> full_empty
@@ -959,6 +1428,38 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Mu_matching ty -> full_mu_matching (full_of_ty ty)
   | Check_size ty -> full_check_size (full_of_ty ty)
   | StringEnum -> full_string_enum
+  | CompactMake cty -> full_make_compact (compactfull_of_compactty cty)
+
+and compactfull_of_compactty : type a. a compactty -> a compactfull = function
+  | CmpctEmpty -> compactfull_empty
+  | CmpctBool -> compactfull_bool
+  | CmpctOption cty -> compactfull_option (compactfull_of_compactty cty)
+  | CmpctTup1 cty -> compactfull_tup1 (compactfull_of_compactty cty)
+  | CmpctTup2 (ctya, ctyb) ->
+      compactfull_tup2
+        (compactfull_of_compactty ctya)
+        (compactfull_of_compactty ctyb)
+  | CmpctTup3 (ctya, ctyb, ctyc) ->
+      compactfull_tup3
+        (compactfull_of_compactty ctya)
+        (compactfull_of_compactty ctyb)
+        (compactfull_of_compactty ctyc)
+  | CmpctTup4 (ctya, ctyb, ctyc, ctyd) ->
+      compactfull_tup4
+        (compactfull_of_compactty ctya)
+        (compactfull_of_compactty ctyb)
+        (compactfull_of_compactty ctyc)
+        (compactfull_of_compactty ctyd)
+  | CmpctInt32 -> compactfull_int32
+  | CmpctInt64 -> compactfull_int64
+  | CmpctList ty -> compactfull_list (full_of_ty ty)
+  | CmpctUnion1 cty -> compactfull_union1 (compactfull_of_compactty cty)
+  | CmpctUnion2 (ctya, ctyb) ->
+      compactfull_union2
+        (compactfull_of_compactty ctya)
+        (compactfull_of_compactty ctyb)
+  | CmpctOrInt32 ty -> compactfull_orint32 (full_of_ty ty)
+  | CmpctPayload ty -> compactfull_payload (full_of_ty ty)
 
 type full_and_v = FullAndV : 'a full * 'a -> full_and_v
 
