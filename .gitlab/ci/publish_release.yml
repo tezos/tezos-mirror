@@ -23,6 +23,8 @@ docker:merge_manifests:
     - .image_template__latest # Docker-in-Docker (dind)
     - .docker_registry_auth # Sets up a before_script
   stage: publish_release
+  # this job does not need artifacts from previous jobs.
+  dependencies: []
   script:
     - apk add git
     # Environment variables from before_script
