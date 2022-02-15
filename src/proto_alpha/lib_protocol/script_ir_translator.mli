@@ -509,6 +509,14 @@ val get_single_sapling_state :
   'a ->
   (Sapling.Id.t option * context) tzresult
 
+(** [code_size ctxt code views] returns an overapproximation of the size of
+    the in-memory representation of [code] and [views] in the context [ctxt]. *)
+val code_size :
+  context ->
+  ('a, 'b) Script_typed_ir.lambda ->
+  Script_typed_ir.view_map ->
+  (Cache_memory_helpers.sint * context) tzresult
+
 (** [script_size script] returns an overapproximation of the size of
     the in-memory representation of [script] as well as the cost
     associated to computing that overapproximation. *)
