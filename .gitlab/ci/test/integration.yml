@@ -123,7 +123,7 @@ integration:static-binaries:
   dependencies:
     - build:static-x86_64-linux-binaries
   script:
-    - sudo cp -a ../tezos-binaries/* ../
+    - sudo cp -a ../tezos-binaries/x86_64/* ../
     - make -C ../ build-parameters
     - poetry run pytest "tests_alpha/test_basic.py" -m "not slow" --exitfirst --color=yes --log-dir=tmp "--junitxml=reports/alpha_batch.xml" --timeout 7200
 
