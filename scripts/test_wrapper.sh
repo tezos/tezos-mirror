@@ -23,9 +23,9 @@ echo "Running test \"dune build $* @$nametest/runtest\" ..."
 
 START=$(date +%s.%N)
 
-dune build "$@" "@$nametest/runtest" > "test_results/$name.log" 2>&1
-
-EXITCODE=$?
+EXITCODE=0
+dune build "$@" "@$nametest/runtest" > "test_results/$name.log" 2>&1 \
+    || EXITCODE=$?
 
 END=$(date +%s.%N)
 
