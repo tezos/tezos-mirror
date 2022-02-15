@@ -217,7 +217,7 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
     | None -> Lwt.return_unit
     | Some node -> Node.wait_for_request ~request:`Inject node
   in
-  let* oph_json = inject ~async ~data:(`String signed_op) client in
+  let*! oph_json = inject ~async ~data:(`String signed_op) client in
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
 

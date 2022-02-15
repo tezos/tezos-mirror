@@ -167,23 +167,12 @@ let inject_block ?endpoint ?hooks ~data client =
 let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["injection"; "operation"] in
   let query_string = if async then [("async", "")] else [] in
-  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let spawn_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["private"; "injection"; "operation"] in
   let query_string = if async then [("async", "")] else [] in
-  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let spawn_private_inject_operation ?endpoint ?hooks ?(async = false) ~data
-    client =
-  let path = ["private"; "injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in

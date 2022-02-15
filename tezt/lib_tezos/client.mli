@@ -174,6 +174,21 @@ val spawn_rpc :
   t ->
   Process.t
 
+module Spawn : sig
+  (* FIXME: This module is temporary and is here to make the new
+     interface cohabits with the old one. *)
+  val rpc :
+    ?endpoint:endpoint ->
+    ?hooks:Process.hooks ->
+    ?env:string String_map.t ->
+    ?data:JSON.u ->
+    ?query_string:query_string ->
+    meth ->
+    path ->
+    t ->
+    JSON.t Process.runnable
+end
+
 (** Run [tezos-client rpc list]. *)
 val rpc_list : ?endpoint:endpoint -> t -> string Lwt.t
 

@@ -123,16 +123,7 @@ val inject_operation :
   ?async:bool ->
   data:JSON.u ->
   Client.t ->
-  JSON.t Lwt.t
-
-(** Same as {!inject_operation}, but do not wait for the process to exit. *)
-val spawn_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  Process.t
+  JSON.t Process.runnable
 
 (** Call RPC /private/injection/operation *)
 val private_inject_operation :
@@ -141,16 +132,7 @@ val private_inject_operation :
   ?async:bool ->
   data:JSON.u ->
   Client.t ->
-  JSON.t Lwt.t
-
-(** Same as {!private_inject_operation}, but do not wait for the process to exit. *)
-val spawn_private_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  Process.t
+  JSON.t Process.runnable
 
 (** Call RPC /injection/block *)
 val inject_block :

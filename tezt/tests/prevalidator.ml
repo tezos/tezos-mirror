@@ -866,7 +866,7 @@ module Revamped = struct
       Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_hex
     in
     let signed_op = op_str_hex ^ signature in
-    let p = RPC.spawn_inject_operation ~data:(`String signed_op) client in
+    let*? p = RPC.inject_operation ~data:(`String signed_op) client in
 
     log_step 4 "Check that injection failed as expected." ;
     let injection_error_rex =
@@ -2084,7 +2084,8 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
 
 let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  RPC.inject_operation ~data:(`String signed_op) client
+  let*! r = RPC.inject_operation ~data:(`String signed_op) client in
+  return r
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client =
@@ -2179,7 +2180,8 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   let signed_op = op_str_hex ^ signature in
-  RPC.inject_operation ~data:(`String signed_op) client
+  let*! r = RPC.inject_operation ~data:(`String signed_op) client in
+  return r
 
 let check_batch_operations_are_in_applied_mempool ops oph n =
   let open JSON in
@@ -2522,7 +2524,7 @@ let propagation_future_endorsement =
   Log.info "%s" step6_msg ;
   let (`Hex bytes) = Hex.of_bytes bytes in
   let injection_waiter = wait_for_injection node_2 in
-  let* _ = RPC.private_inject_operation ~data:(`String bytes) client_2 in
+  let*! _ = RPC.private_inject_operation ~data:(`String bytes) client_2 in
   let* () = injection_waiter in
   Log.info "%s" step7_msg ;
   let* () = Client.Admin.trust_address client_2 ~peer:node_3
@@ -3388,7 +3390,7 @@ let force_operation_injection =
   in
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
-  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client1 in
+  let*? p = RPC.inject_operation ~data:(`String signed_op) client1 in
   let injection_error_rex =
     rex
       ~opts:[`Dotall]
@@ -3396,18 +3398,16 @@ let force_operation_injection =
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
-  let p =
-    RPC.spawn_private_inject_operation ~data:(`String signed_op) client1
-  in
+  let*? p = RPC.private_inject_operation ~data:(`String signed_op) client1 in
   let access_error_rex =
     rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
   in
   let* () = Process.check_error ~msg:access_error_rex p in
   Log.info "%s" step7_msg ;
-  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client2 in
+  let*? p = RPC.inject_operation ~data:(`String signed_op) client2 in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step8_msg ;
-  let* _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
+  let*! _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
   unit
 
 (** This test tries to inject an operation with an old known branch *)
@@ -3472,8 +3472,8 @@ let injecting_old_operation_fails =
     Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_hex
   in
   log_step 5 step5 ;
-  let process =
-    RPC.spawn_inject_operation ~data:(`String (op_str_hex ^ signature)) client
+  let*? process =
+    RPC.inject_operation ~data:(`String (op_str_hex ^ signature)) client
   in
   let injection_error_rex =
     rex
