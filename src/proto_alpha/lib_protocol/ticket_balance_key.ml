@@ -43,7 +43,7 @@ let ticket_balance_key ctxt ~owner
      same hash. *)
   Gas.consume ctxt (Script.strip_annotations_cost cont_ty_unstripped)
   >>?= fun ctxt ->
-  let typ = Script.strip_annotations cont_ty_unstripped in
+  let ty = Script.strip_annotations cont_ty_unstripped in
   let ticketer = Destination.Contract ticketer in
   let ticketer_address =
     Script_typed_ir.{destination = ticketer; entrypoint = Entrypoint.default}
@@ -71,4 +71,4 @@ let ticket_balance_key ctxt ~owner
     Script_typed_ir.address_t
     owner_address
   >>=? fun (owner, ctxt) ->
-  Lwt.return (Ticket_hash.make ctxt ~ticketer ~typ ~contents ~owner)
+  Lwt.return (Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner)
