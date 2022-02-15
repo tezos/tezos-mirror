@@ -1025,7 +1025,8 @@ let run () =
          @ List.map (sf "/%s") Cli.options.tags_not_to_run)) ;
     if Cli.options.list = None then
       prerr_endline
-        "You can use --list to get the list of tests and their tags.") ;
+        "You can use --list to get the list of tests and their tags." ;
+    exit 3) ;
   (* Read records. *)
   List.iter
     Record.(fun filename -> use (input_file filename))
