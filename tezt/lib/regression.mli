@@ -35,16 +35,20 @@
     This function is a wrapper around [Test.register]. It adds the "regression" tag
     to the [tags] list provided by the argument.
 
-    The [output_file] is a filename, where the output of the test is stored and
-    read to be compared on subsequent runs. The output file with ".out"
-    filename extension added is placed in the [regression_output_path],
-    which is by default "tezt/_regressions". *)
+    The [output_file] specifies the name of the file where the output of the test is stored
+    and read to be compared on subsequent runs. The actual filename is
+    [Cli.options.regression_dir // output_file ^ ".out"].
+
+    Note that [output_file] can contain subdirectories.
+    For instance, using the default [--regression-dir],
+    [~output_file:"math/sqrt"] will result in the creation of directory
+    ["tezt/_regressions/math"] if needed and regression output will be written
+    in ["tezt/_regressions/math/sqrt.out"]. *)
 val register :
   __FILE__:string ->
   title:string ->
   tags:string list ->
   output_file:string ->
-  ?regression_output_path:string ->
   (unit -> unit Lwt.t) ->
   unit
 

@@ -1031,8 +1031,7 @@ let register () =
     ~__FILE__
     ~title:"Binary RPC regression tests"
     ~tags:["rpc"; "regression"; "binary"]
-    ~output_file:"binary_rpc"
-    ~regression_output_path:"tezt/_regressions/rpc/"
+    ~output_file:"rpc/binary_rpc"
     binary_regression_test ;
   let alpha_consensus_threshold = [(["consensus_threshold"], Some "0")] in
   let alpha_overrides = Some alpha_consensus_threshold in

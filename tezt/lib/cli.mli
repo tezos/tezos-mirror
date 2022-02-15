@@ -84,6 +84,7 @@ type options = {
   mutable list : [`Ascii_art | `Tsv] option;
   mutable global_timeout : float option;
   mutable test_timeout : float option;
+  mutable regression_dir : string;
   mutable reset_regressions : bool;
   mutable loop_mode : loop_mode;
   mutable time : bool;
