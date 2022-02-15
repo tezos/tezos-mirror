@@ -31,7 +31,7 @@ let store_empty = empty
 let shallow_of_tree repo tree =
   let h = Tree.hash tree in
   let hash =
-    match Tree.kind tree with `Tree -> `Node h | `Value -> `Contents h
+    match Tree.kind tree with `Tree -> `Node h | `Value -> `Value h
   in
   Tree.shallow repo hash
 

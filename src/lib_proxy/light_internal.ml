@@ -68,7 +68,7 @@ module Merkle = struct
         | Ok hash_str ->
             let irmin_hash =
               match kind with
-              | Contents -> `Contents hash_str
+              | Contents -> `Value hash_str
               | Node -> `Node hash_str
             in
             return @@ Store.Tree.shallow repo irmin_hash)

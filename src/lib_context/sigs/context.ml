@@ -23,8 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The tree depth of a fold. See the [View.fold] function for more
-    information. *)
+(** The tree depth of a fold. See the [fold] function for more information. *)
 type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
 
 module type VIEW = sig
@@ -63,7 +62,7 @@ module type VIEW = sig
   val list :
     t -> ?offset:int -> ?length:int -> key -> (string * tree) list Lwt.t
 
-  (** [length t key] is an Lwt promise that resolve to the number of
+  (** [length t key] is an Lwt promise that resolves to the number of
       files and sub-nodes stored under [k] in [t].
 
       It is equivalent to [let+ l = list t k in List.length l] but has a
@@ -101,11 +100,11 @@ module type VIEW = sig
       The depth is 0-indexed. If [depth] is set (by default it is not), then [f]
       is only called when the conditions described by the parameter is true:
 
-      - [Eq d] folds over nodes and contents of depth exactly [d].
-      - [Lt d] folds over nodes and contents of depth strictly less than [d].
-      - [Le d] folds over nodes and contents of depth less than or equal to [d].
-      - [Gt d] folds over nodes and contents of depth strictly more than [d].
-      - [Ge d] folds over nodes and contents of depth more than or equal to [d].
+      - [Eq d] folds over nodes and values of depth exactly [d].
+      - [Lt d] folds over nodes and values of depth strictly less than [d].
+      - [Le d] folds over nodes and values of depth less than or equal to [d].
+      - [Gt d] folds over nodes and values of depth strictly more than [d].
+      - [Ge d] folds over nodes and values of depth more than or equal to [d].
 
       If [order] is [`Sorted] (the default), the elements are traversed in
       lexicographic order of their keys. For large nodes, it is memory-consuming,
@@ -187,145 +186,197 @@ module type HASH_VERSION = sig
 end
 
 module Proof_types = struct
-  (** The type for node segments. *)
-  type segment = string
+  (** Proofs are compact representations of trees which can be shared
+      between peers.
 
-  (** The type for contents. *)
-  type contents = bytes
+      This is expected to be used as follows:
+
+      - A first peer runs a function [f] over a tree [t]. While performing
+        this computation, it records: the hash of [t] (called [before]
+        below), the hash of [f t] (called [after] below) and a subset of [t]
+        which is needed to replay [f] without any access to the first peer's
+        storage. Once done, all these informations are packed into a proof of
+        type [t] that is sent to the second peer.
+
+      - The second peer generates an initial tree [t'] from [p] and computes
+        [f t']. Once done, it compares [t']'s hash and [f t']'s hash to [before]
+        and [after]. If they match, they know that the result state [f t'] is a
+        valid context state, without having to have access to the full storage
+        of the first peer. *)
+
+  (** The type for file and directory names. *)
+  type step = string
+
+  (** The type for values. *)
+  type value = bytes
+
+  (** The type of indices for inodes' children. *)
+  type index = int
 
   (** The type for hashes. *)
   type hash = Context_hash.t
 
   (** The type for (internal) inode proofs.
 
-    These proofs encode large directories into a more efficient tree-like
-    structure.
+      These proofs encode large directories into a tree-like structure. This
+      reflects irmin-pack's way of representing nodes and computing
+      hashes (tree-like representations for nodes scales better than flat
+      representations).
 
-    Invariant are dependent on the backend.
+      [length] is the total number of entries in the children of the inode.
+      It's the size of the "flattened" version of that inode. [length] can be
+      used to prove the correctness of operations such [Tree.length] and
+      [Tree.list ~offset ~length] in an efficient way.
 
-    [length] is the total number of entries in the chidren of the inode.
-    E.g. the size of the "flattened" version of that inode. This is used
-    to efficiently implements paginated lists.
+      [proofs] contains the children proofs. It is a sparse list of ['a] values.
+      These values are associated to their index in the list, and the list is
+      kept sorted in increasing order of indices. ['a] can be a concrete proof
+      or a hash of that proof.
+      - In proofs with version 0, inodes have at most 32 proofs
+        (indexed from 0 to 31). *)
+  type 'a inode = {length : int; proofs : (index * 'a) list}
 
-    [proofs] have a length of at most [Conf.entries] entries. This list can
-    be sparse so every proof is indexed by their position between
-    [0 ... (Conf.entries-1)]. For binary trees, this boolean
-    index is a segment of the left-right decision proof corresponding
-    to the path in that binary tree. *)
-  type 'a inode = {length : int; proofs : (int * 'a) list}
+  (** The type for inode extenders.
 
-  (** The type for inode extenders. *)
-  type 'a inode_extender = {length : int; segments : int list; proof : 'a}
-  [@@deriving irmin]
+      An extender is a compact representation of a sequence of [inode] which
+      contain only one child. As for inodes, The ['a] parameter can be a
+      concrete proof or a hash of that proof.
 
-  (** The type for inode trees.
-
-    Inodes are optimized representations of trees. Pointers in that trees
-    would refer to blinded nodes, nodes or to other inodes. E.g.
-    Blinded content nor contents are not expected to appear directly in
-    an inode tree. *)
-  type 'tree inode_tree =
-    | Blinded_inode of hash
-    | Inode_values of (segment * 'tree) list
-    | Inode_tree of 'tree inode_tree inode
-    | Inode_extender of 'tree inode_tree inode_extender
+      If an inode proof contains singleton children [i_0, ..., i_n] such as:
+      [{length=l; proofs = [ (i_0, {proofs = ... { proofs = [ (i_n, p) ] }})]}],
+      then it is compressed into the inode extender
+      [{length=l; segment = [i_0;..;i_n]; proof=p}] sharing the same lenght [l]
+      and final proof [p]. *)
+  type 'a inode_extender = {length : int; segment : index list; proof : 'a}
   [@@deriving irmin]
 
   (** The type for compressed and partial Merkle tree proofs.
 
-    [Blinded_contents h] is a shallow pointer to contents having hash [h].
-    [Contents c] is the contents [c].
+      Tree proofs do not provide any guarantee with the ordering of
+      computations. For instance, if two effects commute, they won't be
+      distinguishable by this kind of proofs.
 
-    Tree proofs do not provide any guarantee with the ordering of
-    computations. For instance, if two effects commute, they won't be
-    distinguishable by this kind of proofs.
+      [Value v] proves that a value [v] exists in the store.
 
-    [Blinded_node h] is a shallow pointer to a node having hash [h].
+      [Blinded_value h] proves a value with hash [h] exists in the store.
 
-    [Node ls] is a "flat" node containing the list of files [ls]. The length
-    of [ls]  is at most [Conf.stable_hash].
+      [Node ls] proves that a a "flat" node containing the list of files [ls]
+      exists in the store.
+      - In proofs with version 0, the length of [ls] is at most 256;
 
-    [Inode i] is an optimized representation of a node as a tree.
+      [Blinded_node h] proves that a node with hash [h] exists in the store.
 
- *)
+      [Inode i] proves that an inode [i] exists in the store.
+
+      [Extender e] proves that an inode extender [e] exist in the store. *)
   type tree =
-    | Contents of contents
-    | Blinded_contents of hash
-    | Node of (segment * tree) list
+    | Value of value
+    | Blinded_value of hash
+    | Node of (step * tree) list
     | Blinded_node of hash
-    | Inode of tree inode_tree inode
-    | Extender of tree inode_tree inode_extender
-  [@@deriving irmin]
+    | Inode of inode_tree inode
+    | Extender of inode_tree inode_extender
+
+  (** The type for inode trees. It is a subset of [tree], limited to nodes.
+
+      [Blinded_inode h] proves that an inode with hash [h] exists in the store.
+
+      [Inode_values ls] is simliar to trees' [Node].
+
+      [Inode_tree i] is similar to tree's [Inode].
+
+      [Inode_extender e] is similar to trees' [Extender].  *)
+  and inode_tree =
+    | Blinded_inode of hash
+    | Inode_values of (step * tree) list
+    | Inode_tree of inode_tree inode
+    | Inode_extender of inode_tree inode_extender
 
   (** The type for kinded hashes. *)
-  type kinded_hash = [`Contents of Context_hash.t | `Node of Context_hash.t]
+  type kinded_hash = [`Value of hash | `Node of hash]
 
-  (** The type for elements of stream proofs. *)
-  type elt =
-    | Contents of contents
-    | Node of (segment * kinded_hash) list
-    | Inode of hash inode
-    | Inode_extender of hash inode_extender
-  [@@deriving irmin]
+  module Stream = struct
+    (** Stream proofs represent an explicit traversal of a Merle tree proof.
+        Every element (a node, a value, or a shallow pointer) met is first
+        "compressed" by shallowing its children and then recorded in the proof.
 
-  (** The type for stream proofs. Stream poofs provides stronger ordering
-      guarantees as the read effects have to happen in the exact same order and
-      they are easier to verify. *)
-  type stream = elt Seq.t [@@deriving irmin]
+        As stream proofs directly encode the recursive construction of the
+        Merkle root hash is slightly simpler to implement: verifier simply
+        need to hash the compressed elements lazily, without any memory or
+        choice.
 
-  type 'a t = {before : kinded_hash; after : kinded_hash; state : 'a}
+        Moreover, the minimality of stream proofs is trivial to check.
+        Once the computation has consumed the compressed elements required,
+        it is sufficient to check that no more compressed elements remain
+        in the proof.
+
+        However, as the compressed elements contain all the hashes of their
+        shallow children, the size of stream proofs is larger
+        (at least double in size in practice) than tree proofs, which only
+        contains the hash for intermediate shallow pointers. *)
+
+    (** The type for elements of stream proofs.
+
+        [Value v] is a proof that the next element read in the store is the
+        value [v].
+
+        [Node n] is a proof that the next element read in the store is the
+        node [n].
+
+        [Inode i] is a proof that the next element read in the store is the
+        inode [i].
+
+        [Inode_extender e] is a proof that the next element read in the store
+        is the node extender [e]. *)
+    type elt =
+      | Value of value
+      | Node of (step * kinded_hash) list
+      | Inode of hash inode
+      | Inode_extender of hash inode_extender
+
+    (** The type for stream proofs.
+
+        The sequance [e_1 ... e_n] proves that the [e_1], ..., [e_n] are
+        read in the store in sequence. *)
+    type t = elt Seq.t
+  end
+
+  type stream = Stream.t
+
+  (** The type for proofs of kind ['a].
+
+      A proof [p] proves that the state advanced from [before p] to
+      [after p]. [state p]'s hash is [before p], and [state p] contains
+      the minimal information for the computation to reach [after p].
+
+      [version p] is the proof version, currently only version 0 is supported.
+      - Proofs with version 0 have top-level nodes of size 256. Whenever a node
+        has more than 256 entries, it is converted into an inode tree with
+        an branching factor of 32. *)
+  type 'a t = {
+    version : int;
+    before : kinded_hash;
+    after : kinded_hash;
+    state : 'a;
+  }
 end
 
 module type PROOF = sig
-  (** Proofs are compact representations of trees which can be shared
-    between a node and a client.
-
-    The protocol is the following:
-
-    - The node runs a function [f] over a tree [t]. While performing
-      this computation, the node records: the hash of [t] (called [before]
-      below), the hash of [f t] (called [after] below) and a subset of [t]
-      which is needed to replay [f] without any access to the node's storage.
-      Once done, the node packs this into a proof [p] and sends this to the
-      client.
-
-    - The client generates an initial tree [t'] from [p] and computes [f t'].
-      Once done, it compares [t']'s hash and [f t']'s hash to [before] and
-      [after]. If they match, they know that the result state [f t'] is a
-      valid context state, without having to have access to the full node's
-      storage. *)
-
-  include
-    module type of Proof_types
-      with type 'a inode = 'a Proof_types.inode
-       and type 'a inode_extender = 'a Proof_types.inode_extender
-       and type 'a inode_tree = 'a Proof_types.inode_tree
-       and type tree = Proof_types.tree
-       and type elt = Proof_types.elt
-       and type stream = Proof_types.stream
-       and type 'a t = 'a Proof_types.t
-
-  (** [t] proves that the state advanced from [before t] to [after t].
-      [state t]'s hash is [before], and [state t] contains the minimal
-      information for the computation to reach [after t]. *)
-
-  (** [before t] it the state's hash at the beginning of the computation. *)
-  val before : 'a t -> kinded_hash
-
-  (** [after t] is the state's hash at the end of the computation. *)
-  val after : 'a t -> kinded_hash
-
-  (** [proof t] is a subset of the initial state needed to prove that the proven
-      computation could run without performing any I/O. *)
-  val state : 'a t -> 'a
-
-  val v : before:kinded_hash -> after:kinded_hash -> 'a -> 'a t
+  include module type of struct
+    include Proof_types
+  end
 end
 
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
   module Proof : PROOF
+
+  (** The type for context repositories. *)
+  type index
+
+  (** The type of tree for which to build a shallow tree with [shallow] *)
+  type kinded_hash := [`Value of Context_hash.t | `Node of Context_hash.t]
 
   module Tree : sig
     include
@@ -353,69 +404,86 @@ module type S = sig
     (** [of_raw t] is the tree equivalent to the raw tree [t]. *)
     val of_raw : raw -> tree
 
-    (** The type of tree for which to build a shallow tree with [shallow] *)
-    type kinded_hash := [`Contents of Context_hash.t | `Node of Context_hash.t]
-
     type repo
 
     val make_repo : unit -> repo Lwt.t
 
+    (** [shallow repo h] is the shallow tree having hash [h] based on
+        the repository [r]. *)
     val shallow : repo -> kinded_hash -> tree
-
-    (** [produce r h f] runs [f] on top of a real store [r], producing a proof
-        and a reulst using the initial root hash [h].
-
-        The trees produced during [f]'s computation will carry the full history
-        of reads. This history will be reset when [f] is complete so subtrees
-        escaping the scope of [f] will not cause memory leaks.
-
-        It is possible to call [produce_proof] recursively. In that case, each
-        input trees will have their own history of reads and will contain only
-        the reads needed to unshallow that corresponding trees. Proof trees
-        proof should then interact as if they were all unshallowed (note: in the
-        case of nested proofs, it's unclear what [verify_proof] should do...). *)
-    type ('proof, 'result) producer :=
-      repo ->
-      kinded_hash ->
-      (tree -> (tree * 'result) Lwt.t) ->
-      ('proof * 'result) Lwt.t
-
-    (** [verify t f] runs [f] in checking mode, loading data from the proof as
-        needed.
-
-        The generated tree is the tree after [f] has completed. More operations
-        can be run on that tree, but it won't be able to access the underlying
-        storage.
-
-        Raise [Proof.Bad_proof] when the proof is rejected. *)
-    type ('proof, 'result) verifier :=
-      'proof ->
-      (tree -> (tree * 'result) Lwt.t) ->
-      (tree * 'result, [`Msg of string]) result Lwt.t
-
-    (** The type for tree proofs.
-
-        Guarantee that the given computation performs exactly the same state
-        operations as the generating computation, *in some order*. *)
-    type tree_proof := Proof.tree Proof.t
-
-    (** [produce_proof] is the producer of tree proofs. *)
-    val produce_proof : (tree_proof, 'a) producer
-
-    (** [verify_proof] is the verifier of tree proofs. *)
-    val verify_proof : (tree_proof, 'a) verifier
-
-    (** The type for stream proofs.
-
-        Guarantee that the given computation performs exactly the same state
-        operations as the generating computation, in the exact same order.*in
-        some order*. *)
-    type stream_proof := Proof.stream Proof.t
-
-    (** [produce_stream] is the producer of stream proofs. *)
-    val produce_stream : (stream_proof, 'a) producer
-
-    (** [verify_stream] is the verifier of stream proofs. *)
-    val verify_stream : (stream_proof, 'a) verifier
   end
+
+  (** [produce r h f] runs [f] on top of a real store [r], producing a proof and
+      a result using the initial root hash [h].
+
+      The trees produced during [f]'s computation will carry the full history of
+      reads. This history will be reset when [f] is complete so subtrees
+      escaping the scope of [f] will not cause memory leaks.
+
+      Calling [produce_proof] recursively has an undefined behaviour. *)
+  type ('proof, 'result) producer :=
+    index ->
+    kinded_hash ->
+    (tree -> (tree * 'result) Lwt.t) ->
+    ('proof * 'result) Lwt.t
+
+  (** [verify p f] runs [f] in checking mode. [f] is a function that takes a
+      tree as input and returns a new version of the tree and a result. [p] is a
+      proof, that is a minimal representation of the tree that contains what [f]
+      should be expecting.
+
+      Therefore, contrary to trees found in a storage, the contents of the trees
+      passed to [f] may not be available. For this reason, looking up a value at
+      some [path] can now produce three distinct outcomes:
+      - A value [v] is present in the proof [p] and returned : [find tree path]
+        is a promise returning [Some v];
+      - [path] is known to have no value in [tree] : [find tree path] is a
+        promise returning [None]; and
+      - [path] is known to have a value in [tree] but [p] does not provide it
+        because [f] should not need it: [verify] returns an error classifying
+        [path] as an invalid path (see below).
+
+      The same semantics apply to all operations on the tree [t] passed to [f]
+      and on all operations on the trees built from [f].
+
+      The generated tree is the tree after [f] has completed. That tree is
+      disconnected from any storage (i.e. [index]). It is possible to run
+      operations on it as long as they don't require loading shallowed subtrees.
+
+      The result is [Error _] if the proof is rejected:
+      - For tree proofs: when [p.before] is different from the hash of
+        [p.state];
+      - For tree and stream proofs: when [p.after] is different from the hash
+        of [f p.state];
+      - For tree and stream proofs: when [f p.state] tries to access paths
+        invalid paths in [p.state];
+      - For stream proofs: when the proof is not empty once [f] is done. *)
+  type ('proof, 'result) verifier :=
+    'proof ->
+    (tree -> (tree * 'result) Lwt.t) ->
+    (tree * 'result, [`Msg of string]) result Lwt.t
+
+  (** The type for tree proofs.
+
+      Guarantee that the given computation performs exactly the same state
+      operations as the generating computation, *in some order*. *)
+  type tree_proof := Proof.tree Proof.t
+
+  (** [produce_tree_proof] is the producer of tree proofs. *)
+  val produce_tree_proof : (tree_proof, 'a) producer
+
+  (** [verify_tree_proof] is the verifier of tree proofs. *)
+  val verify_tree_proof : (tree_proof, 'a) verifier
+
+  (** The type for stream proofs.
+
+      Guarantee that the given computation performs exactly the same state
+      operations as the generating computation, in the exact same order. *)
+  type stream_proof := Proof.stream Proof.t
+
+  (** [produce_stream_proof] is the producer of stream proofs. *)
+  val produce_stream_proof : (stream_proof, 'a) producer
+
+  (** [verify_stream] is the verifier of stream proofs. *)
+  val verify_stream_proof : (stream_proof, 'a) verifier
 end

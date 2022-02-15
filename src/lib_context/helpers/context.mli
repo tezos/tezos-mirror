@@ -44,8 +44,6 @@ module Make_tree (DB : DB) : sig
        and type value := DB.contents
        and type tree := DB.tree
 
-  module Proof : Tezos_context_sigs.Context.PROOF
-
   val pp : Format.formatter -> DB.tree -> unit
 
   val empty : _ -> DB.tree
@@ -60,7 +58,7 @@ module Make_tree (DB : DB) : sig
 
   val of_raw : raw -> DB.tree
 
-  type kinded_hash := [`Contents of Context_hash.t | `Node of Context_hash.t]
+  type kinded_hash := [`Value of Context_hash.t | `Node of Context_hash.t]
 
   type repo = DB.repo
 
@@ -68,12 +66,22 @@ module Make_tree (DB : DB) : sig
 
   val shallow : DB.repo -> kinded_hash -> DB.tree
 
+  (** Exception raised by [find_tree] and [add_tree] when applied to shallow
+    trees. It is exposed for so that the memory context can in turn raise it. *)
+  exception Context_dangling_hash of string
+end
+
+module Make_proof (DB : DB) : sig
+  module Proof : Tezos_context_sigs.Context.PROOF
+
+  type kinded_hash := [`Value of Context_hash.t | `Node of Context_hash.t]
+
   type tree_proof := Proof.tree Proof.t
 
   type stream_proof := Proof.stream Proof.t
 
   type ('proof, 'result) producer :=
-    repo ->
+    DB.repo ->
     kinded_hash ->
     (DB.tree -> (DB.tree * 'result) Lwt.t) ->
     ('proof * 'result) Lwt.t
@@ -83,17 +91,13 @@ module Make_tree (DB : DB) : sig
     (DB.tree -> (DB.tree * 'result) Lwt.t) ->
     (DB.tree * 'result, [`Msg of string]) result Lwt.t
 
-  val produce_proof : (tree_proof, 'a) producer
+  val produce_tree_proof : (tree_proof, 'a) producer
 
-  val verify_proof : (tree_proof, 'a) verifier
+  val verify_tree_proof : (tree_proof, 'a) verifier
 
-  val produce_stream : (stream_proof, 'a) producer
+  val produce_stream_proof : (stream_proof, 'a) producer
 
-  val verify_stream : (stream_proof, 'a) verifier
-
-  (** Exception raised by [find_tree] and [add_tree] when applied to shallow
-    trees. It is exposed for so that the memory context can in turn raise it. *)
-  exception Context_dangling_hash of string
+  val verify_stream_proof : (stream_proof, 'a) verifier
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t
