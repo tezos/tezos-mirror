@@ -446,7 +446,7 @@ struct
       (** The order of the finite field *)
       val order : Z.t
 
-      (** minimal number of bytes required to encode a value of the field. *)
+      (** Minimal number of bytes required to encode a value of the field. *)
       val size_in_bytes : int
 
       (** [check_bytes bs] returns [true] if [bs] is a correct byte
@@ -496,6 +496,9 @@ struct
     module type PRIME_FIELD = sig
       include FIELD
 
+      (** Actual number of bytes allocated for a value of type t *)
+      val size_in_memory : int
+
       (** [of_z x] builds an element t from the Zarith element [x]. [mod order] is
           applied if [x >= order] or [x < 0]. *)
       val of_z : Z.t -> t
@@ -509,6 +512,9 @@ struct
     module type CURVE = sig
       (** The type of the element in the elliptic curve *)
       type t
+
+      (** Actual number of bytes allocated for a value of type t *)
+      val size_in_memory : int
 
       (** The size of a point representation, in bytes *)
       val size_in_bytes : int
