@@ -2775,9 +2775,6 @@ module Operation : sig
 
   val internal_operation_encoding : packed_internal_operation Data_encoding.t
 
-  val packed_internal_operation_in_memory_size :
-    packed_internal_operation -> Cache_memory_helpers.nodes_and_size
-
   val pack : 'kind operation -> packed_operation
 
   type ('a, 'b) eq = Eq : ('a, 'a) eq
