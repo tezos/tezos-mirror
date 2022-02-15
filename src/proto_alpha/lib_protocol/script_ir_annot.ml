@@ -156,16 +156,13 @@ let get_two_annot loc = function
   | [a; b] -> ok (a, b)
   | _ -> error (Unexpected_annotation loc)
 
-let check_type_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_type_annot loc annot =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc types >|? fun _a -> ()
 
-let check_composed_type_annot : Script.location -> string list -> unit tzresult
-    =
- fun loc annot ->
+let check_composed_type_annot loc annot =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc vars >>? fun () ->
   get_one_annot loc types >>? fun _t ->
@@ -206,55 +203,46 @@ let has_field_annot node =
 let remove_field_annot node =
   extract_field_annot node >|? fun (node, _a) -> node
 
-let extract_entrypoint_annot :
-    Script.node -> (Script.node * Entrypoint.t option) tzresult =
- fun node ->
+let extract_entrypoint_annot node =
   extract_field_annot node >|? fun (node, field_annot_opt) ->
   ( node,
     Option.bind field_annot_opt (fun field_annot ->
         Entrypoint.of_annot_lax_opt field_annot) )
 
-let check_var_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_var_annot loc annot =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc vars >|? fun (_a : var_annot option) -> ()
 
-let check_constr_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_constr_annot loc annot =
   parse_annots ~allow_special_field:true loc annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
   get_one_annot loc types >>? fun (_t : type_annot option) ->
   get_two_annot loc fields >|? fun (_f1, _f2) -> ()
 
-let check_two_var_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_two_var_annot loc annot =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   error_unexpected_annot loc fields >>? fun () ->
   get_two_annot loc vars >|? fun (_a1, _a2) -> ()
 
-let check_destr_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_destr_annot loc annot =
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
   get_one_annot loc fields >|? fun (_f : field_annot option) -> ()
 
-let check_unpair_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_unpair_annot loc annot =
   parse_annots loc ~allow_special_var:true annot >>? classify_annot loc
   >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_two_annot loc vars >>? fun (_vcar, _vcdr) ->
   get_two_annot loc fields >|? fun (_f1, _f2) -> ()
 
-let parse_entrypoint_annot :
-    Script.location -> string list -> field_annot option tzresult =
- fun loc annot ->
+let parse_entrypoint_annot loc annot =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc types >>? fun () ->
   get_one_annot loc fields >>? fun f ->
@@ -270,8 +258,7 @@ let parse_entrypoint_annot_lax loc annot =
   | None -> Ok Entrypoint.default
   | Some (Field_annot annot) -> Entrypoint.of_annot_lax annot
 
-let check_var_type_annot : Script.location -> string list -> unit tzresult =
- fun loc annot ->
+let check_var_type_annot loc annot =
   parse_annots loc annot >>? classify_annot loc >>? fun (vars, types, fields) ->
   error_unexpected_annot loc fields >>? fun () ->
   get_one_annot loc vars >>? fun (_v : var_annot option) ->
