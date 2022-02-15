@@ -96,6 +96,7 @@ module Term = struct
        with Arg.Help help_str ->
          Format.eprintf "%s@." help_str ;
          exit 0) ;
+      Long_test.init () ;
       let executors = Long_test.[x86_executor1] in
       Long_test.register
         ~__FILE__

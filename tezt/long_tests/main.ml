@@ -51,6 +51,7 @@ let default_executors = Long_test.[x86_executor1]
 
 let () =
   Cli.init () ;
+  Long_test.init () ;
   (* Register your tests here. *)
   (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
   Qcheck_rpc.register ~executors:default_executors () ;

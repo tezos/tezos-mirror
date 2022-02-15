@@ -388,8 +388,10 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
 
 (** {2 Configuration} *)
 
-(** This section is only relevant if you intend to run the tests yourself.
-    Even then, if you don't need to send alerts, send data points, and retrieve
+(** This module should be initialized with [init] to read the configuration file.
+    If not, default values are used.
+
+    If you don't need to send alerts, send data points, and retrieve
     data points, you do not need to write a configuration file.
     If you do intend to run the tests yourself, you should store data points
     in your own database though. Indeed, time measurements only make sense
@@ -503,8 +505,11 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
     because measurements in Grafana queries are prefixed with the measurement prefix
     configured for InfluxDB. *)
 
-(** The [test_data_path] field from the configuration. *)
-val test_data_path : string
+(** Read configuration file. *)
+val init : unit -> unit
+
+(** Get the [test_data_path] field from the configuration. *)
+val test_data_path : unit -> string
 
 (** {2 Internal Functions for Debugging} *)
 
