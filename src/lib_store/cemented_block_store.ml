@@ -141,6 +141,8 @@ let load_table cemented_blocks_dir =
   let open Lwt_tzresult_syntax in
   protect (fun () ->
       let cemented_blocks_dir_path = Naming.dir_path cemented_blocks_dir in
+      (* No need to check the existence of the cemented block
+         directory as it is always there, even if empty. *)
       let*! dir_handle = Lwt_unix.opendir cemented_blocks_dir_path in
       let rec loop acc =
         let*! filename =
@@ -186,53 +188,57 @@ let load_metadata_table cemented_blocks_dir =
       let cemented_metadata_dir =
         Naming.cemented_blocks_metadata_dir cemented_blocks_dir
       in
-      let*! dir_handle =
-        Lwt_unix.opendir (Naming.dir_path cemented_metadata_dir)
-      in
-      let rec loop acc =
-        let*! filename =
-          Option.catch_s
-            ~catch_only:(function End_of_file -> true | _ -> false)
-            (fun () -> Lwt_unix.readdir dir_handle)
+      let metadata_dir_path = Naming.dir_path cemented_metadata_dir in
+      (* Make sure that the cemented metadata data directory exists,
+         as it may not be the case, depending on the history mode. *)
+      let*! exists = Lwt_unix.file_exists metadata_dir_path in
+      if exists then (
+        let*! dir_handle = Lwt_unix.opendir metadata_dir_path in
+        let rec loop acc =
+          let*! filename =
+            Option.catch_s
+              ~catch_only:(function End_of_file -> true | _ -> false)
+              (fun () -> Lwt_unix.readdir dir_handle)
+          in
+          match filename with
+          | Some filename -> (
+              let levels =
+                String.split_on_char '_' (Filename.remove_extension filename)
+              in
+              match levels with
+              | [start_level; end_level] -> (
+                  let start_level_opt = Int32.of_string_opt start_level in
+                  let end_level_opt = Int32.of_string_opt end_level in
+                  match (start_level_opt, end_level_opt) with
+                  | (Some start_level, Some end_level) ->
+                      let file =
+                        Naming.cemented_blocks_file
+                          cemented_blocks_dir
+                          ~start_level
+                          ~end_level
+                      in
+                      let metadata_file =
+                        Naming.cemented_blocks_metadata_file
+                          cemented_metadata_dir
+                          file
+                      in
+                      loop ({start_level; end_level; metadata_file} :: acc)
+                  | _ -> loop acc)
+              | _ -> loop acc)
+          | None -> Lwt.return acc
         in
-        match filename with
-        | Some filename -> (
-            let levels =
-              String.split_on_char '_' (Filename.remove_extension filename)
-            in
-            match levels with
-            | [start_level; end_level] -> (
-                let start_level_opt = Int32.of_string_opt start_level in
-                let end_level_opt = Int32.of_string_opt end_level in
-                match (start_level_opt, end_level_opt) with
-                | (Some start_level, Some end_level) ->
-                    let file =
-                      Naming.cemented_blocks_file
-                        cemented_blocks_dir
-                        ~start_level
-                        ~end_level
-                    in
-                    let metadata_file =
-                      Naming.cemented_blocks_metadata_file
-                        cemented_metadata_dir
-                        file
-                    in
-                    loop ({start_level; end_level; metadata_file} :: acc)
-                | _ -> loop acc)
-            | _ -> loop acc)
-        | None -> Lwt.return acc
-      in
-      let*! cemented_files =
-        Lwt.finalize
-          (fun () -> loop [])
-          (fun () -> Lwt_unix.closedir dir_handle)
-      in
-      match cemented_files with
-      | [] -> return_none
-      | cemented_files_list ->
-          let cemented_files_array = Array.of_list cemented_files_list in
-          Array.sort compare_cemented_metadata cemented_files_array ;
-          return_some cemented_files_array)
+        let*! cemented_files =
+          Lwt.finalize
+            (fun () -> loop [])
+            (fun () -> Lwt_unix.closedir dir_handle)
+        in
+        match cemented_files with
+        | [] -> return_none
+        | cemented_files_list ->
+            let cemented_files_array = Array.of_list cemented_files_list in
+            Array.sort compare_cemented_metadata cemented_files_array ;
+            return_some cemented_files_array)
+      else return_none)
 
 let load ~readonly ~log_size cemented_blocks_dir =
   let open Lwt_tzresult_syntax in
