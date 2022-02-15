@@ -1908,6 +1908,8 @@ module Ticket_hash : sig
 
   val pp : Format.formatter -> t -> unit
 
+  val of_script_expr_hash : Script_expr_hash.t -> t
+
   val equal : t -> t -> bool
 
   val compare : t -> t -> int
