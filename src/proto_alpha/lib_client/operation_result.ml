@@ -242,21 +242,7 @@ let pp_balance_updates ppf = function
             let balance =
               match balance with
               | Contract c -> Format.asprintf "%a" Contract.pp c
-              | Legacy_rewards (pkh, l) ->
-                  Format.asprintf
-                    "legacy_rewards(%a,%a)"
-                    pp_baker
-                    pkh
-                    Cycle.pp
-                    l
               | Block_fees -> "payload fees(the block proposer)"
-              | Legacy_deposits (pkh, l) ->
-                  Format.asprintf
-                    "legacy_deposits(%a,%a)"
-                    pp_baker
-                    pkh
-                    Cycle.pp
-                    l
               | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
               | Nonce_revelation_rewards -> "nonce revelation rewards"
               | Double_signing_evidence_rewards ->
@@ -264,8 +250,6 @@ let pp_balance_updates ppf = function
               | Endorsing_rewards -> "endorsing rewards"
               | Baking_rewards -> "baking rewards"
               | Baking_bonuses -> "baking bonuses"
-              | Legacy_fees (pkh, c) ->
-                  Format.asprintf "legacy_fees(%a,%a)" pp_baker pkh Cycle.pp c
               | Storage_fees -> "storage fees"
               | Double_signing_punishments -> "double signing punishments"
               | Lost_endorsing_rewards (pkh, p, r) ->

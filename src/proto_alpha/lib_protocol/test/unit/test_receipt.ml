@@ -70,16 +70,13 @@ let test_encodings () =
   let open Receipt in
   let pkh = Signature.Public_key_hash.zero in
   test_encodings (Contract (Contract.implicit_contract pkh)) >>=? fun () ->
-  test_encodings (Legacy_rewards (pkh, Cycle.root)) >>=? fun () ->
   test_encodings Block_fees >>=? fun () ->
-  test_encodings (Legacy_deposits (pkh, Cycle.root)) >>=? fun () ->
   test_encodings (Deposits pkh) >>=? fun () ->
   test_encodings Nonce_revelation_rewards >>=? fun () ->
   test_encodings Double_signing_evidence_rewards >>=? fun () ->
   test_encodings Endorsing_rewards >>=? fun () ->
   test_encodings Baking_rewards >>=? fun () ->
   test_encodings Baking_bonuses >>=? fun () ->
-  test_encodings (Legacy_fees (pkh, Cycle.root)) >>=? fun () ->
   test_encodings Storage_fees >>=? fun () ->
   test_encodings Double_signing_punishments >>=? fun () ->
   test_encodings (Lost_endorsing_rewards (pkh, Random.bool (), Random.bool ()))

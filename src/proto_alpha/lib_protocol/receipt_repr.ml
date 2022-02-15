@@ -26,16 +26,13 @@
 
 type balance =
   | Contract of Contract_repr.t
-  | Legacy_rewards of Signature.Public_key_hash.t * Cycle_repr.t
   | Block_fees
-  | Legacy_deposits of Signature.Public_key_hash.t * Cycle_repr.t
   | Deposits of Signature.Public_key_hash.t
   | Nonce_revelation_rewards
   | Double_signing_evidence_rewards
   | Endorsing_rewards
   | Baking_rewards
   | Baking_bonuses
-  | Legacy_fees of Signature.Public_key_hash.t * Cycle_repr.t
   | Storage_fees
   | Double_signing_punishments
   | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
@@ -61,16 +58,6 @@ let balance_encoding =
            (function Contract c -> Some ((), c) | _ -> None)
            (fun ((), c) -> Contract c);
          case
-           (Tag 1)
-           ~title:"Legacy_rewards"
-           (obj4
-              (req "kind" (constant "freezer"))
-              (req "category" (constant "legacy_rewards"))
-              (req "delegate" Signature.Public_key_hash.encoding)
-              (req "cycle" Cycle_repr.encoding))
-           (function Legacy_rewards (d, l) -> Some ((), (), d, l) | _ -> None)
-           (fun ((), (), d, l) -> Legacy_rewards (d, l));
-         case
            (Tag 2)
            ~title:"Block_fees"
            (obj2
@@ -78,17 +65,6 @@ let balance_encoding =
               (req "category" (constant "block fees")))
            (function Block_fees -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Block_fees);
-         case
-           (Tag 3)
-           ~title:"Legacy_deposits"
-           (obj4
-              (req "kind" (constant "freezer"))
-              (req "category" (constant "legacy_deposits"))
-              (req "delegate" Signature.Public_key_hash.encoding)
-              (req "cycle" Cycle_repr.encoding))
-           (function
-             | Legacy_deposits (d, l) -> Some ((), (), d, l) | _ -> None)
-           (fun ((), (), d, l) -> Legacy_deposits (d, l));
          case
            (Tag 4)
            ~title:"Deposits"
@@ -139,16 +115,6 @@ let balance_encoding =
               (req "category" (constant "baking bonuses")))
            (function Baking_bonuses -> Some ((), ()) | _ -> None)
            (fun ((), ()) -> Baking_bonuses);
-         case
-           (Tag 10)
-           ~title:"Legacy_fees"
-           (obj4
-              (req "kind" (constant "freezer"))
-              (req "category" (constant "legacy_fees"))
-              (req "delegate" Signature.Public_key_hash.encoding)
-              (req "cycle" Cycle_repr.encoding))
-           (function Legacy_fees (d, l) -> Some ((), (), d, l) | _ -> None)
-           (fun ((), (), d, l) -> Legacy_fees (d, l));
          case
            (Tag 11)
            ~title:"Storage_fees"
@@ -242,12 +208,6 @@ let is_not_zero c = not (Compare.Int.equal c 0)
 let compare_balance ba bb =
   match (ba, bb) with
   | (Contract ca, Contract cb) -> Contract_repr.compare ca cb
-  | (Legacy_rewards (pkha, ca), Legacy_rewards (pkhb, cb)) ->
-      let c = Signature.Public_key_hash.compare pkha pkhb in
-      if is_not_zero c then c else Cycle_repr.compare ca cb
-  | (Legacy_deposits (pkha, ca), Legacy_deposits (pkhb, cb)) ->
-      let c = Signature.Public_key_hash.compare pkha pkhb in
-      if is_not_zero c then c else Cycle_repr.compare ca cb
   | (Deposits pkha, Deposits pkhb) ->
       Signature.Public_key_hash.compare pkha pkhb
   | ( Lost_endorsing_rewards (pkha, pa, ra),
@@ -259,33 +219,27 @@ let compare_balance ba bb =
         if is_not_zero c then c else Compare.Bool.compare ra rb
   | (Commitments bpkha, Commitments bpkhb) ->
       Blinded_public_key_hash.compare bpkha bpkhb
-  | (Legacy_fees (pkha, ca), Legacy_fees (pkhb, cb)) ->
-      let c = Signature.Public_key_hash.compare pkha pkhb in
-      if is_not_zero c then c else Cycle_repr.compare ca cb
   | (_, _) ->
       let index b =
         match b with
         | Contract _ -> 0
-        | Legacy_rewards _ -> 1
-        | Block_fees -> 2
-        | Legacy_deposits _ -> 3
-        | Deposits _ -> 4
-        | Nonce_revelation_rewards -> 5
-        | Double_signing_evidence_rewards -> 6
-        | Endorsing_rewards -> 7
-        | Baking_rewards -> 8
-        | Baking_bonuses -> 9
-        | Legacy_fees _ -> 10
-        | Storage_fees -> 11
-        | Double_signing_punishments -> 12
-        | Lost_endorsing_rewards _ -> 13
-        | Liquidity_baking_subsidies -> 14
-        | Burned -> 15
-        | Commitments _ -> 16
-        | Bootstrap -> 17
-        | Invoice -> 18
-        | Initial_commitments -> 19
-        | Minted -> 20
+        | Block_fees -> 1
+        | Deposits _ -> 2
+        | Nonce_revelation_rewards -> 3
+        | Double_signing_evidence_rewards -> 4
+        | Endorsing_rewards -> 5
+        | Baking_rewards -> 6
+        | Baking_bonuses -> 7
+        | Storage_fees -> 8
+        | Double_signing_punishments -> 9
+        | Lost_endorsing_rewards _ -> 10
+        | Liquidity_baking_subsidies -> 11
+        | Burned -> 12
+        | Commitments _ -> 13
+        | Bootstrap -> 14
+        | Invoice -> 15
+        | Initial_commitments -> 16
+        | Minted -> 17
         (* don't forget to add parameterized cases in the first part of the function *)
       in
       Compare.Int.compare (index ba) (index bb)

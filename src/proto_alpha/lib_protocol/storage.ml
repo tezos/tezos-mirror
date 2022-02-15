@@ -92,14 +92,6 @@ module type Simple_single_data_storage = sig
   val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
 end
 
-module Legacy_block_priority :
-  Simple_single_data_storage with type value = int =
-  Make_single_data_storage (Registered) (Raw_context)
-    (struct
-      let name = ["block_priority"]
-    end)
-    (Encoding.UInt16)
-
 module Block_round : Simple_single_data_storage with type value = Round_repr.t =
   Make_single_data_storage (Registered) (Raw_context)
     (struct
@@ -209,35 +201,6 @@ module Contract = struct
         let name = ["missed_endorsements"]
       end)
       (Missed_endorsements_info)
-
-  module Legacy_frozen_balance_index =
-    Make_indexed_subcontext
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["frozen_balance"]
-         end))
-         (Make_index (Cycle_repr.Index))
-
-  module Legacy_frozen_deposits =
-    Legacy_frozen_balance_index.Make_map
-      (struct
-        let name = ["deposits"]
-      end)
-      (Tez_repr)
-
-  module Legacy_frozen_fees =
-    Legacy_frozen_balance_index.Make_map
-      (struct
-        let name = ["fees"]
-      end)
-      (Tez_repr)
-
-  module Legacy_frozen_rewards =
-    Legacy_frozen_balance_index.Make_map
-      (struct
-        let name = ["rewards"]
-      end)
-      (Tez_repr)
 
   module Manager =
     Indexed_context.Make_map
@@ -371,20 +334,6 @@ module Contract = struct
         let name = ["used_bytes"]
       end)
       (Encoding.Z)
-
-  module Roll_list_legacy =
-    Indexed_context.Make_map
-      (struct
-        let name = ["roll_list"]
-      end)
-      (Roll_repr_legacy)
-
-  module Change_legacy =
-    Indexed_context.Make_map
-      (struct
-        let name = ["change"]
-      end)
-      (Tez_repr)
 
   module Frozen_deposits =
     Indexed_context.Make_map
@@ -940,27 +889,6 @@ module Delegates =
        end))
        (Public_key_hash_index)
 
-module Legacy_active_delegates_with_rolls =
-  Make_data_set_storage
-    (Make_subcontext (Registered) (Raw_context)
-       (struct
-         let name = ["active_delegates_with_rolls"]
-       end))
-       (Public_key_hash_index)
-
-module Legacy_delegates_with_frozen_balance_index =
-  Make_indexed_subcontext
-    (Make_subcontext (Registered) (Raw_context)
-       (struct
-         let name = ["delegates_with_frozen_balance"]
-       end))
-       (Make_index (Cycle_repr.Index))
-
-module Legacy_delegates_with_frozen_balance =
-  Make_data_set_storage
-    (Legacy_delegates_with_frozen_balance_index.Raw_context)
-    (Public_key_hash_index)
-
 (** Per cycle storage *)
 
 type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
@@ -995,22 +923,6 @@ module Cycle = struct
          end))
          (Pair (Make_index (Raw_level_repr.Index)) (Public_key_hash_index))
             (Slashed_level)
-
-  module Last_roll_legacy =
-    Make_indexed_data_storage
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["last_roll"]
-         end))
-         (Int31_index)
-      (Roll_repr_legacy)
-
-  module Roll_snapshot_legacy =
-    Indexed_context.Make_map
-      (struct
-        let name = ["roll_snapshot"]
-      end)
-      (Encoding.UInt16)
 
   module Selected_stake_distribution =
     Indexed_context.Make_map
@@ -1095,48 +1007,6 @@ module Cycle = struct
            let encoding = nonce_status_encoding
          end)
 
-  let nonce_status_encoding_legacy =
-    let open Data_encoding in
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Unrevealed"
-          (tup4
-             Nonce_hash.encoding
-             Signature.Public_key_hash.encoding
-             Tez_repr.encoding
-             Tez_repr.encoding)
-          (function
-            | Unrevealed _ ->
-                assert false (* only used in read only for migration *)
-            | _ -> None)
-          (fun (nonce_hash, delegate, _, _) ->
-            Unrevealed {nonce_hash; delegate});
-        case
-          (Tag 1)
-          ~title:"Revealed"
-          Seed_repr.nonce_encoding
-          (function
-            | Revealed _ ->
-                assert false (* only used in read only for migration *)
-            | _ -> None)
-          (fun nonce -> Revealed nonce);
-      ]
-
-  module Nonce_legacy =
-    Make_indexed_data_storage
-      (Make_subcontext (Ghost) (Indexed_context.Raw_context)
-         (struct
-           let name = ["nonces"]
-         end))
-         (Make_index (Raw_level_repr.Index))
-         (struct
-           type t = nonce_status
-
-           let encoding = nonce_status_encoding_legacy
-         end)
-
   module Seed =
     Indexed_context.Make_map
       (struct
@@ -1188,117 +1058,6 @@ end
 
 module Total_active_stake = Cycle.Total_active_stake
 module Delegate_sampler_state = Cycle.Delegate_sampler_state
-
-module Roll_legacy = struct
-  module Raw_context =
-    Make_subcontext (Ghost) (Raw_context)
-      (struct
-        let name = ["rolls"]
-      end)
-
-  module Indexed_context =
-    Make_indexed_subcontext
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["index"]
-         end))
-         (Make_index (Roll_repr_legacy.Index))
-
-  module Next =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["next"]
-      end)
-      (Roll_repr_legacy)
-
-  module Limbo =
-    Make_single_data_storage (Registered) (Raw_context)
-      (struct
-        let name = ["limbo"]
-      end)
-      (Roll_repr_legacy)
-
-  module Delegate_roll_list =
-    Wrap_indexed_data_storage
-      (Contract.Roll_list_legacy)
-      (struct
-        type t = Signature.Public_key_hash.t
-
-        let wrap = Contract_repr.implicit_contract
-
-        let unwrap = Contract_repr.is_implicit
-      end)
-
-  module Successor =
-    Indexed_context.Make_map
-      (struct
-        let name = ["successor"]
-      end)
-      (Roll_repr_legacy)
-
-  module Delegate_change =
-    Wrap_indexed_data_storage
-      (Contract.Change_legacy)
-      (struct
-        type t = Signature.Public_key_hash.t
-
-        let wrap = Contract_repr.implicit_contract
-
-        let unwrap = Contract_repr.is_implicit
-      end)
-
-  module Snapshoted_owner_index : INDEX with type t = Cycle_repr.t * int =
-  struct
-    type t = Cycle_repr.t * int
-
-    let path_length = Cycle_repr.Index.path_length + 1
-
-    let to_path (c, n) s = Cycle_repr.Index.to_path c (string_of_int n :: s)
-
-    let of_path l =
-      match Misc.take Cycle_repr.Index.path_length l with
-      | None | Some (_, ([] | _ :: _ :: _)) -> None
-      | Some (l1, [l2]) -> (
-          match (Cycle_repr.Index.of_path l1, int_of_string_opt l2) with
-          | (None, _) | (_, None) -> None
-          | (Some c, Some i) -> Some (c, i))
-
-    type 'a ipath = ('a * Cycle_repr.t) * int
-
-    let left_args =
-      Storage_description.One
-        {
-          rpc_arg = Cycle_repr.rpc_arg;
-          encoding = Cycle_repr.encoding;
-          compare = Cycle_repr.compare;
-        }
-
-    let right_args =
-      Storage_description.One
-        {
-          rpc_arg = RPC_arg.int;
-          encoding = Data_encoding.int31;
-          compare = Compare.Int.compare;
-        }
-
-    let args = Storage_description.(Pair (left_args, right_args))
-  end
-
-  module Owner =
-    Make_indexed_data_snapshotable_storage
-      (Make_subcontext (Registered) (Raw_context)
-         (struct
-           let name = ["owner"]
-         end))
-         (Snapshoted_owner_index)
-      (Make_index (Roll_repr_legacy.Index))
-      (Signature.Public_key)
-
-  module Snapshot_for_cycle = Cycle.Roll_snapshot_legacy
-  module Last_for_snapshot = Cycle.Last_roll_legacy
-
-  let clear = Indexed_context.clear
-end
 
 (** Votes *)
 
@@ -1462,43 +1221,6 @@ module Seed = struct
 
     let remove ctxt (l : Level_repr.t) =
       Cycle.Nonce.remove (ctxt, l.cycle) l.level
-  end
-
-  module Nonce_legacy :
-    Non_iterable_indexed_data_storage
-      with type key := Level_repr.t
-       and type value := nonce_status
-       and type t := Raw_context.t = struct
-    open Level_repr
-
-    type context = Raw_context.t
-
-    let mem ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.mem (ctxt, l.cycle) l.level
-
-    let get ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.get (ctxt, l.cycle) l.level
-
-    let find ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.find (ctxt, l.cycle) l.level
-
-    let update ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.update (ctxt, l.cycle) l.level v
-
-    let init ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.init (ctxt, l.cycle) l.level v
-
-    let add ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.add (ctxt, l.cycle) l.level v
-
-    let add_or_remove ctxt (l : Level_repr.t) v =
-      Cycle.Nonce_legacy.add_or_remove (ctxt, l.cycle) l.level v
-
-    let remove_existing ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.remove_existing (ctxt, l.cycle) l.level
-
-    let remove ctxt (l : Level_repr.t) =
-      Cycle.Nonce_legacy.remove (ctxt, l.cycle) l.level
   end
 
   module For_cycle : FOR_CYCLE = Cycle.Seed
