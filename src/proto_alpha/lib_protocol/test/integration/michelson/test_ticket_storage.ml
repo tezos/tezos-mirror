@@ -44,14 +44,14 @@ let make_context () =
   let* incr = Incremental.begin_construction block in
   return (Incremental.alpha_ctxt incr)
 
-let hash_key ctxt ~ticketer ~typ ~contents ~owner =
+let hash_key ctxt ~ticketer ~ty ~contents ~owner =
   let ticketer = Micheline.root @@ Expr.from_string ticketer in
-  let typ = Micheline.root @@ Expr.from_string typ in
+  let ty = Micheline.root @@ Expr.from_string ty in
   let contents = Micheline.root @@ Expr.from_string contents in
   let owner = Micheline.root @@ Expr.from_string owner in
   wrap
   @@ Lwt.return
-       (Alpha_context.Ticket_hash.make ctxt ~ticketer ~typ ~contents ~owner)
+       (Alpha_context.Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner)
 
 let assert_balance ctxt ~loc key expected =
   let* (balance, _) = wrap @@ Ticket_balance.get_balance ctxt key in
@@ -69,23 +69,13 @@ let adjust_balance ctxt key delta =
   wrap @@ Ticket_balance.adjust_balance ctxt key ~delta:(Z.of_int delta)
 
 let assert_non_overlapping_keys ~loc ~ticketer1 ~ticketer2 ~contents1 ~contents2
-    ~typ1 ~typ2 ~owner1 ~owner2 =
+    ~ty1 ~ty2 ~owner1 ~owner2 =
   let* ctxt = make_context () in
   let* (k1, ctxt) =
-    hash_key
-      ctxt
-      ~ticketer:ticketer1
-      ~typ:typ1
-      ~contents:contents1
-      ~owner:owner1
+    hash_key ctxt ~ticketer:ticketer1 ~ty:ty1 ~contents:contents1 ~owner:owner1
   in
   let* (k2, _ctxt) =
-    hash_key
-      ctxt
-      ~ticketer:ticketer2
-      ~typ:typ2
-      ~contents:contents2
-      ~owner:owner2
+    hash_key ctxt ~ticketer:ticketer2 ~ty:ty2 ~contents:contents2 ~owner:owner2
   in
   Assert.not_equal
     ~loc
@@ -99,7 +89,7 @@ let make_key ctxt content =
   hash_key
     ctxt
     ~ticketer:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
-    ~typ:"string"
+    ~ty:"string"
     ~contents:(Printf.sprintf {|"%s"|} content)
     ~owner:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
 
@@ -109,8 +99,8 @@ let test_non_overlapping_keys_ticketer () =
     ~loc:__LOC__
     ~ticketer1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
     ~ticketer2:{|"KT1PWx2mnDueood7fEmfbBDKx1D9BAnnXitn"|}
-    ~typ1:"nat"
-    ~typ2:"int"
+    ~ty1:"nat"
+    ~ty2:"int"
     ~contents1:{|"1"|}
     ~contents2:{|"1"|}
     ~owner1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
@@ -122,8 +112,8 @@ let test_non_overlapping_keys_contents () =
     ~loc:__LOC__
     ~ticketer1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
     ~ticketer2:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
-    ~typ1:"string"
-    ~typ2:"string"
+    ~ty1:"string"
+    ~ty2:"string"
     ~contents1:{|"red"|}
     ~contents2:{|"blue"|}
     ~owner1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
@@ -135,8 +125,8 @@ let test_non_overlapping_keys_type () =
     ~loc:__LOC__
     ~ticketer1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
     ~ticketer2:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
-    ~typ1:"nat"
-    ~typ2:"int"
+    ~ty1:"nat"
+    ~ty2:"int"
     ~contents1:{|"1"|}
     ~contents2:{|"1"|}
     ~owner1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
@@ -148,8 +138,8 @@ let test_non_overlapping_keys_owner () =
     ~loc:__LOC__
     ~ticketer1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
     ~ticketer2:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}
-    ~typ1:"nat"
-    ~typ2:"int"
+    ~ty1:"nat"
+    ~ty2:"int"
     ~contents1:{|"1"|}
     ~contents2:{|"1"|}
     ~owner1:{|"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"|}

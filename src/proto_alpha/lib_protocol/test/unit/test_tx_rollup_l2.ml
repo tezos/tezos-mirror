@@ -353,12 +353,12 @@ let make_unit_ticket_key ctxt ticketer address =
           Alpha_context.Contract.encoding
           ticketer )
   in
-  let typ = Prim (0, T_unit, [], []) in
+  let ty = Prim (0, T_unit, [], []) in
   let contents = Prim (0, D_Unit, [], []) in
   let owner =
     String (dummy_location, Tx_rollup_l2_address.to_b58check address)
   in
-  match Alpha_context.Ticket_hash.make ctxt ~ticketer ~typ ~contents ~owner with
+  match Alpha_context.Ticket_hash.make ctxt ~ticketer ~ty ~contents ~owner with
   | Ok (x, _) -> x
   | Error _ -> raise (Invalid_argument "make_unit_ticket_key")
 

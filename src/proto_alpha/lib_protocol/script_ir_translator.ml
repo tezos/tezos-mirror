@@ -653,16 +653,16 @@ let pack_node unparsed ctxt =
   let bytes = Bytes.cat (Bytes.of_string "\005") bytes in
   (bytes, ctxt)
 
-let pack_comparable_data ctxt typ data ~mode =
-  unparse_comparable_data ~loc:() ctxt mode typ data
-  >>=? fun (unparsed, ctxt) -> Lwt.return @@ pack_node unparsed ctxt
+let pack_comparable_data ctxt ty data ~mode =
+  unparse_comparable_data ~loc:() ctxt mode ty data >>=? fun (unparsed, ctxt) ->
+  Lwt.return @@ pack_node unparsed ctxt
 
 let hash_bytes ctxt bytes =
   Gas.consume ctxt (Michelson_v1_gas.Cost_of.Interpreter.blake2b bytes)
   >|? fun ctxt -> (Script_expr_hash.(hash_bytes [bytes]), ctxt)
 
-let hash_comparable_data ctxt typ data =
-  pack_comparable_data ctxt typ data ~mode:Optimized_legacy
+let hash_comparable_data ctxt ty data =
+  pack_comparable_data ctxt ty data ~mode:Optimized_legacy
   >>=? fun (bytes, ctxt) -> Lwt.return @@ hash_bytes ctxt bytes
 
 (* ---- Tickets ------------------------------------------------------------ *)
@@ -5735,16 +5735,16 @@ let unparse_script ctxt mode
        },
        ctxt ))
 
-let pack_data_with_mode ctxt typ data ~mode =
-  unparse_data ~stack_depth:0 ctxt mode typ data >>=? fun (unparsed, ctxt) ->
+let pack_data_with_mode ctxt ty data ~mode =
+  unparse_data ~stack_depth:0 ctxt mode ty data >>=? fun (unparsed, ctxt) ->
   Lwt.return @@ pack_node unparsed ctxt
 
-let hash_data ctxt typ data =
-  pack_data_with_mode ctxt typ data ~mode:Optimized_legacy
+let hash_data ctxt ty data =
+  pack_data_with_mode ctxt ty data ~mode:Optimized_legacy
   >>=? fun (bytes, ctxt) -> Lwt.return @@ hash_bytes ctxt bytes
 
-let pack_data ctxt typ data =
-  pack_data_with_mode ctxt typ data ~mode:Optimized_legacy
+let pack_data ctxt ty data =
+  pack_data_with_mode ctxt ty data ~mode:Optimized_legacy
 
 (* ---------------- Big map -------------------------------------------------*)
 

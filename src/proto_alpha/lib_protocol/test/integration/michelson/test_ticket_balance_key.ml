@@ -46,9 +46,9 @@ let new_ctxt () =
 
 let make_contract ticketer = wrap @@ Lwt.return @@ Contract.of_b58check ticketer
 
-let make_ex_token ctxt ~ticketer ~typ ~content =
+let make_ex_token ctxt ~ticketer ~ty ~content =
   let* (Script_ir_translator.Ex_comparable_ty cty, ctxt) =
-    let node = Micheline.root @@ Expr.from_string typ in
+    let node = Micheline.root @@ Expr.from_string ty in
     wrap @@ Lwt.return @@ Script_ir_translator.parse_comparable_ty ctxt node
   in
   let* ticketer = make_contract ticketer in
@@ -58,8 +58,8 @@ let make_ex_token ctxt ~ticketer ~typ ~content =
   in
   return (Ticket_token.Ex_token {contents_type = cty; ticketer; contents}, ctxt)
 
-let make_key ctxt ~ticketer ~typ ~content ~owner =
-  let* (ex_token, ctxt) = make_ex_token ctxt ~ticketer ~typ ~content in
+let make_key ctxt ~ticketer ~ty ~content ~owner =
+  let* (ex_token, ctxt) = make_ex_token ctxt ~ticketer ~ty ~content in
   let* owner = make_contract owner in
   let* (key, ctxt) =
     wrap @@ Ticket_balance_key.ticket_balance_key ctxt ~owner ex_token
@@ -72,14 +72,14 @@ let equal_script_hash ~loc msg key1 key2 =
 let not_equal_script_hash ~loc msg key1 key2 =
   Assert.not_equal ~loc Ticket_hash.equal msg Ticket_hash.pp key1 key2
 
-let assert_keys ~ticketer1 ~ticketer2 ~typ1 ~typ2 ~amount1 ~amount2 ~content1
+let assert_keys ~ticketer1 ~ticketer2 ~ty1 ~ty2 ~amount1 ~amount2 ~content1
     ~content2 ~owner1 ~owner2 assert_condition =
   let* ctxt = new_ctxt () in
   let* (key1, ctxt) =
-    make_key ctxt ~ticketer:ticketer1 ~typ:typ1 ~content:content1 ~owner:owner1
+    make_key ctxt ~ticketer:ticketer1 ~ty:ty1 ~content:content1 ~owner:owner1
   in
   let* (key2, _) =
-    make_key ctxt ~ticketer:ticketer2 ~typ:typ2 ~content:content2 ~owner:owner2
+    make_key ctxt ~ticketer:ticketer2 ~ty:ty2 ~content:content2 ~owner:owner2
   in
   assert_condition (key1, amount1) (key2, amount2)
 
@@ -98,8 +98,8 @@ let test_different_amounts () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"unit"
-    ~typ2:"unit"
+    ~ty1:"unit"
+    ~ty2:"unit"
     ~content1:"Unit"
     ~content2:"Unit"
     ~amount1:1
@@ -113,8 +113,8 @@ let test_different_ticketers () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1AafHA1C1vk959wvHWBispY9Y2f3fxBUUo"
-    ~typ1:"nat"
-    ~typ2:"nat"
+    ~ty1:"nat"
+    ~ty2:"nat"
     ~content1:"1"
     ~content2:"1"
     ~amount1:1
@@ -128,8 +128,8 @@ let test_different_owners () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"nat"
-    ~typ2:"nat"
+    ~ty1:"nat"
+    ~ty2:"nat"
     ~content1:"1"
     ~content2:"1"
     ~amount1:1
@@ -143,8 +143,8 @@ let test_different_content () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"nat"
-    ~typ2:"nat"
+    ~ty1:"nat"
+    ~ty2:"nat"
     ~content1:"1"
     ~content2:"2"
     ~amount1:1
@@ -159,8 +159,8 @@ let test_nat_int () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"nat"
-    ~typ2:"int"
+    ~ty1:"nat"
+    ~ty2:"int"
     ~content1:"1"
     ~content2:"1"
     ~amount1:1
@@ -175,8 +175,8 @@ let test_nat_mutez () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"nat"
-    ~typ2:"mutez"
+    ~ty1:"nat"
+    ~ty2:"mutez"
     ~content1:"1"
     ~content2:"1"
     ~amount1:1
@@ -191,8 +191,8 @@ let test_bool_nat () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"bool"
-    ~typ2:"nat"
+    ~ty1:"bool"
+    ~ty2:"nat"
     ~content1:"False"
     ~content2:"0"
     ~amount1:1
@@ -207,8 +207,8 @@ let test_nat_bytes () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"nat"
-    ~typ2:"bytes"
+    ~ty1:"nat"
+    ~ty2:"bytes"
     ~content1:"0"
     ~content2:"0x"
     ~amount1:1
@@ -223,8 +223,8 @@ let test_string_chain_id () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"string"
-    ~typ2:"chain_id"
+    ~ty1:"string"
+    ~ty2:"chain_id"
     ~content1:{|"NetXynUjJNZm7wi"|}
     ~content2:{|"NetXynUjJNZm7wi"|}
     ~amount1:1
@@ -239,8 +239,8 @@ let test_string_key_hash () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"string"
-    ~typ2:"key_hash"
+    ~ty1:"string"
+    ~ty2:"key_hash"
     ~content1:{|"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"|}
     ~content2:{|"tz1KqTpEZ7Yob7QbPE4Hy4Wo8fHG8LhKxZSx"|}
     ~amount1:1
@@ -255,8 +255,8 @@ let test_string_key () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"string"
-    ~typ2:"key"
+    ~ty1:"string"
+    ~ty2:"key"
     ~content1:{|"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"|}
     ~content2:{|"edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav"|}
     ~amount1:1
@@ -271,8 +271,8 @@ let test_string_timestamp () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"string"
-    ~typ2:"timestamp"
+    ~ty1:"string"
+    ~ty2:"timestamp"
     ~content1:{|"2019-09-26T10:59:51Z"|}
     ~content2:{|"2019-09-26T10:59:51Z"|}
     ~amount1:1
@@ -287,8 +287,8 @@ let test_string_address () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"string"
-    ~typ2:"address"
+    ~ty1:"string"
+    ~ty2:"address"
     ~content1:{|"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%entrypoint"|}
     ~content2:{|"KT1BEqzn5Wx8uJrZNvuS9DVHmLvG9td3fDLi%entrypoint"|}
     ~amount1:1
@@ -306,8 +306,8 @@ let test_string_signature () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"string"
-    ~typ2:"signature"
+    ~ty1:"string"
+    ~ty2:"signature"
     ~content1:signature
     ~content2:signature
     ~amount1:1
@@ -325,8 +325,8 @@ let test_annotation_pair () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"(pair int string)"
-    ~typ2:{|(pair (int %id) (string %name))|}
+    ~ty1:"(pair int string)"
+    ~ty2:{|(pair (int %id) (string %name))|}
     ~content1:{|Pair 1 "hello"|}
     ~content2:{|Pair 1 "hello"|}
     ~amount1:1
@@ -343,8 +343,8 @@ let test_annotation_or () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"(or int string)"
-    ~typ2:{|(or (int %id) (string %name))|}
+    ~ty1:"(or int string)"
+    ~ty2:{|(or (int %id) (string %name))|}
     ~content1:{|Left 1|}
     ~content2:{|Left 1|}
     ~amount1:1
@@ -360,8 +360,8 @@ let test_annotation_type_alias () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"int"
-    ~typ2:"(int :int_alias)"
+    ~ty1:"int"
+    ~ty2:"(int :int_alias)"
     ~content1:"0"
     ~content2:"0"
     ~amount1:1
@@ -378,8 +378,8 @@ let test_annotation_pair_or () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"pair (or int string) int"
-    ~typ2:{|pair (or (int %id) (string %name)) int|}
+    ~ty1:"pair (or int string) int"
+    ~ty2:{|pair (or (int %id) (string %name)) int|}
     ~content1:{|Pair (Left 1) 2|}
     ~content2:{|Pair (Left 1) 2|}
     ~amount1:1
@@ -394,8 +394,8 @@ let test_option_none () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"option int"
-    ~typ2:"option nat"
+    ~ty1:"option int"
+    ~ty2:"option nat"
     ~content1:{|None|}
     ~content2:{|None|}
     ~amount1:1
@@ -410,8 +410,8 @@ let test_option_some () =
     ~loc:__LOC__
     ~ticketer1:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
     ~ticketer2:"KT1ThEdxfUcWUwqsdergy3QnbCWGHSUHeHJq"
-    ~typ1:"option int"
-    ~typ2:"option nat"
+    ~ty1:"option int"
+    ~ty2:"option nat"
     ~content1:{|Some 0|}
     ~content2:{|Some 0|}
     ~amount1:1

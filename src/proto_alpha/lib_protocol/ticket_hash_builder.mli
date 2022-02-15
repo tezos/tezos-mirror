@@ -24,14 +24,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** [make ctxt ~ticketer ~typ ~contents ~owner] creates a hashed
-    representation of the given [ticketer], [typ], [contents] and
+(** [make ctxt ~ticketer ~ty ~contents ~owner] creates a hashed
+    representation of the given [ticketer], [ty], [contents] and
     [owner].
 *)
 val make :
   Raw_context.t ->
   ticketer:Script_repr.node ->
-  typ:Script_repr.node ->
+  ty:Script_repr.node ->
   contents:Script_repr.node ->
   owner:Script_repr.node ->
   (Ticket_hash_repr.t * Raw_context.t) tzresult

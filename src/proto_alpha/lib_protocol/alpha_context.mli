@@ -1915,7 +1915,7 @@ module Ticket_hash : sig
   val make :
     context ->
     ticketer:Script.node ->
-    typ:Script.node ->
+    ty:Script.node ->
     contents:Script.node ->
     owner:Script.node ->
     (t * context) tzresult

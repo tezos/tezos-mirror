@@ -59,6 +59,6 @@ let hash_of_node ctxt node =
         ctxt )
   | None -> error Failed_to_hash_node
 
-let make ctxt ~ticketer ~typ ~contents ~owner =
+let make ctxt ~ticketer ~ty ~contents ~owner =
   hash_of_node ctxt
-  @@ Micheline.Seq (Micheline.dummy_location, [ticketer; typ; contents; owner])
+  @@ Micheline.Seq (Micheline.dummy_location, [ticketer; ty; contents; owner])
