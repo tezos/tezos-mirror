@@ -39,7 +39,7 @@ module Store = struct
 end
 
 module Proof = Tezos_context_helpers.Context.Make_proof (Store)
-open Proof
+open Tezos_context_helpers.Context.Proof_encoding_V1
 
 module Gen = struct
   include Gen
@@ -229,7 +229,9 @@ let test_sample () =
           proof = Inode_values [("z", tree_b)];
         }
     in
-    let inode_tree : inode_tree = Inode_values [("a", tree_a); ("b", tree_b); ("c", tree_c)] in
+    let inode_tree : inode_tree =
+      Inode_values [("a", tree_a); ("b", tree_b); ("c", tree_c)]
+    in
     let tree = Inode {length = 100; proofs = [(0, inode_tree)]} in
     {version = 1; before = `Value ch; after = `Node ch; state = tree}
   in

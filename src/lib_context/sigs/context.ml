@@ -366,6 +366,14 @@ module type PROOF = sig
   end
 end
 
+module type PROOF_ENCODING = sig
+  open Proof_types
+
+  val tree_proof_encoding : tree t Data_encoding.t
+
+  val stream_proof_encoding : stream t Data_encoding.t
+end
+
 module type S = sig
   include VIEW with type key = string list and type value = bytes
 
@@ -479,10 +487,6 @@ module type S = sig
       Guarantee that the given computation performs exactly the same state
       operations as the generating computation, in the exact same order. *)
   type stream_proof := Proof.stream Proof.t
-
-  val tree_proof_encoding : tree_proof Data_encoding.t
-
-  val stream_proof_encoding : stream_proof Data_encoding.t
 
   (** [produce_stream_proof] is the producer of stream proofs. *)
   val produce_stream_proof : (stream_proof, 'a) producer

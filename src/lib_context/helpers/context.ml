@@ -221,6 +221,364 @@ module Make_tree (Store : DB) = struct
         | exn -> raise exn)
 end
 
+module Proof_encoding_V1 = struct
+  open Tezos_context_sigs.Context.Proof_types
+  open Data_encoding
+
+  let value_encoding : value Data_encoding.t = bytes
+
+  let length_field = req "length" (conv Int64.of_int Int64.to_int int64)
+
+  let step_encoding : step Data_encoding.t =
+    (* Context path name.  [bytes] must be used for JSON since we have no
+       charset specificaiton. *)
+    conv
+      Bytes.unsafe_of_string
+      Bytes.unsafe_to_string
+      (Bounded.bytes 255 (* 1 byte for the length *))
+
+  let hash_encoding = Context_hash.encoding
+
+  let index_encoding =
+    (* Assumes uint8 covers [0..Conf.entries-1] *)
+    assert (Tezos_context_encoding.Context.Conf.entries <= 256) ;
+    uint8
+
+  let segment_encoding =
+    assert (Tezos_context_encoding.Context.Conf.entries <= 32) ;
+    (* The segment int is in 5bits. *)
+    (* Format
+
+       * Required bytes = (n * 5 + 8) / 8
+       * 10* is filled at the end of the bytes
+
+       ex: Encoding of [aaaaa; bbbbb; ccccc; ddddd; eeeee; ..; zzzzz]
+
+               |76543210|76543210|7654.. ..       |76543210|
+               |aaaaabbb|bbcccccd|ddde.. ..        zzzzz100|
+
+               |76543210|76543210|7654.. ..  43210|76543210|
+               |aaaaabbb|bbcccccd|ddde.. ..  yzzzz|z1000000|
+
+               |76543210|76543210|7654.. .. 543210|76543210|
+               |aaaaabbb|bbcccccd|ddde.. .. yzzzzz|10000000|
+    *)
+    let encode is =
+      let buf = Buffer.create 0 in
+      let push c = Buffer.add_char buf @@ Char.chr c in
+      let close c bit = push (c lor (1 lsl (7 - bit))) in
+      let write c bit i =
+        if bit < 3 then (c lor (i lsl (3 - bit)), bit + 5)
+        else
+          let i = i lsl (11 - bit) in
+          push (c lor (i / 256)) ;
+          (i land 255, bit - 3)
+      in
+      let rec f c bit = function
+        | [] -> close c bit
+        | i :: is ->
+            let (c, bit) = write c bit i in
+            f c bit is
+      in
+      f 0 0 is ;
+      Buffer.to_bytes buf
+    in
+    let decode b =
+      let open Tzresult_syntax in
+      let error = Error "invalid 5bit list" in
+      let* l =
+        let sl = Bytes.length b in
+        if sl = 0 then error
+        else
+          let c = Char.code @@ Bytes.get b (sl - 1) in
+          let* last_bit =
+            if c = 0 then error
+            else
+              let rec aux i =
+                if c land (1 lsl i) = 0 then aux (i + 1) else i + 1
+              in
+              Ok (aux 0)
+          in
+          let bits = (sl * 8) - last_bit in
+          if bits mod 5 = 0 then Ok (bits / 5) else error
+      in
+      let s = Bytes.to_seq b in
+      let head s =
+        (* This assertion won't fail even with malformed input. *)
+        match s () with
+        | Seq.Nil -> assert false
+        | Seq.Cons (c, s) -> (Char.code c, s)
+      in
+      let rec read c rembit l s =
+        if l = 0 then []
+        else
+          let (c, s, rembit) =
+            if rembit >= 5 then (c, s, rembit)
+            else
+              let (c', s) = head s in
+              ((c * 256) + c', s, rembit + 8)
+          in
+          let rembit = rembit - 5 in
+          let i = c lsr rembit in
+          let c = c land ((1 lsl rembit) - 1) in
+          i :: read c rembit (l - 1) s
+      in
+      Ok (read 0 0 l s)
+    in
+    conv_with_guard encode decode bytes
+
+  let inode_proofs_encoding a =
+    (* When the number of proofs is large enough (>= Context.Conf.entries / 2),
+       proofs are encoded as `array` instead of `list` for compactness. *)
+    (* This encode assumes that proofs are ordered by its index. *)
+    let entries = Tezos_context_encoding.Context.Conf.entries in
+    let encode_type =
+      if entries <= 2 then fun _ -> `List
+      else fun v ->
+        if Compare.List_length_with.(v >= entries / 2) then `Array else `List
+    in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          ~title:"sparse_proof"
+          (Tag 0)
+          (obj1
+             (req
+                "sparse_proof"
+                (conv_with_guard
+                   (fun v -> List.map (fun (i, d) -> (i, Some d)) v)
+                   (fun v ->
+                     List.fold_right_e
+                       (fun (i, d) acc ->
+                         match d with
+                         | None -> Error "cannot decode ill-formed Merkle proof"
+                         | Some d -> Ok ((i, d) :: acc))
+                       v
+                       [])
+                   (list (tup2 index_encoding a)))))
+          (fun v -> if encode_type v = `List then Some v else None)
+          (fun v -> v);
+        case
+          ~title:"dense_proof"
+          (Tag 1)
+          (obj1 (req "dense_proof" (array ~max_length:entries a)))
+          (fun v ->
+            if encode_type v = `Array then (
+              let arr = Array.make entries None in
+              (* The `a` passed to this encoding will be
+                 `option_inode_tree_encoding` and `option_inode_tree_encoding`,
+                 both encode `option` tags with its variant tag,
+                 thus this `option` wrapping won't increase the encoding size. *)
+              List.iter (fun (i, d) -> arr.(i) <- Some d) v ;
+              Some arr)
+            else None)
+          (fun v ->
+            let res = ref [] in
+            Array.iteri
+              (fun i -> function None -> () | Some d -> res := (i, d) :: !res)
+              v ;
+            List.rev !res);
+      ]
+
+  let inode_encoding a =
+    conv
+      (fun {length; proofs} -> (length, proofs))
+      (fun (length, proofs) -> {length; proofs})
+    @@ obj2 length_field (req "proofs" (inode_proofs_encoding a))
+
+  let inode_extender_encoding a =
+    conv
+      (fun {length; segment; proof} -> (length, segment, proof))
+      (fun (length, segment, proof) -> {length; segment; proof})
+    @@ obj3 length_field (req "segment" segment_encoding) (req "proof" a)
+
+  (* data-encoding.0.4/test/mu.ml for building mutually recursive data_encodings *)
+  let (_inode_tree_encoding, tree_encoding) =
+    let unoptionize enc =
+      conv_with_guard
+        (fun v -> Some v)
+        (function
+          | Some v -> Ok v
+          | None -> Error "cannot decode ill-formed Merkle proof")
+        enc
+    in
+    let mu_option_inode_tree_encoding tree_encoding =
+      mu "inode_tree" (fun option_inode_tree_encoding ->
+          let inode_tree_encoding = unoptionize option_inode_tree_encoding in
+          union
+            [
+              case
+                ~title:"Blinded_inode"
+                (Tag 0)
+                (obj1 (req "blinded_inode" hash_encoding))
+                (function Some (Blinded_inode h) -> Some h | _ -> None)
+                (fun h -> Some (Blinded_inode h));
+              case
+                ~title:"Inode_values"
+                (Tag 1)
+                (obj1
+                   (req
+                      "inode_values"
+                      (list (tup2 step_encoding tree_encoding))))
+                (function Some (Inode_values xs) -> Some xs | _ -> None)
+                (fun xs -> Some (Inode_values xs));
+              case
+                ~title:"Inode_tree"
+                (Tag 2)
+                (obj1
+                   (req
+                      "inode_tree"
+                      (inode_encoding option_inode_tree_encoding)))
+                (function Some (Inode_tree i) -> Some i | _ -> None)
+                (fun i -> Some (Inode_tree i));
+              case
+                ~title:"Inode_extender"
+                (Tag 3)
+                (obj1
+                   (req
+                      "inode_extender"
+                      (inode_extender_encoding inode_tree_encoding)))
+                (function
+                  | Some (Inode_extender i : inode_tree) -> Some i | _ -> None)
+                (fun i : inode_tree option -> Some (Inode_extender i));
+              case
+                ~title:"None"
+                (Tag 4)
+                (obj1 (req "none" null))
+                (function None -> Some () | Some _ -> None)
+                (fun () -> None);
+            ])
+    in
+    let mu_option_tree_encoding : tree option encoding =
+      mu "tree_encoding" (fun option_tree_encoding ->
+          let tree_encoding = unoptionize option_tree_encoding in
+          let option_inode_tree_encoding =
+            mu_option_inode_tree_encoding tree_encoding
+          in
+          let inode_tree_encoding = unoptionize option_inode_tree_encoding in
+          union
+            [
+              case
+                ~title:"Value"
+                (Tag 0)
+                (obj1 (req "value" value_encoding))
+                (function Some (Value v : tree) -> Some v | _ -> None)
+                (fun v -> Some (Value v));
+              case
+                ~title:"Blinded_value"
+                (Tag 1)
+                (obj1 (req "blinded_value" hash_encoding))
+                (function Some (Blinded_value hash) -> Some hash | _ -> None)
+                (fun hash -> Some (Blinded_value hash));
+              case
+                ~title:"Node"
+                (Tag 2)
+                (obj1 (req "node" (list (tup2 step_encoding tree_encoding))))
+                (function Some (Node sts : tree) -> Some sts | _ -> None)
+                (fun sts -> Some (Node sts));
+              case
+                ~title:"Blinded_node"
+                (Tag 3)
+                (obj1 (req "blinded_node" hash_encoding))
+                (function Some (Blinded_node hash) -> Some hash | _ -> None)
+                (fun hash -> Some (Blinded_node hash));
+              case
+                ~title:"Inode"
+                (Tag 4)
+                (obj1 (req "inode" (inode_encoding option_inode_tree_encoding)))
+                (function Some (Inode i : tree) -> Some i | _ -> None)
+                (fun i -> Some (Inode i));
+              case
+                ~title:"Extender"
+                (Tag 5)
+                (obj1
+                   (req
+                      "extender"
+                      (inode_extender_encoding inode_tree_encoding)))
+                (function Some (Extender i) -> Some i | _ -> None)
+                (fun i -> Some (Extender i));
+              case
+                ~title:"None"
+                (Tag 6)
+                (obj1 (req "none" null))
+                (function None -> Some () | Some _ -> None)
+                (fun () -> None);
+            ])
+    in
+    let tree_encoding = unoptionize mu_option_tree_encoding in
+    let inode_tree_encoding =
+      unoptionize @@ mu_option_inode_tree_encoding tree_encoding
+    in
+    (inode_tree_encoding, tree_encoding)
+
+  let kinded_hash_encoding =
+    union
+      [
+        case
+          ~title:"Value"
+          (Tag 0)
+          (obj1 (req "value" hash_encoding))
+          (function `Value ch -> Some ch | _ -> None)
+          (fun ch -> `Value ch);
+        case
+          ~title:"Node"
+          (Tag 1)
+          (obj1 (req "node" hash_encoding))
+          (function `Node ch -> Some ch | _ -> None)
+          (fun ch -> `Node ch);
+      ]
+
+  let elt_encoding =
+    let open Stream in
+    union
+      [
+        case
+          ~title:"Value"
+          (Tag 0)
+          (obj1 (req "value" value_encoding))
+          (function Value v -> Some v | _ -> None)
+          (fun v -> Value v);
+        case
+          ~title:"Node"
+          (Tag 1)
+          (obj1 (req "node" (list (tup2 step_encoding kinded_hash_encoding))))
+          (function Node sks -> Some sks | _ -> None)
+          (fun sks -> Node sks);
+        case
+          ~title:"Inode"
+          (Tag 2)
+          (* This option wrapping increases the encoding size.
+             But stream encoding is basically larger than proof encoding,
+             so I temporarily won't mind this increment. *)
+          (obj1 (req "inode" (inode_encoding (option hash_encoding))))
+          (function Inode hinode -> Some hinode | _ -> None)
+          (fun hinode -> Inode hinode);
+        case
+          ~title:"Inode_extender"
+          (Tag 3)
+          (obj1 (req "inode_extender" (inode_extender_encoding hash_encoding)))
+          (function Inode_extender e -> Some e | _ -> None)
+          (fun e -> Inode_extender e);
+      ]
+
+  let stream_encoding = conv List.of_seq List.to_seq (list elt_encoding)
+
+  let encoding a =
+    conv
+      (fun {version; before; after; state} -> (version, before, after, state))
+      (fun (version, before, after, state) -> {version; before; after; state})
+    @@ obj4
+         (req "version" int16)
+         (req "before" kinded_hash_encoding)
+         (req "after" kinded_hash_encoding)
+         (req "state" a)
+
+  let tree_proof_encoding = encoding tree_encoding
+
+  let stream_proof_encoding = encoding stream_encoding
+end
+
 module Make_proof (Store : DB) = struct
   module DB_proof = Store.Tree.Proof
 
@@ -337,377 +695,6 @@ module Make_proof (Store : DB) = struct
   let verify_stream_proof proof f =
     let proof = Proof.of_stream proof in
     Store.Tree.verify_stream proof f
-
-  module Encoding = struct
-    open Proof
-
-    let value_encoding : value Data_encoding.t = Data_encoding.bytes
-
-    let length_field = Data_encoding.(req "length" int31)
-    (* XXX int31 may not be enough *)
-
-    let step_encoding : step Data_encoding.t =
-      (* I understand that a step here is a file name.
-         [bytes] is used For JSON, in the case when it is not UTF-8 *)
-      let open Data_encoding in
-      conv
-        Bytes.unsafe_of_string
-        Bytes.unsafe_to_string
-        (Bounded.bytes 255 (* 1 byte for the length *))
-
-    let hash_encoding = Context_hash.encoding
-
-    let index_encoding =
-      (* Assuming uint8 covers Conf.entries *)
-      assert (Tezos_context_encoding.Context.Conf.entries <= 256) ;
-      Data_encoding.uint8
-
-    let segment_encoding =
-      assert (Tezos_context_encoding.Context.Conf.entries <= 32) ;
-      (* The segment int is in 5bits.  We may express them in bytes *)
-      (* Format
-
-         * Required bytes = (n * 5 + 8) / 8
-         * 10* is filled at the end of the bytes
-
-         ex: Encoding of [aaaaa; bbbbb; ccccc; ddddd; eeeee; ..; zzzzz]
-
-                 |76543210|76543210|7654.. ..       |76543210|
-                 |aaaaabbb|bbcccccd|ddde.. ..        zzzzz100|
-
-                 |76543210|76543210|7654.. ..  43210|76543210|
-                 |aaaaabbb|bbcccccd|ddde.. ..  yzzzz|z1000000|
-
-                 |76543210|76543210|7654.. .. 543210|76543210|
-                 |aaaaabbb|bbcccccd|ddde.. .. yzzzzz|10000000|
-      *)
-      let encode is =
-        let buf = Buffer.create 0 in
-        let push c = Buffer.add_char buf @@ Char.chr c in
-        let close c bit =
-          push (c lor (1 lsl (7 - bit)))
-        in
-        let write c bit i =
-          if bit < 3 then (c lor (i lsl (3 - bit)), bit + 5)
-          else
-            let i = i lsl (11 - bit) in
-            push (c lor (i / 256)) ;
-            (i land 255, bit - 3)
-        in
-        let rec f c bit = function
-          | [] -> close c bit
-          | i :: is ->
-              let (c, bit) = write c bit i in
-              f c bit is
-        in
-        f 0 0 is ;
-        Buffer.to_bytes buf
-      in
-      let decode b =
-        let open Tzresult_syntax in
-        let error = Error "invalid 5bit list" in
-        let* l =
-          let sl = Bytes.length b in
-          if sl = 0 then error
-          else
-            let c = Char.code @@ Bytes.get b (sl - 1) in
-            let* last_bit =
-              if c = 0 then error
-              else
-                let rec aux i =
-                  if c land (1 lsl i) = 0 then aux (i + 1) else i + 1
-                in
-                Ok (aux 0)
-            in
-            let bits = (sl * 8) - last_bit in
-            if bits mod 5 = 0 then Ok (bits / 5) else error
-        in
-        let s = Bytes.to_seq b in
-        let head s =
-          (* This assertion won't fail even with malformed input. *)
-          match s () with
-          | Seq.Nil -> assert false
-          | Seq.Cons (c, s) -> (Char.code c, s)
-        in
-        let rec read c rembit l s =
-          if l = 0 then []
-          else
-            let (c, s, rembit) =
-              if rembit >= 5 then (c, s, rembit)
-              else
-                let (c', s) = head s in
-                ((c * 256) + c', s, rembit + 8)
-            in
-            let rembit = rembit - 5 in
-            let i = c lsr rembit in
-            let c = c land ((1 lsl rembit) - 1) in
-            i :: read c rembit (l - 1) s
-        in
-        Ok (read 0 0 l s)
-      in
-      Data_encoding.(conv_with_guard encode decode bytes)
-
-    let inode_proofs_encoding a =
-      (* When the number of proofs is large enough (>= Context.Conf.entries / 2),
-         proofs are encoded as `array` instead of `list` for compactness. *)
-      (* This encode assumes that proofs are ordered by its index. *)
-      let entries = Tezos_context_encoding.Context.Conf.entries in
-      let encode_type =
-        if entries <= 2 then fun _ -> `List
-        else fun v ->
-          if Compare.List_length_with.(v >= entries / 2) then `Array else `List
-      in
-      let open Data_encoding in
-      union
-        ~tag_size:`Uint8
-        [
-          case
-            ~title:"small_proof"
-            (Tag 0)
-            (obj1
-               (req
-                  "small_proof"
-                  (conv_with_guard
-                     (fun v -> List.map (fun (i, d) -> (i, Some d)) v)
-                     (fun v ->
-                       List.fold_right_e
-                         (fun (i, d) acc ->
-                           match d with
-                           | None ->
-                               Error "cannot decode ill-formed Merkle proof"
-                           | Some d -> Ok ((i, d) :: acc))
-                         v
-                         [])
-                     (list (tup2 index_encoding a)))))
-            (fun v -> if encode_type v = `List then Some v else None)
-            (fun v -> v);
-          case
-            ~title:"large_proof"
-            (Tag 1)
-            (obj1 (req "large_proof" (array ~max_length:entries a)))
-            (fun v ->
-              if encode_type v = `Array then (
-                let arr = Array.make entries None in
-                List.iter (fun (i, d) -> arr.(i) <- Some d) v ;
-                Some arr)
-              else None)
-            (fun v ->
-              let res = ref [] in
-              Array.iteri
-                (fun i -> function
-                  | None -> ()
-                  | Some d -> res := (i, d) :: !res)
-                v ;
-              List.rev !res);
-        ]
-
-    let inode_encoding a =
-      let open Data_encoding in
-      conv
-        (fun {length; proofs} -> (length, proofs))
-        (fun (length, proofs) -> {length; proofs})
-      @@ obj2 length_field (req "proofs" (inode_proofs_encoding a))
-
-    let inode_extender_encoding a =
-      let open Data_encoding in
-      conv
-        (fun {length; segment; proof} -> (length, segment, proof))
-        (fun (length, segment, proof) -> {length; segment; proof})
-      @@ obj3 length_field (req "segment" segment_encoding) (req "proof" a)
-
-    (* data-encoding.0.4/test/mu.ml for building mutually recursive data_encodings *)
-    let (_inode_tree_encoding, tree_encoding) =
-      let open Data_encoding in
-      let unoptionize enc =
-        conv_with_guard
-          (fun v -> Some v)
-          (function
-            | Some v -> Ok v
-            | None -> Error "cannot decode ill-formed Merkle proof")
-          enc
-      in
-      let mu_option_inode_tree_encoding tree_encoding =
-        mu "inode_tree" (fun option_inode_tree_encoding ->
-            let inode_tree_encoding = unoptionize option_inode_tree_encoding in
-            union
-              [
-                case
-                  ~title:"Blinded_inode"
-                  (Tag 0)
-                  (obj1 (req "blinded_inode" hash_encoding))
-                  (function Some (Blinded_inode h) -> Some h | _ -> None)
-                  (fun h -> Some (Blinded_inode h));
-                case
-                  ~title:"Inode_values"
-                  (Tag 1)
-                  (obj1
-                     (req
-                        "inode_values"
-                        (list (tup2 step_encoding tree_encoding))))
-                  (function Some (Inode_values xs) -> Some xs | _ -> None)
-                  (fun xs -> Some (Inode_values xs));
-                case
-                  ~title:"Inode_tree"
-                  (Tag 2)
-                  (obj1
-                     (req
-                        "inode_tree"
-                        (inode_encoding option_inode_tree_encoding)))
-                  (function Some (Inode_tree i) -> Some i | _ -> None)
-                  (fun i -> Some (Inode_tree i));
-                case
-                  ~title:"Inode_extender"
-                  (Tag 3)
-                  (obj1
-                     (req
-                        "inode_extender"
-                        (inode_extender_encoding inode_tree_encoding)))
-                  (function
-                    | Some (Inode_extender i : inode_tree) -> Some i | _ -> None)
-                  (fun i : inode_tree option -> Some (Inode_extender i));
-                case
-                  ~title:"Dummy"
-                  (Tag 4)
-                  (obj1 (req "dummy" null))
-                  (function None -> Some () | Some _ -> None)
-                  (fun () -> None);
-              ])
-      in
-      let mu_option_tree_encoding : tree option encoding =
-        mu "tree_encoding" (fun option_tree_encoding ->
-            let tree_encoding = unoptionize option_tree_encoding in
-            let option_inode_tree_encoding =
-              mu_option_inode_tree_encoding tree_encoding
-            in
-            let inode_tree_encoding = unoptionize option_inode_tree_encoding in
-            union
-              [
-                case
-                  ~title:"Value"
-                  (Tag 0)
-                  (obj1 (req "value" value_encoding))
-                  (function Some (Value v : tree) -> Some v | _ -> None)
-                  (fun v -> Some (Value v));
-                case
-                  ~title:"Blinded_value"
-                  (Tag 1)
-                  (obj1 (req "blinded_value" hash_encoding))
-                  (function
-                    | Some (Blinded_value hash) -> Some hash | _ -> None)
-                  (fun hash -> Some (Blinded_value hash));
-                case
-                  ~title:"Node"
-                  (Tag 2)
-                  (obj1 (req "node" (list (tup2 step_encoding tree_encoding))))
-                  (function Some (Node sts : tree) -> Some sts | _ -> None)
-                  (fun sts -> Some (Node sts));
-                case
-                  ~title:"Blinded_node"
-                  (Tag 3)
-                  (obj1 (req "blinded_node" hash_encoding))
-                  (function Some (Blinded_node hash) -> Some hash | _ -> None)
-                  (fun hash -> Some (Blinded_node hash));
-                case
-                  ~title:"Inode"
-                  (Tag 4)
-                  (obj1
-                     (req "inode" (inode_encoding option_inode_tree_encoding)))
-                  (function Some (Inode i : tree) -> Some i | _ -> None)
-                  (fun i -> Some (Inode i));
-                case
-                  ~title:"Extender"
-                  (Tag 5)
-                  (obj1
-                     (req
-                        "extender"
-                        (inode_extender_encoding inode_tree_encoding)))
-                  (function Some (Extender i) -> Some i | _ -> None)
-                  (fun i -> Some (Extender i));
-                case
-                  ~title:"Dummy"
-                  (Tag 6)
-                  (obj1 (req "dummy" null))
-                  (function None -> Some () | Some _ -> None)
-                  (fun () -> None);
-              ])
-      in
-      let tree_encoding = unoptionize mu_option_tree_encoding in
-      let inode_tree_encoding =
-        unoptionize @@ mu_option_inode_tree_encoding tree_encoding
-      in
-      (inode_tree_encoding, tree_encoding)
-
-    let kinded_hash_encoding =
-      let open Data_encoding in
-      union
-        [
-          case
-            ~title:"Value"
-            (Tag 0)
-            (obj1 (req "value" Context_hash.encoding))
-            (function `Value ch -> Some ch | _ -> None)
-            (fun ch -> `Value ch);
-          case
-            ~title:"Node"
-            (Tag 1)
-            (obj1 (req "node" Context_hash.encoding))
-            (function `Node ch -> Some ch | _ -> None)
-            (fun ch -> `Node ch);
-        ]
-
-    let elt_encoding =
-      let open Data_encoding in
-      let open Stream in
-      union
-        [
-          case
-            ~title:"Value"
-            (Tag 0)
-            (obj1 (req "value" value_encoding))
-            (function Value v -> Some v | _ -> None)
-            (fun v -> Value v);
-          case
-            ~title:"Node"
-            (Tag 1)
-            (obj1 (req "node" (list (tup2 step_encoding kinded_hash_encoding))))
-            (function Node sks -> Some sks | _ -> None)
-            (fun sks -> Node sks);
-          case
-            ~title:"Inode"
-            (Tag 2)
-            (obj1 (req "inode" (inode_encoding (option hash_encoding))))
-            (function Inode hinode -> Some hinode | _ -> None)
-            (fun hinode -> Inode hinode);
-          case
-            ~title:"Inode_extender"
-            (Tag 3)
-            (obj1
-               (req "inode_extender" (inode_extender_encoding hash_encoding)))
-            (function Inode_extender e -> Some e | _ -> None)
-            (fun e -> Inode_extender e);
-        ]
-
-    let stream_encoding =
-      let open Data_encoding in
-      conv List.of_seq List.to_seq (list elt_encoding)
-
-    let encoding a =
-      let open Data_encoding in
-      conv
-        (fun {version; before; after; state} -> (version, before, after, state))
-        (fun (version, before, after, state) -> {version; before; after; state})
-      @@ obj4
-           (req "version" int16)
-           (req "before" kinded_hash_encoding)
-           (req "after" kinded_hash_encoding)
-           (req "state" a)
-  end
-
-  open Encoding
-
-  let tree_proof_encoding = encoding tree_encoding
-
-  let stream_proof_encoding = encoding stream_encoding
 end
 
 type error += Unsupported_context_hash_version of Context_hash.Version.t
