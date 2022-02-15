@@ -19,8 +19,14 @@ current_dir=$(cd "$(dirname "${0}")" && pwd)
 # Create directory for Docker JSON configuration (if does not exist)
 mkdir -pv ~/.docker
 
+echo '### Input variables'
+echo "MASTER_OR_RELEASE=${MASTER_OR_RELEASE:-}"
+echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
+echo "CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE}"
+echo "TEZOS_DEFAULT_NAMESPACE=${TEZOS_DEFAULT_NAMESPACE}"
+
 # /!\ MASTER_OR_RELEASE can be unset
-if [ "${MASTER_OR_RELEASE:-}" = 'true' ] && [ "${TEZOS_DEFAULT_NAMESPACE}/${TEZOS_DEFAULT_BRANCH}" = 'tezos/tezos' ]
+if [ "${MASTER_OR_RELEASE:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "${TEZOS_DEFAULT_NAMESPACE}" ]
 then
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
@@ -36,8 +42,6 @@ docker_image_tag=$(echo "${IMAGE_ARCH_PREFIX:-}${CI_COMMIT_REF_NAME}" | tr -c --
 
 echo "export DOCKER_IMAGE_NAME=${docker_image_name}" > "${current_dir}/docker.env"
 echo "export DOCKER_IMAGE_TAG=${docker_image_tag}"  >> "${current_dir}/docker.env"
-
-## Output (debug)
 
 # shellcheck source=./scripts/ci/docker.env
 . "${current_dir}/docker.env"
