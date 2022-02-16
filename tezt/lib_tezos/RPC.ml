@@ -626,25 +626,26 @@ module Script_cache = struct
 end
 
 module Tx_rollup = struct
-  let sub_path ?(chain = "main") ?(block = "head") ~tx_rollup sub =
-    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; tx_rollup; sub]
+  let sub_path ?(chain = "main") ?(block = "head") ~rollup sub =
+    ["chains"; chain; "blocks"; block; "context"; "tx_rollup"; rollup; sub]
 
-  let get_state ?endpoint ?hooks ?chain ?block ~tx_rollup client =
-    let path = sub_path ?chain ?block ~tx_rollup "state" in
+  let get_state ?endpoint ?hooks ?chain ?block ~rollup client =
+    let path = sub_path ?chain ?block ~rollup "state" in
     Client.rpc ?endpoint ?hooks GET path client
 
-  let get_inbox ?endpoint ?hooks ?chain ?block ~tx_rollup client =
-    let path = sub_path ?chain ?block ~tx_rollup "inbox" in
+  let get_inbox ?endpoint ?hooks ?chain ?block ~rollup client =
+    let path = sub_path ?chain ?block ~rollup "inbox" in
     Client.rpc ?endpoint ?hooks GET path client
 
-  let spawn_get_inbox ?endpoint ?hooks ?chain ?block ~tx_rollup client =
-    let path = sub_path ?chain ?block ~tx_rollup "inbox" in
+  let spawn_get_inbox ?endpoint ?hooks ?chain ?block ~rollup client =
+    let path = sub_path ?chain ?block ~rollup "inbox" in
     Client.spawn_rpc ?endpoint ?hooks GET path client
 
   let get_commitments ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~tx_rollup client =
-    let path = sub_path ~chain ~block ~tx_rollup "commitments" in
-    Client.rpc ?endpoint ?hooks GET path client
+      ?(offset = 0) ~rollup client =
+    let path = sub_path ~chain ~block ~rollup "commitments" in
+    let query_string = [("offset", string_of_int offset)] in
+    Client.rpc ?endpoint ?hooks ~query_string GET path client
 end
 
 module Sc_rollup = struct

@@ -1132,7 +1132,7 @@ let originate_tx_rollup ?wait ?burn_cap ?storage_limit ~src client =
   |> mandatory "tx rollup hash" |> Lwt.return
 
 let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
-    ?hooks ~content ~tx_rollup ~src client =
+    ?hooks ~content ~rollup ~src client =
   spawn_command
     ?hooks
     client
@@ -1144,7 +1144,7 @@ let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
         "batch";
         Hex.(of_string content |> show);
         "to";
-        tx_rollup;
+        rollup;
         "from";
         src;
       ]
@@ -1158,14 +1158,14 @@ let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
         storage_limit)
 
 let submit_tx_rollup_batch ?wait ?burn_cap ?storage_limit ?hooks ~content
-    ~tx_rollup ~src client =
+    ~rollup ~src client =
   spawn_submit_tx_rollup_batch
     ?wait
     ?burn_cap
     ?storage_limit
     ?hooks
     ~content
-    ~tx_rollup
+    ~rollup
     ~src
     client
   |> Process.check

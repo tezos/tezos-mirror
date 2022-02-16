@@ -871,7 +871,7 @@ val submit_tx_rollup_batch :
   ?storage_limit:int ->
   ?hooks:Process.hooks ->
   content:string ->
-  tx_rollup:string ->
+  rollup:string ->
   src:string ->
   t ->
   unit Lwt.t
@@ -883,7 +883,7 @@ val spawn_submit_tx_rollup_batch :
   ?storage_limit:int ->
   ?hooks:Process.hooks ->
   content:string ->
-  tx_rollup:string ->
+  rollup:string ->
   src:string ->
   t ->
   Process.t

@@ -56,15 +56,15 @@ let node_rpc node service =
 let get_block_hash block_json =
   JSON.(block_json |-> "hash" |> as_string) |> return
 
-let get_state ?hooks tx_rollup client =
+let get_state ?hooks rollup client =
   (* The state is currently empty, but the RPC can fail if [tx_rollup]
      does not exist. *)
-  let* json = RPC.Tx_rollup.get_state ?hooks ~tx_rollup client in
+  let* json = RPC.Tx_rollup.get_state ?hooks ~rollup client in
   let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
   return {burn_per_byte}
 
-let get_inbox ?hooks tx_rollup client =
-  let* json = RPC.Tx_rollup.get_inbox ?hooks ~tx_rollup client in
+let get_inbox ?hooks rollup client =
+  let* json = RPC.Tx_rollup.get_inbox ?hooks ~rollup client in
   let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
   let contents = JSON.(json |-> "contents" |> as_list |> List.map as_string) in
   return {cumulated_size; contents}
@@ -128,23 +128,19 @@ let test_submit_batch ~protocols =
   let* (node, client) =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
-  let* tx_rollup =
+  let* rollup =
     Client.originate_tx_rollup
       ~burn_cap:Tez.(of_int 9999999)
       ~storage_limit:60_000
       ~src:Constant.bootstrap1.public_key_hash
       client
   in
-
-  Regression.capture tx_rollup ;
-
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
-
   (* We check the rollup exists by trying to fetch its state. Since it
      is a regression test, we can detect changes to this default
      state. *)
-  let* _state = get_state ~hooks tx_rollup client in
+  let* _state = Rollup.get_state ~hooks ~rollup client in
 
   (* Submit a batch *)
   let batch = "tezos" in
@@ -153,7 +149,7 @@ let test_submit_batch ~protocols =
     Client.submit_tx_rollup_batch
       ~hooks
       ~content:batch
-      ~tx_rollup
+      ~rollup
       ~src:Constant.bootstrap1.public_key_hash
       client
   in
@@ -162,7 +158,7 @@ let test_submit_batch ~protocols =
   let* _ = Node.wait_for_level node 3 in
 
   (* Check the inbox has been created *)
-  let* inbox = get_inbox ~hooks tx_rollup client in
+  let* inbox = get_inbox ~hooks rollup client in
   Check.(
     (( = )
        (String.length batch)
@@ -191,7 +187,7 @@ let test_invalid_rollup_address ~protocols =
     Client.spawn_submit_tx_rollup_batch
       ~hooks
       ~content:""
-      ~tx_rollup:invalid_address
+      ~rollup:invalid_address
       ~src:Constant.bootstrap1.public_key_hash
       client
     |> Process.check_error
@@ -232,7 +228,7 @@ let test_submit_from_originated_source ~protocols =
   let* _ = Node.wait_for_level node 2 in
 
   (* We originate a tx_rollup using an implicit account *)
-  let* tx_rollup =
+  let* rollup =
     Client.originate_tx_rollup
       ~burn_cap:Tez.(of_int 9999999)
       ~storage_limit:60_000
@@ -249,7 +245,7 @@ let test_submit_from_originated_source ~protocols =
     Client.spawn_submit_tx_rollup_batch
       ~hooks
       ~content:batch
-      ~tx_rollup
+      ~rollup
       ~src:originated_contract
       client
     |> Process.check_error
@@ -374,7 +370,7 @@ let test_tx_node_store_inbox =
         Client.submit_tx_rollup_batch
           ~hooks
           ~content:batch
-          ~tx_rollup:tx_rollup_hash
+          ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap1.public_key_hash
           client
       in
@@ -409,7 +405,7 @@ let test_tx_node_store_inbox =
         Client.submit_tx_rollup_batch
           ~hooks
           ~content:snd_batch
-          ~tx_rollup:tx_rollup_hash
+          ~rollup:tx_rollup_hash
           ~src:Constant.bootstrap1.public_key_hash
           client
       in
