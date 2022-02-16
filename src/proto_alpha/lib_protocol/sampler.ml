@@ -78,8 +78,8 @@ module Make (Mass : SMass) : S with type mass = Mass.t = struct
     match (small, large) with
     | ([], _) -> List.iter (fun (_, i) -> FallbackArray.set p i total) large
     | (_, []) ->
-        (* This can only happen because of numerical inaccuracies when using
-           eg [Mass.t = float] *)
+        (* This can only happen because of numerical inaccuracies e.g. when using
+           [Mass.t = float] *)
         List.iter (fun (_, i) -> FallbackArray.set p i total) small
     | ((qi, i) :: small', (qj, j) :: large') ->
         FallbackArray.set p i qi ;
@@ -204,4 +204,16 @@ module Mass : SMass with type t = int64 = struct
   let ( < ) = Compare.Int64.( < )
 end
 
+(* This is currently safe to do that since since at this point the values for
+   [total] is 8 * 10^8 * 10^6 and the delgates [n] = 400.
+
+   Therefore [let q = Mass.mul p n ...] in [create] does not overflow since p <
+   total.
+
+   Assuming the total active stake does not increase too much, which is the case
+   at the current 5% inflation rate, this implementation can thus support around
+   10000 delegates without overflows.
+
+   If/when this happens, the implementation should be revisited.
+ *)
 include Make (Mass)

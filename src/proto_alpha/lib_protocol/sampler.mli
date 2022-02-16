@@ -66,7 +66,14 @@ end
 (**/**)
 
 module Internal_for_tests : sig
-  (** [Mass] is the module type describing the measure associated to points. *)
+  (** [Mass] is the module type describing the measure associated to points.
+
+      The current signature reflects the need for efficiency for the arithmetic
+      operators. As such, they do not error or add dynamic checks for
+      over-/under-flow.
+
+      One must make sure that the implementation of its arithmetic operators
+      cannot over-/under-flow under the current usage.  *)
   module type SMass = sig
     (** [t] is the type describing the measure associated to points. *)
     type t
@@ -95,4 +102,10 @@ module Internal_for_tests : sig
   module Make : functor (Mass : SMass) -> S with type mass = Mass.t
 end
 
+(** Sampler based on int64. In the current state of the protocol, this should
+    not ever over-/under-flow -- see the thought process in the .ml file.
+
+   However, should the total stake increase a lot or the number of delegates get
+   close to 10k, this might not be true anymore and this module should be
+   revisited.  *)
 include S with type mass = Int64.t
