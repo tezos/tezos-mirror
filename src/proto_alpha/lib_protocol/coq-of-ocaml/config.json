@@ -110,7 +110,7 @@
   "merge_returns": [
     ["return=", "return?", "return=?"]
   ],
-  "ty_eq": [
+  "merge_types": [
     ["M=", "M?", "M=?"]
   ],
   "monadic_lets": [
