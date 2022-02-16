@@ -148,6 +148,47 @@ let with_timeout {timeout; _} p =
 
 let uid_rex = rex "[a-zA-Z0-9._-]{1,128}"
 
+type http_request = {
+  uri : Uri.t;
+  meth : Cohttp.Code.meth;
+  headers : Cohttp.Header.t;
+  body : Cohttp_lwt.Body.t option;
+}
+
+let http_call request config =
+  with_timeout config
+  @@ Cohttp_lwt_unix.Client.call
+       ~headers:request.headers
+       ?body:request.body
+       request.meth
+       request.uri
+
+let string_of_http_request request =
+  let* body =
+    Option.map
+      (fun body ->
+        Lwt.map (fun s -> ", Body: " ^ s) @@ Cohttp_lwt.Body.to_string body)
+      request.body
+    |> Option.value ~default:(Lwt.return "")
+  in
+  return
+  @@ Format.sprintf
+       "Uri: %s, Method: %s, Headers: [%s]%s"
+       (Uri.to_string request.uri)
+       (Cohttp.Code.string_of_method request.meth)
+       (Cohttp.Header.to_string request.headers)
+       body
+
+let handle_http_error resp_status resp_body request =
+  let* body = Cohttp_lwt.Body.to_string resp_body in
+  let* req = string_of_http_request request in
+  failwith
+  @@ sf
+       "Grafana responded with %s - %s for request (%s) "
+       (Cohttp.Code.string_of_status resp_status)
+       body
+       req
+
 let update_dashboard config dashboard =
   if dashboard.uid =~! uid_rex then
     invalid_arg
@@ -158,47 +199,38 @@ let update_dashboard config dashboard =
   let authorization = ("Authorization", "Bearer " ^ config.api_token) in
   (* Delete so that we don't care about versions. *)
   let* () =
-    let* (response, body) =
-      with_timeout config
-      @@ Cohttp_lwt_unix.Client.call
-           ~headers:(Cohttp.Header.of_list [authorization])
-           `DELETE
-           (make_url config ("dashboards/uid/" ^ dashboard.uid))
+    let delete_request =
+      {
+        uri = make_url config ("dashboards/uid/" ^ dashboard.uid);
+        meth = `DELETE;
+        headers = Cohttp.Header.of_list [authorization];
+        body = None;
+      }
     in
+    let* (response, body) = http_call delete_request config in
     match response.status with
     | #Cohttp.Code.success_status | `Not_found ->
         Cohttp_lwt.Body.drain_body body
-    | status ->
-        let* body = Cohttp_lwt.Body.to_string body in
-        failwith
-          (sf
-             "Grafana responded with %s - %s"
-             (Cohttp.Code.string_of_status status)
-             body)
+    | status -> handle_http_error status body delete_request
   in
   (* (Re-)create dashboard. *)
   let body =
     `O [("dashboard", encode_dashboard config dashboard)] |> JSON.encode_u
   in
-  let* (response, body) =
-    with_timeout config
-    @@ Cohttp_lwt_unix.Client.call
-         ~headers:
-           (Cohttp.Header.of_list
-              [("Content-Type", "application/json"); authorization])
-         ~body:(Cohttp_lwt.Body.of_string body)
-         `POST
-         (make_url config "dashboards/db")
+  let create_request =
+    {
+      uri = make_url config "dashboards/db";
+      meth = `POST;
+      headers =
+        Cohttp.Header.of_list
+        @@ [("Content-Type", "application/json"); authorization];
+      body = Option.some @@ Cohttp_lwt.Body.of_string body;
+    }
   in
+  let* (response, body) = http_call create_request config in
   match response.status with
   | #Cohttp.Code.success_status -> Cohttp_lwt.Body.drain_body body
-  | status ->
-      let* body = Cohttp_lwt.Body.to_string body in
-      failwith
-        (sf
-           "Grafana responded with %s - %s"
-           (Cohttp.Code.string_of_status status)
-           body)
+  | status -> handle_http_error status body create_request
 
 let where_clause_of_tag (tag_name, tag_label) =
   InfluxDB.Tag (tag_name, EQ, tag_label)
