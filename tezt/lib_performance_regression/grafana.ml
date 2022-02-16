@@ -65,6 +65,7 @@ let encode_target (query : InfluxDB.select) : JSON.u =
     [
       ("query", `String (InfluxDB.show_select ~grafana:true query));
       ("rawQuery", `Bool true);
+      ("resultFormat", `String "time_series");
     ]
 
 let encode_yaxis = function
@@ -101,7 +102,7 @@ let encode_panel config y panel : JSON.u =
   | Graph {title; description; queries; yaxis_1; yaxis_2} ->
       `O
         [
-          ("type", `String "graph");
+          ("type", `String "timeseries");
           ("datasource", `String config.data_source);
           ("title", `String title);
           ("description", `String description);
@@ -119,6 +120,27 @@ let encode_panel config y panel : JSON.u =
               ] );
           ("targets", `A (List.map encode_target queries));
           ("yaxes", `A [encode_yaxis yaxis_1; encode_yaxis yaxis_2]);
+          ( "fieldConfig",
+            `O
+              [
+                ( "defaults",
+                  `O
+                    [
+                      ( "custom",
+                        `O
+                          [
+                            ("drawStyle", `String "line");
+                            ("lineInterpolation", `String "linear");
+                            ("showPoints", `String "always");
+                            ("pointSize", `Float 5.);
+                            ("spanNulls", `Bool true);
+                            ("lineWidth", `Float 1.);
+                            ("fillOpacity", `Float 10.);
+                            ("axisSoftMin", `Float 0.);
+                          ] );
+                      ("unit", `String "s");
+                    ] );
+              ] );
         ]
 
 let encode_dashboard config {uid; title; description; panels} : JSON.u =
@@ -251,8 +273,7 @@ let simple_query ?(tags = []) measurement field =
     [Function (MEAN, Field field)]
     ~from:(Measurement measurement)
     ~where:where_clause
-    ~group_by:
-      (Time {interval = Grafana_interval; tag = None; fill = Some Previous})
+    ~group_by:(Time {interval = Grafana_interval; tag = None; fill = None})
 
 let simple_graph ?title ?(description = "") ?(yaxis_format = "s") ?tags
     measurement field =

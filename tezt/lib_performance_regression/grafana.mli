@@ -60,7 +60,7 @@ type yaxis = {format : string; label : string option}
         [Function (MEAN, Field "duration")]
         ~from:(Measurement "rpc")
         ~where:Grafana_time_filter
-        ~group_by:(Time {interval = Grafana_interval; tag = None; fill = Some Previous})
+        ~group_by:(Time {interval = Grafana_interval; tag = None; fill = None})
     ] *)
 type graph = {
   title : string;
