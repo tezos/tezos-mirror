@@ -21,7 +21,7 @@ depends: [
   "tezos-stdlib"
   "lwt-watcher" { = "0.2" }
   "ringo-lwt" { = "0.8" }
-  "camlzip" { = "1.11" }
+  "camlzip" { >= "1.11" & < "1.12" }
   "tar"
   "tar-unix" { = "2.0.0" }
   "prometheus"
