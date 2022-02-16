@@ -59,12 +59,14 @@ let string_of_duration =
   | Month x -> f x "M"
   | Years x -> f x "y"
 
+type alias = string
+
 type yaxis = {format : string; label : string option}
 
 type graph = {
   title : string;
   description : string;
-  queries : InfluxDB.select list;
+  queries : (InfluxDB.select * alias option) list;
   interval : duration option;
   yaxis_1 : yaxis option;
   yaxis_2 : yaxis option;
@@ -81,13 +83,17 @@ type dashboard = {
   panels : panel list;
 }
 
-let encode_target (query : InfluxDB.select) : JSON.u =
+let encode_target ((query : InfluxDB.select), alias) : JSON.u =
+  let label =
+    Option.map (fun a -> ("alias", `String a)) alias |> Option.to_list
+  in
   `O
-    [
-      ("query", `String (InfluxDB.show_select ~grafana:true query));
-      ("rawQuery", `Bool true);
-      ("resultFormat", `String "time_series");
-    ]
+    (label
+    @ [
+        ("query", `String (InfluxDB.show_select ~grafana:true query));
+        ("rawQuery", `Bool true);
+        ("resultFormat", `String "time_series");
+      ])
 
 let encode_yaxis = function
   | None -> `O [("show", `Bool false)]
@@ -308,7 +314,7 @@ let simple_graph ?title ?(description = "") ?(yaxis_format = "s") ?tags
     {
       title;
       description;
-      queries = [simple_query ?tags ~measurement ~field ~test ()];
+      queries = [(simple_query ?tags ~measurement ~field ~test (), None)];
       interval;
       yaxis_1 = Some {format = yaxis_format; label = Some field};
       yaxis_2 = None;
@@ -319,7 +325,9 @@ let graphs_per_tags ?title ?(description = "") ?(yaxis_format = "s") ?interval
   let title = Option.value title ~default:measurement in
   let queries =
     List.map
-      (fun tag -> simple_query ~tags:[tag] ~measurement ~field ~test ())
+      (fun (key, value) ->
+        ( simple_query ~tags:[(key, value)] ~measurement ~field ~test (),
+          Some (key ^ "=" ^ value) ))
       tags
   in
   Graph

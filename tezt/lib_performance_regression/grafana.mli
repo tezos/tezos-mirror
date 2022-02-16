@@ -57,14 +57,22 @@ type duration =
   | Month of int
   | Years of int
 
+(** The alias associated to a curve in the graph. *)
+type alias = string
+
 (** Grafana graph panels.
 
     Queries should use [Grafana_time_filter] in their WHERE clause
     and [Grafana_interval] in a GROUP BY time clause to reduce the size of the query.
     If an [interval] is specified, it will represent the minimum accepted by [Grafana_interval]
     to draw the graph.
+
     The GROUP BY time clause should usually also contain a FILL clause to make
     continuous graphs instead of bunches of dots.
+
+    Each query is optionally associated to an alias. This alias will be used to name the resulting
+    curve in the graph key. If this alias is not given, Grafana will deduce it automatically from
+    the query.
 
     Example query:
     [
@@ -77,7 +85,7 @@ type duration =
 type graph = {
   title : string;
   description : string;
-  queries : InfluxDB.select list;
+  queries : (InfluxDB.select * alias option) list;
   interval : duration option;
   yaxis_1 : yaxis option;
   yaxis_2 : yaxis option;
