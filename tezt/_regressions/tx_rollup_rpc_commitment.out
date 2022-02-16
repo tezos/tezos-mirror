@@ -1,0 +1,62 @@
+tezt/_regressions/tx_rollup_rpc_commitment.out
+
+./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+Node is bootstrapped.
+Estimated gas: 2440.220 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000508
+    Expected counter: 2
+    Gas limit: 2541
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000508
+      payload fees(the block proposer) ....... +ꜩ0.000508
+    Tx rollup transaction:[TX_ROLLUP_HASH], 4 bytes, From: [PUBLIC_KEY_HASH]
+      This tx rollup submit operation was successfully applied
+      Balance updates:
+        
+      Consumed gas: 2440.220
+
+
+./tezos-client --wait none submit tx rollup commitment 3  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+Node is bootstrapped.
+Estimated gas: 2670.280 units (will add 100 for safety)
+Estimated storage: no bytes added
+Operation successfully injected in the node.
+Operation hash is '[OPERATION_HASH]'
+NOT waiting for the operation to be included.
+Use command
+  tezos-client wait for [OPERATION_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
+and/or an external block explorer to make sure that it has been included.
+This sequence of operations was run:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0.000539
+    Expected counter: 3
+    Gas limit: 2771
+    Storage limit: 0 bytes
+    Balance updates:
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000539
+      payload fees(the block proposer) ....... +ꜩ0.000539
+    Tx rollup commitment:[TX_ROLLUP_HASH], commitment 3 : batches = 726f6f74 predecessor 
+      From: [PUBLIC_KEY_HASH]
+      This tx rollup commit operation was successfully applied
+      Balance updates:
+        
+      Consumed gas: 2670.280
+
+
+./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitments?offset=3'
+[ { "commitment":
+      { "level": 3, "batches": [ { "root": "726f6f74" } ],
+        "predecessor": null },
+    "commiter": "[PUBLIC_KEY_HASH]", "submitted_at": 6 } ]
