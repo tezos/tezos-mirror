@@ -95,9 +95,10 @@ let register ~__FILE__ ~title ~tags ~output_file f =
         not (Sys.file_exists stored_output_file || Cli.options.reset_regressions)
       then
         Test.fail
-          "No existing regression output file found (%s). To generate it, run \
-           with option \"--reset-regressions\""
-          stored_output_file ;
+          "Regression output file not found: %s. To generate it, use: \
+           --reset-regressions --test %s"
+          (Log.quote_shell stored_output_file)
+          (Log.quote_shell title) ;
       let capture_f ~output_file =
         run_and_capture_output ~output_file @@ fun () ->
         capture stored_output_file ;
@@ -141,7 +142,11 @@ let register ~__FILE__ ~title ~tags ~output_file f =
             let diff = Buffer.contents buffer in
             Buffer.reset buffer ;
             log_regression_diff diff ;
-            Test.fail "The regression test output contains differences")
+            Test.fail
+              "Regression output file contains differences: %s. To accept the \
+               differences, use: --reset-regressions --test %s"
+              (Log.quote_shell stored_output_file)
+              (Log.quote_shell title))
 
 let check_unknown_output_files () =
   let full_output_files = String_set.map full_output_file !all_output_files in
