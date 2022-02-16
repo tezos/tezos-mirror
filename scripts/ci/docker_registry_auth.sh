@@ -25,12 +25,14 @@ echo "IMAGE_ARCH_PREFIX=${IMAGE_ARCH_PREFIX:-}"
 echo "CI_PROJECT_NAMESPACE=${CI_PROJECT_NAMESPACE}"
 echo "TEZOS_DEFAULT_NAMESPACE=${TEZOS_DEFAULT_NAMESPACE}"
 
-# /!\ MASTER_OR_RELEASE can be unset
-if [ "${MASTER_OR_RELEASE:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "${TEZOS_DEFAULT_NAMESPACE}" ]
+# /!\ MASTER_OR_RELEASE can be unset, CI_DOCKER_AUTH is only available on protected branches
+if [ "${MASTER_OR_RELEASE:-}" = 'true' ] && [ "${CI_PROJECT_NAMESPACE}" = "${TEZOS_DEFAULT_NAMESPACE}" ] && [ -n "${CI_DOCKER_AUTH:-}" ]
 then
+  # Docker Hub
   docker_image_name="docker.io/${CI_PROJECT_PATH}-"
   echo "{\"auths\":{\"https://index.docker.io/v1/\":{\"auth\":\"${CI_DOCKER_AUTH}\"}}}" > ~/.docker/config.json
 else
+  # GitLab container registry
   docker login -u "${CI_REGISTRY_USER}" -p "${CI_REGISTRY_PASSWORD}" "${CI_REGISTRY}"
   docker_image_name="${CI_REGISTRY}/${CI_PROJECT_NAMESPACE}/${CI_PROJECT_NAME}/"
 fi
