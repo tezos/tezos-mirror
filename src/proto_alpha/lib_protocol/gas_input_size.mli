@@ -30,50 +30,15 @@
     other than gas computation.
  *)
 
-type t = int
-
-type micheline_size = {traversal : t; int_bytes : t; string_bytes : t}
+include module type of Gas_comparable_input_size
 
 (* ------------------------------------------------------------------------- *)
-(* encoding *)
-
-val encoding : t Data_encoding.encoding
-
-val micheline_size_encoding : micheline_size Data_encoding.encoding
-
-(* ------------------------------------------------------------------------- *)
-
-val zero : t
-
-val add : t -> t -> t
-
-val pp : Format.formatter -> t -> unit
-
-val pp_micheline_size : Format.formatter -> micheline_size -> unit
-
-val to_int : t -> int
-
-val of_int : int -> t
-
-val integer : 'a Alpha_context.Script_int.num -> t
-
-val string : string -> t
-
-val script_string : Alpha_context.Script_string.t -> t
-
-val bytes : Bytes.t -> t
-
-val mutez : Alpha_context.Tez.tez -> t
 
 val list : 'a Script_typed_ir.boxed_list -> t
 
 val set : 'a Script_typed_ir.set -> t
 
 val map : ('a, 'b) Script_typed_ir.map -> t
-
-val timestamp : Alpha_context.Script_timestamp.t -> t
-
-val size_of_comparable_value : 'a Script_typed_ir.comparable_ty -> 'a -> t
 
 (* ------------------------------------------------------------------------- *)
 (* Micheline/Michelson-related *)

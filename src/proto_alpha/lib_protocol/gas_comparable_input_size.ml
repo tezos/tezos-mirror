@@ -103,17 +103,6 @@ let address (addr : Script_typed_ir.address) : t =
 let tx_rollup_l2_address x =
   Tx_rollup_l2_address.Indexable.size @@ Indexable.forget x
 
-let list (list : 'a Script_typed_ir.boxed_list) : t =
-  list.Script_typed_ir.length
-
-let set (set : 'a Script_typed_ir.set) : t =
-  let res = Alpha_context.Script_int.to_int (Script_set.size set) in
-  match res with None -> assert false | Some x -> x
-
-let map (map : ('a, 'b) Script_typed_ir.map) : t =
-  let res = Alpha_context.Script_int.to_int (Script_map.size map) in
-  match res with None -> assert false | Some x -> x
-
 let timestamp (tstamp : Alpha_context.Script_timestamp.t) : t =
   Z.numbits (Alpha_context.Script_timestamp.to_zint tstamp) / 8
 
@@ -151,43 +140,3 @@ let rec size_of_comparable_value :
    | Signature_key -> signature v
    | Key_key -> public_key v
    | Chain_id_key -> chain_id v
-
-(* ------------------------------------------------------------------------- *)
-(* Micheline/Michelson-related *)
-
-let micheline_zero = {traversal = 0; int_bytes = 0; string_bytes = 0}
-
-let ( ++ ) x y =
-  {
-    traversal = x.traversal + y.traversal;
-    int_bytes = x.int_bytes + y.int_bytes;
-    string_bytes = x.string_bytes + y.string_bytes;
-  }
-
-let node leaves =
-  let r = List.fold_left ( ++ ) micheline_zero leaves in
-  {r with traversal = r.traversal + 1}
-
-let rec of_micheline (x : ('a, 'b) Micheline.node) =
-  match x with
-  | Micheline.Int (_loc, z) ->
-      let int_bytes = integer (Alpha_context.Script_int.of_zint z) in
-      {traversal = 1; int_bytes; string_bytes = 0}
-  | Micheline.String (_loc, s) ->
-      let string_bytes = String.length s in
-      {traversal = 1; int_bytes = 0; string_bytes}
-  | Micheline.Bytes (_loc, b) ->
-      let string_bytes = bytes b in
-      {traversal = 1; int_bytes = 0; string_bytes}
-  | Micheline.Prim (_loc, _prim, subterms, _annot) ->
-      node (List.map of_micheline subterms)
-  | Micheline.Seq (_loc, subterms) -> node (List.map of_micheline subterms)
-
-(* ------------------------------------------------------------------------- *)
-(* Sapling-related *)
-
-let sapling_transaction_inputs : Alpha_context.Sapling.transaction -> t =
- fun tx -> List.length tx.inputs
-
-let sapling_transaction_outputs : Alpha_context.Sapling.transaction -> t =
- fun tx -> List.length tx.outputs

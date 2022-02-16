@@ -28,6 +28,9 @@
     sizes, but rather they can be seen as an information size. They are
     tailored to the models that use them, and should not be used for anything
     other than gas computation.
+
+    [Gas_comparable_input_size] is the restriction of [Gas_input_size] to
+    comparable types.
  *)
 
 type t = int
@@ -65,24 +68,6 @@ val bytes : Bytes.t -> t
 
 val mutez : Alpha_context.Tez.tez -> t
 
-val list : 'a Script_typed_ir.boxed_list -> t
-
-val set : 'a Script_typed_ir.set -> t
-
-val map : ('a, 'b) Script_typed_ir.map -> t
-
 val timestamp : Alpha_context.Script_timestamp.t -> t
 
 val size_of_comparable_value : 'a Script_typed_ir.comparable_ty -> 'a -> t
-
-(* ------------------------------------------------------------------------- *)
-(* Micheline/Michelson-related *)
-
-val of_micheline : ('a, 'b) Micheline.node -> micheline_size
-
-(* ------------------------------------------------------------------------- *)
-(* Sapling-related *)
-
-val sapling_transaction_inputs : Alpha_context.Sapling.transaction -> t
-
-val sapling_transaction_outputs : Alpha_context.Sapling.transaction -> t
