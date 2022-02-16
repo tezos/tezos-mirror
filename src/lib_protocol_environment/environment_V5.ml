@@ -1065,6 +1065,12 @@ struct
     include Context
     include Environment_context.V5
 
+    let tree_proof_encoding =
+      Tezos_context_helpers.Context.Proof_encoding_V1.tree_proof_encoding
+
+    let stream_proof_encoding =
+      Tezos_context_helpers.Context.Proof_encoding_V1.stream_proof_encoding
+
     let register_resolver = Base58.register_resolver
 
     let complete ctxt s = Base58.complete ctxt s
