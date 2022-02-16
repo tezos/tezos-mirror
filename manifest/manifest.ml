@@ -175,9 +175,10 @@ module Dune = struct
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
       ?library_flags ?(inline_tests = false) ?(preprocess = Stdlib.List.[])
-      ?(preprocessor_deps = Stdlib.List.[]) ?(wrapped = true) ?modules ?modes
-      ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
-      ?(deps = Stdlib.List.[]) ?js_of_ocaml (names : string list) =
+      ?(preprocessor_deps = Stdlib.List.[]) ?(wrapped = true) ?modules
+      ?modules_without_implementation ?modes ?foreign_stubs ?c_library_flags
+      ?(private_modules = Stdlib.List.[]) ?(deps = Stdlib.List.[]) ?js_of_ocaml
+      (names : string list) =
     [
       V
         [
@@ -226,6 +227,8 @@ module Dune = struct
           opt flags (fun x -> [S "flags"; x]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
           opt modules (fun x -> S "modules" :: x);
+          opt modules_without_implementation (fun x ->
+              S "modules_without_implementation" :: x);
           (match private_modules with
           | [] -> E
           | _ -> S "private_modules" :: of_atom_list private_modules);
@@ -682,7 +685,9 @@ module Target = struct
     linkall : bool;
     modes : Dune.mode list option;
     modules : modules;
+    modules_without_implementation : string list;
     nopervasives : bool;
+    nostdlib : bool;
     ocaml : Version.constraints option;
     opam : string option;
     opaque : bool;
@@ -812,8 +817,10 @@ module Target = struct
     ?linkall:bool ->
     ?modes:Dune.mode list ->
     ?modules:string list ->
+    ?modules_without_implementation:string list ->
     ?node_wrapper_flags:string list ->
     ?nopervasives:bool ->
+    ?nostdlib:bool ->
     ?ocaml:Version.constraints ->
     ?opam:string ->
     ?opaque:bool ->
@@ -836,11 +843,12 @@ module Target = struct
       ?(conflicts = []) ?(dep_files = []) ?(deps = []) ?(dune = Dune.[])
       ?foreign_stubs ?(inline_tests = false) ?js_compatible ?js_of_ocaml
       ?documentation ?(linkall = false) ?modes ?modules
-      ?(node_wrapper_flags = []) ?(nopervasives = false) ?ocaml ?opam
-      ?(opaque = false) ?(opens = []) ?(preprocess = [])
-      ?(preprocessor_deps = []) ?(private_modules = []) ?(opam_only_deps = [])
-      ?release ?static ?static_cclibs ?synopsis ?(time_measurement_ppx = false)
-      ?(wrapped = true) ~path names =
+      ?(modules_without_implementation = []) ?(node_wrapper_flags = [])
+      ?(nopervasives = false) ?(nostdlib = false) ?ocaml ?opam ?(opaque = false)
+      ?(opens = []) ?(preprocess = []) ?(preprocessor_deps = [])
+      ?(private_modules = []) ?(opam_only_deps = []) ?release ?static
+      ?static_cclibs ?synopsis ?(time_measurement_ppx = false) ?(wrapped = true)
+      ~path names =
     let conflicts = List.filter_map Fun.id conflicts in
     let deps = List.filter_map Fun.id deps in
     let opam_only_deps = List.filter_map Fun.id opam_only_deps in
@@ -1003,7 +1011,9 @@ module Target = struct
         linkall;
         modes;
         modules;
+        modules_without_implementation;
         nopervasives;
+        nostdlib;
         ocaml;
         opam;
         opaque;
@@ -1296,6 +1306,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     |> List.map (fun m -> Dune.(G [S "-open"; S m]))
     |> cons_if (internal.linkall && not is_lib) (Dune.S "-linkall")
     |> cons_if internal.nopervasives (Dune.S "-nopervasives")
+    |> cons_if internal.nostdlib (Dune.S "-nostdlib")
     |> cons_if internal.opaque (Dune.S "-opaque")
     |> fun flags ->
     flags
@@ -1334,6 +1345,11 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     | Modules modules -> Some (Dune.of_atom_list modules)
     | All_modules_except modules ->
         Some Dune.[S ":standard" :: S "\\" :: Dune.of_atom_list modules]
+  in
+  let modules_without_implementation =
+    match internal.modules_without_implementation with
+    | [] -> None
+    | _ :: _ as modules -> Some (Dune.of_atom_list modules)
   in
   let create_empty_files =
     match empty_files_to_create with
@@ -1401,6 +1417,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       ~preprocessor_deps
       ~wrapped:internal.wrapped
       ?modules
+      ?modules_without_implementation
       ?modes:internal.modes
       ?foreign_stubs:internal.foreign_stubs
       ?c_library_flags:internal.c_library_flags

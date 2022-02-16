@@ -1489,6 +1489,14 @@ let tezos_protocol_environment_packer =
     ~synopsis:"Tezos: sigs/structs packer for economic protocol environment"
     ~modules:[]
 
+let tezos_protocol_environment_sigs_stdlib_compat =
+  public_lib
+    "tezos-protocol-environment-sigs.stdlib-compat"
+    ~internal_name:"tezos_protocol_environment_sigs_stdlib_compat"
+    ~path:"src/lib_protocol_environment/sigs/stdlib_compat"
+    ~opam:"src/lib_protocol_environment/tezos-protocol-environment-sigs"
+    ~modules_without_implementation:["V_all"; "V2"; "V3"; "V4"]
+
 let tezos_protocol_environment_sigs =
   public_lib
     "tezos-protocol-environment-sigs"
@@ -1496,6 +1504,7 @@ let tezos_protocol_environment_sigs =
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment-sigs"
     ~ocaml:V.(at_least "4.12")
     ~synopsis:"Tezos: restricted typing environment for the economic protocols"
+    ~deps:[tezos_protocol_environment_sigs_stdlib_compat]
     ~opam_only_deps:
       [
         (* Build dependency but not for the (library) itself,
@@ -1503,6 +1512,7 @@ let tezos_protocol_environment_sigs =
         tezos_protocol_environment_packer;
       ]
     ~nopervasives:true
+    ~nostdlib:true
     ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"]
     ~dune:
       Dune.
@@ -1653,6 +1663,16 @@ let tezos_protocol_compiler_registerer =
               S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
               S
                 "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
+              S
+                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
+              S
+                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
+              S
+                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
+              S
+                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
+              S
+                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
               S
                 "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}";
               S

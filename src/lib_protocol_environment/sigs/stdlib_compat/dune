@@ -1,0 +1,8 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(library
+ (name tezos_protocol_environment_sigs_stdlib_compat)
+ (public_name tezos-protocol-environment-sigs.stdlib-compat)
+ (instrumentation (backend bisect_ppx))
+ (modules_without_implementation V_all V2 V3 V4))

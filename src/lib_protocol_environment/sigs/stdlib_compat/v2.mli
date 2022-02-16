@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 G.B. Fefe <gb.fefe@protonmail.com>                     *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,30 +23,11 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val camlinternalFormatBasics_cmi : string
+(* Type equalities for the restricted typing environment of the
+   economic protocols *)
 
-val tezos_protocol_environment_sigs_stdlib_compat_cmi : string
-
-val tezos_protocol_environment_sigs_stdlib_compat__V_all_cmi : string
-
-val tezos_protocol_environment_sigs_stdlib_compat__V2_cmi : string
-
-val tezos_protocol_environment_sigs_stdlib_compat__V3_cmi : string
-
-val tezos_protocol_environment_sigs_stdlib_compat__V4_cmi : string
-
-val tezos_protocol_environment_sigs_cmi : string
-
-val tezos_protocol_environment_sigs__V0_cmi : string
-
-val tezos_protocol_environment_sigs__V1_cmi : string
-
-val tezos_protocol_environment_sigs__V2_cmi : string
-
-val tezos_protocol_environment_sigs__V3_cmi : string
-
-val tezos_protocol_environment_sigs__V4_cmi : string
-
-val tezos_protocol_environment_sigs__V5_cmi : string
-
-val tezos_protocol_registerer__Registerer_cmi : string
+module Stdlib : sig
+  module Seq : sig
+    type 'a t = 'a Stdlib.Seq.t
+  end
+end

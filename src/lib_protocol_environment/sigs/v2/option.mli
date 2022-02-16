@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_environment_sigs_stdlib_compat.V2
+
 (** Signature from Lwtreslib's option module *)
 
 type 'a t = 'a option = None | Some of 'a

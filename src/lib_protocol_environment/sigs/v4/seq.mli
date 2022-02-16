@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_protocol_environment_sigs_stdlib_compat.V4
+
 (* From Lwtreslib *)
 
 type 'a t = unit -> 'a node
