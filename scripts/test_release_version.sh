@@ -26,6 +26,21 @@ trap cleanup EXIT INT
 
 cleanup
 
+echo "Test version in git archive tarball"
+
+git tag -d "v$VERSION" > /dev/null 2>&1
+git tag "v$VERSION" -m "test"
+git archive HEAD -o test.tgz
+res=$(tar -Ozxvf test.tgz src/lib_version/exe/get_git_info.ml | grep "let raw_current_version")
+if [ "$res" != "let raw_current_version = \"v$VERSION\"" ]; then
+  echo "expected \"let raw_current_version = \"v$VERSION\"\"; got $res : FAIL"
+  exit 1
+else
+  echo "Tag: v$VERSION ; Expected Version : $res : PASS"
+fi
+git tag -d "v$VERSION" > /dev/null 2>&1
+rm -f test.tgz
+
 git checkout -b $TESTBRANCH
 
 rm -f _build/default/src/lib_version/generated_git_info.ml
@@ -109,3 +124,5 @@ fi
 git checkout -
 
 cleanup
+
+
