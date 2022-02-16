@@ -21,14 +21,14 @@ trace
     [ "hello"
       None
       {} ]
-  - location: 17 (remaining gas: 1039989.651 units remaining)
+  - location: 17 (remaining gas: 1039989.741 units remaining)
     [ None
       {} ]
-  - location: 18 (remaining gas: 1039989.636 units remaining)
+  - location: 18 (remaining gas: 1039989.726 units remaining)
     [ (Pair None {}) ]
-  - location: 19 (remaining gas: 1039989.621 units remaining)
+  - location: 19 (remaining gas: 1039989.711 units remaining)
     [ {}
       (Pair None {}) ]
-  - location: 21 (remaining gas: 1039989.606 units remaining)
+  - location: 21 (remaining gas: 1039989.696 units remaining)
     [ (Pair {} None {}) ]
 

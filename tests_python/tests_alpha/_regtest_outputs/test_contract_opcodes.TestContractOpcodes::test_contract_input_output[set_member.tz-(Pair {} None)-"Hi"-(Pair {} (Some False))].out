@@ -33,29 +33,29 @@ trace
     [ "Hi"
       {}
       (Pair "Hi" {} None) ]
-  - location: 19 (remaining gas: 1039983.826 units remaining)
+  - location: 19 (remaining gas: 1039983.859 units remaining)
     [ False
       (Pair "Hi" {} None) ]
-  - location: 20 (remaining gas: 1039983.811 units remaining)
+  - location: 20 (remaining gas: 1039983.844 units remaining)
     [ (Some False)
       (Pair "Hi" {} None) ]
-  - location: 21 (remaining gas: 1039983.796 units remaining)
+  - location: 21 (remaining gas: 1039983.829 units remaining)
     [ (Pair "Hi" {} None) ]
-  - location: 24 (remaining gas: 1039983.786 units remaining)
+  - location: 24 (remaining gas: 1039983.819 units remaining)
     [ (Pair {} None) ]
-  - location: 25 (remaining gas: 1039983.776 units remaining)
+  - location: 25 (remaining gas: 1039983.809 units remaining)
     [ {} ]
-  - location: 21 (remaining gas: 1039983.746 units remaining)
+  - location: 21 (remaining gas: 1039983.779 units remaining)
     [ (Some False)
       {} ]
-  - location: 26 (remaining gas: 1039983.736 units remaining)
+  - location: 26 (remaining gas: 1039983.769 units remaining)
     [ {}
       (Some False) ]
-  - location: 27 (remaining gas: 1039983.721 units remaining)
+  - location: 27 (remaining gas: 1039983.754 units remaining)
     [ (Pair {} (Some False)) ]
-  - location: 28 (remaining gas: 1039983.706 units remaining)
+  - location: 28 (remaining gas: 1039983.739 units remaining)
     [ {}
       (Pair {} (Some False)) ]
-  - location: 30 (remaining gas: 1039983.691 units remaining)
+  - location: 30 (remaining gas: 1039983.724 units remaining)
     [ (Pair {} {} (Some False)) ]
 

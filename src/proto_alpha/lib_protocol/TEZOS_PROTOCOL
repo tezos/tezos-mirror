@@ -121,6 +121,7 @@
         "Script_comparable",
         "Script_set",
         "Script_map",
+	"Gas_input_size",
         "Script_typed_ir_size",
         "Script_typed_ir_size_costs",
         "Michelson_v1_gas",

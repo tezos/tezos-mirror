@@ -24,6 +24,7 @@
 (*****************************************************************************)
 
 open Protocol
+module Size = Gas_input_size
 
 (** {2 [Script_ir_translator] benchmarks} *)
 

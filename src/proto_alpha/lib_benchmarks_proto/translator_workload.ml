@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Size = Protocol.Gas_input_size
+
 type kind = Parsing | Unparsing
 
 type code_or_data = Code | Data
@@ -97,10 +99,10 @@ let workload_to_sparse_vec (trace : t) =
   let n s = name ^ "_" ^ s in
   let vars =
     [
-      (n "traversal", Size.to_float traversal);
-      (n "int_bytes", Size.to_float int_bytes);
-      (n "string_bytes", Size.to_float string_bytes);
-      (n "gas", Size.to_float consumed);
+      (n "traversal", float_of_int (Size.to_int traversal));
+      (n "int_bytes", float_of_int (Size.to_int int_bytes));
+      (n "string_bytes", float_of_int (Size.to_int string_bytes));
+      (n "gas", float_of_int (Size.to_int consumed));
     ]
   in
   Sparse_vec.String.of_list vars
