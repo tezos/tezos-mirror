@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -863,6 +864,12 @@ let assert_tx_rollup_feature_enabled ctxt =
 let assert_sc_rollup_feature_enabled ctxt =
   fail_unless (Constants.sc_rollup_enable ctxt) Sc_rollup_feature_disabled
 
+let update_script_storage_and_ticket_balances ctxt ~self storage
+    lazy_storage_diff ticket_diffs operations =
+  Contract.update_script_storage ctxt self storage lazy_storage_diff
+  >>=? fun ctxt ->
+  Ticket_accounting.update_ticket_balances ctxt ~self ~ticket_diffs operations
+
 (**
 
    Retrieving the source code of a contract from its address is costly
@@ -1010,18 +1017,20 @@ let apply_manager_operation_content :
             ~parameter
             ~entrypoint
             ~internal
-          >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
+          >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
                      (updated_cached_script, updated_size) ) ->
-          Contract.update_script_storage
+          update_script_storage_and_ticket_balances
             ctxt
-            destination
+            ~self:destination
             storage
             lazy_storage_diff
-          >>=? fun ctxt ->
+            ticket_diffs
+            operations
+          >>=? fun (ticket_table_size_diff, ctxt) ->
           Fees.record_paid_storage_space
             ctxt
             destination
-            ~ticket_table_size_diff:Z.zero
+            ~ticket_table_size_diff
           >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
           Contract.originated_from_current_nonce
             ~since:before_operation
@@ -1120,12 +1129,32 @@ let apply_manager_operation_content :
         ctxt
         script.code
       >>?= fun (unparsed_code, ctxt) ->
-      Script_ir_translator.parse_script
-        ctxt
-        ~legacy:false
-        ~allow_forged_in_storage:internal
-        script
-      >>=? fun (Ex_script parsed_script, ctxt) ->
+      let parse_script ctxt =
+        Script_ir_translator.parse_script
+          ctxt
+          ~legacy:false
+          ~allow_forged_in_storage:internal
+          script
+      in
+      (* The preorigination field is only used to early return the address of an
+         originated contract in Michelson. It cannot come from the outside. *)
+      (match preorigination with
+      | Some contract -> (
+          assert internal ;
+          (* Try to look up the script from the cache. It may have been stored
+             there when traversing operations for ticket balance updates. *)
+          Script_cache.find ctxt contract
+          >>=? fun (ctxt, _cache_key, cached_script) ->
+          match cached_script with
+          | None ->
+              parse_script ctxt >|=? fun (ex_script, ctxt) ->
+              (ex_script, contract, ctxt)
+          | Some (_script, ex_script) -> return (ex_script, contract, ctxt))
+      | None ->
+          parse_script ctxt >>=? fun (ex_script, ctxt) ->
+          Contract.fresh_contract_from_current_nonce ctxt
+          >>?= fun (ctxt, contract) -> return (ex_script, contract, ctxt))
+      >>=? fun (Ex_script parsed_script, contract, ctxt) ->
       let views_result =
         Script_ir_translator.typecheck_views
           ctxt
@@ -1160,15 +1189,6 @@ let apply_manager_operation_content :
       >>=? fun (storage, ctxt) ->
       let storage = Script.lazy_expr (Micheline.strip_locations storage) in
       let script = {script with storage} in
-      (match preorigination with
-      | Some contract ->
-          assert internal ;
-          (* The preorigination field is only used to early return
-                 the address of an originated contract in Michelson.
-                 It cannot come from the outside. *)
-          ok (ctxt, contract)
-      | None -> Contract.fresh_contract_from_current_nonce ctxt)
-      >>?= fun (ctxt, contract) ->
       Contract.raw_originate
         ctxt
         ~prepaid_bootstrap_storage:false
@@ -2733,7 +2753,13 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
              ~cached_script:(Some script_ir)
              ~entrypoint:Entrypoint.default
              ~internal:false
-           >>=? fun ( {ctxt; storage; lazy_storage_diff; operations},
+           >>=? fun ( {
+                        ctxt;
+                        storage;
+                        lazy_storage_diff;
+                        operations;
+                        ticket_diffs;
+                      },
                       (updated_cached_script, updated_size) ) ->
            match operations with
            | _ :: _ ->
@@ -2741,16 +2767,18 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                return (backtracking_ctxt, [])
            | [] ->
                (* update CPMM storage *)
-               Contract.update_script_storage
+               update_script_storage_and_ticket_balances
                  ctxt
-                 liquidity_baking_cpmm_contract
+                 ~self:liquidity_baking_cpmm_contract
                  storage
                  lazy_storage_diff
-               >>=? fun ctxt ->
+                 ticket_diffs
+                 operations
+               >>=? fun (ticket_table_size_diff, ctxt) ->
                Fees.record_paid_storage_space
                  ctxt
                  liquidity_baking_cpmm_contract
-                 ~ticket_table_size_diff:Z.zero
+                 ~ticket_table_size_diff
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
                let consumed_gas =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt

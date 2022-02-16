@@ -1885,10 +1885,11 @@ module RPC = struct
           ~entrypoint
           ~parameter
           ~internal:true
-        >>=? fun ({ctxt; storage; lazy_storage_diff; operations}, _) ->
+        >>=? fun ( {ctxt; storage; lazy_storage_diff; operations; ticket_diffs},
+                   _ ) ->
         logger.get_log () >|=? fun trace ->
         let trace = Option.value ~default:[] trace in
-        ({ctxt; storage; lazy_storage_diff; operations}, trace)
+        ({ctxt; storage; lazy_storage_diff; operations; ticket_diffs}, trace)
     end
 
     let typecheck_data :
@@ -2248,10 +2249,11 @@ module RPC = struct
             ~parameter
             ~internal:true
           >|=? fun ( {
+                       ctxt = _;
                        Script_interpreter.storage;
                        operations;
                        lazy_storage_diff;
-                       _;
+                       ticket_diffs = _;
                      },
                      _ ) -> (storage, operations, lazy_storage_diff)) ;
       Registration.register0
@@ -2314,10 +2316,11 @@ module RPC = struct
             ~entrypoint
             ~parameter
           >|=? fun ( {
+                       ctxt = _;
                        Script_interpreter.storage;
                        operations;
                        lazy_storage_diff;
-                       _;
+                       ticket_diffs = _;
                      },
                      trace ) -> (storage, operations, trace, lazy_storage_diff)) ;
       Registration.register0
