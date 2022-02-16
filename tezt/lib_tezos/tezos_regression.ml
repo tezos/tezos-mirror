@@ -29,6 +29,8 @@ let hooks =
     let replacements =
       [
         ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
+        ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
+        ("tru1\\w{33}", "[TX_ROLLUP_HASH]");
         ("edpk\\w{50}", "[PUBLIC_KEY]");
         ("KT1\\w{33}", "[CONTRACT_HASH]");
         ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
