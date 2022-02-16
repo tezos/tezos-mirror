@@ -434,8 +434,10 @@ val update_grafana_dashboard : Grafana.dashboard -> unit
         "influxdb": {
             "url": "https://localhost:8086",
             "database": "db",
-            "username": "user",
-            "password": "password",
+            "credentials": {
+                "username": "user",
+                "password": "password"
+            },
             "measurement_prefix": "tezt_",
             "tags": { "commit_hash": "12345678" },
             "timeout": 20
@@ -478,8 +480,10 @@ v}
       (optional, data points are not sent nor queried if not specified);
       - [url] is the base URL of the InfuxDB API;
       - [database] is the name of the InfluxDB database;
-      - [username] is the username used to log in the InfluxDB database;
-      - [password] is the password used to log in the InfluxDB database;
+      - [credentials] contains the credentials needed to authenticate to the database.
+        (optional, can be omitted for test databases that don't need authentication);
+        - [username] is the username used to log in the InfluxDB database;
+        - [password] is the password used to log in the InfluxDB database;
       - [measurement_prefix] is a prefix which is prepended to all measurement names
         to prevent accidentally polluting other data of the database - it is
         automatically prepended both when sending data points and in SELECT queries;

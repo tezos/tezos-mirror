@@ -30,24 +30,32 @@ let with_buffer size f =
   f buffer ;
   Buffer.contents buffer
 
+type credentials = {username : string; password : string}
+
 type config =
   | V1_8 of {
       url : Uri.t;
       database : string;
-      username : string;
-      password : string;
+      credentials : credentials option;
       measurement_prefix : string;
       tags : (string * string) list;
       timeout : float;
     }
+
+let credentials_of_json json =
+  {
+    username = JSON.(json |-> "username" |> as_string);
+    password = JSON.(json |-> "password" |> as_string);
+  }
 
 let config_of_json json =
   V1_8
     {
       url = JSON.(json |-> "url" |> as_string |> Uri.of_string);
       database = JSON.(json |-> "database" |> as_string);
-      username = JSON.(json |-> "username" |> as_string);
-      password = JSON.(json |-> "password" |> as_string);
+      credentials =
+        JSON.(
+          json |-> "credentials" |> as_opt |> Option.map credentials_of_json);
       measurement_prefix =
         JSON.(
           json |-> "measurement_prefix" |> as_string_opt
@@ -107,7 +115,12 @@ let add_tag tag value data_point =
   check_nl ~in_:"tag value" value ;
   {data_point with tags = (tag, value) :: data_point.tags}
 
-let make_url (V1_8 {url; database; username; password; _}) path =
+let make_url (V1_8 {url; database; credentials; _}) path =
+  let creds_as_uri_params =
+    match credentials with
+    | Some {username; password} -> [("u", username); ("p", password)]
+    | None -> []
+  in
   let url =
     let path =
       let base_path = Uri.path url in
@@ -117,7 +130,7 @@ let make_url (V1_8 {url; database; username; password; _}) path =
     in
     Uri.with_path url path
   in
-  Uri.add_query_params' url [("db", database); ("u", username); ("p", password)]
+  Uri.add_query_params' url @@ ("db", database) :: creds_as_uri_params
 
 (* https://docs.influxdata.com/influxdb/v1.8/write_protocols/line_protocol_reference *)
 module Line_protocol = struct
