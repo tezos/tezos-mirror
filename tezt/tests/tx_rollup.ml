@@ -27,7 +27,7 @@
 
 (* Testing
    -------
-   Component:    Mempool
+   Component:    Transactional rollups
    Invocation:   dune exec tezt/tests/main.exe -- --file tx_rollup.ml
    Subject:      .
 *)
