@@ -8,6 +8,9 @@ from client.client import Client
 from tools import utils, constants
 from . import protocol
 
+# TODO: <https://gitlab.com/tezos/tezos/-/issues/2519>
+# When PROTO_A >= J (proto 013) then replace this constant by
+# CYCLES_PER_VOTING_PERIOD = 2
 BLOCKS_PER_VOTING_PERIOD = 8
 OFFSET = int(BLOCKS_PER_VOTING_PERIOD / 2)
 POLLING_TIME = 5
@@ -98,6 +101,9 @@ class TestVotingFull:
 
     def test_activate_proto_a(self, sandbox: Sandbox):
         parameters = protocol.get_parameters(protocol.Protocol.PREV)
+        # TODO: <https://gitlab.com/tezos/tezos/-/issues/2519>
+        # When PROTO_A >= J (proto 013) then replace this line with
+        # parameters["cycles_per_voting_period"] = CYCLES_PER_VOTING_PERIOD
         parameters["blocks_per_voting_period"] = BLOCKS_PER_VOTING_PERIOD
         utils.activate_protocol(
             sandbox.client(0),

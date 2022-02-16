@@ -17,7 +17,7 @@ def client(sandbox):
     proto_params = dict(protocol.PARAMETERS)
     parameters = copy.deepcopy(proto_params)
     parameters["blocks_per_cycle"] = 4
-    parameters["blocks_per_voting_period"] = 4
+    parameters["cycles_per_voting_period"] = 1
     parameters['consensus_threshold'] = 0
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     protocol.activate(sandbox.client(0), parameters, activate_in_the_past=True)
@@ -27,7 +27,7 @@ def client(sandbox):
 @pytest.mark.vote
 @pytest.mark.incremental
 class TestManualBaking:
-    """Test voting protocol with manual baking, 4 blocks per voting period."""
+    """Test voting protocol with manual baking, 1 cycle per voting period."""
 
     def test_current_period(self, client: Client):
         period_info = client.get_current_period()
