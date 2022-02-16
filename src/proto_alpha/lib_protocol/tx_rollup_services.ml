@@ -44,10 +44,16 @@ module S = struct
       ~output:Tx_rollup_inbox.encoding
       RPC_path.(custom_root /: Tx_rollup.rpc_arg / "inbox")
 
+  let commitment_query =
+    let open RPC_query in
+    query (fun offset -> offset)
+    |+ opt_field ~descr:"offset" "offset" RPC_arg.int (fun t -> t)
+    |> seal
+
   let commitments =
     RPC_service.get_service
       ~description:"."
-      ~query:RPC_query.empty
+      ~query:commitment_query
       ~output:Tx_rollup_commitments.encoding
       RPC_path.(custom_root /: Tx_rollup.rpc_arg / "commitments")
 end
@@ -58,9 +64,19 @@ let register () =
       Tx_rollup_state.find ctxt tx_rollup >|=? snd) ;
   opt_register1 ~chunked:false S.inbox (fun ctxt tx_rollup () () ->
       Tx_rollup_inbox.find ctxt tx_rollup ~level:`Current >|=? snd) ;
-  register1 ~chunked:false S.commitments (fun ctxt tx_rollup () () ->
-      let level = (Level.current ctxt).level in
-      Tx_rollup_commitments.get_commitments ctxt tx_rollup level >|=? snd)
+  register1 ~chunked:false S.commitments (fun ctxt tx_rollup offset () ->
+      let level =
+        match offset with
+        | None -> Level.current ctxt
+        | Some offset -> (
+            if Compare.Int.(offset < 0) then
+              failwith "offset should not be negative." ;
+            match Level.sub ctxt (Level.current ctxt) offset with
+            | None ->
+                failwith "the offset is not valid: The block level is negative."
+            | Some level -> level)
+      in
+      Tx_rollup_commitments.get_commitments ctxt tx_rollup level.level >|=? snd)
 
 let state ctxt block tx_rollup =
   RPC_context.make_call1 S.state ctxt block tx_rollup () ()
@@ -68,8 +84,8 @@ let state ctxt block tx_rollup =
 let inbox ctxt block tx_rollup =
   RPC_context.make_call1 S.inbox ctxt block tx_rollup () ()
 
-let commitments ctxt block tx_rollup =
-  RPC_context.make_call1 S.commitments ctxt block tx_rollup () ()
+let commitments ctxt block ?offset tx_rollup =
+  RPC_context.make_call1 S.commitments ctxt block tx_rollup offset ()
 
 let current_tezos_head () =
   RPC_service.get_service

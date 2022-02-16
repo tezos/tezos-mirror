@@ -46,6 +46,7 @@ val inbox :
 val commitments :
   'a #RPC_context.simple ->
   'a ->
+  ?offset:int ->
   Tx_rollup.t ->
   Tx_rollup_commitments.t shell_tzresult Lwt.t
 
