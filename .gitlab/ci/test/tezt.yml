@@ -43,6 +43,7 @@ tezt:static-binaries:
 tezt:build-long:
   extends:
     - .build_template
+    - .rules_template__development
   stage: test
   script:
     - dune build @tezt/long_tests/check
