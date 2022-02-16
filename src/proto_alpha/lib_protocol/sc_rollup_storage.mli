@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -359,3 +359,6 @@ val remove_staker :
   Sc_rollup_repr.t ->
   Sc_rollup_repr.Staker.t ->
   Raw_context.t tzresult Lwt.t
+
+(* [list context] returns a list of all rollups that have been originated. *)
+val list : Raw_context.t -> Sc_rollup_repr.t list tzresult Lwt.t

@@ -425,6 +425,11 @@ class TestRPCsExistence:
             f'context/nonces/{BLOCK_LEVEL}',
         )
 
+    def test_chain_block_context_sc_rollup(self, sandbox: Sandbox):
+        sandbox.client(1).rpc(
+            'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'context/sc_rollup'
+        )
+
     def test_chain_block_context_raw_bytes(self, sandbox: Sandbox):
         sandbox.client(1).rpc(
             'get', f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/' 'context/raw/bytes'

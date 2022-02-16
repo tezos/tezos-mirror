@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -902,6 +903,15 @@ module Tx_rollup : sig
 end
 
 module Sc_rollup : sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup *)
+  val list :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
   (** Call RPC /chain/[chain]/blocks/[block]/context/sc_rollup/[rollup_hash]/state *)
   val get_inbox :
     ?endpoint:Client.endpoint ->
