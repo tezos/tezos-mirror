@@ -47,10 +47,22 @@ val config_of_json : JSON.t -> config
     See Grafana documentation for other possible values. *)
 type yaxis = {format : string; label : string option}
 
+(** Represent a duration, used to express intervals for example. *)
+type duration =
+  | Seconds of int
+  | Minutes of int
+  | Hours of int
+  | Days of int
+  | Weeks of int
+  | Month of int
+  | Years of int
+
 (** Grafana graph panels.
 
     Queries should use [Grafana_time_filter] in their WHERE clause
     and [Grafana_interval] in a GROUP BY time clause to reduce the size of the query.
+    If an [interval] is specified, it will represent the minimum accepted by [Grafana_interval]
+    to draw the graph.
     The GROUP BY time clause should usually also contain a FILL clause to make
     continuous graphs instead of bunches of dots.
 
@@ -66,6 +78,7 @@ type graph = {
   title : string;
   description : string;
   queries : InfluxDB.select list;
+  interval : duration option;
   yaxis_1 : yaxis option;
   yaxis_2 : yaxis option;
 }
@@ -128,6 +141,7 @@ val simple_graph :
   ?description:string ->
   ?yaxis_format:string ->
   ?tags:(InfluxDB.tag * string) list ->
+  ?interval:duration ->
   InfluxDB.measurement ->
   InfluxDB.field ->
   panel

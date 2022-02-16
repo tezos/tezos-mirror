@@ -39,12 +39,33 @@ let config_of_json json =
       JSON.(json |-> "timeout" |> as_float_opt |> Option.value ~default:20.);
   }
 
+type duration =
+  | Seconds of int
+  | Minutes of int
+  | Hours of int
+  | Days of int
+  | Weeks of int
+  | Month of int
+  | Years of int
+
+let string_of_duration =
+  let f value unit = string_of_int value ^ unit in
+  function
+  | Seconds x -> f x "s"
+  | Minutes x -> f x "m"
+  | Hours x -> f x "h"
+  | Days x -> f x "d"
+  | Weeks x -> f x "w"
+  | Month x -> f x "M"
+  | Years x -> f x "y"
+
 type yaxis = {format : string; label : string option}
 
 type graph = {
   title : string;
   description : string;
   queries : InfluxDB.select list;
+  interval : duration option;
   yaxis_1 : yaxis option;
   yaxis_2 : yaxis option;
 }
@@ -99,49 +120,56 @@ let encode_panel config y panel : JSON.u =
                      value) );
               ] );
         ]
-  | Graph {title; description; queries; yaxis_1; yaxis_2} ->
+  | Graph {title; description; queries; interval; yaxis_1; yaxis_2} ->
+      let interval =
+        Option.map
+          (fun i -> ("interval", `String (string_of_duration i)))
+          interval
+        |> Option.to_list
+      in
       `O
-        [
-          ("type", `String "timeseries");
-          ("datasource", `String config.data_source);
-          ("title", `String title);
-          ("description", `String description);
-          ( "gridPos",
-            `O
-              [
-                ("h", `Float 8.);
-                ("w", `Float 24.);
-                ("x", `Float 0.);
-                ( "y",
-                  `Float
-                    (let value = float !y in
-                     y := !y + 8 ;
-                     value) );
-              ] );
-          ("targets", `A (List.map encode_target queries));
-          ("yaxes", `A [encode_yaxis yaxis_1; encode_yaxis yaxis_2]);
-          ( "fieldConfig",
-            `O
-              [
-                ( "defaults",
-                  `O
-                    [
-                      ( "custom",
-                        `O
-                          [
-                            ("drawStyle", `String "line");
-                            ("lineInterpolation", `String "linear");
-                            ("showPoints", `String "always");
-                            ("pointSize", `Float 5.);
-                            ("spanNulls", `Bool true);
-                            ("lineWidth", `Float 1.);
-                            ("fillOpacity", `Float 10.);
-                            ("axisSoftMin", `Float 0.);
-                          ] );
-                      ("unit", `String "s");
-                    ] );
-              ] );
-        ]
+        (interval
+        @ [
+            ("type", `String "timeseries");
+            ("datasource", `String config.data_source);
+            ("title", `String title);
+            ("description", `String description);
+            ( "gridPos",
+              `O
+                [
+                  ("h", `Float 8.);
+                  ("w", `Float 24.);
+                  ("x", `Float 0.);
+                  ( "y",
+                    `Float
+                      (let value = float !y in
+                       y := !y + 8 ;
+                       value) );
+                ] );
+            ("targets", `A (List.map encode_target queries));
+            ("yaxes", `A [encode_yaxis yaxis_1; encode_yaxis yaxis_2]);
+            ( "fieldConfig",
+              `O
+                [
+                  ( "defaults",
+                    `O
+                      [
+                        ( "custom",
+                          `O
+                            [
+                              ("drawStyle", `String "line");
+                              ("lineInterpolation", `String "linear");
+                              ("showPoints", `String "always");
+                              ("pointSize", `Float 5.);
+                              ("spanNulls", `Bool true);
+                              ("lineWidth", `Float 1.);
+                              ("fillOpacity", `Float 10.);
+                              ("axisSoftMin", `Float 0.);
+                            ] );
+                        ("unit", `String "s");
+                      ] );
+                ] );
+          ])
 
 let encode_dashboard config {uid; title; description; panels} : JSON.u =
   `O
@@ -276,13 +304,14 @@ let simple_query ?(tags = []) measurement field =
     ~group_by:(Time {interval = Grafana_interval; tag = None; fill = None})
 
 let simple_graph ?title ?(description = "") ?(yaxis_format = "s") ?tags
-    measurement field =
+    ?interval measurement field =
   let title = Option.value title ~default:measurement in
   Graph
     {
       title;
       description;
       queries = [simple_query ?tags measurement field];
+      interval;
       yaxis_1 = Some {format = yaxis_format; label = Some field};
       yaxis_2 = None;
     }
