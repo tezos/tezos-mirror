@@ -153,7 +153,7 @@ let gen_l2_account () =
     Bytes.init 32 (fun _ -> char_of_int @@ Random.State.int rng_state 255)
   in
   let secret_key = Bls12_381.Signature.generate_sk seed in
-  let public_key = Bls12_381.Signature.derive_pk secret_key in
+  let public_key = Bls12_381.Signature.MinPk.derive_pk secret_key in
   (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
 
 let is_implicit_exn x =

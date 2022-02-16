@@ -524,7 +524,7 @@ end)
       let secret_key = Bls12_381.Signature.generate_sk seed in
       Tx_rollup_l2_address.Indexable.value
         (Tx_rollup_l2_address.of_bls_pk
-        @@ Bls12_381.Signature.derive_pk secret_key)
+        @@ Bls12_381.Signature.MinPk.derive_pk secret_key)
 
     let chain_id rng_state =
       let string = Base_samplers.uniform_string ~nbytes:4 rng_state in

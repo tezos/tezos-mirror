@@ -91,7 +91,7 @@ module type V4 = sig
        and type Timelock.chest_key = Timelock.chest_key
        and type Timelock.opening_result = Timelock.opening_result
        and module Sapling = Tezos_sapling.Core.Validator
-       and type Bls_signature.pk = Bls12_381.Signature.pk
+       and type Bls_signature.pk = Bls12_381.Signature.MinPk.pk
 
   type error += Ecoproto_error of Error_monad.error
 
@@ -284,23 +284,31 @@ struct
   end
 
   module Bls_signature = struct
-    open Bls12_381.Signature
+    type pk = Bls12_381.Signature.MinPk.pk
 
-    type pk = Bls12_381.Signature.pk
+    let unsafe_pk_of_bytes = Bls12_381.Signature.MinPk.unsafe_pk_of_bytes
 
-    let unsafe_pk_of_bytes = unsafe_pk_of_bytes
+    let pk_of_bytes_opt = Bls12_381.Signature.MinPk.pk_of_bytes_opt
 
-    let pk_of_bytes_opt = pk_of_bytes_opt
+    let pk_to_bytes = Bls12_381.Signature.MinPk.pk_to_bytes
 
-    let pk_to_bytes = pk_to_bytes
+    type signature = Bytes.t
 
-    type signature = Bls12_381.Signature.signature
+    let verify pk bytes signature =
+      Bls12_381.Signature.MinPk.Aug.verify
+        pk
+        bytes
+        (Bls12_381.Signature.MinPk.unsafe_signature_of_bytes signature)
 
-    let verify = Aug.verify
+    let aggregate_verify data signature =
+      Bls12_381.Signature.MinPk.Aug.aggregate_verify
+        data
+        (Bls12_381.Signature.MinPk.unsafe_signature_of_bytes signature)
 
-    let aggregate_verify = Aug.aggregate_verify
-
-    let aggregate_signature_opt = aggregate_signature_opt
+    let aggregate_signature_opt sigs =
+      Option.map Bls12_381.Signature.MinPk.signature_to_bytes
+      @@ Bls12_381.Signature.MinPk.aggregate_signature_opt
+           (List.map Bls12_381.Signature.MinPk.unsafe_signature_of_bytes sigs)
   end
 
   module Ed25519 = Ed25519

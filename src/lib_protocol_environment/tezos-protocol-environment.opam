@@ -11,7 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "bls12-381" { >= "1.1.0" & < "1.2.0" }
+  "bls12-381" { >= "2.0.0" & < "2.1.0" }
   "ringo" { = "0.7" }
   "ringo-lwt" { = "0.7" }
   "tezos-base"
