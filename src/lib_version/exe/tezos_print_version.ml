@@ -1,4 +1,5 @@
 (*****************************************************************************)
+(*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
@@ -22,15 +23,27 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let rpc_directory net =
-  let dir = RPC_directory.empty in
-  let version = Current_git_info.version in
-  let network_version = P2p.announced_version net in
-  let commit_hash = Current_git_info.commit_hash in
-  let commit_date = Current_git_info.committer_date in
-  let commit_info =
-    Some ({commit_hash; commit_date} : Node_version.commit_info)
-  in
-  RPC_directory.gen_register dir Version_services.S.version (fun () () () ->
-      RPC_answer.return
-      @@ ({version; network_version; commit_info} : Node_version.t))
+(* this is a script run at build time to print out the current version of the
+   node *)
+
+open Version
+open Current_git_info
+
+let help_string =
+  "This script prints out the current version of the\n\
+   node as it is deduced from the git tag of the current branch.\n\
+   print_version [--major|--minor|--additional-info|--full]"
+
+let () =
+  match Sys.argv with
+  | [|_; "--major"|] -> print_endline (string_of_int version.major)
+  | [|_; "--minor"|] -> print_endline (string_of_int version.minor)
+  | [|_; "--additional-info"|] ->
+      print_endline (string_of_additional_info version.additional_info)
+  | [|_; "--full"|] | [|_|] -> print_endline (Version.to_string version)
+  | [|_; "--help"|] -> print_endline help_string
+  | _ ->
+      print_endline help_string ;
+      prerr_endline
+        ("invalid argument: " ^ String.concat " " (Array.to_list Sys.argv)) ;
+      exit 1

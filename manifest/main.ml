@@ -88,6 +88,8 @@ let digestif = external_lib ~js_compatible:true "digestif" V.(at_least "0.7.3")
 
 let digestif_c = external_sublib digestif "digestif.c"
 
+let dune_configurator = external_lib "dune-configurator" V.True
+
 let dynlink = external_lib "dynlink" V.True ~opam:""
 
 let ezjsonm = external_lib ~js_compatible:true "ezjsonm" V.(at_least "1.1.0")
@@ -180,6 +182,10 @@ let ppx_blob = external_lib "ppx_blob" V.True
 let ppx_inline_test = external_lib "ppx_inline_test" V.True
 
 let ptime = external_lib ~js_compatible:true "ptime" V.(at_least "0.8.4")
+
+let ppx_deriving = external_lib "ppx_deriving" V.True
+
+let ppx_deriving_show = external_sublib ppx_deriving "ppx_deriving.show"
 
 let ptime_clock_os = external_sublib ptime "ptime.clock.os"
 
@@ -901,12 +907,21 @@ let tezos_base_test_helpers =
     ~linkall:true
     ~bisect_ppx:false
 
+let tezos_version_parser =
+  public_lib
+    "tezos-version.parser"
+    ~path:"src/lib_version/parser"
+    ~opam:"src/lib_version/tezos-version"
+    ~dune:Dune.[ocamllex "tezos_version_parser"]
+    ~preprocess:[pps ppx_deriving_show]
+
 let tezos_version =
   public_lib
     "tezos-version"
     ~path:"src/lib_version"
+    ~opam:"src/lib_version/tezos-version"
     ~synopsis:"Tezos: version information generated from Git"
-    ~deps:[tezos_base |> open_ ~m:"TzPervasives"]
+    ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_version_parser]
     ~dune:
       Dune.
         [
@@ -914,17 +929,37 @@ let tezos_version =
           [
             S "rule";
             [S "targets"; S "generated_git_info.ml"];
-            [S "deps"; [S "universe"]; [S ":script"; S "get-git-info.mlt"]];
-            [
-              S "action";
-              [
-                S "with-stdout-to";
-                S "%{targets}";
-                [S "run"; S "%{ocaml}"; S "unix.cma"; S "%{script}"];
-              ];
-            ];
+            [S "deps"; [S "universe"]];
+            [S "action"; [S "run"; S "./exe/get_git_info.exe"]];
           ];
         ]
+
+let _tezos_version_get_git_info =
+  private_exe
+    "get_git_info"
+    ~path:"src/lib_version/exe"
+    ~opam:"src/lib_version/tezos-version"
+    ~deps:[dune_configurator; tezos_version_parser]
+    ~modules:["get_git_info"]
+    ~bisect_ppx:false
+
+let _tezos_print_version_exe =
+  public_exe
+    "tezos-version"
+    ~internal_name:"tezos_print_version"
+    ~path:"src/lib_version/exe"
+    ~opam:"src/lib_version/tezos-version"
+    ~deps:[tezos_version |> open_; tezos_base_unix]
+    ~modules:["tezos_print_version"]
+    ~bisect_ppx:false
+
+let _tezos_version_tests =
+  test
+    "test_parser"
+    ~path:"src/lib_version/test"
+    ~opam:"src/lib_version/tezos-version"
+    ~deps:
+      [tezos_version |> open_; tezos_version_parser; tezos_base_unix; alcotest]
 
 let tezos_p2p_services =
   public_lib

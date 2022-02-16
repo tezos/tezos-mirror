@@ -9,7 +9,10 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
+  "ppx_deriving"
   "tezos-base"
+  "dune-configurator"
+  "alcotest" { with-test & >= "1.5.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

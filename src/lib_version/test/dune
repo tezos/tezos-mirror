@@ -1,0 +1,12 @@
+; This file was automatically generated, do not edit.
+; Edit file manifest/main.ml instead.
+
+(test
+ (name test_parser)
+ (package tezos-version)
+ (libraries
+  tezos-version
+  tezos-version.parser
+  tezos-base.unix
+  alcotest)
+ (flags (:standard -open Tezos_version)))

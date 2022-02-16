@@ -6,10 +6,11 @@
  (public_name tezos-version)
  (instrumentation (backend bisect_ppx))
  (libraries
-  tezos-base)
+  tezos-base
+  tezos-version.parser)
  (flags (:standard -open Tezos_base.TzPervasives)))
 
 (rule
  (targets generated_git_info.ml)
- (deps (universe) (:script get-git-info.mlt))
- (action (with-stdout-to %{targets} (run %{ocaml} unix.cma %{script}))))
+ (deps (universe))
+ (action (run ./exe/get_git_info.exe)))

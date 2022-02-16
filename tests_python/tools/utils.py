@@ -741,3 +741,13 @@ def check_static_binary(execname: str):
     # tezos-node: ELF 64-bit LSB executable, x86-64, version 1 (SYSV),
     # statically linked, no section header
     return "statically linked" in str(ret.communicate()[0])
+
+
+def get_tezos_node_version() -> str:
+    cmd = ["dune", "exec", "tezos-version"]
+    process_ret = subprocess.run(
+        cmd, capture_output=True, text=True, check=True
+    )
+    version = process_ret.stdout.strip()
+    assert version, "version should not be empty"
+    return version

@@ -9,3 +9,4 @@ devtools	export-ignore
 docs/active export-ignore
 
 src/lib_version/current_git_info.ml	export-subst
+src/lib_version/exe/get_git_info.ml export-subst
