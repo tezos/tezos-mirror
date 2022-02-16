@@ -74,14 +74,14 @@ let message_hash_testable : Tx_rollup_message.hash Alcotest.testable =
 
 let wrap m = m >|= Environment.wrap_tzresult
 
-(** [inbox_fees state size] computes the fees (per byte of message)
+(** [inbox_burn state size] computes the burn (per byte of message)
     one has to pay to submit a message to the current inbox. *)
-let inbox_fees state size =
-  Environment.wrap_tzresult (Tx_rollup_state.fees state size)
+let inbox_burn state size =
+  Environment.wrap_tzresult (Tx_rollup_state.burn ~limit:None state size)
 
-(** [fees_per_byte state] returns the cost to insert one byte inside
+(** [burn_per_byte state] returns the cost to insert one byte inside
     the inbox. *)
-let fees_per_byte state = inbox_fees state 1
+let burn_per_byte state = inbox_burn state 1
 
 (** [check_batch_in_inbox inbox n expected] checks that the [n]th
     element of [inbox] is a batch equal to [expected]. *)
@@ -233,37 +233,37 @@ let test_two_originations () =
   check_tx_rollup_exists (I i) txo1 >>=? fun () ->
   check_tx_rollup_exists (I i) txo2 >>=? fun () -> return_unit
 
-(** [test_fees_per_byte_update] checks [update_fees_per_byte] behaves
+(** [test_burn_per_byte_update] checks [update_burn_per_byte] behaves
     according to its docstring. *)
-let test_fees_per_byte_update () =
-  let test ~inbox_ema ~fees_per_byte ~final_size ~hard_limit ~result =
-    let fees_per_byte = Tez.of_mutez_exn fees_per_byte in
+let test_burn_per_byte_update () =
+  let test ~inbox_ema ~burn_per_byte ~final_size ~hard_limit ~result =
+    let burn_per_byte = Tez.of_mutez_exn burn_per_byte in
     let result = Tez.of_mutez_exn result in
     let state =
       Alpha_context.Tx_rollup_state.Internal_for_tests.make
-        ~fees_per_byte
+        ~burn_per_byte
         ~inbox_ema
         ~last_inbox_level:None
     in
     let state =
-      Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
+      Alpha_context.Tx_rollup_state.Internal_for_tests.update_burn_per_byte
         state
         ~final_size
         ~hard_limit
     in
-    let new_fees =
-      match Alpha_context.Tx_rollup_state.fees state 1 with
+    let new_burn =
+      match Alpha_context.Tx_rollup_state.burn ~limit:None state 1 with
       | Ok x -> x
       | Error _ ->
           Stdlib.failwith "could not compute the fees for a message of 1 byte"
     in
-    Assert.equal_tez ~loc:__LOC__ result new_fees
+    Assert.equal_tez ~loc:__LOC__ result new_burn
   in
 
   (* Fees per byte should remain constant *)
   test
     ~inbox_ema:1_000
-    ~fees_per_byte:1_000L
+    ~burn_per_byte:1_000L
     ~final_size:1_000
     ~hard_limit:1_100
     ~result:1_000L
@@ -271,7 +271,7 @@ let test_fees_per_byte_update () =
   (* Fees per byte should increase *)
   test
     ~inbox_ema:1_000
-    ~fees_per_byte:1_000L
+    ~burn_per_byte:1_000L
     ~final_size:1_000
     ~hard_limit:1_000
     ~result:1_050L
@@ -279,7 +279,7 @@ let test_fees_per_byte_update () =
   (* Fees per byte should decrease *)
   test
     ~inbox_ema:1_000
-    ~fees_per_byte:1_000L
+    ~burn_per_byte:1_000L
     ~final_size:1_000
     ~hard_limit:1_500
     ~result:950L
@@ -287,7 +287,7 @@ let test_fees_per_byte_update () =
   (* Fees per byte should increase even with [0] as its initial value *)
   test
     ~inbox_ema:1_000
-    ~fees_per_byte:0L
+    ~burn_per_byte:0L
     ~final_size:1_000
     ~hard_limit:1_000
     ~result:1L
@@ -304,8 +304,30 @@ let test_add_batch () =
   let length = List.length contents in
   Alcotest.(check int "Expect an inbox with a single item" 1 length) ;
   Alcotest.(check int "Expect cumulated size" contents_size cumulated_size) ;
-  inbox_fees state contents_size >>?= fun cost ->
+  inbox_burn state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
+
+let test_add_batch_with_limit () =
+  (* From an empty context the burn will be [Tez.zero], we set the hard limit to
+     [Tez.zero], so [cost] >= [limit] *)
+  let burn_limit = Tez.zero in
+  let contents = String.make 5 'd' in
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_submit_batch (I i) contract tx_rollup contents ~burn_limit
+  >>=? fun op ->
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error (function
+          | Tx_rollup_state_repr.Tx_rollup_submit_batch_burn_excedeed _ -> true
+          | _ -> false))
+  >>=? fun _ -> return_unit
 
 (** [test_add_two_batches] originates a tx rollup and adds two
     arbitrary batches to one of its inboxes. Ensure that their order
@@ -347,7 +369,7 @@ let test_add_two_batches () =
   Alcotest.(check int "Expect an inbox with two items" 2 (List.length contents)) ;
   check_batch_in_inbox inbox 0 contents1 >>=? fun () ->
   check_batch_in_inbox inbox 1 contents2 >>=? fun () ->
-  inbox_fees state expected_cumulated_size >>?= fun cost ->
+  inbox_burn state expected_cumulated_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
 (** Try to add a batch too large in an inbox. *)
@@ -440,9 +462,9 @@ let test_finalization () =
   originate b contract >>=? fun (b, tx_rollup) ->
   Context.get_constants (B b)
   >>=? fun {parametric = {tx_rollup_hard_size_limit_per_inbox; _}; _} ->
-  (* Get the initial fees_per_byte. *)
+  (* Get the initial burn_per_byte. *)
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
-  fees_per_byte state >>?= fun cost ->
+  burn_per_byte state >>?= fun cost ->
   Assert.equal_tez ~loc:__LOC__ Tez.zero cost >>=? fun () ->
   (* Fill the inbox. *)
   Context.get_constants (B b) >>=? fun constant ->
@@ -467,26 +489,26 @@ let test_finalization () =
   ( increase_ema 1 b tx_rollup @@ fun b tx_rollup ->
     fill_inbox b tx_rollup filler contents (fun i size _ -> return (size, i)) )
   >>=? fun (b, n, inbox_size) ->
-  let rec update_fees_per_byte_n_time n state =
+  let rec update_burn_per_byte_n_time n state =
     if n > 0 then
       let state =
-        Alpha_context.Tx_rollup_state.Internal_for_tests.update_fees_per_byte
+        Alpha_context.Tx_rollup_state.Internal_for_tests.update_burn_per_byte
           state
           ~final_size:inbox_size
           ~hard_limit:tx_rollup_hard_size_limit_per_inbox
       in
-      update_fees_per_byte_n_time (n - 1) state
+      update_burn_per_byte_n_time (n - 1) state
     else state
   in
   (* Check the fees we are getting after finalization are (1) strictly
      positive, and (2) the one we can predict with
-     [update_fees_per_byte]. *)
-  let expected_state = update_fees_per_byte_n_time n state in
-  fees_per_byte expected_state >>?= fun expected_fees_per_byte ->
+     [update_burn_per_byte]. *)
+  let expected_state = update_burn_per_byte_n_time n state in
+  burn_per_byte expected_state >>?= fun expected_burn_per_byte ->
   Context.Tx_rollup.state (B b) tx_rollup >>=? fun state ->
-  fees_per_byte state >>?= fun fees_per_byte ->
-  assert (Tez.(zero < fees_per_byte)) ;
-  Assert.equal_tez ~loc:__LOC__ expected_fees_per_byte fees_per_byte
+  burn_per_byte state >>?= fun burn_per_byte ->
+  assert (Tez.(zero < burn_per_byte)) ;
+  Assert.equal_tez ~loc:__LOC__ expected_burn_per_byte burn_per_byte
   >>=? fun () ->
   (* Insert a small batch in a new block *)
   let contents_size = 5 in
@@ -497,7 +519,7 @@ let test_finalization () =
   >>=? fun op ->
   Block.bake b ~operation:op >>=? fun b ->
   (* Predict the cost we had to pay. *)
-  inbox_fees state contents_size >>?= fun cost ->
+  inbox_burn state contents_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
 let test_inbox_linked_list () =
@@ -783,12 +805,16 @@ let tests =
       `Quick
       test_two_originations;
     Tztest.tztest
-      "check the function that updates the fees per byte rate of a transaction \
+      "check the function that updates the burn per byte rate of a transaction \
        rollup"
       `Quick
-      test_fees_per_byte_update;
+      test_burn_per_byte_update;
     Tztest.tztest "add one batch to a rollup" `Quick test_add_batch;
     Tztest.tztest "add two batches to a rollup" `Quick test_add_two_batches;
+    Tztest.tztest
+      "add one batch and limit the burn"
+      `Quick
+      test_add_batch_with_limit;
     Tztest.tztest
       "Try to add a batch larger than the limit"
       `Quick

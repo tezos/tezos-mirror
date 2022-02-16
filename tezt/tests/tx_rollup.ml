@@ -38,7 +38,7 @@
     regression framework. *)
 let hooks = Tezos_regression.hooks
 
-type state = {fees_per_byte : int}
+type state = {burn_per_byte : int}
 
 type inbox = {cumulated_size : int; contents : string list}
 
@@ -60,8 +60,8 @@ let get_state ?hooks tx_rollup client =
   (* The state is currently empty, but the RPC can fail if [tx_rollup]
      does not exist. *)
   let* json = RPC.Tx_rollup.get_state ?hooks ~tx_rollup client in
-  let fees_per_byte = JSON.(json |-> "fees_per_byte" |> as_int) in
-  return {fees_per_byte}
+  let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
+  return {burn_per_byte}
 
 let get_inbox ?hooks tx_rollup client =
   let* json = RPC.Tx_rollup.get_inbox ?hooks ~tx_rollup client in

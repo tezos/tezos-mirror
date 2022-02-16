@@ -25,55 +25,61 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** The state of a transaction rollup is composed of [fees_per_byte]
+type error +=
+  | Tx_rollup_submit_batch_burn_excedeed of {
+      burn : Tez_repr.t;
+      limit : Tez_repr.t;
+    }
+
+(** The state of a transaction rollup is composed of [burn_per_byte]
     and [inbox_ema] fields. [initial_state] introduces their initial
-    values. Both values are updated by [update_fees_per_byte] as the
+    values. Both values are updated by [update_burn_per_byte] as the
     rollup progresses.
 
-    [fees_per_byte] state the cost of fees per byte to be paid for
+    [burn_per_byte] state the cost of burn per byte to be paid for
     each byte submitted to a transaction rollup inbox. [inbox_ema]
-    is a key factor to impact the update of [fees_per_byte].
+    is a key factor to impact the update of [burn_per_byte].
 
     [inbox_ema] is the N-block EMA to react to recent N-inbox size
     changes. N-block EMA is an exponential moving average (EMA), that
     is a type of moving average that places a greater weight and
     significance on the most N data points. The purpose of [inbox_ema]
-    is to get lessened volatility of fees, that is more resistant to
-    spurious spikes of [fees_per_byte].
+    is to get lessened volatility of burn, that is more resistant to
+    spurious spikes of [burn_per_byte].
 *)
 type t = {
-  fees_per_byte : Tez_repr.t;
+  burn_per_byte : Tez_repr.t;
   inbox_ema : int;
   last_inbox_level : Raw_level_repr.t option;
 }
 
 let initial_state =
-  {fees_per_byte = Tez_repr.zero; inbox_ema = 0; last_inbox_level = None}
+  {burn_per_byte = Tez_repr.zero; inbox_ema = 0; last_inbox_level = None}
 
 let encoding : t Data_encoding.t =
   let open Data_encoding in
   conv
-    (fun {last_inbox_level; fees_per_byte; inbox_ema} ->
-      (last_inbox_level, fees_per_byte, inbox_ema))
-    (fun (last_inbox_level, fees_per_byte, inbox_ema) ->
-      {last_inbox_level; fees_per_byte; inbox_ema})
+    (fun {last_inbox_level; burn_per_byte; inbox_ema} ->
+      (last_inbox_level, burn_per_byte, inbox_ema))
+    (fun (last_inbox_level, burn_per_byte, inbox_ema) ->
+      {last_inbox_level; burn_per_byte; inbox_ema})
     (obj3
        (req "last_inbox_level" (option Raw_level_repr.encoding))
-       (req "fees_per_byte" Tez_repr.encoding)
+       (req "burn_per_byte" Tez_repr.encoding)
        (req "inbox_ema" int31))
 
-let pp fmt {fees_per_byte; last_inbox_level; inbox_ema} =
+let pp fmt {burn_per_byte; last_inbox_level; inbox_ema} =
   Format.fprintf
     fmt
-    "Tx_rollup: fees_per_byte = %a; inbox_ema %d; last_inbox_level = %a"
+    "Tx_rollup: burn_per_byte = %a; inbox_ema %d; last_inbox_level = %a"
     Tez_repr.pp
-    fees_per_byte
+    burn_per_byte
     inbox_ema
     (Format.pp_print_option Raw_level_repr.pp)
     last_inbox_level
 
-let update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t =
- fun ({fees_per_byte; inbox_ema; _} as state) ~final_size ~hard_limit ->
+let update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t =
+ fun ({burn_per_byte; inbox_ema; _} as state) ~final_size ~hard_limit ->
   let threshold_increase = 90 in
   let threshold_decrease = 80 in
   let variation_factor = 5L in
@@ -98,43 +104,76 @@ let update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t =
     let open Compare.Int in
     if threshold_decrease < percentage && percentage <= threshold_increase then
       (* constant case *)
-      ok fees_per_byte
+      ok burn_per_byte
     else
-      Tez_repr.(fees_per_byte *? variation_factor >>? fun x -> x /? 100L)
+      Tez_repr.(burn_per_byte *? variation_factor >>? fun x -> x /? 100L)
       >>? fun variation ->
       let variation =
         if Tez_repr.(variation = zero) then Tez_repr.one_mutez else variation
       in
       (* increase case *)
       if threshold_increase < percentage then
-        Tez_repr.(fees_per_byte +? variation)
-      else if percentage < threshold_decrease && Tez_repr.(zero < fees_per_byte)
+        Tez_repr.(burn_per_byte +? variation)
+      else if percentage < threshold_decrease && Tez_repr.(zero < burn_per_byte)
       then
-        (* decrease case, and strictly positive fees *)
-        Tez_repr.(fees_per_byte -? variation)
-      else (* decrease case, and fees equals zero *)
-        ok fees_per_byte
+        (* decrease case, and strictly positive burn *)
+        Tez_repr.(burn_per_byte -? variation)
+      else (* decrease case, and burn equals zero *)
+        ok burn_per_byte
   in
   match computation with
-  | Ok fees_per_byte -> {state with fees_per_byte; inbox_ema}
-  (* In the (very unlikely) event of an overflow, we force the fees to
+  | Ok burn_per_byte -> {state with burn_per_byte; inbox_ema}
+  (* In the (very unlikely) event of an overflow, we force the burn to
      be the maximum amount. *)
-  | Error _ -> {state with fees_per_byte = Tez_repr.max_mutez; inbox_ema}
+  | Error _ -> {state with burn_per_byte = Tez_repr.max_mutez; inbox_ema}
 
-let fees {fees_per_byte; _} size = Tez_repr.(fees_per_byte *? Int64.of_int size)
+let burn {burn_per_byte; _} size = Tez_repr.(burn_per_byte *? Int64.of_int size)
 
 let last_inbox_level {last_inbox_level; _} = last_inbox_level
 
 let append_inbox t level = {t with last_inbox_level = Some level}
 
+let burn ~limit state size =
+  burn state size >>? fun burn ->
+  match limit with
+  | Some limit when Tez_repr.(limit >= burn) ->
+      error (Tx_rollup_submit_batch_burn_excedeed {burn; limit})
+  | _ -> ok burn
+
+(* ------ Error registration ------------------------------------------------ *)
+
+let () =
+  (* Tx_rollup_submit_batch_burn_excedeed *)
+  register_error_kind
+    `Permanent
+    ~id:"operation.tx_rollup_submit_batch_burn_excedeed"
+    ~title:"Submit batch excedeed burn limit"
+    ~description:
+      "The submit batch would exceed the burn limit, we withdraw the submit."
+    ~pp:(fun ppf (burn, limit) ->
+      Format.fprintf
+        ppf
+        "Cannot submit the batch of L2 operations as the cost (%a) would \
+         exceed the burn limit (%a)"
+        Tez_repr.pp
+        burn
+        Tez_repr.pp
+        limit)
+    Data_encoding.(
+      obj2 (req "burn" Tez_repr.encoding) (req "limit" Tez_repr.encoding))
+    (function
+      | Tx_rollup_submit_batch_burn_excedeed {burn; limit} -> Some (burn, limit)
+      | _ -> None)
+    (fun (burn, limit) -> Tx_rollup_submit_batch_burn_excedeed {burn; limit})
+
 module Internal_for_tests = struct
   let make :
-      fees_per_byte:Tez_repr.t ->
+      burn_per_byte:Tez_repr.t ->
       inbox_ema:int ->
       last_inbox_level:Raw_level_repr.t option ->
       t =
-   fun ~fees_per_byte ~inbox_ema ~last_inbox_level ->
-    {fees_per_byte; inbox_ema; last_inbox_level}
+   fun ~burn_per_byte ~inbox_ema ~last_inbox_level ->
+    {burn_per_byte; inbox_ema; last_inbox_level}
 
   let get_inbox_ema : t -> int = fun {inbox_ema; _} -> inbox_ema
 end

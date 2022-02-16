@@ -253,6 +253,7 @@ and _ manager_operation =
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
       content : string;
+      burn_limit : Tez_repr.t option;
     }
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {

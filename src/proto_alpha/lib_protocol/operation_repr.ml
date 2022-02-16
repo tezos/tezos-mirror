@@ -274,6 +274,7 @@ and _ manager_operation =
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
       content : string;
+      burn_limit : Tez_repr.t option;
     }
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
@@ -540,18 +541,20 @@ module Encoding = struct
           tag = tx_rollup_operation_submit_batch_tag;
           name = "tx_rollup_submit_batch";
           encoding =
-            obj2
+            obj3
               (req "rollup" Tx_rollup_repr.encoding)
-              (req "content" Data_encoding.string);
+              (req "content" Data_encoding.string)
+              (opt "burn_limit" Tez_repr.encoding);
           select =
             (function
             | Manager (Tx_rollup_submit_batch _ as op) -> Some op | _ -> None);
           proj =
             (function
-            | Tx_rollup_submit_batch {tx_rollup; content} -> (tx_rollup, content));
+            | Tx_rollup_submit_batch {tx_rollup; content; burn_limit} ->
+                (tx_rollup, content, burn_limit));
           inj =
-            (fun (tx_rollup, content) ->
-              Tx_rollup_submit_batch {tx_rollup; content});
+            (fun (tx_rollup, content, burn_limit) ->
+              Tx_rollup_submit_batch {tx_rollup; content; burn_limit});
         }
 
     let[@coq_axiom_with_reason "gadt"] tx_rollup_commit_case =

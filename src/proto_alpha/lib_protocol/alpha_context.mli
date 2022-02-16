@@ -1990,7 +1990,7 @@ module Tx_rollup_state : sig
 
   val update : context -> Tx_rollup.t -> t -> context tzresult Lwt.t
 
-  val fees : t -> int -> Tez.t tzresult
+  val burn : limit:Tez.t option -> t -> int -> Tez.t tzresult
 
   val last_inbox_level : t -> Raw_level.t option
 
@@ -2000,12 +2000,12 @@ module Tx_rollup_state : sig
 
   module Internal_for_tests : sig
     val make :
-      fees_per_byte:Tez.t ->
+      burn_per_byte:Tez.t ->
       inbox_ema:int ->
       last_inbox_level:Raw_level.t option ->
       t
 
-    val update_fees_per_byte : t -> final_size:int -> hard_limit:int -> t
+    val update_burn_per_byte : t -> final_size:int -> hard_limit:int -> t
 
     val get_inbox_ema : t -> int
   end
@@ -2342,6 +2342,7 @@ and _ manager_operation =
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup.t;
       content : string;
+      burn_limit : Tez.tez option;
     }
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
