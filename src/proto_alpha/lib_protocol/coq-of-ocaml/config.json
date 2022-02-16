@@ -30,7 +30,10 @@
     "Tezos_raw_protocol_alpha.Raw_context_intf.T",
     "No type known for the following variants:",
     "Constructor of the variant",
-    "Polymorphic variant types are defined as standard algebraic types"
+    "Polymorphic variant types are defined as standard algebraic types",
+    "Mutual type definitions in signatures not handled.",
+    "Did not find a module signature name for the following shape:\n[ max_int; min_int ]",
+    "Unreachable expressions are not supported"
   ],
   "escape_value": [
     "a",
