@@ -67,6 +67,8 @@ type signature = Signature.t
 module Slot : sig
   type t
 
+  type slot = t
+
   include Compare.S with type t := t
 
   val pp : Format.formatter -> t -> unit
@@ -79,9 +81,19 @@ module Slot : sig
 
   val encoding : t Data_encoding.encoding
 
-  type slot_range = private t list
+  module Range : sig
+    type t
 
-  val slot_range : min:int -> count:int -> slot_range tzresult
+    val create : min:int -> count:int -> t tzresult
+
+    val fold : ('a -> slot -> 'a) -> 'a -> t -> 'a
+
+    val fold_es :
+      ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
+
+    val rev_fold_es :
+      ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
+  end
 
   module Map : Map.S with type key = t
 
@@ -1631,7 +1643,7 @@ module Delegate : sig
   val deactivated :
     context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
-  val grace_period :
+  val last_cycle_before_deactivation :
     context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
 
   val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t

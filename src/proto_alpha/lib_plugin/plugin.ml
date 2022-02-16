@@ -3572,7 +3572,7 @@ module RPC = struct
       Signature.Public_key_hash.Map.fold
         (fun delegate slots acc ->
           {level = level.level; delegate; slots} :: acc)
-        rights
+        (rights :> Slot.t list Signature.Public_key_hash.Map.t)
         []
 
     let register () =

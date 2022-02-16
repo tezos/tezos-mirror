@@ -77,34 +77,30 @@ let baking_rights c level =
   in
   f c Round.zero
 
+type ordered_slots = Slot.t list
+
+(* Slots returned by this function are assumed by consumers to be in increasing
+   order, hence the use of [Slot.Range.rev_fold_es]. *)
 let endorsing_rights (ctxt : t) level =
   let consensus_committee_size = Constants.consensus_committee_size ctxt in
-  Slot.slot_range ~min:0 ~count:consensus_committee_size >>?= fun slots ->
-  List.fold_left_es
-    (fun (ctxt, acc) slot ->
+  Slot.Range.create ~min:0 ~count:consensus_committee_size >>?= fun slots ->
+  Slot.Range.rev_fold_es
+    (fun (ctxt, map) slot ->
       Stake_distribution.slot_owner ctxt level slot >>=? fun (ctxt, (_, pkh)) ->
-      return (ctxt, (slot, pkh) :: acc))
-    (ctxt, [])
-    (slots :> Slot.t list)
-  >>=? fun (ctxt, right_owners) ->
-  let rights =
-    List.fold_left
-      (fun acc (slot, pkh) ->
-        let slots =
-          match Signature.Public_key_hash.Map.find pkh acc with
-          | None -> [slot]
-          | Some slots -> slot :: slots
-        in
-        Signature.Public_key_hash.Map.add pkh slots acc)
-      Signature.Public_key_hash.Map.empty
-      right_owners
-  in
-  return (ctxt, rights)
+      let map =
+        Signature.Public_key_hash.Map.update
+          pkh
+          (function None -> Some [slot] | Some slots -> Some (slot :: slots))
+          map
+      in
+      return (ctxt, map))
+    (ctxt, Signature.Public_key_hash.Map.empty)
+    slots
 
 let endorsing_rights_by_first_slot ctxt level =
-  Slot.slot_range ~min:0 ~count:(Constants.consensus_committee_size ctxt)
+  Slot.Range.create ~min:0 ~count:(Constants.consensus_committee_size ctxt)
   >>?= fun slots ->
-  List.fold_left_es
+  Slot.Range.fold_es
     (fun (ctxt, (delegates_map, slots_map)) slot ->
       Stake_distribution.slot_owner ctxt level slot
       >|=? fun (ctxt, (pk, pkh)) ->
@@ -126,5 +122,5 @@ let endorsing_rights_by_first_slot ctxt level =
       in
       (ctxt, (delegates_map, slots_map)))
     (ctxt, (Signature.Public_key_hash.Map.empty, Slot.Map.empty))
-    (slots :> Slot.t list)
+    slots
   >>=? fun (ctxt, (_, slots_map)) -> return (ctxt, slots_map)

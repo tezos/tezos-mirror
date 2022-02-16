@@ -37,8 +37,7 @@ let find = Storage.Contract.Frozen_deposits.find
 
 let update_balance ctxt delegate f amount =
   let delegate_contract = Contract_repr.implicit_contract delegate in
-  Storage.Contract.Frozen_deposits.get ctxt delegate_contract
-  >>=? fun frozen_deposits ->
+  get ctxt delegate_contract >>=? fun frozen_deposits ->
   f frozen_deposits.current_amount amount >>?= fun new_amount ->
   Storage.Contract.Frozen_deposits.update
     ctxt
@@ -52,8 +51,7 @@ let spend_only_call_from_token ctxt delegate amount =
   update_balance ctxt delegate Tez_repr.( -? ) amount
 
 let update_initial_amount ctxt delegate_contract deposits_cap =
-  Storage.Contract.Frozen_deposits.get ctxt delegate_contract
-  >>=? fun frozen_deposits ->
+  get ctxt delegate_contract >>=? fun frozen_deposits ->
   Storage.Contract.Frozen_deposits.update
     ctxt
     delegate_contract

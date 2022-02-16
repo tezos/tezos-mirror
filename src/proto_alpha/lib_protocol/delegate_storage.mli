@@ -100,6 +100,11 @@ type participation_info = {
      required minimum, then the rewards are zero. (dynamic) *)
 }
 
+(** Only use this function for RPC: this is expensive.
+
+   [delegate_participation_info] and [!val:check_delegate] forms the
+   implementation of RPC call "/context/delegates/<pkh>/participation".
+ *)
 val delegate_participation_info :
   Raw_context.t ->
   Signature.Public_key_hash.t ->

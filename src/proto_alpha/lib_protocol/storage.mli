@@ -73,7 +73,7 @@ module Contract : sig
      may also possess tez in frozen deposits. Empty balances (of zero
      tez) are only allowed for originated contracts, not for implicit
      ones. *)
-  module Balance :
+  module Spendable_balance :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Tez_repr.t
@@ -141,7 +141,7 @@ module Contract : sig
 
   (** The last cycle where the delegate is considered active; that is,
      at the next cycle it will be considered inactive. *)
-  module Delegate_desactivation :
+  module Delegate_last_cycle_before_deactivation :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Cycle_repr.t
@@ -351,6 +351,7 @@ module Stake : sig
        and type snapshot = int
        and type t := Raw_context.t
 
+  (** Counter of stake storage snapshots taken since last cycle *)
   module Last_snapshot :
     Single_data_storage with type value = int and type t := Raw_context.t
 

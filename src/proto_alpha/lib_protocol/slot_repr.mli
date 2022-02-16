@@ -32,6 +32,8 @@
    max_value]. In this case it returns an [Invalid_slot] error.*)
 type t
 
+type slot = t
+
 val encoding : t Data_encoding.t
 
 (** {1 Constructors }*)
@@ -41,19 +43,19 @@ val zero : t
 (** Upper bound on the value a slot index can take *)
 val max_value : t
 
-(** [of_int i] creates a slot index from integer [i]. 
+(** [of_int i] creates a slot index from integer [i].
 
-    @return [Error (Invalid_slot i)] if [i < 0 || i > max_value], and 
+    @return [Error (Invalid_slot i)] if [i < 0 || i > max_value], and
             [Ok slot] otherwise
  *)
 val of_int : int -> t tzresult
 
 (** [of_int_do_not_use_except_for_parameters i] is an unchecked construction
-   function. 
+   function.
 
    It may be used in cases where one knows [0 <= i <= max_value], e.g., when
-   creating protocol parameters. 
-   
+   creating protocol parameters.
+
    When in doubt, use [of_int] or [of_int_exn].
  *)
 val of_int_do_not_use_except_for_parameters : int -> t
@@ -80,12 +82,36 @@ module Set : Set.S with type elt = t
 
 include Compare.S with type t := t
 
-module List : sig
-  (** A list of slot is an ordered list of increasing slot values *)
-  type nonrec t = private t list
+(** {2 Slot ranges} *)
+module Range : sig
+  (** An ordered range of slots, in increasing order. *)
+  type t
 
-  val encoding : t Data_encoding.t
+  (** {3 Constructor} *)
 
-  (** {3 Constructors} *)
-  val slot_range : min:int -> count:int -> t tzresult
+  (** [create ~min ~count] creates a full slot range starting at [min], of size
+      [count], i.e, [min, min + count - 1].
+
+      [create] errors if
+      - [min < 0]
+      - [count < 1]
+      - [min + count - 1 > max_value]
+   *)
+  val create : min:int -> count:int -> t tzresult
+
+  (** {3 Iterators} *)
+
+  (** [fold f acc range] folds [f] over the values of [range], in increasing
+      order. *)
+  val fold : ('a -> slot -> 'a) -> 'a -> t -> 'a
+
+  (** [fold_es f acc range] folds [f] over the values of [range], in increasing
+      order. *)
+  val fold_es :
+    ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
+
+  (** [rev_fold_es f acc range] folds [f] over the values of [range], in decreasing
+      order. *)
+  val rev_fold_es :
+    ('a -> slot -> 'a tzresult Lwt.t) -> 'a -> t -> 'a tzresult Lwt.t
 end

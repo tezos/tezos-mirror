@@ -34,17 +34,23 @@ type error +=
       consensus_threshold : int;
     }
 
-(** For a given level computes who has the right to include an
-   endorsement in the next block. It returns a mapping from the
-   delegates with such rights to their endorsing slots.  This function
-   is only used by the 'validators' RPC.  *)
+type ordered_slots = private Slot.t list
+
+(** For a given level computes who has the right to include an endorsement in
+   the next block.
+
+   @return map from delegates with such rights to their endorsing slots, in
+   increasing order.
+
+   This function is only used by the 'validators' RPC.  *)
 val endorsing_rights :
   context ->
   Level.t ->
-  (context * Slot.t list Signature.Public_key_hash.Map.t) tzresult Lwt.t
+  (context * ordered_slots Signature.Public_key_hash.Map.t) tzresult Lwt.t
 
-(** Computes the endorsing rights for a given level. Returns a map
-   from allocated first slots to their owner's public key, public key
+(** Computes endorsing rights for a given level. 
+
+   @return  map from allocated first slots to their owner's public key, public key
    hash, and endorsing power. *)
 val endorsing_rights_by_first_slot :
   context ->

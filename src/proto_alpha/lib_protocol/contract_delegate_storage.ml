@@ -44,7 +44,7 @@ let registered c delegate =
   | None -> false
 
 let link c contract delegate =
-  Storage.Contract.Balance.get c contract >>=? fun balance ->
+  Storage.Contract.Spendable_balance.get c contract >>=? fun balance ->
   Stake_storage.add_stake c delegate balance >>=? fun c ->
   Storage.Contract.Delegated.add
     (c, Contract_repr.implicit_contract delegate)
@@ -55,7 +55,7 @@ let unlink c contract =
   Storage.Contract.Delegate.find c contract >>=? function
   | None -> return c
   | Some delegate ->
-      Storage.Contract.Balance.get c contract >>=? fun balance ->
+      Storage.Contract.Spendable_balance.get c contract >>=? fun balance ->
       (* Removes the balance of the contract from the delegate *)
       Stake_storage.remove_stake c delegate balance >>=? fun c ->
       Storage.Contract.Delegated.remove
@@ -70,8 +70,6 @@ let init ctxt contract delegate =
 let delete ctxt contract =
   unlink ctxt contract >>=? fun ctxt ->
   Storage.Contract.Delegate.remove ctxt contract >|= ok
-
-let remove ctxt contract = unlink ctxt contract
 
 let set ctxt contract delegate =
   unlink ctxt contract >>=? fun ctxt ->

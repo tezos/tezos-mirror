@@ -57,10 +57,7 @@ module Selected_distribution_for_cycle = struct
 
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
-    (Cache.find ctxt id >>=? function
-     | None -> return ctxt
-     | Some _ -> Cache.update ctxt id None |> Lwt.return)
-    >>=? fun ctxt ->
+    Cache.update ctxt id None >>?= fun ctxt ->
     Storage.Stake.Selected_distribution_for_cycle.remove_existing ctxt cycle
 end
 
@@ -98,28 +95,27 @@ module Delegate_sampler_state = struct
 
   let remove_existing ctxt cycle =
     let id = identifier_of_cycle cycle in
-    (Cache.find ctxt id >>=? function
-     | None -> return ctxt
-     | Some _ -> Cache.update ctxt id None |> Lwt.return)
-    >>=? fun ctxt -> Storage.Delegate_sampler_state.remove_existing ctxt cycle
+    Cache.update ctxt id None >>?= fun ctxt ->
+    Storage.Delegate_sampler_state.remove_existing ctxt cycle
 end
 
 let get_staking_balance = Storage.Stake.Staking_balance.get
 
-let ensure_stake_inited ctxt delegate =
-  Storage.Stake.Staking_balance.mem ctxt delegate >>= function
-  | true -> return ctxt
-  | false ->
+let get_initialized_stake ctxt delegate =
+  Storage.Stake.Staking_balance.find ctxt delegate >>=? function
+  | Some staking_balance -> return (staking_balance, ctxt)
+  | None ->
       Frozen_deposits_storage.init ctxt delegate >>=? fun ctxt ->
-      Storage.Stake.Staking_balance.init ctxt delegate Tez_repr.zero
+      let balance = Tez_repr.zero in
+      Storage.Stake.Staking_balance.init ctxt delegate balance >>=? fun ctxt ->
+      return (balance, ctxt)
 
 let remove_stake ctxt delegate amount =
-  ensure_stake_inited ctxt delegate >>=? fun ctxt ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  get_staking_balance ctxt delegate >>=? fun staking_balance_before ->
+  get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   Tez_repr.(staking_balance_before -? amount) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
+  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance_before >= tokens_per_roll) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
     if (not inactive) && Tez_repr.(staking_balance < tokens_per_roll) then
@@ -133,12 +129,11 @@ let remove_stake ctxt delegate amount =
     return ctxt
 
 let add_stake ctxt delegate amount =
-  ensure_stake_inited ctxt delegate >>=? fun ctxt ->
-  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
-  get_staking_balance ctxt delegate >>=? fun staking_balance_before ->
+  get_initialized_stake ctxt delegate >>=? fun (staking_balance_before, ctxt) ->
   Tez_repr.(amount +? staking_balance_before) >>?= fun staking_balance ->
   Storage.Stake.Staking_balance.update ctxt delegate staking_balance
   >>=? fun ctxt ->
+  let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance >= tokens_per_roll) then
     Delegate_activation_storage.is_inactive ctxt delegate >>=? fun inactive ->
     if inactive || Tez_repr.(staking_balance_before >= tokens_per_roll) then
@@ -156,8 +151,7 @@ let deactivate_only_call_from_delegate_storage ctxt delegate =
   Storage.Stake.Active_delegate_with_one_roll.remove ctxt delegate
 
 let activate_only_call_from_delegate_storage ctxt delegate =
-  ensure_stake_inited ctxt delegate >>=? fun ctxt ->
-  get_staking_balance ctxt delegate >>=? fun staking_balance ->
+  get_initialized_stake ctxt delegate >>=? fun (staking_balance, ctxt) ->
   let tokens_per_roll = Constants_storage.tokens_per_roll ctxt in
   if Tez_repr.(staking_balance >= tokens_per_roll) then
     Storage.Stake.Active_delegate_with_one_roll.add ctxt delegate ()
@@ -170,6 +164,58 @@ let snapshot ctxt =
   Storage.Stake.Staking_balance.snapshot ctxt index >>=? fun ctxt ->
   Storage.Stake.Active_delegate_with_one_roll.snapshot ctxt index
 
+let get_stakes_for_selected_index ctxt index =
+  Storage.Stake.Active_delegate_with_one_roll.fold_snapshot
+    ctxt
+    index
+    ~order:`Sorted
+    ~init:([], Tez_repr.zero)
+    ~f:(fun delegate () (acc, total_stake) ->
+      Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
+      >>=? fun staking_balance ->
+      let delegate_contract = Contract_repr.implicit_contract delegate in
+      Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
+      >>=? fun frozen_deposits_limit ->
+      Storage.Contract.Spendable_balance.get ctxt delegate_contract
+      >>=? fun balance ->
+      Frozen_deposits_storage.get ctxt delegate_contract
+      >>=? fun frozen_deposits ->
+      Tez_repr.(balance +? frozen_deposits.current_amount)
+      >>?= fun total_balance ->
+      let frozen_deposits_percentage =
+        Constants_storage.frozen_deposits_percentage ctxt
+      in
+      let stake_to_consider =
+        match frozen_deposits_limit with
+        | Some frozen_deposits_limit -> (
+            try
+              let open Tez_repr in
+              let max_mutez = of_mutez_exn Int64.max_int in
+              if frozen_deposits_limit > div_exn max_mutez 100 then
+                let frozen_deposits_limit_by_10 =
+                  mul_exn frozen_deposits_limit 10
+                in
+                if frozen_deposits_limit_by_10 < staking_balance then
+                  frozen_deposits_limit_by_10
+                else staking_balance
+              else
+                min
+                  staking_balance
+                  (div_exn
+                     (mul_exn frozen_deposits_limit 100)
+                     frozen_deposits_percentage)
+            with _ -> staking_balance)
+        | None -> staking_balance
+      in
+      Tez_repr.(total_balance *? 100L) >>?= fun expanded_balance ->
+      Tez_repr.(expanded_balance /? Int64.of_int frozen_deposits_percentage)
+      >>?= fun max_staking_capacity ->
+      let stake_for_cycle =
+        Tez_repr.min stake_to_consider max_staking_capacity
+      in
+      Tez_repr.(total_stake +? stake_for_cycle) >>?= fun total_stake ->
+      return ((delegate, stake_for_cycle) :: acc, total_stake))
+
 let select_distribution_for_cycle ctxt cycle pubkey =
   Storage.Stake.Last_snapshot.get ctxt >>=? fun max_index ->
   Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
@@ -181,53 +227,7 @@ let select_distribution_for_cycle ctxt cycle pubkey =
   List.fold_left_es
     (fun ctxt index ->
       (if Compare.Int.(index = selected_index) then
-       Storage.Stake.Active_delegate_with_one_roll.fold_snapshot
-         ctxt
-         index
-         ~order:`Sorted
-         ~init:([], Tez_repr.zero)
-         ~f:(fun delegate () (acc, total_stake) ->
-           Storage.Stake.Staking_balance.Snapshot.get ctxt (index, delegate)
-           >>=? fun staking_balance ->
-           let delegate_contract = Contract_repr.implicit_contract delegate in
-           Storage.Contract.Frozen_deposits_limit.find ctxt delegate_contract
-           >>=? fun frozen_deposits_limit ->
-           Storage.Contract.Balance.get ctxt delegate_contract
-           >>=? fun balance ->
-           Frozen_deposits_storage.get ctxt delegate_contract
-           >>=? fun frozen_deposits ->
-           Tez_repr.(balance +? frozen_deposits.current_amount)
-           >>?= fun total_balance ->
-           let frozen_deposits_percentage =
-             Constants_storage.frozen_deposits_percentage ctxt
-           in
-           let stake_to_consider =
-             match frozen_deposits_limit with
-             | Some frozen_deposits_limit -> (
-                 try
-                   let max_mutez = Tez_repr.of_mutez_exn Int64.max_int in
-                   let frozen_stake_limit =
-                     if Tez_repr.(frozen_deposits_limit > div_exn max_mutez 100)
-                     then max_mutez
-                     else
-                       Tez_repr.(
-                         div_exn
-                           (mul_exn frozen_deposits_limit 100)
-                           frozen_deposits_percentage)
-                   in
-                   Tez_repr.min staking_balance frozen_stake_limit
-                 with _ -> staking_balance)
-             | None -> staking_balance
-           in
-           let max_staking_capacity =
-             Tez_repr.(
-               div_exn (mul_exn total_balance 100) frozen_deposits_percentage)
-           in
-           let stake_for_cycle =
-             Tez_repr.min stake_to_consider max_staking_capacity
-           in
-           Tez_repr.(total_stake +? stake_for_cycle) >>?= fun total_stake ->
-           return ((delegate, stake_for_cycle) :: acc, total_stake))
+       get_stakes_for_selected_index ctxt index
        >>=? fun (stakes, total_stake) ->
        let stakes =
          List.sort (fun (_, x) (_, y) -> Tez_repr.compare y x) stakes

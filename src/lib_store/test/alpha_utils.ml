@@ -369,7 +369,7 @@ let check_constants_consistency constants =
       (fun () ->
         failwith
           "Inconsistent constants : blocks per cycle must be superior than \
-           blocks per roll snapshot")
+           blocks per stake snapshot")
   in
   return_unit
 

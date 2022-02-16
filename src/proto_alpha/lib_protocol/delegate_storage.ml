@@ -171,9 +171,7 @@ let () =
     (fun pkh -> Not_registered pkh)
 
 let set_inactive ctxt delegate =
-  let delegate_contract = Contract_repr.implicit_contract delegate in
-  Delegate_activation_storage.set_inactive ctxt delegate_contract
-  >>= fun ctxt ->
+  Delegate_activation_storage.set_inactive ctxt delegate >>= fun ctxt ->
   Stake_storage.deactivate_only_call_from_delegate_storage ctxt delegate >|= ok
 
 let set_active ctxt delegate =
@@ -244,7 +242,7 @@ let set c contract delegate =
             else return_unit
         | None -> return_unit)
         >>=? fun () ->
-        Storage.Contract.Balance.mem c contract >>= fun exists ->
+        Storage.Contract.Spendable_balance.mem c contract >>= fun exists ->
         error_when
           (self_delegation && not exists)
           (Empty_delegate_account delegate)
@@ -276,7 +274,9 @@ let update_activity ctxt last_cycle =
         ~init:(Ok (ctxt, []))
         ~f:(fun delegate () acc ->
           acc >>?= fun (ctxt, deactivated) ->
-          Delegate_activation_storage.grace_period ctxt delegate
+          Delegate_activation_storage.last_cycle_before_deactivation
+            ctxt
+            delegate
           >>=? fun cycle ->
           if Cycle_repr.(cycle <= last_cycle) then
             set_inactive ctxt delegate >|=? fun ctxt ->
@@ -466,7 +466,8 @@ let freeze_deposits ?(origin = Receipt_repr.Block_application) ctxt ~new_cycle
       else if Tez_repr.(current_amount < maximum_stake_to_be_deposited) then
         Tez_repr.(maximum_stake_to_be_deposited -? current_amount)
         >>?= fun desired_to_freeze ->
-        Storage.Contract.Balance.get ctxt delegate_contract >>=? fun balance ->
+        Storage.Contract.Spendable_balance.get ctxt delegate_contract
+        >>=? fun balance ->
         (* In case the delegate hasn't been slashed in this cycle,
            the following invariant holds:
            maximum_stake_to_be_deposited <= frozen_deposits + balance
@@ -532,7 +533,7 @@ let cycle_end ctxt last_cycle unrevealed_nonces =
 
 let balance ctxt delegate =
   let contract = Contract_repr.implicit_contract delegate in
-  Storage.Contract.Balance.get ctxt contract
+  Storage.Contract.Spendable_balance.get ctxt contract
 
 let frozen_deposits ctxt delegate =
   Frozen_deposits_storage.get ctxt (Contract_repr.implicit_contract delegate)

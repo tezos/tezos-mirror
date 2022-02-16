@@ -48,9 +48,9 @@ type container =
   | `Frozen_deposits of Signature.Public_key_hash.t
   | `Block_fees ]
 
-(** [source] is the type of token providers. Token providers that are not
-    containers are considered to have infinite capacity. *)
-type source =
+(** [infinite_source] defines types of tokens provides which are considered to be
+ ** of infinite capacity. *)
+type infinite_source =
   [ `Invoice
   | `Bootstrap
   | `Initial_commitments
@@ -60,17 +60,21 @@ type source =
   | `Baking_rewards
   | `Baking_bonuses
   | `Minted
-  | `Liquidity_baking_subsidies
-  | container ]
+  | `Liquidity_baking_subsidies ]
 
-(** [sink] is the type of token receivers. Token receivers that are not
+(** [source] is the type of token providers. Token providers that are not
     containers are considered to have infinite capacity. *)
-type sink =
+type source = [infinite_source | container]
+
+type infinite_sink =
   [ `Storage_fees
   | `Double_signing_punishments
   | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
-  | `Burned
-  | container ]
+  | `Burned ]
+
+(** [sink] is the type of token receivers. Token receivers that are not
+    containers are considered to have infinite capacity. *)
+type sink = [infinite_sink | container]
 
 (** [allocated ctxt container] returns true if [balance ctxt container] is
     guaranteed not to fail, and returns false when [balance ctxt container] may

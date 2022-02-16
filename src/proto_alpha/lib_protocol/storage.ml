@@ -188,7 +188,7 @@ module Contract = struct
 
   let list = Indexed_context.keys
 
-  module Balance =
+  module Spendable_balance =
     Indexed_context.Make_map
       (struct
         let name = ["balance"]
@@ -223,9 +223,10 @@ module Contract = struct
         let name = ["inactive_delegate"]
       end)
 
-  module Delegate_desactivation =
+  module Delegate_last_cycle_before_deactivation =
     Indexed_context.Make_map
       (struct
+        (* FIXME? Change the key name to reflect the functor's name *)
         let name = ["delegate_desactivation"]
       end)
       (Cycle_repr)
@@ -1048,6 +1049,21 @@ module Stake = struct
 
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
 
+  (* This is an index that is set to 0 by calls to
+     Stake_storage.selected_new_distribution_at_cycle_end and incremented (by 1)
+     by calls to Stake_storage.snapshot.
+
+     Stake_storage.snapshot is called in relation with constant
+     [Constants_storage.blocks_per_stake_snapshot] here in
+     [Level_storage.may_snapshot_rolls].
+
+     That is, the increment is effectively done every 512 blocks or so, and
+     reset at the end of cycles. So it goes up to around 16 (= 8192/512) for the
+     number of blocks per cycle is 8192, then comes back to 0, so that a UInt16
+     is big enough.
+
+     The ratio above (blocks_per_cycle / blocks_per_stake_snapshot) is checked
+     in {!val:Constants_repr.check_constants} to fit in a UInt16. *)
   module Last_snapshot =
     Make_single_data_storage (Registered) (Raw_context)
       (struct

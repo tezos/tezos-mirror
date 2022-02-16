@@ -38,6 +38,8 @@ let () =
 
 include Compare.Int
 
+type slot = t
+
 (* TODO? should there be some assertions to verify that slots are
    never too big ? Or do that in a storage module that depends on
    constants ? *)
@@ -66,70 +68,39 @@ let succ slot = of_int (slot + 1)
 module Map = Map.Make (Compare.Int)
 module Set = Set.Make (Compare.Int)
 
-module List = struct
-  (* Expected invariant: list of increasing values *)
-  type nonrec t = t list
+module Range = struct
+  (* For now, we only need full intervals. If we ever need sparse ones, we
+     could switch this representation to interval trees. [hi] and [lo] bounds
+     are included. *)
+  type t = Interval of {lo : int; hi : int}
 
-  module Compressed = struct
-    type elt = {skip : int; take : int}
-
-    type encoded = elt list
-
-    let elt_encoding =
-      Data_encoding.(
-        conv
-          (fun {skip; take} -> (skip, take))
-          (fun (skip, take) -> {skip; take})
-          (obj2 (req "skip" uint16) (req "take" uint16)))
-
-    let encoding = Data_encoding.list elt_encoding
-
-    let encode l : encoded =
-      let rec loop_taking ~pos ~skipped ~taken l =
-        match l with
-        | [] -> if taken > 0 then [{skip = skipped; take = taken}] else []
-        | h :: t ->
-            if h = pos then
-              loop_taking ~pos:(pos + 1) ~skipped ~taken:(taken + 1) t
-            else
-              let elt = {skip = skipped; take = taken} in
-              let skipped = h - pos in
-              let taken = 1 in
-              let elts = loop_taking ~pos:(h + 1) ~skipped ~taken t in
-              elt :: elts
-      in
-      loop_taking ~pos:0 ~skipped:0 ~taken:0 l
-
-    let decode (elts : encoded) =
-      let rec loop ~pos elts =
-        match elts with
-        | [] -> Ok []
-        | elt :: elts -> (
-            let pos = pos + elt.skip in
-            match
-              List.init ~when_negative_length:() elt.take (fun i -> i + pos)
-            with
-            | Ok l -> (
-                let pos = pos + elt.take in
-                match loop ~pos elts with Ok t -> Ok (l @ t) | e -> e)
-            | Error () ->
-                Error "A compressed element contains a negative list size")
-      in
-      loop ~pos:0 elts
-  end
-
-  let encoding =
-    Data_encoding.conv_with_guard
-      Compressed.encode
-      Compressed.decode
-      Compressed.encoding
-
-  let slot_range ~min ~count =
+  let create ~min ~count =
     error_when (min < 0) (Invalid_slot min) >>? fun () ->
     error_when (min > max_value) (Invalid_slot min) >>? fun () ->
     error_when (count < 1) (Invalid_slot count) >>? fun () ->
     error_when (count > max_value) (Invalid_slot count) >>? fun () ->
     let max = min + count - 1 in
     error_when (max > max_value) (Invalid_slot max) >>? fun () ->
-    ok Misc.(min --> max)
+    ok (Interval {lo = min; hi = max})
+
+  let fold f init (Interval {lo; hi}) =
+    let rec loop ~acc ~next =
+      if Compare.Int.(next > hi) then acc
+      else loop ~acc:(f acc next) ~next:(next + 1)
+    in
+    loop ~acc:(f init lo) ~next:(lo + 1)
+
+  let fold_es f init (Interval {lo; hi}) =
+    let rec loop ~acc ~next =
+      if Compare.Int.(next > hi) then return acc
+      else f acc next >>=? fun acc -> loop ~acc ~next:(next + 1)
+    in
+    f init lo >>=? fun acc -> loop ~acc ~next:(lo + 1)
+
+  let rev_fold_es f init (Interval {lo; hi}) =
+    let rec loop ~acc ~next =
+      if Compare.Int.(next < lo) then return acc
+      else f acc next >>=? fun acc -> loop ~acc ~next:(next - 1)
+    in
+    f init hi >>=? fun acc -> loop ~acc ~next:(hi - 1)
 end

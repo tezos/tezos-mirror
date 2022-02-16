@@ -204,7 +204,7 @@ let register_exn (type cvalue)
       @@ Admin.cache_size ctxt ~cache_index:C.cache_index
 
     let size_limit ctxt =
-      Option.value ~default:max_int
+      Option.value ~default:0
       @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
 
     let update ctxt id v =

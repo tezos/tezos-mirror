@@ -39,6 +39,11 @@ type 'a t
    [v]. The value [v] is the fallback value for [a]. *)
 val make : int -> 'a -> 'a t
 
+(** [of_list ~fallback ~proj l] builds a fallback array [a] of length
+    [List.length l] where each cell [i] is initialized by [proj (List.nth l i)]
+    and the fallback value is [fallback]. *)
+val of_list : fallback:'b -> proj:('a -> 'b) -> 'a list -> 'b t
+
 (** [fallback a] returns the fallback value for [a]. *)
 val fallback : 'a t -> 'a
 

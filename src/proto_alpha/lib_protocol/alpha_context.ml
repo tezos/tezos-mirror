@@ -49,13 +49,7 @@ module Timestamp = struct
   let predecessor = Raw_context.predecessor_timestamp
 end
 
-module Slot = struct
-  include Slot_repr
-
-  type slot_range = List.t
-
-  let slot_range ~min ~count = List.slot_range ~min ~count
-end
+module Slot = Slot_repr
 
 module Sc_rollup = struct
   include Sc_rollup_repr
@@ -359,7 +353,8 @@ module Delegate = struct
     current_amount : Tez.t;
   }
 
-  let grace_period = Delegate_activation_storage.grace_period
+  let last_cycle_before_deactivation =
+    Delegate_activation_storage.last_cycle_before_deactivation
 
   let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
 
