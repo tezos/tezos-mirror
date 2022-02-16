@@ -591,7 +591,7 @@ let transfer (ctxt, sc) gas amount location parameters_ty parameters destination
 
 (* TODO: https://gitlab.com/tezos/tezos/-/issues/1688
    Refactor the sharing part of unparse_script and create_contract *)
-let create_contract (ctxt, sc) gas storage_type param_type code views
+let create_contract (ctxt, sc) gas storage_type param_type lambda views
     entrypoints delegate credit init =
   let ctxt = update_context gas ctxt in
   let loc = Micheline.dummy_location in
@@ -613,6 +613,7 @@ let create_contract (ctxt, sc) gas storage_type param_type code views
     :: views
   in
   let views = Script_map.fold view views [] |> List.rev in
+  let (Lam (_, code)) = lambda in
   let code =
     strip_locations
       (Seq

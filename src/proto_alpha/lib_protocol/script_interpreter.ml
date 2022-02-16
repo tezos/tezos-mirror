@@ -1138,15 +1138,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                     (EmptyCell, EmptyCell))))))
           | Tx_rollup _ -> (return_none [@ocaml.tailcall]) ctxt)
       | ICreate_contract
-          {
-            storage_type;
-            arg_type;
-            lambda = Lam (_, code);
-            views;
-            entrypoints;
-            k;
-            _;
-          } ->
+          {storage_type; arg_type; lambda; views; entrypoints; k; _} ->
           (* Removed the instruction's arguments manager, spendable and delegatable *)
           let delegate = accu in
           let (credit, (init, stack)) = stack in
@@ -1155,7 +1147,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
             gas
             storage_type
             arg_type
-            code
+            lambda
             views
             entrypoints
             delegate
