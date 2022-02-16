@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -572,7 +573,7 @@ let test_drag_after_import () =
       {
         constants_test with
         blocks_per_cycle = 256l;
-        blocks_per_voting_period = 256l;
+        cycles_per_voting_period = 1l;
         consensus_threshold = 0;
       }
   in

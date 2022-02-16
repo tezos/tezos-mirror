@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -92,7 +93,12 @@ let test_voting_power_cache () =
   let policy = By_round 0 in
   Context.init ~consensus_threshold:0 1 >>=? fun (genesis, _contracts) ->
   Context.get_constants (B genesis) >>=? fun csts ->
-  let blocks_per_voting_period = csts.parametric.blocks_per_voting_period in
+  let blocks_per_voting_period =
+    Int32.(
+      mul
+        csts.parametric.blocks_per_cycle
+        csts.parametric.cycles_per_voting_period)
+  in
   let blocks_per_voting_periods n =
     Int64.of_int (n * Int32.to_int blocks_per_voting_period)
   in

@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -81,7 +82,7 @@ type parametric = {
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   blocks_per_stake_snapshot : int32;
-  blocks_per_voting_period : int32;
+  cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;

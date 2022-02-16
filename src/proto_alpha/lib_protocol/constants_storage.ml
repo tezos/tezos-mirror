@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,9 +40,9 @@ let blocks_per_stake_snapshot c =
   let constants = Raw_context.constants c in
   constants.blocks_per_stake_snapshot
 
-let blocks_per_voting_period c =
+let cycles_per_voting_period c =
   let constants = Raw_context.constants c in
-  constants.blocks_per_voting_period
+  constants.cycles_per_voting_period
 
 let hard_gas_limit_per_operation c =
   let constants = Raw_context.constants c in

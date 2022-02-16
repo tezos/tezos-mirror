@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -119,7 +120,7 @@ val genesis :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
-  ?blocks_per_voting_period:int32 ->
+  ?cycles_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
   ?sc_rollup_enable:bool ->
   (Account.t * Tez.tez) list ->
@@ -254,7 +255,7 @@ val prepare_initial_context_params :
   ?baking_reward_fixed_portion:Tez.t ->
   ?origination_size:int ->
   ?blocks_per_cycle:int32 ->
-  ?blocks_per_voting_period:int32 ->
+  ?cycles_per_voting_period:int32 ->
   ?tx_rollup_enable:bool ->
   ?sc_rollup_enable:bool ->
   (Account.t * Tez.t) list ->

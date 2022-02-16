@@ -133,7 +133,10 @@ module Admin = struct
   let future_cache_expectation ?blocks_before_activation ctxt ~time_in_blocks =
     let time_in_blocks' = Int32.of_int time_in_blocks in
     let blocks_per_voting_period =
-      Constants_storage.blocks_per_voting_period ctxt
+      Int32.(
+        mul
+          (Constants_storage.cycles_per_voting_period ctxt)
+          (Constants_storage.blocks_per_cycle ctxt))
     in
     (match blocks_before_activation with
     | None -> Voting_period_storage.blocks_before_activation ctxt
