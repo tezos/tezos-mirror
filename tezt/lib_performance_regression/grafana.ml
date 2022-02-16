@@ -313,3 +313,21 @@ let simple_graph ?title ?(description = "") ?(yaxis_format = "s") ?tags
       yaxis_1 = Some {format = yaxis_format; label = Some field};
       yaxis_2 = None;
     }
+
+let graphs_per_tags ?title ?(description = "") ?(yaxis_format = "s") ?interval
+    ~measurement ~field ~test ~tags () =
+  let title = Option.value title ~default:measurement in
+  let queries =
+    List.map
+      (fun tag -> simple_query ~tags:[tag] ~measurement ~field ~test ())
+      tags
+  in
+  Graph
+    {
+      title;
+      description;
+      queries;
+      interval;
+      yaxis_1 = Some {format = yaxis_format; label = Some field};
+      yaxis_2 = None;
+    }

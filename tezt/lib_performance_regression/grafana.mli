@@ -156,3 +156,44 @@ val simple_graph :
   test:string ->
   unit ->
   panel
+
+(** Make a graph panel that draws a curve per given tag.
+
+    Usage: [graphs_per_tags
+             ~measurement
+             ~field
+             ~test:test_title
+             ~tags:[(tag1, value1); (tag2, value2)]
+             ()]
+
+    This will draw a curve in the resulting graph for each one of the following request:
+
+    [
+      SELECT MEAN(field)
+      FROM measurement
+      WHERE $timeFilter AND test = test_title AND tag1 = value1
+      GROUP BY time($__interval) fill(previous)
+    ]
+
+    [
+      SELECT MEAN(field)
+      FROM measurement
+      WHERE $timeFilter AND test = test_name AND tag2 = value2
+      GROUP BY time($__interval) fill(previous)
+    ]
+
+    Default [title] is the measurement name.
+    Default [description] is [""].
+    Default [yaxis_format] is [s] (seconds).
+    Default [tags] is an empty list. *)
+val graphs_per_tags :
+  ?title:string ->
+  ?description:string ->
+  ?yaxis_format:string ->
+  ?interval:duration ->
+  measurement:InfluxDB.measurement ->
+  field:InfluxDB.field ->
+  test:string ->
+  tags:(InfluxDB.tag * string) list ->
+  unit ->
+  panel
