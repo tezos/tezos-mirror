@@ -35,6 +35,8 @@ module PVM : sig
     val parse_boot_sector : string -> boot_sector option
 
     val pp_boot_sector : Format.formatter -> boot_sector -> unit
+
+    include Sc_rollup_PVM_sem.S
   end
 
   type t = (module S)

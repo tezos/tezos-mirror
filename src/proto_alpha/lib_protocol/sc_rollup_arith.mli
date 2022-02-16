@@ -32,3 +32,5 @@ val name : string
 val parse_boot_sector : string -> PVM.boot_sector option
 
 val pp_boot_sector : Format.formatter -> PVM.boot_sector -> unit
+
+include Sc_rollup_PVM_sem.S
