@@ -291,11 +291,9 @@ let where_clause_of_tags hd tail =
     (where_clause_of_tag hd)
     tail
 
-let simple_query ?(tags = []) measurement field =
+let simple_query ?(tags = []) ~measurement ~field ~test () =
   let where_clause =
-    match tags with
-    | [] -> InfluxDB.Grafana_time_filter
-    | a :: xs -> InfluxDB.And (Grafana_time_filter, where_clause_of_tags a xs)
+    InfluxDB.And (Grafana_time_filter, where_clause_of_tags ("test", test) tags)
   in
   InfluxDB.select
     [Function (MEAN, Field field)]
@@ -304,13 +302,13 @@ let simple_query ?(tags = []) measurement field =
     ~group_by:(Time {interval = Grafana_interval; tag = None; fill = None})
 
 let simple_graph ?title ?(description = "") ?(yaxis_format = "s") ?tags
-    ?interval measurement field =
+    ?interval ~measurement ~field ~test () =
   let title = Option.value title ~default:measurement in
   Graph
     {
       title;
       description;
-      queries = [simple_query ?tags measurement field];
+      queries = [simple_query ?tags ~measurement ~field ~test ()];
       interval;
       yaxis_1 = Some {format = yaxis_format; label = Some field};
       yaxis_2 = None;

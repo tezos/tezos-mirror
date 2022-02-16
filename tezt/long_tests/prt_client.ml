@@ -30,36 +30,48 @@
    Subject: check regressions in the duration it takes for the client to load.
 *)
 
+let load_time = "client load time"
+
+let response_time_test = "get blocks time"
+
+let response_time_measurement = "RPC.get_block response time"
+
 let grafana_panels : Grafana.panel list =
   [
     Row "Test: client";
-    Grafana.simple_graph "client load time" "duration";
-    Row "Test: client";
-    Grafana.simple_graph "RPC.get_block response time" "duration";
+    Grafana.simple_graph
+      ~measurement:load_time
+      ~test:load_time
+      ~field:"duration"
+      ();
+    Grafana.simple_graph
+      ~measurement:response_time_measurement
+      ~test:response_time_test
+      ~field:"duration"
+      ();
   ]
 
 let client_load_time ~executors () =
   Long_test.register
     ~__FILE__
-    ~title:"client load time"
+    ~title:load_time
     ~tags:["client"; "load"]
     ~timeout:(Minutes 2)
     ~executors
   @@ fun () ->
   let client = Client.create () in
-  Long_test.time_lwt ~repeat:5 "client load time" @@ fun () ->
-  Client.version client
+  Long_test.time_lwt ~repeat:5 load_time @@ fun () -> Client.version client
 
 let get_blocks_response_time ~executors () =
   Long_test.register
     ~__FILE__
-    ~title:"get blocks time"
+    ~title:response_time_test
     ~tags:["rpc"]
     ~timeout:(Seconds 20)
     ~executors
   @@ fun () ->
   let* (_node, client) = Client.init_with_protocol `Client ~protocol:Alpha () in
-  Long_test.time_lwt "RPC.get_block response time" @@ fun () ->
+  Long_test.time_lwt response_time_measurement @@ fun () ->
   let* _ = RPC.get_block client in
   unit
 
