@@ -2233,6 +2233,104 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
+      ~desc:"Submit a optimistic transaction rollup commitment operation."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["submit"; "tx"; "rollup"; "commitment"]
+      @@ Clic.param
+           ~name:"level"
+           ~desc:"The level"
+           Client_proto_args.int_parameter
+      @@ Clic.param
+           ~name:"predecessor"
+           ~desc:
+             "a bytes representation of the predecessor commitment in \
+              hexadecimal form, or empty for no predecessor."
+           Client_proto_args.string_parameter
+      @@ Clic.param
+           ~name:"batches"
+           ~desc:
+             "a bytes representation of the commitment roots in hex and, \
+              separated by !."
+           Client_proto_args.string_parameter
+      @@ prefix "to" @@ tx_rollup_param @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account submitting the commitment."
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           level
+           predecessor
+           batches
+           tx_rollup
+           (_, source)
+           cctxt ->
+        let level = Int32.of_int level in
+        match Contract.is_implicit source with
+        | None ->
+            failwith
+              "Only implicit accounts can submit transaction rollup commitments"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            let predecessor =
+              if String.equal predecessor "" then None else Some predecessor
+            in
+
+            submit_tx_rollup_commitment
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ~tx_rollup
+              ~level
+              ~batches
+              ~predecessor
+              ()
+            >>=? fun _res -> return_unit);
+    command
+      ~group
       ~desc:"Originate a new smart-contract rollup."
       (args12
          fee_arg

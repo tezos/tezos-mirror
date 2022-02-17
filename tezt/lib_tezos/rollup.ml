@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,45 +23,47 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let hooks =
-  (* Replace variables that may change between different runs by constants. *)
-  let replace_variables string =
-    let replacements =
-      [
-        ("tz[123]\\w{33}", "[PUBLIC_KEY_HASH]");
-        ("\\bB\\w{50}\\b", "[BLOCK_HASH]");
-        ("tru1\\w{33}", "[TX_ROLLUP_HASH]");
-        ("edpk\\w{50}", "[PUBLIC_KEY]");
-        ("KT1\\w{33}", "[CONTRACT_HASH]");
-        ("\\bo\\w{50}\\b", "[OPERATION_HASH]");
-        ("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z", "[TIMESTAMP]");
-        (* Ports are non-deterministic when using -j. *)
-        ("/localhost:\\d{4,5}/", "/localhost:[PORT]/");
-      ]
+module Tx_rollup = struct
+  type state = {
+    burn_per_byte : int;
+    inbox_ema : int;
+    last_inbox_level : int option;
+  }
+
+  type inbox = {cumulated_size : int; contents : string list}
+
+  let get_state ?hooks ~rollup client : state Lwt.t =
+    let* json = RPC.Tx_rollup.get_state ?hooks ~rollup client in
+    let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
+    let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
+    let last_inbox_level =
+      JSON.(json |-> "last_inbox_level" |> as_opt |> Option.map as_int)
     in
-    List.fold_left
-      (fun string (replace, by) ->
-        replace_string ~all:true (rex replace) ~by string)
-      string
-      replacements
-  in
-  let on_spawn command arguments =
-    (* Remove arguments that shouldn't be captured in regression output. *)
-    let (arguments, _) =
-      List.fold_left
-        (fun (acc, scrub_next) arg ->
-          if scrub_next then (acc, false)
-          else
-            match arg with
-            (* scrub client global options *)
-            | "--base-dir" | "-d" | "--endpoint" | "-E" | "--sources" ->
-                (acc, true)
-            | _ -> (acc @ [replace_variables arg], false))
-        ([], (* scrub_next *) false)
-        arguments
+    return {burn_per_byte; inbox_ema; last_inbox_level}
+
+  let get_inbox ?hooks ~rollup client =
+    let* json = RPC.Tx_rollup.get_inbox ?hooks ~rollup client in
+    let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
+    let contents =
+      JSON.(json |-> "contents" |> as_list |> List.map as_string)
     in
-    let message = Log.quote_shell_command command arguments in
-    Regression.capture ("\n" ^ message)
-  in
-  let on_log output = replace_variables output |> Regression.capture in
-  {Process.on_spawn; on_log}
+    return {cumulated_size; contents}
+
+  let get_commitments ?hooks ?block ?offset ~rollup client =
+    RPC.Tx_rollup.get_commitments ?hooks ?block ?offset ~rollup client
+
+  module Check = struct
+    let state : state Check.typ =
+      let open Check in
+      convert
+        (fun {burn_per_byte; inbox_ema; last_inbox_level} ->
+          (burn_per_byte, inbox_ema, last_inbox_level))
+        (tuple3 int int (option int))
+
+    let inbox : inbox Check.typ =
+      let open Check in
+      convert
+        (fun {cumulated_size; contents} -> (cumulated_size, contents))
+        (tuple2 int (list string))
+  end
+end

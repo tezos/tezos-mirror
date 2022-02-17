@@ -983,7 +983,7 @@ module Tx_rollup : sig
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    tx_rollup:string ->
+    rollup:string ->
     Client.t ->
     JSON.t Lwt.t
 
@@ -993,7 +993,7 @@ module Tx_rollup : sig
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    tx_rollup:string ->
+    rollup:string ->
     Client.t ->
     JSON.t Lwt.t
 
@@ -1003,7 +1003,7 @@ module Tx_rollup : sig
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    tx_rollup:string ->
+    rollup:string ->
     Client.t ->
     Process.t
 
@@ -1013,7 +1013,8 @@ module Tx_rollup : sig
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
-    tx_rollup:string ->
+    ?offset:int ->
+    rollup:string ->
     Client.t ->
     JSON.t Lwt.t
 end
