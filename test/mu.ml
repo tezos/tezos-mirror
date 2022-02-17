@@ -165,6 +165,33 @@ let big_test () =
 
 type foo = Foo of foo option
 
+let doesnt_terminate () =
+  let es =
+    let open Data_encoding in
+    [
+      (fun () ->
+        mu "foo" (fun e ->
+            conv_with_guard
+              Option.some
+              (Option.to_result ~none:"NONE")
+              (option e)));
+      (fun () ->
+        mu "fool" (fun e -> conv (fun (Foo x) -> x) (fun x -> Foo x) (option e)));
+      (fun () ->
+        mu "foolish" (fun e ->
+            conv
+              (fun (Foo x) -> x)
+              (fun x -> Foo x)
+              (obj1 (req "foolishness" (option e)))));
+    ]
+  in
+  let check f =
+    match f () with
+    | exception Invalid_argument _ -> ()
+    | _ -> failwith "Expected to not terminate but did"
+  in
+  List.iter check es
+
 let discriminated_option e =
   let open Data_encoding in
   union
@@ -188,20 +215,6 @@ let terminates () =
   let es =
     let open Data_encoding in
     [
-      (fun () ->
-        mu "foo" (fun e ->
-            conv_with_guard
-              Option.some
-              (Option.to_result ~none:"NONE")
-              (option e)));
-      (fun () ->
-        mu "fool" (fun e -> conv (fun (Foo x) -> x) (fun x -> Foo x) (option e)));
-      (fun () ->
-        mu "foolish" (fun e ->
-            conv
-              (fun (Foo x) -> x)
-              (fun x -> Foo x)
-              (obj1 (req "foolishness" (option e)))));
       (fun () ->
         mu "foocustom" (fun e ->
             conv (fun (Foo x) -> x) (fun x -> Foo x) (discriminated_option e)));
@@ -260,5 +273,6 @@ let tests =
     ("tiny", `Quick, tiny_test);
     ("flip-flop", `Quick, flip_flop);
     ("big", `Quick, big_test);
+    ("doesnt_terminate", `Quick, doesnt_terminate);
     ("terminates", `Quick, terminates);
   ]

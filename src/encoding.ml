@@ -828,17 +828,24 @@ let mu name ?title ?description fix =
      This partial memoization only takes a bounded amount of memory
      and is useful because in practice we decode many values before
      applying [fix] to a new argument. *)
+  let fixing = ref false in
   let self = ref None in
   let fix_f = fix in
   let fix e =
     match !self with
     | Some (e0, e') when e == e0 -> e'
     | _ ->
-        let e' = fix_f e in
-        self := Some (e, e') ;
-        e'
+        if !fixing then (
+          fixing := false ;
+          invalid_arg "infinite recursion in mu initialisation")
+        else (
+          fixing := true ;
+          let e' = fix_f e in
+          fixing := false ;
+          self := Some (e, e') ;
+          e')
   in
-  (* Attempt to determine kind. Note that this can results in memoisation
+  (* Attempt to determine the kind. Note that this can result in memoisation
      misses: the [fix] function might be called multiple times. *)
   try
     let precursor =
