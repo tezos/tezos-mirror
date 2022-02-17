@@ -56,5 +56,7 @@ module type S = sig
     val rev_combine : loc:string -> 'a list -> 'b list -> ('a * 'b) list
 
     val map2 : loc:string -> ('a -> 'b -> 'c) -> 'a list -> 'b list -> 'c list
+
+    val init : loc:string -> int -> (int -> 'a) -> 'a list
   end
 end
