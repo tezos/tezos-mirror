@@ -766,7 +766,6 @@ let tezos_stdlib_unix =
         re;
         ezjsonm;
         ptime;
-        ptime_clock_os;
         mtime;
         mtime_clock_os;
         lwt_log;
