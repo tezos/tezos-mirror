@@ -202,12 +202,12 @@ variables:
 
 .rules_template__trigger_opam_pipeline:
   rules:
-    # Run on push to the default branch (i.e master).
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: always
     # Run on scheduled builds.
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
       when: always
+    # Never run on branch pipelines for master.
+    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
+      when: never
     # Run when the branch name contains the `opam` keyword.
     - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
       when: always
