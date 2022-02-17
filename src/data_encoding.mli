@@ -190,7 +190,20 @@ module Encoding : sig
 
   (** Combinator to make an optional value
       (represented as a 1-byte tag followed by the data (or nothing) in binary
-       and either the raw value or an empty object in JSON). *)
+       and either the raw value or a null in JSON).
+
+      Note that the JSON representation is only weakly discriminating.
+      Specifically, the value [Some None] is represented as the raw value [None]
+      and so the two are indistinguishable. For this reason, this combinator
+      does not support nesting, nor does it support use within a recursive
+      ({!mu}) encoding.
+
+      @raise Invalid_argument if called on an encoding which may be represented
+      as [null] in JSON. This includes an encoding of the form [option _],
+      [conv _ _ (option _)], [dynamic_size (option _)], etc.
+
+      @raise Invalid_argument if called within the body of a {!mu}.
+       *)
   val option : 'a encoding -> 'a option encoding
 
   (** Combinator to make a {!result} value
