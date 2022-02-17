@@ -129,9 +129,7 @@ module Raw_context_tests = struct
     >>=? fun (ctx, id) ->
     Sapling_storage.init ctx id ~memo_size:0 >>= wrap >>=? fun ctx ->
     let nf_list_ctx =
-      List.init ~when_negative_length:() 10 (fun _ -> gen_nf ()) |> function
-      | Error () -> assert false (* 10 > 0 *)
-      | Ok nf_list_ctx -> nf_list_ctx
+      WithExceptions.List.init ~loc:__LOC__ 10 (fun _ -> gen_nf ())
     in
     let state =
       List.fold_left
@@ -141,9 +139,7 @@ module Raw_context_tests = struct
     in
     Sapling_storage.apply_diff ctx id state.diff >>= wrap >>=? fun (ctx, _) ->
     let nf_list_diff =
-      List.init ~when_negative_length:() 10 (fun _ -> gen_nf ()) |> function
-      | Error () -> assert false (* 10 > 0 *)
-      | Ok nf_list_diff -> nf_list_diff
+      WithExceptions.List.init ~loc:__LOC__ 10 (fun _ -> gen_nf ())
     in
     let state =
       List.fold_left
@@ -160,9 +156,7 @@ module Raw_context_tests = struct
       (nf_list_ctx @ nf_list_diff)
     >>=? fun () ->
     let nf_list_absent =
-      List.init 10 ~when_negative_length:() (fun _ -> gen_nf ()) |> function
-      | Error () -> assert false (* 10 > 0 *)
-      | Ok nf_list_absent -> nf_list_absent
+      WithExceptions.List.init ~loc:__LOC__ 10 (fun _ -> gen_nf ())
     in
     List.iter_ep
       (fun nf ->
@@ -192,11 +186,8 @@ module Raw_context_tests = struct
     Sapling_storage.init ctx id ~memo_size >>= wrap >>=? fun ctx ->
     Sapling_storage.state_from_id ctx id >>= wrap >>=? fun (diff, ctx) ->
     let list_added =
-      List.init ~when_negative_length:() 10 (fun _ ->
+      WithExceptions.List.init ~loc:__LOC__ 10 (fun _ ->
           gen_cm_cipher ~memo_size ())
-      |> function
-      | Error () -> assert false (* 10 > 0 *)
-      | Ok list_added -> list_added
     in
     let state = Sapling_storage.add diff list_added in
     Sapling_storage.apply_diff ctx id state.diff >>= wrap >>=? fun (ctx, _) ->
@@ -238,11 +229,8 @@ module Raw_context_tests = struct
     Sapling_storage.init ctx id_one_by_one ~memo_size >>= wrap >>=? fun ctx ->
     let list_to_add =
       fst @@ List.split
-      @@ (List.init ~when_negative_length:() 33 (fun _ ->
-              gen_cm_cipher ~memo_size ())
-          |> function
-          | Error () -> assert false (* 33 > 0 *)
-          | Ok r -> r)
+      @@ WithExceptions.List.init ~loc:__LOC__ 33 (fun _ ->
+             gen_cm_cipher ~memo_size ())
     in
     let rec test counter ctx =
       if counter >= 32 then return_unit
@@ -270,11 +258,8 @@ module Raw_context_tests = struct
         Sapling_storage.Commitments.add
           ctx
           id_all_at_once
-          (List.init ~when_negative_length:() (counter + 1) (fun i ->
-               WithExceptions.Option.get ~loc:__LOC__ @@ List.nth list_to_add i)
-           |> function
-           | Error () -> assert false (* counter >= 0*)
-           | Ok r -> r)
+          (WithExceptions.List.init ~loc:__LOC__ (counter + 1) (fun i ->
+               WithExceptions.Option.get ~loc:__LOC__ @@ List.nth list_to_add i))
           0L
         >>= wrap
         >>=? fun (ctx, _size) ->
@@ -300,13 +285,10 @@ module Raw_context_tests = struct
         (Hacl.Rand.gen 32)
     in
     let roots_ctx =
-      List.init
-        ~when_negative_length:()
+      WithExceptions.List.init
+        ~loc:__LOC__
         (Int32.to_int Sapling_storage.Roots.size + 10)
         (fun _ -> gen_root ())
-      |> function
-      | Error () -> assert false (* size >= 0 *)
-      | Ok roots_ctx -> roots_ctx
     in
     Context.init 1 >>=? fun (b, _) ->
     Raw_context.prepare
@@ -353,9 +335,7 @@ module Raw_context_tests = struct
     >>=? fun _ ->
     (* Add roots w/o increasing the level *)
     let roots_same_level =
-      List.init ~when_negative_length:() 10 (fun _ -> gen_root ()) |> function
-      | Error () -> assert false (* 10 > 0 *)
-      | Ok roots_same_level -> roots_same_level
+      WithExceptions.List.init ~loc:__LOC__ 10 (fun _ -> gen_root ())
     in
     List.fold_left_es
       (fun ctx root -> Sapling_storage.Roots.add ctx id root >>= wrap)
@@ -623,7 +603,7 @@ module Interpreter_tests = struct
     let wb = wallet_gen () in
     let list_addr = gen_addr 15 wb.vk in
     let list_forge_input =
-      List.init ~when_negative_length:() 14 (fun pos_int ->
+      WithExceptions.List.init ~loc:__LOC__ 14 (fun pos_int ->
           let pos = Int64.of_int pos_int in
           let forge_input =
             snd
@@ -631,9 +611,6 @@ module Interpreter_tests = struct
               |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
-      |> function
-      | Error () -> assert false (* 14 > 0 *)
-      | Ok list_forge_input -> list_forge_input
     in
     let list_forge_output =
       List.map
@@ -676,7 +653,7 @@ module Interpreter_tests = struct
     (* The inputs total [total] mutez and 15 of those are transfered in shielded tez *)
     assert (Int64.equal diff (Int64.of_int (total - 15))) ;
     let list_forge_input =
-      List.init ~when_negative_length:() 15 (fun i ->
+      WithExceptions.List.init ~loc:__LOC__ 15 (fun i ->
           let pos = Int64.of_int (i + 14 + 14) in
           let forge_input =
             snd
@@ -684,9 +661,6 @@ module Interpreter_tests = struct
               |> WithExceptions.Option.get ~loc:__LOC__)
           in
           forge_input)
-      |> function
-      | Error () -> assert false (* 14 > 0 *)
-      | Ok list_forge_input -> list_forge_input
     in
     let addr_a =
       snd

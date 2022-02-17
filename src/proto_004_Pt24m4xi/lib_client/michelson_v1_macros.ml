@@ -906,8 +906,7 @@ let dxiiivp_roman_of_decimal decimal =
     (* too short for D*P, fall back to IIIII... *)
     String.concat
       ""
-      (WithExceptions.Result.get_ok ~loc:__LOC__
-      @@ List.init ~when_negative_length:() decimal (fun _ -> "I"))
+      (WithExceptions.List.init ~loc:__LOC__ decimal (fun _ -> "I"))
   else roman
 
 let unexpand_dxiiivp expanded =

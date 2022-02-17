@@ -451,12 +451,8 @@ let default_patch_context ctxt =
 
 let nb_validation_passes = List.length Main.validation_passes
 
-let list_init_exn n f =
-  List.init ~when_negative_length:(Failure "list init exn") n f |> function
-  | Ok x -> x
-  | _ -> assert false
-
-let empty_operations = list_init_exn nb_validation_passes (fun _ -> [])
+let empty_operations =
+  WithExceptions.List.init ~loc:__LOC__ nb_validation_passes (fun _ -> [])
 
 let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
   let open Lwt_tzresult_syntax in
@@ -583,7 +579,7 @@ let apply ctxt chain_id ~policy ?(operations = empty_operations) pred =
     Some
       (List.map
          (List.map (fun r -> Operation_metadata_hash.hash_bytes [r]))
-         (list_init_exn 4 (fun _ -> [])))
+         (WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> [])))
   in
   return
     ( block_header,
@@ -616,7 +612,7 @@ let apply_and_store chain_store ?(synchronous_merge = true) ?policy
           last_allowed_fork_level = validation.last_allowed_fork_level;
         };
       block_metadata = block_header_metadata;
-      ops_metadata = list_init_exn 4 (fun _ -> []);
+      ops_metadata = WithExceptions.List.init ~loc:__LOC__ 4 (fun _ -> []);
       block_metadata_hash;
       ops_metadata_hashes;
     }
