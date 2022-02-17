@@ -250,7 +250,7 @@ commands. The following was generated:
             "1",
             "0"
         ],
-        "blocks_per_voting_period": 64,
+        "cycles_per_voting_period": 8,
         "blocks_per_roll_snapshot": 4,
         "blocks_per_commitment": 4,
         "blocks_per_cycle": 8,
