@@ -160,10 +160,43 @@ module Regressions = struct
     in
     unit
 
+  module Fail = struct
+    let client_submit_batch_invalid_rollup_address ~protocols =
+      let open Tezt_tezos in
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_client_submit_batch_invalid_rollup_address"
+        ~title:"Submit a batch to an invalid rollup address should fail"
+        ~tags:["tx_rollup"; "client"; "fail"]
+        ~protocols
+      @@ fun protocol ->
+      let* parameter_file = parameter_file protocol in
+      let* (_node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let invalid_address = "this is an invalid tx rollup address" in
+      let* () =
+        Client.spawn_submit_tx_rollup_batch
+          ~hooks
+          ~content:""
+          ~rollup:invalid_address
+          ~src:Constant.bootstrap1.public_key_hash
+          client
+        |> Process.check_error
+             ~exit_code:1
+             ~msg:
+               (rex
+                  ("Parameter '" ^ invalid_address
+                 ^ "' is an invalid tx rollup address"))
+      in
+      unit
+  end
+
   let register ~protocols =
     rpc_state ~protocols ;
     rpc_inbox ~protocols ;
-    rpc_commitment ~protocols
+    rpc_commitment ~protocols ;
+    Fail.client_submit_batch_invalid_rollup_address ~protocols
 end
 
 (** To be attached to process whose output needs to be captured by the
@@ -223,42 +256,12 @@ let test_submit_batch ~protocols =
       ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.") ;
   unit
 
-let test_invalid_rollup_address ~protocols =
-  let open Tezt_tezos in
-  Protocol.register_test
-    ~__FILE__
-    ~title:"Submit to an invalid rollup address should fail"
-    ~tags:["tx_rollup"; "cli"]
-    ~protocols
-  @@ fun protocol ->
-  let* parameter_file = parameter_file protocol in
-  let* (_node, client) =
-    Client.init_with_protocol ~parameter_file `Client ~protocol ()
-  in
-  let invalid_address = "this is an invalid tx rollup address" in
-  let* () =
-    Client.spawn_submit_tx_rollup_batch
-      ~hooks
-      ~content:""
-      ~rollup:invalid_address
-      ~src:Constant.bootstrap1.public_key_hash
-      client
-    |> Process.check_error
-         ~exit_code:1
-         ~msg:
-           (rex
-              ("Parameter '" ^ invalid_address
-             ^ "' is an invalid tx rollup address"))
-  in
-
-  unit
-
 let test_submit_from_originated_source ~protocols =
   let open Tezt_tezos in
   Protocol.register_test
     ~__FILE__
     ~title:"Submit from an originated contract should fail"
-    ~tags:["tx_rollup"; "cli"]
+    ~tags:["tx_rollup"; "client"]
     ~protocols
   @@ fun protocol ->
   let* parameter_file = parameter_file protocol in
@@ -276,19 +279,14 @@ let test_submit_from_originated_source ~protocols =
       ~burn_cap:Tez.(of_int 3)
       client
   in
-
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
-
   (* We originate a tx_rollup using an implicit account *)
   let* rollup =
     Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
   in
-
   let* () = Client.bake_for client in
-
   let batch = "tezos" in
-
   (* Finally, we submit a batch to the tx_rollup from an originated contract *)
   let* () =
     Client.spawn_submit_tx_rollup_batch
@@ -302,11 +300,9 @@ let test_submit_from_originated_source ~protocols =
          ~msg:
            (rex "Only implicit accounts can submit transaction rollup batches")
   in
-
   unit
 
 let register ~protocols =
   Regressions.register ~protocols ;
   test_submit_batch ~protocols ;
-  test_invalid_rollup_address ~protocols ;
   test_submit_from_originated_source ~protocols
