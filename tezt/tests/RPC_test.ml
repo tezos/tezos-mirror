@@ -142,7 +142,7 @@ let test_contracts ?endpoint client =
   let test_implicit_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
+    let*! _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
     let* _ =
       RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
     in
@@ -242,10 +242,10 @@ let test_contracts ?endpoint client =
   let test_originated_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
-    let* () =
-      RPC.Contracts.spawn_get_counter ?endpoint ~hooks ~contract_id client
-      |> Process.check ~expect_failure:true
+    let*? process =
+      RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client
     in
+    let* () = Process.check ~expect_failure:true process in
     let* () =
       RPC.Contracts.spawn_get_manager_key ?endpoint ~hooks ~contract_id client
       |> Process.check ~expect_failure:true
@@ -751,7 +751,7 @@ let test_mempool protocol ?endpoint client =
        to record them. *)
     Process.spawn ~hooks:mempool_hooks "curl" ["-s"; monitor_path]
   in
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.Account.public_key_hash
       client
@@ -766,7 +766,7 @@ let test_mempool protocol ?endpoint client =
       ~counter
       client
   in
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap2.Account.public_key_hash
       client

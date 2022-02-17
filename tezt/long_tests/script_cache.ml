@@ -77,7 +77,7 @@ let get_consumed_gas_for_block client =
 let current_head = ["chains"; "main"; "blocks"; "head"]
 
 let get_counter client =
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client

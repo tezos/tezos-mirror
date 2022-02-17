@@ -306,7 +306,7 @@ module Revamped = struct
       "Force inject a transfer with the same counter and the same source as %s \
        on node1."
       oph ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client1
@@ -641,7 +641,7 @@ module Revamped = struct
     in
 
     log_step 2 "Forge and inject an operation on the node." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -728,7 +728,7 @@ module Revamped = struct
     in
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -829,7 +829,7 @@ module Revamped = struct
         `Client
         ()
     in
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -903,7 +903,7 @@ module Revamped = struct
     in
     let source = Constant.bootstrap1 in
     let dest = Constant.bootstrap2 in
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -1002,7 +1002,7 @@ module Revamped = struct
     in
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -1201,7 +1201,7 @@ module Revamped = struct
     let* _ = bake_for ~wait_for_flush:true ~empty:false ~protocol node client in
 
     log_step 3 "Forge and force inject an operation." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter ~contract_id:source1.public_key_hash client
     in
     let counter =
@@ -1239,7 +1239,7 @@ module Revamped = struct
         ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 4 "Forge and force inject an operation." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter ~contract_id:source2.public_key_hash client
     in
     let counter =
@@ -2229,7 +2229,7 @@ let run_batched_operation =
   Log.info "Node is at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client_1
@@ -2601,7 +2601,7 @@ let forge_pre_filtered_operation =
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
-  let* base_counter =
+  let*! base_counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client_1
@@ -2712,7 +2712,7 @@ let refetch_failed_operation =
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* get counter and branches *)
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client_1
@@ -3367,12 +3367,12 @@ let force_operation_injection =
   Log.info "Both nodes are at level %d." proto_activation_level ;
   let open Lwt in
   Log.info "%s" step3_msg ;
-  let* counter =
+  let*! json =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client2
-    >|= JSON.as_int
   in
+  let counter = JSON.as_int json in
   let* branch = RPC.get_branch client2 >|= JSON.as_string in
   Log.info "%s" step4_msg ;
   let* (`Hex op_str_hex as op_hex) =
@@ -3441,12 +3441,12 @@ let injecting_old_operation_fails =
   let* () = Client.activate_protocol ~protocol ~parameter_file client in
   let* _ = Node.wait_for_level node 1 in
   log_step 2 step2 ;
-  let* counter =
+  let*! json =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client
-    >|= JSON.as_int
   in
+  let counter = JSON.as_int json in
   let* branch = RPC.get_branch client >|= JSON.as_string in
   log_step 3 step3 ;
   (* To avoid off-by-one mistakes *)

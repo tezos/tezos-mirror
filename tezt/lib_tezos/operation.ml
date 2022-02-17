@@ -75,8 +75,10 @@ let data_to_json =
 
 (* Some basic auxiliary functions *)
 let get_counter ~source client =
-  RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
-  >|= JSON.as_int
+  let*! json =
+    RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
+  in
+  return (JSON.as_int json)
 
 let get_next_counter ~source client = get_counter client ~source >|= succ
 

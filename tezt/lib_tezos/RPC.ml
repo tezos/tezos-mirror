@@ -325,13 +325,9 @@ module Contracts = struct
     let path = sub_path ~chain ~block ~contract_id "big_map_get" in
     Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
 
-  let spawn_get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
-
   let get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
+    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
 
   let spawn_get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
