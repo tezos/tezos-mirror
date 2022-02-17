@@ -20,6 +20,16 @@
   variables:
     ARCH: "x86_64"
 
+.unit_test_template_x86_64_coverage:
+  extends:
+    - .unit_test_template_x86_64
+    - .template__coverage_files
+  artifacts:
+    when: always
+    paths:
+      - $BISECT_FILE
+      - test_results
+
 .unit_test_template_arm64:
   extends: .unit_test_template
   needs: ["build_arm64"]
@@ -30,8 +40,7 @@
 
 unit:011_PtHangz2:
   extends:
-  - .unit_test_template_x86_64
-  - .template__coverage_files
+  - .unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: >
       src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -41,8 +50,7 @@ unit:011_PtHangz2:
 
 unit:012_Psithaca:
   extends:
-  - .unit_test_template_x86_64
-  - .template__coverage_files
+  - .unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: >
       src/proto_012_Psithaca/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -54,8 +62,7 @@ unit:012_Psithaca:
 
 unit:alpha:
   extends:
-  - .unit_test_template_x86_64
-  - .template__coverage_files
+  - .unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: >
       src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
@@ -64,10 +71,10 @@ unit:alpha:
       src/proto_alpha/lib_plugin.test_proto
       src/proto_alpha/lib_protocol.test_proto
       src/proto_alpha/lib_delegate.test_proto
+
 unit:non-proto-x86_64:
   extends:
-  - .unit_test_template_x86_64
-  - .template__coverage_files
+  - .unit_test_template_x86_64_coverage
   variables:
     MAKE_TARGETS: test-nonproto-unit
 
