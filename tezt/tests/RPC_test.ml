@@ -140,7 +140,7 @@ let check_rpc ~group_name ~protocols ~test_mode_tag
 let test_contracts ?endpoint client =
   let client_bake_for = make_client_bake_for () in
   let test_implicit_contract contract_id =
-    let* _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
+    let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
     let* _ =
@@ -159,7 +159,7 @@ let test_contracts ?endpoint client =
   Log.info "Test un-allocated implicit contract" ;
   let unallocated_implicit = "tz1c5BVkpwCiaPHJBzyjg7UHpJEMPTYA1bHG" in
   assert (not @@ List.mem unallocated_implicit contracts) ;
-  let* _ =
+  let*! _ =
     RPC.Contracts.get ?endpoint ~hooks ~contract_id:unallocated_implicit client
   in
   Log.info "Test non-delegated implicit contract" ;
@@ -240,7 +240,7 @@ let test_contracts ?endpoint client =
       ]
   in
   let test_originated_contract contract_id =
-    let* _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
+    let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let* () =
       RPC.Contracts.spawn_get_counter ?endpoint ~hooks ~contract_id client
