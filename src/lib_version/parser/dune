@@ -5,6 +5,7 @@
  (name tezos_version_parser)
  (public_name tezos-version.parser)
  (instrumentation (backend bisect_ppx))
- (preprocess (pps ppx_deriving.show)))
+ (preprocess (pps ppx_deriving.show))
+ (js_of_ocaml))
 
 (ocamllex tezos_version_parser)

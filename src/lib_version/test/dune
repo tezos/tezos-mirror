@@ -4,9 +4,18 @@
 (test
  (name test_parser)
  (package tezos-version)
+ (modes native js)
  (libraries
   tezos-version
   tezos-version.parser
-  tezos-base.unix
   alcotest)
+ (js_of_ocaml)
  (flags (:standard -open Tezos_version)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-version)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_parser.bc.js})))

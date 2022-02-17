@@ -951,6 +951,7 @@ let tezos_version_parser =
     ~path:"src/lib_version/parser"
     ~opam:"src/lib_version/tezos-version"
     ~dune:Dune.[ocamllex "tezos_version_parser"]
+    ~js_compatible:true
     ~preprocess:[pps ppx_deriving_show]
 
 let tezos_version =
@@ -997,8 +998,9 @@ let _tezos_version_tests =
     "test_parser"
     ~path:"src/lib_version/test"
     ~opam:"src/lib_version/tezos-version"
-    ~deps:
-      [tezos_version |> open_; tezos_version_parser; tezos_base_unix; alcotest]
+    ~js_compatible:true
+    ~modes:[Native; JS]
+    ~deps:[tezos_version |> open_; tezos_version_parser; alcotest]
 
 let tezos_p2p_services =
   public_lib
