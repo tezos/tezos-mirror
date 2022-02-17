@@ -82,3 +82,23 @@ ometrics-code-quality-default:
   artifacts:
     paths:
       - $CODE_QUALITY_REPORT
+
+ometrics-code-quality:
+  stage: test
+  needs: []
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .template__code_quality
+  script:
+    - OMETRICS_GIT=$CI_MERGE_REQUEST_SOURCE_PROJECT_URL OMETRICS_BRANCH=$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME make lint-ometrics-gitlab
+  artifacts:
+    expose_as: 'Code quality report'
+    when: always
+    reports:
+      codequality: $CODE_QUALITY_REPORT
+    paths:
+      - _reports/
+    expire_in: 15 days
+  only:
+    - merge_requests

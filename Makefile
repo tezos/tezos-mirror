@@ -22,6 +22,7 @@ DOCKER_DEPS_IMAGE_VERSION := runtime-build-dependencies--${opam_repository_tag}
 DOCKER_DEPS_MINIMAL_IMAGE_VERSION := runtime-dependencies--${opam_repository_tag}
 COVERAGE_REPORT := _coverage_report
 COBERTURA_REPORT := _coverage_report/cobertura.xml
+CODE_QUALITY_REPORT := _reports/gl-code-quality-report.json
 PROFILE?=dev
 VALID_PROFILES=dev release static
 
@@ -233,6 +234,32 @@ lint-tests-pkg:
 	@(dune build -p tezos-test-helpers @runtest @runtest_js) || \
 	{ echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."; exit 1; }
 
+
+
+NONPROTO_LIBS_DIR := $(addsuffix /,${NONPROTO_LIBS})
+EXCLUDE_NONPROTO_LIBS_DIR := $(addprefix --exclude-file ,${NONPROTO_LIBS_DIR})
+PROTO_LIBS_DIR = $(addsuffix /,${PROTO_LIBS})
+EXCLUDE_PROTO_LIBS_DIR := $(addprefix --exclude-file ,${PROTO_LIBS_DIR})
+
+.PHONY: lint-ometrics
+lint-ometrics:
+	@echo "Running ometrics analysis in your changes."
+	@ometrics check ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        --exclude-entry-re "pp\|pp_.+" \
+        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
+        --exclude-entry-re "compare\|compare_.+\|.+_compare"
+
+.PHONY: lint-ometric-gitlab
+lint-ometrics-gitlab:
+	@echo "Running ometrics analysis in your changes."
+	@mkdir -p _reports
+	@ometrics check-clone ${OMETRICS_GIT} --branch ${OMETRICS_BRANCH} \
+        ${EXCLUDE_NONPROTO_LIBS_DIR} ${EXCLUDE_PROTO_LIBS_DIR} \
+        --exclude-entry-re "pp\|pp_.+" \
+        --exclude-entry-re "encoding\|encoding_.+\|.+_encoding" \
+        --exclude-entry-re "compare\|compare_.+\|.+_compare" \
+        --gitlab --output ${CODE_QUALITY_REPORT}
+	@echo "Report should be available in file://$(shell pwd)/${CODE_QUALITY_REPORT}"
 
 .PHONY: test
 test: lint-opam-dune test-code

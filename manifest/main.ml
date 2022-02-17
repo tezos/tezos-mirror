@@ -185,6 +185,8 @@ let ocplib_endian_bigstring =
 let ocplib_ocamlres =
   external_lib ~opam:"ocp-ocamlres" "ocplib-ocamlres" V.(at_least "0.4")
 
+let ometrics = opam_only "ometrics" V.(at_least "0.1.1")
+
 let parsexp = external_lib ~js_compatible:true "parsexp" V.True
 
 let ppx_blob = external_lib "ppx_blob" V.True
@@ -1077,6 +1079,15 @@ let tezos_tooling =
     ~path:"src/tooling"
     ~synopsis:"Tezos: tooling for the project"
     ~modules:[]
+    ~deps:
+      [
+        coq_of_ocaml;
+        bisect_ppx;
+        (* These next are only used in the CI, we add this dependency so that
+           it is added to tezos/opam-repository. *)
+        ocamlformat;
+        ometrics;
+      ]
     ~dune:
       Dune.
         [
@@ -3181,9 +3192,6 @@ let _tztop =
     ~static:false
     ~deps:
       [
-        coq_of_ocaml;
-        ocamlformat;
-        bisect_ppx;
         (* The following deps come from the original dune file. *)
         tezos_protocol_compiler_lib;
         tezos_base;
