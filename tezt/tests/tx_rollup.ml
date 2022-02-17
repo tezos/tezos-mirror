@@ -58,11 +58,7 @@ module Regressions = struct
     (* We originate a dumb rollup to be able to generate a paths for
        tx_rollups related RPCs. *)
     let* rollup =
-      Client.originate_tx_rollup
-        ~burn_cap:Tez.(of_int 9999999)
-        ~storage_limit:60_000
-        ~src:Constant.bootstrap1.public_key_hash
-        client
+      Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
     in
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node 2 in
@@ -257,11 +253,7 @@ let test_submit_batch ~protocols =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let* rollup =
-    Client.originate_tx_rollup
-      ~burn_cap:Tez.(of_int 9999999)
-      ~storage_limit:60_000
-      ~src:Constant.bootstrap1.public_key_hash
-      client
+    Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
   in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
@@ -357,11 +349,7 @@ let test_submit_from_originated_source ~protocols =
 
   (* We originate a tx_rollup using an implicit account *)
   let* rollup =
-    Client.originate_tx_rollup
-      ~burn_cap:Tez.(of_int 9999999)
-      ~storage_limit:60_000
-      ~src:Constant.bootstrap1.public_key_hash
-      client
+    Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
   in
 
   let* () = Client.bake_for client in
@@ -392,13 +380,7 @@ let test_node_configuration =
     "TX_rollup: configuration"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* tx_rollup_hash =
-        Client.originate_tx_rollup
-          ~burn_cap:Tez.(of_int 9999999)
-          ~storage_limit:60_000
-          ~src:operator
-          client
-      in
+      let* tx_rollup_hash = Client.originate_tx_rollup ~src:operator client in
       let* json = RPC.get_block client in
       let* block_hash = get_block_hash json in
       let tx_rollup_node =
@@ -439,13 +421,7 @@ let test_tx_node_is_ready =
     "TX_rollup: test if the node is ready"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* tx_rollup_hash =
-        Client.originate_tx_rollup
-          ~burn_cap:Tez.(of_int 9999999)
-          ~storage_limit:60_000
-          ~src:operator
-          client
-      in
+      let* tx_rollup_hash = Client.originate_tx_rollup ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
       let* json = RPC.get_block client in
@@ -470,13 +446,7 @@ let test_tx_node_store_inbox =
     "TX_rollup: test"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* tx_rollup_hash =
-        Client.originate_tx_rollup
-          ~burn_cap:Tez.(of_int 9999999)
-          ~storage_limit:60_000
-          ~src:operator
-          client
-      in
+      let* tx_rollup_hash = Client.originate_tx_rollup ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
       let* json = RPC.get_block client in
