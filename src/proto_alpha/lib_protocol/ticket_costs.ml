@@ -45,7 +45,7 @@ module Constants = struct
   *)
   let cost_compare_ticket_hash = S.safe_int 100
 
-  (* TODO: #2315
+  (* TODO: #2520
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)

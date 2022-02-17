@@ -109,6 +109,63 @@ end
 
 let () = Registration_helpers.register (module Compare_ticket_hash_benchmark)
 
+(** A benchmark for {!Ticket_costs.Constants.cost_compare_key_contract}.
+
+    In this benchmark we only compare originated contracts; we never use
+    implicit contracts. This is justified partly by the fact that
+    currently the carbonated maps only use originated contracts as keys.
+    In addition, while developing this benchmark the implicit contracts were
+    also tested and gave almost identical timings. *)
+module Compare_key_contract_benchmark : Benchmark.S = struct
+  type config = unit
+
+  let config_encoding = Data_encoding.unit
+
+  let default_config = ()
+
+  type workload = unit
+
+  let workload_encoding = Data_encoding.unit
+
+  let workload_to_vector () = Sparse_vec.String.of_list []
+
+  let tags = ["tickets"]
+
+  let name = "COMPARE_CONTRACT"
+
+  let info = "Compare cost for Contracts"
+
+  let compare_model =
+    Model.make
+      ~conv:(fun () -> ())
+      ~model:
+        (Model.unknown_const2
+           ~const1:Builtin_benchmarks.timer_variable
+           ~const2:(Free_variable.of_string "compare_contract"))
+
+  let models = [("compare", compare_model)]
+
+  let benchmark rng_state _conf () =
+    let bytes = Base_samplers.bytes rng_state ~size:{min = 32; max = 64} in
+    let branch = Block_hash.hash_bytes [bytes] in
+    let op_hash = Operation.hash_raw {shell = {branch}; proto = bytes} in
+    let nonce = Origination_nonce.Internal_for_tests.initial op_hash in
+    let contract = Contract.Internal_for_tests.originated_contract nonce in
+    let workload = () in
+    let closure () = ignore (Contract.compare contract contract) in
+    Generator.Plain {workload; closure}
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (benchmark rng_state config)
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen compare_model)
+end
+
+let () = Registration_helpers.register (module Compare_key_contract_benchmark)
+
 (* A simple ticket type for use in the benchmarks. *)
 let ticket_ty =
   let open Script_typed_ir in
