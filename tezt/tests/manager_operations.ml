@@ -675,7 +675,7 @@ module Memchecks = struct
     unit
 
   let check_revealed ~__LOC__ {client; _} key ~revealed =
-    let* res =
+    let*! res =
       RPC.Contracts.get_manager_key
         ~contract_id:key.Account.public_key_hash
         client

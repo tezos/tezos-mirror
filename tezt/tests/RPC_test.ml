@@ -143,7 +143,7 @@ let test_contracts ?endpoint client =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let*! _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
-    let* _ =
+    let*! _ =
       RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
     in
     unit
@@ -267,10 +267,10 @@ let test_contracts ?endpoint client =
       RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client
     in
     let* () = Process.check ~expect_failure:true process in
-    let* () =
-      RPC.Contracts.spawn_get_manager_key ?endpoint ~hooks ~contract_id client
-      |> Process.check ~expect_failure:true
+    let*? process =
+      RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
     in
+    let* () = Process.check ~expect_failure:true process in
     let big_map_key =
       Ezjsonm.value_from_string
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
