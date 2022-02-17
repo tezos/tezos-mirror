@@ -37,13 +37,18 @@ type error += Storage_limit_too_high (* `Permanent *)
 val record_global_constant_storage_space :
   Raw_context.t -> Z.t -> Raw_context.t * Z.t
 
-(** [record_paid_storage_space ctxt contract] updates the amount of storage
-    consumed by the [contract] and considered as accounted for as far as
-    future payment is concerned. Returns a new context, the total space
+(** [record_paid_storage_space ctxt contract ~ticket_table_size_diff] updates
+    the amount of storage consumed by the [contract] and the
+    [ticket_table_size_diff] which represents the size change to the
+    ticket-balance table. This total size is considered as accounted for as far
+    as future payment is concerned. Returns a new context, the total space
     consumed by the [contract], and the additional (and unpaid) space consumed
     since the last call of this function on this [contract]. *)
 val record_paid_storage_space :
-  Raw_context.t -> Contract_repr.t -> (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
+  Raw_context.t ->
+  Contract_repr.t ->
+  ticket_table_size_diff:Z.t ->
+  (Raw_context.t * Z.t * Z.t) tzresult Lwt.t
 
 (** [check_storage_limit ctxt ~storage_limit] raises the [Storage_limit_too_high]
      error iff [storage_limit] is negative or greater the constant

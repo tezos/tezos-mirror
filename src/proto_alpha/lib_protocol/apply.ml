@@ -1018,7 +1018,10 @@ let apply_manager_operation_content :
             storage
             lazy_storage_diff
           >>=? fun ctxt ->
-          Fees.record_paid_storage_space ctxt destination
+          Fees.record_paid_storage_space
+            ctxt
+            destination
+            ~ticket_table_size_diff:Z.zero
           >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
           Contract.originated_from_current_nonce
             ~since:before_operation
@@ -1178,7 +1181,10 @@ let apply_manager_operation_content :
       >>=? fun ctxt ->
       Token.transfer ctxt (`Contract source) (`Contract contract) credit
       >>=? fun (ctxt, balance_updates) ->
-      Fees.record_paid_storage_space ctxt contract
+      Fees.record_paid_storage_space
+        ctxt
+        contract
+        ~ticket_table_size_diff:Z.zero
       >|=? fun (ctxt, size, paid_storage_size_diff) ->
       let result =
         Origination_result
@@ -2744,6 +2750,7 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                Fees.record_paid_storage_space
                  ctxt
                  liquidity_baking_cpmm_contract
+                 ~ticket_table_size_diff:Z.zero
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
                let consumed_gas =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt
