@@ -485,17 +485,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_storage], but do not wait for the process to exit. *)
-  val spawn_get_storage :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 end
 
 module Delegates : sig

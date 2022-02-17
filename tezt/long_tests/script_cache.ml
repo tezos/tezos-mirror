@@ -92,7 +92,7 @@ let get_size client =
   return (JSON.as_int size)
 
 let get_storage ~contract_id client =
-  let* storage = RPC.Contracts.get_storage ~contract_id client in
+  let*! storage = RPC.Contracts.get_storage ~contract_id client in
   return
   @@ JSON.(
        List.assoc "args" (as_object storage) |> geti 0 |> fun x ->

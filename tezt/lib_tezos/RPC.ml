@@ -308,14 +308,6 @@ module Contracts = struct
     let path = sub_path ~chain ~block ~contract_id field in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 
-  let spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
-    let path = sub_path ~chain ~block ~contract_id field in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
-  let get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
-    let path = sub_path ~chain ~block ~contract_id field in
-    Client.rpc ?endpoint ?hooks GET path client
-
   let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
@@ -345,13 +337,9 @@ module Contracts = struct
       ~contract_id client =
     get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "script" client
 
-  let spawn_get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
-
   let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
+    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
 end
 
 module Delegates = struct
