@@ -34,11 +34,6 @@ type type_annot = Type_annot
 
 type field_annot = Field_annot of Non_empty_string.t [@@ocaml.unboxed]
 
-module FOR_TESTS = struct
-  let unsafe_field_annot_of_string s =
-    Field_annot (Non_empty_string.of_string_exn s)
-end
-
 let error_unexpected_annot loc annot =
   match annot with
   | [] -> Result.return_unit
