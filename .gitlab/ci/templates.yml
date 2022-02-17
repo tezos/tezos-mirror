@@ -126,11 +126,11 @@ variables:
 # Rules for all the jobs that are run only on release tags
 .rules_template__release_tag:
   rules:
-    - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
-      when: on_success
-    - if: '$CI_PROJECT_NAMESPACE == "nomadic-labs"'
-      when: on_success
-    - when: never
+    # - if: '$CI_COMMIT_TAG =~ /\A\d+\.\d+\.\d+\z/ && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+    #   when: on_success
+    # - if: '$CI_PROJECT_NAMESPACE == "nomadic-labs"'
+    #   when: on_success
+    - when: always
 
 # Rules for specific topics: doc, opam, etc.
 .rules_template__development_documentation:

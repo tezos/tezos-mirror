@@ -1,6 +1,6 @@
 ---
 release-on-gitlab:
-  image: registry.gitlab.com/gitlab-org/release-cli
+  image: registry.gitlab.com/gitlab-org/release-cli:v0.11.0
   extends:
     - .rules_template__release_tag
   variables:
@@ -9,22 +9,22 @@ release-on-gitlab:
   script:
     - apk --no-cache --virtual add jq curl
     - scripts/release/create-gitlab-release.sh
-  dependencies:
-    - build:static-arm64-linux-binaries
-    - build:static-x86_64-linux-binaries
+  # dependencies:
+  #   - build:static-arm64-linux-binaries
+  #   - build:static-x86_64-linux-binaries
 
 # Note: here we rely on $IMAGE_ARCH_PREFIX to be empty.
 # Otherwise, $DOCKER_IMAGE_TAG would contain $IMAGE_ARCH_PREFIX too.
 # $IMAGE_ARCH_PREFIX is only used when building Docker images,
 # here we handle all architectures so there is no such variable.
-docker:merge_manifests:
-  extends:
-    - .rules_template__master_and_releases
-    - .image_template__latest # Docker-in-Docker (dind)
-    - .docker_registry_auth # Sets up a before_script
-  stage: publish_release
-  script:
-    - apk add git
-    # Environment variables from before_script
-    - . ./scripts/ci/docker.env
-    - ./scripts/ci/docker_merge_manifests.sh
+# docker:merge_manifests:
+#   extends:
+#     - .rules_template__master_and_releases
+#     - .image_template__latest # Docker-in-Docker (dind)
+#     - .docker_registry_auth # Sets up a before_script
+#   stage: publish_release
+#   script:
+#     - apk add git
+#     # Environment variables from before_script
+#     - . ./scripts/ci/docker.env
+#     - ./scripts/ci/docker_merge_manifests.sh
