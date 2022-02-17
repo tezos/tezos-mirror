@@ -153,7 +153,7 @@ type t = {
    is past the checkpoint) but the block is not yet in the chain. *)
 let assert_acceptable_header pipeline hash (header : Block_header.t) =
   let chain_store = Distributed_db.chain_store pipeline.chain_db in
-  let time_now = Systime_os.now () in
+  let time_now = Time.System.now () in
   fail_unless
     (Clock_drift.is_not_too_far_in_the_future header.shell.timestamp)
     (Future_block_header

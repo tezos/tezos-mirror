@@ -196,7 +196,7 @@ module Make (Registration : Registration.S) = struct
             persisted_mockup.rpc_context.block_header
           in
           let timestamp =
-            Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
+            Time.System.to_protocol (Tezos_base.Time.System.now ())
           in
           let predecessor = persisted_mockup.rpc_context.block_hash in
           let* (module Mockup) =

@@ -77,7 +77,7 @@ let send_swap_request t =
         (P2p_conn.write_swap_request recipient proposed_point proposed_peer_id)
 
 let classify pool private_mode start_time seen_points point pi =
-  let now = Systime_os.now () in
+  let now = Time.System.now () in
   if
     P2p_point.Set.mem point seen_points
     || P2p_pool.Points.banned pool point
@@ -182,7 +182,7 @@ let rec try_to_contact_loop t start_time ~seen_points min_to_contact
     to incrementally reach the number of connections. The set of
     known points maybe be concurrently updated. *)
 let try_to_contact t min_to_contact max_to_contact =
-  let start_time = Systime_os.now () in
+  let start_time = Time.System.now () in
   let seen_points = P2p_point.Set.empty in
   try_to_contact_loop t start_time min_to_contact max_to_contact ~seen_points
 

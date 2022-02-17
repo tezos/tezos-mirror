@@ -140,7 +140,7 @@ class unix_prompter : Client_context.prompter =
   end
 
 class unix_logger ~base_dir : Client_context.printer =
-  let startup = Format.asprintf "%a" Time.System.pp_hum (Systime_os.now ()) in
+  let startup = Format.asprintf "%a" Time.System.pp_hum (Time.System.now ()) in
   let log channel msg =
     let open Lwt_syntax in
     match channel with
@@ -178,7 +178,7 @@ class unix_ui : Client_context.ui =
 
     method exit : 'a. int -> 'a = fun i -> Lwt_exit.exit_and_raise i
 
-    method now = Tezos_stdlib_unix.Systime_os.now
+    method now = Tezos_base.Time.System.now
   end
 
 class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename

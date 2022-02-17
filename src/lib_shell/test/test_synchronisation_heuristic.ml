@@ -61,7 +61,7 @@ let forge_peer_id () =
   identity.peer_id
 
 let forge_timestamp ?(delay = 0) () =
-  let time = Time.System.to_protocol @@ Systime_os.now () in
+  let time = Time.System.to_protocol @@ Time.System.now () in
   Time.Protocol.add time (Int64.of_int delay)
 
 (* NOTE: timestamp supersedes delay *)

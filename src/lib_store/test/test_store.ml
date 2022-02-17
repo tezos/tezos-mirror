@@ -534,7 +534,7 @@ let test_reach_target chain_store table =
     Store.Chain.set_target chain_store (checkpoint_hash, checkpoint_level)
   in
   let*! (c_hash, _c_level) = Store.Chain.checkpoint chain_store in
-  let time_now = Time.System.to_protocol (Systime_os.now ()) in
+  let time_now = Time.System.to_protocol (Time.System.now ()) in
   if
     Time.Protocol.compare
       (Time.Protocol.add time_now 15L)

@@ -947,7 +947,7 @@ Sometimes you want to add context or information to an error. E.g.,
    let with_debug_info ~position f =
      match f () with
      | Ok _ as ok -> ok
-     | Error e -> Error { payload = e; timestamp = Systime_os.now (); position }
+     | Error e -> Error { payload = e; timestamp = Time.System.now (); position }
 
 This specific example can be useful for debugging, but other wrappers
 can be useful in other contexts.

@@ -545,7 +545,7 @@ let compute_round proposal round_durations =
   if Protocol_hash.(proposal.block.protocol <> proposal.block.next_protocol)
   then ok Round.zero
   else
-    let timestamp = Systime_os.now () |> Time.System.to_protocol in
+    let timestamp = Time.System.now () |> Time.System.to_protocol in
     let predecessor_block = proposal.predecessor in
     Environment.wrap_tzresult
     @@ Alpha_context.Round.round_of_timestamp

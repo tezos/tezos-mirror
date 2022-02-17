@@ -111,7 +111,7 @@ let ef ?(all = false) state =
 
 let start t process =
   let date =
-    Tezos_stdlib_unix.Systime_os.now () |> Tezos_base.Time.System.to_notation
+    Tezos_base.Time.System.now () |> Tezos_base.Time.System.to_notation
   in
   let open_file f =
     System_error.catch

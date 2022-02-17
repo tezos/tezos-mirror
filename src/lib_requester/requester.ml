@@ -265,7 +265,7 @@ end = struct
     match next with
     | None -> fst @@ Lwt.task ()
     | Some next ->
-        let now = Systime_os.now () in
+        let now = Time.System.now () in
         let delay = Ptime.diff next now in
         if Ptime.Span.compare delay Ptime.Span.zero <= 0 then Lwt.return_unit
         else Systime_os.sleep delay
@@ -330,14 +330,14 @@ end = struct
       in
       if Lwt.state shutdown <> Lwt.Sleep then Events.(emit terminated) ()
       else if Lwt.state state.events <> Lwt.Sleep then (
-        let now = Systime_os.now () in
+        let now = Time.System.now () in
         let* events = state.events in
         state.events <- Lwt_pipe.Unbounded.pop_all state.queue ;
         let* () = List.iter_s (process_event state now) events in
         loop state)
       else
         let* () = Events.(emit timeout) () in
-        let now = Systime_os.now () in
+        let now = Time.System.now () in
         let active_peers = Request.active state.param in
         let requests =
           Table.fold

@@ -1067,7 +1067,7 @@ module Make_s
       pv.shell.live_operations <- new_live_operations ;
       Lwt_watcher.shutdown_input pv.operation_stream ;
       pv.operation_stream <- Lwt_watcher.create_input () ;
-      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
+      let timestamp_system = Tezos_base.Time.System.now () in
       pv.shell.timestamp <- timestamp_system ;
       let timestamp = Time.System.to_protocol timestamp_system in
       pv.shell.parameters.tools.create
@@ -1608,7 +1608,7 @@ module Make
       Store.Chain.mempool chain_store >>= fun mempool ->
       Store.Chain.live_blocks chain_store
       >>= fun (live_blocks, live_operations) ->
-      let timestamp_system = Tezos_stdlib_unix.Systime_os.now () in
+      let timestamp_system = Tezos_base.Time.System.now () in
       let timestamp = Time.System.to_protocol timestamp_system in
       Prevalidation_t.create
         chain_store
@@ -1875,7 +1875,7 @@ module Internal_for_tests = struct
     let live_blocks = Block_hash.Set.empty in
     let live_operations = Operation_hash.Set.empty in
     let pending = Pending_ops.empty in
-    let timestamp = Tezos_stdlib_unix.Systime_os.now () in
+    let timestamp = Tezos_base.Time.System.now () in
     {
       advertisement;
       banned_operations;

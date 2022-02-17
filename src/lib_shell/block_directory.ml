@@ -374,7 +374,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   register0 S.Helpers.Preapply.block (fun (chain_store, block) q p ->
       let timestamp =
         match q#timestamp with
-        | None -> Time.System.to_protocol (Systime_os.now ())
+        | None -> Time.System.to_protocol (Time.System.now ())
         | Some time -> time
       in
       let protocol_data =
@@ -423,7 +423,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
         ~predecessor_level:header.level
         ~predecessor_fitness:header.fitness
         ~predecessor
-        ~timestamp:(Time.System.to_protocol (Systime_os.now ()))
+        ~timestamp:(Time.System.to_protocol (Time.System.now ()))
         ~cache:`Lazy
         ()
       >>=? fun state ->
@@ -477,7 +477,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
              See {!Environment_context.source_of_cache}.
            *)
            let predecessor = Store.Block.hash block in
-           let timestamp = Time.System.to_protocol (Systime_os.now ()) in
+           let timestamp = Time.System.to_protocol (Time.System.now ()) in
            Next_proto.value_of_key
              ~chain_id
              ~predecessor_context

@@ -200,7 +200,7 @@ let prepare_endorsement ~(max_past : int64) ()
     (cctxt : #Protocol_client_context.full) state bi =
   let past =
     Time.Protocol.diff
-      (Time.System.to_protocol (Systime_os.now ()))
+      (Time.System.to_protocol (Time.System.now ()))
       bi.Client_baking_blocks.timestamp
   in
   if past > max_past then
@@ -209,7 +209,7 @@ let prepare_endorsement ~(max_past : int64) ()
     Events.(emit endorsement_got_block) bi.hash >>= fun () ->
     let time =
       Time.Protocol.add
-        (Time.System.to_protocol (Systime_os.now ()))
+        (Time.System.to_protocol (Time.System.now ()))
         state.delay
     in
     get_delegates cctxt state >>=? fun delegates ->
@@ -226,7 +226,7 @@ let compute_timeout state =
       | Some timeout ->
           let timespan =
             let timespan =
-              Ptime.diff (Time.System.of_protocol_exn time) (Systime_os.now ())
+              Ptime.diff (Time.System.of_protocol_exn time) (Time.System.now ())
             in
             if Ptime.Span.compare timespan Ptime.Span.zero > 0 then timespan
             else Ptime.Span.zero

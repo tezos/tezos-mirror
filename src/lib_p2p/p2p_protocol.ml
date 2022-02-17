@@ -107,11 +107,11 @@ module Default_answerer = struct
 
   let swap t pool source_peer_id ~connect current_peer_id new_point =
     let open Lwt_syntax in
-    t.latest_accepted_swap <- Systime_os.now () ;
+    t.latest_accepted_swap <- Time.System.now () ;
     let* r = connect new_point in
     match r with
     | Ok _new_conn -> (
-        t.latest_successful_swap <- Systime_os.now () ;
+        t.latest_successful_swap <- Time.System.now () ;
         t.log (Swap_success {source = source_peer_id}) ;
         let* () = Events.(emit swap_succeeded) new_point in
         match P2p_pool.Connection.find_by_peer_id pool current_peer_id with
@@ -152,7 +152,7 @@ module Default_answerer = struct
     (* Ignore if already connected to peer or already swapped less than <swap_linger> ago. *)
     let span_since_last_swap =
       Ptime.diff
-        (Systime_os.now ())
+        (Time.System.now ())
         (Time.System.max
            config.latest_successful_swap
            config.latest_accepted_swap)
