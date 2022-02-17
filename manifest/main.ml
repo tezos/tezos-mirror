@@ -1100,12 +1100,10 @@ let tezos_tooling =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "package"; S "tezos-tooling"];
-            [S "section"; S "libexec"];
-            [S "files"; [S "lint.sh"; S "as"; S "lint.sh"]];
-          ];
+          install
+            [as_ "lint.sh" "lint.sh"]
+            ~package:"tezos-tooling"
+            ~section:"libexec";
         ]
 
 let _tezos_tooling_js_inline_tests =
@@ -1725,20 +1723,21 @@ let tezos_protocol_compiler_native =
       ]
     ~modules:["Native"]
     ~dune:
-      [
+      Dune.
         [
-          S "install";
-          [S "section"; S "libexec"];
-          [
-            S "files";
-            S "dune_protocol.v0";
-            S "dune_protocol.v1";
-            S "dune_protocol.template.v0";
-            S "dune_protocol.template.v1";
-            S "final_protocol_versions";
-          ];
-        ];
-      ]
+          install
+            [
+              V
+                [
+                  S "dune_protocol.v0";
+                  S "dune_protocol.v1";
+                  S "dune_protocol.template.v0";
+                  S "dune_protocol.template.v1";
+                  S "final_protocol_versions";
+                ];
+            ]
+            ~section:"libexec";
+        ]
 
 let tezos_protocol_updater =
   public_lib
@@ -2972,12 +2971,10 @@ let _s_packer =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "section"; S "libexec"];
-            [S "package"; S "tezos-protocol-environment-packer"];
-            [S "files"; [S "s_packer.exe"; S "as"; S "s_packer"]];
-          ];
+          install
+            [as_ "s_packer.exe" "s_packer"]
+            ~package:"tezos-protocol-environment-packer"
+            ~section:"libexec";
         ]
 
 let _replace =
@@ -2994,14 +2991,7 @@ let _replace =
       ]
     ~modules:["Replace"]
     ~static:true
-    ~dune:
-      [
-        [
-          S "install";
-          [S "section"; S "libexec"];
-          [S "files"; [S "replace.exe"; S "as"; S "replace"]];
-        ];
-      ]
+    ~dune:Dune.[install [as_ "replace.exe" "replace"] ~section:"libexec"]
 
 let _tezos_validator_bin =
   public_exe
@@ -3058,15 +3048,10 @@ let _tezos_node =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "package"; S "tezos-node"];
-            [S "section"; S "bin"];
-            [
-              S "files";
-              [S "tezos-sandboxed-node.sh"; S "as"; S "tezos-sandboxed-node.sh"];
-            ];
-          ];
+          install
+            [as_ "tezos-sandboxed-node.sh" "tezos-sandboxed-node.sh"]
+            ~package:"tezos-node"
+            ~section:"bin";
         ]
 
 let _tezos_client =
@@ -3103,19 +3088,14 @@ let _tezos_client =
     ~dune:
       Dune.
         [
-          [
-            S "install";
-            [S "package"; S "tezos-client"];
-            [S "section"; S "bin"];
+          install
             [
-              S "files";
-              [
-                S "tezos-init-sandboxed-client.sh";
-                S "as";
-                S "tezos-init-sandboxed-client.sh";
-              ];
-            ];
-          ];
+              as_
+                "tezos-init-sandboxed-client.sh"
+                "tezos-init-sandboxed-client.sh";
+            ]
+            ~package:"tezos-client"
+            ~section:"bin";
         ]
 
 let _tezos_codec =
