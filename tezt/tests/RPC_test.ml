@@ -254,7 +254,7 @@ let test_contracts ?endpoint client =
       Ezjsonm.value_from_string
         "{ \"key\": { \"int\": \"0\" }, \"type\": { \"prim\": \"int\" } }"
     in
-    let* _ =
+    let*! _ =
       RPC.Contracts.big_map_get
         ?endpoint
         ~hooks
@@ -302,7 +302,7 @@ let test_contracts ?endpoint client =
       "{ \"key\": { \"string\": \"test\" }, \"type\": { \"prim\": \"string\" } \
        }"
   in
-  let* _ =
+  let*! _ =
     RPC.Contracts.big_map_get
       ?endpoint
       ~hooks
@@ -314,7 +314,7 @@ let test_contracts ?endpoint client =
     Ezjsonm.value_from_string
       "{ \"key\": { \"string\": \"dup\" }, \"type\": { \"prim\": \"string\" } }"
   in
-  let* _ =
+  let*! _ =
     RPC.Contracts.big_map_get
       ?endpoint
       ~hooks

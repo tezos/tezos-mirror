@@ -425,18 +425,7 @@ module Contracts : sig
     contract_id:string ->
     data:JSON.u ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [big_map_get], but do not wait for the process to exit. *)
-  val spawn_big_map_get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    data:JSON.u ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
   val get_counter :
