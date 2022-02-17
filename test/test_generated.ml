@@ -244,6 +244,10 @@ let () =
     [gen]
     test_full_and_v_binary_to_string ;
   add_test
+    ~name:"binary roundtrips (to_/of_string) (compacts)"
+    [gen_with_compact]
+    test_full_and_v_binary_to_string ;
+  add_test
     ~name:"json roundtrips (construct/destruct)"
     [gen]
     test_full_and_v_json ;
