@@ -196,6 +196,31 @@ module Dune : sig
 
       Such stanzas are used at toplevel to include other dune files. *)
   val include_ : string -> s_expr
+
+  (* Makes a rule stanza to generate targets.
+
+     Example: [targets_rule ?deps targets ~action] results in:
+
+     (rule
+       (targets <targets>)
+       (deps <deps>)
+       (action <action>)) *)
+  val targets_rule : ?deps:s_expr list -> string list -> action:s_expr -> s_expr
+
+  (* Makes an [install] stanza.
+
+     Example: [install files ~package ~section] creates a stanza of the form:
+
+     [(install
+       (package <package>)
+       (section <section>)
+       (files <files>))] *)
+  val install : ?package:string -> s_expr list -> section:string -> s_expr
+
+  (* Makes an [as] expression.
+
+     Example: [as_ "foo" "bar"] results in [(foo as bar)] *)
+  val as_ : string -> string -> s_expr
 end
 
 module Version : sig

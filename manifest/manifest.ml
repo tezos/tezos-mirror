@@ -325,6 +325,26 @@ module Dune = struct
   let include_ name = [S "include"; S name]
 
   let file name = [S "file"; S name]
+
+  let targets_rule ?deps targets ~action =
+    [
+      S "rule";
+      [S "targets"; G (of_atom_list targets)];
+      (match deps with None -> E | Some deps -> [S "deps"; G (of_list deps)]);
+      [S "action"; action];
+    ]
+
+  let install ?package files ~section =
+    [
+      S "install";
+      (match package with
+      | None -> E
+      | Some package -> [S "package"; S package]);
+      [S "section"; S section];
+      [S "files"; G (of_list files)];
+    ]
+
+  let as_ target alias = [S target; S "as"; S alias]
 end
 
 (*****************************************************************************)
