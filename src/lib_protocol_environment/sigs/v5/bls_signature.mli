@@ -24,6 +24,9 @@
 (** Type of the public keys *)
 type pk
 
+(** The size in bytes of a serialized value [pk] *)
+val pk_size_in_bytes : int
+
 (** Build a value of type [pk] without performing any check on the input.
     It is safe to use this function when verifying a signature as the
     signature function verifies if the point is in the prime subgroup. Using
@@ -50,6 +53,9 @@ val pk_to_bytes : pk -> Bytes.t
 
 (** Type of the signatures *)
 type signature
+
+(** The size in bytes of a serialized value [signature] *)
+val signature_size_in_bytes : int
 
 (** Build a value of type {!signature} without performing any check on the
     input. It is safe to use this function when verifying a signature as the
