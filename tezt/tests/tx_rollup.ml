@@ -170,10 +170,6 @@ end
     regression framework. *)
 let hooks = Tezos_regression.hooks
 
-type state = {burn_per_byte : int}
-
-type inbox = {cumulated_size : int; contents : string list}
-
 let test_submit_batch ~protocols =
   Protocol.register_test
     ~__FILE__
