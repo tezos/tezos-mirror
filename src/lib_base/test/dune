@@ -18,6 +18,7 @@
 (rule
  (alias runtest_js)
  (package tezos-base)
+ (locks npm)
  (action
   (run
    %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
@@ -26,6 +27,7 @@
 (rule
  (alias runtest_js)
  (package tezos-base)
+ (locks npm)
  (action
   (run
    %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
@@ -34,6 +36,7 @@
 (rule
  (alias runtest_js)
  (package tezos-base)
+ (locks npm)
  (action
   (run
    %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
@@ -42,6 +45,7 @@
 (rule
  (alias runtest_js)
  (package tezos-base)
+ (locks npm)
  (action
   (run
    %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
@@ -66,6 +70,7 @@
  (alias runtest_js)
  (package tezos-base)
  (deps points.ok points.ko)
+ (locks npm)
  (action
   (run
    %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
