@@ -322,7 +322,11 @@ let union : type a. ?tag_bits:int -> ?inner_bits:int -> a case list -> a t =
       in
       (bits "tag" min_extra tag_bits, bits "inner" min_len inner_bits)
 
-    let tag_len = extra_tag_len + inner_tag_len
+    let tag_len =
+      let r = extra_tag_len + inner_tag_len in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.union: tags do not fit" ;
+      r
 
     type layout = a case_layout
 
@@ -422,7 +426,11 @@ let tup2 : type a b. a t -> b t -> (a * b) t =
 
     type layout = A.layout * B.layout
 
-    let tag_len = A.tag_len + B.tag_len
+    let tag_len =
+      let r = A.tag_len + B.tag_len in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup2: tags do not fit" ;
+      r
 
     let layouts =
       let open List_syntax in
@@ -449,7 +457,11 @@ let tup3 : type a b c. a t -> b t -> c t -> (a * b * c) t =
 
     type layout = A.layout * B.layout * C.layout
 
-    let tag_len = A.tag_len + B.tag_len + C.tag_len
+    let tag_len =
+      let r = A.tag_len + B.tag_len + C.tag_len in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup2: tags do not fit" ;
+      r
 
     let layouts =
       let open List_syntax in
@@ -485,7 +497,11 @@ let tup4 : type a b c d. a t -> b t -> c t -> d t -> (a * b * c * d) t =
 
     type layout = A.layout * B.layout * C.layout * D.layout
 
-    let tag_len = A.tag_len + B.tag_len + C.tag_len + D.tag_len
+    let tag_len =
+      let r = A.tag_len + B.tag_len + C.tag_len + D.tag_len in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup2: tags do not fit" ;
+      r
 
     let layouts =
       let open List_syntax in
