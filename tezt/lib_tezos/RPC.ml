@@ -303,14 +303,13 @@ module Contracts = struct
       field;
     ]
 
-  (* FIXME: to be removed once all those spawn RPCs are merged. *)
-  let get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id field client =
+  let get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
     let path = sub_path ~chain ~block ~contract_id field in
     Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
 
   let big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id ~data client =
@@ -319,27 +318,27 @@ module Contracts = struct
 
   let get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
 
   let get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
 
   let get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "entrypoints" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "entrypoints" client
 
   let get_manager_key ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "manager_key" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "manager_key" client
 
   let get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "script" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
 
   let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
+    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
 end
 
 module Delegates = struct
