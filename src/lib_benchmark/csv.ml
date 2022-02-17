@@ -47,12 +47,12 @@ let concat (csv1 : csv) (csv2 : csv) : csv =
       let msg = "Csv.concat: first argument has uneven # of lines" in
       Stdlib.failwith msg
     else
-      List.map2
-        ~when_different_lengths:()
+      (* see top if condition *)
+      WithExceptions.List.map2
+        ~loc:__LOC__
         (fun line1 line2 -> line1 @ line2)
         csv1
         csv2
-      |> (* see top if condition *) WithExceptions.Result.get_ok ~loc:__LOC__
 
 let export ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv) =
   Format.eprintf "Exporting to %s@." filename ;
