@@ -89,6 +89,26 @@ end
 
 type proxy_m = (module M)
 
+(** Input data required by the proxy mode to build a
+    {!Tezos_protocol_environment.rpc_context}. *)
+type rpc_context_args = {
+  printer : Tezos_client_base.Client_context.printer option;
+      (** Optional printer to display information in some custom format. *)
+  proxy_builder : Proxy_proto.proto_rpc -> proxy_m Lwt.t;
+      (** Given the protocol implementation of the RPCs required by the proxy mode,
+          how to build an instance of {!proxy_m} that will then make it possible
+          to build a {!Tezos_protocol_environment.Proxy_context}. *)
+  rpc_context : RPC_context.generic;
+      (** How to perform RPC calls. We need such a value, because the proxy mode
+          performs RPCs to initialize itself (by requesting the header) and
+          also to fill {!Tezos_protocol_environment.Proxy_context} on-demand. *)
+  mode : Proxy.mode;  (** Whether the client or the proxy server is running. *)
+  chain : Tezos_shell_services.Block_services.chain;
+      (** The chain to provide RPC calls for. *)
+  block : Tezos_shell_services.Block_services.block;
+      (** The block to provide RPC calls for. *)
+}
+
 (** Functor to obtain the implementation of [M] for the proxy
     mode (as opposed to the light mode implementation) *)
 module MakeProxy (X : Proxy_proto.PROTO_RPC) : M
