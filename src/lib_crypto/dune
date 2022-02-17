@@ -10,7 +10,7 @@
   data-encoding
   tezos-lwt-result-stdlib
   lwt
-  tezos-hacl-glue
+  tezos-hacl
   secp256k1-internal
   tezos-error-monad
   tezos-rpc

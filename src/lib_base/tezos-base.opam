@@ -22,7 +22,7 @@ depends: [
   "lwt" { >= "5.4.0" }
   "ipaddr" { >= "5.0.0" & < "6.0.0" }
   "bls12-381-unix"
-  "tezos-hacl-glue-unix"
+  "tezos-hacl"
   "tezos-stdlib-unix"
   "qcheck-alcotest" { with-test & >= "0.15" }
   "tezos-test-helpers" {with-test}

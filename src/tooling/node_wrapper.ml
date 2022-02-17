@@ -136,9 +136,18 @@ let () =
   let b = Buffer.create 1024 in
   Buffer.add_string
     b
-    {|process.on('uncaughtException', function (error) {
-   console.log(error.stack);
-});|} ;
+    {|
+process.on('uncaughtException', function (error) {
+   console.error(error.stack);
+});
+
+var major = process.version.match(/^v?([0-9]+)\./)[1];
+var minimum_major = 14
+if(parseInt(major) < minimum_major){
+    console.error("Error: nodejs v" + minimum_major + " or greater is needed. Current version is " + process.version);
+    process.exit(1);
+}
+|} ;
   List.iter (fun lib -> Buffer.add_string b (Lib.to_js lib)) libs ;
   List.iteri (fun i file -> Buffer.add_string b (run i file args)) files ;
   let promises = List.map Lib.to_load_ident libs in

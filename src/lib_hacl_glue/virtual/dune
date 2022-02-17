@@ -1,9 +1,0 @@
-; This file was automatically generated, do not edit.
-; Edit file manifest/main.ml instead.
-
-(library
- (name tezos_hacl_glue)
- (public_name tezos-hacl-glue)
- (instrumentation (backend bisect_ppx))
- (js_of_ocaml)
- (virtual_modules hacl))

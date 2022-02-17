@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2020 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -26,79 +26,54 @@
 (** Testing
     -------
     Component:    Crypto
-    Invocation:   dune build @src/lib_hacl_glue/runtest
-    Subject:      Tests the consistency between the [DIRECT_HASH] and
-                  [INCREMENTAL_HASH] interfaces of hashes SHA256 and
-                  SHA512.
+    Invocation:   dune build @src/lib_hacl/runtest
+    Subject:      Property-tests over the interface Hacl.SIGNATURE checking
+                  the equivalence between [pk_of_bytes_without_validation]
+                  and [pk_of_bytes] on valid public keys.
+                  This is currently only relevant for Hacl.P256 since it is
+                  the only scheme in which these 2 functions are different.
 *)
-
 open Lib_test.Qcheck2_helpers
+
 open QCheck2
 
-module Hash_Properties (Desc : sig
+module Pk_Properties (Desc : sig
   val name : string
 end)
-(X : Hacl.Hash.S) =
+(X : Hacl.SIGNATURE) =
 struct
-  let pp_bytes fmt d = Format.fprintf fmt "%S" (Bytes.to_string d)
+  (** Checks that [pk_of_bytes_without_validation] and [pk_of_bytes] have
+      the same output on valid public keys and always return a Some. *)
+  let test_prop_sign_check (sk_bytes : string) =
+    match X.sk_of_bytes @@ Bytes.of_string sk_bytes with
+    | Some sk ->
+        let pk = X.neuterize sk in
+        let pk_bytes = X.to_bytes pk in
+        let pk1 = X.pk_of_bytes_without_validation pk_bytes in
+        let pk2 = X.pk_of_bytes pk_bytes in
+        pk1 = pk2 && Option.is_some pk1
+    | None ->
+        Test.fail_report
+          "X.sk_of_bytes @@ Bytes.of_string sk_bytes can't return a None."
 
-  (** Verifies equivalence between the hash of [msg_s] obtained through the
-      direct and incremental interface of [X].
-   *)
-  let test_prop_incremental_one (msg_s : string) =
-    let st = X.init () in
-    let msg = Bytes.of_string msg_s in
-    X.update st msg ;
-    let expected = X.finish st in
-    let actual = X.digest msg in
-    qcheck_eq' ~pp:pp_bytes ~expected ~actual ()
-
-  let test_prop_incremental_one =
+  let test_prop_sign_check =
     Test.make
-      ~name:(Desc.name ^ "_incremental_one")
+      ~name:(Desc.name ^ "_pk_of_bytes")
       ~print:Print.string
-      Gen.string
-      test_prop_incremental_one
+      Gen.(string_size @@ pure X.sk_size)
+      test_prop_sign_check
 
-  (** Verifies equivalence between the hash of the concatenation of [msg_ss]
-      obtained through the direct and incremental interface of [X].
-   *)
-  let test_prop_incremental_list (msg_ss : string list) =
-    let st = X.init () in
-    let msgs = List.map Bytes.of_string msg_ss in
-    List.iter (X.update st) msgs ;
-    let expected = X.finish st in
-    let actual = X.digest (Bytes.concat Bytes.empty msgs) in
-    qcheck_eq' ~pp:pp_bytes ~expected ~actual ()
-
-  let test_prop_incremental_list =
-    Test.make
-      ~name:(Desc.name ^ "_incremental_list")
-      ~print:Print.(list string)
-      Gen.(list string)
-      test_prop_incremental_list
-
-  let tests = [test_prop_incremental_one; test_prop_incremental_list]
+  let tests = [test_prop_sign_check]
 end
 
-module SHA256_Props =
-  Hash_Properties
+module P256_Props =
+  Pk_Properties
     (struct
-      let name = "SHA256"
+      let name = "P256"
     end)
-    (Hacl.Hash.SHA256)
-
-module SHA512_Props =
-  Hash_Properties
-    (struct
-      let name = "SHA512"
-    end)
-    (Hacl.Hash.SHA512)
+    (Hacl.P256)
 
 let () =
   Alcotest.run
-    "tezos-crypto-shaX-props"
-    [
-      ("SHA256_Props", qcheck_wrap SHA256_Props.tests);
-      ("SHA512_Props", qcheck_wrap SHA512_Props.tests);
-    ]
+    "tezos-crypto-signature-pk"
+    [("P256_Pros", qcheck_wrap P256_Props.tests)]

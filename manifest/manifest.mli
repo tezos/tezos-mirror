@@ -80,6 +80,11 @@ module Dune : sig
       Tip: you can remove the outer parentheses using [G], [H] or [V]. *)
   val of_list : s_expr list -> s_expr
 
+  (** Convert a list of [string] to an [s_expr].
+
+      [of_atom_list [a; b; c]] is [of_list [S a; S b; S c]]. *)
+  val of_atom_list : string list -> s_expr
+
   (** Programming languages for foreign stubs.
 
       Only the C programming language is currently supported. *)

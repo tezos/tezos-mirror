@@ -9,9 +9,12 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "dune" { >= "2.9" }
-  "tezos-hacl-glue"
+  "ocaml" { >= "4.08" }
   "hacl-star" { >= "0.4.2" & < "0.5" }
   "hacl-star-raw"
+  "ctypes_stubs_js"
+  "ctypes" { >= "0.18.0" }
+  "ezjsonm" { >= "1.1.0" }
   "tezos-stdlib" {with-test}
   "tezos-error-monad" {with-test}
   "zarith" { with-test & >= "1.12" & < "1.13" }
@@ -27,4 +30,4 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
-synopsis: "Tezos: thin layer of glue around hacl-star (unix implementation)"
+synopsis: "Tezos: thin layer around hacl-star"

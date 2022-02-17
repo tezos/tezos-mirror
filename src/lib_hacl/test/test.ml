@@ -1,4 +1,4 @@
-open Tezos_hacl_glue
+open Tezos_hacl
 
 let log_s = print_endline
 
