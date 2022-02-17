@@ -29,17 +29,26 @@ open Tezos_rpc
 open Tezos_rpc_http
 open Tezos_rpc_http_server
 
+let current_tezos_head =
+  RPC_service.get_service
+    ~description:"Get the current head stored in the tx-rollup-node"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.option Block_hash.encoding)
+    RPC_path.(open_root / "tezos_head")
+
+let current_inbox =
+  RPC_service.get_service
+    ~description:"Get the current inbox stored in the tx-rollup-node"
+    ~query:RPC_query.empty
+    ~output:(Data_encoding.option Alpha_context.Tx_rollup_inbox.encoding)
+    RPC_path.(open_root / "current_inbox")
+
 let register_current_tezos_head state dir =
-  RPC_directory.register0
-    dir
-    (Tx_rollup_services.current_tezos_head ())
-    (fun () () -> State.get_head state >|= ok)
+  RPC_directory.register0 dir current_tezos_head (fun () () ->
+      State.get_head state >|= ok)
 
 let register_current_inbox state dir =
-  RPC_directory.register0
-    dir
-    (Tx_rollup_services.current_inbox ())
-    (fun () () ->
+  RPC_directory.register0 dir current_inbox (fun () () ->
       State.get_head state >|= ok >>=? function
       | None -> return None
       | Some hash ->
