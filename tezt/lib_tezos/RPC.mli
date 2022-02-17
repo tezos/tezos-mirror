@@ -64,7 +64,7 @@ val get_block_hash :
   ?chain:string ->
   ?block:string ->
   Client.t ->
-  JSON.t Lwt.t
+  string Lwt.t
 
 (** Call RPC /chain/[chain]/blocks/[block]/metadata *)
 val get_block_metadata :

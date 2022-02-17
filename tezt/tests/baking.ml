@@ -532,10 +532,7 @@ let wrong_branch_operation_dismissal =
   Log.info "Baking a first proposal." ;
   let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
   (* Retrieve head's hash *)
-  let* head_hash =
-    let* json = RPC.get_block_hash client in
-    return (JSON.as_string json)
-  in
+  let* head_hash = RPC.get_block_hash client in
   Log.info "Injecting a transfer branched on the current head." ;
   let* (`OpHash oph) =
     Operation.inject_transfer
