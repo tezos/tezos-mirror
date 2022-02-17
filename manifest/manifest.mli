@@ -522,6 +522,8 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [synopsis]: short description for the [.opam] file.
 
+    - [warnings]: the argument passed to the -w flag when building.
+
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -560,6 +562,7 @@ type 'a maker =
   ?static_cclibs:string list ->
   ?synopsis:string ->
   ?time_measurement_ppx:bool ->
+  ?warnings:string ->
   ?wrapped:bool ->
   path:string ->
   'a ->
