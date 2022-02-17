@@ -372,19 +372,7 @@ module Big_maps : sig
     ?offset:int ->
     ?length:int ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as {!get_all}, but do not wait for the process to exit. *)
-  val spawn_get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    big_map_id:string ->
-    ?offset:int ->
-    ?length:int ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 end
 
 module Contracts : sig
