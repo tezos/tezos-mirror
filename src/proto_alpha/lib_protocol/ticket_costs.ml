@@ -27,7 +27,7 @@ open Alpha_context
 module S = Saturation_repr
 
 module Constants = struct
-  (* TODO: #2315
+  (* TODO: #2508
      Fill in real benchmarked values.
      Need to create benchmark and fill in values.
   *)
