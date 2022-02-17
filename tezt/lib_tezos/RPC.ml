@@ -341,13 +341,9 @@ module Contracts = struct
       ~contract_id client =
     get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "manager_key" client
 
-  let spawn_get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
   let get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
+    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "script" client
 
   let spawn_get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =

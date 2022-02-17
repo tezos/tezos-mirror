@@ -191,7 +191,11 @@ let test_contracts ?endpoint client =
             client
         in
         Process.check ~expect_failure:true process)
-      [RPC.Contracts.get_delegate; RPC.Contracts.get_entrypoints]
+      [
+        RPC.Contracts.get_delegate;
+        RPC.Contracts.get_entrypoints;
+        RPC.Contracts.get_script;
+      ]
   in
   let* () =
     Lwt_list.iter_s
@@ -204,7 +208,7 @@ let test_contracts ?endpoint client =
           ~contract_id:simple_implicit_key.public_key_hash
           client
         |> Process.check ~expect_failure:true)
-      [RPC.Contracts.spawn_get_script; RPC.Contracts.spawn_get_storage]
+      [RPC.Contracts.spawn_get_storage]
   in
   Log.info "Test delegated implicit contract" ;
   let delegated_implicit = "delegated" in
@@ -245,7 +249,7 @@ let test_contracts ?endpoint client =
             client
         in
         Process.check ~expect_failure:true process)
-      [RPC.Contracts.get_entrypoints]
+      [RPC.Contracts.get_entrypoints; RPC.Contracts.get_script]
   in
   let* () =
     Lwt_list.iter_s
@@ -258,7 +262,7 @@ let test_contracts ?endpoint client =
           ~contract_id:delegated_implicit_key.public_key_hash
           client
         |> Process.check ~expect_failure:true)
-      [RPC.Contracts.spawn_get_script; RPC.Contracts.spawn_get_storage]
+      [RPC.Contracts.spawn_get_storage]
   in
   let test_originated_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
@@ -286,7 +290,7 @@ let test_contracts ?endpoint client =
     let*! _ =
       RPC.Contracts.get_entrypoints ?endpoint ~hooks ~contract_id client
     in
-    let* _ = RPC.Contracts.get_script ?endpoint ~hooks ~contract_id client in
+    let*! _ = RPC.Contracts.get_script ?endpoint ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_storage ?endpoint ~hooks ~contract_id client in
     unit
   in
