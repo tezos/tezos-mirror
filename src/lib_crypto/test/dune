@@ -4,6 +4,7 @@
 (tests
  (names test_run test_prop_signature)
  (package tezos-crypto)
+ (modes native js)
  (libraries
   tezos-stdlib
   tezos-crypto
@@ -13,13 +14,28 @@
   tezos-hacl
   data-encoding
   alcotest
-  alcotest-lwt
-  lwt.unix
   qcheck-alcotest
   tezos-test-helpers)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib
    -open Tezos_crypto
    -open Tezos_error_monad.TzLwtreslib
    -open Data_encoding)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-crypto)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_run.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-crypto)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_prop_signature.bc.js})))

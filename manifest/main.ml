@@ -223,7 +223,7 @@ let re_str = external_sublib ~js_compatible:true re "re.str"
 
 let resto_version = V.(at_least "0.6" && less_than "0.7")
 
-let resto = external_lib "resto" resto_version
+let resto = external_lib ~js_compatible:true "resto" resto_version
 
 let resto_acl = external_lib "resto-acl" resto_version
 
@@ -236,15 +236,17 @@ let resto_cohttp_self_serving_client =
 
 let resto_cohttp_server = external_lib "resto-cohttp-server" resto_version
 
-let resto_directory = external_lib "resto-directory" resto_version
+let resto_directory =
+  external_lib ~js_compatible:true "resto-directory" resto_version
 
-let ringo = external_lib "ringo" V.(exactly "0.7")
+let ringo = external_lib ~js_compatible:true "ringo" V.(exactly "0.7")
 
 let ringo_lwt = external_lib "ringo-lwt" V.(exactly "0.7")
 
 let secp256k1_internal =
   external_lib
     ~node_wrapper_flags:Node_wrapper_flags.secp256k1
+    ~js_compatible:true
     "secp256k1-internal"
     V.True
 
@@ -639,6 +641,7 @@ let tezos_rpc =
         resto;
         resto_directory;
       ]
+    ~js_compatible:true
 
 let tezos_crypto =
   public_lib
@@ -660,11 +663,33 @@ let tezos_crypto =
         zarith;
         zarith_stubs_js;
       ]
+    ~js_compatible:true
 
 let _tezos_crypto_tests =
   tests
     ["test_run"; "test_prop_signature"]
     ~path:"src/lib_crypto/test"
+    ~opam:"src/lib_crypto/tezos-crypto"
+    ~deps:
+      [
+        tezos_stdlib |> open_;
+        tezos_crypto |> open_;
+        tezos_error_monad |> open_ ~m:"TzLwtreslib";
+        zarith;
+        zarith_stubs_js;
+        tezos_hacl;
+        data_encoding |> open_;
+        alcotest;
+        qcheck_alcotest;
+        tezos_test_helpers;
+      ]
+    ~modes:[Native; JS]
+    ~js_compatible:true
+
+let _tezos_crypto_tests_unix =
+  tests
+    ["test_crypto_box"]
+    ~path:"src/lib_crypto/test-unix"
     ~opam:"src/lib_crypto/tezos-crypto"
     ~deps:
       [

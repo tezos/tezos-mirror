@@ -1,6 +1,6 @@
 (*****************************************************************************)
 (*                                                                           *)
-(* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2020-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -113,5 +113,3 @@ let tests =
         ("b58 key encodings", `Slow, test_key_encodings);
       ] );
   ]
-
-let tests_lwt = []

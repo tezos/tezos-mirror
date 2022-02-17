@@ -28,53 +28,28 @@
     -------
     Component:    Crypto
     Invocation:   dune build @src/lib_crypto/runtest
-    Dependencies: src/lib_crypto/test/roundtrips.ml
-    Subject:      On the hash function BLAKE2b
+    Subject:      Roundtrips for functions built on the HACL* NaCl API.
 *)
 
-let test_hashed_roundtrip name enc dec input =
-  (* this wrapper to start with hashing *)
-  Roundtrips.test_rt_opt
-    name
-    (Alcotest.testable
-       (fun fmt (input, _) -> Format.fprintf fmt "%s" input)
-       (fun (_, hashed) (_, decoded) -> hashed = decoded))
-    (fun (_, hashed) -> enc hashed)
-    (fun encoded ->
-      match dec encoded with
-      | None -> None
-      | Some decoded -> Some (input, decoded))
-    (input, Blake2B.hash_string [input])
+let (sk, pk, pkh) = Crypto_box.random_keypair ()
 
-let test_roundtrip_hex input =
-  test_hashed_roundtrip "Hex" Blake2B.to_hex Blake2B.of_hex_opt input
+let zero_nonce = Crypto_box.zero_nonce
 
-let test_roundtrip_string input =
-  test_hashed_roundtrip "String" Blake2B.to_string Blake2B.of_string_opt input
+let chkey = Crypto_box.precompute sk pk
 
-let inputs =
-  [
-    "abc";
-    string_of_int max_int;
-    "0";
-    "00";
-    String.make 64 '0';
-    (*loads of ascii characters: codes between 32 and 126 *)
-    String.init 1000 (fun i -> Char.chr (32 + (i mod (126 - 32))));
-    "";
-  ]
+(** The test defines a proof-of-work target, generates a proof-of-work
+    for that target, and then verifies it the proof of work is accepted
+    by [Crypto_box.check_proof_of_work].
+*)
+let test_check_pow () =
+  let open Lwt.Infix in
+  let target = Crypto_box.make_pow_target 2. in
+  Crypto_box.generate_proof_of_work pk target >|= fun pow ->
+  Alcotest.(check bool)
+    "check_pow"
+    (Crypto_box.check_proof_of_work pk pow target)
+    true
 
-(** Roundtrips of hexadecimal (en/de)coding of Blake2b hash. *)
-let test_roundtrip_hexs () = List.iter test_roundtrip_hex inputs
+let tests_lwt = [("crypto_box", [("Check PoW", `Slow, test_check_pow)])]
 
-(** Roundtrips of string (en/de)coding of Blake2b hash. *)
-let test_roundtrip_strings () = List.iter test_roundtrip_string inputs
-
-let tests =
-  [
-    ( "blake2b-encodings",
-      [
-        ("hash hex/dehex", `Quick, test_roundtrip_hexs);
-        ("hash print/parse", `Quick, test_roundtrip_strings);
-      ] );
-  ]
+let () = Lwt_main.run @@ Alcotest_lwt.run "tezos-crypto-lwt" tests_lwt
