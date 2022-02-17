@@ -966,12 +966,10 @@ let tezos_version =
       Dune.
         [
           (* Ensures the hash updates whenever a source file is modified. *)
-          [
-            S "rule";
-            [S "targets"; S "generated_git_info.ml"];
-            [S "deps"; [S "universe"]];
-            [S "action"; [S "run"; S "./exe/get_git_info.exe"]];
-          ];
+          targets_rule
+            ["generated_git_info.ml"]
+            ~deps:[[S "universe"]]
+            ~action:[S "run"; S "./exe/get_git_info.exe"];
         ]
 
 let _tezos_version_get_git_info =
@@ -1645,53 +1643,50 @@ let tezos_protocol_compiler_registerer =
     ~modules:["Registerer"]
     ~opaque:true
     ~dune:
-      [
+      Dune.
         [
-          S "rule";
-          [S "targets"; S "embedded_cmis.ml"];
-          [
-            S "action";
-            [
-              S "run";
-              G
-                [
-                  S "%{bin:ocp-ocamlres}";
-                  S "-format";
-                  S "ocaml";
-                  S "-o";
-                  S "%{targets}";
-                ];
-              S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
-              S
-                "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V4.cmi}";
-              S
-                "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V5.cmi}";
-            ];
-          ];
-        ];
-      ]
+          targets_rule
+            ["embedded_cmis.ml"]
+            ~action:
+              [
+                S "run";
+                G
+                  [
+                    S "%{bin:ocp-ocamlres}";
+                    S "-format";
+                    S "ocaml";
+                    S "-o";
+                    S "%{targets}";
+                  ];
+                S "%{lib:stdlib:camlinternalFormatBasics.cmi}";
+                S
+                  "%{dep:.tezos_protocol_registerer.objs/byte/tezos_protocol_registerer__Registerer.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V_all.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V2.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V3.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs.stdlib-compat:tezos_protocol_environment_sigs_stdlib_compat__V4.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V0.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V1.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V2.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V3.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V4.cmi}";
+                S
+                  "%{lib:tezos-protocol-environment-sigs:tezos_protocol_environment_sigs__V5.cmi}";
+              ];
+        ]
 
 let tezos_protocol_compiler_lib =
   public_lib
@@ -1973,16 +1968,14 @@ let tezos_client_base =
     ~dune:
       Dune.
         [
-          [
-            S "rule";
-            [S "targets"; S "bip39_english.ml"];
-            [
-              S "deps";
-              [S ":exe"; S "gen/bip39_generator.exe"];
-              S "gen/bip39_english.txt";
-            ];
-            [S "action"; [S "run"; S "%{exe}"; S "%{targets}"]];
-          ];
+          targets_rule
+            ["bip39_english.ml"]
+            ~deps:
+              [
+                [S ":exe"; S "gen/bip39_generator.exe"];
+                S "gen/bip39_english.txt";
+              ]
+            ~action:[S "run"; S "%{exe}"; S "%{targets}"];
         ]
 
 let _tezos_client_base_tests =
