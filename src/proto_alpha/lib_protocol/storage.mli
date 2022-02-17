@@ -185,6 +185,12 @@ module Contract : sig
       with type key = Bond_id_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t * Contract_repr.t
+
+  module Total_frozen_bonds :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Tez_repr.t
+       and type t := Raw_context.t
 end
 
 module Big_map : sig

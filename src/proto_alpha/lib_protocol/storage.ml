@@ -364,6 +364,13 @@ module Contract = struct
         let name = ["frozen_bonds"]
       end)
       (Tez_repr)
+
+  module Total_frozen_bonds =
+    Indexed_context.Make_map
+      (struct
+        let name = ["total_frozen_bonds"]
+      end)
+      (Tez_repr)
 end
 
 module type NEXT = sig

@@ -207,7 +207,20 @@ let transfer_n ?(origin = Receipt_repr.Block_application) ctxt src dest =
         (ctxt, Tez_repr.zero, [])
         sources
       >>=? fun (ctxt, amount, debit_logs) ->
-      credit ctxt dest amount origin >|=? fun (ctxt, credit_log) ->
+      credit ctxt dest amount origin >>=? fun (ctxt, credit_log) ->
+      (* Deallocate implicit contracts with no stake. This must be done after
+         spending and crediting. If done in between then a transfer of all the
+         balance from (`Contract c) to (`Frozen_bonds (c,_)) would leave the
+         contract c unallocated. *)
+      List.fold_left_es
+        (fun ctxt (source, _amount) ->
+          match source with
+          | `Contract contract | `Frozen_bonds (contract, _) ->
+              Contract_storage.ensure_deallocated_if_empty ctxt contract
+          | #source -> return ctxt)
+        ctxt
+        sources
+      >|=? fun ctxt ->
       (* Make sure the order of balance updates is : debit logs in the order of
          of the parameter [src], and then the credit log. *)
       let balance_updates = List.rev (credit_log :: debit_logs) in

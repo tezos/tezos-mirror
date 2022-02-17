@@ -202,7 +202,8 @@ val frozen_deposits :
 
 (** Returns the full 'balance' of the implicit contract associated to
     a given key, i.e. the sum of the spendable balance and of the
-    frozen balance.
+    frozen balance. The frozen balance includes all frozen bonds associated
+    to the contract of the delegate.
 
     Only use this function for RPCs: this is expensive. *)
 val full_balance :

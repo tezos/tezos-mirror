@@ -238,3 +238,17 @@ val credit_bond_only_call_from_token :
   Bond_id_repr.t ->
   Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
+
+(** [has_frozen_bonds ctxt contract] returns [true] if there are frozen bonds
+    associated to [contract], and returns [false] otherwise. *)
+val has_frozen_bonds : Raw_context.t -> Contract_repr.t -> bool tzresult Lwt.t
+
+(** [frozen_balance ctxt contract] returns the total amount of bonds associated
+    to [contract]. *)
+val frozen_balance :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** [ensure_deallocated_if_empty ctxt contract] de-allocates [contract] if its
+    full balance is zero, and it does not delegate. *)
+val ensure_deallocated_if_empty :
+  Raw_context.t -> Contract_repr.t -> Raw_context.t tzresult Lwt.t
