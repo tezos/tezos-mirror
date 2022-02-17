@@ -103,33 +103,35 @@ let rec dummy_type_generator ~rng_state size =
 module Has_tickets_type_benchmark : Benchmark.S = struct
   include Translator_benchmarks.Parse_type_shared
 
+  let tags = ["tickets"]
+
   let name = "TYPE_HAS_TICKETS"
 
   let info = "Benchmarking type_has_tickets"
 
+  let make_bench_helper rng_state config () =
+    let open Result_syntax in
+    let* (ctxt, _) = Lwt_main.run (Execution_context.make ~rng_state) in
+    let ctxt = Gas_helpers.set_limit ctxt in
+    let size = Random.State.int rng_state config.max_size in
+    let (Ex_ty ty) = dummy_type_generator ~rng_state size in
+    Environment.wrap_tzresult
+    @@ let* (_, ctxt') = Ticket_scanner.type_has_tickets ctxt ty in
+       let consumed =
+         Z.to_int
+           (Gas_helpers.fp_to_z
+              (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
+       in
+       let nodes =
+         let size = Script_typed_ir.ty_size ty in
+         Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int size
+       in
+       let workload = Type_workload {nodes; consumed} in
+       let closure () = ignore (Ticket_scanner.type_has_tickets ctxt ty) in
+       ok (Generator.Plain {workload; closure})
+
   let make_bench rng_state config () =
-    let open Error_monad in
-    ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
-      let ctxt = Gas_helpers.set_limit ctxt in
-      let size = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator ~rng_state size in
-      match ty with
-      | Ex_ty ty ->
-          Environment.wrap_tzresult @@ Ticket_scanner.type_has_tickets ctxt ty
-          >>? fun (_, ctxt') ->
-          let consumed =
-            Z.to_int
-              (Gas_helpers.fp_to_z
-                 (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
-          in
-          let nodes =
-            let size = Script_typed_ir.ty_size ty in
-            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int size
-          in
-          let workload = Type_workload {nodes; consumed} in
-          let closure () = ignore (Ticket_scanner.type_has_tickets ctxt ty) in
-          ok (Generator.Plain {workload; closure}) )
-    |> function
+    match make_bench_helper rng_state config () with
     | Ok closure -> closure
     | Error err -> Translator_benchmarks.global_error name err
 
