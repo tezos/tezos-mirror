@@ -189,11 +189,14 @@ let test_submit_batch ~protocols =
   (* We check the rollup exists by trying to fetch its state. Since it
      is a regression test, we can detect changes to this default
      state. *)
-  let* _state = Rollup.get_state ~hooks ~rollup client in
-
-  (* Submit a batch *)
+  let* state = Rollup.get_state ~hooks ~rollup client in
+  let expected_state =
+    Rollup.{burn_per_byte = 0; inbox_ema = 0; last_inbox_level = None}
+  in
+  Check.(state = expected_state)
+    Rollup.Check.state
+    ~error_msg:"Unexpected state. Got: %L. Expected: %R." ;
   let batch = "tezos" in
-
   let* () =
     Client.submit_tx_rollup_batch
       ~hooks
@@ -203,20 +206,21 @@ let test_submit_batch ~protocols =
       client
   in
   let* () = Client.bake_for client in
-
   let* _ = Node.wait_for_level node 3 in
-
   (* Check the inbox has been created *)
   let* inbox = Rollup.get_inbox ~hooks ~rollup client in
+  let expected_inbox =
+    Rollup.
+      {
+        cumulated_size = String.length batch;
+        (* This hash is hard-coded, but maybe could be computed. *)
+        contents = ["M21tdhc2Wn76n164oJvyKW4JVZsDSDeuDsbLgp61XZWtrXjL5WA"];
+      }
+  in
   Check.(
-    (( = )
-       (String.length batch)
-       inbox.cumulated_size
-       ~error_msg:
-         "Cumulated size of inboxes should be equal of the length of the \
-          submited message")
-      int) ;
-
+    (inbox = expected_inbox)
+      Rollup.Check.inbox
+      ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.") ;
   unit
 
 let test_invalid_rollup_address ~protocols =
