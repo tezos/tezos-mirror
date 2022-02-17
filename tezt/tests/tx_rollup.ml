@@ -189,19 +189,6 @@ let node_rpc node service =
 let get_block_hash block_json =
   JSON.(block_json |-> "hash" |> as_string) |> return
 
-let get_state ?hooks rollup client =
-  (* The state is currently empty, but the RPC can fail if [tx_rollup]
-     does not exist. *)
-  let* json = RPC.Tx_rollup.get_state ?hooks ~rollup client in
-  let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
-  return {burn_per_byte}
-
-let get_inbox ?hooks rollup client =
-  let* json = RPC.Tx_rollup.get_inbox ?hooks ~rollup client in
-  let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-  let contents = JSON.(json |-> "contents" |> as_list |> List.map as_string) in
-  return {cumulated_size; contents}
-
 let get_node_inbox node =
   let* json = node_rpc node "current_inbox" in
   match json with
@@ -278,7 +265,7 @@ let test_submit_batch ~protocols =
   let* _ = Node.wait_for_level node 3 in
 
   (* Check the inbox has been created *)
-  let* inbox = get_inbox ~hooks rollup client in
+  let* inbox = Rollup.get_inbox ~hooks ~rollup client in
   Check.(
     (( = )
        (String.length batch)
@@ -415,7 +402,6 @@ let test_node_configuration =
       unit)
 
 let test_tx_node_is_ready =
-  let open Tezt_tezos in
   test_with_setup
     ~__FILE__
     "TX_rollup: test if the node is ready"
@@ -440,26 +426,25 @@ let test_tx_node_is_ready =
       unit)
 
 let test_tx_node_store_inbox =
-  let open Tezt_tezos in
   test_with_setup
     ~__FILE__
     "TX_rollup: test"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* tx_rollup_hash = Client.originate_tx_rollup ~src:operator client in
+      let* rollup = Client.originate_tx_rollup ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
       let* json = RPC.get_block client in
       let* block_hash = get_block_hash json in
       let tx_node =
         Tx_rollup_node.create
-          ~rollup_id:tx_rollup_hash
+          ~rollup_id:rollup
           ~rollup_genesis:block_hash
           ~operator
           client
           node
       in
-      let* _ = Tx_rollup_node.config_init tx_node tx_rollup_hash block_hash in
+      let* _ = Tx_rollup_node.config_init tx_node rollup block_hash in
       let* () = Tx_rollup_node.run tx_node in
       (* Submit a batch *)
       let batch = "tezos" in
@@ -468,14 +453,14 @@ let test_tx_node_store_inbox =
         Client.submit_tx_rollup_batch
           ~hooks
           ~content:batch
-          ~rollup:tx_rollup_hash
+          ~rollup
           ~src:Constant.bootstrap1.public_key_hash
           client
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
       let* node_inbox = get_node_inbox tx_node in
-      let* inbox = get_inbox ~hooks tx_rollup_hash client in
+      let* inbox = Rollup.get_inbox ~hooks ~rollup client in
 
       (* Enusre that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
@@ -503,14 +488,14 @@ let test_tx_node_store_inbox =
         Client.submit_tx_rollup_batch
           ~hooks
           ~content:snd_batch
-          ~rollup:tx_rollup_hash
+          ~rollup
           ~src:Constant.bootstrap1.public_key_hash
           client
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
       let* node_inbox = get_node_inbox tx_node in
-      let* inbox = get_inbox ~hooks tx_rollup_hash client in
+      let* inbox = Rollup.get_inbox ~hooks ~rollup client in
       (* Enusre that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
       assert (Int.equal node_inbox.cumulated_size inbox.cumulated_size) ;
