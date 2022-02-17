@@ -1551,8 +1551,13 @@ let tezos_shell_context =
     ~path:"src/lib_protocol_environment"
     ~synopsis:
       "Tezos: economic-protocols environment implementation for `tezos-node`"
-    ~deps:[tezos_base; tezos_protocol_environment; tezos_context]
-    ~modules:["Shell_context"]
+    ~deps:
+      [
+        tezos_base |> open_ ~m:"TzPervasives";
+        tezos_protocol_environment;
+        tezos_context;
+      ]
+    ~modules:["Proxy_delegate_maker"; "Shell_context"]
 
 let tezos_protocol_compiler_registerer =
   public_lib
