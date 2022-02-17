@@ -70,4 +70,9 @@ module List = struct
           raise (invalid "Lwtreslib.WithExceptions.List.combine" loc)
     in
     Stdlib.List.rev (aux [] xs ys)
+
+  let map2 ~loc f l1 l2 =
+    match List.map2 ~when_different_lengths:() f l1 l2 with
+    | Ok v -> v
+    | Error _ -> raise (invalid "Lwtreslib.WithExceptions.List.map2" loc)
 end
