@@ -1139,8 +1139,10 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty address_key, ctxt)
     | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty tx_rollup_l2_address_key, ctxt)
+        if Constants.tx_rollup_enable ctxt then
+          check_type_annot loc annot >|? fun () ->
+          (Ex_comparable_ty tx_rollup_l2_address_key, ctxt)
+        else error @@ Tx_rollup_addresses_disabled loc
     | Prim
         ( loc,
           (( T_unit | T_never | T_int | T_nat | T_string | T_bytes | T_mutez
@@ -1301,8 +1303,10 @@ let[@coq_axiom_with_reason "complex mutually recursive definition"] rec parse_ty
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt address_t
     | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
-        check_type_annot loc annot >|? fun () ->
-        return ctxt tx_rollup_l2_address_t
+        if Constants.tx_rollup_enable ctxt then
+          check_type_annot loc annot >|? fun () ->
+          return ctxt tx_rollup_l2_address_t
+        else error @@ Tx_rollup_addresses_disabled loc
     | Prim (loc, T_signature, [], annot) ->
         check_type_annot loc annot >|? fun () -> return ctxt signature_t
     | Prim (loc, T_operation, [], annot) ->
@@ -2256,7 +2260,14 @@ let parse_chain_id ctxt : Script.node -> (Script_chain_id.t * context) tzresult
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 
-let parse_address ctxt : Script.node -> (address * context) tzresult = function
+let parse_address ctxt : Script.node -> (address * context) tzresult =
+  let destination_allowed loc {destination; entrypoint} ctxt =
+    match destination with
+    | Destination.Tx_rollup _ when not (Constants.tx_rollup_enable ctxt) ->
+        error @@ Tx_rollup_addresses_disabled loc
+    | _ -> Ok ({destination; entrypoint}, ctxt)
+  in
+  function
   | Bytes (loc, bytes) as expr (* As unparsed with [Optimized]. *) -> (
       Gas.consume ctxt Typecheck_costs.contract >>? fun ctxt ->
       match
@@ -2264,7 +2275,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Data_encoding.(tup2 Destination.encoding Entrypoint.value_encoding)
           bytes
       with
-      | Some (destination, entrypoint) -> Ok ({destination; entrypoint}, ctxt)
+      | Some (destination, entrypoint) ->
+          destination_allowed loc {destination; entrypoint} ctxt
       | None ->
           error
           @@ Invalid_syntactic_constant
@@ -2279,8 +2291,8 @@ let parse_address ctxt : Script.node -> (address * context) tzresult = function
           Entrypoint.of_string_strict ~loc name >|? fun entrypoint ->
           (String.sub s 0 pos, entrypoint))
       >>? fun (addr, entrypoint) ->
-      Destination.of_b58check addr >|? fun destination ->
-      ({destination; entrypoint}, ctxt)
+      Destination.of_b58check addr >>? fun destination ->
+      destination_allowed loc {destination; entrypoint} ctxt
   | expr ->
       error @@ Invalid_kind (location expr, [String_kind; Bytes_kind], kind expr)
 

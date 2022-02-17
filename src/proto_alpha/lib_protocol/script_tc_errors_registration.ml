@@ -254,6 +254,15 @@ let () =
     (obj1 (req "requested_value" Data_encoding.z))
     (function Tx_rollup_invalid_ticket_amount z -> Some z | _ -> None)
     (fun z -> Tx_rollup_invalid_ticket_amount z) ;
+  (* Tx rollup addresses disabled *)
+  register_error_kind
+    `Permanent
+    ~id:"michelson_v1.tx_rollup_addresses_disabled"
+    ~title:"Tx rollup addresses are disabled"
+    ~description:"Cannot parse a tx_rollup address as tx rollups are disabled."
+    (obj1 (req "location" Script.location_encoding))
+    (function Tx_rollup_addresses_disabled loc -> Some loc | _ -> None)
+    (fun loc -> Tx_rollup_addresses_disabled loc) ;
   (* Duplicate entrypoint *)
   register_error_kind
     `Permanent
