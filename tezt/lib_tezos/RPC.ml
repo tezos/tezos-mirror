@@ -303,6 +303,11 @@ module Contracts = struct
       field;
     ]
 
+  (* FIXME: to be removed once all those spawn RPCs are merged. *)
+  let get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id field client =
+    let path = sub_path ~chain ~block ~contract_id field in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
+
   let spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
     let path = sub_path ~chain ~block ~contract_id field in
     Client.spawn_rpc ?endpoint ?hooks GET path client
@@ -311,13 +316,9 @@ module Contracts = struct
     let path = sub_path ~chain ~block ~contract_id field in
     Client.rpc ?endpoint ?hooks GET path client
 
-  let spawn_get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
-
   let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
+    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
 
   let spawn_big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id ~data client =

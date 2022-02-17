@@ -141,7 +141,7 @@ let test_contracts ?endpoint client =
   let client_bake_for = make_client_bake_for () in
   let test_implicit_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
+    let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let* _ = RPC.Contracts.get_counter ?endpoint ~hooks ~contract_id client in
     let* _ =
       RPC.Contracts.get_manager_key ?endpoint ~hooks ~contract_id client
@@ -241,7 +241,7 @@ let test_contracts ?endpoint client =
   in
   let test_originated_contract contract_id =
     let*! _ = RPC.Contracts.get ?endpoint ~hooks ~contract_id client in
-    let* _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
+    let*! _ = RPC.Contracts.get_balance ?endpoint ~hooks ~contract_id client in
     let* () =
       RPC.Contracts.spawn_get_counter ?endpoint ~hooks ~contract_id client
       |> Process.check ~expect_failure:true
