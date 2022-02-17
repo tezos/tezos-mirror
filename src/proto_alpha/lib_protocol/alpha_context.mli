@@ -2615,6 +2615,9 @@ end
 module Stake_distribution : sig
   val snapshot : context -> context tzresult Lwt.t
 
+  val compute_snapshot_index :
+    context -> Cycle.t -> max_snapshot_index:int -> int tzresult Lwt.t
+
   val baking_rights_owner :
     context ->
     Level.t ->
