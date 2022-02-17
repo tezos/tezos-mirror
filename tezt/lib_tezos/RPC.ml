@@ -274,15 +274,9 @@ let get_ddb ?endpoint ?hooks ?(chain = "main") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 module Contracts = struct
-  let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
-      =
-    let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    let* contracts = Client.rpc ?endpoint ?hooks GET path client in
-    return (JSON.as_list contracts |> List.map JSON.as_string)
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_all_delegates ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       client =

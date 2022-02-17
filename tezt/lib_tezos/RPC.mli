@@ -385,7 +385,7 @@ module Contracts : sig
     ?chain:string ->
     ?block:string ->
     Client.t ->
-    string list Lwt.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
   val get_all_delegates :
@@ -395,15 +395,6 @@ module Contracts : sig
     ?block:string ->
     Client.t ->
     string list Lwt.t
-
-  (** Same as [get_all], but do not wait for the process to exit. *)
-  val spawn_get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    Process.t
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id] *)
   val get :
