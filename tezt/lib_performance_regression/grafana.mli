@@ -28,11 +28,14 @@
 (** Grafana configuration.
 
     [url] is the base URL of the Grafana API.
+
     [api_token] is the bearer token to use in the Authorization header.
+    If not provided, it will try to connect without authenticating (insecure mode).
+
     [data_source] is the name of the InfluxDB data source configured in Grafana. *)
 type config = {
   url : Uri.t;
-  api_token : string;
+  api_token : string option;
   data_source : string;
   timeout : float;
 }

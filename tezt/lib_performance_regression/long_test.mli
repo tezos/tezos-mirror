@@ -498,7 +498,9 @@ v}
     - [grafana] configures how to update graph dashboards
       (optional, dashboards are not updated if not specified);
       - [url] is the base URL of the Grafana API (ending with [/api]);
-      - [api_token] is an API token the Grafana admin can create in the Grafana interface;
+      - [api_token] is an API token the Grafana admin can create in the Grafana interface
+        (optional, If the grafana instance is run in insecure mode (no authentication required),
+        it can be ommited. This is particularly useful to connect to a Grafana test instance);
       - [data_source] is the name of the InfluxDB data source configured by the Grafana admin;
       - [timeout] is how long, in seconds, to wait when updating dashboards before giving up
         (optional, default value is 20).

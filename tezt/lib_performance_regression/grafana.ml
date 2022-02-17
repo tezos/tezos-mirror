@@ -25,7 +25,7 @@
 
 type config = {
   url : Uri.t;
-  api_token : string;
+  api_token : string option;
   data_source : string;
   timeout : float;
 }
@@ -33,7 +33,7 @@ type config = {
 let config_of_json json =
   {
     url = JSON.(json |-> "url" |> as_string |> Uri.of_string);
-    api_token = JSON.(json |-> "api_token" |> as_string);
+    api_token = JSON.(json |-> "api_token" |> as_string_opt);
     data_source = JSON.(json |-> "data_source" |> as_string);
     timeout =
       JSON.(json |-> "timeout" |> as_float_opt |> Option.value ~default:20.);
@@ -252,14 +252,17 @@ let update_dashboard config dashboard =
          "Grafana.update_dashboard: invalid UID: %s (must match: %s)"
          dashboard.uid
          (show_rex uid_rex)) ;
-  let authorization = ("Authorization", "Bearer " ^ config.api_token) in
+  let authorization =
+    Option.map (fun t -> ("Authorization", "Bearer " ^ t)) config.api_token
+    |> Option.to_list
+  in
   (* Delete so that we don't care about versions. *)
   let* () =
     let delete_request =
       {
         uri = make_url config ("dashboards/uid/" ^ dashboard.uid);
         meth = `DELETE;
-        headers = Cohttp.Header.of_list [authorization];
+        headers = Cohttp.Header.of_list authorization;
         body = None;
       }
     in
@@ -279,7 +282,7 @@ let update_dashboard config dashboard =
       meth = `POST;
       headers =
         Cohttp.Header.of_list
-        @@ [("Content-Type", "application/json"); authorization];
+        @@ ("Content-Type", "application/json") :: authorization;
       body = Option.some @@ Cohttp_lwt.Body.of_string body;
     }
   in
