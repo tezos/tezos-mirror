@@ -329,13 +329,9 @@ module Contracts = struct
       ~contract_id client =
     get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
 
-  let spawn_get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
-
   let get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
-    get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
+    get_sub_new ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
 
   let spawn_get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =

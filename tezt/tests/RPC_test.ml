@@ -153,7 +153,7 @@ let test_contracts ?endpoint client =
   Log.info "Test implicit baker contract" ;
   let bootstrap = List.hd contracts in
   let* () = test_implicit_contract bootstrap in
-  let* _ =
+  let*! _ =
     RPC.Contracts.get_delegate ?endpoint ~hooks ~contract_id:bootstrap client
   in
   Log.info "Test un-allocated implicit contract" ;
@@ -181,6 +181,21 @@ let test_contracts ?endpoint client =
   let* () =
     Lwt_list.iter_s
       (fun rpc ->
+        let*? process =
+          rpc
+            ?endpoint
+            ?hooks:(Some hooks)
+            ?chain:None
+            ?block:None
+            ~contract_id:simple_implicit_key.public_key_hash
+            client
+        in
+        Process.check ~expect_failure:true process)
+      [RPC.Contracts.get_delegate]
+  in
+  let* () =
+    Lwt_list.iter_s
+      (fun rpc ->
         rpc
           ?endpoint
           ?hooks:(Some hooks)
@@ -190,7 +205,6 @@ let test_contracts ?endpoint client =
           client
         |> Process.check ~expect_failure:true)
       [
-        RPC.Contracts.spawn_get_delegate;
         RPC.Contracts.spawn_get_entrypoints;
         RPC.Contracts.spawn_get_script;
         RPC.Contracts.spawn_get_storage;
@@ -215,7 +229,7 @@ let test_contracts ?endpoint client =
   in
   let* () = client_bake_for client in
   let* () = test_implicit_contract delegated_implicit_key.public_key_hash in
-  let* _ =
+  let*! _ =
     RPC.Contracts.get_delegate
       ?endpoint
       ~hooks

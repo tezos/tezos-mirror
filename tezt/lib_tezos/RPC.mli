@@ -445,17 +445,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_delegate], but do not wait for the process to exit. *)
-  val spawn_get_delegate :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/entrypoints *)
   val get_entrypoints :
