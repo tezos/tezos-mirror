@@ -110,7 +110,7 @@ module V1 : sig
 
   type ('signer, 'content) transaction = ('signer, 'content) operation list
 
-  type signature = bytes
+  type signature = Bls_signature.signature
 
   type ('signer, 'content) t = {
     contents : ('signer, 'content) transaction list;

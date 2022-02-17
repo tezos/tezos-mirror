@@ -285,19 +285,13 @@ struct
   let bls_verify : (Bls_signature.pk * bytes) list -> signature -> bool m =
    fun accounts aggregated_signature ->
     let open Syntax in
-    let aggregated_signature_opt =
-      Bls_signature.signature_of_bytes_opt aggregated_signature
-    in
-    match aggregated_signature_opt with
-    | None -> return false
-    | Some aggregated_signature ->
-        return (Bls_signature.aggregate_verify accounts aggregated_signature)
+    return (Bls_signature.aggregate_verify accounts aggregated_signature)
 
   let unwrap_or : type a. a option -> error -> a S.m =
    fun opt err ->
     match opt with Some x -> S.Syntax.return x | None -> S.Syntax.fail err
 
-  let serialize_key : type a. a key -> signature m =
+  let serialize_key : type a. a key -> bytes m =
    fun key ->
     unwrap_or
       (Data_encoding.Binary.to_bytes_opt packed_key_encoding (Key key))
