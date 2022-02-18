@@ -1961,7 +1961,7 @@ module Tx_rollup : sig
     contents : Script.node;
     ty : Script.node;
     ticketer : Script.node;
-    amount : int64;
+    amount : Tx_rollup_l2_qty.t;
     destination : Tx_rollup_l2_address.Indexable.value;
   }
 
@@ -2039,7 +2039,7 @@ module Tx_rollup_message : sig
   type deposit = {
     destination : Tx_rollup_l2_address.Indexable.either;
     ticket_hash : Ticket_hash.t;
-    amount : int64;
+    amount : Tx_rollup_l2_qty.t;
   }
 
   type t = private Batch of string | Deposit of deposit
@@ -2054,7 +2054,10 @@ module Tx_rollup_message : sig
       along with its size in bytes. See
       {!Tx_rollup_message_repr.size}. *)
   val make_deposit :
-    Tx_rollup_l2_address.Indexable.value -> Ticket_hash.t -> int64 -> t * int
+    Tx_rollup_l2_address.Indexable.value ->
+    Ticket_hash.t ->
+    Tx_rollup_l2_qty.t ->
+    t * int
 
   val encoding : t Data_encoding.t
 

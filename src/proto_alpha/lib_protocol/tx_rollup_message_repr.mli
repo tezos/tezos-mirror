@@ -37,7 +37,7 @@
 type deposit = {
   destination : Tx_rollup_l2_address.Indexable.either;
   ticket_hash : Ticket_hash_repr.t;
-  amount : int64;
+  amount : Tx_rollup_l2_qty.t;
 }
 
 (** A [message] is a piece of data originated from the layer-1 to be

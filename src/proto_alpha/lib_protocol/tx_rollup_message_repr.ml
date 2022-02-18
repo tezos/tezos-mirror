@@ -28,7 +28,7 @@
 type deposit = {
   destination : Tx_rollup_l2_address.Indexable.either;
   ticket_hash : Ticket_hash_repr.t;
-  amount : int64;
+  amount : Tx_rollup_l2_qty.t;
 }
 
 let deposit_encoding =
@@ -41,7 +41,7 @@ let deposit_encoding =
   @@ obj3
        (req "destination" Tx_rollup_l2_address.Indexable.encoding)
        (req "ticket_hash" Ticket_hash_repr.encoding)
-       (req "amount" int64)
+       (req "amount" Tx_rollup_l2_qty.encoding)
 
 type t = Batch of string | Deposit of deposit
 
@@ -83,11 +83,12 @@ let pp fmt =
   | Deposit {destination; ticket_hash; amount} ->
       fprintf
         fmt
-        "@[<hov 2>Deposit:@ destination=%a,@ ticket_hash=%a,@ amount:%Ld@]"
+        "@[<hov 2>Deposit:@ destination=%a,@ ticket_hash=%a,@ amount:%a@]"
         Tx_rollup_l2_address.Indexable.pp
         destination
         Ticket_hash_repr.pp
         ticket_hash
+        Tx_rollup_l2_qty.pp
         amount
 
 let size = function
