@@ -57,8 +57,6 @@ let bls12_381 =
     "bls12-381"
     version
 
-let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
-
 let camlzip = external_lib "camlzip" V.(at_least "1.11" && less_than "1.12")
 
 let caqti = external_lib "caqti" V.True
@@ -1572,7 +1570,7 @@ let tezos_protocol_environment_structs =
         tezos_crypto;
         tezos_lwt_result_stdlib;
         data_encoding;
-        bls12_381_legacy;
+        bls12_381;
       ]
     ~modules:["V0"; "V1"; "V2"; "V3"; "V4"; "V5"]
     ~dune:
