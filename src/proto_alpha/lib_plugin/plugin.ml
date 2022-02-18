@@ -2740,8 +2740,8 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 script
-              >>=? fun (Ex_script script, ctxt) ->
-              unparse_script ctxt unparsing_mode script
+              >>=? fun (ex_script, ctxt) ->
+              unparse_script ctxt unparsing_mode ex_script
               >>=? fun (script, ctxt) ->
               Script.force_decode_in_context
                 ~consume_deserialization_gas:When_needed
@@ -2764,8 +2764,8 @@ module RPC = struct
                 ~legacy:true
                 ~allow_forged_in_storage:true
                 script
-              >>=? fun (Ex_script script, ctxt) ->
-              unparse_script ctxt unparsing_mode script
+              >>=? fun (ex_script, ctxt) ->
+              unparse_script ctxt unparsing_mode ex_script
               >>=? fun (script, _ctxt) -> return_some script)
 
     let get_storage_normalized ctxt block ~contract ~unparsing_mode =

@@ -344,8 +344,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script >>=? fun (script, ctxt) ->
+          >>=? fun (ex_script, ctxt) ->
+          unparse_script ctxt Readable ex_script >>=? fun (script, ctxt) ->
           Script.force_decode_in_context
             ~consume_deserialization_gas:When_needed
             ctxt
@@ -460,8 +460,8 @@ let[@coq_axiom_with_reason "gadt"] register () =
           let ctxt = Gas.set_unlimited ctxt in
           let open Script_ir_translator in
           parse_script ctxt ~legacy:true ~allow_forged_in_storage:true script
-          >>=? fun (Ex_script script, ctxt) ->
-          unparse_script ctxt Readable script >|=? fun (script, ctxt) ->
+          >>=? fun (ex_script, ctxt) ->
+          unparse_script ctxt Readable ex_script >|=? fun (script, ctxt) ->
           (Some script, ctxt))
       >|=? fun (script, _ctxt) -> {balance; delegate; script; counter}) ;
   S.Sapling.register ()

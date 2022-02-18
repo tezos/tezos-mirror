@@ -58,8 +58,8 @@ let test_unparse_view () =
     ~legacy:true
     ~allow_forged_in_storage:false
     script
-  >>=?? fun (Ex_script script, ctx) ->
-  Script_ir_translator.unparse_script ctx Readable script
+  >>=?? fun (ex_script, ctx) ->
+  Script_ir_translator.unparse_script ctx Readable ex_script
   >>=?? fun (unparse_script, _ctx) ->
   let aft = Data_encoding.force_bytes unparse_script.code in
   Alcotest.(check bytes) "didn't match" bef aft |> return

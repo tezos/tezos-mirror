@@ -392,10 +392,7 @@ val parse_script :
 
 (* Gas accounting may not be perfect in this function, as it is only called by RPCs. *)
 val unparse_script :
-  context ->
-  unparsing_mode ->
-  ('a, 'b) Script_typed_ir.script ->
-  (Script.t * context) tzresult Lwt.t
+  context -> unparsing_mode -> ex_script -> (Script.t * context) tzresult Lwt.t
 
 val parse_contract :
   context ->
