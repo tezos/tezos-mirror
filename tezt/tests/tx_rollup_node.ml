@@ -86,7 +86,9 @@ let test_node_configuration =
     "TX_rollup: configuration"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* tx_rollup_hash = Client.originate_tx_rollup ~src:operator client in
+      let* tx_rollup_hash =
+        Client.Tx_rollup.originate_tx_rollup ~src:operator client
+      in
       let* json = RPC.get_block client in
       let* block_hash = get_block_hash json in
       let tx_rollup_node =
@@ -126,7 +128,9 @@ let test_tx_node_is_ready =
     "TX_rollup: test if the node is ready"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* tx_rollup_hash = Client.originate_tx_rollup ~src:operator client in
+      let* tx_rollup_hash =
+        Client.Tx_rollup.originate_tx_rollup ~src:operator client
+      in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
       let* json = RPC.get_block client in
@@ -150,7 +154,7 @@ let test_tx_node_store_inbox =
     "TX_rollup: test"
     (fun _protocol node client bootstrap1_key _ ->
       let operator = bootstrap1_key.public_key_hash in
-      let* rollup = Client.originate_tx_rollup ~src:operator client in
+      let* rollup = Client.Tx_rollup.originate_tx_rollup ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
       let* json = RPC.get_block client in
@@ -167,9 +171,8 @@ let test_tx_node_store_inbox =
       let* () = Rollup_node.run tx_node in
       (* Submit a batch *)
       let batch = "tezos" in
-
       let* () =
-        Client.submit_tx_rollup_batch
+        Client.Tx_rollup.submit_tx_rollup_batch
           ~hooks
           ~content:batch
           ~rollup
@@ -200,7 +203,7 @@ let test_tx_node_store_inbox =
           (list string)) ;
       let snd_batch = "tezos_tezos" in
       let* () =
-        Client.submit_tx_rollup_batch
+        Client.Tx_rollup.submit_tx_rollup_batch
           ~hooks
           ~content:snd_batch
           ~rollup

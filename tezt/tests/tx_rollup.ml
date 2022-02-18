@@ -57,7 +57,9 @@ module Regressions = struct
     (* We originate a dumb rollup to be able to generate a paths for
        tx_rollups related RPCs. *)
     let* rollup =
-      Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
+      Client.Tx_rollup.originate_tx_rollup
+        ~src:Constant.bootstrap1.public_key_hash
+        client
     in
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node 2 in
@@ -77,7 +79,7 @@ module Regressions = struct
 
   let submit_batch ~batch {rollup; client; node} =
     let* () =
-      Client.submit_tx_rollup_batch
+      Client.Tx_rollup.submit_tx_rollup_batch
         ~hooks
         ~content:batch
         ~rollup
@@ -108,7 +110,7 @@ module Regressions = struct
 
   let submit_commitment ~level ~roots ~predecessor {rollup; client; node} =
     let* () =
-      Client.submit_tx_rollup_commitment
+      Client.Tx_rollup.submit_tx_rollup_commitment
         ~hooks
         ~level
         ~roots
@@ -176,7 +178,7 @@ module Regressions = struct
       in
       let invalid_address = "this is an invalid tx rollup address" in
       let* () =
-        Client.spawn_submit_tx_rollup_batch
+        Client.Tx_rollup.spawn_submit_tx_rollup_batch
           ~hooks
           ~content:""
           ~rollup:invalid_address
@@ -207,7 +209,12 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
   let* () =
     Lwt_list.iter_p
       (fun (content, src, _) ->
-        Client.submit_tx_rollup_batch ~hooks ~content ~rollup ~src client)
+        Client.Tx_rollup.submit_tx_rollup_batch
+          ~hooks
+          ~content
+          ~rollup
+          ~src
+          client)
       batches
   in
   let* () = Client.bake_for client in
@@ -243,7 +250,9 @@ let test_submit_batches_in_several_blocks ~protocols =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let* rollup =
-    Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
+    Client.Tx_rollup.originate_tx_rollup
+      ~src:Constant.bootstrap1.public_key_hash
+      client
   in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
@@ -259,7 +268,7 @@ let test_submit_batches_in_several_blocks ~protocols =
     ~error_msg:"Unexpected state. Got: %L. Expected: %R." ;
   let batch = "tezos" in
   let* () =
-    Client.submit_tx_rollup_batch
+    Client.Tx_rollup.submit_tx_rollup_batch
       ~hooks
       ~content:batch
       ~rollup
@@ -325,13 +334,15 @@ let test_submit_from_originated_source ~protocols =
   let* _ = Node.wait_for_level node 2 in
   (* We originate a tx_rollup using an implicit account *)
   let* rollup =
-    Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
+    Client.Tx_rollup.originate_tx_rollup
+      ~src:Constant.bootstrap1.public_key_hash
+      client
   in
   let* () = Client.bake_for client in
   let batch = "tezos" in
   (* Finally, we submit a batch to the tx_rollup from an originated contract *)
   let* () =
-    Client.spawn_submit_tx_rollup_batch
+    Client.Tx_rollup.spawn_submit_tx_rollup_batch
       ~hooks
       ~content:batch
       ~rollup
