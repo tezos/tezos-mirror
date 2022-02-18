@@ -2052,6 +2052,12 @@ Special operations
 
     :: 'S   ->   nat : 'S
 
+- ``MIN_BLOCK_TIME``: Push the current minimal block time in seconds.
+
+::
+
+    :: 'S   ->   nat : 'S
+
 Operations on bytes
 ~~~~~~~~~~~~~~~~~~~
 

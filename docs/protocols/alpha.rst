@@ -146,6 +146,11 @@ Michelson
   public keys (with a string notation based of a base58 encoding,
   prefixed with ``tru2``). (MR :gl:`!4431`)
 
+- A new instruction ``MIN_BLOCK_TIME`` has been added. It can be used to
+  push the current minimal time between blocks onto the stack. The value is
+  obtained from the protocol's ``minimal_block_delay`` constant.
+  (MR :gl:`!4471`)
+
 Internal
 --------
 

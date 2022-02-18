@@ -325,6 +325,8 @@ module Cost_of : sig
 
     val now : Gas.cost
 
+    val min_block_time : Gas.cost
+
     val hash_key : Signature.Public_key.t -> Gas.cost
 
     val source : Gas.cost

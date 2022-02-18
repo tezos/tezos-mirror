@@ -574,6 +574,7 @@ and kinstr_size :
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes accu lambda
     | ISet_delegate (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | INow (kinfo, _) -> ret_succ_adding accu (base kinfo)
+    | IMin_block_time (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IBalance (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ILevel (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICheck_signature (kinfo, _) -> ret_succ_adding accu (base kinfo)

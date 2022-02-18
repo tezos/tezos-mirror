@@ -159,7 +159,10 @@ type instruction_name =
   | N_IImplicit_account
   | N_ICreate_contract
   | N_ISet_delegate
+  (* time *)
   | N_INow
+  | N_IMin_block_time
+  (* other *)
   | N_IBalance
   | N_ILevel
   | N_IView
@@ -347,6 +350,7 @@ let string_of_instruction_name : instruction_name -> string =
   | N_ICreate_contract -> "N_ICreate_contract"
   | N_ISet_delegate -> "N_ISet_delegate"
   | N_INow -> "N_INow"
+  | N_IMin_block_time -> "N_IMin_block_time"
   | N_IBalance -> "N_IBalance"
   | N_ICheck_signature_ed25519 -> "N_ICheck_signature_ed25519"
   | N_ICheck_signature_secp256k1 -> "N_ICheck_signature_secp256k1"
@@ -941,6 +945,8 @@ module Instructions = struct
 
   let now = ir_sized_step N_INow nullary
 
+  let min_block_time = ir_sized_step N_IMin_block_time nullary
+
   let balance = ir_sized_step N_IBalance nullary
 
   let check_signature_ed25519 _pk _signature message =
@@ -1411,6 +1417,7 @@ let extract_ir_sized_step :
         Z.log2 Z.(one + Script_int_repr.to_zint time) |> Size.of_int
       in
       Instructions.open_chest log_time plaintext_size
+  | (IMin_block_time _, _) -> Instructions.min_block_time
 
 let extract_control_trace (type bef_top bef aft_top aft)
     (cont : (bef_top, bef, aft_top, aft) Script_typed_ir.continuation) =

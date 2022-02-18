@@ -107,6 +107,7 @@ type prim =
   | I_NONE
   | I_NOT
   | I_NOW
+  | I_MIN_BLOCK_TIME
   | I_OR
   | I_PAIR
   | I_UNPAIR
@@ -208,8 +209,8 @@ let namespace = function
   | I_IF_LEFT | I_IF_NONE | I_IMPLICIT_ACCOUNT | I_INT | I_ISNAT | I_ITER
   | I_JOIN_TICKETS | I_KECCAK | I_LAMBDA | I_LE | I_LEFT | I_LEVEL | I_LOOP
   | I_LOOP_LEFT | I_LSL | I_LSR | I_LT | I_MAP | I_MEM | I_MUL | I_NEG | I_NEQ
-  | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW | I_OR | I_PACK | I_PAIR
-  | I_PAIRING_CHECK | I_PUSH | I_READ_TICKET | I_RENAME | I_RIGHT
+  | I_NEVER | I_NIL | I_NONE | I_NOT | I_NOW | I_MIN_BLOCK_TIME | I_OR | I_PACK
+  | I_PAIR | I_PAIRING_CHECK | I_PUSH | I_READ_TICKET | I_RENAME | I_RIGHT
   | I_SAPLING_EMPTY_STATE | I_SAPLING_VERIFY_UPDATE | I_SELF | I_SELF_ADDRESS
   | I_SENDER | I_SET_DELEGATE | I_SHA256 | I_SHA512 | I_SHA3 | I_SIZE | I_SLICE
   | I_SOME | I_SOURCE | I_SPLIT_TICKET | I_STEPS_TO_QUOTA | I_SUB | I_SUB_MUTEZ
@@ -311,6 +312,7 @@ let string_of_prim = function
   | I_NONE -> "NONE"
   | I_NOT -> "NOT"
   | I_NOW -> "NOW"
+  | I_MIN_BLOCK_TIME -> "MIN_BLOCK_TIME"
   | I_OR -> "OR"
   | I_PAIR -> "PAIR"
   | I_PUSH -> "PUSH"
@@ -464,6 +466,7 @@ let prim_of_string = function
   | "NONE" -> ok I_NONE
   | "NOT" -> ok I_NOT
   | "NOW" -> ok I_NOW
+  | "MIN_BLOCK_TIME" -> ok I_MIN_BLOCK_TIME
   | "OR" -> ok I_OR
   | "PAIR" -> ok I_PAIR
   | "UNPAIR" -> ok I_UNPAIR
@@ -753,6 +756,7 @@ let prim_encoding =
          ("SUB_MUTEZ", I_SUB_MUTEZ);
          (* Alpha_013 addition *)
          ("tx_rollup_l2_address", T_tx_rollup_l2_address);
+         ("MIN_BLOCK_TIME", I_MIN_BLOCK_TIME);
          (* New instructions must be added here, for backward compatibility of the encoding. *)
          (* Keep the comment above at the end of the list *)
        ]

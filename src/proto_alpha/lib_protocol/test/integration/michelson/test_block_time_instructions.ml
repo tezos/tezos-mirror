@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 TriliTech <contact@trili.tech>                         *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,30 +25,56 @@
 
 (** Testing
     -------
-    Component:    Protocol
-    Invocation:   dune runtest src/proto_alpha/lib_protocol/test/integration/michelson
-    Subject:      Integration > Michelson
+    Component:  Protocol (Michelson block-time instructions)
+    Invocation: dune exec src/proto_alpha/lib_protocol/test/integration/michelson/main.exe \
+                -- test "^block time instructions$"
+    Subject:    This module tests that Michelson instructions related to block time are correct.
 *)
 
-let () =
-  Alcotest_lwt.run
-    "protocol > integration > michelson"
-    [
-      ("global table of constants", Test_global_constants_storage.tests);
-      ("interpretation", Test_interpretation.tests);
-      ("lazy storage diff", Test_lazy_storage_diff.tests);
-      ("sapling", Test_sapling.tests);
-      ("script typed ir size", Test_script_typed_ir_size.tests);
-      ("temp big maps", Test_temp_big_maps.tests);
-      ("ticket balance key", Test_ticket_balance_key.tests);
-      ("ticket scanner", Test_ticket_scanner.tests);
-      ("ticket storage", Test_ticket_storage.tests);
-      ("ticket lazy storage diff", Test_ticket_lazy_storage_diff.tests);
-      ("ticket operations diff", Test_ticket_operations_diff.tests);
-      ("ticket accounting", Test_ticket_accounting.tests);
-      ("timelock", Test_timelock.tests);
-      ("typechecking", Test_typechecking.tests);
-      ("script cache", Test_script_cache.tests);
-      ("block time instructions", Test_block_time_instructions.tests);
-    ]
-  |> Lwt_main.run
+open Tezos_protocol_alpha_parameters
+open Protocol
+open Alpha_context
+
+let context_with_constants constants =
+  let open Lwt_tzresult_syntax in
+  let* (block, _contracts) = Context.init_with_constants constants 1 in
+  let+ incremental = Incremental.begin_construction block in
+  Incremental.alpha_ctxt incremental
+
+let test_min_block_time () =
+  let open Lwt_tzresult_syntax in
+  let* context = context_with_constants Default_parameters.constants_mainnet in
+  let* (result, _) =
+    Contract_helpers.run_script
+      context
+      ~storage:"0"
+      ~parameter:"Unit"
+      {| { parameter unit; storage nat; code { DROP; MIN_BLOCK_TIME; NIL operation; PAIR } } |}
+      ()
+  in
+
+  let expected_value =
+    Default_parameters.constants_mainnet.minimal_block_delay
+    |> Period.to_seconds |> Z.of_int64
+  in
+
+  match Micheline.root result.storage with
+  | Int (_, result_storage) when Z.equal result_storage expected_value ->
+      return_unit
+  | _ ->
+      failwith
+        "Expected storage to be %a, but got %a"
+        Z.pp_print
+        expected_value
+        Micheline_printer.print_expr
+        (Micheline_printer.printable
+           Michelson_v1_primitives.string_of_prim
+           result.storage)
+
+let tests =
+  [
+    Tztest.tztest
+      "MIN_BLOCK_TIME gives current minimal block delay"
+      `Quick
+      test_min_block_time;
+  ]

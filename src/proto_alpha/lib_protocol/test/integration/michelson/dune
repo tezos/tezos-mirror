@@ -5,6 +5,7 @@
  (libraries alcotest-lwt
             tezos-base
             tezos-protocol-alpha
+            tezos-protocol-alpha-parameters
             tezos-base-test-helpers
             tezos-alpha-test-helpers
 
