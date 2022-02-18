@@ -198,7 +198,13 @@ val list : bits:int -> 'a Encoding.t -> 'a list t
 
 type 'a case
 
-val case : string -> ('a -> 'b option) -> ('b -> 'a) -> 'b t -> 'a case
+val case :
+  title:string ->
+  ?description:string ->
+  'b t ->
+  ('a -> 'b option) ->
+  ('b -> 'a) ->
+  'a case
 
 val void_case : void case
 

@@ -1259,7 +1259,13 @@ let expr_encoding =
     (** Usage: [case name encode decode encoding]
 
         Intended to be used inside a [union]. *)
-    val case : string -> ('a -> 'b option) -> ('b -> 'a) -> 'b t -> 'a case
+    val case :
+      title:string ->
+      ?description:string ->
+      'b t ->
+      ('a -> 'b option) ->
+      ('b -> 'a) ->
+      'a case
 
     (** [union cases] creates a new compact encoding to encompass a
         disjunction of cases.

@@ -1523,7 +1523,13 @@ let compactfull_union1 : type a. a compactfull -> a compactfull =
       let encoding =
         let open Data_encoding.Compact in
         union
-          [case "A" (function v -> Some v) (fun v -> v) CompactFulla.encoding]
+          [
+            case
+              ~title:"A"
+              CompactFulla.encoding
+              (function v -> Some v)
+              (fun v -> v);
+          ]
 
       let gen = CompactFulla.gen
 
@@ -1554,15 +1560,15 @@ let compactfull_union2 :
         union
           [
             case
-              "A"
+              ~title:"A"
+              CompactFulla.encoding
               (function Left v -> Some v | Right _ -> None)
-              (fun v -> Left v)
-              CompactFulla.encoding;
+              (fun v -> Left v);
             case
-              "B"
+              ~title:"B"
+              CompactFullb.encoding
               (function Left _ -> None | Right v -> Some v)
-              (fun v -> Right v)
-              CompactFullb.encoding;
+              (fun v -> Right v);
           ]
 
       let gen =
@@ -1617,25 +1623,25 @@ let compactfull_union4 :
         union
           [
             case
-              "A"
+              ~title:"A"
+              CompactFulla.encoding
               (function Left (Left v) -> Some v | _ -> None)
-              (fun v -> Left (Left v))
-              CompactFulla.encoding;
+              (fun v -> Left (Left v));
             case
-              "B"
+              ~title:"B"
+              CompactFullb.encoding
               (function Left (Right v) -> Some v | _ -> None)
-              (fun v -> Left (Right v))
-              CompactFullb.encoding;
+              (fun v -> Left (Right v));
             case
-              "C"
+              ~title:"C"
+              CompactFullc.encoding
               (function Right (Left v) -> Some v | _ -> None)
-              (fun v -> Right (Left v))
-              CompactFullc.encoding;
+              (fun v -> Right (Left v));
             case
-              "D"
+              ~title:"D"
+              CompactFulld.encoding
               (function Right (Right v) -> Some v | _ -> None)
-              (fun v -> Right (Right v))
-              CompactFulld.encoding;
+              (fun v -> Right (Right v));
           ]
 
       let gen =

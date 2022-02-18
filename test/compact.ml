@@ -56,42 +56,42 @@ let documentation_mentions_correct_tag_bit_counts () =
       (union
          ~union_tag_bits:0
          ~cases_tag_bits:0
-         [case "unit" Option.some Fun.id unit])
+         [case ~title:"unit" unit Option.some Fun.id])
     = 0) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:1
          ~cases_tag_bits:0
-         [case "unit" Option.some Fun.id unit])
+         [case ~title:"unit" unit Option.some Fun.id])
     = 1) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:0
          ~cases_tag_bits:1
-         [case "unit" Option.some Fun.id (option unit)])
+         [case ~title:"unit" (option unit) Option.some Fun.id])
     = 1) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:1
          ~cases_tag_bits:1
-         [case "unit" Option.some Fun.id unit])
+         [case ~title:"unit" unit Option.some Fun.id])
     = 2) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:3
          ~cases_tag_bits:2
-         [case "unit" Option.some Fun.id unit])
+         [case ~title:"unit" unit Option.some Fun.id])
     = 5) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:7
          ~cases_tag_bits:6
-         [case "unit" Option.some Fun.id unit])
+         [case ~title:"unit" unit Option.some Fun.id])
     = 13) ;
   ()
 

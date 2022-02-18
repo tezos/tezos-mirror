@@ -189,7 +189,8 @@ let void : void t =
   end)
 
 type ('a, 'b, 'c) case_open = {
-  kind : string;
+  title : string;
+  description : string option;
   proj : 'a -> 'b option;
   inj : 'b -> 'a;
   compact : (module S with type input = 'b and type layout = 'c);
@@ -205,10 +206,17 @@ type ('a, 'b, 'c) case_layout_open = {
 
 type 'a case = Case : ('a, 'b, 'c) case_open -> 'a case [@@unboxed]
 
-let case : type a b. string -> (a -> b option) -> (b -> a) -> b t -> a case =
- fun kind proj inj compact ->
+let case :
+    type a b.
+    title:string ->
+    ?description:string ->
+    b t ->
+    (a -> b option) ->
+    (b -> a) ->
+    a case =
+ fun ~title ?description compact proj inj ->
   let (module C : S with type input = b) = compact in
-  Case {kind; proj; inj; compact = (module C)}
+  Case {title; description; proj; inj; compact = (module C)}
 
 type 'a case_layout =
   | Case_layout : ('a, 'b, 'c) case_layout_open -> 'a case_layout
@@ -220,7 +228,7 @@ let case_to_layout_open :
     (a, b, layout) case_open ->
     ((a, b, layout) case_layout_open -> c) ->
     c list =
- fun extra_tag {proj; inj; kind = _; compact} f ->
+ fun extra_tag {proj; inj; compact; _} f ->
   let (module C : S with type input = b and type layout = layout) = compact in
   List.map (fun layout -> f {extra_tag; proj; inj; compact; layout}) C.layouts
 
@@ -285,32 +293,40 @@ let partial_encoding_of_case_layout_open :
     type a b layout. (a, b, layout) case_layout_open -> a Encoding.t =
  fun {proj; inj; compact; layout; _} ->
   let (module C : S with type input = b and type layout = layout) = compact in
+  (* TODO: introduce a [def] combinator. Problem: needs an [id]. *)
   conv_partial proj inj @@ C.partial_encoding layout
 
 let partial_encoding_of_case_layout : type a. a case_layout -> a Encoding.t =
  fun (Case_layout layout) -> partial_encoding_of_case_layout_open layout
 
-let case_to_data_encoding_case_open :
+let case_to_json_data_encoding_case_open :
     type a b layout. int -> (a, b, layout) case_open -> a Encoding.case =
- fun tag {kind; proj; inj; compact} ->
+ fun tag {title; description; proj; inj; compact} ->
   let (module C : S with type input = b and type layout = layout) = compact in
   Encoding.(
     case
       (Tag tag)
-      ~title:(Format.sprintf "case %d" tag)
+      ~title
+      ?description
       (obj2 (req "kind" string) (req "value" C.json_encoding))
-      (fun x -> match proj x with Some x -> Some (kind, x) | None -> None)
+      (fun x -> match proj x with Some x -> Some (title, x) | None -> None)
       (function
-        | kind', x when String.equal kind' kind -> inj x
+        | title', x when String.equal title title' -> inj x
         | _ ->
             raise
             @@ Invalid_argument
                  "case_to_data_encoding_case_open: Incorrect kind"))
 
-let case_to_data_encoding_case : type a. int -> a case -> a Encoding.case =
- fun tag (Case layout) -> case_to_data_encoding_case_open tag layout
+let case_to_json_data_encoding_case : type a. int -> a case -> a Encoding.case =
+ fun tag (Case layout) -> case_to_json_data_encoding_case_open tag layout
 
-let void_case = case "VOID" refute refute void
+let void_case =
+  case
+    ~title:"VOID"
+    ~description:"This case is void. No data is\naccepted."
+    void
+    refute
+    refute
 
 let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
@@ -365,7 +381,7 @@ let union :
     let tag layout = tag_with_case_layout cases_tag_len layout
 
     let json_encoding : input Encoding.t =
-      Encoding.union @@ List.mapi case_to_data_encoding_case cases
+      Encoding.union @@ List.mapi case_to_json_data_encoding_case cases
   end)
 
 let payload : type a. a Encoding.t -> a t =
@@ -416,8 +432,12 @@ let conv : type a b. ?json:a Encoding.t -> (a -> b) -> (b -> a) -> b t -> a t =
 let option compact =
   union
     [
-      case "some" (fun x -> x) (fun x -> Some x) compact;
-      case "none" (function None -> Some () | _ -> None) (fun () -> None) unit;
+      case ~title:"some" compact (fun x -> x) (fun x -> Some x);
+      case
+        ~title:"none"
+        unit
+        (function None -> Some () | _ -> None)
+        (fun () -> None);
     ]
 
 let tup1 : type a. a t -> a t =
