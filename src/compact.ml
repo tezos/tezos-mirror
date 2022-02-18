@@ -290,8 +290,9 @@ let case_to_data_encoding_case_open :
 let case_to_data_encoding_case : type a. int -> a case -> a Encoding.case =
  fun tag (Case layout) -> case_to_data_encoding_case_open tag layout
 
-let union : type a. ?tag_bits:int -> ?inner_bits:int -> a case list -> a t =
- fun ?tag_bits ?inner_bits cases ->
+let union :
+    type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
+ fun ?union_tag_bits ?cases_tag_bits cases ->
   (module struct
     type input = a
 
@@ -302,11 +303,11 @@ let union : type a. ?tag_bits:int -> ?inner_bits:int -> a case list -> a t =
           raise
             (Invalid_argument (Format.sprintf "union: not enough %s bits" title))
 
-    (* [extra_tag_len] is the number of bits introduced by [union] to
+    (* [union_tag_len] is the number of bits introduced by [union] to
        distinguish between cases, while [inner_tag] is the greatest
        number of bits used by the cases themselves. *)
-    let extra_tag_len, inner_tag_len =
-      let min_extra, min_len =
+    let union_tag_len, cases_tag_len =
+      let min_union, min_cases =
         match cases with
         | [] -> (0, 0)
         | case :: rst ->
@@ -320,10 +321,11 @@ let union : type a. ?tag_bits:int -> ?inner_bits:int -> a case list -> a t =
               rst
             |> fun (_, _, extra, len) -> (extra, len)
       in
-      (bits "tag" min_extra tag_bits, bits "inner" min_len inner_bits)
+      ( bits "tag" min_union union_tag_bits,
+        bits "inner" min_cases cases_tag_bits )
 
     let tag_len =
-      let r = extra_tag_len + inner_tag_len in
+      let r = union_tag_len + cases_tag_len in
       if r >= 16 then
         raise @@ Invalid_argument "Compact_encoding.union: tags do not fit" ;
       r
@@ -336,7 +338,7 @@ let union : type a. ?tag_bits:int -> ?inner_bits:int -> a case list -> a t =
 
     let partial_encoding = partial_encoding_of_case_layout
 
-    let tag layout = tag_with_case_layout inner_tag_len layout
+    let tag layout = tag_with_case_layout cases_tag_len layout
 
     let json_encoding : input Encoding.t =
       Encoding.union @@ List.mapi case_to_data_encoding_case cases

@@ -1098,7 +1098,8 @@ let expr_encoding =
         Note that, if omitted, [tag_bits] and [inner_bits] are inferred
         by [union] to be minimal. To avoid breaking backward compatibility
         unknowingly, it is recommended to set them. *)
-    val union : ?tag_bits:int -> ?inner_bits:int -> 'a case list -> 'a t
+    val union :
+      ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
     (** [or_int32 c] creates a new compact encoding for the disjunction of
         any type [a] (see {!case}) with [int32]. It uses the same number

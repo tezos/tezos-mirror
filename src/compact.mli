@@ -77,7 +77,7 @@ type 'a case
 
 val case : string -> ('a -> 'b option) -> ('b -> 'a) -> 'b t -> 'a case
 
-val union : ?tag_bits:int -> ?inner_bits:int -> 'a case list -> 'a t
+val union : ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
 val or_int32 :
   int32_kind:string ->
