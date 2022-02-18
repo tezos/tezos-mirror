@@ -90,24 +90,16 @@ let prepare_value h : 'a either -> 'a value tzresult Lwt.t = function
   | Index x -> h x >|=? fun x -> Value x
   | Value x -> return (Value x)
 
+let compact val_encoding =
+  Data_encoding.Compact.(
+    conv
+      (function Index x -> Either.Left x | Value x -> Right x)
+      (function Left x -> Index x | Right x -> Value x)
+    @@ or_int32 ~int32_kind:"index" ~alt_kind:"value" val_encoding)
+
 let encoding : 'a Data_encoding.t -> 'a either Data_encoding.t =
  fun val_encoding ->
-  Data_encoding.(
-    union
-      [
-        case
-          (Tag 0)
-          ~title:"Key"
-          int32
-          (function Index x -> Some x | _ -> None)
-          (fun x -> Index x);
-        case
-          (Tag 1)
-          ~title:"Value"
-          val_encoding
-          (function Value x -> Some x | _ -> None)
-          (fun x -> Value x);
-      ])
+  Data_encoding.Compact.make ~tag_size:`Uint8 @@ compact val_encoding
 
 let pp :
     (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a either -> unit =
@@ -172,6 +164,8 @@ module Make (V : VALUE) = struct
   let from_index = from_index
 
   let from_index_exn = from_index_exn
+
+  let compact = compact V.encoding
 
   let encoding = encoding V.encoding
 

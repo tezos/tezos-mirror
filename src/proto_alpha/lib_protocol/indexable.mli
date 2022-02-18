@@ -93,6 +93,14 @@ val forget_value : 'a value -> 'a either
     by the type system. *)
 val forget_index : 'a index -> 'a either
 
+(** [compact val_encoding] is a combinator to derive a compact
+    encoding for an indexable value of type ['a] from an encoding for
+    ['a]. It uses two bits in the shared tag. [00] is used for indexes
+    fitting in one byte, [01] for indexes fitting in two bytes, [10]
+    for indexes fitting in four bytes, and [11] for the values of type
+    ['a]. *)
+val compact : 'a Data_encoding.t -> 'a either Data_encoding.Compact.t
+
 val encoding : 'a Data_encoding.t -> 'a either Data_encoding.t
 
 val pp :
@@ -180,6 +188,8 @@ module Make (V : VALUE) : sig
 
   val prepare_value :
     (int32 -> V.t tzresult Lwt.t) -> either -> value tzresult Lwt.t
+
+  val compact : either Data_encoding.Compact.t
 
   val encoding : either Data_encoding.t
 

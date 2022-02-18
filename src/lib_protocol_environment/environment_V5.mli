@@ -32,6 +32,7 @@ module type V5 = sig
     Tezos_protocol_environment_sigs.V5.T
       with type Format.formatter = Format.formatter
        and type 'a Data_encoding.t = 'a Data_encoding.t
+       and type 'a Data_encoding.Compact.t = 'a Data_encoding.Compact.t
        and type 'a Data_encoding.lazy_t = 'a Data_encoding.lazy_t
        and type 'a Lwt.t = 'a Lwt.t
        and type ('a, 'b) Pervasives.result = ('a, 'b) result
