@@ -27,7 +27,7 @@
 
 type 'a t
 
-val make : ?tag_size:[`Uint8 | `Uint16] -> 'a t -> 'a Encoding.t
+val make : ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> 'a t -> 'a Encoding.t
 
 type void
 

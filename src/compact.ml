@@ -97,9 +97,12 @@ end
 
 type 'a t = (module S with type input = 'a)
 
-let make : type a. ?tag_size:[`Uint8 | `Uint16] -> a t -> a Encoding.t =
- fun ?(tag_size = `Uint8) (module C : S with type input = a) ->
-  let tag_len_limit = match tag_size with `Uint8 -> 8 | `Uint16 -> 16 in
+let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
+    =
+ fun ?(tag_size = `Uint0) (module C : S with type input = a) ->
+  let tag_len_limit =
+    match tag_size with `Uint0 -> 0 | `Uint8 -> 8 | `Uint16 -> 16
+  in
 
   if C.tag_len > tag_len_limit then
     raise @@ Invalid_argument "Compact_encoding.make: tags do not fit" ;
@@ -112,31 +115,42 @@ let make : type a. ?tag_size:[`Uint8 | `Uint16] -> a t -> a Encoding.t =
   in
 
   Encoding.(
-    raw_splitted
-      ~json:(Json.convert C.json_encoding)
-      ~binary:
-        (matching ~tag_size (fun x ->
-             let layout = C.classify x in
-             matched
-               ~tag_size
-               (C.tag layout |> to_int)
-               (C.partial_encoding layout)
-               x)
-        @@ List.map
-             (fun layout ->
-               let tag = tag layout in
-               (*
-                 Note: the projection function is never used. This is
-                 because [matching] uses the list of cases for
-                 decoding only, not encoding.
-                *)
-               case
-                 ~title:(Format.sprintf "case %d" tag)
-                 (Tag tag)
-                 (C.partial_encoding layout)
-                 (fun x -> Some x)
-                 (fun x -> x))
-             C.layouts))
+    match tag_size with
+    | `Uint0 -> (
+        (* INVARIANT: when [tag_len = 0] then either:
+           - it's void and [layouts = []], or
+           - [layouts] has a single element and [partial_encoding] is total *)
+        match C.layouts with
+        | [] -> C.json_encoding
+        | [single_layout] -> C.partial_encoding single_layout
+        | _ ->
+            invalid_arg
+              "Data_encoding.Compact.make: 0-tag encoding has more than one \
+               layout")
+    | (`Uint8 | `Uint16) as tag_size ->
+        raw_splitted
+          ~json:(Json.convert C.json_encoding)
+          ~binary:
+            (matching ~tag_size (fun x ->
+                 let layout = C.classify x in
+                 matched
+                   ~tag_size
+                   (C.tag layout |> to_int)
+                   (C.partial_encoding layout)
+                   x)
+            @@ List.map
+                 (fun layout ->
+                   let tag = tag layout in
+                   (* Note: the projection function is never used. This is
+                      because [matching] uses the list of cases for decoding
+                      only, not encoding. *)
+                   case
+                     ~title:(Format.sprintf "case %d" tag)
+                     (Tag tag)
+                     (C.partial_encoding layout)
+                     (fun x -> Some x)
+                     (fun x -> x))
+                 C.layouts))
 
 (* ---- Combinators --------------------------------------------------------- *)
 

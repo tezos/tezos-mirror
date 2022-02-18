@@ -946,7 +946,7 @@ let expr_encoding =
 
         @raise Invalid_argument if the shared tags cannot fit in [tag_size]
         space. *)
-    val make : ?tag_size:[`Uint8 | `Uint16] -> 'a t -> 'a encoding
+    val make : ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> 'a t -> 'a encoding
 
     (** {1 Combinators} *)
 
