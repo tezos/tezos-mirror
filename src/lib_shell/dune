@@ -8,6 +8,7 @@
  (libraries
   lwt-watcher
   lwt-canceler
+  prometheus
   tezos-base
   tezos-base.unix
   tezos-context

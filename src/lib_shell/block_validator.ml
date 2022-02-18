@@ -57,6 +57,18 @@ module Name = struct
 end
 
 module Types = struct
+  type metrics = {
+    already_commited_blocks_count : Prometheus.Counter.t;
+    outdated_blocks_count : Prometheus.Counter.t;
+    validated_blocks_count : Prometheus.Counter.t;
+    validation_errors_count : Prometheus.Counter.t;
+    preapplied_blocks_count : Prometheus.Counter.t;
+    preapplication_errors_count : Prometheus.Counter.t;
+    validation_errors_after_precheck_count : Prometheus.Counter.t;
+    precheck_failed_count : Prometheus.Counter.t;
+    validation_worker_metrics : Worker_metrics.t;
+  }
+
   type state = {
     protocol_validator : Protocol_validator.t;
     validation_process : Block_validator_process.t;
@@ -288,6 +300,76 @@ let on_request : type r. t -> r Request.t -> r tzresult Lwt.t =
   | Request.Request_validation r -> on_validation_request w r
   | Request.Request_preapplication r -> on_preapplication_request w r
 
+let metrics =
+  let namespace = String.concat "_" Name.base in
+  let subsystem = None in
+  let already_commited_blocks_count =
+    let help = "Number of requests to validate a block already handled" in
+    Prometheus.Counter.v
+      ~help
+      ~namespace
+      ?subsystem
+      "already_commited_blocks_count"
+  in
+  let outdated_blocks_count =
+    let help =
+      "Number of requests to validate a block older than the node's checkpoint"
+    in
+    Prometheus.Counter.v ~help ~namespace ?subsystem "outdated_blocks_count"
+  in
+  let validated_blocks_count =
+    let help = "Number of requests to validate a valid block" in
+    Prometheus.Counter.v ~help ~namespace ?subsystem "validated_blocks_count"
+  in
+  let validation_errors_count =
+    let help = "Number of requests to validate an invalid block" in
+    Prometheus.Counter.v ~help ~namespace ?subsystem "validation_errors_count"
+  in
+  let preapplied_blocks_count =
+    let help = "Number of successful application simulations of blocks" in
+    Prometheus.Counter.v ~help ~namespace ?subsystem "preapplied_blocks_count"
+  in
+  let preapplication_errors_count =
+    let help = "Number of refused application simulations of blocks" in
+    Prometheus.Counter.v
+      ~help
+      ~namespace
+      ?subsystem
+      "preapplication_errors_count"
+  in
+  let validation_errors_after_precheck_count =
+    let help =
+      "Number of requests to validate an invalid but precheckable block"
+    in
+    Prometheus.Counter.v
+      ~help
+      ~namespace
+      ?subsystem
+      "validation_errors_after_precheck_count"
+  in
+  let precheck_failed_count =
+    let help =
+      "Number of block validation requests where the prechecking of a block \
+       failed"
+    in
+    Prometheus.Counter.v ~help ~namespace ?subsystem "precheck_failed_count"
+  in
+  let validation_worker_metrics =
+    Worker_metrics.declare ~label_names:[] ~namespace ?subsystem () []
+  in
+  Types.
+    {
+      already_commited_blocks_count;
+      outdated_blocks_count;
+      validated_blocks_count;
+      validation_errors_count;
+      preapplied_blocks_count;
+      preapplication_errors_count;
+      validation_errors_after_precheck_count;
+      precheck_failed_count;
+      validation_worker_metrics;
+    }
+
 let on_launch _ _ (limits, start_testchain, db, validation_process) =
   let protocol_validator = Protocol_validator.create db in
   let invalid_blocks_after_precheck = Block_hash_ring.create 50 in
@@ -315,30 +397,42 @@ let on_completion :
     type a. t -> a Request.t -> a -> Worker_types.request_status -> unit Lwt.t =
  fun w request v st ->
   match (request, v) with
-  | (Request.Request_validation {hash; _}, (Already_commited | Outdated_block))
-    ->
+  | (Request.Request_validation {hash; _}, Already_commited) ->
+      Prometheus.Counter.inc_one metrics.already_commited_blocks_count ;
+      Worker.log_event w (Previously_validated hash) >>= fun () ->
+      Lwt.return_unit
+  | (Request.Request_validation {hash; _}, Outdated_block) ->
+      Prometheus.Counter.inc_one metrics.outdated_blocks_count ;
       Worker.log_event w (Previously_validated hash) >>= fun () ->
       Lwt.return_unit
   | (Request.Request_validation _, Validated) -> (
+      let () = Worker_metrics.update metrics.validation_worker_metrics st in
+      Prometheus.Counter.inc_one metrics.validated_blocks_count ;
       match Request.view request with
       | Validation v -> Worker.log_event w (Validation_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
   | (Request.Request_validation _, Validation_error errs) -> (
+      let () = Worker_metrics.update metrics.validation_worker_metrics st in
+      Prometheus.Counter.inc_one metrics.validation_errors_count ;
       match Request.view request with
       | Validation v ->
           Worker.log_event w (Event.Validation_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | (Request.Request_preapplication _, Preapplied _) -> (
+      Prometheus.Counter.inc_one metrics.preapplied_blocks_count ;
       match Request.view request with
       | Preapplication v ->
           Worker.log_event w (Event.Preapplication_success (v, st))
       | _ -> (* assert false *) Lwt.return_unit)
   | (Request.Request_preapplication _, Preapplication_error errs) -> (
+      Prometheus.Counter.inc_one metrics.preapplication_errors_count ;
       match Request.view request with
       | Preapplication v ->
           Worker.log_event w (Event.Preapplication_failure (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | (Request.Request_validation _, Validation_error_after_precheck errs) -> (
+      let () = Worker_metrics.update metrics.validation_worker_metrics st in
+      Prometheus.Counter.inc_one metrics.validation_errors_after_precheck_count ;
       match Request.view request with
       | Validation v ->
           Worker.log_event
@@ -346,6 +440,8 @@ let on_completion :
             (Event.Validation_failure_after_precheck (v, st, errs))
       | _ -> (* assert false *) Lwt.return_unit)
   | (Request.Request_validation _, Precheck_failed errs) -> (
+      let () = Worker_metrics.update metrics.validation_worker_metrics st in
+      Prometheus.Counter.inc_one metrics.precheck_failed_count ;
       match Request.view request with
       | Validation v ->
           Worker.log_event w (Event.Precheck_failure (v, st, errs))

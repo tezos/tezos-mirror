@@ -571,14 +571,12 @@ struct
           | None -> Handlers.on_no_request w
           | Some (pushed, Message (request, u)) -> (
               let current_request = Request.view request in
-              let treated_time = Systime_os.now () in
-              w.current_request <- Some (pushed, treated_time, current_request) ;
+              let treated = Systime_os.now () in
+              w.current_request <- Some (pushed, treated, current_request) ;
               match u with
               | None ->
                   let* res = Handlers.on_request w request in
-                  let completed_time = Systime_os.now () in
-                  let treated = Ptime.diff treated_time pushed in
-                  let completed = Ptime.diff completed_time treated_time in
+                  let completed = Systime_os.now () in
                   w.current_request <- None ;
                   let status = Worker_types.{pushed; treated; completed} in
                   let*! () = Handlers.on_completion w request res status in
@@ -595,9 +593,7 @@ struct
                   let*! res = Handlers.on_request w request in
                   Lwt.wakeup_later u res ;
                   let*? res = res in
-                  let completed_time = Systime_os.now () in
-                  let treated = Ptime.diff treated_time pushed in
-                  let completed = Ptime.diff completed_time treated_time in
+                  let completed = Systime_os.now () in
                   let status = Worker_types.{pushed; treated; completed} in
                   w.current_request <- None ;
                   let*! () = Handlers.on_completion w request res status in
@@ -617,10 +613,8 @@ struct
           | Error errs -> (
               let* r =
                 match w.current_request with
-                | Some (pushed, treated_time, request) ->
-                    let completed_time = Systime_os.now () in
-                    let treated = Ptime.diff treated_time pushed in
-                    let completed = Ptime.diff completed_time treated_time in
+                | Some (pushed, treated, request) ->
+                    let completed = Systime_os.now () in
                     w.current_request <- None ;
                     Handlers.on_error
                       w

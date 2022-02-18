@@ -11,6 +11,7 @@ depends: [
   "dune" { >= "2.9" }
   "lwt-watcher" { = "0.1" }
   "lwt-canceler" { >= "0.3" & < "0.4" }
+  "prometheus"
   "tezos-base"
   "tezos-context"
   "tezos-store"

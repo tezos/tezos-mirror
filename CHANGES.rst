@@ -25,6 +25,11 @@ be documented here either.
 Node
 ----
 
+- **Breaking change**:
+  restored the encoding of events corresponding to "completed
+  requests" (block validation, head switch, ...) to pre v11. They only
+  contains absolute timestamp.
+
 - Add optional query parameters ``applied``, ``refused``, ``outdated``,
   ``branch_refused``, and ``branch_delayed`` to RPC
   ``GET /chains/main/mempool/pending_operations``.

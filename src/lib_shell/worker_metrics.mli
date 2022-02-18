@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,49 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Error_monad
+type t
 
-(** The running status of an individual worker. *)
-type worker_status =
-  | Launching of Time.System.t
-  | Running of Time.System.t
-  | Closing of Time.System.t * Time.System.t
-  | Closed of Time.System.t * Time.System.t * error list option
+val declare :
+  label_names:string list ->
+  namespace:string ->
+  ?subsystem:string ->
+  unit ->
+  string list ->
+  t
 
-(** Worker status serializer for RPCs. *)
-val worker_status_encoding :
-  error list Data_encoding.t -> worker_status Data_encoding.t
-
-type worker_information = {
-  instances_number : int;
-  wstatus : worker_status;
-  queue_length : int;
-}
-
-val worker_information_encoding :
-  error list Data_encoding.t -> worker_information Data_encoding.t
-
-(** The running status of an individual request. *)
-type request_status = {
-  pushed : Time.System.t;
-  treated : Time.System.t;
-  completed : Time.System.t;
-}
-
-(** Request status serializer for RPCs. *)
-val request_status_encoding : request_status Data_encoding.t
-
-(** The full status of an individual worker. *)
-type 'req full_status = {
-  status : worker_status;
-  pending_requests : (Time.System.t * 'req) list;
-  current_request : (Time.System.t * Time.System.t * 'req) option;
-}
-
-(** Full worker status serializer for RPCs. *)
-val full_status_encoding :
-  'req Data_encoding.t ->
-  error list Data_encoding.t ->
-  'req full_status Data_encoding.t
-
-val pp_status : Format.formatter -> request_status -> unit
+val update : t -> Worker_types.request_status -> unit
