@@ -101,9 +101,12 @@ let make : type a. ?tag_size:[`Uint8 | `Uint16] -> a t -> a Encoding.t =
  fun ?(tag_size = `Uint8) (module C : S with type input = a) ->
   let tag_len_limit = match tag_size with `Uint8 -> 8 | `Uint16 -> 16 in
 
+  if C.tag_len > tag_len_limit then
+    raise @@ Invalid_argument "Compact_encoding.make: tags do not fit" ;
+
   let tag layout =
     let candidate = C.tag layout in
-    if C.tag_len >= tag_len_limit || candidate >= (1l << C.tag_len) then
+    if candidate >= (1l << C.tag_len) then
       raise @@ Invalid_argument "Compact_encoding.make: tags do not fit" ;
     to_int candidate
   in
@@ -293,6 +296,8 @@ let case_to_data_encoding_case : type a. int -> a case -> a Encoding.case =
 let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
+  if cases = [] then
+    invalid_arg "Data_encoding.Compact.union: empty list of cases." ;
   (module struct
     type input = a
 
@@ -309,7 +314,7 @@ let union :
     let union_tag_len, cases_tag_len =
       let min_union, min_cases =
         match cases with
-        | [] -> (0, 0)
+        | [] -> assert false
         | case :: rst ->
             List.fold_left
               (fun (bound, size, acc_extra, acc_len) case ->
