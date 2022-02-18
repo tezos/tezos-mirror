@@ -1123,32 +1123,32 @@ let sign_block client block_hex ~delegate =
   spawn_sign_block client block_hex ~delegate |> Process.check_and_read_stdout
 
 module Tx_rollup = struct
-  let spawn_originate_tx_rollup ?(wait = "none")
-      ?(burn_cap = Tez.of_int 9_999_999) ?(storage_limit = 60_000) ~src client =
-    spawn_command
-      client
-      [
-        "--wait";
-        wait;
-        "originate";
-        "tx";
-        "rollup";
-        "from";
-        src;
-        "--burn-cap";
-        Tez.to_string burn_cap;
-        "--storage-limit";
-        string_of_int storage_limit;
-      ]
-
-  let originate_tx_rollup ?wait ?burn_cap ?storage_limit ~src client =
+  let originate_tx_rollup ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
+      ?(storage_limit = 60_000) ~src client =
     let process =
-      spawn_originate_tx_rollup ?wait ?burn_cap ?storage_limit ~src client
+      spawn_command
+        client
+        [
+          "--wait";
+          wait;
+          "originate";
+          "tx";
+          "rollup";
+          "from";
+          src;
+          "--burn-cap";
+          Tez.to_string burn_cap;
+          "--storage-limit";
+          string_of_int storage_limit;
+        ]
     in
-    let* client_output = Process.check_and_read_stdout process in
-    client_output
-    =~* rex "Originated tx rollup: ?(\\w*)"
-    |> mandatory "tx rollup hash" |> Lwt.return
+    let parse process =
+      let* output = Process.check_and_read_stdout process in
+      output
+      =~* rex "Originated tx rollup: ?(\\w*)"
+      |> mandatory "tx rollup hash" |> Lwt.return
+    in
+    {value = process; run = parse}
 
   let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
       ?hooks ~content ~rollup ~src client =

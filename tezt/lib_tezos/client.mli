@@ -869,16 +869,7 @@ module Tx_rollup : sig
     ?storage_limit:int ->
     src:string ->
     t ->
-    string Lwt.t
-
-  (** Same as [originate_tx_rollup], but do not wait for the process to exit. *)
-  val spawn_originate_tx_rollup :
-    ?wait:string ->
-    ?burn_cap:Tez.t ->
-    ?storage_limit:int ->
-    src:string ->
-    t ->
-    Process.t
+    string Process.runnable
 
   (** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
   val submit_tx_rollup_batch :
