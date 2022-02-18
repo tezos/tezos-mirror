@@ -252,41 +252,41 @@ let test_stresstest_sources_format =
   in
   loop ~first_iteration:true ~repeat:3
 
-(** Initialize a single node and run the [stresstest] command.
-    Wait for it to inject the requested number of transfers
-    (argument [transfers]), and check that the node's mempool
-    contains this many applied operations. *)
-let test_stresstest_applied =
+(** Run the [stresstest] command in an isolated node with an explicit
+    parameter [transfers], that makes it stop after injecting this
+    number of transfers. Then check that the mempool contains this many
+    applied operations, and bake a block and check that it also
+    contains the same number of manager operations. *)
+let test_stresstest_n_transfers =
   Protocol.register_test
     ~__FILE__
-    ~title:"stresstest applied"
-    ~tags:["client"; "stresstest"; "applied"]
+    ~title:"stresstest explicit transfers argument"
+    ~tags:["stresstest"; "isolated_node"; "n_transfers"]
   @@ fun protocol ->
-  let transfers = 30 in
-  let* (node, client) =
+  let n_transfers = 10 in
+  let n_bootstraps = 2 * n_transfers in
+  let* (_node, client) =
     Client.init_with_protocol
-      ~nodes_args:
-        [
-          Synchronisation_threshold 0;
-          Connections 0;
-          Disable_operations_precheck;
-          (* FIXME: https://gitlab.com/tezos/tezos/-/issues/2085
-             Stresstest command uses counters to inject a lot of operations with limited
-             number of bootstrap accounts. With precheck these operations are mostly
-             rejected because we don't apply the effect of operations in the
-             prevalidation context in mempool mode anymore. So, only the operation with
-             the correct counter is considered as Applied (without incrementing the
-             counter in the context). Once the issue is fixed, the
-             [Disable_operations_precheck] flag above can be removed. *)
-        ]
+      ~nodes_args:[Synchronisation_threshold 0; Connections 0]
+      ~additional_bootstrap_account_count:
+        (n_bootstraps - Constant.default_bootstrap_count)
       `Client
       ~protocol
       ()
   in
-  let waiter = wait_for_n_injections transfers node in
-  let* () = Client.stresstest ~transfers client in
-  let* () = waiter in
-  let* _ = check_n_applied_operations_in_mempool transfers client in
+  let source_aliases =
+    List.map (fun i -> sf "bootstrap%d" i) (range 1 n_bootstraps)
+  in
+  let* () =
+    Client.stresstest
+      ~transfers:n_transfers
+      ~source_aliases
+      ~single_op_per_pkh_per_block:true
+      client
+  in
+  let* _ = check_n_applied_operations_in_mempool n_transfers client in
+  let* () = Client.bake_for client in
+  let* _ = check_n_manager_operations_in_head n_transfers client in
   unit
 
 (** Similar to {!test_stresstest_applied}, but instead of the
@@ -524,7 +524,7 @@ let test_stresstest_applied_multiple_nodes_1op =
 
 let register ~protocols =
   test_stresstest_sources_format protocols ;
-  test_stresstest_applied protocols ;
+  test_stresstest_n_transfers protocols ;
   test_stresstest_applied_new_bootstraps protocols ;
   test_stresstest_applied_1op protocols ;
   test_stresstest_applied_multiple_nodes protocols ;
