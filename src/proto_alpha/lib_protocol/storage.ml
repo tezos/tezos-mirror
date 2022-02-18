@@ -1423,15 +1423,38 @@ module Tx_rollup = struct
         let encoding = Tx_rollup_inbox_repr.metadata_encoding
       end)
 
-  module Inbox_rev_contents =
-    Level_tx_rollup_context.Make_carbonated_map
+  module Message_index = struct
+    type t = int32
+
+    let compare = Compare.Int32.compare
+
+    let encoding = Data_encoding.int32
+
+    let rpc_arg = RPC_arg.int32
+
+    let path_length = 1
+
+    let to_path i l = Int32.to_string i :: l
+
+    let of_path = function
+      | [] | _ :: _ :: _ -> None
+      | [i] -> Int32.of_string_opt i
+  end
+
+  module Message_indexed_context =
+    Make_subcontext (Registered) (Level_tx_rollup_context.Raw_context)
       (struct
         let name = ["inbox_contents"]
       end)
-      (struct
-        type t = Tx_rollup_message_repr.hash list
 
-        let encoding = Data_encoding.list Tx_rollup_message_repr.hash_encoding
+  module Inbox_contents =
+    Make_indexed_carbonated_data_storage
+      (Message_indexed_context)
+      (Make_index (Message_index))
+      (struct
+        type t = Tx_rollup_message_repr.hash
+
+        let encoding = Tx_rollup_message_repr.hash_encoding
       end)
 
   module Level_indexed_context =

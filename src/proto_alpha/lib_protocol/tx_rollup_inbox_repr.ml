@@ -44,6 +44,7 @@ let encoding =
        (req "cumulated_size" int31))
 
 type metadata = {
+  inbox_length : int32;
   cumulated_size : int;
   predecessor : Raw_level_repr.t option;
   successor : Raw_level_repr.t option;
@@ -52,11 +53,12 @@ type metadata = {
 let metadata_encoding =
   let open Data_encoding in
   conv
-    (fun {cumulated_size; predecessor; successor} ->
-      (cumulated_size, predecessor, successor))
-    (fun (cumulated_size, predecessor, successor) ->
-      {cumulated_size; predecessor; successor})
-    (obj3
+    (fun {inbox_length; cumulated_size; predecessor; successor} ->
+      (inbox_length, cumulated_size, predecessor, successor))
+    (fun (inbox_length, cumulated_size, predecessor, successor) ->
+      {inbox_length; cumulated_size; predecessor; successor})
+    (obj4
+       (req "inbox_length" int32)
        (req "cumulated_size" int31)
        (req "predecessor" (option Raw_level_repr.encoding))
        (req "successor" (option Raw_level_repr.encoding)))
