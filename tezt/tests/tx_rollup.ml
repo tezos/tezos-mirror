@@ -157,7 +157,7 @@ module Regressions = struct
         state
     in
     let offset = Node.get_level node - batch_level in
-    let* _state =
+    let*! _state =
       Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
     in
     unit

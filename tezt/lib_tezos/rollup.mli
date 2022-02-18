@@ -44,7 +44,7 @@ module Tx_rollup : sig
     ?offset:int ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
+    JSON.t Process.runnable
 
   module Check : sig
     val state : state Check.typ

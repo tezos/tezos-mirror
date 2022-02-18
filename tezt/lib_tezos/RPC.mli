@@ -886,7 +886,7 @@ module Tx_rollup : sig
     ?offset:int ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
+    JSON.t Process.runnable
 end
 
 module Sc_rollup : sig
