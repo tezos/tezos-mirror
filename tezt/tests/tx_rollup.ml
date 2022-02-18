@@ -78,7 +78,7 @@ module Regressions = struct
     return ()
 
   let submit_batch ~batch {rollup; client; node} =
-    let* () =
+    let*! () =
       Client.Tx_rollup.submit_tx_rollup_batch
         ~hooks
         ~content:batch
@@ -177,19 +177,22 @@ module Regressions = struct
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let invalid_address = "this is an invalid tx rollup address" in
-      let* () =
-        Client.Tx_rollup.spawn_submit_tx_rollup_batch
+      let*? process =
+        Client.Tx_rollup.submit_tx_rollup_batch
           ~hooks
           ~content:""
           ~rollup:invalid_address
           ~src:Constant.bootstrap1.public_key_hash
           client
-        |> Process.check_error
-             ~exit_code:1
-             ~msg:
-               (rex
-                  ("Parameter '" ^ invalid_address
-                 ^ "' is an invalid tx rollup address"))
+      in
+      let* () =
+        Process.check_error
+          ~exit_code:1
+          ~msg:
+            (rex
+               ("Parameter '" ^ invalid_address
+              ^ "' is an invalid tx rollup address"))
+          process
       in
       unit
   end
@@ -209,12 +212,15 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
   let* () =
     Lwt_list.iter_p
       (fun (content, src, _) ->
-        Client.Tx_rollup.submit_tx_rollup_batch
-          ~hooks
-          ~content
-          ~rollup
-          ~src
-          client)
+        let*! () =
+          Client.Tx_rollup.submit_tx_rollup_batch
+            ~hooks
+            ~content
+            ~rollup
+            ~src
+            client
+        in
+        unit)
       batches
   in
   let* () = Client.bake_for client in
@@ -267,7 +273,7 @@ let test_submit_batches_in_several_blocks ~protocols =
     Rollup.Check.state
     ~error_msg:"Unexpected state. Got: %L. Expected: %R." ;
   let batch = "tezos" in
-  let* () =
+  let*! () =
     Client.Tx_rollup.submit_tx_rollup_batch
       ~hooks
       ~content:batch
@@ -341,17 +347,19 @@ let test_submit_from_originated_source ~protocols =
   let* () = Client.bake_for client in
   let batch = "tezos" in
   (* Finally, we submit a batch to the tx_rollup from an originated contract *)
-  let* () =
-    Client.Tx_rollup.spawn_submit_tx_rollup_batch
+  let*? process =
+    Client.Tx_rollup.submit_tx_rollup_batch
       ~hooks
       ~content:batch
       ~rollup
       ~src:originated_contract
       client
-    |> Process.check_error
-         ~exit_code:1
-         ~msg:
-           (rex "Only implicit accounts can submit transaction rollup batches")
+  in
+  let* () =
+    Process.check_error
+      ~exit_code:1
+      ~msg:(rex "Only implicit accounts can submit transaction rollup batches")
+      process
   in
   unit
 

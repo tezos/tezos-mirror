@@ -1150,44 +1150,35 @@ module Tx_rollup = struct
     in
     {value = process; run = parse}
 
-  let spawn_submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit
-      ?hooks ~content ~rollup ~src client =
-    spawn_command
-      ?hooks
-      client
-      (["--wait"; wait]
-      @ [
-          "submit";
-          "tx";
-          "rollup";
-          "batch";
-          Hex.(of_string content |> show);
-          "to";
-          rollup;
-          "from";
-          src;
-        ]
-      @ Option.fold
-          ~none:[]
-          ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
-          burn_cap
-      @ Option.fold
-          ~none:[]
-          ~some:(fun s -> ["--storage-limit"; string_of_int s])
-          storage_limit)
-
-  let submit_tx_rollup_batch ?wait ?burn_cap ?storage_limit ?hooks ~content
-      ~rollup ~src client =
-    spawn_submit_tx_rollup_batch
-      ?wait
-      ?burn_cap
-      ?storage_limit
-      ?hooks
-      ~content
-      ~rollup
-      ~src
-      client
-    |> Process.check
+  let submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ~content ~rollup ~src client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ [
+            "submit";
+            "tx";
+            "rollup";
+            "batch";
+            Hex.(of_string content |> show);
+            "to";
+            rollup;
+            "from";
+            src;
+          ]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
 
   let spawn_submit_tx_rollup_commitment ?(wait = "none") ?burn_cap
       ?storage_limit ?hooks ~level ~roots ~predecessor ~rollup ~src client =

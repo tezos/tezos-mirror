@@ -173,7 +173,7 @@ let test_tx_node_store_inbox =
       let* () = Rollup_node.run tx_node in
       (* Submit a batch *)
       let batch = "tezos" in
-      let* () =
+      let*! () =
         Client.Tx_rollup.submit_tx_rollup_batch
           ~hooks
           ~content:batch
@@ -204,7 +204,7 @@ let test_tx_node_store_inbox =
              the cumulated size given by the RPC"
           (list string)) ;
       let snd_batch = "tezos_tezos" in
-      let* () =
+      let*! () =
         Client.Tx_rollup.submit_tx_rollup_batch
           ~hooks
           ~content:snd_batch
