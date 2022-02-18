@@ -982,27 +982,13 @@ struct
     let init c bh = init c bh >|= wrap_error
   end
 
-  module Lift (P : Updater.PROTOCOL) = struct
-    include LiftV1 (P)
+  module Lift (P : Updater.PROTOCOL) = IgnoreCaches (struct
+    let set_log_message_consumer _ = ()
 
-    include IgnoreCaches (struct
-      let set_log_message_consumer _ = ()
+    let environment_version = Protocol.V1
 
-      let environment_version = Protocol.V1
-
-      include Environment_protocol_T.V0toV3 (LiftV1 (P))
-    end)
-
-    let begin_partial_application ~chain_id ~ancestor_context
-        ~(predecessor : Block_header.t) ~predecessor_hash:_ ~cache:_
-        (raw_block : block_header) =
-      begin_partial_application
-        ~chain_id
-        ~ancestor_context
-        ~predecessor_timestamp:predecessor.shell.timestamp
-        ~predecessor_fitness:predecessor.shell.fitness
-        raw_block
-  end
+    include Environment_protocol_T.V0toV3 (LiftV1 (P))
+  end)
 
   class ['chain, 'block] proto_rpc_context (t : Tezos_rpc.RPC_context.t)
     (prefix : (unit, (unit * 'chain) * 'block) RPC_path.t) =
