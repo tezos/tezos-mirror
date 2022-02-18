@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -25,29 +25,12 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
-
-type t = {contents : Tx_rollup_message.t list; cumulated_size : int}
-
-let pp fmt {contents; cumulated_size} =
-  Format.fprintf
-    fmt
-    "tx rollup inbox: %d messages using %d bytes"
-    (List.length contents)
-    cumulated_size
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {contents; cumulated_size} -> (contents, cumulated_size))
-    (fun (contents, cumulated_size) -> {contents; cumulated_size})
-    (obj2
-       (req "contents" @@ list Tx_rollup_message.encoding)
-       (req "cumulated_size" int31))
-
-let to_protocol_inbox {contents; cumulated_size} =
-  Tx_rollup_inbox.
-    {
-      contents = List.map Tx_rollup_message.hash_uncarbonated contents;
-      cumulated_size;
-    }
+let hash :
+    Raw_context.t ->
+    Tx_rollup_message_repr.t ->
+    (Raw_context.t * Tx_rollup_message_repr.hash) tzresult =
+ fun ctxt msg ->
+  Tx_rollup_gas.message_hash_cost @@ Tx_rollup_message_repr.size msg
+  >>? fun cost ->
+  Raw_context.consume_gas ctxt cost >>? fun ctxt ->
+  ok (ctxt, Tx_rollup_message_repr.hash_uncarbonated msg)

@@ -72,5 +72,5 @@ val hash_encoding : hash Data_encoding.t
 
 val pp_hash : Format.formatter -> hash -> unit
 
-(** [hash msg] computes the hash of [msg] to be stored in the inbox. *)
-val hash : t -> hash
+(** [hash_uncarbonated msg] computes the hash of [msg] without gas consumption. *)
+val hash_uncarbonated : t -> hash

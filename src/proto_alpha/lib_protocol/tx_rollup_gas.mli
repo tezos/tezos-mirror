@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -25,29 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+type error += Tx_rollup_negative_message_size
 
-type t = {contents : Tx_rollup_message.t list; cumulated_size : int}
+(** [message_hash_cost size] returns the cost of gas for hashing a
+    message of [size] bytes.
 
-let pp fmt {contents; cumulated_size} =
-  Format.fprintf
-    fmt
-    "tx rollup inbox: %d messages using %d bytes"
-    (List.length contents)
-    cumulated_size
-
-let encoding =
-  let open Data_encoding in
-  conv
-    (fun {contents; cumulated_size} -> (contents, cumulated_size))
-    (fun (contents, cumulated_size) -> {contents; cumulated_size})
-    (obj2
-       (req "contents" @@ list Tx_rollup_message.encoding)
-       (req "cumulated_size" int31))
-
-let to_protocol_inbox {contents; cumulated_size} =
-  Tx_rollup_inbox.
-    {
-      contents = List.map Tx_rollup_message.hash_uncarbonated contents;
-      cumulated_size;
-    }
+    Returns [Tx_rollup_negative_message_size] iff [size < 0]. *)
+val message_hash_cost : int -> Gas_limit_repr.cost tzresult

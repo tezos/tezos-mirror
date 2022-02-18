@@ -1,8 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
+(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
@@ -25,29 +25,29 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Protocol.Alpha_context
+type error += Tx_rollup_negative_message_size
 
-type t = {contents : Tx_rollup_message.t list; cumulated_size : int}
+module S = Saturation_repr
 
-let pp fmt {contents; cumulated_size} =
-  Format.fprintf
-    fmt
-    "tx rollup inbox: %d messages using %d bytes"
-    (List.length contents)
-    cumulated_size
+(** The same model as in {!Michelson_v1_gas.N_IBlake2b}. *)
+let message_hash_cost msg_size =
+  if Compare.Int.(0 <= msg_size) then
+    let ( + ) = S.add in
+    let v0 = Saturation_repr.safe_int msg_size in
+    let cost_N_IBlake2b = S.safe_int 430 + v0 + S.shift_right v0 3 in
+    ok @@ Gas_limit_repr.atomic_step_cost cost_N_IBlake2b
+  else error Tx_rollup_negative_message_size
 
-let encoding =
+let () =
   let open Data_encoding in
-  conv
-    (fun {contents; cumulated_size} -> (contents, cumulated_size))
-    (fun (contents, cumulated_size) -> {contents; cumulated_size})
-    (obj2
-       (req "contents" @@ list Tx_rollup_message.encoding)
-       (req "cumulated_size" int31))
-
-let to_protocol_inbox {contents; cumulated_size} =
-  Tx_rollup_inbox.
-    {
-      contents = List.map Tx_rollup_message.hash_uncarbonated contents;
-      cumulated_size;
-    }
+  (* Wrong_commitment_predecessor_level *)
+  register_error_kind
+    `Permanent
+    ~id:"tx_rollup_negative_message_size"
+    ~title:"The protocol has computed a negative size for an inbox messages"
+    ~description:
+      "The protocol has computed a negative size for an inbox messages. This \
+       is an internal error, and denotes a bug in the protocol implementation."
+    unit
+    (function Tx_rollup_negative_message_size -> Some () | _ -> None)
+    (fun () -> Tx_rollup_negative_message_size)

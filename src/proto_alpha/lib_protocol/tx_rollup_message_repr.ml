@@ -127,5 +127,5 @@ let pp_hash = Message_hash.pp
 
 let hash_encoding = Message_hash.encoding
 
-let hash msg =
+let hash_uncarbonated msg =
   Message_hash.hash_bytes [Data_encoding.Binary.to_bytes_exn encoding msg]
