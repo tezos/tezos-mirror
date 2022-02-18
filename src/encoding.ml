@@ -278,7 +278,30 @@ module Fixed = struct
     | _ -> invalid_arg "Cannot pad non-fixed size encoding"
 end
 
-let rec is_zeroable : type t. string list -> t encoding -> bool =
+(* [Mu_visited] is intended for internal use only. It is used to record visit
+   to recursion nodes ([Mu]) to avoid infinite recursion. See [is_zeroable] for
+   an example of use. *)
+module Mu_visited : sig
+  type t
+
+  val empty : t
+
+  val mem : _ desc -> t -> bool
+
+  (* Raise an exception if called with a node different than [Mu]. *)
+  val add : _ desc -> t -> t
+end = struct
+  type t = Obj.t list
+
+  let empty = []
+
+  let mem x m =
+    match x with Mu _ -> List.memq (Obj.repr x) m | _ -> assert false
+
+  let add x m = match x with Mu _ -> Obj.repr x :: m | _ -> assert false
+end
+
+let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
  fun visited e ->
   (* Whether an encoding can ever produce zero-byte of encoding. It is dangerous
      to place zero-size elements in a collection (list/array) because
@@ -323,9 +346,9 @@ let rec is_zeroable : type t. string list -> t encoding -> bool =
   | Union _ -> false (* includes a tag *)
   (* other recursive cases: truth propagates *)
   | Mu {kind = `Dynamic; _} -> false (* size prefix *)
-  | Mu {kind = `Variable; fix; name; _} ->
-      if List.mem name visited then true
-      else is_zeroable (name :: visited) (fix e)
+  | Mu {kind = `Variable; fix; _} ->
+      if Mu_visited.mem e.encoding visited then true
+      else is_zeroable (Mu_visited.add e.encoding visited) (fix e)
   | Conv {encoding; _} -> is_zeroable visited encoding
   | Describe {encoding; _} -> is_zeroable visited encoding
   | Splitted {encoding; _} -> is_zeroable visited encoding
@@ -335,7 +358,7 @@ let rec is_zeroable : type t. string list -> t encoding -> bool =
   (* Protected against zeroable *)
   | Dynamic_size _ -> false
 
-let is_zeroable e = is_zeroable [] e
+let is_zeroable e = is_zeroable Mu_visited.empty e
 
 (* always some data for size *)
 
@@ -492,7 +515,7 @@ let raw_splitted ~json ~binary =
   @@ Splitted
        {encoding = binary; json_encoding = json; is_obj = false; is_tup = false}
 
-let rec is_obj : type a. string list -> a t -> bool =
+let rec is_obj : type a. Mu_visited.t -> a t -> bool =
  fun visited e ->
   match e.encoding with
   | Obj _ -> true
@@ -503,16 +526,17 @@ let rec is_obj : type a. string list -> a t -> bool =
       List.for_all (fun (Case {encoding = e; _}) -> is_obj visited e) cases
   | Empty -> true
   | Ignore -> true
-  | Mu {fix; name; _} ->
-      if List.mem name visited then false else is_obj (name :: visited) (fix e)
+  | Mu {fix; _} ->
+      if Mu_visited.mem e.encoding visited then false
+      else is_obj (Mu_visited.add e.encoding visited) (fix e)
   | Splitted {is_obj; _} -> is_obj
   | Delayed f -> is_obj visited (f ())
   | Describe {encoding; _} -> is_obj visited encoding
   | _ -> false
 
-let is_obj e = is_obj [] e
+let is_obj e = is_obj Mu_visited.empty e
 
-let rec is_tup : type a. string list -> a t -> bool =
+let rec is_tup : type a. Mu_visited.t -> a t -> bool =
  fun visited e ->
   match e.encoding with
   | Tup _ -> true
@@ -521,14 +545,15 @@ let rec is_tup : type a. string list -> a t -> bool =
   | Dynamic_size {encoding = e; _} -> is_tup visited e
   | Union {cases; _} ->
       List.for_all (function Case {encoding = e; _} -> is_tup visited e) cases
-  | Mu {fix; name; _} ->
-      if List.mem name visited then false else is_tup (name :: visited) (fix e)
+  | Mu {fix; _} ->
+      if Mu_visited.mem e.encoding visited then false
+      else is_tup (Mu_visited.add e.encoding visited) (fix e)
   | Splitted {is_tup; _} -> is_tup
   | Delayed f -> is_tup visited (f ())
   | Describe {encoding; _} -> is_tup visited encoding
   | _ -> false
 
-let is_tup e = is_tup [] e
+let is_tup e = is_tup Mu_visited.empty e
 
 let raw_merge_objs left right =
   let kind = Kind.combine "objects" (classify left) (classify right) in
@@ -772,7 +797,7 @@ let matched ?(tag_size : [`Uint8 | `Uint16] = `Uint8) tag encoding v =
   valid_tag tag_size tag ;
   Matched (tag, encoding, v)
 
-let rec is_nullable : type t. string list -> t encoding -> bool =
+let rec is_nullable : type t. Mu_visited.t -> t encoding -> bool =
  fun visited e ->
   match e.encoding with
   | Null -> true
@@ -804,9 +829,9 @@ let rec is_nullable : type t. string list -> t encoding -> bool =
   | Tups _ -> false
   | Union {cases; _} ->
       List.exists (fun (Case {encoding = e; _}) -> is_nullable visited e) cases
-  | Mu {fix; name; _} ->
-      if List.mem name visited then false
-      else is_nullable (name :: visited) (fix e)
+  | Mu {fix; _} ->
+      if Mu_visited.mem e.encoding visited then false
+      else is_nullable (Mu_visited.add e.encoding visited) (fix e)
   | Conv {encoding = e; _} -> is_nullable visited e
   | Describe {encoding = e; _} -> is_nullable visited e
   | Splitted {json_encoding; _} -> Json_encoding.is_nullable json_encoding
@@ -814,7 +839,7 @@ let rec is_nullable : type t. string list -> t encoding -> bool =
   | Check_size {encoding = e; _} -> is_nullable visited e
   | Delayed _ -> true
 
-let is_nullable e = is_nullable [] e
+let is_nullable e = is_nullable Mu_visited.empty e
 
 let option ty =
   if is_nullable ty then
