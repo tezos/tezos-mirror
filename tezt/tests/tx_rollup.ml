@@ -203,10 +203,38 @@ end
     regression framework. *)
 let hooks = Tezos_regression.hooks
 
-let test_submit_batch ~protocols =
+let submit_three_batches_and_check_size ~rollup node client batches level =
+  let* () =
+    Lwt_list.iter_p
+      (fun (content, src, _) ->
+        Client.submit_tx_rollup_batch ~hooks ~content ~rollup ~src client)
+      batches
+  in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node level in
+  (* Check the inbox has been created, with the expected cumulated size. *)
+  let expected_inbox =
+    Rollup.
+      {
+        cumulated_size =
+          List.fold_left
+            (fun acc (batch, _, _) -> acc + String.length batch)
+            0
+            batches;
+        contents = List.map (fun (_, _, batch) -> batch) batches;
+      }
+  in
+  let* inbox = Rollup.get_inbox ~hooks ~rollup client in
+  Check.(
+    ((inbox = expected_inbox)
+       ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.")
+      Rollup.Check.inbox) ;
+  return ()
+
+let test_submit_batches_in_several_blocks ~protocols =
   Protocol.register_test
     ~__FILE__
-    ~title:"Simple use case"
+    ~title:"Submit batches in several blocks"
     ~tags:["tx_rollup"]
     ~protocols
   @@ fun protocol ->
@@ -238,22 +266,36 @@ let test_submit_batch ~protocols =
       ~src:Constant.bootstrap1.public_key_hash
       client
   in
-  let* () = Client.bake_for client in
-  let* _ = Node.wait_for_level node 3 in
-  (* Check the inbox has been created *)
-  let* inbox = Rollup.get_inbox ~hooks ~rollup client in
-  let expected_inbox =
-    Rollup.
-      {
-        cumulated_size = String.length batch;
-        (* This hash is hard-coded, but maybe could be computed. *)
-        contents = ["M21tdhc2Wn76n164oJvyKW4JVZsDSDeuDsbLgp61XZWtrXjL5WA"];
-      }
+
+  let batch1 = "tezos" in
+  let batch2 = "tx_rollup" in
+  let batch3 = "layer-2" in
+
+  (* Hashes are hardcoded, but could be computed programmatically. *)
+  let submission =
+    [
+      ( batch1,
+        Constant.bootstrap1.public_key_hash,
+        "M292FuoYJhEhgpQDTpKvXSagLopdXtGXRMyLyxhPTd982dqxoaE" );
+      ( batch2,
+        Constant.bootstrap2.public_key_hash,
+        "M21VEKoBenkHCZC8WpUDtxzv4uoixG1iGUxUvMg4UGc88CRWFNF" );
+      ( batch3,
+        Constant.bootstrap3.public_key_hash,
+        "M21tdhc2Wn76n164oJvyKW4JVZsDSDeuDsbLgp61XZWtrXjL5WA" );
+    ]
   in
-  Check.(
-    (inbox = expected_inbox)
-      Rollup.Check.inbox
-      ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.") ;
+
+  (* Let’s try once and see if everything goes as expected *)
+  let* () =
+    submit_three_batches_and_check_size ~rollup node client submission 3
+  in
+
+  (* Let’s try to see if we can submit three more batches in the next level *)
+  let* () =
+    submit_three_batches_and_check_size ~rollup node client submission 3
+  in
+
   unit
 
 let test_submit_from_originated_source ~protocols =
@@ -304,5 +346,5 @@ let test_submit_from_originated_source ~protocols =
 
 let register ~protocols =
   Regressions.register ~protocols ;
-  test_submit_batch ~protocols ;
+  test_submit_batches_in_several_blocks ~protocols ;
   test_submit_from_originated_source ~protocols
