@@ -981,7 +981,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           >>=? fun (opt, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks opt stack
       | IAddress (_, k) ->
-          (step [@ocaml.tailcall]) g gas k ks accu.address stack
+          let (Typed_contract {address; _}) = accu in
+          (step [@ocaml.tailcall]) g gas k ks address stack
       | IContract (kinfo, t, entrypoint, k) -> (
           let addr = accu in
           let entrypoint_opt =
@@ -1005,11 +1006,9 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           | None -> (step [@ocaml.tailcall]) (ctxt, sc) gas k ks None stack)
       | ITransfer_tokens (_, k) ->
           let p = accu in
-          let (amount, (tcontract, stack)) = stack in
-          let tp = tcontract.arg_ty in
-          let destination = tcontract.address.destination in
-          let entrypoint = tcontract.address.entrypoint in
-          transfer (ctxt, sc) gas amount tp p destination entrypoint
+          let (amount, (Typed_contract {arg_ty; address}, stack)) = stack in
+          let {destination; entrypoint} = address in
+          transfer (ctxt, sc) gas amount arg_ty p destination entrypoint
           >>=? fun (accu, ctxt, gas) ->
           (step [@ocaml.tailcall]) (ctxt, sc) gas k ks accu stack
       | IImplicit_account (_, k) ->
@@ -1021,7 +1020,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               entrypoint = Entrypoint.default;
             }
           in
-          let res = {arg_ty; address} in
+          let res = Typed_contract {arg_ty; address} in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | IView (_, View_signature {name; input_ty; output_ty}, k) -> (
           let input = accu in
@@ -1211,7 +1210,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf (_, ty, entrypoint, k) ->
           let destination : Destination.t = Contract sc.self in
-          let res = {arg_ty = ty; address = {destination; entrypoint}} in
+          let address = {destination; entrypoint} in
+          let res = Typed_contract {arg_ty = ty; address} in
           (step [@ocaml.tailcall]) g gas k ks res (accu, stack)
       | ISelf_address (_, k) ->
           let destination : Destination.t = Contract sc.self in

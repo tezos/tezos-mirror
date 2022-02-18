@@ -438,7 +438,7 @@ let unparse_tx_rollup_l2_address ~loc ctxt mode
       let b58check = Tx_rollup_l2_address.to_b58check tx_address in
       (String (loc, b58check), ctxt)
 
-let unparse_contract ~loc ctxt mode {arg_ty = _; address} =
+let unparse_contract ~loc ctxt mode (Typed_contract {arg_ty = _; address}) =
   unparse_address ~loc ctxt mode address
 
 let unparse_signature ~loc ctxt mode s =
@@ -2657,7 +2657,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
             arg_ty
             address.destination
             ~entrypoint:address.entrypoint
-          >|=? fun (ctxt, _) -> ({arg_ty; address}, ctxt) )
+          >|=? fun (ctxt, _) -> (Typed_contract {arg_ty; address}, ctxt) )
   (* Pairs *)
   | (Pair_t (tl, tr, _), expr) ->
       let r_witness = comb_witness1 tr in
@@ -5051,7 +5051,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
               >>? fun (eq, ctxt) ->
                 eq >|? fun Eq ->
                 let destination : Destination.t = Contract contract in
-                (ctxt, {arg_ty = arg; address = {destination; entrypoint}}) )
+                let address = {destination; entrypoint} in
+                (ctxt, Typed_contract {arg_ty = arg; address}) )
           else fail (No_such_entrypoint entrypoint)
       | None -> (
           (* Originated account *)
@@ -5089,7 +5090,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
                        loc
                   >>? fun (entrypoint_arg, ctxt) ->
                   entrypoint_arg >|? fun (entrypoint, arg_ty) ->
-                  (ctxt, {arg_ty; address = {destination; entrypoint}}) )))
+                  let address = {destination; entrypoint} in
+                  (ctxt, Typed_contract {arg_ty; address}) )))
   | Tx_rollup tx_rollup ->
       Tx_rollup_state.assert_exist ctxt tx_rollup >>=? fun ctxt ->
       if Entrypoint.(entrypoint = Tx_rollup.deposit_entrypoint) then
@@ -5097,7 +5099,8 @@ and[@coq_axiom_with_reason "complex mutually recursive definition"] parse_contra
            [parse_contract] and [parse_tx_rollup_deposit_parameters]. *)
         match arg with
         | Pair_t (Ticket_t (_, _), Tx_rollup_l2_address_t, _) ->
-            return (ctxt, {arg_ty = arg; address = {destination; entrypoint}})
+            let address = {destination; entrypoint} in
+            return (ctxt, Typed_contract {arg_ty = arg; address})
         | _ ->
             fail
             @@ Tx_rollup_bad_deposit_parameter (loc, serialize_ty_for_error arg)
@@ -5242,9 +5245,8 @@ let parse_contract_for_script :
                 match eq with
                 | Ok Eq ->
                     let destination : Destination.t = Contract contract in
-                    let contract =
-                      {arg_ty = arg; address = {destination; entrypoint}}
-                    in
+                    let address = {destination; entrypoint} in
+                    let contract = Typed_contract {arg_ty = arg; address} in
                     (ctxt, Some contract)
                 | Error Inconsistent_types_fast -> (ctxt, None) )
           else
@@ -5296,9 +5298,8 @@ let parse_contract_for_script :
                           match entrypoint_arg with
                           | Ok (entrypoint, arg_ty) ->
                               let destination = Destination.Contract contract in
-                              let contract =
-                                {arg_ty; address = {destination; entrypoint}}
-                              in
+                              let address = {destination; entrypoint} in
+                              let contract = Typed_contract {arg_ty; address} in
                               (ctxt, Some contract)
                           | Error Inconsistent_types_fast -> (ctxt, None))) )))
   | Tx_rollup tx_rollup -> (
@@ -5311,10 +5312,8 @@ let parse_contract_for_script :
                entrypoint = Alpha_context.Tx_rollup.deposit_entrypoint) -> (
           Tx_rollup_state.find ctxt tx_rollup >|=? function
           | (ctxt, Some _) ->
-              ( ctxt,
-                Some
-                  {arg_ty = arg; address = {destination = contract; entrypoint}}
-              )
+              let address = {destination = contract; entrypoint} in
+              (ctxt, Some (Typed_contract {arg_ty = arg; address}))
           | (ctxt, None) -> (ctxt, None))
       | _ -> return (ctxt, None))
 
