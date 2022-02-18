@@ -979,13 +979,11 @@ let expr_encoding =
         exhibits a value of type [void]. *)
     val refute : void -> 'a
 
-    (** A compact encoding of the singleton value [empty], which has zero
+    (** A compact encoding of the singleton value [unit], which has zero
         memory footprint.
 
-        For instance, one can define a compact encoding of [bool] values
-        with [union [empty; empty]]: this compact encoding uses zero (0) bit in the
-        shared tag, and 0 bytes in the payload. *)
-    val empty : unit t
+        Uses zero (0) bits of tag. *)
+    val unit : unit t
 
     (** Efficient encoding of boolean values. It uses one (1) bit in the
         shared tag, and zero bit in the payload. *)

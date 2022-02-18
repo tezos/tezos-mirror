@@ -37,7 +37,7 @@ val void : void t
 
 val refute : void -> 'a
 
-val empty : unit t
+val unit : unit t
 
 val bool : bool t
 

@@ -44,7 +44,7 @@ let documentation_mentions_correct_tag_bit_counts () =
   assert (tag_bit_count int64 = 2) ;
   assert (
     tag_bit_count
-      (or_int32 ~int32_kind:"i32" ~alt_kind:"alt" Data_encoding.empty)
+      (or_int32 ~int32_kind:"i32" ~alt_kind:"alt" Data_encoding.unit)
     = 2) ;
   assert (tag_bit_count (list ~bits:0 Data_encoding.int31) = 0) ;
   assert (tag_bit_count (list ~bits:1 Data_encoding.int31) = 1) ;
@@ -56,42 +56,42 @@ let documentation_mentions_correct_tag_bit_counts () =
       (union
          ~union_tag_bits:0
          ~cases_tag_bits:0
-         [case "unit" Option.some Fun.id empty])
+         [case "unit" Option.some Fun.id unit])
     = 0) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:1
          ~cases_tag_bits:0
-         [case "unit" Option.some Fun.id empty])
+         [case "unit" Option.some Fun.id unit])
     = 1) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:0
          ~cases_tag_bits:1
-         [case "unit" Option.some Fun.id empty])
+         [case "unit" Option.some Fun.id (option unit)])
     = 1) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:1
          ~cases_tag_bits:1
-         [case "unit" Option.some Fun.id empty])
+         [case "unit" Option.some Fun.id unit])
     = 2) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:3
          ~cases_tag_bits:2
-         [case "unit" Option.some Fun.id empty])
+         [case "unit" Option.some Fun.id unit])
     = 5) ;
   assert (
     tag_bit_count
       (union
          ~union_tag_bits:7
          ~cases_tag_bits:6
-         [case "unit" Option.some Fun.id empty])
+         [case "unit" Option.some Fun.id unit])
     = 13) ;
   ()
 

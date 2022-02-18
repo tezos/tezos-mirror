@@ -185,7 +185,7 @@ let void : void t =
 
     let json_encoding =
       Encoding.(
-        conv_with_guard refute (fun _ -> Error "void has no inhabitant") empty)
+        conv_with_guard refute (fun _ -> Error "void has no inhabitant") unit)
   end)
 
 type ('a, 'b, 'c) case_open = {
@@ -316,7 +316,7 @@ let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
   if cases = [] then
-    invalid_arg "Data_encoding.Compact.union: empty list of cases." ;
+    invalid_arg "Data_encoding.Compact.union: unit list of cases." ;
   (module struct
     type input = a
 
@@ -388,7 +388,7 @@ let payload : type a. a Encoding.t -> a t =
     let json_encoding = encoding
   end)
 
-let empty = payload Encoding.empty
+let unit = payload Encoding.unit
 
 let conv : type a b. ?json:a Encoding.t -> (a -> b) -> (b -> a) -> b t -> a t =
  fun ?json f g (module B : S with type input = b) ->
@@ -417,11 +417,7 @@ let option compact =
   union
     [
       case "some" (fun x -> x) (fun x -> Some x) compact;
-      case
-        "none"
-        (function None -> Some () | _ -> None)
-        (fun () -> None)
-        empty;
+      case "none" (function None -> Some () | _ -> None) (fun () -> None) unit;
     ]
 
 let tup1 : type a. a t -> a t =
@@ -1525,7 +1521,7 @@ module Compact_bool = struct
       conv_partial
         (function b' when Bool.equal b b' -> Some () | _ -> None)
         (fun () -> b)
-        empty)
+        unit)
 
   let classify x = x
 
@@ -1651,7 +1647,7 @@ module Compact_list = struct
             conv_partial
               (function [] -> Some () | _ -> None)
               (fun () -> [])
-              empty
+              unit
         | 1 ->
             conv_partial
               (function [x] -> Some x | _ -> None)

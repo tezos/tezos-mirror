@@ -106,7 +106,7 @@ type _ ty =
   | CompactMake16 : 'a compactty -> 'a ty
 
 and _ compactty =
-  | CmpctEmpty : unit compactty
+  | CmpctUnit : unit compactty
   | CmpctBool : bool compactty
   | CmpctOption : 'a compactty -> 'a option compactty
   | CmpctTup1 : 'a compactty -> 'a compactty
@@ -192,7 +192,7 @@ let rec pp_ty : type a. a ty Crowbar.printer =
 and pp_cty : type a. a compactty Crowbar.printer =
  fun ppf cty ->
   match cty with
-  | CmpctEmpty -> Crowbar.pp ppf "()"
+  | CmpctUnit -> Crowbar.pp ppf "unit"
   | CmpctBool -> Crowbar.pp ppf "bool"
   | CmpctOption cty -> Crowbar.pp ppf "option(%a)" pp_cty cty
   | CmpctTup1 cty -> Crowbar.pp ppf "tup1(%a)" pp_cty cty
@@ -362,7 +362,7 @@ let any_compactty_gen =
     fix (fun g ->
         choose
           [
-            const @@ AnyCTy CmpctEmpty;
+            const @@ AnyCTy CmpctUnit;
             const @@ AnyCTy CmpctInt32;
             const @@ AnyCTy CmpctInt64;
             const @@ AnyCTy CmpctBool;
@@ -1168,11 +1168,11 @@ let compactfull_payload : type a. a full -> a compactfull =
     let encoding = Data_encoding.Compact.payload Full.encoding
   end)
 
-let compactfull_empty : unit compactfull =
+let compactfull_unit : unit compactfull =
   (module struct
     type t = unit
 
-    let ty = CmpctEmpty
+    let ty = CmpctUnit
 
     let eq () () = true
 
@@ -1180,7 +1180,7 @@ let compactfull_empty : unit compactfull =
 
     let gen = Crowbar.const ()
 
-    let encoding = Data_encoding.Compact.empty
+    let encoding = Data_encoding.Compact.unit
   end)
 
 let compactfull_bool : bool compactfull =
@@ -1739,7 +1739,7 @@ let rec full_of_ty : type a. a ty -> a full = function
   | CompactMake16 cty -> full_make_compact16 (compactfull_of_compactty cty)
 
 and compactfull_of_compactty : type a. a compactty -> a compactfull = function
-  | CmpctEmpty -> compactfull_empty
+  | CmpctUnit -> compactfull_unit
   | CmpctBool -> compactfull_bool
   | CmpctOption cty -> compactfull_option (compactfull_of_compactty cty)
   | CmpctTup1 cty -> compactfull_tup1 (compactfull_of_compactty cty)
