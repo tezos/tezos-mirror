@@ -26,12 +26,6 @@
 
 open Alpha_context
 
-type field_annot = private Field_annot of Non_empty_string.t [@@ocaml.unboxed]
-
-module FOR_TESTS : sig
-  val unsafe_field_annot_of_string : string -> field_annot
-end
-
 (** @return an error {!Unexpected_annotation} in the monad the list is not empty. *)
 val error_unexpected_annot : Script.location -> 'a list -> unit tzresult
 

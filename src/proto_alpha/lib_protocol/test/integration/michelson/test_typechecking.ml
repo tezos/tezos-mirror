@@ -185,8 +185,6 @@ let test_parse_ty (type exp) ctxt node (expected : exp Script_typed_ir.ty) =
       >>? fun (eq, ctxt) ->
       eq >|? fun Eq -> ctxt )
 
-let field_annot = Script_ir_annot.FOR_TESTS.unsafe_field_annot_of_string
-
 let test_parse_comb_type () =
   let open Script in
   let open Script_typed_ir in
