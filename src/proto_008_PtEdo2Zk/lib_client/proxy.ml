@@ -143,7 +143,7 @@ let initial_context
   let pgi : Tezos_proxy.Proxy.proxy_getter_input =
     {rpc_context = (rpc_context :> RPC_context.simple); mode; chain; block}
   in
-  let module N : Proxy_context.M.ProxyDelegate = struct
+  let module N : Proxy_delegate.T = struct
     let proxy_dir_mem = M.proxy_dir_mem pgi
 
     let proxy_get = M.proxy_get pgi

@@ -23,28 +23,14 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let of_memory_tree (t : Tezos_context_memory.Context.tree) : Proxy_delegate.t =
-  (module struct
-    let proxy_dir_mem key =
-      Tezos_context_memory.Context.Tree.mem_tree t key
-      >>= Lwt_result_syntax.return
+module Local = Tezos_context_memory.Context
 
-    let proxy_get key =
-      Tezos_context_memory.Context.Tree.find_tree t key
-      >>= Lwt_result_syntax.return
+module type T = sig
+  val proxy_dir_mem : Local.key -> bool tzresult Lwt.t
 
-    let proxy_mem key =
-      Tezos_context_memory.Context.Tree.mem t key >>= Lwt_result_syntax.return
-  end : Proxy_delegate.T)
+  val proxy_get : Local.key -> Local.tree option tzresult Lwt.t
 
-let of_memory_context (m : Tezos_context_memory.Context.t) : Proxy_delegate.t =
-  (module struct
-    let proxy_dir_mem key =
-      Tezos_context_memory.Context.mem_tree m key >>= Lwt_result_syntax.return
+  val proxy_mem : Local.key -> bool tzresult Lwt.t
+end
 
-    let proxy_get key =
-      Tezos_context_memory.Context.find_tree m key >>= Lwt_result_syntax.return
-
-    let proxy_mem key =
-      Tezos_context_memory.Context.mem m key >>= Lwt_result_syntax.return
-  end : Proxy_delegate.T)
+type t = (module T)

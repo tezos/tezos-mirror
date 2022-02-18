@@ -32,19 +32,9 @@ module M = struct
 
   type tree = Local.tree
 
-  module type ProxyDelegate = sig
-    val proxy_dir_mem : key -> bool tzresult Lwt.t
-
-    val proxy_get : key -> tree option tzresult Lwt.t
-
-    val proxy_mem : key -> bool tzresult Lwt.t
-  end
-
-  type proxy_delegate = (module ProxyDelegate)
-
   (* When the [proxy] option is [None], this instance of [M] should
      behave like [Memory_context]. *)
-  type t = {proxy : proxy_delegate option; local : Local.t}
+  type t = {proxy : Proxy_delegate.t option; local : Local.t}
 
   let empty = Local.Tree.empty Local.empty
 end
@@ -57,7 +47,7 @@ module C = struct
   type t = M.t
 
   (* [tree] is the tree available under [/data/<path>]. *)
-  type tree = {proxy : M.proxy_delegate option; path : key; tree : Local.tree}
+  type tree = {proxy : Proxy_delegate.t option; path : key; tree : Local.tree}
 
   (** Generic pretty printing functions *)
   let pp_key ppf key =
