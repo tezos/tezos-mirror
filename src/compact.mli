@@ -200,6 +200,8 @@ type 'a case
 
 val case : string -> ('a -> 'b option) -> ('b -> 'a) -> 'b t -> 'a case
 
+val void_case : void case
+
 val union : ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
 val or_int32 :

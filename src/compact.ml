@@ -310,6 +310,8 @@ let case_to_data_encoding_case_open :
 let case_to_data_encoding_case : type a. int -> a case -> a Encoding.case =
  fun tag (Case layout) -> case_to_data_encoding_case_open tag layout
 
+let void_case = case "VOID" refute refute void
+
 let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
