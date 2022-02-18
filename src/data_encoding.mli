@@ -956,6 +956,9 @@ let expr_encoding =
         space. *)
     val make : ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> 'a t -> 'a encoding
 
+    (** [tag_bit_count c] is the number of bits that a compact encoding uses. *)
+    val tag_bit_count : 'a t -> int
+
     (** {1 Combinators} *)
 
     (** Similarly to [Data_encoding], we provide various combinators to

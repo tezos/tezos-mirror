@@ -29,6 +29,8 @@ type 'a t
 
 val make : ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> 'a t -> 'a Encoding.t
 
+val tag_bit_count : 'a t -> int
+
 type void
 
 val void : void t

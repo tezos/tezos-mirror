@@ -97,6 +97,9 @@ end
 
 type 'a t = (module S with type input = 'a)
 
+let tag_bit_count : type a. a t -> int =
+ fun (module C : S with type input = a) -> C.tag_len
+
 let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
     =
  fun ?(tag_size = `Uint0) (module C : S with type input = a) ->

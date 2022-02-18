@@ -405,10 +405,12 @@ let any_compactty_gen =
             map [shallow_ty] (fun (AnyTy ty) -> AnyCTy (CmpctPayload ty));
           ])
   in
-  let g = choose [
-    map [g] (fun (AnyCTy cty) -> AnyTy (CompactMake cty));
-    map [g] (fun (AnyCTy cty) -> AnyTy (CompactMake16 cty));
-  ]
+  let g =
+    choose
+      [
+        map [g] (fun (AnyCTy cty) -> AnyTy (CompactMake cty));
+        map [g] (fun (AnyCTy cty) -> AnyTy (CompactMake16 cty));
+      ]
   in
   let g = choose [g; any_ty_fix g; any_ty_fix (any_ty_fix g)] in
   with_printer pp_any_ty g
@@ -1124,7 +1126,8 @@ let full_make_compact : type a. a compactfull -> a full =
 
       let gen = CompactFull.gen
 
-      let encoding = Data_encoding.Compact.make ~tag_size:`Uint8 CompactFull.encoding
+      let encoding =
+        Data_encoding.Compact.make ~tag_size:`Uint8 CompactFull.encoding
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
@@ -1143,7 +1146,8 @@ let full_make_compact16 : type a. a compactfull -> a full =
 
       let gen = CompactFull.gen
 
-      let encoding = Data_encoding.Compact.make ~tag_size:`Uint16 CompactFull.encoding
+      let encoding =
+        Data_encoding.Compact.make ~tag_size:`Uint16 CompactFull.encoding
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
@@ -1731,9 +1735,8 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Mu_matching ty -> full_mu_matching (full_of_ty ty)
   | Check_size ty -> full_check_size (full_of_ty ty)
   | StringEnum -> full_string_enum
-  | CompactMake cty -> full_make_compact  (compactfull_of_compactty cty)
-  | CompactMake16 cty ->
-      full_make_compact16  (compactfull_of_compactty cty)
+  | CompactMake cty -> full_make_compact (compactfull_of_compactty cty)
+  | CompactMake16 cty -> full_make_compact16 (compactfull_of_compactty cty)
 
 and compactfull_of_compactty : type a. a compactty -> a compactfull = function
   | CmpctEmpty -> compactfull_empty
