@@ -876,6 +876,14 @@ let check_simulation_close_to_protocol_auto_activation ~executors ~migrate_from
     \    and predicts %d gas consumption"
     predicted_gas_in_simulation ;
 
+  (*
+
+     We do not have [predicted_gas_in_simulation = gas_no_cache]. The
+     two values are very close but they are produced by two execution
+     paths which are distinct (e.g., the two executsion do not occur at
+     the same levels).
+
+  *)
   Check.(
     (predicted_gas_in_simulation > gas_with_cache)
       int
