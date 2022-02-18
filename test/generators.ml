@@ -1465,7 +1465,31 @@ let compactfull_int32 : int32 compactfull =
 
     let pp ppf v = Crowbar.pp ppf "%ld" v
 
-    let gen = Crowbar.int32
+    let gen =
+      let open Crowbar in
+      choose
+        [
+          const 0x0l;
+          const 0x1l;
+          const 0xFl;
+          const 0xFFl;
+          const 0xFFFl;
+          const 0xFFFFl;
+          const 0xFFFFFl;
+          const 0xFFFFFFl;
+          const 0xFFFFFFFl;
+          const 0xFFFFFFFFl;
+          const (Int32.neg 0x1l);
+          const (Int32.neg 0xFl);
+          const (Int32.neg 0xFFl);
+          const (Int32.neg 0xFFFl);
+          const (Int32.neg 0xFFFFl);
+          const (Int32.neg 0xFFFFFl);
+          const (Int32.neg 0xFFFFFFl);
+          const (Int32.neg 0xFFFFFFFl);
+          const (Int32.neg 0xFFFFFFFFl);
+          int32;
+        ]
 
     let encoding = Data_encoding.Compact.int32
   end)
@@ -1480,7 +1504,31 @@ let compactfull_int64 : int64 compactfull =
 
     let pp ppf v = Crowbar.pp ppf "%Ld" v
 
-    let gen = Crowbar.int64
+    let gen =
+      let open Crowbar in
+      choose
+        [
+          const 0x0L;
+          const 0x1L;
+          const 0xFL;
+          const 0xFFL;
+          const 0xFFFL;
+          const 0xFFFFL;
+          const 0xFFFFFFL;
+          const 0xFFFFFFFFL;
+          const 0xFFFFFFFFFFFFL;
+          const 0xFFFFFFFFFFFFFFFFL;
+          const (Int64.neg 0x1L);
+          const (Int64.neg 0xFL);
+          const (Int64.neg 0xFFL);
+          const (Int64.neg 0xFFFL);
+          const (Int64.neg 0xFFFFL);
+          const (Int64.neg 0xFFFFFFL);
+          const (Int64.neg 0xFFFFFFFFL);
+          const (Int64.neg 0xFFFFFFFFFFFFL);
+          const (Int64.neg 0xFFFFFFFFFFFFFFFFL);
+          int64;
+        ]
 
     let encoding = Data_encoding.Compact.int64
   end)
