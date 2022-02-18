@@ -585,6 +585,7 @@ module Script : sig
     | I_NONE
     | I_NOT
     | I_NOW
+    | I_MIN_BLOCK_TIME
     | I_OR
     | I_PAIR
     | I_UNPAIR

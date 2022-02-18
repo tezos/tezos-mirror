@@ -1170,6 +1170,16 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       | ILevel (_, k) ->
           (step [@ocaml.tailcall]) g gas k ks sc.level (accu, stack)
       | INow (_, k) -> (step [@ocaml.tailcall]) g gas k ks sc.now (accu, stack)
+      | IMin_block_time (_, k) ->
+          let ctxt = update_context gas ctxt in
+          let min_block_time =
+            Alpha_context.Constants.minimal_block_delay ctxt
+            |> Period.to_seconds |> Script_int.of_int64
+            (* Realistically the block delay is never negative. *)
+            |> Script_int.abs
+          in
+          let new_stack = (accu, stack) in
+          (step [@ocaml.tailcall]) g gas k ks min_block_time new_stack
       | ICheck_signature (_, k) ->
           let key = accu and (signature, (message, stack)) = stack in
           let res = Script_signature.check key signature message in

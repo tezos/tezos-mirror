@@ -944,6 +944,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | INow :
       ('a, 's) kinfo * (Script_timestamp.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
+  | IMin_block_time :
+      ('a, 's) kinfo * (n num, 'a * 's, 'r, 'f) kinstr
+      -> ('a, 's, 'r, 'f) kinstr
   | IBalance :
       ('a, 's) kinfo * (Tez.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr

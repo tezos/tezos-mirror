@@ -537,6 +537,13 @@ module Cost_of = struct
     (* model N_INow *)
     let cost_N_INow = S.safe_int 15
 
+    (* model N_IMin_block_time *)
+    let cost_N_IMin_block_time =
+      (* TODO: #2504
+         Benchmark MIN_BLOCK_TIME instruction to get an accurate Gas cost.
+      *)
+      S.safe_int 30
+
     (* model N_IOpen_chest *)
     (* 612000 + chest * 19 + time * 19050 *)
     let cost_N_IOpen_chest ~chest ~time =
@@ -1285,6 +1292,8 @@ module Cost_of = struct
     let level = atomic_step_cost cost_N_ILevel
 
     let now = atomic_step_cost cost_N_INow
+
+    let min_block_time = atomic_step_cost cost_N_IMin_block_time
 
     let source = atomic_step_cost cost_N_ISource
 

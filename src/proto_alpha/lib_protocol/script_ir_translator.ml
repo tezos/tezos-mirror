@@ -4547,6 +4547,12 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let instr = {apply = (fun kinfo k -> INow (kinfo, k))} in
       let stack = Item_t (timestamp_t, stack) in
       typed ctxt loc instr stack
+  | (Prim (loc, I_MIN_BLOCK_TIME, [], _), stack) ->
+      typed
+        ctxt
+        loc
+        {apply = (fun kinfo k -> IMin_block_time (kinfo, k))}
+        (Item_t (nat_t, stack))
   | (Prim (loc, I_AMOUNT, [], annot), stack) ->
       check_var_annot loc annot >>?= fun () ->
       let instr = {apply = (fun kinfo k -> IAmount (kinfo, k))} in
@@ -4811,13 +4817,14 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
            | I_EXEC | I_FAILWITH | I_SIZE | I_ADD | I_SUB | I_SUB_MUTEZ | I_MUL
            | I_EDIV | I_OR | I_AND | I_XOR | I_NOT | I_ABS | I_NEG | I_LSL
            | I_LSR | I_COMPARE | I_EQ | I_NEQ | I_LT | I_GT | I_LE | I_GE
-           | I_TRANSFER_TOKENS | I_SET_DELEGATE | I_NOW | I_IMPLICIT_ACCOUNT
-           | I_AMOUNT | I_BALANCE | I_LEVEL | I_CHECK_SIGNATURE | I_HASH_KEY
-           | I_SOURCE | I_SENDER | I_BLAKE2B | I_SHA256 | I_SHA512 | I_ADDRESS
-           | I_RENAME | I_PACK | I_ISNAT | I_INT | I_SELF | I_CHAIN_ID | I_NEVER
-           | I_VOTING_POWER | I_TOTAL_VOTING_POWER | I_KECCAK | I_SHA3
-           | I_PAIRING_CHECK | I_TICKET | I_READ_TICKET | I_SPLIT_TICKET
-           | I_JOIN_TICKETS | I_OPEN_CHEST ) as name),
+           | I_TRANSFER_TOKENS | I_SET_DELEGATE | I_NOW | I_MIN_BLOCK_TIME
+           | I_IMPLICIT_ACCOUNT | I_AMOUNT | I_BALANCE | I_LEVEL
+           | I_CHECK_SIGNATURE | I_HASH_KEY | I_SOURCE | I_SENDER | I_BLAKE2B
+           | I_SHA256 | I_SHA512 | I_ADDRESS | I_RENAME | I_PACK | I_ISNAT
+           | I_INT | I_SELF | I_CHAIN_ID | I_NEVER | I_VOTING_POWER
+           | I_TOTAL_VOTING_POWER | I_KECCAK | I_SHA3 | I_PAIRING_CHECK
+           | I_TICKET | I_READ_TICKET | I_SPLIT_TICKET | I_JOIN_TICKETS
+           | I_OPEN_CHEST ) as name),
           (_ :: _ as l),
           _ ),
       _ ) ->
@@ -4959,6 +4966,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
              I_TRANSFER_TOKENS;
              I_CREATE_CONTRACT;
              I_NOW;
+             I_MIN_BLOCK_TIME;
              I_AMOUNT;
              I_BALANCE;
              I_LEVEL;

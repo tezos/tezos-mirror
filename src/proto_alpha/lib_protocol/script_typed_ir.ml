@@ -991,6 +991,9 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
   | INow :
       ('a, 's) kinfo * (Script_timestamp.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
+  | IMin_block_time :
+      ('a, 's) kinfo * (n num, 'a * 's, 'r, 'f) kinstr
+      -> ('a, 's, 'r, 'f) kinstr
   | IBalance :
       ('a, 's) kinfo * (Tez.t, 'a * 's, 'r, 'f) kinstr
       -> ('a, 's, 'r, 'f) kinstr
@@ -1509,6 +1512,7 @@ let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
   | ICreate_contract {kinfo; _} -> kinfo
   | ISet_delegate (kinfo, _) -> kinfo
   | INow (kinfo, _) -> kinfo
+  | IMin_block_time (kinfo, _) -> kinfo
   | IBalance (kinfo, _) -> kinfo
   | ILevel (kinfo, _) -> kinfo
   | ICheck_signature (kinfo, _) -> kinfo
@@ -1713,6 +1717,7 @@ let kinstr_rewritek :
         {kinfo; storage_type; arg_type; lambda; views; entrypoints; k}
   | ISet_delegate (kinfo, k) -> ISet_delegate (kinfo, f.apply k)
   | INow (kinfo, k) -> INow (kinfo, f.apply k)
+  | IMin_block_time (kinfo, k) -> IMin_block_time (kinfo, f.apply k)
   | IBalance (kinfo, k) -> IBalance (kinfo, f.apply k)
   | ILevel (kinfo, k) -> ILevel (kinfo, f.apply k)
   | ICheck_signature (kinfo, k) -> ICheck_signature (kinfo, f.apply k)
@@ -2036,6 +2041,7 @@ let kinstr_traverse i init f =
     | ICreate_contract {k; _} -> (next [@ocaml.tailcall]) k
     | ISet_delegate (_, k) -> (next [@ocaml.tailcall]) k
     | INow (_, k) -> (next [@ocaml.tailcall]) k
+    | IMin_block_time (_, k) -> (next [@ocaml.tailcall]) k
     | IBalance (_, k) -> (next [@ocaml.tailcall]) k
     | ILevel (_, k) -> (next [@ocaml.tailcall]) k
     | ICheck_signature (_, k) -> (next [@ocaml.tailcall]) k

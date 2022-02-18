@@ -287,6 +287,7 @@ let cost_of_instr : type a s r f. (a, s, r, f) kinstr -> a -> s -> Gas.cost =
   | IBalance _ -> Interp_costs.balance
   | ILevel _ -> Interp_costs.level
   | INow _ -> Interp_costs.now
+  | IMin_block_time _ -> Interp_costs.min_block_time
   | ISapling_empty_state _ -> Interp_costs.sapling_empty_state
   | ISource _ -> Interp_costs.source
   | ISender _ -> Interp_costs.sender
