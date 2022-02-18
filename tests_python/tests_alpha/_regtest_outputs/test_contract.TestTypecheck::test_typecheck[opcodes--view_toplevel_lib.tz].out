@@ -1,7 +1,7 @@
 tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/view_toplevel_lib.tz]
 
 Well typed
-Gas remaining: 1039942.437 units remaining
+Gas remaining: 1039943.603 units remaining
 { parameter nat ;
   storage nat ;
   code { CAR
