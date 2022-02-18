@@ -116,6 +116,15 @@ and _ compactty =
   | CmpctTup4 :
       'a compactty * 'b compactty * 'c compactty * 'd compactty
       -> ('a * 'b * 'c * 'd) compactty
+  | CmpctTup7 :
+      'a compactty
+      * 'b compactty
+      * 'c compactty
+      * 'd compactty
+      * 'e compactty
+      * 'f compactty
+      * 'g compactty
+      -> ('a * 'b * 'c * 'd * 'e * 'f * 'g) compactty
   | CmpctInt32 : int32 compactty
   | CmpctInt64 : int64 compactty
   | CmpctList : 'a ty -> 'a list compactty
@@ -198,6 +207,24 @@ and pp_cty : type a. a compactty Crowbar.printer =
         ctyc
         pp_cty
         ctyd
+  | CmpctTup7 (ctya, ctyb, ctyc, ctyd, ctye, ctyf, ctyg) ->
+      Crowbar.pp
+        ppf
+        "tup7(%a,%a,%a,%a,%a,%a,%a)"
+        pp_cty
+        ctya
+        pp_cty
+        ctyb
+        pp_cty
+        ctyc
+        pp_cty
+        ctyd
+        pp_cty
+        ctye
+        pp_cty
+        ctyf
+        pp_cty
+        ctyg
   | CmpctInt32 -> Crowbar.pp ppf "int32"
   | CmpctInt64 -> Crowbar.pp ppf "int32"
   | CmpctList ty -> Crowbar.pp ppf "list(%a)" pp_ty ty
@@ -335,6 +362,19 @@ let any_compactty_gen =
               [g; g; g; g]
               (fun (AnyCTy cty_a) (AnyCTy cty_b) (AnyCTy cty_c) (AnyCTy cty_d)
               -> AnyCTy (CmpctTup4 (cty_a, cty_b, cty_c, cty_d)));
+            map
+              [g; g; g; g; g; g; g]
+              (fun
+                (AnyCTy cty_a)
+                (AnyCTy cty_b)
+                (AnyCTy cty_c)
+                (AnyCTy cty_d)
+                (AnyCTy cty_e)
+                (AnyCTy cty_f)
+                (AnyCTy cty_g)
+              ->
+                AnyCTy
+                  (CmpctTup7 (cty_a, cty_b, cty_c, cty_d, cty_e, cty_f, cty_g)));
             map [g] (fun (AnyCTy cty_a) -> AnyCTy (CmpctUnion1 cty_a));
             map [g; g] (fun (AnyCTy cty_a) (AnyCTy cty_b) ->
                 AnyCTy (CmpctUnion2 (cty_a, cty_b)));
@@ -1272,6 +1312,101 @@ let compactfull_tup4 :
     end)
   with Invalid_argument _ -> Crowbar.bad_test ()
 
+let compactfull_tup7 :
+    type a b c d e f g.
+    a compactfull ->
+    b compactfull ->
+    c compactfull ->
+    d compactfull ->
+    e compactfull ->
+    f compactfull ->
+    g compactfull ->
+    (a * b * c * d * e * f * g) compactfull =
+ fun compactfulla
+     compactfullb
+     compactfullc
+     compactfulld
+     compactfulle
+     compactfullf
+     compactfullg ->
+  try
+    let module CompactFulla = (val compactfulla) in
+    let module CompactFullb = (val compactfullb) in
+    let module CompactFullc = (val compactfullc) in
+    let module CompactFulld = (val compactfulld) in
+    let module CompactFulle = (val compactfulle) in
+    let module CompactFullf = (val compactfullf) in
+    let module CompactFullg = (val compactfullg) in
+    (module struct
+      type t =
+        CompactFulla.t
+        * CompactFullb.t
+        * CompactFullc.t
+        * CompactFulld.t
+        * CompactFulle.t
+        * CompactFullf.t
+        * CompactFullg.t
+
+      let ty =
+        CmpctTup7
+          ( CompactFulla.ty,
+            CompactFullb.ty,
+            CompactFullc.ty,
+            CompactFulld.ty,
+            CompactFulle.ty,
+            CompactFullf.ty,
+            CompactFullg.ty )
+
+      let eq (a, b, c, d, e, f, g) (u, v, w, z, y, k, p) =
+        CompactFulla.eq a u && CompactFullb.eq b v && CompactFullc.eq c w
+        && CompactFulld.eq d z && CompactFulle.eq e y && CompactFullf.eq f k
+        && CompactFullg.eq g p
+
+      let pp ppf (a, b, c, d, e, f, g) =
+        Crowbar.pp
+          ppf
+          "tup7(%a,%a,%a,%a,%a,%a,%a)"
+          CompactFulla.pp
+          a
+          CompactFullb.pp
+          b
+          CompactFullc.pp
+          c
+          CompactFulld.pp
+          d
+          CompactFulle.pp
+          e
+          CompactFullf.pp
+          f
+          CompactFullg.pp
+          g
+
+      let gen =
+        Crowbar.map
+          [
+            CompactFulla.gen;
+            CompactFullb.gen;
+            CompactFullc.gen;
+            CompactFulld.gen;
+            CompactFulle.gen;
+            CompactFullf.gen;
+            CompactFullg.gen;
+          ]
+          (fun a b c d e f g -> (a, b, c, d, e, f, g))
+
+      let encoding =
+        Data_encoding.Compact.(
+          tup7
+            CompactFulla.encoding
+            CompactFullb.encoding
+            CompactFullc.encoding
+            CompactFulld.encoding
+            CompactFulle.encoding
+            CompactFullf.encoding
+            CompactFullg.encoding)
+    end)
+  with Invalid_argument _ -> Crowbar.bad_test ()
+
 let compactfull_int32 : int32 compactfull =
   (module struct
     type t = int32
@@ -1483,6 +1618,15 @@ and compactfull_of_compactty : type a. a compactty -> a compactfull = function
         (compactfull_of_compactty ctyb)
         (compactfull_of_compactty ctyc)
         (compactfull_of_compactty ctyd)
+  | CmpctTup7 (ctya, ctyb, ctyc, ctyd, ctye, ctyf, ctyg) ->
+      compactfull_tup7
+        (compactfull_of_compactty ctya)
+        (compactfull_of_compactty ctyb)
+        (compactfull_of_compactty ctyc)
+        (compactfull_of_compactty ctyd)
+        (compactfull_of_compactty ctye)
+        (compactfull_of_compactty ctyf)
+        (compactfull_of_compactty ctyg)
   | CmpctInt32 -> compactfull_int32
   | CmpctInt64 -> compactfull_int64
   | CmpctList ty -> compactfull_list (full_of_ty ty)

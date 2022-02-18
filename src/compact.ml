@@ -481,7 +481,7 @@ let tup3 : type a b c. a t -> b t -> c t -> (a * b * c) t =
     let tag_len =
       let r = A.tag_len + B.tag_len + C.tag_len in
       if r >= 16 then
-        raise @@ Invalid_argument "Compact_encoding.tup2: tags do not fit" ;
+        raise @@ Invalid_argument "Compact_encoding.tup3: tags do not fit" ;
       r
 
     let layouts =
@@ -521,7 +521,7 @@ let tup4 : type a b c d. a t -> b t -> c t -> d t -> (a * b * c * d) t =
     let tag_len =
       let r = A.tag_len + B.tag_len + C.tag_len + D.tag_len in
       if r >= 16 then
-        raise @@ Invalid_argument "Compact_encoding.tup2: tags do not fit" ;
+        raise @@ Invalid_argument "Compact_encoding.tup4: tags do not fit" ;
       r
 
     let layouts =
@@ -557,6 +557,574 @@ let tup4 : type a b c d. a t -> b t -> c t -> d t -> (a * b * c * d) t =
         B.json_encoding
         C.json_encoding
         D.json_encoding
+  end)
+
+let tup5 :
+    type a b c d e. a t -> b t -> c t -> d t -> e t -> (a * b * c * d * e) t =
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     (module C : S with type input = c)
+     (module D : S with type input = d)
+     (module E : S with type input = e) :
+     (module S with type input = a * b * c * d * e) ->
+  (module struct
+    type input = A.input * B.input * C.input * D.input * E.input
+
+    type layout = A.layout * B.layout * C.layout * D.layout * E.layout
+
+    let tag_len =
+      let r = A.tag_len + B.tag_len + C.tag_len + D.tag_len + E.tag_len in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup5: tags do not fit" ;
+      r
+
+    let layouts =
+      let open List_syntax in
+      let* a = A.layouts in
+      let* b = B.layouts in
+      let* c = C.layouts in
+      let* d = D.layouts in
+      let* e = E.layouts in
+      return (a, b, c, d, e)
+
+    let classify (a, b, c, d, e) =
+      (A.classify a, B.classify b, C.classify c, D.classify d, E.classify e)
+
+    let partial_encoding (la, lb, lc, ld, le) =
+      Encoding.tup5
+        (A.partial_encoding la)
+        (B.partial_encoding lb)
+        (C.partial_encoding lc)
+        (D.partial_encoding ld)
+        (E.partial_encoding le)
+
+    let tag (a, b, c, d, e) =
+      join_tags
+        [
+          (A.tag a, A.tag_len);
+          (B.tag b, B.tag_len);
+          (C.tag c, C.tag_len);
+          (D.tag d, D.tag_len);
+          (E.tag e, E.tag_len);
+        ]
+
+    let json_encoding =
+      Encoding.tup5
+        A.json_encoding
+        B.json_encoding
+        C.json_encoding
+        D.json_encoding
+        E.json_encoding
+  end)
+
+let tup6 :
+    type a b c d e f.
+    a t -> b t -> c t -> d t -> e t -> f t -> (a * b * c * d * e * f) t =
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     (module C : S with type input = c)
+     (module D : S with type input = d)
+     (module E : S with type input = e)
+     (module F : S with type input = f) :
+     (module S with type input = a * b * c * d * e * f) ->
+  (module struct
+    type input = A.input * B.input * C.input * D.input * E.input * F.input
+
+    type layout =
+      A.layout * B.layout * C.layout * D.layout * E.layout * F.layout
+
+    let tag_len =
+      let r =
+        A.tag_len + B.tag_len + C.tag_len + D.tag_len + E.tag_len + F.tag_len
+      in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup6: tags do not fit" ;
+      r
+
+    let layouts =
+      let open List_syntax in
+      let* a = A.layouts in
+      let* b = B.layouts in
+      let* c = C.layouts in
+      let* d = D.layouts in
+      let* e = E.layouts in
+      let* f = F.layouts in
+      return (a, b, c, d, e, f)
+
+    let classify (a, b, c, d, e, f) =
+      ( A.classify a,
+        B.classify b,
+        C.classify c,
+        D.classify d,
+        E.classify e,
+        F.classify f )
+
+    let partial_encoding (la, lb, lc, ld, le, lf) =
+      Encoding.tup6
+        (A.partial_encoding la)
+        (B.partial_encoding lb)
+        (C.partial_encoding lc)
+        (D.partial_encoding ld)
+        (E.partial_encoding le)
+        (F.partial_encoding lf)
+
+    let tag (a, b, c, d, e, f) =
+      join_tags
+        [
+          (A.tag a, A.tag_len);
+          (B.tag b, B.tag_len);
+          (C.tag c, C.tag_len);
+          (D.tag d, D.tag_len);
+          (E.tag e, E.tag_len);
+          (F.tag f, F.tag_len);
+        ]
+
+    let json_encoding =
+      Encoding.tup6
+        A.json_encoding
+        B.json_encoding
+        C.json_encoding
+        D.json_encoding
+        E.json_encoding
+        F.json_encoding
+  end)
+
+let tup7 :
+    type a b c d e f g.
+    a t ->
+    b t ->
+    c t ->
+    d t ->
+    e t ->
+    f t ->
+    g t ->
+    (a * b * c * d * e * f * g) t =
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     (module C : S with type input = c)
+     (module D : S with type input = d)
+     (module E : S with type input = e)
+     (module F : S with type input = f)
+     (module G : S with type input = g) :
+     (module S with type input = a * b * c * d * e * f * g) ->
+  (module struct
+    type input =
+      A.input * B.input * C.input * D.input * E.input * F.input * G.input
+
+    type layout =
+      A.layout * B.layout * C.layout * D.layout * E.layout * F.layout * G.layout
+
+    let tag_len =
+      let r =
+        A.tag_len + B.tag_len + C.tag_len + D.tag_len + E.tag_len + F.tag_len
+        + G.tag_len
+      in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup7: tags do not fit" ;
+      r
+
+    let layouts =
+      let open List_syntax in
+      let* a = A.layouts in
+      let* b = B.layouts in
+      let* c = C.layouts in
+      let* d = D.layouts in
+      let* e = E.layouts in
+      let* f = F.layouts in
+      let* g = G.layouts in
+      return (a, b, c, d, e, f, g)
+
+    let classify (a, b, c, d, e, f, g) =
+      ( A.classify a,
+        B.classify b,
+        C.classify c,
+        D.classify d,
+        E.classify e,
+        F.classify f,
+        G.classify g )
+
+    let partial_encoding (la, lb, lc, ld, le, lf, lg) =
+      Encoding.tup7
+        (A.partial_encoding la)
+        (B.partial_encoding lb)
+        (C.partial_encoding lc)
+        (D.partial_encoding ld)
+        (E.partial_encoding le)
+        (F.partial_encoding lf)
+        (G.partial_encoding lg)
+
+    let tag (a, b, c, d, e, f, g) =
+      join_tags
+        [
+          (A.tag a, A.tag_len);
+          (B.tag b, B.tag_len);
+          (C.tag c, C.tag_len);
+          (D.tag d, D.tag_len);
+          (E.tag e, E.tag_len);
+          (F.tag f, F.tag_len);
+          (G.tag g, G.tag_len);
+        ]
+
+    let json_encoding =
+      Encoding.tup7
+        A.json_encoding
+        B.json_encoding
+        C.json_encoding
+        D.json_encoding
+        E.json_encoding
+        F.json_encoding
+        G.json_encoding
+  end)
+
+let tup8 :
+    type a b c d e f g h.
+    a t ->
+    b t ->
+    c t ->
+    d t ->
+    e t ->
+    f t ->
+    g t ->
+    h t ->
+    (a * b * c * d * e * f * g * h) t =
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     (module C : S with type input = c)
+     (module D : S with type input = d)
+     (module E : S with type input = e)
+     (module F : S with type input = f)
+     (module G : S with type input = g)
+     (module H : S with type input = h) :
+     (module S with type input = a * b * c * d * e * f * g * h) ->
+  (module struct
+    type input =
+      A.input
+      * B.input
+      * C.input
+      * D.input
+      * E.input
+      * F.input
+      * G.input
+      * H.input
+
+    type layout =
+      A.layout
+      * B.layout
+      * C.layout
+      * D.layout
+      * E.layout
+      * F.layout
+      * G.layout
+      * H.layout
+
+    let tag_len =
+      let r =
+        A.tag_len + B.tag_len + C.tag_len + D.tag_len + E.tag_len + F.tag_len
+        + G.tag_len + H.tag_len
+      in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup8: tags do not fit" ;
+      r
+
+    let layouts =
+      let open List_syntax in
+      let* a = A.layouts in
+      let* b = B.layouts in
+      let* c = C.layouts in
+      let* d = D.layouts in
+      let* e = E.layouts in
+      let* f = F.layouts in
+      let* g = G.layouts in
+      let* h = H.layouts in
+      return (a, b, c, d, e, f, g, h)
+
+    let classify (a, b, c, d, e, f, g, h) =
+      ( A.classify a,
+        B.classify b,
+        C.classify c,
+        D.classify d,
+        E.classify e,
+        F.classify f,
+        G.classify g,
+        H.classify h )
+
+    let partial_encoding (la, lb, lc, ld, le, lf, lg, lh) =
+      Encoding.tup8
+        (A.partial_encoding la)
+        (B.partial_encoding lb)
+        (C.partial_encoding lc)
+        (D.partial_encoding ld)
+        (E.partial_encoding le)
+        (F.partial_encoding lf)
+        (G.partial_encoding lg)
+        (H.partial_encoding lh)
+
+    let tag (a, b, c, d, e, f, g, h) =
+      join_tags
+        [
+          (A.tag a, A.tag_len);
+          (B.tag b, B.tag_len);
+          (C.tag c, C.tag_len);
+          (D.tag d, D.tag_len);
+          (E.tag e, E.tag_len);
+          (F.tag f, F.tag_len);
+          (G.tag g, G.tag_len);
+          (H.tag h, H.tag_len);
+        ]
+
+    let json_encoding =
+      Encoding.tup8
+        A.json_encoding
+        B.json_encoding
+        C.json_encoding
+        D.json_encoding
+        E.json_encoding
+        F.json_encoding
+        G.json_encoding
+        H.json_encoding
+  end)
+
+let tup9 :
+    type a b c d e f g h i.
+    a t ->
+    b t ->
+    c t ->
+    d t ->
+    e t ->
+    f t ->
+    g t ->
+    h t ->
+    i t ->
+    (a * b * c * d * e * f * g * h * i) t =
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     (module C : S with type input = c)
+     (module D : S with type input = d)
+     (module E : S with type input = e)
+     (module F : S with type input = f)
+     (module G : S with type input = g)
+     (module H : S with type input = h)
+     (module I : S with type input = i) :
+     (module S with type input = a * b * c * d * e * f * g * h * i) ->
+  (module struct
+    type input =
+      A.input
+      * B.input
+      * C.input
+      * D.input
+      * E.input
+      * F.input
+      * G.input
+      * H.input
+      * I.input
+
+    type layout =
+      A.layout
+      * B.layout
+      * C.layout
+      * D.layout
+      * E.layout
+      * F.layout
+      * G.layout
+      * H.layout
+      * I.layout
+
+    let tag_len =
+      let r =
+        A.tag_len + B.tag_len + C.tag_len + D.tag_len + E.tag_len + F.tag_len
+        + G.tag_len + H.tag_len + I.tag_len
+      in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup9: tags do not fit" ;
+      r
+
+    let layouts =
+      let open List_syntax in
+      let* a = A.layouts in
+      let* b = B.layouts in
+      let* c = C.layouts in
+      let* d = D.layouts in
+      let* e = E.layouts in
+      let* f = F.layouts in
+      let* g = G.layouts in
+      let* h = H.layouts in
+      let* i = I.layouts in
+      return (a, b, c, d, e, f, g, h, i)
+
+    let classify (a, b, c, d, e, f, g, h, i) =
+      ( A.classify a,
+        B.classify b,
+        C.classify c,
+        D.classify d,
+        E.classify e,
+        F.classify f,
+        G.classify g,
+        H.classify h,
+        I.classify i )
+
+    let partial_encoding (la, lb, lc, ld, le, lf, lg, lh, li) =
+      Encoding.tup9
+        (A.partial_encoding la)
+        (B.partial_encoding lb)
+        (C.partial_encoding lc)
+        (D.partial_encoding ld)
+        (E.partial_encoding le)
+        (F.partial_encoding lf)
+        (G.partial_encoding lg)
+        (H.partial_encoding lh)
+        (I.partial_encoding li)
+
+    let tag (a, b, c, d, e, f, g, h, i) =
+      join_tags
+        [
+          (A.tag a, A.tag_len);
+          (B.tag b, B.tag_len);
+          (C.tag c, C.tag_len);
+          (D.tag d, D.tag_len);
+          (E.tag e, E.tag_len);
+          (F.tag f, F.tag_len);
+          (G.tag g, G.tag_len);
+          (H.tag h, H.tag_len);
+          (I.tag i, I.tag_len);
+        ]
+
+    let json_encoding =
+      Encoding.tup9
+        A.json_encoding
+        B.json_encoding
+        C.json_encoding
+        D.json_encoding
+        E.json_encoding
+        F.json_encoding
+        G.json_encoding
+        H.json_encoding
+        I.json_encoding
+  end)
+
+let tup10 :
+    type a b c d e f g h i j.
+    a t ->
+    b t ->
+    c t ->
+    d t ->
+    e t ->
+    f t ->
+    g t ->
+    h t ->
+    i t ->
+    j t ->
+    (a * b * c * d * e * f * g * h * i * j) t =
+ fun (module A : S with type input = a)
+     (module B : S with type input = b)
+     (module C : S with type input = c)
+     (module D : S with type input = d)
+     (module E : S with type input = e)
+     (module F : S with type input = f)
+     (module G : S with type input = g)
+     (module H : S with type input = h)
+     (module I : S with type input = i)
+     (module J : S with type input = j) :
+     (module S with type input = a * b * c * d * e * f * g * h * i * j) ->
+  (module struct
+    type input =
+      A.input
+      * B.input
+      * C.input
+      * D.input
+      * E.input
+      * F.input
+      * G.input
+      * H.input
+      * I.input
+      * J.input
+
+    type layout =
+      A.layout
+      * B.layout
+      * C.layout
+      * D.layout
+      * E.layout
+      * F.layout
+      * G.layout
+      * H.layout
+      * I.layout
+      * J.layout
+
+    let tag_len =
+      let r =
+        A.tag_len + B.tag_len + C.tag_len + D.tag_len + E.tag_len + F.tag_len
+        + G.tag_len + H.tag_len + I.tag_len + J.tag_len
+      in
+      if r >= 16 then
+        raise @@ Invalid_argument "Compact_encoding.tup10: tags do not fit" ;
+      r
+
+    let layouts =
+      let open List_syntax in
+      let* a = A.layouts in
+      let* b = B.layouts in
+      let* c = C.layouts in
+      let* d = D.layouts in
+      let* e = E.layouts in
+      let* f = F.layouts in
+      let* g = G.layouts in
+      let* h = H.layouts in
+      let* i = I.layouts in
+      let* j = J.layouts in
+      return (a, b, c, d, e, f, g, h, i, j)
+
+    let classify (a, b, c, d, e, f, g, h, i, j) =
+      ( A.classify a,
+        B.classify b,
+        C.classify c,
+        D.classify d,
+        E.classify e,
+        F.classify f,
+        G.classify g,
+        H.classify h,
+        I.classify i,
+        J.classify j )
+
+    let partial_encoding (la, lb, lc, ld, le, lf, lg, lh, li, lj) =
+      Encoding.tup10
+        (A.partial_encoding la)
+        (B.partial_encoding lb)
+        (C.partial_encoding lc)
+        (D.partial_encoding ld)
+        (E.partial_encoding le)
+        (F.partial_encoding lf)
+        (G.partial_encoding lg)
+        (H.partial_encoding lh)
+        (I.partial_encoding li)
+        (J.partial_encoding lj)
+
+    let tag (a, b, c, d, e, f, g, h, i, j) =
+      join_tags
+        [
+          (A.tag a, A.tag_len);
+          (B.tag b, B.tag_len);
+          (C.tag c, C.tag_len);
+          (D.tag d, D.tag_len);
+          (E.tag e, E.tag_len);
+          (F.tag f, F.tag_len);
+          (G.tag g, G.tag_len);
+          (H.tag h, H.tag_len);
+          (I.tag i, I.tag_len);
+          (J.tag j, J.tag_len);
+        ]
+
+    let json_encoding =
+      Encoding.tup10
+        A.json_encoding
+        B.json_encoding
+        C.json_encoding
+        D.json_encoding
+        E.json_encoding
+        F.json_encoding
+        G.json_encoding
+        H.json_encoding
+        I.json_encoding
+        J.json_encoding
   end)
 
 type 'a field_contents = {name : string; compact : 'a t}
@@ -676,6 +1244,264 @@ let obj4_open :
   end)
 
 let obj4 (Field f1) (Field f2) (Field f3) (Field f4) = obj4_open f1 f2 f3 f4
+
+let obj5_open :
+    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b.
+    (t1a, t1b) field_open ->
+    (t2a, t2b) field_open ->
+    (t3a, t3b) field_open ->
+    (t4a, t4b) field_open ->
+    (t5a, t5b) field_open ->
+    (module S with type input = t1b * t2b * t3b * t4b * t5b) =
+ fun f1 f2 f3 f4 f5 ->
+  let (module Tup) =
+    tup5
+      (field_to_inner_compact f1)
+      (field_to_inner_compact f2)
+      (field_to_inner_compact f3)
+      (field_to_inner_compact f4)
+      (field_to_inner_compact f5)
+  in
+  (module struct
+    include Tup
+
+    let json_encoding =
+      Encoding.(
+        obj5
+          (field_to_data_encoding_open f1)
+          (field_to_data_encoding_open f2)
+          (field_to_data_encoding_open f3)
+          (field_to_data_encoding_open f4)
+          (field_to_data_encoding_open f5))
+  end)
+
+let obj5 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) =
+  obj5_open f1 f2 f3 f4 f5
+
+let obj6_open :
+    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b.
+    (t1a, t1b) field_open ->
+    (t2a, t2b) field_open ->
+    (t3a, t3b) field_open ->
+    (t4a, t4b) field_open ->
+    (t5a, t5b) field_open ->
+    (t6a, t6b) field_open ->
+    (module S with type input = t1b * t2b * t3b * t4b * t5b * t6b) =
+ fun f1 f2 f3 f4 f5 f6 ->
+  let (module Tup) =
+    tup6
+      (field_to_inner_compact f1)
+      (field_to_inner_compact f2)
+      (field_to_inner_compact f3)
+      (field_to_inner_compact f4)
+      (field_to_inner_compact f5)
+      (field_to_inner_compact f6)
+  in
+  (module struct
+    include Tup
+
+    let json_encoding =
+      Encoding.(
+        obj6
+          (field_to_data_encoding_open f1)
+          (field_to_data_encoding_open f2)
+          (field_to_data_encoding_open f3)
+          (field_to_data_encoding_open f4)
+          (field_to_data_encoding_open f5)
+          (field_to_data_encoding_open f6))
+  end)
+
+let obj6 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6) =
+  obj6_open f1 f2 f3 f4 f5 f6
+
+let obj7_open :
+    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b t7a t7b.
+    (t1a, t1b) field_open ->
+    (t2a, t2b) field_open ->
+    (t3a, t3b) field_open ->
+    (t4a, t4b) field_open ->
+    (t5a, t5b) field_open ->
+    (t6a, t6b) field_open ->
+    (t7a, t7b) field_open ->
+    (module S with type input = t1b * t2b * t3b * t4b * t5b * t6b * t7b) =
+ fun f1 f2 f3 f4 f5 f6 f7 ->
+  let (module Tup) =
+    tup7
+      (field_to_inner_compact f1)
+      (field_to_inner_compact f2)
+      (field_to_inner_compact f3)
+      (field_to_inner_compact f4)
+      (field_to_inner_compact f5)
+      (field_to_inner_compact f6)
+      (field_to_inner_compact f7)
+  in
+  (module struct
+    include Tup
+
+    let json_encoding =
+      Encoding.(
+        obj7
+          (field_to_data_encoding_open f1)
+          (field_to_data_encoding_open f2)
+          (field_to_data_encoding_open f3)
+          (field_to_data_encoding_open f4)
+          (field_to_data_encoding_open f5)
+          (field_to_data_encoding_open f6)
+          (field_to_data_encoding_open f7))
+  end)
+
+let obj7 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
+    (Field f7) =
+  obj7_open f1 f2 f3 f4 f5 f6 f7
+
+let obj8_open :
+    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b t7a t7b t8a t8b.
+    (t1a, t1b) field_open ->
+    (t2a, t2b) field_open ->
+    (t3a, t3b) field_open ->
+    (t4a, t4b) field_open ->
+    (t5a, t5b) field_open ->
+    (t6a, t6b) field_open ->
+    (t7a, t7b) field_open ->
+    (t8a, t8b) field_open ->
+    (module S with type input = t1b * t2b * t3b * t4b * t5b * t6b * t7b * t8b) =
+ fun f1 f2 f3 f4 f5 f6 f7 f8 ->
+  let (module Tup) =
+    tup8
+      (field_to_inner_compact f1)
+      (field_to_inner_compact f2)
+      (field_to_inner_compact f3)
+      (field_to_inner_compact f4)
+      (field_to_inner_compact f5)
+      (field_to_inner_compact f6)
+      (field_to_inner_compact f7)
+      (field_to_inner_compact f8)
+  in
+  (module struct
+    include Tup
+
+    let json_encoding =
+      Encoding.(
+        obj8
+          (field_to_data_encoding_open f1)
+          (field_to_data_encoding_open f2)
+          (field_to_data_encoding_open f3)
+          (field_to_data_encoding_open f4)
+          (field_to_data_encoding_open f5)
+          (field_to_data_encoding_open f6)
+          (field_to_data_encoding_open f7)
+          (field_to_data_encoding_open f8))
+  end)
+
+let obj8 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
+    (Field f7) (Field f8) =
+  obj8_open f1 f2 f3 f4 f5 f6 f7 f8
+
+let obj9_open :
+    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b t7a t7b t8a t8b t9a t9b.
+    (t1a, t1b) field_open ->
+    (t2a, t2b) field_open ->
+    (t3a, t3b) field_open ->
+    (t4a, t4b) field_open ->
+    (t5a, t5b) field_open ->
+    (t6a, t6b) field_open ->
+    (t7a, t7b) field_open ->
+    (t8a, t8b) field_open ->
+    (t9a, t9b) field_open ->
+    (module S
+       with type input = t1b * t2b * t3b * t4b * t5b * t6b * t7b * t8b * t9b) =
+ fun f1 f2 f3 f4 f5 f6 f7 f8 f9 ->
+  let (module Tup) =
+    tup9
+      (field_to_inner_compact f1)
+      (field_to_inner_compact f2)
+      (field_to_inner_compact f3)
+      (field_to_inner_compact f4)
+      (field_to_inner_compact f5)
+      (field_to_inner_compact f6)
+      (field_to_inner_compact f7)
+      (field_to_inner_compact f8)
+      (field_to_inner_compact f9)
+  in
+  (module struct
+    include Tup
+
+    let json_encoding =
+      Encoding.(
+        obj9
+          (field_to_data_encoding_open f1)
+          (field_to_data_encoding_open f2)
+          (field_to_data_encoding_open f3)
+          (field_to_data_encoding_open f4)
+          (field_to_data_encoding_open f5)
+          (field_to_data_encoding_open f6)
+          (field_to_data_encoding_open f7)
+          (field_to_data_encoding_open f8)
+          (field_to_data_encoding_open f9))
+  end)
+
+let obj9 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
+    (Field f7) (Field f8) (Field f9) =
+  obj9_open f1 f2 f3 f4 f5 f6 f7 f8 f9
+
+let obj10_open :
+    type t1a t1b t2a t2b t3a t3b t4a t4b t5a t5b t6a t6b t7a t7b t8a t8b t9a t9b t10a t10b.
+    (t1a, t1b) field_open ->
+    (t2a, t2b) field_open ->
+    (t3a, t3b) field_open ->
+    (t4a, t4b) field_open ->
+    (t5a, t5b) field_open ->
+    (t6a, t6b) field_open ->
+    (t7a, t7b) field_open ->
+    (t8a, t8b) field_open ->
+    (t9a, t9b) field_open ->
+    (t10a, t10b) field_open ->
+    (module S
+       with type input = t1b
+                         * t2b
+                         * t3b
+                         * t4b
+                         * t5b
+                         * t6b
+                         * t7b
+                         * t8b
+                         * t9b
+                         * t10b) =
+ fun f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 ->
+  let (module Tup) =
+    tup10
+      (field_to_inner_compact f1)
+      (field_to_inner_compact f2)
+      (field_to_inner_compact f3)
+      (field_to_inner_compact f4)
+      (field_to_inner_compact f5)
+      (field_to_inner_compact f6)
+      (field_to_inner_compact f7)
+      (field_to_inner_compact f8)
+      (field_to_inner_compact f9)
+      (field_to_inner_compact f10)
+  in
+  (module struct
+    include Tup
+
+    let json_encoding =
+      Encoding.(
+        obj10
+          (field_to_data_encoding_open f1)
+          (field_to_data_encoding_open f2)
+          (field_to_data_encoding_open f3)
+          (field_to_data_encoding_open f4)
+          (field_to_data_encoding_open f5)
+          (field_to_data_encoding_open f6)
+          (field_to_data_encoding_open f7)
+          (field_to_data_encoding_open f8)
+          (field_to_data_encoding_open f9)
+          (field_to_data_encoding_open f10))
+  end)
+
+let obj10 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
+    (Field f7) (Field f8) (Field f9) (Field f10) =
+  obj10_open f1 f2 f3 f4 f5 f6 f7 f8 f9 f10
 
 module Compact_bool = struct
   type input = bool

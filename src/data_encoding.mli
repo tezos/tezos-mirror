@@ -1031,6 +1031,69 @@ let expr_encoding =
         Uses as many bits of tags as the sum of the tags used by its arguments. *)
     val tup4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
 
+    val tup5 :
+      'f1 t ->
+      'f2 t ->
+      'f3 t ->
+      'f4 t ->
+      'f5 t ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5) t
+
+    val tup6 :
+      'f1 t ->
+      'f2 t ->
+      'f3 t ->
+      'f4 t ->
+      'f5 t ->
+      'f6 t ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6) t
+
+    val tup7 :
+      'f1 t ->
+      'f2 t ->
+      'f3 t ->
+      'f4 t ->
+      'f5 t ->
+      'f6 t ->
+      'f7 t ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7) t
+
+    val tup8 :
+      'f1 t ->
+      'f2 t ->
+      'f3 t ->
+      'f4 t ->
+      'f5 t ->
+      'f6 t ->
+      'f7 t ->
+      'f8 t ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8) t
+
+    val tup9 :
+      'f1 t ->
+      'f2 t ->
+      'f3 t ->
+      'f4 t ->
+      'f5 t ->
+      'f6 t ->
+      'f7 t ->
+      'f8 t ->
+      'f9 t ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9) t
+
+    val tup10 :
+      'f1 t ->
+      'f2 t ->
+      'f3 t ->
+      'f4 t ->
+      'f5 t ->
+      'f6 t ->
+      'f7 t ->
+      'f8 t ->
+      'f9 t ->
+      'f10 t ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) t
+
     type 'a field
 
     (** [req "f" compact] can be used in conjunction with [optN] to create
@@ -1072,6 +1135,69 @@ let expr_encoding =
         Uses as many bits of tags as there are [opt] fields in its arguments. *)
     val obj4 :
       'a field -> 'b field -> 'c field -> 'd field -> ('a * 'b * 'c * 'd) t
+
+    val obj5 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5) t
+
+    val obj6 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6) t
+
+    val obj7 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7) t
+
+    val obj8 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      'f8 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8) t
+
+    val obj9 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      'f8 field ->
+      'f9 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9) t
+
+    val obj10 :
+      'f1 field ->
+      'f2 field ->
+      'f3 field ->
+      'f4 field ->
+      'f5 field ->
+      'f6 field ->
+      'f7 field ->
+      'f8 field ->
+      'f9 field ->
+      'f10 field ->
+      ('f1 * 'f2 * 'f3 * 'f4 * 'f5 * 'f6 * 'f7 * 'f8 * 'f9 * 'f10) t
 
     (** A compact encoding for [int32] values. It uses 2 bits in the
         shared tag, to determine how many bytes are used in the payload:
