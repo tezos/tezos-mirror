@@ -1936,27 +1936,6 @@ module Ticket_hash : sig
     (t * context) tzresult
 end
 
-(** This simply re-exports {!Destination_repr}. *)
-module Destination : sig
-  type t = Contract of Contract.t
-
-  val encoding : t Data_encoding.t
-
-  val pp : Format.formatter -> t -> unit
-
-  val compare : t -> t -> int
-
-  val equal : t -> t -> bool
-
-  val to_b58check : t -> string
-
-  val of_b58check : string -> t tzresult
-
-  val in_memory_size : t -> Cache_memory_helpers.sint
-
-  type error += Invalid_destination_b58check of string
-end
-
 (** This module re-exports definitions from {!Tx_rollup_repr} and
     {!Tx_rollup_storage}. *)
 module Tx_rollup : sig
@@ -1975,6 +1954,33 @@ module Tx_rollup : sig
   val pp : Format.formatter -> tx_rollup -> unit
 
   val encoding : tx_rollup Data_encoding.t
+
+  val deposit_entrypoint : Entrypoint.t
+
+  type deposit_parameters = {
+    contents : Script.node;
+    ty : Script.node;
+    ticketer : Script.node;
+    amount : int64;
+    destination : Tx_rollup_l2_address.Indexable.value;
+  }
+
+  (** [hash_ticket ctxt tx_rollup ~contents ~ticketer ~ty] computes the
+      hash of the ticket of type [ty ticket], of content [contents] and
+      of ticketer [ticketer].
+
+      The goal of the computed hash is twofold:
+
+      {ul {li Identifying the ticket in the layer-2, and}
+          {li Registering in the table of tickets that [tx_rollup]
+              owns this ticket.}} *)
+  val hash_ticket :
+    context ->
+    t ->
+    contents:Script.node ->
+    ticketer:Script.node ->
+    ty:Script.node ->
+    (Ticket_hash.t * context) tzresult
 
   val originate : context -> (context * tx_rollup) tzresult Lwt.t
 
@@ -2007,6 +2013,8 @@ module Tx_rollup_state : sig
 
   val burn : limit:Tez.t option -> t -> int -> Tez.t tzresult
 
+  val assert_exist : context -> Tx_rollup.t -> context tzresult Lwt.t
+
   val last_inbox_level : t -> Raw_level.t option
 
   type error +=
@@ -2036,10 +2044,17 @@ module Tx_rollup_message : sig
 
   type t = private Batch of string | Deposit of deposit
 
-  (** [make_batch batch] creates a new message to be added that can be
+  (** [make_batch batch] creates a new [Batch] message to be added that can be
       added to an inbox, along with its size in bytes. See
       {!Tx_rollup_message_repr.size}. *)
   val make_batch : string -> t * int
+
+  (** [make_deposit destination ticket_hash qty] creates a new
+      [Deposit] message to be added that can be added to an inbox,
+      along with its size in bytes. See
+      {!Tx_rollup_message_repr.size}. *)
+  val make_deposit :
+    Tx_rollup_l2_address.Indexable.value -> Ticket_hash.t -> int64 -> t * int
 
   val encoding : t Data_encoding.t
 
@@ -2166,6 +2181,27 @@ module Tx_rollup_commitments : sig
 
   val get_commitments :
     context -> Tx_rollup.t -> Raw_level.t -> (context * t) tzresult Lwt.t
+end
+
+(** This simply re-exports {!Destination_repr}. *)
+module Destination : sig
+  type t = Contract of Contract.t | Tx_rollup of Tx_rollup.t
+
+  val encoding : t Data_encoding.t
+
+  val pp : Format.formatter -> t -> unit
+
+  val compare : t -> t -> int
+
+  val equal : t -> t -> bool
+
+  val to_b58check : t -> string
+
+  val of_b58check : string -> t tzresult
+
+  val in_memory_size : t -> Cache_memory_helpers.sint
+
+  type error += Invalid_destination_b58check of string
 end
 
 module Kind : sig

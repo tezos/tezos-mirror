@@ -116,6 +116,15 @@ and successful_transaction_result =
       paid_storage_size_diff : Z.t;
       allocated_destination_contract : bool;
     }
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2339
+     Storage fees for transaction rollup.
+     We need to charge for newly allocated storage (as we do for
+     Michelson’s big map). *)
+  | Transaction_to_tx_rollup_result of {
+      ticket_hash : Ticket_hash.t;
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+    }
 
 (** Result of applying a {!manager_operation_content}, either internal
     or external. *)

@@ -68,6 +68,11 @@ let null_address = "tz1Ke2h7sDdakHJQh8WX4Z372du1KChsksyU"
 
 let liquidity_baking_dex = "KT1TxqZ8QtKvLu3V3JH7Gx58n7Co8pgtpQU5"
 
+(* The following address has been extracted from
+   [tezt/_regressions/tx_rollup_simple_use_case.out]. *)
+
+let tx_rollup_address = "tru1EL3YqhLS3kwni3ikbqMrui61fA5k7StHz"
+
 let assert_compat contract destination =
   match destination with
   | Destination_repr.Contract contract'
@@ -162,6 +167,17 @@ let test_encoding_binary_compat = test_contracts encoding_binary_compat
 
 let test_encoding_json_compat = test_contracts encoding_json_compat
 
+let test_compare_destination () =
+  let tz1 = !!(Destination_repr.of_b58check null_address) in
+  let kt1 = !!(Destination_repr.of_b58check liquidity_baking_dex) in
+  let tru1 = !!(Destination_repr.of_b58check tx_rollup_address) in
+
+  assert (Destination_repr.(tz1 < kt1)) ;
+  assert (Destination_repr.(kt1 < tru1)) ;
+  assert (Destination_repr.(tz1 < tru1)) ;
+
+  return_unit
+
 let tests =
   [
     tztest "Json decoding compat implicit contract (null address)" `Quick
@@ -190,4 +206,5 @@ let tests =
        dummy contracts"
       `Quick
     @@ test_encoding_json_compat;
+    tztest "Comparison of destinations" `Quick test_compare_destination;
   ]

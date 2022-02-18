@@ -69,7 +69,8 @@ let collect_error_locations errs =
     | Environment.Ecoproto_error
         ( Ill_formed_type (_, _, _)
         | No_such_entrypoint _ | Duplicate_entrypoint _
-        | Unreachable_entrypoint _ | Runtime_contract_error _
+        | Unreachable_entrypoint _ | Tx_rollup_invalid_ticket_amount _
+        | Runtime_contract_error _
         | Michelson_v1_primitives.Invalid_primitive_name (_, _)
         | Ill_typed_data (_, _, _)
         | Ill_typed_contract (_, _) )
@@ -254,6 +255,28 @@ let report_errors ~details ~show_source ?parsed ppf errs =
             (List.map Michelson_v1_primitives.string_of_prim path)
         in
         Format.fprintf ppf "Entrypoint at path %s is not reachable" path ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Tx_rollup_bad_deposit_parameter (loc, expr))
+      :: rest ->
+        Format.fprintf
+          ppf
+          "@[<v 2>%aTrying to call the deposit entrypoint of a transaction \
+           rollup with an ill-formed parameter:@ %a@]"
+          print_loc
+          loc
+          print_expr
+          expr ;
+        if rest <> [] then Format.fprintf ppf "@," ;
+        print_trace locations rest
+    | Environment.Ecoproto_error (Tx_rollup_invalid_ticket_amount amount)
+      :: rest ->
+        Format.fprintf
+          ppf
+          "Amount of tickets to deposit to a transaction rollup needs to fit \
+           in a 64-bit integer, but %a is too big"
+          Z.pp_print
+          amount ;
         if rest <> [] then Format.fprintf ppf "@," ;
         print_trace locations rest
     | Environment.Ecoproto_error (Ill_formed_type (_, expr, loc)) :: rest ->

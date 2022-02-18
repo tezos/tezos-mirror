@@ -382,6 +382,11 @@ let pp_manager_operation_contents_and_result ppf
             (Z.to_string paid_storage_size_diff) ;
         Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
         pp_balance_updates_opt ppf balance_updates
+    | Transaction_to_tx_rollup_result
+        {balance_updates; consumed_gas; ticket_hash} ->
+        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+        pp_balance_updates_opt ppf balance_updates ;
+        Format.fprintf ppf "@,Ticket hash: %a" Ticket_hash.pp ticket_hash
   in
   let pp_origination_result
       (Origination_result

@@ -243,6 +243,12 @@ let tickets_of_operation ctxt
         destination = Destination.Contract destination;
       } ->
       tickets_of_transaction ctxt ~destination ~parameters
+  | Transaction {destination = Destination.Tx_rollup _; _} ->
+      (* TODO: #2488
+         The ticket accounting for the recipient of rollup transactions
+         is currently done in the apply function, but should rather be
+         done in this module. *)
+      return (None, ctxt)
   | Origination {delegate = _; script; credit = _; preorigination} ->
       tickets_of_origination ctxt ~preorigination script
   | Delegation _ -> return (None, ctxt)

@@ -238,6 +238,12 @@ end
 module Tx_rollup = struct
   include Tx_rollup_repr
   include Tx_rollup_storage
+
+  let hash_ticket ctxt tx_rollup ~contents ~ticketer ~ty =
+    let open Micheline in
+    let owner = String (dummy_location, to_b58check tx_rollup) in
+    Ticket_hash_builder.make ctxt ~ticketer ~ty ~contents ~owner
+
   module Internal_for_tests = Tx_rollup_repr
 end
 
@@ -254,9 +260,18 @@ end
 module Tx_rollup_message = struct
   include Tx_rollup_message_repr
 
-  let make_batch string =
-    let message = Batch string in
-    (message, size message)
+  let make_message msg = (msg, size msg)
+
+  let make_batch string = make_message @@ Batch string
+
+  let make_deposit dst ticket_hash amount =
+    make_message
+    @@ Deposit
+         {
+           destination = Tx_rollup_l2_address.Indexable.forget_value dst;
+           ticket_hash;
+           amount;
+         }
 end
 
 module Tx_rollup_inbox = struct

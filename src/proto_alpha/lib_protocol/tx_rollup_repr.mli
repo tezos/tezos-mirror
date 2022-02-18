@@ -42,6 +42,10 @@ type tx_rollup = t
 
 include Compare.S with type t := t
 
+(** [in_memory_size tx_rollup] returns the number of bytes [tx_rollup]
+    uses in RAM. *)
+val in_memory_size : t -> Cache_memory_helpers.sint
+
 val to_b58check : t -> string
 
 val of_b58check : string -> t tzresult
@@ -59,3 +63,33 @@ val originated_tx_rollup : Origination_nonce.t -> t
 val rpc_arg : t RPC_arg.arg
 
 module Index : Storage_description.INDEX with type t = t
+
+(** The entrypoint a layer-1 contract can use to deposit Michelson tickets
+    into a transaction rollup. *)
+val deposit_entrypoint : Entrypoint_repr.t
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2035
+   Refactor this away when proper internal operations are introduced.
+   Currently, this type is needed because when emitting an internal
+   operation, the Michelson interpreter serialize the parameters,
+   loosing their type information in the process. Se we need to inject
+   said type (the [ty] field) in the Micheline produced by the
+   interpreter, so that the transaction rollup can use it to hash the
+   ticket. Without this serialization/deserialization step, type
+   information are preserved, and there is no more need to instrument
+   the parameters of the deposit entrypoint. *)
+
+(** The parameters expected to be supplied to the deposit entrypoint.
+
+    These arguments will not be supplied as-is, but encoded using
+    Micheline.
+
+    The function {!Script_ir_translator.parse_tx_rollup_deposit_parameters}
+    should be used to extract a [deposit_parameters] from a Micheline value. *)
+type deposit_parameters = {
+  contents : Script_repr.node;
+  ty : Script_repr.node;
+  ticketer : Script_repr.node;
+  amount : int64;
+  destination : Tx_rollup_l2_address.Indexable.value;
+}

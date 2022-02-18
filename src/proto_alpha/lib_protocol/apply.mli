@@ -43,6 +43,10 @@ type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
 
 type error += (* `Permanent *) Tx_rollup_feature_disabled
 
+type error += (* `Permanent *) Tx_rollup_invalid_transaction_amount
+
+type error += (* `Permanent *) Tx_rollup_non_internal_transaction
+
 type error += (* `Permanent *) Sc_rollup_feature_disabled
 
 type error += (* `Permanent *) Inconsistent_counters
