@@ -123,16 +123,7 @@ val inject_operation :
   ?async:bool ->
   data:JSON.u ->
   Client.t ->
-  JSON.t Lwt.t
-
-(** Same as {!inject_operation}, but do not wait for the process to exit. *)
-val spawn_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  Process.t
+  JSON.t Process.runnable
 
 (** Call RPC /private/injection/operation *)
 val private_inject_operation :
@@ -141,16 +132,7 @@ val private_inject_operation :
   ?async:bool ->
   data:JSON.u ->
   Client.t ->
-  JSON.t Lwt.t
-
-(** Same as {!private_inject_operation}, but do not wait for the process to exit. *)
-val spawn_private_inject_operation :
-  ?endpoint:Client.endpoint ->
-  ?hooks:Process.hooks ->
-  ?async:bool ->
-  data:JSON.u ->
-  Client.t ->
-  Process.t
+  JSON.t Process.runnable
 
 (** Call RPC /injection/block *)
 val inject_block :
@@ -390,19 +372,7 @@ module Big_maps : sig
     ?offset:int ->
     ?length:int ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as {!get_all}, but do not wait for the process to exit. *)
-  val spawn_get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    big_map_id:string ->
-    ?offset:int ->
-    ?length:int ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 end
 
 module Contracts : sig
@@ -415,7 +385,7 @@ module Contracts : sig
     ?chain:string ->
     ?block:string ->
     Client.t ->
-    string list Lwt.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates *)
   val get_all_delegates :
@@ -426,15 +396,6 @@ module Contracts : sig
     Client.t ->
     string list Lwt.t
 
-  (** Same as [get_all], but do not wait for the process to exit. *)
-  val spawn_get_all :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    Client.t ->
-    Process.t
-
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id] *)
   val get :
     ?endpoint:Client.endpoint ->
@@ -443,17 +404,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get], but do not wait for the process to exit. *)
-  val spawn_get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/balance *)
   val get_balance :
@@ -463,17 +414,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_balance], but do not wait for the process to exit. *)
-  val spawn_get_balance :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/big_map_get *)
   val big_map_get :
@@ -484,18 +425,7 @@ module Contracts : sig
     contract_id:string ->
     data:JSON.u ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [big_map_get], but do not wait for the process to exit. *)
-  val spawn_big_map_get :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    data:JSON.u ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/counter *)
   val get_counter :
@@ -505,17 +435,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_counter], but do not wait for the process to exit. *)
-  val spawn_get_counter :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/delegate *)
   val get_delegate :
@@ -525,17 +445,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_delegate], but do not wait for the process to exit. *)
-  val spawn_get_delegate :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/entrypoints *)
   val get_entrypoints :
@@ -545,17 +455,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_entrypoints], but do not wait for the process to exit. *)
-  val spawn_get_entrypoints :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/manager_key *)
   val get_manager_key :
@@ -565,17 +465,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_manager_key], but do not wait for the process to exit. *)
-  val spawn_get_manager_key :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/script *)
   val get_script :
@@ -585,17 +475,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_script], but do not wait for the process to exit. *)
-  val spawn_get_script :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/contracts/[contract_id]/storage *)
   val get_storage :
@@ -605,17 +485,7 @@ module Contracts : sig
     ?block:string ->
     contract_id:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_storage], but do not wait for the process to exit. *)
-  val spawn_get_storage :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    contract_id:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 end
 
 module Delegates : sig

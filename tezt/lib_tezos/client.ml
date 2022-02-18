@@ -203,28 +203,43 @@ let string_of_query_string = function
 let rpc_path_query_to_string ?(query_string = []) path =
   string_of_path path ^ string_of_query_string query_string
 
+module Spawn = struct
+  let rpc ?endpoint ?hooks ?env ?data ?query_string meth path client :
+      JSON.t Process.runnable =
+    let process =
+      let data =
+        Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
+      in
+      let query_string =
+        Option.fold ~none:"" ~some:string_of_query_string query_string
+      in
+      let path = string_of_path path in
+      let full_path = path ^ query_string in
+      spawn_command
+        ?endpoint
+        ?hooks
+        ?env
+        client
+        (["rpc"; string_of_meth meth; full_path] @ data)
+    in
+    let parse process =
+      let* output = Process.check_and_read_stdout process in
+      return (JSON.parse ~origin:(string_of_path path ^ " response") output)
+    in
+    {value = process; run = parse}
+end
+
 let spawn_rpc ?endpoint ?hooks ?env ?data ?query_string meth path client =
-  let data =
-    Option.fold ~none:[] ~some:(fun x -> ["with"; JSON.encode_u x]) data
+  let*? res =
+    Spawn.rpc ?endpoint ?hooks ?env ?data ?query_string meth path client
   in
-  let query_string =
-    Option.fold ~none:"" ~some:string_of_query_string query_string
-  in
-  let path = string_of_path path in
-  let full_path = path ^ query_string in
-  spawn_command
-    ?endpoint
-    ?hooks
-    ?env
-    client
-    (["rpc"; string_of_meth meth; full_path] @ data)
+  res
 
 let rpc ?endpoint ?hooks ?env ?data ?query_string meth path client =
-  let* output =
-    spawn_rpc ?endpoint ?hooks ?env ?data ?query_string meth path client
-    |> Process.check_and_read_stdout
+  let*! res =
+    Spawn.rpc ?endpoint ?hooks ?env ?data ?query_string meth path client
   in
-  return (JSON.parse ~origin:(string_of_path path ^ " response") output)
+  return res
 
 let spawn_rpc_list ?endpoint client =
   spawn_command ?endpoint client ["rpc"; "list"]

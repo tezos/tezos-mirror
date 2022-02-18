@@ -306,7 +306,7 @@ module Revamped = struct
       "Force inject a transfer with the same counter and the same source as %s \
        on node1."
       oph ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client1
@@ -641,7 +641,7 @@ module Revamped = struct
     in
 
     log_step 2 "Forge and inject an operation on the node." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -728,7 +728,7 @@ module Revamped = struct
     in
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -829,7 +829,7 @@ module Revamped = struct
         `Client
         ()
     in
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -866,7 +866,7 @@ module Revamped = struct
       Operation.sign_manager_op_hex ~signer:Constant.bootstrap2 op_hex
     in
     let signed_op = op_str_hex ^ signature in
-    let p = RPC.spawn_inject_operation ~data:(`String signed_op) client in
+    let*? p = RPC.inject_operation ~data:(`String signed_op) client in
 
     log_step 4 "Check that injection failed as expected." ;
     let injection_error_rex =
@@ -903,7 +903,7 @@ module Revamped = struct
     in
     let source = Constant.bootstrap1 in
     let dest = Constant.bootstrap2 in
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -1002,7 +1002,7 @@ module Revamped = struct
     in
 
     log_step 2 "Force inject a transfer with a counter in the futur." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter
         ~contract_id:Constant.bootstrap1.public_key_hash
         client
@@ -1201,7 +1201,7 @@ module Revamped = struct
     let* _ = bake_for ~wait_for_flush:true ~empty:false ~protocol node client in
 
     log_step 3 "Forge and force inject an operation." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter ~contract_id:source1.public_key_hash client
     in
     let counter =
@@ -1239,7 +1239,7 @@ module Revamped = struct
         ~error_msg:"mempool expected to be %L, got %R") ;
 
     log_step 4 "Forge and force inject an operation." ;
-    let* counter =
+    let*! counter =
       RPC.Contracts.get_counter ~contract_id:source2.public_key_hash client
     in
     let counter =
@@ -2084,7 +2084,8 @@ let forge_operation ~branch ~fee ~gas_limit ~source ~destination ~counter
 
 let inject_operation ~client (`Hex op_str_hex) (`Hex signature) =
   let signed_op = op_str_hex ^ signature in
-  RPC.inject_operation ~data:(`String signed_op) client
+  let*! r = RPC.inject_operation ~data:(`String signed_op) client in
+  return r
 
 let forge_and_inject_operation ~branch ~fee ~gas_limit ~source ~destination
     ~counter ~signer ~client =
@@ -2179,7 +2180,8 @@ let forge_run_and_inject_n_batched_operation n ~branch ~fee ~gas_limit ~source
   in
   let (`Hex signature) = Tezos_crypto.Signature.to_hex signature in
   let signed_op = op_str_hex ^ signature in
-  RPC.inject_operation ~data:(`String signed_op) client
+  let*! r = RPC.inject_operation ~data:(`String signed_op) client in
+  return r
 
 let check_batch_operations_are_in_applied_mempool ops oph n =
   let open JSON in
@@ -2227,7 +2229,7 @@ let run_batched_operation =
   Log.info "Node is at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client_1
@@ -2522,7 +2524,7 @@ let propagation_future_endorsement =
   Log.info "%s" step6_msg ;
   let (`Hex bytes) = Hex.of_bytes bytes in
   let injection_waiter = wait_for_injection node_2 in
-  let* _ = RPC.private_inject_operation ~data:(`String bytes) client_2 in
+  let*! _ = RPC.private_inject_operation ~data:(`String bytes) client_2 in
   let* () = injection_waiter in
   Log.info "%s" step7_msg ;
   let* () = Client.Admin.trust_address client_2 ~peer:node_3
@@ -2599,7 +2601,7 @@ let forge_pre_filtered_operation =
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* Get the counter and the current branch *)
-  let* base_counter =
+  let*! base_counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client_1
@@ -2710,7 +2712,7 @@ let refetch_failed_operation =
   Log.info "All nodes are at level %d." 1 ;
   (* Step 2 *)
   (* get counter and branches *)
-  let* counter =
+  let*! counter =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client_1
@@ -3365,12 +3367,12 @@ let force_operation_injection =
   Log.info "Both nodes are at level %d." proto_activation_level ;
   let open Lwt in
   Log.info "%s" step3_msg ;
-  let* counter =
+  let*! json =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client2
-    >|= JSON.as_int
   in
+  let counter = JSON.as_int json in
   let* branch = RPC.get_branch client2 >|= JSON.as_string in
   Log.info "%s" step4_msg ;
   let* (`Hex op_str_hex as op_hex) =
@@ -3388,7 +3390,7 @@ let force_operation_injection =
   in
   let signed_op = op_str_hex ^ signature in
   Log.info "%s" step5_msg ;
-  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client1 in
+  let*? p = RPC.inject_operation ~data:(`String signed_op) client1 in
   let injection_error_rex =
     rex
       ~opts:[`Dotall]
@@ -3396,18 +3398,16 @@ let force_operation_injection =
   in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step6_msg ;
-  let p =
-    RPC.spawn_private_inject_operation ~data:(`String signed_op) client1
-  in
+  let*? p = RPC.private_inject_operation ~data:(`String signed_op) client1 in
   let access_error_rex =
     rex ~opts:[`Dotall] "Fatal error:\n  .HTTP 403. Access denied to: .*"
   in
   let* () = Process.check_error ~msg:access_error_rex p in
   Log.info "%s" step7_msg ;
-  let p = RPC.spawn_inject_operation ~data:(`String signed_op) client2 in
+  let*? p = RPC.inject_operation ~data:(`String signed_op) client2 in
   let* () = Process.check_error ~msg:injection_error_rex p in
   Log.info "%s" step8_msg ;
-  let* _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
+  let*! _ = RPC.private_inject_operation ~data:(`String signed_op) client2 in
   unit
 
 (** This test tries to inject an operation with an old known branch *)
@@ -3441,12 +3441,12 @@ let injecting_old_operation_fails =
   let* () = Client.activate_protocol ~protocol ~parameter_file client in
   let* _ = Node.wait_for_level node 1 in
   log_step 2 step2 ;
-  let* counter =
+  let*! json =
     RPC.Contracts.get_counter
       ~contract_id:Constant.bootstrap1.public_key_hash
       client
-    >|= JSON.as_int
   in
+  let counter = JSON.as_int json in
   let* branch = RPC.get_branch client >|= JSON.as_string in
   log_step 3 step3 ;
   (* To avoid off-by-one mistakes *)
@@ -3472,8 +3472,8 @@ let injecting_old_operation_fails =
     Operation.sign_manager_op_hex ~signer:Constant.bootstrap1 op_hex
   in
   log_step 5 step5 ;
-  let process =
-    RPC.spawn_inject_operation ~data:(`String (op_str_hex ^ signature)) client
+  let*? process =
+    RPC.inject_operation ~data:(`String (op_str_hex ^ signature)) client
   in
   let injection_error_rex =
     rex

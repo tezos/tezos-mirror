@@ -167,23 +167,12 @@ let inject_block ?endpoint ?hooks ~data client =
 let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["injection"; "operation"] in
   let query_string = if async then [("async", "")] else [] in
-  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let spawn_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
-  let path = ["injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["private"; "injection"; "operation"] in
   let query_string = if async then [("async", "")] else [] in
-  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
-
-let spawn_private_inject_operation ?endpoint ?hooks ?(async = false) ~data
-    client =
-  let path = ["private"; "injection"; "operation"] in
-  let query_string = if async then [("async", "")] else [] in
-  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+  Client.Spawn.rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
@@ -265,20 +254,6 @@ module Big_maps = struct
     in
     Client.rpc ?endpoint ?hooks GET path client
 
-  let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~big_map_id ?offset ?length client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "big_maps"; big_map_id]
-    in
-    let query_string =
-      [
-        Option.map (fun offset -> ("offset", Int.to_string offset)) offset;
-        Option.map (fun length -> ("length", Int.to_string length)) length;
-      ]
-      |> List.filter_map Fun.id
-    in
-    Client.spawn_rpc ?endpoint ?hooks ~query_string GET path client
-
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~big_map_id
       ?offset ?length client =
     let path =
@@ -291,7 +266,7 @@ module Big_maps = struct
       ]
       |> List.filter_map Fun.id
     in
-    Client.rpc ?endpoint ?hooks ~query_string GET path client
+    Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
 end
 
 let get_ddb ?endpoint ?hooks ?(chain = "main") client =
@@ -299,15 +274,9 @@ let get_ddb ?endpoint ?hooks ?(chain = "main") client =
   Client.rpc ?endpoint ?hooks GET path client
 
 module Contracts = struct
-  let spawn_get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client
-      =
-    let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get_all ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
     let path = ["chains"; chain; "blocks"; block; "context"; "contracts"] in
-    let* contracts = Client.rpc ?endpoint ?hooks GET path client in
-    return (JSON.as_list contracts |> List.map JSON.as_string)
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_all_delegates ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       client =
@@ -315,19 +284,12 @@ module Contracts = struct
     let* contracts = Client.rpc ?endpoint ?hooks GET path client in
     return (JSON.as_list contracts |> List.map JSON.as_string)
 
-  let spawn_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    let path =
-      ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
-    in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~contract_id
       client =
     let path =
       ["chains"; chain; "blocks"; block; "context"; "contracts"; contract_id]
     in
-    Client.rpc ?endpoint ?hooks GET path client
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let sub_path ~chain ~block ~contract_id field =
     [
@@ -341,89 +303,38 @@ module Contracts = struct
       field;
     ]
 
-  let spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
-    let path = sub_path ~chain ~block ~contract_id field in
-    Client.spawn_rpc ?endpoint ?hooks GET path client
-
   let get_sub ?endpoint ?hooks ~chain ~block ~contract_id field client =
     let path = sub_path ~chain ~block ~contract_id field in
-    Client.rpc ?endpoint ?hooks GET path client
-
-  let spawn_get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 
   let get_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "balance" client
 
-  let spawn_big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id ~data client =
-    let path = sub_path ~chain ~block ~contract_id "big_map_get" in
-    Client.spawn_rpc ?endpoint ?hooks ~data POST path client
-
   let big_map_get ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id ~data client =
     let path = sub_path ~chain ~block ~contract_id "big_map_get" in
-    Client.rpc ?endpoint ?hooks ~data POST path client
-
-  let spawn_get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
+    Client.Spawn.rpc ?endpoint ?hooks ~data POST path client
 
   let get_counter ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "counter" client
 
-  let spawn_get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
-
   let get_delegate ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "delegate" client
-
-  let spawn_get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~contract_id
-      "entrypoints"
-      client
 
   let get_entrypoints ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "entrypoints" client
 
-  let spawn_get_manager_key ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub
-      ?endpoint
-      ?hooks
-      ~chain
-      ~block
-      ~contract_id
-      "manager_key"
-      client
-
   let get_manager_key ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "manager_key" client
 
-  let spawn_get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
   let get_script ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =
     get_sub ?endpoint ?hooks ~chain ~block ~contract_id "script" client
-
-  let spawn_get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
-      ~contract_id client =
-    spawn_get_sub ?endpoint ?hooks ~chain ~block ~contract_id "storage" client
 
   let get_storage ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~contract_id client =

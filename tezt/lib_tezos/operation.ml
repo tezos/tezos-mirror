@@ -75,8 +75,10 @@ let data_to_json =
 
 (* Some basic auxiliary functions *)
 let get_counter ~source client =
-  RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
-  >|= JSON.as_int
+  let*! json =
+    RPC.Contracts.get_counter ~contract_id:source.Account.public_key_hash client
+  in
+  return (JSON.as_int json)
 
 let get_next_counter ~source client = get_counter client ~source >|= succ
 
@@ -217,7 +219,7 @@ let inject_operation ?(async = false) ?(force = false) ?wait_for_injection
     | None -> Lwt.return_unit
     | Some node -> Node.wait_for_request ~request:`Inject node
   in
-  let* oph_json = inject ~async ~data:(`String signed_op) client in
+  let*! oph_json = inject ~async ~data:(`String signed_op) client in
   let* () = waiter in
   return (`OpHash (JSON.as_string oph_json))
 

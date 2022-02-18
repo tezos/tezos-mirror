@@ -67,6 +67,43 @@ val some : 'a -> 'a option Lwt.t
     [name] is used in the error message if [option] is [None]. *)
 val mandatory : string -> 'a option -> 'a
 
+(** {2 The runnable monad} *)
+
+(** Values that come with functions to handle them.
+
+    This is intended mainly for use with ['a = Process.t].
+    Indeed, it is convenient to define functions that declare both how to
+    spawn processes and how to read their output. Sometimes you want
+    the output, sometimes you just want the [Process.t] itself
+    (e.g. to check its exit code). Instead of defining one function for
+    each use case, you can define a single function that returns a [runnable],
+    and use [let*!] when you need the output value, or [let*?] if you just
+    need the process itself. There is no function to inject a value
+    into the monad ([return]), as there is no need for it.
+
+    For instance, let's say you have a function which runs [git log]:
+    {[
+      val git_log: unit -> (Process.t, string list) runnable
+    ]}
+    If you just want to check the exit code, use it like this:
+    {[
+      let*? process : Process.t = git_log () in
+      Process.check process
+    ]}
+    If you just want to get its output, use it like this:
+    {[
+      let*! log : string list = git_log () in
+    ]} *)
+type ('a, 'b) runnable = {value : 'a; run : 'a -> 'b Lwt.t}
+
+(** Apply the function of a runnable to its value. *)
+val ( let*! ) : ('a, 'b) runnable -> ('b -> 'c Lwt.t) -> 'c Lwt.t
+
+(** Get the value of a runnable and pass it to a continuation.
+
+    You can also just access field [value] directly. *)
+val ( let*? ) : ('a, 'b) runnable -> ('a -> 'c) -> 'c
+
 (** {2 Lists} *)
 
 (** Make a list of all integers between two integers.

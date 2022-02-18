@@ -196,3 +196,9 @@ val run_and_read_stderr :
 (** [program_path p] returns [Some path] if the shell command [command -v p]
     succeeds and prints [path]. Returns [None] otherwise. *)
 val program_path : string -> string option Lwt.t
+
+(** Processes with associated run functions.
+
+    Typically, processes are associated to run functions that parse their output
+    into values of type ['a]. See [Base.runnable] for an example. *)
+type nonrec 'a runnable = (t, 'a) Base.runnable

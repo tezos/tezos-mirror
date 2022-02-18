@@ -145,8 +145,8 @@ let big_map_get ?(big_map_size = 10) ?nb_gets ~protocol mode () =
   in
   let* () = Client.bake_for client in
   let* mockup_client = Client.init_mockup ~protocol () in
-  let* _ = RPC.Contracts.get_script ?endpoint ~contract_id client in
-  let* _ = RPC.Contracts.get_storage ?endpoint ~contract_id client in
+  let*! _ = RPC.Contracts.get_script ?endpoint ~contract_id client in
+  let*! _ = RPC.Contracts.get_storage ?endpoint ~contract_id client in
   let* indices_exprs =
     let compute_index_expr index =
       let* key_value_list =
