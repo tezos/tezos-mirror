@@ -324,6 +324,30 @@ module Scripts = struct
            (req "type" Script.expr_encoding)
            (req "val" Script.expr_encoding))
 
+    let run_instr_input_encoding =
+      merge_objs
+        (obj10
+           (req "input" stack_encoding)
+           (req "code" Script.expr_encoding)
+           (req "chain_id" Chain_id.encoding)
+           (opt "gas" Gas.Arith.z_integral_encoding)
+           (opt "now" Script_timestamp.encoding)
+           (opt "level" Script_int.n_encoding)
+           (opt "sender" Contract.encoding)
+           (opt "source" Contract.implicit_encoding)
+           (opt "self" Contract.originated_encoding)
+           (opt "parameter" Script.expr_encoding))
+        (obj6
+           (req "amount" Tez.encoding)
+           (opt "balance" Tez.encoding)
+           (opt "other_contracts" other_contracts_encoding)
+           (opt "big_maps" extra_big_maps_encoding)
+           (opt "unparsing_mode" unparsing_mode_encoding)
+           (dft "legacy" bool false))
+
+    let run_instr_output_encoding =
+      obj2 (req "output" stack_encoding) (req "gas" Gas.encoding)
+
     let run_tzip4_view_encoding =
       let open Data_encoding in
       merge_objs
@@ -410,6 +434,14 @@ module Scripts = struct
         ~output:(obj1 (req "data" Script.expr_encoding))
         ~query:RPC_query.empty
         RPC_path.(path / "run_script_view")
+
+    let run_instr =
+      RPC_service.post_service
+        ~description:"Run a single Michelson instruction"
+        ~query:RPC_query.empty
+        ~input:run_instr_input_encoding
+        ~output:run_instr_output_encoding
+        RPC_path.(path / "run_instruction")
 
     let typecheck_code =
       RPC_service.post_service
@@ -1325,7 +1357,7 @@ module Scripts = struct
       let sender = Destination.Contract sender in
       (ctxt, {sender; payer; self; amount; balance; chain_id; now; level})
     in
-    let configure_gas_and_step_constants ctxt script ~gas_opt ~balance ~amount
+    let configure_gas_and_step_constants ctxt ~script ~gas_opt ~balance ~amount
         ~chain_id ~sender_opt ~payer_opt ~self_opt ~now_opt ~level_opt =
       let gas =
         match gas_opt with
@@ -1423,7 +1455,7 @@ module Scripts = struct
         let* ctxt, step_constants =
           configure_gas_and_step_constants
             ctxt
-            {storage; code}
+            ~script:{storage; code}
             ~gas_opt
             ~balance
             ~amount
@@ -1490,7 +1522,7 @@ module Scripts = struct
         let* ctxt, step_constants =
           configure_gas_and_step_constants
             ctxt
-            {storage; code}
+            ~script:{storage; code}
             ~gas_opt
             ~balance
             ~amount
@@ -1882,6 +1914,115 @@ module Scripts = struct
         in
         let normalized = Unparse_types.unparse_ty ~loc:() typ in
         return @@ Micheline.strip_locations normalized) ;
+    Registration.register0
+      ~chunked:true
+      S.run_instr
+      (fun
+        ctxt
+        ()
+        ( ( input,
+            code,
+            chain_id,
+            gas_opt,
+            now_opt,
+            level_opt,
+            sender_opt,
+            source_opt,
+            self_opt,
+            parameter_opt ),
+          ( amount,
+            balance,
+            other_contracts,
+            extra_big_maps,
+            unparsing_mode,
+            legacy ) )
+      ->
+        let unparsing_mode = Option.value ~default:Readable unparsing_mode in
+        let other_contracts = Option.value ~default:[] other_contracts in
+        let* ctxt = originate_dummy_contracts ctxt other_contracts in
+        let extra_big_maps = Option.value ~default:[] extra_big_maps in
+        let* ctxt = initialize_big_maps ctxt extra_big_maps in
+        let parameter =
+          Option.value
+            ~default:
+              (Micheline.strip_locations
+                 (Prim (0, Michelson_v1_primitives.T_unit, [], [])))
+            parameter_opt
+        in
+        let*? Ex_parameter_ty_and_entrypoints {arg_type; entrypoints}, ctxt =
+          Script_ir_translator.parse_parameter_ty_and_entrypoints
+            ctxt
+            ~legacy
+            (Micheline.root parameter)
+        in
+        let* ctxt, step_constants =
+          configure_gas_and_step_constants
+            ctxt
+            ~script:(View_helpers.make_tzip4_viewer_script parameter)
+            ~gas_opt
+            ~balance
+            ~amount
+            ~chain_id
+            ~sender_opt
+            ~payer_opt:source_opt
+            ~self_opt
+            ~now_opt
+            ~level_opt
+        in
+        let input_nodes =
+          List.map (fun (a, b) -> (Micheline.root a, Micheline.root b)) input
+        in
+        let* Normalize_stack.Ex_stack (st_ty, x, st), ctxt =
+          Normalize_stack.parse_stack ctxt ~legacy input_nodes
+        in
+        let* j, ctxt =
+          Script_ir_translator.parse_instr
+            ~elab_conf:(Script_ir_translator_config.make ~legacy ())
+            (Script_tc_context.toplevel
+               ~storage_type:Script_typed_ir.unit_t
+               ~param_type:arg_type
+               ~entrypoints)
+            ctxt
+            (Micheline.root code)
+            st_ty
+        in
+        match j with
+        | Failed {descr} -> (
+            let impossible_stack_ty =
+              Script_typed_ir.(Item_t (never_t, Bot_t))
+            in
+            let descr = descr impossible_stack_ty in
+            let descr = Script_ir_translator.close_descr descr in
+            let* absurd =
+              Script_interpreter.Internals.step_descr
+                None
+                ctxt
+                step_constants
+                descr
+                x
+                st
+            in
+            match absurd with _ -> .)
+        | Typed descr ->
+            let descr = Script_ir_translator.close_descr descr in
+            let* y, output_st, _ctxt =
+              Script_interpreter.Internals.step_descr
+                None
+                ctxt
+                step_constants
+                descr
+                x
+                st
+            in
+            let+ output, ctxt =
+              Normalize_stack.unparse_stack
+                ctxt
+                unparsing_mode
+                descr.kaft
+                y
+                output_st
+            in
+            (output, Gas.level ctxt)) ;
     (* TODO: https://gitlab.com/tezos/tezos/-/issues/3364
 
        Should [run_operation] be registered at successor level? *)
@@ -2002,6 +2143,22 @@ module Scripts = struct
           unparsing_mode,
           now ),
         (level, other_contracts, extra_big_maps) )
+
+  let run_instr ~gas ~legacy ~input ~code ~chain_id ~now ~level ~unparsing_mode
+      ~source ~sender ~self ~parameter ~amount ~balance ~other_contracts
+      ~extra_big_maps ctxt block =
+    RPC_context.make_call0
+      S.run_instr
+      ctxt
+      block
+      ()
+      ( (input, code, chain_id, gas, now, level, sender, source, self, parameter),
+        ( amount,
+          balance,
+          other_contracts,
+          extra_big_maps,
+          unparsing_mode,
+          legacy ) )
 
   let typecheck_code ~gas ~legacy ~script ~show_types ctxt block =
     RPC_context.make_call0
