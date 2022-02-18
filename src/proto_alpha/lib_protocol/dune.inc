@@ -69,6 +69,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
+   tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
@@ -226,6 +227,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
+   tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
@@ -383,6 +385,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
+   tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
@@ -562,6 +565,7 @@ include Tezos_raw_protocol_alpha.Main
    Indexable
    Entrypoint_repr
    Tx_rollup_l2_address
+   Tx_rollup_l2_qty
    Tx_rollup_repr
    Tx_rollup_state_repr
    Tx_rollup_message_repr
@@ -760,6 +764,7 @@ include Tezos_raw_protocol_alpha.Main
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
+   tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
