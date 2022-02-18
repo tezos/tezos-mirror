@@ -29,7 +29,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none submit tx rollup commitment 3  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2460.288 units (will add 100 for safety)
+Estimated gas: 2460.272 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -52,11 +52,11 @@ This sequence of operations was run:
       This tx rollup commit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2460.288
+      Consumed gas: 2460.272
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitments?offset=3'
-[ { "commitment":
-      { "level": 3, "batches": [ { "root": "726f6f74" } ],
-        "predecessor": null },
-    "commiter": "[PUBLIC_KEY_HASH]", "submitted_at": 6 } ]
+./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitment?offset=3'
+{ "commitment":
+    { "level": 3, "batches": [ { "root": "726f6f74" } ],
+      "predecessor": null },
+  "committer": "[PUBLIC_KEY_HASH]", "submitted_at": 6 }

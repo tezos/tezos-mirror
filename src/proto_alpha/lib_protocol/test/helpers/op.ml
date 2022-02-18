@@ -554,7 +554,7 @@ let sc_rollup_origination ?counter ?fee ?gas_limit ?storage_limit ctxt
 
 let tx_rollup_commit ?counter ?fee ?gas_limit ?storage_limit ctxt
     (source : Contract.t) (tx_rollup : Tx_rollup.t)
-    (commitment : Tx_rollup_commitments.Commitment.t) =
+    (commitment : Tx_rollup_commitment.t) =
   manager_operation
     ?counter
     ?fee

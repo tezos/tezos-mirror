@@ -43,11 +43,11 @@ val inbox :
   Tx_rollup.t ->
   Tx_rollup_inbox.t shell_tzresult Lwt.t
 
-val commitments :
+val commitment :
   'a #RPC_context.simple ->
   'a ->
   ?offset:int ->
   Tx_rollup.t ->
-  Tx_rollup_commitments.t shell_tzresult Lwt.t
+  Tx_rollup_commitment.Submitted_commitment.t option shell_tzresult Lwt.t
 
 val register : unit -> unit

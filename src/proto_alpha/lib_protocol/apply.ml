@@ -1280,7 +1280,7 @@ let apply_manager_operation_content :
           fail Tx_rollup_commit_with_non_implicit_contract
           (* This is only called with implicit contracts *)
       | Some key ->
-          Tx_rollup_commitments.add_commitment ctxt tx_rollup key commitment
+          Tx_rollup_commitment.add_commitment ctxt tx_rollup key commitment
           >>=? fun ctxt ->
           let result =
             Tx_rollup_commit_result
@@ -1447,7 +1447,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       let current_level = (Level.current ctxt).level in
       fail_when
         Raw_level.(current_level <= Raw_level.succ commitment.level)
-        Tx_rollup_commitments.Commitment_too_early
+        Tx_rollup_commitment.Commitment_too_early
       >|=? fun () -> ctxt
   | Sc_rollup_originate _ | Sc_rollup_add_messages _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)

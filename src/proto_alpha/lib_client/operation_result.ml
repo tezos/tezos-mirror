@@ -195,7 +195,7 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         else "Tx rollup commitment")
         Tx_rollup.pp
         tx_rollup
-        Tx_rollup_commitments.Commitment.pp
+        Tx_rollup_commitment.pp
         commitment
         Contract.pp
         source

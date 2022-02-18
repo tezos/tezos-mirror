@@ -2129,47 +2129,40 @@ module Tx_rollup_inbox : sig
 end
 
 (** This simply re-exports [Tx_rollup_commitments_repr] *)
-module Tx_rollup_commitments : sig
+module Tx_rollup_commitment : sig
   module Commitment_hash : sig
     val commitment_hash : string
 
     include S.HASH
   end
 
-  module Commitment : sig
-    type batch_commitment = {root : bytes}
+  type batch_commitment = {root : bytes}
 
-    val batch_commitment_equal : batch_commitment -> batch_commitment -> bool
+  val batch_commitment_equal : batch_commitment -> batch_commitment -> bool
 
-    type t = {
-      level : Raw_level.t;
-      batches : batch_commitment list;
-      predecessor : Commitment_hash.t option;
-    }
-
-    val ( = ) : t -> t -> bool
-
-    val pp : Format.formatter -> t -> unit
-
-    val encoding : t Data_encoding.t
-
-    val hash : t -> Commitment_hash.t
-  end
-
-  type pending_commitment = {
-    commitment : Commitment.t;
-    hash : Commitment_hash.t;
-    committer : Signature.Public_key_hash.t;
-    submitted_at : Raw_level.t;
+  type t = {
+    level : Raw_level.t;
+    batches : batch_commitment list;
+    predecessor : Commitment_hash.t option;
   }
 
-  type t = pending_commitment list
+  include Compare.S with type t := t
+
+  module Submitted_commitment : sig
+    type nonrec t = {
+      commitment : t;
+      committer : Signature.Public_key_hash.t;
+      submitted_at : Raw_level.t;
+    }
+
+    val encoding : t Data_encoding.t
+  end
+
+  val pp : Format.formatter -> t -> unit
 
   val encoding : t Data_encoding.t
 
-  type error += Commitment_hash_already_submitted
-
-  type error += Two_commitments_from_one_committer
+  val hash : t -> Commitment_hash.t
 
   type error += Wrong_commitment_predecessor_level
 
@@ -2179,15 +2172,20 @@ module Tx_rollup_commitments : sig
 
   type error += Commitment_too_early
 
+  type error += Level_already_has_commitment of Raw_level.t
+
   val add_commitment :
     context ->
     Tx_rollup.t ->
-    Signature.Public_key_hash.t ->
-    Commitment.t ->
+    Signature.public_key_hash ->
+    t ->
     context tzresult Lwt.t
 
-  val get_commitments :
-    context -> Tx_rollup.t -> Raw_level.t -> (context * t) tzresult Lwt.t
+  val get_commitment :
+    context ->
+    Tx_rollup.t ->
+    Raw_level.t ->
+    (context * Submitted_commitment.t option) tzresult Lwt.t
 end
 
 (** This simply re-exports {!Destination_repr}. *)
@@ -2405,7 +2403,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
       tx_rollup : Tx_rollup.t;
-      commitment : Tx_rollup_commitments.Commitment.t;
+      commitment : Tx_rollup_commitment.t;
     }
       -> Kind.tx_rollup_commit manager_operation
   | Sc_rollup_originate : {

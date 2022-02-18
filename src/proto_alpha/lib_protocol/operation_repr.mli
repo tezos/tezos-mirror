@@ -258,7 +258,7 @@ and _ manager_operation =
       -> Kind.tx_rollup_submit_batch manager_operation
   | Tx_rollup_commit : {
       tx_rollup : Tx_rollup_repr.t;
-      commitment : Tx_rollup_commitments_repr.Commitment.t;
+      commitment : Tx_rollup_commitment_repr.t;
     }
       -> Kind.tx_rollup_commit manager_operation
   | Sc_rollup_originate : {

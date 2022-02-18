@@ -50,12 +50,14 @@ module S = struct
     |+ opt_field ~descr:"offset" "offset" RPC_arg.int (fun t -> t)
     |> seal
 
-  let commitments =
+  let commitment =
     RPC_service.get_service
-      ~description:"."
+      ~description:"Return the commitment for a level, if any"
       ~query:commitment_query
-      ~output:Tx_rollup_commitments.encoding
-      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "commitments")
+      ~output:
+        (Data_encoding.option
+           Tx_rollup_commitment.Submitted_commitment.encoding)
+      RPC_path.(custom_root /: Tx_rollup.rpc_arg / "commitment")
 end
 
 let register () =
@@ -64,7 +66,7 @@ let register () =
       Tx_rollup_state.find ctxt tx_rollup >|=? snd) ;
   opt_register1 ~chunked:false S.inbox (fun ctxt tx_rollup () () ->
       Tx_rollup_inbox.find ctxt tx_rollup ~level:`Current >|=? snd) ;
-  register1 ~chunked:false S.commitments (fun ctxt tx_rollup offset () ->
+  register1 ~chunked:false S.commitment (fun ctxt tx_rollup offset () ->
       let level =
         match offset with
         | None -> Level.current ctxt
@@ -76,7 +78,7 @@ let register () =
                 failwith "the offset is not valid: The block level is negative."
             | Some level -> level)
       in
-      Tx_rollup_commitments.get_commitments ctxt tx_rollup level.level >|=? snd)
+      Tx_rollup_commitment.get_commitment ctxt tx_rollup level.level >|=? snd)
 
 let state ctxt block tx_rollup =
   RPC_context.make_call1 S.state ctxt block tx_rollup () ()
@@ -84,5 +86,5 @@ let state ctxt block tx_rollup =
 let inbox ctxt block tx_rollup =
   RPC_context.make_call1 S.inbox ctxt block tx_rollup () ()
 
-let commitments ctxt block ?offset tx_rollup =
-  RPC_context.make_call1 S.commitments ctxt block tx_rollup offset ()
+let commitment ctxt block ?offset tx_rollup =
+  RPC_context.make_call1 S.commitment ctxt block tx_rollup offset ()

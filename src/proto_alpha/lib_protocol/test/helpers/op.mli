@@ -262,5 +262,5 @@ val tx_rollup_commit :
   Context.t ->
   Contract.t ->
   Tx_rollup.t ->
-  Tx_rollup_commitments.Commitment.t ->
+  Tx_rollup_commitment.t ->
   Operation.packed tzresult Lwt.t

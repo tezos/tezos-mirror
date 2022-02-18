@@ -49,8 +49,8 @@ module Tx_rollup = struct
     in
     return {cumulated_size; contents}
 
-  let get_commitments ?hooks ?block ?offset ~rollup client =
-    RPC.Tx_rollup.get_commitments ?hooks ?block ?offset ~rollup client
+  let get_commitment ?hooks ?block ?offset ~rollup client =
+    RPC.Tx_rollup.get_commitment ?hooks ?block ?offset ~rollup client
 
   module Check = struct
     let state : state Check.typ =

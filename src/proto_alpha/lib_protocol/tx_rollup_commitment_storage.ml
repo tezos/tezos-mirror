@@ -27,26 +27,14 @@
 
 let just_ctxt (ctxt, _, _) = ctxt
 
-open Tx_rollup_commitments_repr
-
-(** Return commitments in the order that they were submitted *)
-let get_or_empty_commitments :
-    Raw_context.t ->
-    Raw_level_repr.t * Tx_rollup_repr.t ->
-    (Raw_context.t * Tx_rollup_commitments_repr.t) tzresult Lwt.t =
- fun ctxt key ->
-  Storage.Tx_rollup.Commitment_list.find ctxt key >|=? fun (ctxt, commitment) ->
-  Option.fold
-    commitment
-    ~none:(ctxt, Tx_rollup_commitments_repr.empty)
-    ~some:(fun l -> (ctxt, List.rev l))
+open Tx_rollup_commitment_repr
 
 let get_prev_level ctxt tx_rollup level =
   Tx_rollup_inbox_storage.get_adjacent_levels ctxt level tx_rollup
   >|=? fun (ctxt, predecessor_level, _) -> (ctxt, predecessor_level)
 
-let check_commitment_predecessor_hash ctxt tx_rollup (commitment : Commitment.t)
-    =
+let check_commitment_predecessor_hash ctxt tx_rollup
+    (commitment : Tx_rollup_commitment_repr.t) =
   let level = commitment.level in
   (* Check that level has the correct predecessor *)
   get_prev_level ctxt tx_rollup level >>=? fun (ctxt, predecessor_level) ->
@@ -55,40 +43,44 @@ let check_commitment_predecessor_hash ctxt tx_rollup (commitment : Commitment.t)
   | (Some _, None) | (None, Some _) -> fail Wrong_commitment_predecessor_level
   | (Some predecessor_level, Some hash) ->
       (* The predecessor level must include this commitment*)
-      get_or_empty_commitments ctxt (predecessor_level, tx_rollup)
-      >>=? fun (ctxt, predecesor_commitments) ->
+      Storage.Tx_rollup.Commitment.get ctxt (predecessor_level, tx_rollup)
+      >>=? fun (ctxt, predecesor_commitment) ->
+      let expected_hash =
+        Tx_rollup_commitment_repr.hash predecesor_commitment.commitment
+      in
       fail_unless
-        (Tx_rollup_commitments_repr.commitment_exists
-           predecesor_commitments
-           hash)
+        Tx_rollup_commitment_repr.Commitment_hash.(hash = expected_hash)
         Missing_commitment_predecessor
       >>=? fun () -> return ctxt
 
-let add_commitment ctxt tx_rollup contract (commitment : Commitment.t) =
+let add_commitment ctxt tx_rollup pkh (commitment : Tx_rollup_commitment_repr.t)
+    =
   let key = (commitment.level, tx_rollup) in
-  get_or_empty_commitments ctxt key >>=? fun (ctxt, pending) ->
   Tx_rollup_inbox_storage.get ctxt ~level:(`Level commitment.level) tx_rollup
   >>=? fun (ctxt, inbox) ->
   let expected_len = List.length inbox.contents in
   let actual_len = List.length commitment.batches in
   fail_unless Compare.Int.(expected_len = actual_len) Wrong_batch_count
   >>=? fun () ->
+  Storage.Tx_rollup.Commitment.mem ctxt key >>=? fun (ctxt, old_commitment) ->
+  fail_when old_commitment (Level_already_has_commitment commitment.level)
+  >>=? fun () ->
   check_commitment_predecessor_hash ctxt tx_rollup commitment >>=? fun ctxt ->
-  Tx_rollup_commitments_repr.append
-    pending
-    contract
-    commitment
-    (Raw_context.current_level ctxt).level
-  >>?= fun new_pending ->
-  Storage.Tx_rollup.Commitment_list.add ctxt key new_pending >|=? just_ctxt
+  let current_level = (Raw_context.current_level ctxt).level in
+  let submitted : Tx_rollup_commitment_repr.Submitted_commitment.t =
+    {commitment; committer = pkh; submitted_at = current_level}
+  in
+  Storage.Tx_rollup.Commitment.add ctxt key submitted >|=? just_ctxt
 
-let get_commitments :
+let get_commitment :
     Raw_context.t ->
     Tx_rollup_repr.t ->
     Raw_level_repr.t ->
-    (Raw_context.t * Tx_rollup_commitments_repr.t) tzresult Lwt.t =
+    (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
+    tzresult
+    Lwt.t =
  fun ctxt tx_rollup level ->
   Storage.Tx_rollup.State.find ctxt tx_rollup >>=? fun (ctxt, state) ->
   match state with
   | None -> fail @@ Tx_rollup_state_storage.Tx_rollup_does_not_exist tx_rollup
-  | Some _ -> get_or_empty_commitments ctxt (level, tx_rollup)
+  | Some _ -> Storage.Tx_rollup.Commitment.find ctxt (level, tx_rollup)
