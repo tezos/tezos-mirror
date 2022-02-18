@@ -113,9 +113,7 @@ let gen_l2_address () =
   (secret_key, public_key, Tx_rollup_l2_address.of_bls_pk public_key)
 
 let gen_n_address n =
-  List.init ~when_negative_length:[] n (fun _ -> gen_l2_address ()) |> function
-  | Ok addresses -> addresses
-  | _ -> assert false
+  WithExceptions.List.init ~loc:__LOC__ n (fun _ -> gen_l2_address ())
 
 let nth_exn l i = match List.nth l i with Some x -> x | None -> assert false
 
