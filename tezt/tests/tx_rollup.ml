@@ -105,7 +105,7 @@ module Regressions = struct
     (* The content of the batch does not matter for the regression test. *)
     let batch = "blob" in
     let* () = submit_batch ~batch state in
-    let* _state = Rollup.get_inbox ~hooks ~rollup client in
+    let*! _state = Rollup.get_inbox ~hooks ~rollup client in
     unit
 
   let submit_commitment ~level ~roots ~predecessor {rollup; client; node} =
@@ -237,7 +237,7 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
         contents = List.map (fun (_, _, batch) -> batch) batches;
       }
   in
-  let* inbox = Rollup.get_inbox ~hooks ~rollup client in
+  let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
   Check.(
     ((inbox = expected_inbox)
        ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.")
@@ -281,7 +281,6 @@ let test_submit_batches_in_several_blocks ~protocols =
       ~src:Constant.bootstrap1.public_key_hash
       client
   in
-
   let batch1 = "tezos" in
   let batch2 = "tx_rollup" in
   let batch3 = "layer-2" in
@@ -300,17 +299,14 @@ let test_submit_batches_in_several_blocks ~protocols =
         "M21tdhc2Wn76n164oJvyKW4JVZsDSDeuDsbLgp61XZWtrXjL5WA" );
     ]
   in
-
   (* Let’s try once and see if everything goes as expected *)
   let* () =
     submit_three_batches_and_check_size ~rollup node client submission 3
   in
-
   (* Let’s try to see if we can submit three more batches in the next level *)
   let* () =
     submit_three_batches_and_check_size ~rollup node client submission 3
   in
-
   unit
 
 let test_submit_from_originated_source ~protocols =

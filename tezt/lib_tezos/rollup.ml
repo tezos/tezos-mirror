@@ -42,12 +42,15 @@ module Tx_rollup = struct
     return {burn_per_byte; inbox_ema; last_inbox_level}
 
   let get_inbox ?hooks ~rollup client =
-    let* json = RPC.Tx_rollup.get_inbox ?hooks ~rollup client in
-    let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
-    let contents =
-      JSON.(json |-> "contents" |> as_list |> List.map as_string)
+    let parse json =
+      let cumulated_size = JSON.(json |-> "cumulated_size" |> as_int) in
+      let contents =
+        JSON.(json |-> "contents" |> as_list |> List.map as_string)
+      in
+      {cumulated_size; contents}
     in
-    return {cumulated_size; contents}
+    let runnable = RPC.Tx_rollup.get_inbox ?hooks ~rollup client in
+    Process.runnable_map parse runnable
 
   let get_commitment ?hooks ?block ?offset ~rollup client =
     RPC.Tx_rollup.get_commitment ?hooks ?block ?offset ~rollup client

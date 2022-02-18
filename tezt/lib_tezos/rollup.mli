@@ -36,7 +36,7 @@ module Tx_rollup : sig
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Lwt.t
 
   val get_inbox :
-    ?hooks:Process.hooks -> rollup:string -> Client.t -> inbox Lwt.t
+    ?hooks:Process.hooks -> rollup:string -> Client.t -> inbox Process.runnable
 
   val get_commitment :
     ?hooks:Process.hooks ->

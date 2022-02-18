@@ -184,7 +184,7 @@ let test_tx_node_store_inbox =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
       let* node_inbox = get_node_inbox tx_node in
-      let* inbox = Rollup.get_inbox ~hooks ~rollup client in
+      let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
       (* Enusre that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
       Check.(
@@ -215,7 +215,7 @@ let test_tx_node_store_inbox =
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
       let* node_inbox = get_node_inbox tx_node in
-      let* inbox = Rollup.get_inbox ~hooks ~rollup client in
+      let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
       (* Enusre that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
       assert (Int.equal node_inbox.cumulated_size inbox.cumulated_size) ;
