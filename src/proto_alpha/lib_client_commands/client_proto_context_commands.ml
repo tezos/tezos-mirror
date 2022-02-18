@@ -2233,7 +2233,7 @@ let commands_rw () =
             >>=? fun _res -> return_unit);
     command
       ~group
-      ~desc:"Submit a optimistic transaction rollup commitment operation."
+      ~desc:"Submit an optimistic transaction rollup commitment operation."
       (args12
          fee_arg
          dry_run_switch
