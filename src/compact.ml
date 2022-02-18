@@ -29,9 +29,9 @@ let ( << ) x y = Int32.shift_left x y
 
 (* ---- Constants ----------------------------------------------------------- *)
 
-let max_uint8_l = 0xFFl
+let max_uint8_l = Int32.of_int (Binary_size.max_int `Uint8)
 
-let max_uint16_l = 0xFFFFl
+let max_uint16_l = Int32.of_int (Binary_size.max_int `Uint16)
 
 let max_uint8_L = Int64.of_int32 max_uint8_l
 
