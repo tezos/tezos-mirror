@@ -32,14 +32,17 @@ module Tx_rollup = struct
 
   type inbox = {cumulated_size : int; contents : string list}
 
-  let get_state ?hooks ~rollup client : state Lwt.t =
-    let* json = RPC.Tx_rollup.get_state ?hooks ~rollup client in
-    let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
-    let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
-    let last_inbox_level =
-      JSON.(json |-> "last_inbox_level" |> as_opt |> Option.map as_int)
+  let get_state ?hooks ~rollup client =
+    let parse json =
+      let burn_per_byte = JSON.(json |-> "burn_per_byte" |> as_int) in
+      let inbox_ema = JSON.(json |-> "inbox_ema" |> as_int) in
+      let last_inbox_level =
+        JSON.(json |-> "last_inbox_level" |> as_opt |> Option.map as_int)
+      in
+      {burn_per_byte; inbox_ema; last_inbox_level}
     in
-    return {burn_per_byte; inbox_ema; last_inbox_level}
+    let runnable = RPC.Tx_rollup.get_state ?hooks ~rollup client in
+    Process.runnable_map parse runnable
 
   let get_inbox ?hooks ~rollup client =
     let parse json =

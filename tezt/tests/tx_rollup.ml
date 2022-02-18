@@ -74,7 +74,7 @@ module Regressions = struct
       ~protocols
     @@ fun protocol ->
     let* {node = _; client; rollup} = init_with_tx_rollup ~protocol in
-    let* _state = Rollup.get_state ~hooks ~rollup client in
+    let*! _state = Rollup.get_state ~hooks ~rollup client in
     return ()
 
   let submit_batch ~batch {rollup; client; node} =
@@ -265,7 +265,7 @@ let test_submit_batches_in_several_blocks ~protocols =
   (* We check the rollup exists by trying to fetch its state. Since it
      is a regression test, we can detect changes to this default
      state. *)
-  let* state = Rollup.get_state ~hooks ~rollup client in
+  let*! state = Rollup.get_state ~hooks ~rollup client in
   let expected_state =
     Rollup.{burn_per_byte = 0; inbox_ema = 0; last_inbox_level = None}
   in

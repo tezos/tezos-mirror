@@ -865,7 +865,7 @@ module Tx_rollup : sig
     ?block:string ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox *)
   val get_inbox :
