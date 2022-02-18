@@ -617,15 +617,16 @@ module Raw = struct
     let merkle_hash = R.merkle_hash
 
     let uncommitted_hashes =
-      let max_height = 32 in
-      let res = Array.make (max_height + 1) R.tree_uncommitted in
-      for height = 0 to max_height - 1 do
-        let h = res.(height) in
-        res.(height + 1) <- R.merkle_hash ~height h h
-      done ;
-      res
+      lazy
+        (let max_height = 32 in
+         let res = Array.make (max_height + 1) R.tree_uncommitted in
+         for height = 0 to max_height - 1 do
+           let h = res.(height) in
+           res.(height + 1) <- R.merkle_hash ~height h h
+         done ;
+         res)
 
-    let uncommitted ~height = uncommitted_hashes.(height)
+    let uncommitted ~height = (Lazy.force uncommitted_hashes).(height)
 
     let of_bytes_exn = R.to_hash
 

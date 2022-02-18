@@ -22,6 +22,24 @@
    -open Tezos_stdlib
    -open Data_encoding
    -open Tezos_base_test_helpers))
+ (modules (:standard \ test_js))
  (deps (file vectors.csv) (file vectors-zip32.csv)))
 
 (env (dev (flags (:standard -warn-error -A))))
+
+(executable
+ (name test_js)
+ (modes js)
+ (libraries
+  tezos-sapling
+  tezos-hacl)
+ (js_of_ocaml)
+ (modules test_js))
+
+(rule
+ (alias runtest_js)
+ (package tezos-sapling)
+ (action
+  (run
+   %{dep:../../tooling/node_wrapper.exe} --secp256k1 1.1.1 --hacl 1.1.0
+   %{dep:./test_js.bc.js})))

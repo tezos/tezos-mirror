@@ -124,6 +124,9 @@ let index = external_lib "index" V.(at_least "1.3.0")
 
 let integers = external_lib ~js_compatible:true "integers" V.True
 
+let integers_stubs_js =
+  external_lib ~js_compatible:true "integers_stubs_js" V.True
+
 let ipaddr =
   external_lib
     ~js_compatible:true
@@ -1371,7 +1374,9 @@ let tezos_sapling =
       [
         conf_rust;
         integers;
+        integers_stubs_js;
         ctypes;
+        ctypes_stubs_js;
         data_encoding;
         tezos_stdlib |> open_;
         tezos_crypto |> open_;
@@ -1379,6 +1384,7 @@ let tezos_sapling =
         tezos_rust_lib;
         tezos_lwt_result_stdlib;
       ]
+    ~js_of_ocaml:[[S "javascript_files"; S "runtime.js"]]
     ~foreign_stubs:
       {
         language = C;
@@ -1395,10 +1401,25 @@ let tezos_sapling =
     ~dune:
       Dune.
         [
+          [S "copy_files"; S "bindings/rustzcash_ctypes_bindings.ml"];
           [
-            S "copy_files";
-            S
-              "bindings/{rustzcash_ctypes_c_stubs.c,rustzcash_ctypes_stubs.ml,rustzcash_ctypes_bindings.ml}";
+            S "rule";
+            [S "target"; S "runtime.js"];
+            [S "deps"; [S ":gen"; S "./bindings/gen_runtime_js.exe"]];
+            [
+              S "action";
+              [S "with-stdout-to"; S "%{target}"; run "%{gen}" ["%{target}"]];
+            ];
+          ];
+          [
+            S "rule";
+            [
+              S "targets";
+              S "rustzcash_ctypes_stubs.ml";
+              S "rustzcash_ctypes_c_stubs.c";
+            ];
+            [S "deps"; [S ":gen"; S "./bindings/rustzcash_ctypes_gen.exe"]];
+            [S "action"; run "%{gen}" ["%{targets}"]];
           ];
         ]
 
@@ -1421,6 +1442,7 @@ let _tezos_sapling_tests =
         tezos_base_test_helpers |> open_;
         alcotest_lwt;
       ]
+    ~all_modules_except:["test_js"]
     ~dune:
       Dune.
         [
@@ -1430,28 +1452,25 @@ let _tezos_sapling_tests =
           ];
         ]
 
-let _rustzcash_ctypes_gen =
-  private_exe
-    "rustzcash_ctypes_gen"
+let _tezos_sapling_js_tests =
+  test_exe
+    "test_js"
+    ~path:"src/lib_sapling/test"
+    ~opam:"src/lib_sapling/tezos-sapling"
+    ~deps:[tezos_sapling; tezos_hacl]
+    ~modules:["test_js"]
+    ~modes:[JS]
+    ~js_compatible:true
+
+let _tezos_sapling_ctypes_gen =
+  private_exes
+    ["rustzcash_ctypes_gen"; "gen_runtime_js"]
     ~path:"src/lib_sapling/bindings"
     ~opam:"src/lib_sapling/tezos-sapling"
     ~bisect_ppx:false
     ~deps:[ctypes_stubs; ctypes]
-    ~modules:["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"]
-    ~dune:
-      Dune.
-        [
-          [
-            S "rule";
-            [
-              S "targets";
-              S "rustzcash_ctypes_stubs.ml";
-              S "rustzcash_ctypes_c_stubs.c";
-            ];
-            [S "deps"; [S ":gen"; S "./rustzcash_ctypes_gen.exe"]];
-            [S "action"; run "%{gen}" ["%{targets}"]];
-          ];
-        ]
+    ~modules:
+      ["rustzcash_ctypes_gen"; "rustzcash_ctypes_bindings"; "gen_runtime_js"]
 
 let tezos_protocol_environment_packer =
   public_lib
