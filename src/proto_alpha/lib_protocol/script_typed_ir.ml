@@ -1395,12 +1395,13 @@ and (_, _) dup_n_gadt_witness =
       ('stack, 'b) dup_n_gadt_witness
       -> ('a * 'stack, 'b) dup_n_gadt_witness
 
-and ('a, 'b) view_signature =
-  | View_signature of {
+and ('input, 'output) view_signature =
+  | View_signature : {
       name : Script_string.t;
-      input_ty : 'a ty;
-      output_ty : 'b ty;
+      input_ty : 'input ty;
+      output_ty : 'output ty;
     }
+      -> ('input, 'output) view_signature
 
 let kinfo_of_kinstr : type a s b f. (a, s, b, f) kinstr -> (a, s) kinfo =
  fun i ->
