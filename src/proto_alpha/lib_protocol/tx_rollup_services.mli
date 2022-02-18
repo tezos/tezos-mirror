@@ -51,9 +51,3 @@ val commitments :
   Tx_rollup_commitments.t shell_tzresult Lwt.t
 
 val register : unit -> unit
-
-val current_inbox :
-  unit -> ([`GET], 'a, 'a, unit, unit, Tx_rollup_inbox.t option) RPC_service.t
-
-val current_tezos_head :
-  unit -> ([`GET], 'a, 'a, unit, unit, Block_hash.t option) RPC_service.t
