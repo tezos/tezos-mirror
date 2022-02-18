@@ -82,7 +82,22 @@ type ex_parameter_ty_and_entrypoints =
 type ex_stack_ty =
   | Ex_stack_ty : ('a, 's) Script_typed_ir.stack_ty -> ex_stack_ty
 
-type ex_script = Ex_script : ('a, 'b) Script_typed_ir.script -> ex_script
+type ('arg, 'storage) script = {
+  code :
+    ( ('arg, 'storage) Script_typed_ir.pair,
+      ( Script_typed_ir.operation Script_typed_ir.boxed_list,
+        'storage )
+      Script_typed_ir.pair )
+    Script_typed_ir.lambda;
+  arg_type : 'arg Script_typed_ir.ty;
+  storage : 'storage;
+  storage_type : 'storage Script_typed_ir.ty;
+  views : Script_typed_ir.view_map;
+  entrypoints : 'arg Script_typed_ir.entrypoints;
+  code_size : Cache_memory_helpers.sint;
+}
+
+type ex_script = Ex_script : ('a, 'b) script -> ex_script
 
 type toplevel = {
   code_field : Script.node;

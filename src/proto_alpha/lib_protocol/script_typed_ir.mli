@@ -385,16 +385,6 @@ and 'arg nested_entrypoints =
 (** [no_entrypoints] is [{name = None; nested = Entrypoints_None}] *)
 val no_entrypoints : _ entrypoints
 
-type ('arg, 'storage) script = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-  arg_type : 'arg ty;
-  storage : 'storage;
-  storage_type : 'storage ty;
-  views : view_map;
-  entrypoints : 'arg entrypoints;
-  code_size : Cache_memory_helpers.sint;
-}
-
 (* ---- Instructions --------------------------------------------------------*)
 
 (*
@@ -496,7 +486,7 @@ type ('arg, 'storage) script = {
    [1]: http://www.complang.tuwien.ac.at/projects/interpreters.html
 
  *)
-and ('before_top, 'before, 'result_top, 'result) kinstr =
+type ('before_top, 'before, 'result_top, 'result) kinstr =
   (*
      Stack
      -----

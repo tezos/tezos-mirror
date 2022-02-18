@@ -523,23 +523,8 @@ and 'arg nested_entrypoints =
 
 let no_entrypoints = {name = None; nested = Entrypoints_None}
 
-type ('arg, 'storage) script = {
-  code : (('arg, 'storage) pair, (operation boxed_list, 'storage) pair) lambda;
-  arg_type : 'arg ty;
-  storage : 'storage;
-  storage_type : 'storage ty;
-  views : view_map;
-  entrypoints : 'arg entrypoints;
-  code_size : Cache_memory_helpers.sint;
-      (* This is an over-approximation of the value size in memory, in
-         bytes, of the contract's static part, that is its source
-         code. This includes the code of the contract as well as the code
-         of the views. The storage size is not taken into account by this
-         field as it has a dynamic size. *)
-}
-
 (* ---- Instructions --------------------------------------------------------*)
-and ('before_top, 'before, 'result_top, 'result) kinstr =
+type ('before_top, 'before, 'result_top, 'result) kinstr =
   (*
      Stack
      -----
