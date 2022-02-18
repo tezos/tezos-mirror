@@ -202,3 +202,5 @@ val program_path : string -> string option Lwt.t
     Typically, processes are associated to run functions that parse their output
     into values of type ['a]. See [Base.runnable] for an example. *)
 type nonrec 'a runnable = (t, 'a) Base.runnable
+
+val runnable_map : ('a -> 'b) -> 'a runnable -> 'b runnable
