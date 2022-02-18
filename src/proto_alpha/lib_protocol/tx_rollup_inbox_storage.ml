@@ -43,9 +43,21 @@ let prepare_metadata :
     tzresult
     Lwt.t =
  fun ctxt rollup state level ->
+  (* Consume a fix amount of gas. *)
+  (* TODO/TORU: https://gitlab.com/tezos/tezos/-/issues/2340
+     Extract the constant in a dedicated [Tx_rollup_cost] module, and
+     refine it if need be. *)
+  Raw_context.consume_gas
+    ctxt
+    Gas_limit_repr.(cost_of_gas @@ Arith.integral_of_int_exn 200)
+  >>?= fun ctxt ->
+  (* Opt-out gas accounting *)
+  let save_gas_level = Raw_context.gas_level ctxt in
+  let ctxt = Raw_context.set_gas_unlimited ctxt in
+  (* Processing *)
   Storage.Tx_rollup.Inbox_metadata.find (ctxt, level) rollup
   >>=? fun (ctxt, metadata) ->
-  match metadata with
+  (match metadata with
   | Some metadata -> return (ctxt, state, metadata)
   | None ->
       (* First message in inbox: need to update linked list and pending
@@ -66,9 +78,29 @@ let prepare_metadata :
           >|=? fun (ctxt, _, _) -> ctxt)
       >>=? fun ctxt ->
       let new_metadata : Tx_rollup_inbox_repr.metadata =
-        {cumulated_size = 0; predecessor; successor = None}
+        {inbox_length = 0l; cumulated_size = 0; predecessor; successor = None}
       in
-      return (ctxt, new_state, new_metadata)
+      return (ctxt, new_state, new_metadata))
+  >>=? fun (ctxt, new_state, new_metadata) ->
+  (* Restore gas accounting. *)
+  let ctxt =
+    match save_gas_level with
+    | Gas_limit_repr.Unaccounted -> ctxt
+    | Gas_limit_repr.Limited {remaining = limit} ->
+        Raw_context.set_gas_limit ctxt limit
+  in
+  return (ctxt, new_state, new_metadata)
+
+(** [update_metadata metadata msg_size] updates [metadata] to account
+    for a new message of [msg_size] bytes. *)
+let update_metadata :
+    Tx_rollup_inbox_repr.metadata -> int -> Tx_rollup_inbox_repr.metadata =
+ fun metadata msg_size ->
+  {
+    metadata with
+    inbox_length = Int32.succ metadata.inbox_length;
+    cumulated_size = msg_size + metadata.cumulated_size;
+  }
 
 let append_message :
     Raw_context.t ->
@@ -80,13 +112,8 @@ let append_message :
   let level = (Raw_context.current_level ctxt).level in
   let message_size = Tx_rollup_message_repr.size message in
   prepare_metadata ctxt rollup state level
-  >>=? fun (ctxt, new_state, new_metadata) ->
-  let new_metadata =
-    {
-      new_metadata with
-      cumulated_size = message_size + new_metadata.cumulated_size;
-    }
-  in
+  >>=? fun (ctxt, new_state, metadata) ->
+  let new_metadata = update_metadata metadata message_size in
   Storage.Tx_rollup.Inbox_metadata.add (ctxt, level) rollup new_metadata
   >>=? fun (ctxt, _, _) ->
   let new_size = new_metadata.cumulated_size in
@@ -97,14 +124,12 @@ let append_message :
     Compare.Int.(new_size < inbox_limit)
     (Tx_rollup_inbox_size_would_exceed_limit rollup)
   >>=? fun () ->
-  Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) rollup
-  >>=? fun (ctxt, mcontents) ->
   (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2408
      Carbonate hashing the message. *)
-  Storage.Tx_rollup.Inbox_rev_contents.add
-    (ctxt, level)
-    rollup
-    (Tx_rollup_message_repr.hash message :: Option.value ~default:[] mcontents)
+  Storage.Tx_rollup.Inbox_contents.add
+    ((ctxt, level), rollup)
+    metadata.inbox_length
+    (Tx_rollup_message_repr.hash message)
   >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
 let get_level :
@@ -121,10 +146,9 @@ let messages_opt :
     (Raw_context.t * Tx_rollup_message_repr.hash list option) tzresult Lwt.t =
  fun ctxt ~level tx_rollup ->
   let level = get_level ctxt level in
-  Storage.Tx_rollup.Inbox_rev_contents.find (ctxt, level) tx_rollup
+  Storage.Tx_rollup.Inbox_contents.list_values ((ctxt, level), tx_rollup)
   >>=? function
-  | (ctxt, Some rev_contents) -> return (ctxt, Some (List.rev rev_contents))
-  | (ctxt, None) ->
+  | (ctxt, []) ->
       (*
         Prior to returning [None], we check whether or not the
         transaction rollup address is valid, to raise the appropriate
@@ -132,6 +156,7 @@ let messages_opt :
        *)
       Tx_rollup_state_storage.assert_exist ctxt tx_rollup >>=? fun ctxt ->
       return (ctxt, None)
+  | (ctxt, contents) -> return (ctxt, Some contents)
 
 let messages :
     Raw_context.t ->

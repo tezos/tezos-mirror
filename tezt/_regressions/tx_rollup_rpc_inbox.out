@@ -2,7 +2,7 @@ tezt/_regressions/tx_rollup_rpc_inbox.out
 
 ./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2440.220 units (will add 100 for safety)
+Estimated gas: 2256.220 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -13,18 +13,18 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000508
+    Fee to the baker: ꜩ0.000489
     Expected counter: 2
-    Gas limit: 2541
+    Gas limit: 2357
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000508
-      payload fees(the block proposer) ....... +ꜩ0.000508
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000489
+      payload fees(the block proposer) ....... +ꜩ0.000489
     Tx rollup transaction:[TX_ROLLUP_HASH], 4 bytes, From: [PUBLIC_KEY_HASH]
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2440.220
+      Consumed gas: 2256.220
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/inbox'

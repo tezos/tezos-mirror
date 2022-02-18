@@ -41,13 +41,13 @@ val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
 
-(* The metadata for an inbox stores the [cumulated_size] in
-   bytes for the inbox, so that we do not need to retrieve the entries
-   for the inbox just to get the size.  It also stores the
-   [predecessor] and [successor] levels.  For the first inbox of a
-   rollup, the [predecessor] will be None.  For all inboxes, the
-   [successor] will be None until a subsequent inbox is created. *)
+(* The metadata for an inbox stores the [cumulated_size] in bytes for
+   the inbox, the [inbox_length] ({i i.e.}, the number of messages),
+   the [predecessor] and [successor] levels. For the first inbox of a
+   rollup, the [predecessor] will be [None]. For all inboxes, the
+   [successor] will be [None] until a subsequent inbox is created. *)
 type metadata = {
+  inbox_length : int32;
   cumulated_size : int;
   predecessor : Raw_level_repr.t option;
   successor : Raw_level_repr.t option;

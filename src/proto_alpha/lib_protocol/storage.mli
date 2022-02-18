@@ -602,16 +602,35 @@ module Tx_rollup : sig
        and type value = Tx_rollup_inbox_repr.metadata
 
   (** A carbonated storage to store the hashes of the messages
-      appended in an inbox, in reverse order.
+      appended in an inbox. The key is the batch number, which is
+      sequentially assigned from 0.
 
       The actual content is already stored in the block (as part of
       the operations), so by only storing the hashes we avoid
       unnecessary storage duplication. *)
-  module Inbox_rev_contents :
-    Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Raw_level_repr.t
-       and type key = Tx_rollup_repr.t
-       and type value = Tx_rollup_message_repr.hash list
+  module Inbox_contents : sig
+    include
+      Non_iterable_indexed_carbonated_data_storage
+        with type t := (Raw_context.t * Raw_level_repr.t) * Tx_rollup_repr.t
+         and type key = int32
+         and type value = Tx_rollup_message_repr.hash
+
+    (** [list_values ?offset ?length ((ctxt, level), tx_rollup)] returns
+        the list of message hash of the inbox of [tx_rollup] at [level].
+
+        [length] and [offset] can be used to retreive a subset of the
+        result. [length] is the maximum number of elements to fetch. A
+        negative [length] produces an empty list of result. [offset]
+        is the number of elements to ignore. If [offset] is negative,
+        then it is treated as if it was equal to [0].
+
+        {b: Note:} This is the same HACK as [Big_map.Contents]. **)
+    val list_values :
+      ?offset:int ->
+      ?length:int ->
+      (Raw_context.t * Raw_level_repr.t) * Tx_rollup_repr.t ->
+      (Raw_context.t * Tx_rollup_message_repr.hash list) tzresult Lwt.t
+  end
 
   (** [fold (ctxt, level) ~order ~init ~f] traverses all rollups with
       a nonempty inbox at [level].
