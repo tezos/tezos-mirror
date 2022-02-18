@@ -65,7 +65,7 @@ type validation_mode =
       predecessor_level : Alpha_context.Level.t;
       predecessor_round : Alpha_context.Round.t;
     }
-      (** [Partial_application] is use in chain bootstrapping - not all checks
+      (** [Partial_application] is used in chain bootstrapping - not all checks
          are done. Special case of [Application] to allow quick rejection of bad
          blocks. See
          {!val:Tezos_protocol_environment_sigs.V5.T.Updater.PROTOCOL.begin_partial_application}
