@@ -1562,6 +1562,7 @@ let tezos_protocol_environment =
         "Dummy_context";
         "Memory_context";
         "Proxy_context";
+        "Proxy_delegate";
       ]
 
 let _tezos_protocol_environment_tests =

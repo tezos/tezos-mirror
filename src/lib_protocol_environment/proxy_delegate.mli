@@ -23,28 +23,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let of_memory_tree (t : Tezos_context_memory.Context.tree) : Proxy_delegate.t =
-  (module struct
-    let proxy_dir_mem key =
-      Tezos_context_memory.Context.Tree.mem_tree t key
-      >>= Lwt_result_syntax.return
+(** The module that needs to be implemented for providing the delegation
+    feature to {!Proxy_context}. Implementors willing to add a new backend
+    to the client's [--mode proxy] and [tezos-proxy-server] should likely
+    add a new implementation of this module type. *)
+module type T = sig
+  (** [proxy_dir_mem key] returns whether {!proxy_get} would return a non-leaf tree. *)
+  val proxy_dir_mem : string list -> bool tzresult Lwt.t
 
-    let proxy_get key =
-      Tezos_context_memory.Context.Tree.find_tree t key
-      >>= Lwt_result_syntax.return
+  (** [proxy_get key] returns the tree associated to [key]. *)
+  val proxy_get :
+    string list -> Tezos_context_memory.Context.tree option tzresult Lwt.t
 
-    let proxy_mem key =
-      Tezos_context_memory.Context.Tree.mem t key >>= Lwt_result_syntax.return
-  end : Proxy_delegate.T)
+  (** [proxy_mem key] returns whether [proxy_get key] would return a leaf tree. *)
+  val proxy_mem : string list -> bool tzresult Lwt.t
+end
 
-let of_memory_context (m : Tezos_context_memory.Context.t) : Proxy_delegate.t =
-  (module struct
-    let proxy_dir_mem key =
-      Tezos_context_memory.Context.mem_tree m key >>= Lwt_result_syntax.return
-
-    let proxy_get key =
-      Tezos_context_memory.Context.find_tree m key >>= Lwt_result_syntax.return
-
-    let proxy_mem key =
-      Tezos_context_memory.Context.mem m key >>= Lwt_result_syntax.return
-  end : Proxy_delegate.T)
+(** {!T} as a type, to make it easier to pass it around *)
+type t = (module T)

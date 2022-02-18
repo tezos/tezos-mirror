@@ -32,8 +32,7 @@
     This constructor is easier to use than {!of_memory_context}, because
     it requires only a tree of data; not a context. This constructor
     is typically useful for tests. *)
-val of_memory_tree :
-  Tezos_context_memory.Context.tree -> Proxy_context.M.proxy_delegate
+val of_memory_tree : Tezos_context_memory.Context.tree -> Proxy_delegate.t
 
 (** [of_memory_context m] creates a delegate that is backed by the tree underlying [m].
     This is an alternative to delegating to a distant endpoint by doing RPCs
@@ -44,5 +43,4 @@ val of_memory_tree :
     This constructor is slightly harder to use than {!of_memory_tree}, because
     it requires a full-fledged context instead of a tree (a context contains
     a tree, so a context is harder to obtain). *)
-val of_memory_context :
-  Tezos_context_memory.Context.t -> Proxy_context.M.proxy_delegate
+val of_memory_context : Tezos_context_memory.Context.t -> Proxy_delegate.t

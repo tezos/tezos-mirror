@@ -37,7 +37,8 @@
   Environment_protocol_T_test
   Dummy_context
   Memory_context
-  Proxy_context))
+  Proxy_context
+  Proxy_delegate))
 
 (library
  (name tezos_shell_context)
