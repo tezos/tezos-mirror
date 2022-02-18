@@ -40,7 +40,7 @@ let message_hash_cost msg_size =
 
 let () =
   let open Data_encoding in
-  (* Wrong_commitment_predecessor_level *)
+  (* Tx_rollup_negative_message_size *)
   register_error_kind
     `Permanent
     ~id:"tx_rollup_negative_message_size"

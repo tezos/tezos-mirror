@@ -1426,14 +1426,13 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_origination ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
   | Tx_rollup_submit_batch {content; _} ->
-      (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2408
-         Do we need to take into account the carbonation of hasing
-         [content] here? *)
       assert_tx_rollup_feature_enabled ctxt >>=? fun () ->
       let size_limit =
         Alpha_context.Constants.tx_rollup_hard_size_limit_per_message ctxt
       in
-      let (_, message_size) = Tx_rollup_message.make_batch content in
+      let (_message, message_size) = Tx_rollup_message.make_batch content in
+      Tx_rollup_gas.message_hash_cost message_size >>?= fun cost ->
+      Alpha_context.Gas.consume ctxt cost >>?= fun ctxt ->
       fail_unless
         Compare.Int.(message_size < size_limit)
         Tx_rollup_inbox.Tx_rollup_message_size_exceeds_limit
