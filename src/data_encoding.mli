@@ -944,6 +944,14 @@ let expr_encoding =
 
     (** Turn a compact encoding into a regular {!Data_encoding.t}.
 
+        @param tag_size controls the size of the tag used to discriminate the
+        values. Note that in data-encoding, all the writes and reads are byte
+        aligned so the tag must fit in either 0 ([`Uint0]), 1 ([`Uint8]), or 2
+        ([`Uint16]) bytes.
+
+        The default is [`Uint8], i.e., no tag at all. This is can only represent
+        values which use 8 bits of tags.
+
         @raise Invalid_argument if the shared tags cannot fit in [tag_size]
         space. *)
     val make : ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> 'a t -> 'a encoding
@@ -959,7 +967,9 @@ let expr_encoding =
     type void
 
     (** A compact encoding used to denote an impossible case inside of
-        conjunction operators such as [union]. *)
+        conjunction operators such as [union].
+
+        Uses 0 bit og tag. *)
     val void : void t
 
     (** [refute x] can be used to refute a branch of a [match] which
@@ -970,19 +980,19 @@ let expr_encoding =
         memory footprint.
 
         For instance, one can define a compact encoding of [bool] values
-        with [union [empty; empty]]: this compact encoding uses one bit in the
-        shared tag, and zero in the payload. *)
+        with [union [empty; empty]]: this compact encoding uses zero (0) bit in the
+        shared tag, and 0 bytes in the payload. *)
     val empty : unit t
 
-    (** Efficient encoding of boolean values. It uses one bit in the
+    (** Efficient encoding of boolean values. It uses one (1) bit in the
         shared tag, and zero bit in the payload. *)
     val bool : bool t
 
     (** [payload encoding] unconditionally uses [encoding] in the
-        payload, and uses zero bit in the shared tag. *)
+        payload, and uses zero (0) bit in the shared tag. *)
     val payload : 'a encoding -> 'a t
 
-    (** Uses one bit in the tag to encode an option. *)
+    (** Uses one (1) bit in the tag to encode an option. *)
     val option : 'a t -> 'a option t
 
     (** {2 Conversion} *)
@@ -995,18 +1005,30 @@ let expr_encoding =
 
     (** {2 Conjunctions} *)
 
+    (** [tup1 e] wraps the underlying encoding of [e] in a [tup1] (from the
+        parent module). This is only useful in that, provided you use
+        [make ~tag_size:`Uint0] to translate the returned compact encoding, it
+        allows you to call [merge_tups] on it.
+
+        Uses as many bits of tag as [e]. *)
     val tup1 : 'a t -> 'a t
 
     (** [tup2 e1 e2] concatenates the shared tags and payloads of [e1] and
-        [e2]. *)
+        [e2].
+
+        Uses as many bits of tags as the sum of the tags used by its arguments. *)
     val tup2 : 'a t -> 'b t -> ('a * 'b) t
 
     (** [tup3 e1 e2 e3] concatenates the shared tags and payloads of [e1],
-        [e2], and [e3]. *)
+        [e2], and [e3].
+
+        Uses as many bits of tags as the sum of the tags used by its arguments. *)
     val tup3 : 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
 
     (** [tup4 e1 e2 e3 e4] concatenates the shared tags and payloads of
-        [e1], [e2], [e3] and [e4]. *)
+        [e1], [e2], [e3] and [e4].
+
+        Uses as many bits of tags as the sum of the tags used by its arguments. *)
     val tup4 : 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
 
     type 'a field
@@ -1017,26 +1039,37 @@ let expr_encoding =
         contains the field [f] with a value encoded using [compact]. *)
     val req : string -> 'a t -> 'a field
 
-    (** Same as {!req}, but the field is optional. *)
+    (** Same as {!req}, but the field is optional.
+
+        An [objN] compact encoding which includes an [opt] field uses one (1)
+        bit of tag. *)
     val opt : string -> 'a t -> 'a option field
 
     (** [obj1] can be used in conjunction with [req] or [opt] to produce
-        more readable JSON outputs.  *)
+        more readable JSON outputs.
+
+        Uses as many bits of tags as there are [opt] fields in its arguments. *)
     val obj1 : 'a field -> 'a t
 
     (** An alternative to [tup2] which can be used in conjunction with
         {!req} and {!opt} to produce more readable JSON outputs based on
-        dictionary. *)
+        dictionary.
+
+        Uses as many bits of tags as there are [opt] fields in its arguments. *)
     val obj2 : 'a field -> 'b field -> ('a * 'b) t
 
     (** An alternative to [tup3] which can be used in conjunction with
         {!req} and {!opt} to produce more readable JSON outputs based on
-        dictionary. *)
+        dictionary.
+
+        Uses as many bits of tags as there are [opt] fields in its arguments. *)
     val obj3 : 'a field -> 'b field -> 'c field -> ('a * 'b * 'c) t
 
     (** An alternative to [tup4] which can be used in conjunction with
         {!req} and {!opt} to produce more readable JSON outputs based on
-        dictionary. *)
+        dictionary.
+
+        Uses as many bits of tags as there are [opt] fields in its arguments. *)
     val obj4 :
       'a field -> 'b field -> 'c field -> 'd field -> ('a * 'b * 'c * 'd) t
 
@@ -1045,7 +1078,16 @@ let expr_encoding =
 
         {ul {li [00]: from 0 to 255, one byte.}
             {li [01]: from 256 to 65,535, two bytes.}
-            {li [10]: from 65,536 to [Int32.max_int] and for negative values, four bytes.}} *)
+            {li [10]: from 65,536 to [Int32.max_int] and for negative values, four bytes.}}
+
+        Note that by itself, this compact encoding is not necessarily more
+        economical in space. However, in combination with other compact
+        encodings (say, when you have two bits of tag to spare anyway) or given
+        a very skewed distribution of values (say, when the vast majority of
+        your values are in the 0–255 interval), then it can help you save some
+        space.
+
+        Uses two (2) bits of tag. *)
     val int32 : int32 t
 
     (** A compact encoding for [int64] values. It uses 2 bits in the
@@ -1054,7 +1096,11 @@ let expr_encoding =
         {ul {li [00]: from 0 to 255, one byte.}
             {li [01]: from 256 to 65,535, two bytes.}
             {li [10]: from 65,536 to 4,294,967,295 four bytes.}
-            {li [11]: from 4,294,967,295 and for negative values eight bytes.}} *)
+            {li [11]: from 4,294,967,295 and for negative values eight bytes.}}
+
+        See {!int32} for usage recommendations.
+
+        Uses two (2) bits of tag. *)
     val int64 : int64 t
 
     (** [list ~bits:n encoding] uses [n] bits in the shared tag to encode the
@@ -1067,14 +1113,16 @@ let expr_encoding =
                 [encoding].}
             {li [10]: a list of two elements encoded with [encoding]}
             {li [11]: a list of more than two elements, prefixed with its
-                size (that uses 8 bytes)}}
+                size (which uses 8 bytes)}}
 
         With [~bits:3], lists of 0 to 6 items are encoded with tags [000] to
         [110], and lists of 7 or more are encoded with tag [111] and the
         length.
 
         In the current implementation, performance may become bad for
-        [~bits > 8], so don't do that. *)
+        [~bits > 8], so don't do that.
+
+        Uses [n] bits of tags. *)
     val list : bits:int -> 'a encoding -> 'a list t
 
     (** {2 Disjunctions} *)
@@ -1089,22 +1137,77 @@ let expr_encoding =
     (** [union cases] creates a new compact encoding to encompass a
         disjunction of cases.
 
-        On the one hand, the [tag_bits] optional label can be used to
-        specify the number of bits used to distinguish between cases. On
-        the other hand, the [inner_bits] optional label can be used to
-        specify the number of bits used by the compact encoding of the
-        disjunction cases.
+        The value uses some tag bits to distinguish the different cases of the
+        union (see discussion of parameter [union_tag_bits]) and some tag bits
+        (potentially 0) to distinguish the values within a case.
 
-        Note that, if omitted, [tag_bits] and [inner_bits] are inferred
-        by [union] to be minimal. To avoid breaking backward compatibility
-        unknowingly, it is recommended to set them. *)
+        E.g., Given [type t = A of bool | B of int option] then encoding
+        {v
+        let c =
+          union [
+            case "A" (function A b -> Some b | _ -> None) (fun b -> A b) bool;
+            case "B" (function B i -> Some i | _ -> None) (fun i -> B b) (option (payload int));
+        in
+        make ~tag_size:Uint8 c
+        v}
+        then a value can have either of the following 4 tags:
+        - 0b00000000: case [A], [false]
+        - 0b00000001: case [A], [true]
+        - 0b00000010: case [B], [Some] (a payload of 4 bytes follows)
+        - 0b00000011: case [B], [None]
+
+        In other words, the second bit of this tag is used to discriminate the
+        cases of the union, whilst the first bit is used to discriminate within
+        each case.
+
+        Note that the compact union can be combined with more compact encoding
+        before being passed to [make] in which case the two bits of tags will be
+        combined with the tags of the other compact encodings. E.g.,
+        [make ~tag_size:`Uint8 (tup2 c c)].
+
+        @param union_tag_bits is the number of bits used to distinguish the
+        different cases of the union. For example, if the union has 4 cases
+        (i.e., if [List.length cases = 4]) then you can use [~union_tag_bits:2].
+
+        If not provided explicitely, [union_tag_bits] is inferred: it is set to
+        the smallest value which can accomodate the provided [cases].o
+
+        It is recommended to set [union_tag_bits] explicitely if you need the
+        layout to be stable even if the [cases] may change. E.g., if you remove
+        one of the [cases] in a new version of your software. E.g., if you think
+        you may need to add some [cases] in a future version of your software.
+
+        You can overprovision the [union_tag_bits] if you expect the [cases] to
+        grow in the future.
+
+        @raise Invalid_argument if the value passed for [union_tag_bits] is not
+        sufficient to distinguish between the [cases].
+
+        @param cases_tag_bits is the number of bits that each of the [cases] can
+        use. This is only useful if the cases use more than 0 bits of tag.
+
+        It is recommended to set [cases_tag_bits] explicitely if you need the
+        layout to be stable even if the [cases] or one of its element changes.
+
+        You can overprovision the [cases_tag_bits] if you expect one of the
+        cases to change to use more bits of tag or if you expect that a new case
+        using more tag bits will be added in the future.
+
+        @raise Invalid_argument if one of the elements of [cases] needs more
+        than [cases_tag_bits] bits of tag.
+
+        E.g., [union ~cases_tag_bits:0 [case "Bool" Option.some Fun.id bool]]
+        raises [Invalid_argument] because {!bool} uses one bit of tag which is
+        more than [0].
+
+        @raise Invalid_argument if [cases] is empty. *)
     val union :
       ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
     (** [or_int32 c] creates a new compact encoding for the disjunction of
         any type [a] (see {!case}) with [int32]. It uses the same number
-        of bits as {!int32}, that is 2, and uses the tag [11] for values
-        of type [a]. *)
+        of bits as {!int32}, that is 2, and uses the spare tag ([11]) within
+        this size for values of type [a]. *)
     val or_int32 :
       int32_kind:string ->
       alt_kind:string ->
@@ -1113,7 +1216,7 @@ let expr_encoding =
 
     (** {1 Custom} *)
 
-    (** This module can be used to write compact encoding for complex type
+    (** This module can be used to write compact encoding for complex types
         without using relying on the existing combinators. *)
     module Custom : sig
       type tag = int32
