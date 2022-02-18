@@ -1072,19 +1072,20 @@ module Stake = struct
   module Selected_distribution_for_cycle = Cycle.Selected_stake_distribution
 
   (* This is an index that is set to 0 by calls to
-     Stake_storage.selected_new_distribution_at_cycle_end and incremented (by 1)
-     by calls to Stake_storage.snapshot.
+     {!val:Stake_storage.selected_new_distribution_at_cycle_end} and incremented
+     (by 1) by calls to {!val:Stake_storage.snapshot}.
 
-     Stake_storage.snapshot is called in relation with constant
-     [Constants_storage.blocks_per_stake_snapshot] here in
-     [Level_storage.may_snapshot_rolls].
+     {!val:Stake_storage.snapshot} is called in relation with constant
+     [blocks_per_stake_snapshot] in {!val:Level_storage.may_snapshot_rolls}.
 
-     That is, the increment is effectively done every 512 blocks or so, and
-     reset at the end of cycles. So it goes up to around 16 (= 8192/512) for the
-     number of blocks per cycle is 8192, then comes back to 0, so that a UInt16
-     is big enough.
+     That is, the increment is done every [blocks_per_stake_snaphot] blocks and
+     reset at the end of cycles. So, it goes up to [blocks_per_cycle /
+     blocks_per_stake_snaphot], which is currently 16 (= 8192/512 -- the
+     concrete values can be found in
+     {!val:Default_parameters.constants_mainnet}), then comes back to 0, so that
+     a UInt16 is big enough.
 
-     The ratio above (blocks_per_cycle / blocks_per_stake_snapshot) is checked
+     The ratio [blocks_per_cycle / blocks_per_stake_snapshot] above is checked
      in {!val:Constants_repr.check_constants} to fit in a UInt16. *)
   module Last_snapshot =
     Make_single_data_storage (Registered) (Raw_context)
