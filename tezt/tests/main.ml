@@ -106,6 +106,7 @@ let () =
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
   Tx_rollup.register ~protocols:[Alpha] ;
+  Tx_rollup_node.register ~protocols:[Alpha] ;
   Manager_operations.register ~protocols ;
   Replace_by_fees.register ~protocols:[Ithaca; Alpha] ;
   Sc_rollup.register ~protocols:[Alpha] ;

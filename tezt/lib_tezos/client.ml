@@ -1107,20 +1107,23 @@ let spawn_sign_block client block_hex ~delegate =
 let sign_block client block_hex ~delegate =
   spawn_sign_block client block_hex ~delegate |> Process.check_and_read_stdout
 
-let spawn_originate_tx_rollup ?(wait = "none") ?burn_cap ?storage_limit ~src
-    client =
+let spawn_originate_tx_rollup ?(wait = "none")
+    ?(burn_cap = Tez.of_int 9_999_999) ?(storage_limit = 60_000) ~src client =
   spawn_command
     client
-    (["--wait"; wait]
-    @ ["originate"; "tx"; "rollup"; "from"; src]
-    @ Option.fold
-        ~none:[]
-        ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
-        burn_cap
-    @ Option.fold
-        ~none:[]
-        ~some:(fun s -> ["--storage-limit"; string_of_int s])
-        storage_limit)
+    [
+      "--wait";
+      wait;
+      "originate";
+      "tx";
+      "rollup";
+      "from";
+      src;
+      "--burn-cap";
+      Tez.to_string burn_cap;
+      "--storage-limit";
+      string_of_int storage_limit;
+    ]
 
 let originate_tx_rollup ?wait ?burn_cap ?storage_limit ~src client =
   let process =
