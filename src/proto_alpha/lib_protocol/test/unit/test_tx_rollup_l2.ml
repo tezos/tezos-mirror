@@ -418,11 +418,12 @@ module Test_Ticket_ledger = struct
     let* (ctxt, idx1) = context_with_one_addr in
 
     let* amount = get ctxt ticket_idx1 idx1 in
-    assert (amount = 0L) ;
+    assert (Tx_rollup_l2_qty.(amount = zero)) ;
 
-    let* ctxt = credit ctxt ticket_idx1 idx1 1L in
+    let one = Tx_rollup_l2_qty.of_int64_exn 1L in
+    let* ctxt = credit ctxt ticket_idx1 idx1 one in
     let* amount = get ctxt ticket_idx1 idx1 in
-    assert (amount = 1L) ;
+    assert (Tx_rollup_l2_qty.(amount = one)) ;
 
     return_unit
 
@@ -430,10 +431,14 @@ module Test_Ticket_ledger = struct
   let test_credit_too_much () =
     let* (ctxt, idx1) = context_with_one_addr in
 
-    let* ctxt = credit ctxt ticket_idx1 idx1 Int64.(max_int) in
+    let* ctxt =
+      credit ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn Int64.max_int)
+    in
 
     let* () =
-      expect_error (credit ctxt ticket_idx1 idx1 Int64.one) Balance_overflow
+      expect_error
+        (credit ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn Int64.one))
+        Balance_overflow
     in
 
     return_unit
@@ -442,7 +447,9 @@ module Test_Ticket_ledger = struct
   let test_credit_invalid_quantity () =
     let* (ctxt, idx1) = context_with_one_addr in
     let* () =
-      expect_error (credit ctxt ticket_idx1 idx1 Int64.zero) Invalid_quantity
+      expect_error
+        (credit ctxt ticket_idx1 idx1 Tx_rollup_l2_qty.zero)
+        Invalid_quantity
     in
 
     return_unit
@@ -452,7 +459,13 @@ module Test_Ticket_ledger = struct
   let test_credit_unknown_index () =
     let ctxt = empty_context in
 
-    let* _ctxt = credit ctxt ticket_idx1 (Indexable.index_exn 0l) 1L in
+    let* _ctxt =
+      credit
+        ctxt
+        ticket_idx1
+        (Indexable.index_exn 0l)
+        (Tx_rollup_l2_qty.of_int64_exn 1L)
+    in
 
     return_unit
 
@@ -460,15 +473,19 @@ module Test_Ticket_ledger = struct
   let test_spend_valid () =
     let* (ctxt, idx1) = context_with_one_addr in
 
-    let* ctxt = credit ctxt ticket_idx1 idx1 10L in
+    let* ctxt =
+      credit ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn 10L)
+    in
 
     let* amount = get ctxt ticket_idx1 idx1 in
-    assert (amount = 10L) ;
+    assert (Tx_rollup_l2_qty.(amount = of_int64_exn 10L)) ;
 
-    let* ctxt = spend ctxt ticket_idx1 idx1 5L in
+    let* ctxt =
+      spend ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn 5L)
+    in
 
     let* amount = get ctxt ticket_idx1 idx1 in
-    assert (amount = 5L) ;
+    assert (Tx_rollup_l2_qty.(amount = of_int64_exn 5L)) ;
 
     return_unit
 
@@ -476,7 +493,11 @@ module Test_Ticket_ledger = struct
   let test_spend_without_balance () =
     let* (ctxt, idx1) = context_with_one_addr in
 
-    let* () = expect_error (spend ctxt ticket_idx1 idx1 1L) Balance_too_low in
+    let* () =
+      expect_error
+        (spend ctxt ticket_idx1 idx1 (Tx_rollup_l2_qty.of_int64_exn 1L))
+        Balance_too_low
+    in
 
     return_unit
 
@@ -518,7 +539,7 @@ let test_l2_operation_size () =
     {
       destination = Layer2 (Indexable.from_index_exn 0l);
       ticket_hash = Indexable.from_index_exn 1l;
-      qty = 12L;
+      qty = Tx_rollup_l2_qty.of_int64_exn 12L;
     }
   in
   let buffer = encode_content opc in
