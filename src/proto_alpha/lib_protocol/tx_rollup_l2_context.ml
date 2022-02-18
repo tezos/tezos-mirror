@@ -156,7 +156,7 @@ type _ key =
   | Address_index : Tx_rollup_l2_address.t -> address_index key
   | Ticket_count : int32 key
   | Ticket_index : Alpha_context.Ticket_hash.t -> ticket_index key
-  | Ticket_ledger : ticket_index * address_index -> int64 key
+  | Ticket_ledger : ticket_index * address_index -> Tx_rollup_l2_qty.t key
 
 (** A monomorphic version of {!Key}, used for serialization purposes. *)
 type packed_key = Key : 'a key -> packed_key
@@ -220,7 +220,7 @@ let value_encoding : type a. a key -> a Data_encoding.t =
   | Address_index _ -> Tx_rollup_l2_address.Indexable.index_encoding
   | Ticket_count -> int32
   | Ticket_index _ -> Ticket_indexable.index_encoding
-  | Ticket_ledger _ -> int64
+  | Ticket_ledger _ -> Tx_rollup_l2_qty.encoding
 
 (** {1 Errors} *)
 
@@ -276,6 +276,10 @@ struct
     let fail_unless cond error =
       let open S.Syntax in
       if cond then return () else fail error
+
+    let fail_when cond error =
+      let open S.Syntax in
+      if cond then fail error else return ()
   end
 
   let bls_verify : (Bls_signature.pk * bytes) list -> signature -> bool m =
@@ -436,25 +440,23 @@ struct
     let get ctxt tidx aidx =
       let open Syntax in
       let+ res = get ctxt (Ticket_ledger (tidx, aidx)) in
-      Option.value res ~default:0L
+      Option.value res ~default:Tx_rollup_l2_qty.zero
 
     let set ctxt tidx aidx = set ctxt (Ticket_ledger (tidx, aidx))
 
     let spend ctxt tidx aidx qty =
       let open Syntax in
       let* src_balance = get ctxt tidx aidx in
-      let remainder = Int64.sub src_balance qty in
-      let* () = fail_unless Compare.Int64.(0L <= remainder) Balance_too_low in
-      set ctxt tidx aidx remainder
+      match Tx_rollup_l2_qty.sub src_balance qty with
+      | None -> fail Balance_too_low
+      | Some remainder -> set ctxt tidx aidx remainder
 
     let credit ctxt tidx aidx qty =
       let open Syntax in
-      let* () = fail_unless Compare.Int64.(qty > 0L) Invalid_quantity in
+      let* () = fail_when Tx_rollup_l2_qty.(qty = zero) Invalid_quantity in
       let* balance = get ctxt tidx aidx in
-      let new_balance = Int64.add balance qty in
-      let* () =
-        fail_unless Compare.Int64.(balance <= new_balance) Balance_overflow
-      in
-      set ctxt tidx aidx new_balance
+      match Tx_rollup_l2_qty.add balance qty with
+      | None -> fail Balance_overflow
+      | Some new_balance -> set ctxt tidx aidx new_balance
   end
 end

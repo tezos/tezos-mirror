@@ -237,8 +237,9 @@ module type CONTEXT = sig
 
         {b Note:} It is the responsibility of the caller to verify that [aidx]
         and [tidx] have been associated to an address and
-        a ticket respectively. The function will return [0L] by default. *)
-    val get : t -> ticket_index -> address_index -> int64 m
+        a ticket respectively. The function will return zero when the address
+        has no such ticket. *)
+    val get : t -> ticket_index -> address_index -> Tx_rollup_l2_qty.t m
 
     (** [credit ctxt tidx aidx qty] updates the ledger to
         increase the number of tickets indexed by [tidx] the address
@@ -254,7 +255,7 @@ module type CONTEXT = sig
         {b Note:} It is the responsibility of the caller to verify that [aidx]
         and [tidx] have been associated to an address and
         a ticket respectively. *)
-    val credit : t -> ticket_index -> address_index -> int64 -> t m
+    val credit : t -> ticket_index -> address_index -> Tx_rollup_l2_qty.t -> t m
 
     (** [spend ctxt tidx aidx qty] updates the ledger to
         decrease the number of tickets indexed by [tidx] the address
@@ -266,6 +267,6 @@ module type CONTEXT = sig
         {b Note:} It is the responsibility of the caller to verify
         that [aidx] and [tidx] have been associated to an address and
         a ticket respectively. *)
-    val spend : t -> ticket_index -> address_index -> int64 -> t m
+    val spend : t -> ticket_index -> address_index -> Tx_rollup_l2_qty.t -> t m
   end
 end

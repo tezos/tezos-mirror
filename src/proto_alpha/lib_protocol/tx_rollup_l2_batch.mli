@@ -99,7 +99,7 @@ module V1 : sig
   type 'status operation_content = {
     destination : 'status destination;
     ticket_hash : 'status Ticket_indexable.t;
-    qty : int64;
+    qty : Tx_rollup_l2_qty.t;
   }
 
   type ('signer, 'content) operation = {

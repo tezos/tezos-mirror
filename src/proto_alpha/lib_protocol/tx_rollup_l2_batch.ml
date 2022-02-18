@@ -79,7 +79,7 @@ module V1 = struct
   type 'status operation_content = {
     destination : 'status destination;
     ticket_hash : 'status Ticket_indexable.t;
-    qty : int64;
+    qty : Tx_rollup_l2_qty.t;
   }
 
   type ('signer, 'content) operation = {
@@ -109,7 +109,7 @@ module V1 = struct
       @@ obj3
            (req "destination" compact_destination)
            (req "ticket_hash" Ticket_indexable.compact)
-           (req "qty" int64))
+           (req "qty" Tx_rollup_l2_qty.compact_encoding))
 
   let operation_content_encoding =
     Data_encoding.Compact.make ~tag_size compact_operation_content
