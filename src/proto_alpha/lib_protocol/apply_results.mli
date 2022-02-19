@@ -33,6 +33,35 @@
 
 open Alpha_context
 
+type 'kind internal_manager_operation =
+  | Transaction :
+      Alpha_context.transaction
+      -> Kind.transaction internal_manager_operation
+  | Origination :
+      Alpha_context.origination
+      -> Kind.origination internal_manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option
+      -> Kind.delegation internal_manager_operation
+
+val manager_operation_of_internal_operation :
+  'kind internal_manager_operation -> 'kind manager_operation
+
+type 'kind internal_contents = {
+  source : Contract.contract;
+  operation : 'kind internal_manager_operation;
+  nonce : int;
+}
+
+type packed_internal_contents =
+  | Internal_contents : 'kind internal_contents -> packed_internal_contents
+
+val contents_of_packed_internal_operation :
+  packed_internal_operation -> packed_internal_contents
+
+val contents_of_packed_internal_operations :
+  packed_internal_operation list -> packed_internal_contents list
+
 (** Result of applying a {!Operation.t}. Follows the same structure. *)
 type 'kind operation_metadata = {contents : 'kind contents_result_list}
 
@@ -87,7 +116,7 @@ and 'kind contents_result =
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
-      internal_operation_results : packed_internal_operation_result list;
+      internal_operation_results : packed_internal_manager_operation_result list;
     }
       -> 'kind Kind.manager contents_result
 
@@ -232,10 +261,20 @@ and packed_successful_manager_operation_result =
       'kind successful_manager_operation_result
       -> packed_successful_manager_operation_result
 
-and packed_internal_operation_result =
-  | Internal_operation_result :
-      'kind internal_operation * 'kind manager_operation_result
-      -> packed_internal_operation_result
+and packed_internal_manager_operation_result =
+  | Internal_manager_operation_result :
+      'kind internal_contents * 'kind manager_operation_result
+      -> packed_internal_manager_operation_result
+
+val contents_of_internal_operation :
+  'kind internal_operation -> 'kind internal_contents
+
+val pack_internal_manager_operation_result :
+  'kind internal_operation ->
+  'kind manager_operation_result ->
+  packed_internal_manager_operation_result
+
+val internal_contents_encoding : packed_internal_contents Data_encoding.t
 
 val pack_migration_operation_results :
   Migration.origination_result list ->

@@ -46,6 +46,55 @@ let error_encoding =
 
 let trace_encoding = make_trace_encoding error_encoding
 
+type 'kind internal_manager_operation =
+  | Transaction : transaction -> Kind.transaction internal_manager_operation
+  | Origination : origination -> Kind.origination internal_manager_operation
+  | Delegation :
+      Signature.Public_key_hash.t option
+      -> Kind.delegation internal_manager_operation
+
+type packed_internal_manager_operation =
+  | Manager :
+      'kind internal_manager_operation
+      -> packed_internal_manager_operation
+
+type 'kind internal_contents = {
+  source : Contract.contract;
+  operation : 'kind internal_manager_operation;
+  nonce : int;
+}
+
+type packed_internal_contents =
+  | Internal_contents : 'kind internal_contents -> packed_internal_contents
+
+let manager_operation_of_internal_operation (type kind)
+    (operation : kind internal_manager_operation) : kind manager_operation =
+  match operation with
+  | Transaction transaction -> Transaction transaction
+  | Origination origination -> Origination origination
+  | Delegation delegate -> Delegation delegate
+
+let contents_of_internal_operation (type kind)
+    ({source; operation; nonce} : kind internal_operation) :
+    kind internal_contents =
+  let operation : kind internal_manager_operation =
+    match operation with
+    | Transaction transaction -> Transaction transaction
+    | Origination origination -> Origination origination
+    | Delegation delegate -> Delegation delegate
+    (* This function will be used on internal operations only.
+       TODO (MR comment !4291): the branch will be removed when internal
+       operations are strictly defined. *)
+    | _ -> assert false
+  in
+  {source; operation; nonce}
+
+let contents_of_packed_internal_operation (Internal_operation op) =
+  Internal_contents (contents_of_internal_operation op)
+
+let contents_of_packed_internal_operations =
+  List.map contents_of_packed_internal_operation
+
 type successful_transaction_result =
   | Transaction_to_contract_result of {
       storage : Script.expr option;
@@ -188,10 +237,16 @@ type 'kind manager_operation_result =
   | Skipped : 'kind Kind.manager -> 'kind manager_operation_result
 [@@coq_force_gadt]
 
-type packed_internal_operation_result =
-  | Internal_operation_result :
-      'kind internal_operation * 'kind manager_operation_result
-      -> packed_internal_operation_result
+type packed_internal_manager_operation_result =
+  | Internal_manager_operation_result :
+      'kind internal_contents * 'kind manager_operation_result
+      -> packed_internal_manager_operation_result
+
+let pack_internal_manager_operation_result (type kind)
+    (internal_op : kind internal_operation)
+    (manager_op : kind manager_operation_result) =
+  let internal_op = contents_of_internal_operation internal_op in
+  Internal_manager_operation_result (internal_op, manager_op)
 
 module Manager_result = struct
   type 'kind case =
@@ -748,14 +803,164 @@ module Manager_result = struct
 end
 
 type 'kind iselect =
-  packed_internal_operation_result ->
-  ('kind internal_operation * 'kind manager_operation_result) option
+  packed_internal_manager_operation_result ->
+  ('kind internal_contents * 'kind manager_operation_result) option
 
-let internal_operation_result_encoding :
-    packed_internal_operation_result Data_encoding.t =
+module Internal_result = struct
+  open Data_encoding
+
+  type 'kind case =
+    | MCase : {
+        tag : int;
+        name : string;
+        encoding : 'a Data_encoding.t;
+        iselect : 'kind iselect;
+        select :
+          packed_internal_manager_operation ->
+          'kind internal_manager_operation option;
+        proj : 'kind internal_manager_operation -> 'a;
+        inj : 'a -> 'kind internal_manager_operation;
+      }
+        -> 'kind case
+  [@@coq_force_gadt]
+
+  let[@coq_axiom_with_reason "gadt"] transaction_case =
+    MCase
+      {
+        tag = Operation.Encoding.Manager_operations.transaction_tag;
+        name = "transaction";
+        encoding =
+          obj3
+            (req "amount" Tez.encoding)
+            (req "destination" Destination.encoding)
+            (opt
+               "parameters"
+               (obj2
+                  (req "entrypoint" Entrypoint.smart_encoding)
+                  (req "value" Script.lazy_expr_encoding)));
+        iselect : Kind.transaction iselect =
+          (function
+          | Internal_manager_operation_result
+              (({operation = Transaction _; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        select =
+          (function Manager (Transaction _ as op) -> Some op | _ -> None);
+        proj =
+          (function
+          | Transaction {amount; destination; parameters; entrypoint} ->
+              let parameters =
+                if
+                  Script_repr.is_unit_parameter parameters
+                  && Entrypoint.is_default entrypoint
+                then None
+                else Some (entrypoint, parameters)
+              in
+              (amount, destination, parameters));
+        inj =
+          (fun (amount, destination, parameters) ->
+            let (entrypoint, parameters) =
+              match parameters with
+              | None -> (Entrypoint.default, Script.unit_parameter)
+              | Some (entrypoint, value) -> (entrypoint, value)
+            in
+            Transaction {amount; destination; parameters; entrypoint});
+      }
+
+  let[@coq_axiom_with_reason "gadt"] origination_case =
+    MCase
+      {
+        tag = Operation.Encoding.Manager_operations.origination_tag;
+        name = "origination";
+        encoding =
+          obj3
+            (req "balance" Tez.encoding)
+            (opt "delegate" Signature.Public_key_hash.encoding)
+            (req "script" Script.encoding);
+        iselect : Kind.origination iselect =
+          (function
+          | Internal_manager_operation_result
+              (({operation = Origination _; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        select =
+          (function Manager (Origination _ as op) -> Some op | _ -> None);
+        proj =
+          (function
+          | Origination
+              {
+                credit;
+                delegate;
+                script;
+                preorigination =
+                  _
+                  (* the hash is only used internally
+                             when originating from smart
+                             contracts, don't serialize it *);
+                _;
+              } ->
+              (credit, delegate, script));
+        inj =
+          (fun (credit, delegate, script) ->
+            Origination {credit; delegate; script; preorigination = None});
+      }
+
+  let[@coq_axiom_with_reason "gadt"] delegation_case =
+    MCase
+      {
+        tag = Operation.Encoding.Manager_operations.delegation_tag;
+        name = "delegation";
+        encoding = obj1 (opt "delegate" Signature.Public_key_hash.encoding);
+        iselect : Kind.delegation iselect =
+          (function
+          | Internal_manager_operation_result
+              (({operation = Delegation _; _} as op), res) ->
+              Some (op, res)
+          | _ -> None);
+        select =
+          (function Manager (Delegation _ as op) -> Some op | _ -> None);
+        proj = (function Delegation key -> key);
+        inj = (fun key -> Delegation key);
+      }
+
+  let case tag name args proj inj =
+    case
+      tag
+      ~title:(String.capitalize_ascii name)
+      (merge_objs (obj1 (req "kind" (constant name))) args)
+      (fun x -> match proj x with None -> None | Some x -> Some ((), x))
+      (fun ((), x) -> inj x)
+
+  let encoding =
+    let make (MCase {tag; name; encoding; iselect = _; select; proj; inj}) =
+      case
+        (Tag tag)
+        name
+        encoding
+        (fun o -> match select o with None -> None | Some o -> Some (proj o))
+        (fun x -> Manager (inj x))
+    in
+    union
+      ~tag_size:`Uint8
+      [make transaction_case; make origination_case; make delegation_case]
+end
+
+let internal_contents_encoding : packed_internal_contents Data_encoding.t =
+  def "apply_results.alpha.internal_operation_result"
+  @@ conv
+       (fun (Internal_contents {source; operation; nonce}) ->
+         ((source, nonce), Manager operation))
+       (fun ((source, nonce), Manager operation) ->
+         Internal_contents {source; operation; nonce})
+       (merge_objs
+          (obj2 (req "source" Contract.encoding) (req "nonce" uint16))
+          Internal_result.encoding)
+
+let internal_manager_operation_result_encoding :
+    packed_internal_manager_operation_result Data_encoding.t =
   let make (type kind)
       (Manager_result.MCase res_case : kind Manager_result.case)
-      (iselect : kind iselect) =
+      (Internal_result.MCase ires_case : kind Internal_result.case) =
     let (Operation.Encoding.Manager_operations.MCase op_case) =
       res_case.op_case
     in
@@ -767,37 +972,22 @@ let internal_operation_result_encoding :
             (req "kind" (constant op_case.name))
             (req "source" Contract.encoding)
             (req "nonce" uint16))
-         (merge_objs op_case.encoding (obj1 (req "result" res_case.t))))
+         (merge_objs ires_case.encoding (obj1 (req "result" res_case.t))))
       (fun op ->
-        match iselect op with
+        match ires_case.iselect op with
         | Some (op, res) ->
-            Some (((), op.source, op.nonce), (op_case.proj op.operation, res))
+            Some (((), op.source, op.nonce), (ires_case.proj op.operation, res))
         | None -> None)
       (fun (((), source, nonce), (op, res)) ->
-        let op = {source; operation = op_case.inj op; nonce} in
-        Internal_operation_result (op, res))
+        let op = {source; operation = ires_case.inj op; nonce} in
+        Internal_manager_operation_result (op, res))
   in
-  let iselect_transaction : Kind.transaction iselect = function
-    | Internal_operation_result (({operation = Transaction _; _} as op), res) ->
-        Some (op, res)
-    | _ -> None
-  in
-  let iselect_origination : Kind.origination iselect = function
-    | Internal_operation_result (({operation = Origination _; _} as op), res) ->
-        Some (op, res)
-    | _ -> None
-  in
-  let iselect_delegation : Kind.delegation iselect = function
-    | Internal_operation_result (({operation = Delegation _; _} as op), res) ->
-        Some (op, res)
-    | _ -> None
-  in
-  def "operation.alpha.internal_operation_result"
+  def "apply_results.alpha.operation_result"
   @@ union
        [
-         make Manager_result.transaction_case iselect_transaction;
-         make Manager_result.origination_case iselect_origination;
-         make Manager_result.delegation_case iselect_delegation;
+         make Manager_result.transaction_case Internal_result.transaction_case;
+         make Manager_result.origination_case Internal_result.origination_case;
+         make Manager_result.delegation_case Internal_result.delegation_case;
        ]
 
 let successful_manager_operation_result_encoding :
@@ -861,7 +1051,7 @@ type 'kind contents_result =
   | Manager_operation_result : {
       balance_updates : Receipt.balance_updates;
       operation_result : 'kind manager_operation_result;
-      internal_operation_results : packed_internal_operation_result list;
+      internal_operation_results : packed_internal_manager_operation_result list;
     }
       -> 'kind Kind.manager contents_result
 
@@ -1153,7 +1343,7 @@ module Encoding = struct
             (req "operation_result" res_case.t)
             (dft
                "internal_operation_results"
-               (list internal_operation_result_encoding)
+               (list internal_manager_operation_result_encoding)
                []);
         select =
           (function

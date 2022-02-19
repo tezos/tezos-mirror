@@ -658,7 +658,7 @@ let () =
     ~id:"internal_operation_replay"
     ~title:"Internal operation replay"
     ~description:"An internal operation was emitted twice by a script"
-    ~pp:(fun ppf (Internal_operation {nonce; _}) ->
+    ~pp:(fun ppf (Apply_results.Internal_contents {nonce; _}) ->
       Format.fprintf
         ppf
         "Internal operation %d was emitted twice by a script"
