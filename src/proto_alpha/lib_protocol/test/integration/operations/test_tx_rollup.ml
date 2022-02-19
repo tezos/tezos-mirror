@@ -520,7 +520,7 @@ let test_valid_deposit () =
         Tx_rollup_message.make_deposit
           (Tx_rollup_l2_address.Indexable.value pkh)
           ticket_hash
-          10L
+          (Tx_rollup_l2_qty.of_int64_exn 10L)
       in
       let expected = Tx_rollup_message.hash message in
       Alcotest.(check message_hash_testable "deposit" hash expected) ;

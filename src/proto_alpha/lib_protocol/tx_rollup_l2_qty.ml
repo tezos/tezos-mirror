@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,52 +23,35 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Communication from the layer-1 (Tezos) to the layer-2 (a
-    transaction rollup) happens thanks to messages, crafted in the
-    layer-1 to be interpreted in the layer-2.
+include Compare.Int64
 
-    Messages are constructed and gathered in the layer-1, in
-    inboxes (see {!Tx_rollup_repr_storage.append_message}). *)
+let zero = 0L
 
-(** Smart contract on the layer-1 can deposit tickets into a
-    transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}. *)
-type deposit = {
-  destination : Tx_rollup_l2_address.Indexable.either;
-  ticket_hash : Ticket_hash_repr.t;
-  amount : Tx_rollup_l2_qty.t;
-}
+let of_int64 q = if q < 0L then None else Some q
 
-(** A [message] is a piece of data originated from the layer-1 to be
-    interpreted by the layer-2.
+let of_int64_exn q =
+  match of_int64 q with
+  | Some q -> q
+  | None -> invalid_arg "Tx_rollup_l2_qty.of_int64_exn"
 
-    Transaction rollups feature two kind of messages:
+let to_int64 q = q
 
-    {ul {li An array of bytes that supposedly contains a valid
-            sequence of layer-2 operations; their interpretation and
-            validation is deferred to the layer-2..}
-        {li A deposit order for a L1 ticket.}} *)
-type t = Batch of string | Deposit of deposit
+let to_string q = Int64.to_string q
 
-(** [size msg] returns the number of bytes that are allocated in an
-    inbox by [msg]. *)
-val size : t -> int
+let of_string q = Option.fold ~none:None ~some:of_int64 (Int64.of_string_opt q)
 
-val encoding : t Data_encoding.t
+let pp fmt q = Format.pp_print_string fmt (to_string q)
 
-val pp : Format.formatter -> t -> unit
+let compact_encoding = Data_encoding.Compact.(conv to_int64 of_int64_exn int64)
 
-(** The Blake2B hash of a message.
+let encoding = Data_encoding.Compact.(make ~tag_size:`Uint8 compact_encoding)
 
-    To avoid unnecessary storage duplication, the inboxes in the
-    layer-1 do not contain the messages, but their hashes (see
-    {!Tx_rollup_inbox_storage.append_message}). This is possible
-    because the content of the messages can be reconstructed off-chain
-    by looking at the layer-1 operations and their receipt. *)
-type hash
+let sub q1 q2 = if q2 <= q1 then Some (Int64.sub q1 q2) else None
 
-val hash_encoding : hash Data_encoding.t
+let add q1 q2 =
+  let q = Int64.add q1 q2 in
+  if q < q1 then None else Some q
 
-val pp_hash : Format.formatter -> hash -> unit
+let ( - ) = sub
 
-(** [hash msg] computes the hash of [msg] to be stored in the inbox. *)
-val hash : t -> hash
+let ( + ) = add

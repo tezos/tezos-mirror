@@ -75,11 +75,16 @@ let ticket_hash_gen =
   let open QCheck2.Gen in
   from_index_exn <$> ui32
 
+let qty_gen =
+  let open QCheck2.Gen in
+  Protocol.Tx_rollup_l2_qty.of_int64_exn
+  <$> graft_corners ui64 [0L; 1L; 2L; Int64.max_int] ()
+
 let v1_operation_content_gen =
   let open QCheck2.Gen in
   let+ destination = destination_gen
   and+ ticket_hash = ticket_hash_gen
-  and+ qty = Int64.of_int <$> int in
+  and+ qty = qty_gen in
   V1.{destination; ticket_hash; qty}
 
 let v1_operation_gen =
@@ -106,6 +111,39 @@ let batch =
 let pp fmt _ = Format.fprintf fmt "{}"
 
 (* ------ test template ----------------------------------------------------- *)
+
+let test_quantity ~count =
+  let open Protocol in
+  let open QCheck2.Gen in
+  let op_gen = oneofl [`Sub; `Add] in
+  let test_gen = triple op_gen qty_gen qty_gen in
+  let print (op, q1, q2) =
+    Format.asprintf
+      "%a %s %a"
+      Tx_rollup_l2_qty.pp
+      q1
+      (match op with `Add -> "+" | `Sub -> "-")
+      Tx_rollup_l2_qty.pp
+      q2
+  in
+  let test (op, q1, q2) =
+    let f_op =
+      match op with
+      | `Sub -> Tx_rollup_l2_qty.sub
+      | `Add -> Tx_rollup_l2_qty.add
+    in
+    match f_op q1 q2 with
+    | Some q -> Tx_rollup_l2_qty.(q >= zero)
+    | None -> (
+        match op with
+        | `Sub -> Tx_rollup_l2_qty.(q2 > q1)
+        | `Add ->
+            Int64.add
+              (Tx_rollup_l2_qty.to_int64 q1)
+              (Tx_rollup_l2_qty.to_int64 q2)
+            < 0L)
+  in
+  QCheck2.Test.make ~count ~print ~name:"quantity operation" test_gen test
 
 let test_roundtrip ~count title arb equ pp encoding =
   let test rdt input =
@@ -135,6 +173,7 @@ let () =
   Alcotest.run
     "Compact_encoding"
     [
+      ("quantity", qcheck_wrap [test_quantity ~count:100_000]);
       ( "roundtrip",
         qcheck_wrap
           [

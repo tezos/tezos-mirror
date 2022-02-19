@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2022 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,52 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Communication from the layer-1 (Tezos) to the layer-2 (a
-    transaction rollup) happens thanks to messages, crafted in the
-    layer-1 to be interpreted in the layer-2.
+(** This module is an abstraction on top of int64 to build positive (or zero)
+    quantities within the int64 bounds. It comes with a compact encoding to be
+    used in the transaction rollup batches. *)
 
-    Messages are constructed and gathered in the layer-1, in
-    inboxes (see {!Tx_rollup_repr_storage.append_message}). *)
+(** Type of postive quantities. Quantities are bounded by {!Int64.max_int}. *)
+type t
 
-(** Smart contract on the layer-1 can deposit tickets into a
-    transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}. *)
-type deposit = {
-  destination : Tx_rollup_l2_address.Indexable.either;
-  ticket_hash : Ticket_hash_repr.t;
-  amount : Tx_rollup_l2_qty.t;
-}
+(** The zero quantity. *)
+val zero : t
 
-(** A [message] is a piece of data originated from the layer-1 to be
-    interpreted by the layer-2.
+(** Build a quantity from an int64. Returns [None] if the argument is negative. *)
+val of_int64 : int64 -> t option
 
-    Transaction rollups feature two kind of messages:
+(** Build a quantity from an int64 and raise [Invalid_argument] on negative quantities. *)
+val of_int64_exn : int64 -> t
 
-    {ul {li An array of bytes that supposedly contains a valid
-            sequence of layer-2 operations; their interpretation and
-            validation is deferred to the layer-2..}
-        {li A deposit order for a L1 ticket.}} *)
-type t = Batch of string | Deposit of deposit
+(** Convert a quantity to [int64]. *)
+val to_int64 : t -> int64
 
-(** [size msg] returns the number of bytes that are allocated in an
-    inbox by [msg]. *)
-val size : t -> int
+(** Returns a string representation of a quantity. *)
+val to_string : t -> string
 
-val encoding : t Data_encoding.t
+(** Parse a quantity from a string. Returns [None] if the string is not a valid
+   quantity representation. *)
+val of_string : string -> t option
 
+(** Pretty-printer for quantities. *)
 val pp : Format.formatter -> t -> unit
 
-(** The Blake2B hash of a message.
+(** Compact encoding for quantities *)
+val compact_encoding : t Data_encoding.Compact.t
 
-    To avoid unnecessary storage duplication, the inboxes in the
-    layer-1 do not contain the messages, but their hashes (see
-    {!Tx_rollup_inbox_storage.append_message}). This is possible
-    because the content of the messages can be reconstructed off-chain
-    by looking at the layer-1 operations and their receipt. *)
-type hash
+(** Encoding for quantities *)
+val encoding : t Data_encoding.t
 
-val hash_encoding : hash Data_encoding.t
+(** Substract two quantities. Returns [None] on subtraction underflow. *)
+val sub : t -> t -> t option
 
-val pp_hash : Format.formatter -> hash -> unit
+(** Add two quantities. Returns [None] on addition overflow. *)
+val add : t -> t -> t option
 
-(** [hash msg] computes the hash of [msg] to be stored in the inbox. *)
-val hash : t -> hash
+(** Quantities substraction. *)
+val ( - ) : t -> t -> t option
+
+(** Quantities addition. *)
+val ( + ) : t -> t -> t option
+
+include Compare.S with type t := t
