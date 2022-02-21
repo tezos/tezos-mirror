@@ -954,6 +954,13 @@ module Cost_of = struct
     (* TODO: Add benchmarked value from [Unparse_comparable_type_benchmark]. *)
     let cost_UNPARSE_COMPARABLE_TYPE type_size = S.mul (S.safe_int 20) type_size
 
+    (* model the unparse_views sub function of unparse_script *)
+    let cost_UNPARSING_VIEWS number_of_views =
+      S.mul (S.safe_int 30) (S.safe_int number_of_views)
+
+    (* model unparse_script *)
+    let cost_UNPARSING_SCRIPT = S.safe_int 460
+
     (* TODO: benchmark *)
     let cost_COMPARABLE_TY_OF_TY = S.safe_int 120
 
@@ -1444,24 +1451,6 @@ module Cost_of = struct
       compare ty x y Gas.free Return
      [@@coq_axiom_with_reason "non top-level mutually recursive function"]
 
-    let view_mem (elt : Script_string.t)
-        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
-      let open S_syntax in
-      let per_elt_cost = compare Script_typed_ir.string_key elt elt in
-      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
-      let intercept = atomic_step_cost (S.safe_int 80) in
-      Gas.(intercept +@ (log2 size *@ per_elt_cost))
-
-    let view_get = view_mem
-
-    let view_update (elt : Script_string.t)
-        (m : Script_typed_ir.view Script_typed_ir.SMap.t) =
-      let open S_syntax in
-      let per_elt_cost = compare Script_typed_ir.string_key elt elt in
-      let size = S.safe_int (Script_typed_ir.SMap.cardinal m) in
-      let intercept = atomic_step_cost (S.safe_int 80) in
-      Gas.(intercept +@ (S.safe_int 2 * log2 size *@ per_elt_cost))
-
     let set_mem (type a) (elt : a) (set : a Script_typed_ir.set) =
       let open S_syntax in
       let (module Box) = Script_set.get set in
@@ -1525,6 +1514,12 @@ module Cost_of = struct
       (* The 3 factor reflects the update vs mem overhead as benchmarked
          on non-structured data *)
       Gas.(intercept +@ (S.safe_int 3 * log2 size *@ per_elt_cost))
+
+    let view_get (elt : Script_string.t) (m : Script_typed_ir.view_map) =
+      map_get elt m
+
+    let view_update (elt : Script_string.t) (m : Script_typed_ir.view_map) =
+      map_update elt m
 
     let join_tickets :
         'a Script_typed_ir.comparable_ty ->
@@ -1831,6 +1826,12 @@ module Cost_of = struct
     let unparse_instr_cycle = atomic_step_cost cost_UNPARSING_CODE
 
     let unparse_data_cycle = atomic_step_cost cost_UNPARSING_DATA
+
+    let unparse_views (views : Script_typed_ir.view_map) =
+      let (module Box) = Script_map.get_module views in
+      atomic_step_cost @@ cost_UNPARSING_VIEWS Box.size
+
+    let unparse_script = atomic_step_cost cost_UNPARSING_SCRIPT
 
     let unit = Gas.free
 

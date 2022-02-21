@@ -463,6 +463,9 @@ module type Boxed_map_OPS = sig
   val find : key -> t -> value option
 
   val fold : (key -> value -> 'a -> 'a) -> t -> 'a -> 'a
+
+  val fold_es :
+    (key -> value -> 'a -> 'a tzresult Lwt.t) -> t -> 'a -> 'a tzresult Lwt.t
 end
 
 module type Boxed_map = sig
@@ -496,13 +499,13 @@ type ('key, 'value) big_map_overlay = {
 
 type 'elt boxed_list = {elements : 'elt list; length : int}
 
-module SMap = Map.Make (Script_string)
-
 type view = {
   input_ty : Script.node;
   output_ty : Script.node;
   view_code : Script.node;
 }
+
+type view_map = (Script_string.t, view) map
 
 type 'arg entrypoints = {
   name : Entrypoint.t option;
@@ -524,7 +527,7 @@ type ('arg, 'storage) script = {
   arg_type : 'arg ty;
   storage : 'storage;
   storage_type : 'storage ty;
-  views : view SMap.t;
+  views : view_map;
   entrypoints : 'arg entrypoints;
   code_size : Cache_memory_helpers.sint;
       (* This is an over-approximation of the value size in memory, in
@@ -980,7 +983,7 @@ and ('before_top, 'before, 'result_top, 'result) kinstr =
       storage_type : 'a ty;
       arg_type : 'b ty;
       lambda : ('b * 'a, operation boxed_list * 'a) lambda;
-      views : view SMap.t;
+      views : view_map;
       entrypoints : 'b entrypoints;
       k : (operation, address * 's, 'r, 'f) kinstr;
     }

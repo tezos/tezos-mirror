@@ -240,7 +240,7 @@ let view_size {input_ty; output_ty; view_code} =
     h3w
 
 let views_size views =
-  SMap.fold
+  Script_map.fold
     (fun k view accu ->
       ret_adding (accu ++ view_size view) (script_string_size k +! h4w))
     views
@@ -300,7 +300,7 @@ let rec value_size :
         ret_succ_adding accu (boxing_space +! (h4w *? M.size))
     | Map_t (_, _, _) ->
         let module M = (val Script_map.get_module x) in
-        let boxing_space = !!300 in
+        let boxing_space = !!308 in
         ret_succ_adding accu (boxing_space +! (h5w *? M.size))
     | Big_map_t (cty, ty', _) ->
         (big_map_size [@ocaml.tailcall])

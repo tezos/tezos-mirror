@@ -1047,7 +1047,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                     ->
                   Gas.consume ctxt (Interp_costs.view_get name views)
                   >>?= fun ctxt ->
-                  match SMap.find name views with
+                  match Script_map.get name views with
                   | None -> (return_none [@ocaml.tailcall]) ctxt
                   | Some view -> (
                       let view_result =
