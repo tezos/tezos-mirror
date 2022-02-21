@@ -33,6 +33,9 @@ type t
 (** The zero quantity. *)
 val zero : t
 
+(** One quantity. *)
+val one : t
+
 (** Build a quantity from an int64. Returns [None] if the argument is negative. *)
 val of_int64 : int64 -> t option
 
@@ -63,6 +66,9 @@ val sub : t -> t -> t option
 
 (** Add two quantities. Returns [None] on addition overflow. *)
 val add : t -> t -> t option
+
+(** Return the [t] successor. Returns [None] on overflow. *)
+val succ : t -> t option
 
 (** Quantities substraction. *)
 val ( - ) : t -> t -> t option

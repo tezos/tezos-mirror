@@ -27,6 +27,8 @@ include Compare.Int64
 
 let zero = 0L
 
+let one = 1L
+
 let of_int64 q = if q < 0L then None else Some q
 
 let of_int64_exn q =
@@ -51,6 +53,8 @@ let sub q1 q2 = if q2 <= q1 then Some (Int64.sub q1 q2) else None
 let add q1 q2 =
   let q = Int64.add q1 q2 in
   if q < q1 then None else Some q
+
+let succ q = add q one
 
 let ( - ) = sub
 
