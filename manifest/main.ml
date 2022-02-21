@@ -1601,7 +1601,9 @@ let tezos_protocol_environment =
 
 let _tezos_protocol_environment_tests =
   tests
-    ["test"; "test_mem_context_array_theory"; "test_cache"]
+    [
+      "test"; "test_mem_context_array_theory"; "test_cache"; "test_proxy_context";
+    ]
     ~path:"src/lib_protocol_environment/test"
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
     ~deps:

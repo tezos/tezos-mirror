@@ -2,7 +2,7 @@
 ; Edit file manifest/main.ml instead.
 
 (tests
- (names test test_mem_context_array_theory test_cache)
+ (names test test_mem_context_array_theory test_cache test_proxy_context)
  (package tezos-protocol-environment)
  (libraries
   bls12-381-unix
