@@ -155,6 +155,8 @@ Bug Fixes
 
 - Refuse operations with inconsistent counters. (MR :gl:`!4024`)
 
+- Normalize scripts in optimized format during origination. (MR :gl:`!3852`)
+
 Minor Changes
 -------------
 
