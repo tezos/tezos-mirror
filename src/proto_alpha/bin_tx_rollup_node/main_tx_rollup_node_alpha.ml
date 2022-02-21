@@ -146,7 +146,7 @@ let configuration_init_command =
            reconnection_delay )
          cctxt ->
       let open Lwt_result_syntax in
-      let*! () = Event.preamble_warning () in
+      let*! () = Event.(emit preamble_warning) () in
       let* client_keys = to_tzresult "Missing arg --operator" client_keys in
       let* rollup_id = to_tzresult "Missing arg --rollup_id" rollup_id in
       let* rollup_genesis =
@@ -169,9 +169,11 @@ let configuration_init_command =
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
       cctxt#message "Configuration written in %s" file >>= fun _ ->
-      Event.configuration_was_written ~into:file ~config)
+      let*! () = Event.(emit configuration_was_written) (file, config) in
+      return_unit)
 
 let run_command =
+  let open Lwt_syntax in
   let open Clic in
   command
     ~group
@@ -179,7 +181,8 @@ let run_command =
     (args1 data_dir_arg)
     (prefixes ["run"] @@ stop)
     (fun data_dir cctxt ->
-      Event.preamble_warning () >>= fun () -> Daemon.run ~data_dir cctxt)
+      let* () = Event.(emit preamble_warning) () in
+      Daemon.run ~data_dir cctxt)
 
 let tx_rollup_commands () =
   List.map
