@@ -9,6 +9,7 @@
   tezos-base
   tezos-p2p-services
   tezos-version)
+ (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard

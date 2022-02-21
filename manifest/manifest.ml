@@ -285,7 +285,8 @@ module Dune = struct
 
   let run_exe exe_name args = run ("%{exe:" ^ exe_name ^ ".exe}") args
 
-  let runtest_js ~package ~dir ~(node_wrapper_flags : string list) name =
+  let runtest_js ~package ~dir ~dep_files ~(node_wrapper_flags : string list)
+      name =
     let rec go_to_src acc dir =
       match dir with
       | "" | "." ->
@@ -296,16 +297,19 @@ module Dune = struct
           acc
       | _ -> go_to_src (Filename.concat ".." acc) (Filename.dirname dir)
     in
-    let runner =
+    let (runner, locks) =
       match node_wrapper_flags with
-      | [] -> S "node"
+      | [] -> (S "node", None)
       | _ ->
           let node = go_to_src "tooling/node_wrapper.exe" dir in
-          [S ("%{dep:" ^ node ^ "}"); G (of_atom_list node_wrapper_flags)]
+          ( [S ("%{dep:" ^ node ^ "}"); G (of_atom_list node_wrapper_flags)],
+            Some "npm" )
     in
     alias_rule
       "runtest_js"
       ~package
+      ~deps:dep_files
+      ?locks
       ~action:[S "run"; G runner; S ("%{dep:./" ^ name ^ ".bc.js}")]
 
   let setenv name value followup = [G [S "setenv"; S name; S value]; followup]
@@ -986,6 +990,7 @@ module Target = struct
             (fun name ->
               Dune.(
                 runtest_js
+                  ~dep_files
                   ~package:(Filename.basename package)
                   ~node_wrapper_flags
                   ~dir:path

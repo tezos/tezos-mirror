@@ -64,7 +64,10 @@ let int64_gen =
     [
       map Int64.of_int (0 -- Stdlib.Int.shift_left 1 8);
       map Int64.of_int (Stdlib.Int.shift_left 1 8 -- Stdlib.Int.shift_left 1 16);
-      map Int64.of_int (Stdlib.Int.shift_left 1 16 -- Stdlib.Int.shift_left 1 32);
+      map
+        Int64.of_int
+        (Stdlib.Int.shift_left 1 16
+        -- Stdlib.Int.shift_left 1 (min 32 (Sys.int_size - 2)));
       int64;
     ]
 

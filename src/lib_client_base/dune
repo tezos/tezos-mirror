@@ -10,6 +10,7 @@
   tezos-rpc
   tezos-shell-services
   tezos-sapling)
+ (js_of_ocaml)
  (library_flags (:standard -linkall))
  (flags
   (:standard

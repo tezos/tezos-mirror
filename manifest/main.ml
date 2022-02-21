@@ -787,6 +787,7 @@ let tezos_clic =
         tezos_error_monad |> open_ |> open_ ~m:"TzLwtreslib";
         tezos_lwt_result_stdlib;
       ]
+    ~js_compatible:true
 
 let tezos_clic_unix =
   public_lib
@@ -865,6 +866,7 @@ let tezos_base =
         lwt;
         ipaddr;
       ]
+    ~js_compatible:true
     ~dune:Dune.[ocamllex "point_parser"]
 
 let tezos_base_unix =
@@ -892,13 +894,14 @@ let lib_base_tests ?dep_files names =
     ~deps:
       [
         tezos_base |> open_;
-        tezos_base_unix;
         tezos_error_monad |> open_;
         data_encoding;
         qcheck_alcotest;
         tezos_test_helpers;
       ]
     ?dep_files
+    ~modes:[Native; JS]
+    ~js_compatible:true
     ~modules:names
 
 let _tezos_base_tests_1 =
@@ -948,6 +951,7 @@ let tezos_version_parser =
     ~path:"src/lib_version/parser"
     ~opam:"src/lib_version/tezos-version"
     ~dune:Dune.[ocamllex "tezos_version_parser"]
+    ~js_compatible:true
     ~preprocess:[pps ppx_deriving_show]
 
 let tezos_version =
@@ -957,6 +961,7 @@ let tezos_version =
     ~opam:"src/lib_version/tezos-version"
     ~synopsis:"Tezos: version information generated from Git"
     ~deps:[tezos_base |> open_ ~m:"TzPervasives"; tezos_version_parser]
+    ~js_compatible:true
     ~dune:
       Dune.
         [
@@ -993,8 +998,9 @@ let _tezos_version_tests =
     "test_parser"
     ~path:"src/lib_version/test"
     ~opam:"src/lib_version/tezos-version"
-    ~deps:
-      [tezos_version |> open_; tezos_version_parser; tezos_base_unix; alcotest]
+    ~js_compatible:true
+    ~modes:[Native; JS]
+    ~deps:[tezos_version |> open_; tezos_version_parser; alcotest]
 
 let tezos_p2p_services =
   public_lib
@@ -1003,6 +1009,7 @@ let tezos_p2p_services =
     ~synopsis:"Tezos: descriptions of RPCs exported by `tezos-p2p`"
     ~deps:[tezos_base |> open_ ~m:"TzPervasives"]
     ~linkall:true
+    ~js_compatible:true
 
 let tezos_workers =
   public_lib
@@ -1029,6 +1036,7 @@ let tezos_shell_services =
         tezos_version |> open_;
       ]
     ~linkall:true
+    ~js_compatible:true
 
 let _tezos_shell_services_tests =
   test
@@ -1038,11 +1046,11 @@ let _tezos_shell_services_tests =
     ~deps:
       [
         tezos_base |> open_ ~m:"TzPervasives";
-        tezos_base_unix;
-        tezos_stdlib_unix |> open_;
         tezos_shell_services |> open_;
-        alcotest_lwt;
+        alcotest;
       ]
+    ~modes:[Native; JS]
+    ~js_compatible:true
 
 let tezos_shell_services_test_helpers =
   public_lib
@@ -1940,6 +1948,7 @@ let tezos_client_base =
       ]
     ~modules:[":standard"; "bip39_english"]
     ~linkall:true
+    ~js_compatible:true
     ~dune:
       Dune.
         [
@@ -1960,7 +1969,9 @@ let _tezos_client_base_tests =
     ["bip39_tests"; "pbkdf_tests"]
     ~path:"src/lib_client_base/test"
     ~opam:"src/lib_client_base/tezos-client-base"
-    ~deps:[tezos_base; tezos_base_unix; tezos_client_base |> open_; alcotest]
+    ~deps:[tezos_base; tezos_client_base |> open_; alcotest]
+    ~js_compatible:true
+    ~modes:[Native; JS]
 
 let _bip39_generator =
   private_exe
@@ -1981,6 +1992,7 @@ let tezos_signer_services =
         tezos_client_base |> open_;
       ]
     ~linkall:true
+    ~js_compatible:true
 
 let tezos_signer_backends =
   public_lib

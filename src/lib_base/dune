@@ -18,6 +18,7 @@
   ezjsonm
   lwt
   ipaddr)
+ (js_of_ocaml)
  (flags
   (:standard
    -open Tezos_stdlib
