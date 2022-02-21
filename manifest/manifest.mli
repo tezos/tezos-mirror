@@ -437,8 +437,6 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [foreign_stubs]: specifies a [(foreign_stubs)] stanza for the [dune] target.
 
-    - [implements]: specifies an [(implements)] stanza for the [dune] target.
-
     - [inline_tests]: if [true], add [(inline_tests)] to the [dune] target.
       This does NOT add [ppx_inline_test] to [preprocess].
 
@@ -519,11 +517,6 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [synopsis]: short description for the [.opam] file.
 
-    - [virtual_modules]: similar to [modules], but for modules that should have an
-      implementation (an [.ml] file) but that have not. Those modules only come
-      with an [.mli]. This turns the target into a virtual target.
-      Other targets can declare that they implement those modules with [implements].
-
     - [wrapped]: if [false], add the [(wrapped false)] stanza in the [dune] file.
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
@@ -538,7 +531,6 @@ type 'a maker =
   ?deps:target list ->
   ?dune:Dune.s_expr ->
   ?foreign_stubs:Dune.foreign_stubs ->
-  ?implements:target ->
   ?inline_tests:bool ->
   ?js_compatible:bool ->
   ?js_of_ocaml:Dune.s_expr ->
@@ -561,7 +553,6 @@ type 'a maker =
   ?static_cclibs:string list ->
   ?synopsis:string ->
   ?time_measurement_ppx:bool ->
-  ?virtual_modules:string list ->
   ?wrapped:bool ->
   path:string ->
   'a ->
