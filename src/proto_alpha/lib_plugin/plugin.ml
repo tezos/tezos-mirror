@@ -1776,7 +1776,8 @@ module RPC = struct
           ~description:"Simulate an operation"
           ~query:RPC_query.empty
           ~input:
-            (obj3
+            (obj4
+               (opt "blocks_before_activation" int32)
                (req "operation" Operation.encoding)
                (req "chain_id" Chain_id.encoding)
                (dft "latency" int16 default_operation_inclusion_latency))
@@ -2102,9 +2103,13 @@ module RPC = struct
        time of the operation.
 
     *)
-    let simulate_operation_service ctxt () (op, chain_id, time_in_blocks) =
-      let ctxt = Cache.Admin.future_cache_expectation ctxt ~time_in_blocks in
-      run_operation_service ctxt () (op, chain_id)
+    let simulate_operation_service ctxt ()
+        (blocks_before_activation, op, chain_id, time_in_blocks) =
+      Cache.Admin.future_cache_expectation
+        ctxt
+        ~time_in_blocks
+        ?blocks_before_activation
+      >>=? fun ctxt -> run_operation_service ctxt () (op, chain_id)
 
     let default_from_context ctxt get = function
       | None -> get ctxt
@@ -2669,13 +2674,14 @@ module RPC = struct
     let run_operation ~op ~chain_id ctxt block =
       RPC_context.make_call0 S.run_operation ctxt block () (op, chain_id)
 
-    let simulate_operation ~op ~chain_id ~latency ctxt block =
+    let simulate_operation ~op ~chain_id ~latency ?blocks_before_activation ctxt
+        block =
       RPC_context.make_call0
         S.simulate_operation
         ctxt
         block
         ()
-        (op, chain_id, latency)
+        (blocks_before_activation, op, chain_id, latency)
 
     let entrypoint_type ~script ~entrypoint ctxt block =
       RPC_context.make_call0 S.entrypoint_type ctxt block () (script, entrypoint)

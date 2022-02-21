@@ -269,6 +269,16 @@ val post_run_operation :
   Client.t ->
   JSON.t Lwt.t
 
+(** Call RPC /chain/[chain]/blocks/[block]/helpers/scripts/simulate_operation *)
+val post_simulate_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
 (** {2 Protocol RPCs} *)
 
 type ctxt_type = Bytes | Json

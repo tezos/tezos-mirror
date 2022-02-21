@@ -144,6 +144,12 @@ let is_last_block ctxt =
   get_current_remaining ctxt >|=? fun remaining ->
   Compare.Int32.(remaining = 0l)
 
+let blocks_before_activation ctxt =
+  get_current ctxt >>=? function
+  | Voting_period_repr.{kind = Adoption; _} ->
+      get_current_remaining ctxt >>=? return_some
+  | _ -> return_none
+
 let get_rpc_current_info ctxt =
   get_current_info ctxt
   >>=? fun ({voting_period; position; _} as voting_period_info) ->

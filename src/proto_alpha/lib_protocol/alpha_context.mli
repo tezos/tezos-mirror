@@ -1008,7 +1008,11 @@ module Cache : sig
 
     val sync : context -> cache_nonce:Bytes.t -> context Lwt.t
 
-    val future_cache_expectation : context -> time_in_blocks:int -> context
+    val future_cache_expectation :
+      ?blocks_before_activation:int32 ->
+      context ->
+      time_in_blocks:int ->
+      context tzresult Lwt.t
 
     val cache_size : context -> cache_index:int -> size option
 
