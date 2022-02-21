@@ -26,6 +26,7 @@
 (*****************************************************************************)
 
 type deposit = {
+  sender : Signature.Public_key_hash.t;
   destination : Tx_rollup_l2_address.Indexable.value;
   ticket_hash : Ticket_hash_repr.t;
   amount : Tx_rollup_l2_qty.t;
@@ -34,11 +35,12 @@ type deposit = {
 let deposit_encoding =
   let open Data_encoding in
   conv
-    (fun {destination; ticket_hash; amount} ->
-      (destination, ticket_hash, amount))
-    (fun (destination, ticket_hash, amount) ->
-      {destination; ticket_hash; amount})
-  @@ obj3
+    (fun {sender; destination; ticket_hash; amount} ->
+      (sender, destination, ticket_hash, amount))
+    (fun (sender, destination, ticket_hash, amount) ->
+      {sender; destination; ticket_hash; amount})
+  @@ obj4
+       (req "sender" Signature.Public_key_hash.encoding)
        (req "destination" Tx_rollup_l2_address.Indexable.value_encoding)
        (req "ticket_hash" Ticket_hash_repr.encoding)
        (req "amount" Tx_rollup_l2_qty.encoding)
@@ -80,10 +82,13 @@ let pp fmt =
         "@[<hov 2>Batch:@ %s%s@]"
         (Hex.of_string str |> Hex.show)
         ellipsis
-  | Deposit {destination; ticket_hash; amount} ->
+  | Deposit {sender; destination; ticket_hash; amount} ->
       fprintf
         fmt
-        "@[<hov 2>Deposit:@ destination=%a,@ ticket_hash=%a,@ amount:%a@]"
+        "@[<hov 2>Deposit:@ sender=%a,@ destination=%a,@ ticket_hash=%a,@ \
+         amount:%a@]"
+        Signature.Public_key_hash.pp
+        sender
         Tx_rollup_l2_address.Indexable.pp
         destination
         Ticket_hash_repr.pp
@@ -93,7 +98,10 @@ let pp fmt =
 
 let size = function
   | Batch batch -> String.length batch
-  | Deposit {destination = d; ticket_hash = _; amount = _} ->
+  | Deposit {sender = _; destination = d; ticket_hash = _; amount = _} ->
+      (* Size of a BLS public key, that is the underlying type of a
+         l2 address. See [Tx_rollup_l2_address] *)
+      let sender_size = Signature.Public_key_hash.size in
       (* Size of a BLS public key, that is the underlying type of a
          l2 address. See [Tx_rollup_l2_address] *)
       let destination_size = Tx_rollup_l2_address.Indexable.size d in
@@ -102,7 +110,7 @@ let size = function
       let key_hash_size = 32 in
       (* [int64] *)
       let amount_size = 8 in
-      destination_size + key_hash_size + amount_size
+      sender_size + destination_size + key_hash_size + amount_size
 
 let hash_size = 32
 

@@ -33,8 +33,12 @@
     inboxes (see {!Tx_rollup_repr_storage.append_message}). *)
 
 (** Smart contract on the layer-1 can deposit tickets into a
-    transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}. *)
+    transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}.
+    The [sender] is an implicit account where the deposit is returned in form of
+    a withdrawal, should the application of the deposit fail.
+ *)
 type deposit = {
+  sender : Signature.Public_key_hash.t;
   destination : Tx_rollup_l2_address.Indexable.value;
   ticket_hash : Ticket_hash_repr.t;
   amount : Tx_rollup_l2_qty.t;

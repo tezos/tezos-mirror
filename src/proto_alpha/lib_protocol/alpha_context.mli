@@ -2013,6 +2013,15 @@ module Ticket_hash : sig
     contents:Script.node ->
     owner:Script.node ->
     (t * context) tzresult
+
+  module Internal_for_tests : sig
+    val make_uncarbonated :
+      ticketer:Script.node ->
+      ty:Script.node ->
+      contents:Script.node ->
+      owner:Script.node ->
+      t tzresult
+  end
 end
 
 module Tx_rollup_level : sig
@@ -2143,6 +2152,7 @@ end
 (** This module re-exports definitions from {!Tx_rollup_message_repr}. *)
 module Tx_rollup_message : sig
   type deposit = {
+    sender : public_key_hash;
     destination : Tx_rollup_l2_address.Indexable.value;
     ticket_hash : Ticket_hash.t;
     amount : Tx_rollup_l2_qty.t;
@@ -2160,6 +2170,7 @@ module Tx_rollup_message : sig
       along with its size in bytes. See
       {!Tx_rollup_message_repr.size}. *)
   val make_deposit :
+    public_key_hash ->
     Tx_rollup_l2_address.t Indexable.value ->
     Ticket_hash.t ->
     Tx_rollup_l2_qty.t ->

@@ -2140,6 +2140,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                       "deposit": {
                                         "type": "object",
                                         "properties": {
+                                          "sender": {
+                                            "$ref": "#/definitions/Signature.Public_key_hash"
+                                          },
                                           "destination": {
                                             "$ref": "#/definitions/Tx_rollup_l2_address"
                                           },
@@ -2232,7 +2235,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "required": [
                                           "amount",
                                           "ticket_hash",
-                                          "destination"
+                                          "destination",
+                                          "sender"
                                         ],
                                         "additionalProperties": false
                                       }
@@ -2920,6 +2924,18 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         },
                         "encoding": {
                           "fields": [
+                            {
+                              "name": "sender",
+                              "layout": {
+                                "name": "public_key_hash",
+                                "kind": "Ref"
+                              },
+                              "data_kind": {
+                                "size": 21,
+                                "kind": "Float"
+                              },
+                              "kind": "named"
+                            },
                             {
                               "name": "destination",
                               "layout": {
@@ -8399,6 +8415,9 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                       "deposit": {
                                         "type": "object",
                                         "properties": {
+                                          "sender": {
+                                            "$ref": "#/definitions/Signature.Public_key_hash"
+                                          },
                                           "destination": {
                                             "$ref": "#/definitions/Tx_rollup_l2_address"
                                           },
@@ -8491,7 +8510,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "required": [
                                           "amount",
                                           "ticket_hash",
-                                          "destination"
+                                          "destination",
+                                          "sender"
                                         ],
                                         "additionalProperties": false
                                       }

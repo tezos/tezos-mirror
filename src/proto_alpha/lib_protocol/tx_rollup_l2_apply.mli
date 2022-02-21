@@ -59,7 +59,8 @@ type error +=
   | Multiple_operations_for_signer of Bls_signature.pk
   | Invalid_transaction_encoding
   | Invalid_batch_encoding
-  | Invalid_operation_destination
+  | Unexpectedly_indexed_ticket
+  | Missing_ticket of Ticket_hash.t
 
 module Address_indexes : Map.S with type key = Tx_rollup_l2_address.t
 
@@ -79,7 +80,14 @@ type indexes = {
 }
 
 module Message_result : sig
+  type withdrawal = {
+    destination : Signature.Public_key_hash.t;
+    ticket_hash : Ticket_hash.t;
+    amount : Tx_rollup_l2_qty.t;
+  }
+
   (** A transaction inside a batch can either be a success or a failure.
+
       In the case of a failure, we store the operation's index which failed
       with the reason it failed. *)
   type transaction_result =
@@ -105,7 +113,14 @@ module Message_result : sig
         }
   end
 
-  type t = Deposit_result of deposit_result | Batch_V1_result of Batch_V1.t
+  type message_result =
+    | Deposit_result of deposit_result
+    | Batch_V1_result of Batch_V1.t
+
+  (* In addition to [message_result] the result contains the list of
+     withdrawals that result from failing deposits and layer2-to-layer1
+     transfers. *)
+  type t = message_result * withdrawal list
 
   val encoding : t Data_encoding.t
 end
@@ -121,7 +136,7 @@ module Make (Context : CONTEXT) : sig
   module Batch_V1 : sig
     open Tx_rollup_l2_batch.V1
 
-    (** [apply_batch ctxt batch] interpets the batch {Tx_rollup_l2_batch.V1.t}.
+    (** [apply_batch ctxt batch] interprets the batch {Tx_rollup_l2_batch.V1.t}.
 
         By construction, a failing transaction will not affect the [ctxt]
         and other transactions will still be interpreted.
@@ -133,11 +148,14 @@ module Make (Context : CONTEXT) : sig
         that is correctly signed and whose every operations have the expected
         counter. In particular, the result of the application is not important
         (i.e. the counters are updated even if the transaction failed).
+
+        In addition, the list of withdrawals resulting from each
+        layer2-to-layer1 transfer message in the batch is returned.
     *)
     val apply_batch :
       ctxt ->
       (Indexable.unknown, Indexable.unknown) t ->
-      (ctxt * Message_result.Batch_V1.t) m
+      (ctxt * Message_result.Batch_V1.t * Message_result.withdrawal list) m
 
     (** [check_signature ctxt batch] asserts that [batch] is correctly signed.
 
@@ -176,13 +194,15 @@ module Make (Context : CONTEXT) : sig
   (** [apply_deposit ctxt deposit] credits a quantity of tickets to a layer2
       address in [ctxt].
 
-      This function can fail if the [deposit.amount] is not strictly-positive
-      or if the [deposit.quantity] caused an overflow in the context.
+      This function can fail if the [deposit.amount] is not strictly-positive.
+
+      If the [deposit] causes an error, then a withdrawal returning
+      the funds to the deposit's sender is returned.
   *)
   val apply_deposit :
     ctxt ->
     Tx_rollup_message.deposit ->
-    (ctxt * Message_result.deposit_result) m
+    (ctxt * Message_result.deposit_result * Message_result.withdrawal option) m
 
   (** [apply_message ctxt message] interpets the [message] in the [ctxt].
 
@@ -192,11 +212,14 @@ module Make (Context : CONTEXT) : sig
           {li Decodes the batch and interprets it for the
               correct batch version. }}
 
-      The function can fail with {!Invalid_batch_encoding} if its not able
+      The function can fail with {!Invalid_batch_encoding} if it's not able
       to decode the batch.
 
       The function can also return errors from subsequent functions,
       see {!apply_deposit} and batch interpretations for various versions.
+
+      The list of withdrawals in the message result followed the ordering
+      of the contents in the message.
   *)
   val apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
 end

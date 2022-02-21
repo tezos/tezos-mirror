@@ -40,7 +40,8 @@ type error +=
   | Multiple_operations_for_signer of Bls_signature.pk
   | Invalid_transaction_encoding
   | Invalid_batch_encoding
-  | Invalid_operation_destination
+  | Unexpectedly_indexed_ticket
+  | Missing_ticket of Ticket_hash.t
 
 let () =
   let open Data_encoding in
@@ -111,15 +112,26 @@ let () =
     empty
     (function Invalid_batch_encoding -> Some () | _ -> None)
     (function () -> Invalid_batch_encoding) ;
-  (* Invalid operation destination *)
+  (* Unexpectedly indexed ticket *)
   register_error_kind
     `Permanent
-    ~id:"tx_rollup_invalid_operation_destination"
-    ~title:"Invalid operation destination"
-    ~description:"The withdraw operation is not implemented yet"
+    ~id:"tx_rollup_unexpectedly_indexed_ticket"
+    ~title:"Unexpected indexed ticket in deposit or transfer"
+    ~description:
+      "Tickets in layer2-to-layer1 transfers must be referenced by value."
     empty
-    (function Invalid_operation_destination -> Some () | _ -> None)
-    (function () -> Invalid_operation_destination)
+    (function Unexpectedly_indexed_ticket -> Some () | _ -> None)
+    (function () -> Unexpectedly_indexed_ticket) ;
+  (* Missing ticket *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_missing_ticket"
+    ~title:"Attempted to withdraw from a ticket missing in the rollup"
+    ~description:
+      "A withdrawal must reference a ticket that already exists in the rollup."
+    (obj1 (req "ticket_hash" Ticket_hash.encoding))
+    (function Missing_ticket ticket_hash -> Some ticket_hash | _ -> None)
+    (function ticket_hash -> Missing_ticket ticket_hash)
 
 module Address_indexes = Map.Make (Tx_rollup_l2_address)
 module Ticket_indexes = Map.Make (Ticket_hash)
@@ -170,6 +182,24 @@ let encoding_indexes : indexes Data_encoding.t =
              Tx_rollup_l2_context_sig.Ticket_indexable.index_encoding))
 
 module Message_result = struct
+  type withdrawal = {
+    destination : Signature.Public_key_hash.t;
+    ticket_hash : Ticket_hash.t;
+    amount : Tx_rollup_l2_qty.t;
+  }
+
+  let withdrawal_encoding : withdrawal Data_encoding.t =
+    let open Data_encoding in
+    conv
+      (fun {destination; ticket_hash; amount} ->
+        (destination, ticket_hash, amount))
+      (fun (destination, ticket_hash, amount) ->
+        {destination; ticket_hash; amount})
+      (obj3
+         (req "destination" Signature.Public_key_hash.encoding)
+         (req "ticket_hash" Ticket_hash.encoding)
+         (req "amount" Tx_rollup_l2_qty.encoding))
+
   type transaction_result =
     | Transaction_success
     | Transaction_failure of {index : int; reason : error}
@@ -249,9 +279,11 @@ module Message_result = struct
            (req "allocated_indexes" encoding_indexes))
   end
 
-  type t = Deposit_result of deposit_result | Batch_V1_result of Batch_V1.t
+  type message_result =
+    | Deposit_result of deposit_result
+    | Batch_V1_result of Batch_V1.t
 
-  let encoding =
+  let message_result_encoding =
     let open Data_encoding in
     union
       [
@@ -270,6 +302,11 @@ module Message_result = struct
            (function Batch_V1_result result -> Some result | _ -> None)
            (fun result -> Batch_V1_result result));
       ]
+
+  type t = message_result * withdrawal list
+
+  let encoding =
+    Data_encoding.(tup2 message_result_encoding (list withdrawal_encoding))
 end
 
 module Make (Context : CONTEXT) = struct
@@ -537,23 +574,43 @@ module Make (Context : CONTEXT) = struct
         on the [ctxt]. The validity of the transfer is checked in
         the context itself, e.g. for an invalid balance.
 
-        It also returns the potential created indexes:
+        It returns the potential created indexes:
 
         {ul {li The destination address index.}
             {li The ticket exchanged index.}}
+
+        If the transfer is layer2-to-layer1, then it also returns
+        the resulting withdrawal.
     *)
     let apply_operation_content :
         ctxt ->
         indexes ->
         Signer_indexable.index ->
         'content operation_content ->
-        (ctxt * indexes) m =
+        (ctxt * indexes * withdrawal option) m =
      fun ctxt indexes source_idx {destination; ticket_hash; qty} ->
       match destination with
-      | Layer1 _ ->
-          (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2259
-             Implement the withdraw. *)
-          fail Invalid_operation_destination
+      | Layer1 l1_dest ->
+          (* To withdraw, the ticket must be given in the form of a
+             value. Furthermore, the ticket must already exist in the
+             rollup and be indexed (the ticket must have already been
+             assigned an index in the content: otherwise the ticket has
+             not been seen before and we can't withdraw from
+             it). Therefore, we do not create any new associations in
+             the ticket index. *)
+          let*? ticket_hash =
+            Indexable.is_value_e ~error:Unexpectedly_indexed_ticket ticket_hash
+          in
+          let* tidx_opt = Ticket_index.get ctxt ticket_hash in
+          let*? tidx =
+            Option.value_e ~error:(Missing_ticket ticket_hash) tidx_opt
+          in
+          let source_idx = address_of_signer_index source_idx in
+          (* spend the ticket -- this is responsible for checking that
+             the source has the required balance *)
+          let* ctxt = Ticket_ledger.spend ctxt tidx source_idx qty in
+          let withdrawal = {destination = l1_dest; ticket_hash; amount = qty} in
+          return (ctxt, indexes, Some withdrawal)
       | Layer2 l2_dest ->
           let* (ctxt, created_addr, dest_idx) = address_index ctxt l2_dest in
           let* (ctxt, created_ticket, tidx) = ticket_index ctxt ticket_hash in
@@ -562,7 +619,7 @@ module Make (Context : CONTEXT) = struct
           let indexes =
             add_indexes indexes (created_addr, dest_idx) (created_ticket, tidx)
           in
-          return (ctxt, indexes)
+          return (ctxt, indexes, None)
 
     (** [check_counter ctxt signer counter] asserts that the provided [counter] is the
         successor of the one associated to the [signer] in the [ctxt]. *)
@@ -585,15 +642,21 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         indexes ->
         (Indexable.index_only, Indexable.unknown) operation ->
-        (ctxt * indexes) m =
+        (ctxt * indexes * withdrawal list) m =
      fun ctxt indexes {signer; counter; contents} ->
       (* Before applying any operation, we check the counter *)
       let* () = check_counter ctxt signer counter in
-      list_fold_left_m
-        (fun (ctxt, indexes) content ->
-          apply_operation_content ctxt indexes signer content)
-        (ctxt, indexes)
-        contents
+      let* (ctxt, indexes, rev_withdrawals) =
+        list_fold_left_m
+          (fun (ctxt, indexes, withdrawals) content ->
+            let* (ctxt, indexes, withdrawal_opt) =
+              apply_operation_content ctxt indexes signer content
+            in
+            return (ctxt, indexes, Option.to_list withdrawal_opt @ withdrawals))
+          (ctxt, indexes, [])
+          contents
+      in
+      return (ctxt, indexes, rev_withdrawals |> List.rev)
 
     (** [apply_transaction ctxt indexes transaction] applies each operation in
         the [transaction]. It returns a {!transaction_result}, i.e. either
@@ -605,25 +668,30 @@ module Make (Context : CONTEXT) = struct
         ctxt ->
         indexes ->
         (Indexable.index_only, Indexable.unknown) transaction ->
-        (ctxt * indexes * transaction_result) m =
+        (ctxt * indexes * transaction_result * withdrawal list) m =
      fun initial_ctxt initial_indexes transaction ->
-      let rec fold (ctxt, prev_indexes) index ops =
+      let rec fold (ctxt, prev_indexes, withdrawals) index ops =
         match ops with
-        | [] -> return (ctxt, prev_indexes, Transaction_success)
+        | [] -> return (ctxt, prev_indexes, Transaction_success, withdrawals)
         | op :: rst ->
-            let* (ctxt, indexes, status) =
+            let* (ctxt, indexes, status, withdrawals) =
               catch
                 (apply_operation ctxt prev_indexes op)
-                (fun (ctxt, indexes) -> fold (ctxt, indexes) (index + 1) rst)
+                (fun (ctxt, indexes, op_withdrawals) ->
+                  fold
+                    (ctxt, indexes, withdrawals @ op_withdrawals)
+                    (index + 1)
+                    rst)
                 (fun reason ->
                   return
                     ( initial_ctxt,
                       initial_indexes,
-                      Transaction_failure {index; reason} ))
+                      Transaction_failure {index; reason},
+                      [] ))
             in
-            return (ctxt, indexes, status)
+            return (ctxt, indexes, status, withdrawals)
       in
-      fold (initial_ctxt, initial_indexes) 0 transaction
+      fold (initial_ctxt, initial_indexes, []) 0 transaction
 
     (** [update_counters ctxt status transaction] updates the counters for
         the signers of operations in [transaction]. If the [transaction]
@@ -644,28 +712,37 @@ module Make (Context : CONTEXT) = struct
     let apply_batch :
         ctxt ->
         (Indexable.unknown, Indexable.unknown) t ->
-        (ctxt * Message_result.Batch_V1.t) m =
+        (ctxt * Message_result.Batch_V1.t * withdrawal list) m =
      fun ctxt batch ->
       let* (ctxt, indexes, batch) = check_signature ctxt batch in
       let {contents; _} = batch in
-      let* (ctxt, indexes, rev_results) =
+      let* (ctxt, indexes, rev_results, withdrawals) =
         list_fold_left_m
-          (fun (prev_ctxt, prev_indexes, results) transaction ->
-            let* (new_ctxt, new_indexes, status) =
+          (fun (prev_ctxt, prev_indexes, results, withdrawals) transaction ->
+            let* (new_ctxt, new_indexes, status, transaction_withdrawals) =
               apply_transaction prev_ctxt prev_indexes transaction
             in
             let* new_ctxt = update_counters new_ctxt status transaction in
-            return (new_ctxt, new_indexes, (transaction, status) :: results))
-          (ctxt, indexes, [])
+            return
+              ( new_ctxt,
+                new_indexes,
+                (transaction, status) :: results,
+                withdrawals @ transaction_withdrawals ))
+          (ctxt, indexes, [], [])
           contents
       in
       let results = List.rev rev_results in
-      return (ctxt, Message_result.Batch_V1.Batch_result {results; indexes})
+      return
+        ( ctxt,
+          Message_result.Batch_V1.Batch_result {results; indexes},
+          withdrawals )
   end
 
   let apply_deposit :
-      ctxt -> Tx_rollup_message.deposit -> (ctxt * deposit_result) m =
-   fun initial_ctxt Tx_rollup_message.{destination; ticket_hash; amount} ->
+      ctxt ->
+      Tx_rollup_message.deposit ->
+      (ctxt * deposit_result * withdrawal option) m =
+   fun initial_ctxt Tx_rollup_message.{sender; destination; ticket_hash; amount} ->
     let apply_deposit () =
       let* (ctxt, created_addr, aidx) =
         address_index initial_ctxt destination
@@ -681,8 +758,13 @@ module Make (Context : CONTEXT) = struct
     in
     catch
       (apply_deposit ())
-      (fun (ctxt, indexes) -> return (ctxt, Deposit_success indexes))
-      (fun reason -> return (initial_ctxt, Deposit_failure reason))
+      (fun (ctxt, indexes) -> return (ctxt, Deposit_success indexes, None))
+      (fun reason ->
+        (* Should there be an error during the deposit, then return
+           the full [amount] to [sender] in the form of a
+           withdrawal. *)
+        let withdrawal = {destination = sender; ticket_hash; amount} in
+        return (initial_ctxt, Deposit_failure reason, Some withdrawal))
 
   let apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
       =
@@ -690,16 +772,18 @@ module Make (Context : CONTEXT) = struct
     let open Tx_rollup_message in
     match msg with
     | Deposit deposit ->
-        let* (ctxt, result) = apply_deposit ctxt deposit in
-        return (ctxt, Deposit_result result)
+        let* (ctxt, result, withdrawl_opt) = apply_deposit ctxt deposit in
+        return (ctxt, (Deposit_result result, Option.to_list withdrawl_opt))
     | Batch str -> (
         let batch =
           Data_encoding.Binary.of_string_opt Tx_rollup_l2_batch.encoding str
         in
         match batch with
         | Some (V1 batch) ->
-            let* (ctxt, result) = Batch_V1.apply_batch ctxt batch in
-            return (ctxt, Batch_V1_result result)
+            let* (ctxt, result, withdrawals) =
+              Batch_V1.apply_batch ctxt batch
+            in
+            return (ctxt, (Batch_V1_result result, withdrawals))
         | None -> fail Invalid_batch_encoding)
 end
 

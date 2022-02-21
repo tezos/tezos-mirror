@@ -48,6 +48,8 @@ open Indexable
 
 (** {3. Various helpers to facilitate the tests. } *)
 
+let pkh = Signature.Public_key_hash.zero
+
 let ((_, pk1, addr1) as l2_addr1) = gen_l2_address ()
 
 let ((_, pk2, addr2) as l2_addr2) = gen_l2_address ()
@@ -288,12 +290,14 @@ let test_simple_deposit () =
   let ctxt = empty_context in
   let amount = Tx_rollup_l2_qty.of_int64_exn 50L in
 
-  let deposit = {destination = value addr1; ticket_hash = ticket1; amount} in
-  let* (ctxt, result) = apply_deposit ctxt deposit in
+  let deposit =
+    {sender = pkh; destination = value addr1; ticket_hash = ticket1; amount}
+  in
+  let* (ctxt, result, withdrawal_opt) = apply_deposit ctxt deposit in
 
   (* Applying the deposit should create an idx for both [addr1] and [ticket]. *)
-  match result with
-  | Deposit_success indexes ->
+  match (result, withdrawal_opt) with
+  | (Deposit_success indexes, None) ->
       let* () =
         check_indexes [(addr1, index_exn 0l)] [(ticket1, index_exn 0l)] indexes
       in
@@ -321,16 +325,17 @@ let test_deposit_with_existing_indexes () =
 
   let deposit =
     {
+      sender = pkh;
       destination = value addr1;
       ticket_hash = ticket1;
       amount = Tx_rollup_l2_qty.of_int64_exn 1L;
     }
   in
-  let* (ctxt, result) = apply_deposit ctxt deposit in
+  let* (ctxt, result, withdrawal_opt) = apply_deposit ctxt deposit in
 
   (* The indexes should not be considered as created *)
-  match result with
-  | Deposit_success indexes ->
+  match (result, withdrawal_opt) with
+  | (Deposit_success indexes, None) ->
       assert (indexes.address_indexes = Address_indexes.empty) ;
       assert (indexes.ticket_indexes = Ticket_indexes.empty) ;
 
@@ -357,16 +362,17 @@ let test_indexes_creation () =
      transfered between the other addresses. *)
   let deposit =
     {
+      sender = pkh;
       destination = value addr1;
       ticket_hash = ticket1;
       amount = Tx_rollup_l2_qty.of_int64_exn 100L;
     }
   in
-  let* (ctxt, result) = apply_deposit ctxt deposit in
+  let* (ctxt, result, withdrawal_opt) = apply_deposit ctxt deposit in
 
   let* () =
-    match result with
-    | Deposit_success indexes ->
+    match (result, withdrawal_opt) with
+    | (Deposit_success indexes, None) ->
         check_indexes [(addr1, index_exn 0l)] [(ticket1, index_exn 0l)] indexes
     | _ -> unexpected_result
   in
@@ -392,7 +398,9 @@ let test_indexes_creation () =
       [transaction1; transaction2; transaction3]
   in
 
-  let* (_ctxt, Batch_result {indexes; _}) = Batch_V1.apply_batch ctxt batch in
+  let* (_ctxt, Batch_result {indexes; _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
 
   let* () =
     check_indexes
@@ -414,12 +422,13 @@ let test_indexes_creation_bad () =
 
   let deposit =
     {
+      sender = pkh;
       destination = value addr1;
       ticket_hash = ticket1;
       amount = Tx_rollup_l2_qty.of_int64_exn 20L;
     }
   in
-  let* (ctxt, _) = apply_deposit ctxt deposit in
+  let* (ctxt, _, _withdrawal_opt) = apply_deposit ctxt deposit in
 
   let transaction1 =
     (* This transaction will fail because the number of tickets required is
@@ -437,7 +446,7 @@ let test_indexes_creation_bad () =
     batch (List.concat [signature1; signature2]) [transaction1; transaction2]
   in
 
-  let* (ctxt, Batch_result {results; indexes}) =
+  let* (ctxt, Batch_result {results; indexes}, _withdrawals) =
     Batch_V1.apply_batch ctxt batch
   in
 
@@ -482,12 +491,14 @@ let test_simple_transaction () =
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
-  let* (ctxt, Batch_result {results; _}) = Batch_V1.apply_batch ctxt batch in
+  let* (ctxt, Batch_result {results; _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
 
   let status = nth_exn results 0 |> snd in
 
-  match status with
-  | Transaction_success ->
+  match (status, _withdrawals) with
+  | (Transaction_success, []) ->
       (* Check the balance after the transaction has been applied, we ommit
          the check the indexes to not pollute this test. *)
       let* () =
@@ -532,7 +543,8 @@ let test_simple_transaction () =
           20L
       in
       return_unit
-  | Transaction_failure _ -> fail_msg "The transaction should be a success"
+  | (Transaction_success, _) -> fail_msg "Did not expect any withdrawals"
+  | (Transaction_failure _, _) -> fail_msg "The transaction should be a success"
 
 (** Thest that a valid transaction containing both indexes and values is a
     success. *)
@@ -600,12 +612,14 @@ let test_transaction_with_unknown_indexable () =
   let signatures = sign_transaction [sk1; sk2] transaction in
   let batch = batch signatures [transaction] in
 
-  let* (ctxt, Batch_result {results; _}) = Batch_V1.apply_batch ctxt batch in
+  let* (ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
 
   let status = nth_exn results 0 |> snd in
 
-  match status with
-  | Transaction_success ->
+  match (status, withdrawals) with
+  | (Transaction_success, []) ->
       (* Check the balance after the transaction has been applied, we ommit
          the check the indexes to not pollute this test. *)
       let* () =
@@ -650,7 +664,8 @@ let test_transaction_with_unknown_indexable () =
           20L
       in
       return_unit
-  | Transaction_failure _ -> fail_msg "The transaction should be a success"
+  | (Transaction_success, _) -> fail_msg "Did not expect any withdrawals"
+  | (Transaction_failure _, _) -> fail_msg "The transaction should be a success"
 
 (** Test that a transaction containing at least one invalid operation
     fails and does not change the context. It is similar to
@@ -675,7 +690,9 @@ let test_invalid_transaction () =
   in
   let batch = create_batch_v1 [transaction] [[sk1; sk2]] in
 
-  let* (ctxt, Batch_result {results; _}) = Batch_V1.apply_batch ctxt batch in
+  let* (ctxt, Batch_result {results; _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
 
   let status = nth_exn results 0 |> snd in
 
@@ -720,7 +737,9 @@ let test_invalid_counter () =
   let transaction = transfers [(pk1, addr2, ticket1, 10L, Some counter)] in
   let batch = create_batch_v1 [transaction] [[sk1]] in
 
-  let* (_ctxt, Batch_result {results; _}) = Batch_V1.apply_batch ctxt batch in
+  let* (_ctxt, Batch_result {results; _}, _withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
 
   let status = nth_exn results 0 |> snd in
 
@@ -758,13 +777,16 @@ let test_update_counter () =
     create_batch_v1 transactions [[sk1]; [sk1]; [sk1]; [sk1]; [sk1]]
   in
 
-  let* (ctxt, Batch_result {results; _}) = Batch_V1.apply_batch ctxt batch in
+  let* (ctxt, Batch_result {results; _}, withdrawals) =
+    Batch_V1.apply_batch ctxt batch
+  in
 
   let status = nth_exn results 0 |> snd in
 
-  match status with
-  | Transaction_failure
-      {reason = Tx_rollup_l2_apply.Incorrect_aggregated_signature; _} ->
+  match (status, withdrawals) with
+  | ( Transaction_failure
+        {reason = Tx_rollup_l2_apply.Incorrect_aggregated_signature; _},
+      _ ) ->
       fail_msg "This test should not raise [Incorrect_aggregated_signature]"
   | _ ->
       let* () =
@@ -851,7 +873,7 @@ let test_apply_message_batch () =
   let* (_ctxt, result) = apply_message ctxt msg in
 
   match result with
-  | Message_result.Batch_V1_result _ ->
+  | (Message_result.Batch_V1_result _, []) ->
       (* We do not check the result inside as we consider it is
          covered by other tests. *)
       return_unit
@@ -864,6 +886,7 @@ let test_apply_message_deposit () =
 
   let (msg, _) =
     Tx_rollup_message.make_deposit
+      pkh
       (value addr1)
       ticket1
       (Tx_rollup_l2_qty.of_int64_exn amount)
@@ -872,7 +895,7 @@ let test_apply_message_deposit () =
   let* (_ctxt, result) = apply_message ctxt msg in
 
   match result with
-  | Message_result.Deposit_result _ ->
+  | (Message_result.Deposit_result _, []) ->
       (* We do not check the result inside as we consider it is
          covered by other tests. *)
       return_unit
