@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,33 +24,21 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Daemons directly supported by lib_delegate *)
+(** Get the address of the Constant-Product Market Maker receiving the 
+    Liquidity Baking subsidy *)
+val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
 
-(** {1 Baker daemon} *)
-module Baker : sig
-  val run :
-    Protocol_client_context.full ->
-    ?minimal_fees:Protocol.Alpha_context.Tez.t ->
-    ?minimal_nanotez_per_gas_unit:Q.t ->
-    ?minimal_nanotez_per_byte:Q.t ->
-    liquidity_baking_escape_vote:
-      Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote ->
-    ?per_block_vote_file:string ->
-    ?extra_operations:Baking_configuration.Operations_source.t ->
-    chain:Shell_services.chain ->
-    context_path:string ->
-    keep_alive:bool ->
-    Baking_state.delegate list ->
-    unit tzresult Lwt.t
-end
+(** [on_subsidy_allowed ctxt ~toggle_vote f] updates the toggle EMA according to
+    [toggle_vote]. Then the callback function [f] is called if the following
+    conditions are met:
+    - the updated EMA is below the threshold,
+    - the current level is below the sunset level,
+    - the CPMM contract exists.
 
-(** {1 Accuser daemon} *)
-
-module Accuser : sig
-  val run :
-    #Protocol_client_context.full ->
-    chain:Chain_services.chain ->
-    preserved_levels:int ->
-    keep_alive:bool ->
-    unit tzresult Lwt.t
-end
+    The role of the callback function [f] is to send the subsidy to the CPMM,
+    see [apply_liquidity_baking_subsidy] in [apply.ml]. *)
+val on_subsidy_allowed :
+  Raw_context.t ->
+  escape_vote:Liquidity_baking_repr.liquidity_baking_escape_vote ->
+  (Raw_context.t -> Contract_repr.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
+  (Raw_context.t * 'a list * Liquidity_baking_repr.Escape_EMA.t) tzresult Lwt.t

@@ -24,6 +24,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Options available for the Liquidity Baking per-block vote *)
+
+type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
+
+let liquidity_baking_escape_vote_encoding =
+  let of_int8 = function
+    | 0 -> Ok LB_on
+    | 1 -> Ok LB_off
+    | 2 -> Ok LB_pass
+    | _ -> Error "liquidity_baking_escape_vote_of_int8"
+  in
+  let to_int8 = function LB_on -> 0 | LB_off -> 1 | LB_pass -> 2 in
+  let open Data_encoding in
+  (* union *)
+  def "liquidity_baking_escape_vote"
+  @@ splitted
+       ~binary:(conv_with_guard to_int8 of_int8 int8)
+       ~json:(string_enum [("on", LB_on); ("off", LB_off); ("pass", LB_pass)])
+
 module Escape_EMA : sig
   (* The exponential moving average is represented as an Int32 between 0l and 2_000_000_000l *)
 
@@ -43,7 +62,7 @@ module Escape_EMA : sig
 
   val encoding : t Data_encoding.t
 end = struct
-  type t = Int32.t (* Invariant 0 <= ema <= 2_000_000l *)
+  type t = Int32.t (* Invariant 0 <= ema <= 2_000_000_000l *)
 
   (* This error is not registered because we don't expect it to be
      raised. *)
@@ -57,6 +76,7 @@ end = struct
 
   let zero = Int32.zero
 
+  (* The conv_with_guard combinator of Data_encoding expects a (_, string) result. *)
   let of_int32_for_encoding x =
     if check_bounds x then Ok x else Error "out of bounds"
 
@@ -72,6 +92,10 @@ end = struct
 
   let z_1_000_000_000 = Z.of_int 1_000_000_000
 
+  (* Outside of this module, the EMA is always between 0 and 2,000,000,000.
+     This [recenter] wrappers, puts it in between -1,000,000,000 and 1,000,000,000.
+     The goal of this recentering around zero is to make [update_ema_off] and
+     [update_ema_on] behave symmetrically with respect to rounding. *)
   let recenter f ema = Z.(add z_1_000_000_000 (f (sub ema z_1_000_000_000)))
 
   let z_500_000 = Z.of_int 500_000
@@ -90,55 +114,9 @@ end = struct
     Data_encoding.(conv_with_guard to_int32 of_int32_for_encoding int32)
 end
 
-let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
-
-let get_escape_ema ctxt =
-  Storage.Liquidity_baking.Escape_ema.get ctxt >>=? fun ema ->
-  Escape_EMA.of_int32 ema
-
-let on_cpmm_exists ctxt f =
-  get_cpmm_address ctxt >>=? fun cpmm_contract ->
-  Contract_storage.exists ctxt cpmm_contract >>=? function
-  | false ->
-      (* do nothing if the cpmm is not found *)
-      return (ctxt, [])
-  | true -> f ctxt cpmm_contract
-
-let check_below_sunset ctxt =
-  let sunset_level = Constants_storage.liquidity_baking_sunset_level ctxt in
-  let level = Raw_level_repr.to_int32 (Level_storage.current ctxt).level in
-  Compare.Int32.(level < sunset_level)
-
 (* Invariant: 0 <= ema <= 2_000_000 *)
 let compute_new_ema ~escape_vote ema =
   match escape_vote with
-  | Block_header_repr.LB_pass -> ema
+  | LB_pass -> ema
   | LB_off -> Escape_EMA.update_ema_off ema
   | LB_on -> Escape_EMA.update_ema_on ema
-
-(* ema starts at zero and is always between 0 and 2_000_000. It is an
-   exponentional moving average representing the fraction of recent blocks
-   having the liquidity_baking_escape_vote flag set to "off". The computation
-   of this EMA ignores all blocks with the flag set to "pass".
-
-   More precisely,
-   if escape_vote[n] is pass, then ema[n+1] = ema[n].
-   if escape_vote[n] is off, then ema[n+1] = (1999 * ema[n] // 2000) + 1000
-   if escape_vote[n] is on, then ema[n+1] = (1999 * ema[n] // 2000)
-   where escape_vote is protocol_data.contents.liquidity_baking_escape_vote *)
-let update_escape_ema ctxt ~escape_vote =
-  get_escape_ema ctxt >>=? fun old_ema ->
-  let new_ema = compute_new_ema ~escape_vote old_ema in
-  Storage.Liquidity_baking.Escape_ema.update ctxt (Escape_EMA.to_int32 new_ema)
-  >|=? fun ctxt -> (ctxt, new_ema)
-
-let check_ema_below_threshold ctxt ema =
-  Escape_EMA.(
-    ema < Constants_storage.liquidity_baking_escape_ema_threshold ctxt)
-
-let on_subsidy_allowed ctxt ~escape_vote f =
-  update_escape_ema ctxt ~escape_vote >>=? fun (ctxt, escape_ema) ->
-  if check_ema_below_threshold ctxt escape_ema && check_below_sunset ctxt then
-    on_cpmm_exists ctxt f >|=? fun (ctxt, operation_results) ->
-    (ctxt, operation_results, escape_ema)
-  else return (ctxt, [], escape_ema)

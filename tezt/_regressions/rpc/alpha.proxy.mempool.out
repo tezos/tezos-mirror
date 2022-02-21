@@ -755,7 +755,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/cycle_nonce"
                           },
                           "liquidity_baking_escape_vote": {
-                            "$ref": "#/definitions/alpha.block_header.alpha.liquidity_baking_escape_vote"
+                            "$ref": "#/definitions/alpha.liquidity_baking_escape_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -777,14 +777,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "level"
                         ],
                         "additionalProperties": false
-                      },
-                      "alpha.block_header.alpha.liquidity_baking_escape_vote": {
-                        "type": "string",
-                        "enum": [
-                          "off",
-                          "on",
-                          "pass"
-                        ]
                       },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
@@ -953,6 +945,14 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             ],
                             "additionalProperties": false
                           }
+                        ]
+                      },
+                      "alpha.liquidity_baking_escape_vote": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "on",
+                          "pass"
                         ]
                       },
                       "alpha.michelson.v1.primitives": {
@@ -7185,7 +7185,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             "$ref": "#/definitions/cycle_nonce"
                           },
                           "liquidity_baking_escape_vote": {
-                            "$ref": "#/definitions/alpha.block_header.alpha.liquidity_baking_escape_vote"
+                            "$ref": "#/definitions/alpha.liquidity_baking_escape_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -7207,14 +7207,6 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "level"
                         ],
                         "additionalProperties": false
-                      },
-                      "alpha.block_header.alpha.liquidity_baking_escape_vote": {
-                        "type": "string",
-                        "enum": [
-                          "off",
-                          "on",
-                          "pass"
-                        ]
                       },
                       "alpha.entrypoint": {
                         "title": "entrypoint",
@@ -7383,6 +7375,14 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                             ],
                             "additionalProperties": false
                           }
+                        ]
+                      },
+                      "alpha.liquidity_baking_escape_vote": {
+                        "type": "string",
+                        "enum": [
+                          "off",
+                          "on",
+                          "pass"
                         ]
                       },
                       "alpha.michelson.v1.primitives": {

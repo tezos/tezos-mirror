@@ -488,7 +488,11 @@ let internal_nonce_already_recorded =
 let description = Raw_context.description
 
 module Parameters = Parameters_repr
-module Liquidity_baking = Liquidity_baking_repr
+
+module Liquidity_baking = struct
+  include Liquidity_baking_repr
+  include Liquidity_baking_storage
+end
 
 module Ticket_hash = struct
   include Ticket_hash_repr

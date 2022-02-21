@@ -32,7 +32,6 @@
 *)
 
 open Protocol
-open Block_header_repr
 
 let ema_of_int32 ema =
   Liquidity_baking_repr.Escape_EMA.of_int32 ema >|= Environment.wrap_tzresult
@@ -171,6 +170,7 @@ let test_ema_decreases_on_bound () =
 
 (* Test that 1385 Off votes are needed to reach the threshold from 0. *)
 let test_ema_many_off () =
+  let open Liquidity_baking_repr in
   ema_of_int32 0l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__
@@ -184,6 +184,7 @@ let test_ema_many_off () =
 
 (* Test that 1385 On votes are needed to reach the threshold from the max value of the EMA (2,000,000,000). *)
 let test_ema_many_on () =
+  let open Liquidity_baking_repr in
   ema_of_int32 2_000_000_000l >>=? fun initial_ema ->
   Assert.leq_int32
     ~loc:__LOC__

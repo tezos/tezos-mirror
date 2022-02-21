@@ -144,7 +144,7 @@ let keep_alive_arg =
 let liquidity_baking_escape_vote_parameter =
   Clic.parameter
     ~autocomplete:(fun _ctxt -> return ["on"; "off"; "pass"])
-    (let open Protocol.Alpha_context.Block_header in
+    (let open Protocol.Alpha_context.Liquidity_baking in
     fun _ctxt -> function
       | "on" -> return LB_on
       | "off" -> return LB_off

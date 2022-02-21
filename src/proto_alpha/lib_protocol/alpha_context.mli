@@ -1892,18 +1892,13 @@ module Block_payload : sig
 end
 
 module Block_header : sig
-  type liquidity_baking_escape_vote =
-        Block_header_repr.liquidity_baking_escape_vote =
-    | LB_on
-    | LB_off
-    | LB_pass
-
   type contents = {
     payload_hash : Block_payload_hash.t;
     payload_round : Round.t;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
-    liquidity_baking_escape_vote : liquidity_baking_escape_vote;
+    liquidity_baking_escape_vote :
+      Liquidity_baking_repr.liquidity_baking_escape_vote;
   }
 
   type protocol_data = {contents : contents; signature : Signature.t}
@@ -1937,9 +1932,6 @@ module Block_header : sig
   val hash : block_header -> Block_hash.t
 
   val hash_raw : raw -> Block_hash.t
-
-  val liquidity_baking_escape_vote_encoding :
-    liquidity_baking_escape_vote Data_encoding.encoding
 
   val encoding : block_header Data_encoding.encoding
 
@@ -3040,6 +3032,15 @@ module Parameters : sig
 end
 
 module Liquidity_baking : sig
+  type liquidity_baking_escape_vote =
+        Liquidity_baking_repr.liquidity_baking_escape_vote =
+    | LB_on
+    | LB_off
+    | LB_pass
+
+  val liquidity_baking_escape_vote_encoding :
+    liquidity_baking_escape_vote Data_encoding.encoding
+
   val get_cpmm_address : context -> Contract.t tzresult Lwt.t
 
   module Escape_EMA : sig
@@ -3054,7 +3055,7 @@ module Liquidity_baking : sig
 
   val on_subsidy_allowed :
     context ->
-    escape_vote:Block_header.liquidity_baking_escape_vote ->
+    escape_vote:liquidity_baking_escape_vote ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
     (context * 'a list * Escape_EMA.t) tzresult Lwt.t
 end

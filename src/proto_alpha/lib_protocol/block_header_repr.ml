@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Options available for the Liquidity Baking per-block vote *)
-
-type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
-
 (** Block header *)
 
 type contents = {
@@ -34,7 +30,8 @@ type contents = {
   payload_round : Round_repr.t;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
-  liquidity_baking_escape_vote : liquidity_baking_escape_vote;
+  liquidity_baking_escape_vote :
+    Liquidity_baking_repr.liquidity_baking_escape_vote;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -70,21 +67,6 @@ let of_watermark = function
         | _ -> None
       else None
   | _ -> None
-
-let liquidity_baking_escape_vote_encoding =
-  let of_int8 = function
-    | 0 -> Ok LB_on
-    | 1 -> Ok LB_off
-    | 2 -> Ok LB_pass
-    | _ -> Error "liquidity_baking_escape_vote_of_int8"
-  in
-  let to_int8 = function LB_on -> 0 | LB_off -> 1 | LB_pass -> 2 in
-  let open Data_encoding in
-  (* union *)
-  def "block_header.alpha.liquidity_baking_escape_vote"
-  @@ splitted
-       ~binary:(conv_with_guard to_int8 of_int8 int8)
-       ~json:(string_enum [("on", LB_on); ("off", LB_off); ("pass", LB_pass)])
 
 let contents_encoding =
   let open Data_encoding in
@@ -123,7 +105,7 @@ let contents_encoding =
           (opt "seed_nonce_hash" Nonce_hash.encoding)
           (req
              "liquidity_baking_escape_vote"
-             liquidity_baking_escape_vote_encoding))
+             Liquidity_baking_repr.liquidity_baking_escape_vote_encoding))
 
 let protocol_data_encoding =
   let open Data_encoding in

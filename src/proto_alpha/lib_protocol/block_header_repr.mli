@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Options available for the Liquidity Baking per-block vote *)
-
-type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
-
 (** Representation of block headers. *)
 
 type contents = {
@@ -34,7 +30,8 @@ type contents = {
   payload_round : Round_repr.t;
   seed_nonce_hash : Nonce_hash.t option;
   proof_of_work_nonce : bytes;
-  liquidity_baking_escape_vote : liquidity_baking_escape_vote;
+  liquidity_baking_escape_vote :
+    Liquidity_baking_repr.liquidity_baking_escape_vote;
 }
 
 type protocol_data = {contents : contents; signature : Signature.t}
@@ -48,9 +45,6 @@ type raw = Block_header.t
 type shell_header = Block_header.shell_header
 
 val raw : block_header -> raw
-
-val liquidity_baking_escape_vote_encoding :
-  liquidity_baking_escape_vote Data_encoding.encoding
 
 val encoding : block_header Data_encoding.encoding
 

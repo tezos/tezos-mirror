@@ -28,7 +28,7 @@ module Events = Baking_events.Liquidity_baking
 
 type per_block_votes = {
   liquidity_baking_escape_vote :
-    Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote option;
+    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote option;
 }
 
 let per_block_votes_encoding =
@@ -40,7 +40,7 @@ let per_block_votes_encoding =
        (obj1
           (opt
              "liquidity_baking_escape_vote"
-             Protocol.Alpha_context.Block_header
+             Protocol.Alpha_context.Liquidity_baking
              .liquidity_baking_escape_vote_encoding))
 
 type error += Block_vote_file_not_found of string

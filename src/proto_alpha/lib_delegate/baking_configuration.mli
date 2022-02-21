@@ -58,7 +58,7 @@ type t = {
   retries_on_failure : int;
   user_activated_upgrades : (int32 * Protocol_hash.t) list;
   liquidity_baking_escape_vote :
-    Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote;
+    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote;
   per_block_vote_file : string option;
   force : bool;
   state_recorder : state_recorder_config;
@@ -76,7 +76,7 @@ val default_retries_on_failure_config : int
 val default_user_activated_upgrades : (int32 * Protocol_hash.t) list
 
 val default_liquidity_baking_escape_vote :
-  Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote
+  Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote
 
 val default_force : bool
 
@@ -97,7 +97,7 @@ val make :
   ?retries_on_failure:int ->
   ?user_activated_upgrades:(int32 * Protocol_hash.t) list ->
   ?liquidity_baking_escape_vote:
-    Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote ->
+    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote ->
   ?per_block_vote_file:string ->
   ?force:bool ->
   ?state_recorder:state_recorder_config ->
@@ -117,7 +117,7 @@ val user_activate_upgrades_config_encoding :
   (int32 * Protocol_hash.t) list Data_encoding.t
 
 val liquidity_baking_escape_vote_config_encoding :
-  Protocol.Alpha_context.Block_header.liquidity_baking_escape_vote
+  Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote
   Data_encoding.t
 
 val encoding : t Data_encoding.t

@@ -24,7 +24,16 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val get_cpmm_address : Raw_context.t -> Contract_repr.t tzresult Lwt.t
+(** Options available for the Liquidity Baking per-block vote *)
+
+type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
+
+val liquidity_baking_escape_vote_encoding :
+  liquidity_baking_escape_vote Data_encoding.encoding
+
+(** Exponential moving average of toggle votes. Represented as an int32 between
+    0 and 2,000,000. It is an exponential moving average of the [LB_off] votes
+    over a window of the most recent 2000 blocks that did not vote [LB_pass]. *)
 
 module Escape_EMA : sig
   type t
@@ -36,22 +45,20 @@ module Escape_EMA : sig
   val to_int32 : t -> Int32.t
 
   val encoding : t Data_encoding.t
+
+  val ( < ) : t -> Int32.t -> bool
 end
 
-(** [compute_new_ema ~escape_vote old_ema] returns the value of the exponential
-    moving average [old_ema] updated by the vote [escape_vote].
+(** [compute_new_ema ~escape_vote old_ema] returns the value [new_ema] of the
+    exponential moving average [old_ema] updated by the vote [escape_vote].
 
-    This function is only exported to ease unit testing.
+    It is updated as follows:
+    - if [escape_vote] is [LB_pass] then [new_ema] = [old_ema],
+    - if [escape_vote] is [LB_off], then [new_ema] = (1999 * ema[n] // 2000) + 1,000,000,
+    - if [escape_vote] is [LB_on], then [new_ema] = (1999 * ema[n] // 2000).
+
+    The multiplication is performed in [Z.t] to avoid overflows, division is
+    rounded toward 1,000,000,000 (the middle of the interval).
     *)
 val compute_new_ema :
-  escape_vote:Block_header_repr.liquidity_baking_escape_vote ->
-  Escape_EMA.t ->
-  Escape_EMA.t
-
-(** Checks if below EMA threshold (after updating), sunset level, and if CPMM
-    contract exists. *)
-val on_subsidy_allowed :
-  Raw_context.t ->
-  escape_vote:Block_header_repr.liquidity_baking_escape_vote ->
-  (Raw_context.t -> Contract_repr.t -> (Raw_context.t * 'a list) tzresult Lwt.t) ->
-  (Raw_context.t * 'a list * Escape_EMA.t) tzresult Lwt.t
+  escape_vote:liquidity_baking_escape_vote -> Escape_EMA.t -> Escape_EMA.t

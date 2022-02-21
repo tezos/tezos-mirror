@@ -1,7 +1,8 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Tocqueville Group, Inc. <contact@tezos.com>            *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,33 +24,40 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Daemons directly supported by lib_delegate *)
+open Liquidity_baking_repr
 
-(** {1 Baker daemon} *)
-module Baker : sig
-  val run :
-    Protocol_client_context.full ->
-    ?minimal_fees:Protocol.Alpha_context.Tez.t ->
-    ?minimal_nanotez_per_gas_unit:Q.t ->
-    ?minimal_nanotez_per_byte:Q.t ->
-    liquidity_baking_escape_vote:
-      Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote ->
-    ?per_block_vote_file:string ->
-    ?extra_operations:Baking_configuration.Operations_source.t ->
-    chain:Shell_services.chain ->
-    context_path:string ->
-    keep_alive:bool ->
-    Baking_state.delegate list ->
-    unit tzresult Lwt.t
-end
+let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
 
-(** {1 Accuser daemon} *)
+let get_escape_ema ctxt =
+  Storage.Liquidity_baking.Escape_ema.get ctxt >>=? fun ema ->
+  Escape_EMA.of_int32 ema
 
-module Accuser : sig
-  val run :
-    #Protocol_client_context.full ->
-    chain:Chain_services.chain ->
-    preserved_levels:int ->
-    keep_alive:bool ->
-    unit tzresult Lwt.t
-end
+let on_cpmm_exists ctxt f =
+  get_cpmm_address ctxt >>=? fun cpmm_contract ->
+  Contract_storage.exists ctxt cpmm_contract >>=? function
+  | false ->
+      (* do nothing if the cpmm is not found *)
+      return (ctxt, [])
+  | true -> f ctxt cpmm_contract
+
+let check_below_sunset ctxt =
+  let sunset_level = Constants_storage.liquidity_baking_sunset_level ctxt in
+  let level = Raw_level_repr.to_int32 (Level_storage.current ctxt).level in
+  Compare.Int32.(level < sunset_level)
+
+let update_escape_ema ctxt ~escape_vote =
+  get_escape_ema ctxt >>=? fun old_ema ->
+  let new_ema = compute_new_ema ~escape_vote old_ema in
+  Storage.Liquidity_baking.Escape_ema.update ctxt (Escape_EMA.to_int32 new_ema)
+  >|=? fun ctxt -> (ctxt, new_ema)
+
+let check_ema_below_threshold ctxt ema =
+  Escape_EMA.(
+    ema < Constants_storage.liquidity_baking_escape_ema_threshold ctxt)
+
+let on_subsidy_allowed ctxt ~escape_vote f =
+  update_escape_ema ctxt ~escape_vote >>=? fun (ctxt, escape_ema) ->
+  if check_ema_below_threshold ctxt escape_ema && check_below_sunset ctxt then
+    on_cpmm_exists ctxt f >|=? fun (ctxt, operation_results) ->
+    (ctxt, operation_results, escape_ema)
+  else return (ctxt, [], escape_ema)

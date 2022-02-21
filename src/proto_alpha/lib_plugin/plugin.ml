@@ -2991,7 +2991,7 @@ module RPC = struct
                   "proof_of_work_nonce"
                   (Fixed.bytes Alpha_context.Constants.proof_of_work_nonce_size)
                   empty_proof_of_work_nonce)
-               Block_header.(
+               Liquidity_baking.(
                  dft
                    "liquidity_baking_escape_vote"
                    liquidity_baking_escape_vote_encoding

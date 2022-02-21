@@ -1301,7 +1301,7 @@ let mem_init :
         seed_nonce_hash = None;
         proof_of_work_nonce;
         (* following Baking_configuration.escape_votes in lib_delegate *)
-        liquidity_baking_escape_vote = Block_header.LB_pass;
+        liquidity_baking_escape_vote = Liquidity_baking.LB_pass;
       }
     in
     let unsigned_bytes =
