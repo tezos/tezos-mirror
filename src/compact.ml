@@ -320,12 +320,13 @@ let case_to_json_data_encoding_case_open :
 let case_to_json_data_encoding_case : type a. int -> a case -> a Encoding.case =
  fun tag (Case layout) -> case_to_json_data_encoding_case_open tag layout
 
-let void_case =
+let void_case : type a. title:string -> a case =
+ fun ~title ->
   case
-    ~title:"VOID"
-    ~description:"This case is void. No data is\naccepted."
+    ~title
+    ~description:"This case is void. No data is accepted."
     void
-    refute
+    (fun _ -> None)
     refute
 
 let union :

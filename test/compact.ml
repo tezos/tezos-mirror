@@ -91,7 +91,12 @@ let documentation_mentions_correct_tag_bit_counts () =
       (union
          ~union_tag_bits:7
          ~cases_tag_bits:6
-         [case ~title:"unit" unit Option.some Fun.id])
+         [
+           case ~title:"unit" unit Option.some Fun.id;
+           void_case ~title:"VOID01";
+           void_case ~title:"VOID10";
+           void_case ~title:"VOID11";
+         ])
     = 13) ;
   ()
 

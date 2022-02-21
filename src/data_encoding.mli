@@ -1337,12 +1337,12 @@ let expr_encoding =
     val union :
       ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
-    (** [void_case] is an impossible case. It is provided so you can add unused
-        tags within a union. E.g.,
-        [union [case _; void_case; case _; case _]] uses two bits of tag for the
-        discrimination of the union, but the tag [01] is unusued (e.g., reserved
-        for future uses). *)
-    val void_case : void case
+    (** [void_case ~title] is an impossible case. It is provided so you can add
+        unused tags within a union. E.g.,
+        [union [case _; void_case ~title:"reserved-for-v04-compatibility"; case _; case _]]
+        uses two bits of tag for the discrimination of the union,
+        but the tag [01] is unusued (reserved for some version compatibility). *)
+    val void_case : title:string -> 'a case
 
     (** [or_int32 c] creates a new compact encoding for the disjunction of
         any type [a] (see {!case}) with [int32]. It uses the same number

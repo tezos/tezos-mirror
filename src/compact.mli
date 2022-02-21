@@ -206,7 +206,7 @@ val case :
   ('b -> 'a) ->
   'a case
 
-val void_case : void case
+val void_case : title:string -> 'a case
 
 val union : ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
