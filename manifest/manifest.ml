@@ -1696,8 +1696,12 @@ let generate_dune_project_files () =
   Hashtbl.iter
     (fun path () ->
       write (Filename.concat path "dune-project") @@ fun fmt ->
-      Format.fprintf fmt "(lang dune %s)\n" dune_lang_version ;
-      Format.fprintf fmt "(formatting (enabled_for ocaml))\n")
+      Format.fprintf fmt "(lang dune %s)@." dune_lang_version ;
+      Format.fprintf fmt "(formatting (enabled_for ocaml))@." ;
+      Format.fprintf
+        fmt
+        "; This file was automatically generated, do not edit.@." ;
+      Format.fprintf fmt "; Edit file manifest/manifest.ml instead.@.")
     t
 
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
