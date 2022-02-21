@@ -1,4 +1,4 @@
 (copy_files
   (alias copy-parameters)
-  (mode promote-until-clean)
+  (mode (promote (until-clean)))
   (files ../lib_parameters/*.json))
