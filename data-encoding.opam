@@ -15,6 +15,7 @@ depends: [
   "json-data-encoding-bson" { = "0.11" }
   "alcotest" { with-test }
   "crowbar" { >= "0.2" & with-test }
+  "either"
   "ocamlformat" { = "0.20.1" & with-doc } # not technically a doc dep; modify when with-dev becomes available
   "odoc" { with-doc }
 ]

@@ -5,5 +5,5 @@
 (library
  (name data_encoding)
  (public_name data-encoding)
- (libraries json-data-encoding json-data-encoding-bson zarith ezjsonm)
+ (libraries json-data-encoding json-data-encoding-bson zarith ezjsonm either)
  (flags (:standard)))
