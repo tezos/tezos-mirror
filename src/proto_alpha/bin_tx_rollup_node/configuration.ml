@@ -144,20 +144,24 @@ let get_configuration_filename data_dir =
   Filename.concat data_dir filename
 
 let save configuration =
-  let open Lwt_syntax in
+  let open Lwt_result_syntax in
   let json = Data_encoding.Json.construct encoding configuration in
-  let* () = Lwt_utils_unix.create_dir configuration.data_dir in
+  let*! () = Lwt_utils_unix.create_dir configuration.data_dir in
   let file = get_configuration_filename configuration.data_dir in
-  Lwt_utils_unix.with_atomic_open_out file (fun chan ->
-      let content = Data_encoding.Json.to_string json in
-      Lwt_utils_unix.write_string chan content)
-  >|= Result.map_error (fun _ ->
-          [Error.Tx_rollup_unable_to_write_configuration_file file])
+  let*! v =
+    Lwt_utils_unix.with_atomic_open_out file (fun chan ->
+        let content = Data_encoding.Json.to_string json in
+        Lwt_utils_unix.write_string chan content)
+  in
+  Lwt.return
+    (Result.map_error
+       (fun _ -> [Error.Tx_rollup_unable_to_write_configuration_file file])
+       v)
 
 let load ~data_dir =
   let open Lwt_result_syntax in
   let file = get_configuration_filename data_dir in
-  let* exists = Lwt_unix.file_exists file >|= ok in
+  let*! exists = Lwt_unix.file_exists file in
   let* () =
     fail_unless exists (Error.Tx_rollup_configuration_file_does_not_exists file)
   in

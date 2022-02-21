@@ -219,13 +219,15 @@ let run ~data_dir cctxt =
           let*! () =
             Lwt_stream.iter_s
               (fun (current_hash, _header) ->
-                process_inboxes
-                  cctxt
-                  state
-                  rollup_genesis
-                  current_hash
-                  rollup_id
-                >>= function
+                let*! r =
+                  process_inboxes
+                    cctxt
+                    state
+                    rollup_genesis
+                    current_hash
+                    rollup_id
+                in
+                match r with
                 | Ok () -> Lwt.return ()
                 | Error _ ->
                     let () = interupt () in

@@ -168,7 +168,7 @@ let configuration_init_command =
       let* () = Configuration.save config in
       (* This is necessary because the node has not yet been launched, so event
          listening can't be used. *)
-      cctxt#message "Configuration written in %s" file >>= fun _ ->
+      let*! () = cctxt#message "Configuration written in %s" file in
       let*! () = Event.(emit configuration_was_written) (file, config) in
       return_unit)
 

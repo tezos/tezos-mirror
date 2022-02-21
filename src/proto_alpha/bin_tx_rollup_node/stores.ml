@@ -148,8 +148,10 @@ module Make_map (M : MAP_CONF) = struct
     decode (render_key raw_key) binaries
 
   let set rendered_key store key value =
+    let open Lwt_tzresult_syntax in
     let info () = make_info rendered_key in
-    Kv.set ~info store key value >>= function
+    let*! r = Kv.set ~info store key value in
+    match r with
     | Error _ -> fail @@ Error.Tx_rollup_irmin_error "cannot store value"
     | Ok () -> return_unit
 
@@ -204,8 +206,10 @@ module Make_ref (R : REF_CONF) = struct
     value
 
   let set_aux store value =
+    let open Lwt_tzresult_syntax in
     let info () = make_info rendered_key in
-    Kv.set ~info store key value >>= function
+    let*! r = Kv.set ~info store key value in
+    match r with
     | Error _ -> fail @@ Error.Tx_rollup_irmin_error "cannot store value"
     | Ok () -> return_unit
 
