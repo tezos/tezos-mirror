@@ -154,22 +154,33 @@ let check_unknown_output_files () =
   let rec browse path =
     let handle_file filename =
       let full = path // filename in
-      if Sys.is_directory full then browse full
-      else if not (String_set.mem full full_output_files) then
-        if Cli.options.delete_unknown_regression_files then (
-          Sys.remove full ;
-          Log.report "Deleted file: %s" full)
-        else (
-          Log.warn "%s is not used by any test and can be deleted." full ;
-          explain_how_to_delete := true)
+      match Sys.is_directory full with
+      | exception Sys_error _ ->
+          (* If we can't browse, ignore. *)
+          ()
+      | true -> browse full
+      | false ->
+          if not (String_set.mem full full_output_files) then
+            if Cli.options.delete_unknown_regression_files then
+              try
+                Sys.remove full ;
+                Log.report "Deleted file: %s" full
+              with Sys_error message ->
+                Log.warn "Failed to delete file: %s" message
+            else (
+              Log.warn "%s is not used by any test and can be deleted." full ;
+              explain_how_to_delete := true)
     in
     Array.iter handle_file (Sys.readdir path) ;
     (* Check whether directory is empty now that we may have deleted files. *)
     match Sys.readdir path with
     | [||] ->
-        if Cli.options.delete_unknown_regression_files then (
-          Sys.rmdir path ;
-          Log.report "Deleted directory: %s" path)
+        if Cli.options.delete_unknown_regression_files then
+          try
+            Sys.rmdir path ;
+            Log.report "Deleted directory: %s" path
+          with Sys_error message ->
+            Log.warn "Failed to delete directory: %s" message
         else (
           Log.warn "%s is empty and can be deleted." path ;
           explain_how_to_delete := true)
