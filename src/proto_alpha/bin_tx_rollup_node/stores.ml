@@ -45,6 +45,7 @@ let load data_dir =
   let open Lwt_syntax in
   let* repository = Kv.Repo.v (Irmin_pack.config data_dir) in
   let* branch = Kv.master repository in
+  let* () = Event.(emit irmin_store_loaded) data_dir in
   return_ok branch
 
 let close data_dir =

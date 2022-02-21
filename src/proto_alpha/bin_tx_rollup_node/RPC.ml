@@ -77,10 +77,16 @@ let launch ~host ~acl ~node ~dir () =
   return r
 
 let start configuration state =
+  let open Lwt_syntax in
   let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string addr in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.default addr in
-  Lwt.catch (launch ~host ~acl ~node ~dir) fail_with_exn
+  Lwt.catch
+    (fun () ->
+      let* rpc_server = launch ~host ~acl ~node ~dir () in
+      let* () = Event.(emit node_is_ready) (rpc_addr, rpc_port) in
+      Lwt.return rpc_server)
+    fail_with_exn

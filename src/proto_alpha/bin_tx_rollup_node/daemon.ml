@@ -180,15 +180,8 @@ let valid_history_mode = function
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
   let*! () = Event.(emit starting_node) () in
-  let* ({
-          data_dir;
-          rpc_addr;
-          rpc_port;
-          rollup_id;
-          rollup_genesis;
-          reconnection_delay;
-          _;
-        } as configuration) =
+  let* ({data_dir; rollup_id; rollup_genesis; reconnection_delay; _} as
+       configuration) =
     Configuration.load ~data_dir
   in
   let* state =
@@ -201,8 +194,6 @@ let run ~data_dir cctxt =
       ~loc:__LOC__
       (main_exit_callback configuration.data_dir)
   in
-  let*! () = Event.(emit irmin_store_loaded) data_dir in
-  let*! () = Event.(emit node_is_ready) (rpc_addr, rpc_port) in
   let* (_, _, _, history_mode) = Chain_services.checkpoint cctxt () in
   let* () =
     fail_unless
