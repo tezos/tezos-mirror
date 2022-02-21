@@ -414,7 +414,7 @@ To find reviewers, either:
   - Look at authors of the code you are modifying using
     `git blame <https://git-scm.com/docs/git-blame>`_.
   - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
-    by asking him/here on Slack or mentioning them in a comment (see next paragraph).
+    by asking him/her on Slack or mentioning them in a comment (see next paragraph).
 
 Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
 you may or may not be able to use the *Reviewers* field for specifying
