@@ -32,6 +32,8 @@
     of ticket holders within a transaction rollup. *)
 type t
 
+type address = t
+
 val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
@@ -46,7 +48,7 @@ val of_bytes_exn : bytes -> t
 
 val of_bytes_opt : bytes -> t option
 
-val compare : t -> t -> int
+include Compare.S with type t := t
 
 (** [of_bls_pk pk] computes the address of the L2 tickets holder
     authentified by [pk]. *)
@@ -59,47 +61,33 @@ val in_memory_size : t -> Cache_memory_helpers.sint
 val size : t -> int
 
 module Indexable : sig
-  type nonrec index = t Indexable.index
+  type nonrec 'state t = ('state, address) Indexable.t
 
-  type nonrec value = t Indexable.value
+  type nonrec index = address Indexable.index
 
-  type nonrec either = t Indexable.either
+  type nonrec value = address Indexable.value
+
+  type nonrec either = address Indexable.either
 
   val encoding : either Data_encoding.t
 
   val index_encoding : index Data_encoding.t
 
-  val compare : either -> either -> int
-
   val compare_values : value -> value -> int
 
-  val forget_value : value -> either
+  val value_encoding : value Data_encoding.t
 
-  val forget_index : index -> either
+  val compare : 'state t -> 'state' t -> int
 
-  val value : t -> value
+  val value : address -> value
 
   val index : int32 -> index tzresult
 
   val index_exn : int32 -> index
 
-  val from_value : t -> either
+  val pp : Format.formatter -> 'state t -> unit
 
-  val from_index : int32 -> either tzresult
+  val size : 'state t -> int
 
-  val from_index_exn : int32 -> either
-
-  val prepare_index :
-    (t -> int32 tzresult Lwt.t) -> either -> index tzresult Lwt.t
-
-  val prepare_value :
-    (int32 -> t tzresult Lwt.t) -> either -> value tzresult Lwt.t
-
-  val pp : Format.formatter -> either -> unit
-
-  val size : either -> int
-
-  val in_memory_size : either -> Cache_memory_helpers.sint
-
-  type nonrec 'state t = ('state, t) Indexable.t
+  val in_memory_size : 'state t -> Cache_memory_helpers.sint
 end

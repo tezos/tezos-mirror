@@ -100,8 +100,15 @@ let v1_transaction_gen =
 
 let v1_batch =
   let open QCheck2.Gen in
-  let+ contents = small_list v1_transaction_gen
-  and+ aggregated_signature = bytes_gen in
+  let+ contents = small_list v1_transaction_gen in
+  (* This it not ideal as we do not use the QCheck2 seed. We need
+     valid bytes since the signature encoding is "safe" and accept
+     only valid signatures. However, it should not impact the
+     tests here as the bytes length stays the same. *)
+  let bytes = Bls12_381.G2.(to_compressed_bytes (random ())) in
+  let aggregated_signature =
+    Protocol.Environment.Bls_signature.unsafe_signature_of_bytes bytes
+  in
   V1.{aggregated_signature; contents}
 
 let batch =

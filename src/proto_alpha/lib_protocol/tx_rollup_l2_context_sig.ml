@@ -24,9 +24,17 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type signature = bytes
+type signature = Bls_signature.signature
 
-let signature_encoding = Data_encoding.bytes
+let signature_encoding =
+  let open Data_encoding in
+  conv_with_guard
+    (fun signature -> Bls_signature.signature_to_bytes signature)
+    (fun bytes ->
+      match Bls_signature.signature_of_bytes_opt bytes with
+      | Some x -> Ok x
+      | None -> Error "Not a valid bls_signature")
+    (Fixed.bytes Bls_signature.signature_size_in_bytes)
 
 module Ticket_indexable = Indexable.Make (Alpha_context.Ticket_hash)
 

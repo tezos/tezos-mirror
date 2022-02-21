@@ -35,7 +35,7 @@
 (** Smart contract on the layer-1 can deposit tickets into a
     transaction rollup, for the benefit of a {!Tx_rollup_l2_address.t}. *)
 type deposit = {
-  destination : Tx_rollup_l2_address.Indexable.either;
+  destination : Tx_rollup_l2_address.Indexable.value;
   ticket_hash : Ticket_hash_repr.t;
   amount : Tx_rollup_l2_qty.t;
 }

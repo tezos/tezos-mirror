@@ -27,4 +27,10 @@ include Script_expr_hash
 
 let of_script_expr_hash t = t
 
+include Compare.Make (struct
+  type nonrec t = t
+
+  let compare = compare
+end)
+
 module Index = Script_expr_hash

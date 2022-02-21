@@ -425,19 +425,18 @@ let unparse_address ~loc ctxt mode {destination; entrypoint} =
 let unparse_tx_rollup_l2_address ~loc ctxt mode
     (tx_address : tx_rollup_l2_address) =
   Gas.consume ctxt Unparse_costs.contract >|? fun ctxt ->
-  match tx_address with
-  | Value tx_address -> (
-      match mode with
-      | Optimized | Optimized_legacy ->
-          let bytes =
-            Data_encoding.Binary.to_bytes_exn
-              Tx_rollup_l2_address.encoding
-              tx_address
-          in
-          (Bytes (loc, bytes), ctxt)
-      | Readable ->
-          let b58check = Tx_rollup_l2_address.to_b58check tx_address in
-          (String (loc, b58check), ctxt))
+  let tx_address = Indexable.to_value tx_address in
+  match mode with
+  | Optimized | Optimized_legacy ->
+      let bytes =
+        Data_encoding.Binary.to_bytes_exn
+          Tx_rollup_l2_address.encoding
+          tx_address
+      in
+      (Bytes (loc, bytes), ctxt)
+  | Readable ->
+      let b58check = Tx_rollup_l2_address.to_b58check tx_address in
+      (String (loc, b58check), ctxt)
 
 let unparse_contract ~loc ctxt mode {arg_ty = _; address} =
   unparse_address ~loc ctxt mode address

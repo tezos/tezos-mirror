@@ -42,9 +42,7 @@ val encoding : t Data_encoding.t
 
 val pp : Format.formatter -> t -> unit
 
-val equal : t -> t -> bool
-
-val compare : t -> t -> int
+include Compare.S with type t := t
 
 val of_script_expr_hash : Script_expr_hash.t -> t
 

@@ -90,7 +90,7 @@ module V1 = struct
 
   type ('signer, 'content) transaction = ('signer, 'content) operation list
 
-  type signature = bytes
+  type signature = Bls_signature.signature
 
   type ('signer, 'content) t = {
     contents : ('signer, 'content) transaction list;
@@ -143,7 +143,8 @@ module V1 = struct
         (fun (aggregated_signature, contents) ->
           {aggregated_signature; contents})
       @@ obj2
-           (req "aggregated_signature" @@ payload Data_encoding.bytes)
+           (req "aggregated_signature"
+           @@ payload Tx_rollup_l2_context_sig.signature_encoding)
            (req "contents" @@ list ~bits transaction_encoding))
 end
 
