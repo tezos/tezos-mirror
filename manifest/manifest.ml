@@ -1223,11 +1223,14 @@ let write filename f =
   generated_files := String_set.add filename !generated_files ;
   create_parent filename ;
   let outch = open_out filename in
-  match f (Format.formatter_of_out_channel outch) with
+  let fmt = Format.formatter_of_out_channel outch in
+  match f fmt with
   | exception exn ->
+      Format.pp_print_flush fmt () ;
       close_out outch ;
       raise exn
   | x ->
+      Format.pp_print_flush fmt () ;
       close_out outch ;
       x
 
@@ -1678,6 +1681,25 @@ let generate_opam_files_for_release packages_dir release =
   let opam = generate_opam ~release package internal_pkgs in
   write opam_filename @@ fun fmt -> Opam.pp fmt opam
 
+(* Bumping the dune lang version can result in different dune stanza
+   semantic and could require changes to the generation logic. *)
+let dune_lang_version = "2.9"
+
+let generate_dune_project_files () =
+  let t = Hashtbl.create 17 in
+  (* Add a dune project at the root *)
+  Hashtbl.replace t "./" () ;
+  (* And one next to every opam files.
+     Dune only understand dune files at the root of a dune project. *)
+  Target.iter_internal_by_opam (fun package _internals ->
+      Hashtbl.replace t (Filename.dirname package) ()) ;
+  Hashtbl.iter
+    (fun path () ->
+      write (Filename.concat path "dune-project") @@ fun fmt ->
+      Format.fprintf fmt "(lang dune %s)\n" dune_lang_version ;
+      Format.fprintf fmt "(formatting (enabled_for ocaml))\n")
+    t
+
 let check_for_non_generated_files ?(exclude = fun _ -> false) () =
   let rec find_opam_and_dune_files acc dir =
     let dir_contents = Sys.readdir dir in
@@ -1685,8 +1707,11 @@ let check_for_non_generated_files ?(exclude = fun _ -> false) () =
       let full_filename = dir // filename in
       if try Sys.is_directory full_filename with Sys_error _ -> false then
         find_opam_and_dune_files acc full_filename
-      else if filename = "dune" || Filename.extension filename = ".opam" then
-        String_set.add full_filename acc
+      else if
+        filename = "dune"
+        || Filename.extension filename = ".opam"
+        || filename = "dune-project"
+      then String_set.add full_filename acc
       else acc
     in
     Array.fold_left add_item acc dir_contents
@@ -1818,6 +1843,7 @@ let generate ?exclude () =
   try
     generate_dune_files () ;
     generate_opam_files () ;
+    generate_dune_project_files () ;
     check_for_non_generated_files ?exclude () ;
     check_js_of_ocaml () ;
     Option.iter (generate_opam_files_for_release packages_dir) release
