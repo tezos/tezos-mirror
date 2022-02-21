@@ -30,7 +30,7 @@ open Protocol.Apply_results
 open Protocol_client_context
 module Block_hash_map = Map.Make (Block_hash)
 
-type t = {store : Stores.t}
+type t = {store : Stores.t; context_index : Context.index}
 
 (* Stands for the manager operation pass, in which the rollup transactions are
    stored. *)
@@ -136,12 +136,24 @@ let check_origination_in_block_info rollup block_info =
   | Some _ -> return_unit
   | None -> fail @@ Error.Tx_rollup_not_originated_in_the_given_block rollup
 
-let init ~data_dir ~context ~rollup ~rollup_genesis =
+let init_store ~data_dir ~context ~rollup ~rollup_genesis =
   let open Lwt_result_syntax in
   let block = `Hash (rollup_genesis, 0) in
   let* block_info =
     Alpha_block_services.info context ~chain:context#chain ~block ()
   in
   let* () = check_origination_in_block_info rollup block_info in
-  let* store = Stores.load data_dir in
-  return {store}
+  Stores.load (Node_data.store_dir data_dir)
+
+let init_context ~data_dir =
+  let open Lwt_result_syntax in
+  let*! index = Context.init (Node_data.context_dir data_dir) in
+  return index
+
+let init ~data_dir ~context ~rollup ~rollup_genesis =
+  let open Lwt_result_syntax in
+  let store = init_store ~data_dir ~context ~rollup ~rollup_genesis in
+  let context_index = init_context ~data_dir in
+  let* store = store in
+  let* context_index = context_index in
+  return {store; context_index}

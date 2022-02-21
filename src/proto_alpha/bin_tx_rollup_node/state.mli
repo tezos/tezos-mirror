@@ -35,7 +35,7 @@ type t
 (** [init ~data_dir ~context ~rollup ~block_origination_hash]
     checks that the rollup [rollup_id] is created inside the block
     identified by the hash [block_origination_hash], and creates an
-    initial state for the rollup node if that is the case. *)
+    initial state and context for the rollup node if that is the case. *)
 val init :
   data_dir:string ->
   context:#Protocol_client_context.full ->

@@ -179,9 +179,10 @@ let process_inboxes cctxt state rollup_genesis current_hash rollup_id =
   let* () = process_hash cctxt state rollup_genesis current_hash rollup_id in
   return_unit
 
-let main_exit_callback data_dir exit_status =
+let main_exit_callback state data_dir exit_status =
   let open Lwt_syntax in
   let* () = Stores.close data_dir in
+  let* () = Context.close state.State.context_index in
   let* () = Event.(emit node_is_shutting_down) exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
@@ -214,7 +215,7 @@ let run ~data_dir cctxt =
     (* Register cleaner callback *)
     Lwt_exit.register_clean_up_callback
       ~loc:__LOC__
-      (main_exit_callback configuration.data_dir)
+      (main_exit_callback state configuration.data_dir)
   in
   let* (_, _, _, history_mode) = Chain_services.checkpoint cctxt () in
   let* () =
