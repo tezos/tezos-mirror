@@ -30,7 +30,7 @@ val stop : unit -> unit
 val add_received :
   ?unaccurate:bool ->
   Int32.t ->
-  (Signature.Public_key_hash.t * error list * Time.System.t option) list ->
+  (Signature.Public_key_hash.t * error list option * Time.System.t option) list ->
   unit
 
 val add_block :

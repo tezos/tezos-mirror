@@ -30,7 +30,7 @@ module Endorsement = struct
     delegate : Signature.public_key_hash;
     delegate_alias : string option;
     reception_time : Time.System.t option;
-    errors : error list;
+    errors : error list option;
     block_inclusion : Block_hash.t list;
   }
 
@@ -45,7 +45,7 @@ module Endorsement = struct
          (req "delegate" Signature.Public_key_hash.encoding)
          (opt "delegate_alias" string)
          (opt "reception_time" Time.System.encoding)
-         (dft "errors" (list error_encoding) [])
+         (opt "errors" (list error_encoding))
          (dft "included_in_blocks" (list Block_hash.encoding) []))
 end
 
@@ -221,11 +221,11 @@ let extract_anomalies path level infos =
                  block_inclusion;
                } ->
           match errors with
-          | _ :: _ ->
+          | Some (_ :: _) ->
               Anomaly.
                 {level; delegate; delegate_alias; problem = Anomaly.Incorrect}
               :: acc
-          | [] -> (
+          | None | Some [] -> (
               match (reception_time, block_inclusion) with
               | (None, []) ->
                   Anomaly.
@@ -315,7 +315,7 @@ let dump_included_in_block cctxt path block_level block_hash timestamp
                      delegate;
                      delegate_alias = Wallet.alias_of_pkh aliases delegate;
                      reception_time = None;
-                     errors = [];
+                     errors = None;
                      block_inclusion = [block_hash];
                    }
                  :: acc)
@@ -471,7 +471,7 @@ type chunk =
   | Mempool of
       bool option
       * Int32.t
-      * (Signature.Public_key_hash.t * error list * Time.System.t option) list
+      * (Signature.Public_key_hash.t * error list option * Time.System.t option) list
 
 let (chunk_stream, chunk_feeder) = Lwt_stream.create ()
 

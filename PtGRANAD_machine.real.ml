@@ -57,7 +57,7 @@ let dump_my_current_endorsements cctxt ~full block level ops =
     if full then
       List.fold_left
         (fun acc right ->
-          (right.Protocol.Delegate_services.Endorsing_rights.delegate, [], None)
+          (right.Protocol.Delegate_services.Endorsing_rights.delegate, None, None)
           :: acc)
         items
         missing
