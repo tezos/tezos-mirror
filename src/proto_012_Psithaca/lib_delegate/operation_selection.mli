@@ -46,3 +46,8 @@ val filter_operations_without_simulation :
   hard_gas_limit_per_block:Gas.Arith.integral ->
   Operation_pool.Prioritized.t ->
   packed_operation list list
+
+val filter_consensus_operations_only :
+  Baking_simulator.incremental ->
+  Operation_pool.ordered_pool ->
+  (Baking_simulator.incremental * Operation_pool.ordered_pool) tzresult Lwt.t
