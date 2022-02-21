@@ -1359,7 +1359,7 @@ let expr_encoding =
     (** This module can be used to write compact encoding for complex types
         without using relying on the existing combinators. *)
     module Custom : sig
-      type tag = int32
+      type tag = int
 
       (** Combine multiple tags; will throw an error if the total length of
           the tags is more than 16. *)

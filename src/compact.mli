@@ -217,7 +217,7 @@ val or_int32 :
   (int32, 'a) Either.t t
 
 module Custom : sig
-  type tag = int32
+  type tag = int
 
   val join_tags : (tag * int) list -> tag
 

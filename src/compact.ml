@@ -23,10 +23,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let ( lor ) = Int32.logor
-
-let ( << ) x y = Int32.shift_left x y
-
 (* ---- Constants ----------------------------------------------------------- *)
 
 let max_uint8_l = Int32.of_int (Binary_size.max_int `Uint8)
@@ -41,21 +37,21 @@ let max_uint32_L = 0xFFFF_FFFFL
 
 (* ---- Tags ---------------------------------------------------------------- *)
 
-type tag = int32
+(* Ultimately compact-tags are translated to encoding-tag of which uint8 and
+   uint16 are supported. Thus, we can always encode those tags in int. *)
+type tag = int
 
 let join_tags tags =
   let tag_value, tag_len =
     List.fold_left
       (fun (res, ofs) (tag_value, tag_len) ->
-        (res lor (tag_value << ofs), ofs + tag_len))
-      (0l, 0)
+        (res lor (tag_value lsl ofs), ofs + tag_len))
+      (0, 0)
       tags
   in
   if tag_len > 16 then
     raise @@ Invalid_argument "join_tags: total tag_len shouldn't be over 16" ;
   tag_value
-
-let to_int tag_value = Int32.to_int tag_value
 
 (* ---- Encoding helpers ---------------------------------------------------- *)
 
@@ -112,9 +108,9 @@ let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
 
   let tag layout =
     let candidate = C.tag layout in
-    if candidate >= (1l << C.tag_len) then
+    if candidate >= 1 lsl C.tag_len then
       raise @@ Invalid_argument "Compact_encoding.make: tags do not fit" ;
-    to_int candidate
+    candidate
   in
 
   Encoding.(
@@ -136,11 +132,7 @@ let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
           ~binary:
             (matching ~tag_size (fun x ->
                  let layout = C.classify x in
-                 matched
-                   ~tag_size
-                   (C.tag layout |> to_int)
-                   (C.partial_encoding layout)
-                   x)
+                 matched ~tag_size (C.tag layout) (C.partial_encoding layout) x)
             @@ List.map
                  (fun layout ->
                    let tag = tag layout in
@@ -197,7 +189,7 @@ type ('a, 'b, 'c) case_open = {
 }
 
 type ('a, 'b, 'c) case_layout_open = {
-  extra_tag : int32;
+  extra_tag : int;
   proj : 'a -> 'b option;
   inj : 'b -> 'a;
   compact : (module S with type input = 'b and type layout = 'c);
@@ -237,8 +229,7 @@ let case_to_layout : type a. tag -> a case -> a case_layout list =
   case_to_layout_open extra_tag case (fun x -> Case_layout x)
 
 let cases_to_layouts : type a. a case list -> a case_layout list =
- fun cases ->
-  List.mapi (fun i -> case_to_layout @@ Int32.of_int i) cases |> List.concat
+ fun cases -> List.mapi (fun i -> case_to_layout i) cases |> List.concat
 
 let classify_with_case_open :
     type a b layout.
@@ -267,15 +258,15 @@ let classify_with_cases_exn : type a. a case list -> a -> a case_layout =
     | case :: rst -> (
         match classify_with_case extra_tag case input with
         | Some layout -> layout
-        | None -> classify_aux (Int32.succ extra_tag) rst)
+        | None -> classify_aux (succ extra_tag) rst)
   in
-  classify_aux 0l cases
+  classify_aux 0 cases
 
 let tag_with_case_layout_open :
     type a b layout. int -> (a, b, layout) case_layout_open -> tag =
  fun inner_tag_len {extra_tag; compact; layout; _} ->
   let (module C : S with type input = b and type layout = layout) = compact in
-  (extra_tag << inner_tag_len) lor C.tag layout
+  (extra_tag lsl inner_tag_len) lor C.tag layout
 
 let tag_with_case_layout : type a. int -> a case_layout -> tag =
  fun inner_tag_len (Case_layout case) ->
@@ -396,7 +387,7 @@ let payload : type a. a Encoding.t -> a t =
 
     let tag_len = 0
 
-    let tag _ = 0l
+    let tag _ = 0
 
     let classify _ = ()
 
@@ -1534,7 +1525,7 @@ module Compact_bool = struct
 
   let tag_len = 1
 
-  let tag = function true -> 1l | false -> 0l
+  let tag = function true -> 1 | false -> 0
 
   let partial_encoding : layout -> bool Encoding.t =
    fun b ->
@@ -1562,9 +1553,9 @@ module Compact_int32 = struct
 
   let tag_len = 2
 
-  let tag = function Int8 -> 0l | Int16 -> 1l | Int32 -> 2l
+  let tag = function Int8 -> 0 | Int16 -> 1 | Int32 -> 2
 
-  let unused_tag = 3l
+  let unused_tag = 3
 
   (** ---- Partial encoding ------------------------------------------------- *)
 
@@ -1604,7 +1595,7 @@ module Compact_int64 = struct
 
   let tag_len = 2
 
-  let tag = function Int8 -> 0l | Int16 -> 1l | Int32 -> 2l | Int64 -> 3l
+  let tag = function Int8 -> 0 | Int16 -> 1 | Int32 -> 2 | Int64 -> 3
 
   (** ---- Partial encoding ------------------------------------------------- *)
 
@@ -1643,20 +1634,18 @@ end
 let int64 : int64 t = (module Compact_int64)
 
 module Compact_list = struct
-  type layout = Small_list of int32 | Big_list
+  type layout = Small_list of int | Big_list
 
   let layouts bits =
-    let bits = Int32.(shift_left 1l bits |> pred) in
+    let bits = pred (1 lsl bits) in
     let rec aux m acc =
-      if m < bits then aux (Int32.succ m) (Small_list m :: acc) else acc
+      if m < bits then aux (succ m) (Small_list m :: acc) else acc
     in
-    List.rev @@ (Big_list :: aux 0l [])
+    List.rev @@ (Big_list :: aux 0 [])
 
   (** ---- Tag -------------------------------------------------------------- *)
 
-  let tag bits = function
-    | Small_list m -> m
-    | Big_list -> Int32.(pred @@ shift_left 1l bits)
+  let tag bits = function Small_list m -> m | Big_list -> pred (1 lsl bits)
 
   (** ---- Partial encoding ------------------------------------------------- *)
 
@@ -1758,7 +1747,7 @@ module Compact_list = struct
 
   let partial_encoding : 'a Encoding.t -> layout -> 'a list Encoding.t =
    fun encoding -> function
-    | Small_list bits -> list (Int32.to_int bits) encoding
+    | Small_list bits -> list bits encoding
     | Big_list -> Encoding.list encoding
 
   let json_encoding = Encoding.list
@@ -1766,12 +1755,10 @@ module Compact_list = struct
   (** ---- Classifier ------------------------------------------------------- *)
 
   let classify bits l =
-    let m = Int32.(shift_left 1l bits |> pred |> to_int) in
+    let m = pred (1 lsl bits) in
     let rec aux bits l =
       if bits < m then
-        match l with
-        | [] -> Small_list (Int32.of_int bits)
-        | _ :: rst -> aux (bits + 1) rst
+        match l with [] -> Small_list bits | _ :: rst -> aux (bits + 1) rst
       else Big_list
     in
     aux 0 l
@@ -1882,7 +1869,7 @@ let or_int32 :
 module Custom = struct
   module type S = S
 
-  type tag = int32
+  type tag = int
 
   let join_tags = join_tags
 
