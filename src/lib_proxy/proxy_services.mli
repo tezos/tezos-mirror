@@ -38,7 +38,7 @@ exception Rpc_dir_creation_failure of tztrace
 type mode =
   | Light_client of Light.sources  (** [tezos-client --mode light] is running *)
   | Proxy_client  (** [tezos-client --mode proxy] is running *)
-  | Proxy_server of int option
+  | Proxy_server of {sym_block_caching_time : int option}
       (** [tezos-proxy-server] is running and the [int option] value
           is the value of argument [--sym-block-caching-time] *)
 
