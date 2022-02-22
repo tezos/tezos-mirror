@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** See [src/lib_context/tezos_context.ml] for some information. *)
+
 include Context
 
 module Conf = struct

@@ -23,5 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** See [src/lib_context/tezos_context.ml] for some information. *)
+
+(** Variant of [Tezos_context.Context_binary] purely in-memory. *)
 module Context_binary = Context.Make (Tezos_context_encoding.Context_binary)
+
+(** Variant of [Tezos_context.Context] purely in-memory. *)
 module Context = Context.Make (Tezos_context_encoding.Context)
