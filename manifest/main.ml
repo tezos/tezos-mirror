@@ -1467,6 +1467,7 @@ let _tezos_sapling_js_tests =
     ~opam:"src/lib_sapling/tezos-sapling"
     ~deps:[tezos_sapling; tezos_hacl]
     ~modules:["test_js"]
+    ~linkall:true
     ~modes:[JS]
     ~js_compatible:true
 
