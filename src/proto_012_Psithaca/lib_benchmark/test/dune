@@ -20,10 +20,6 @@
          -open Tezos_benchmark_012_Psithaca
          -open Tezos_012_Psithaca_test_helpers)))
 
-(alias
-  (name buildtest)
-  (deps test_sampling_data.exe test_sampling_code.exe))
-
 (rule
   (alias runtest_micheline_rewriting_data)
   (action (run %{exe:test_sampling_data.exe} 1234)))
