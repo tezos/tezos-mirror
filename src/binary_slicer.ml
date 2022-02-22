@@ -398,11 +398,11 @@ and read_list :
     read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list
     =
  fun error max_length e ?name state ->
+  let name = Option.map (fun name -> name ^ " element") name in
   let rec loop max_length acc =
     if state.remaining_bytes = 0 then List.rev acc
     else if max_length = 0 then raise error
     else
-      let name = Option.map (fun name -> name ^ " element") name in
       let v = read_rec e ?name state in
       loop (max_length - 1) (v :: acc)
   in
@@ -411,11 +411,11 @@ and read_list :
 and read_fixed_list :
     type a. int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
  fun exact_length e ?name state ->
+  let name = Option.map (fun name -> name ^ " element") name in
   let rec loop exact_length acc =
     if exact_length = 0 then List.rev acc
     else if state.remaining_bytes = 0 then raise Not_enough_data
     else
-      let name = Option.map (fun name -> name ^ " element") name in
       let v = read_rec e ?name state in
       loop (exact_length - 1) (v :: acc)
   in
