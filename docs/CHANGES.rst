@@ -3,6 +3,54 @@
 Changelog
 '''''''''
 
+Version 12.0
+============
+
+Node
+----
+
+- The tezos-node configuration file parameter
+  ``shell.prevalidator.limits.max_refused_operations`` is now
+  deprecated and may be removed starting from version 13.0.
+
+- Fixed missing removal of replaced operation in the plugin when another better
+  one takes its place (when the mempool is full).
+
+- The output of ``tezos-client get ledger high watermark for <ledger>``
+  now also displays the high-water mark for the round, if available.
+  Rounds are introduced in Tenderbake.
+
+- Optimized global CPU usage. This can save up to a third of CPU usage.
+
+- RPC ``/helpers/scripts/simulate_operations`` now takes protocol
+  activation into account: the cache is considered empty three levels
+  before activation.
+
+- Added an optional field to the RPC
+  ``/helpers/scripts/simulate_operations`` named
+  ``blocks_before_activation`` (int32, measured in number of blocks)
+  which allows to override the number of blocks before activation,
+  which can be useful in case of user-activated upgrade.
+
+Miscellaneous
+-------------
+
+- Updated the build system to use a patched version of the OCaml compiler
+  to fix a bug that could cause compilation to fail on newer versions of gcc and glibc.
+
+- Optimized memory consumption of the block validator.
+  This improves memory usage of the node, the external validator process,
+  and the baker. Memory usage should be lower and more predictable.
+
+Baker / Endorser / Accuser
+--------------------------
+
+- Improved the log messages of the Ithaca baker for the default
+  (``Notice``) and ``Info`` logging levels.
+
+- Fixed a corner case where the baker could include redundant endorsements
+  when a delegate was double baking.
+
 Version 12.0~rc2
 ================
 
