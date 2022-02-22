@@ -207,7 +207,7 @@ let pp_u fmt =
 
 type e = (t, u) Either.t
 
-let e_gen =
+let e_gen : e QCheck2.Gen.t =
   let open QCheck2.Gen in
   let* choice = bool in
   if choice then Either.left <$> t_gen else Either.right <$> u_gen

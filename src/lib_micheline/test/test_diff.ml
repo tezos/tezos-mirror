@@ -64,8 +64,6 @@ let int i = Int ((), Z.of_int i)
 
 let str s = String ((), s)
 
-let bytes bs = Bytes ((), bs)
-
 let prim ?(args = []) ?(annots = []) p = Prim ((), p, args, annots)
 
 let seq els = Seq ((), els)

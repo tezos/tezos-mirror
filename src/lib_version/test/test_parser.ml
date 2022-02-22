@@ -33,8 +33,6 @@ module Assert = struct
   let fail expected given msg =
     Format.kasprintf failwith "@[%s@ expected: %s@ got: %s@]" msg expected given
 
-  let fail_msg fmt = Format.kasprintf (fail "" "") fmt
-
   let default_printer _ = ""
 
   let equal ?(eq = ( = )) ?(prn = default_printer) ?(msg = "") x y =
