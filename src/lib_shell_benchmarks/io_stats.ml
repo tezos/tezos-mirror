@@ -86,24 +86,27 @@ let tree_statistics key_map =
   {total = !nodes; keys = !keys; dirs = !dirs; degrees; depths; sizes}
 
 let load_tree context key =
+  let open Lwt_syntax in
   Context.fold
     context
     key
     ~order:`Sorted
     ~init:Io_helpers.Key_map.empty
     ~f:(fun path t tree ->
-      Context.Tree.to_value t >|= function
+      let+ o = Context.Tree.to_value t in
+      match o with
       | Some bytes ->
           let len = Bytes.length bytes in
           Io_helpers.Key_map.insert path len tree
       | None -> tree)
 
 let context_statistics base_dir context_hash =
+  let open Lwt_syntax in
   let (context, index) =
     Io_helpers.load_context_from_disk base_dir context_hash
   in
-  load_tree context [] >>= fun tree ->
-  Tezos_context.Context.close index >>= fun () ->
+  let* tree = load_tree context [] in
+  let* () = Tezos_context.Context.close index in
   Lwt.return (tree_statistics tree)
 
 let matrix_of_int_list (l : int list) =
@@ -119,26 +122,32 @@ let plot_histograms save_to {degrees; depths; sizes; _} =
   run
     ~nrows:1
     ~ncols:3
-    ( subplot_2d
-        ~row:0
-        ~col:0
-        Axis.(
-          set_title "Tree degree distribution" >>= fun () ->
-          histogram_1d
-            ~h:degrees
-            ~opts:{bins = Some (Bins_num 50); range = None})
-    >>= fun () ->
-      subplot_2d
-        ~row:0
-        ~col:1
-        Axis.(
-          set_title "Key depth distribution" >>= fun () ->
-          histogram_1d ~h:depths ~opts:{bins = Some (Bins_num 50); range = None})
-      >>= fun () ->
-      subplot_2d
-        ~row:0
-        ~col:2
-        Axis.(
-          set_title "Data size distribution" >>= fun () ->
-          histogram_1d ~h:sizes ~opts:{bins = None; range = None})
-      >>= fun () -> savefig ~filename:save_to ~dpi:300 ~quality:95 )
+    (let* () =
+       subplot_2d
+         ~row:0
+         ~col:0
+         Axis.(
+           let* () = set_title "Tree degree distribution" in
+           histogram_1d
+             ~h:degrees
+             ~opts:{bins = Some (Bins_num 50); range = None})
+     in
+     let* () =
+       subplot_2d
+         ~row:0
+         ~col:1
+         Axis.(
+           let* () = set_title "Key depth distribution" in
+           histogram_1d
+             ~h:depths
+             ~opts:{bins = Some (Bins_num 50); range = None})
+     in
+     let* () =
+       subplot_2d
+         ~row:0
+         ~col:2
+         Axis.(
+           let* () = set_title "Data size distribution" in
+           histogram_1d ~h:sizes ~opts:{bins = None; range = None})
+     in
+     savefig ~filename:save_to ~dpi:300 ~quality:95)
