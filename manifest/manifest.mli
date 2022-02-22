@@ -553,6 +553,8 @@ val pps : ?args:string list -> target -> preprocessor
       This causes the library to not come with a toplevel module with aliases to
       all other modules. Not recommended (according to the dune documentation).
 
+    - [action]: how to run this target. Only useful for test targets.
+
     - [path]: the path to the directory of the [dune] file that will define this target. *)
 type 'a maker =
   ?all_modules_except:string list ->
@@ -590,6 +592,7 @@ type 'a maker =
   ?warnings:string ->
   ?wrapped:bool ->
   ?cram:bool ->
+  ?action:Dune.s_expr ->
   path:string ->
   'a ->
   target
