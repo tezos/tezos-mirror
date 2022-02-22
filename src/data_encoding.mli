@@ -688,6 +688,62 @@ let encoding_t =
 
         @raise Invalid_argument if [n <= 0]. *)
     val add_padding : 'a encoding -> int -> 'a encoding
+
+    (** [list n e] is an encoding for lists of exactly [n] elements. If a list
+        of more or fewer elements is provided, then the encoding fails with the
+        [write_error List_too_long]. For decoding, it can fail with
+        [read_error Not_enough_data] or [read_error Extra_bytes], or it may
+        cause other failures further down the line when the AST traversal
+        becomes out-of-sync with the underlying byte-stream traversal.
+
+        This encoding has a narrow set of possible applications because it is
+        very restrictive. Still, it can to:
+        - mirror static guarantees about the length of some lists,
+        - special-case some common lengths of typical input in a union (see
+          example below),
+        - other ends.
+
+{[
+type expr =
+  | Op of string * expr list (* most commonly 1 or 2 operands *)
+  | Literal of string
+let expr_encoding =
+  mu "expr" (fun e ->
+    union [
+      case ~title:"op-nonary" (Tag 0)
+        string
+        (function Op (op, []) -> Some op | _ -> None)
+        (fun op -> Op (op, []));
+      case ~title:"op-unary" (Tag 1)
+        (tup2 string (Fixed.list 1 e))
+        (function Op (op, ([_]) as operand) -> Some (op, operand) | _ -> None)
+        (fun (op, operand) -> Op (op, operand));
+      case ~title:"op-binary" (Tag 2)
+        (tup2 string (Fixed.list 2 e))
+        (function Op (op, ([_;_]) as operand) -> Some (op, operand) | _ -> None)
+        (fun (op, operand) -> Op (op, operand));
+      case ~title:"op-moreary" (Tag 3)
+        (tup2 string (list e))
+        (function Op (op, operand) -> Some (op, operand) | _ -> None)
+        (fun (op, operand) -> Op (op, operand));
+      case ~title:"literal" (Tag 4)
+        string
+        (function Literal l -> Some l | _ -> None)
+        (fun l -> Literal l);
+        ]
+  )
+}]
+
+        Interestingly, the cases for known lengths can be generated
+        programmatically.
+
+        @raise Invalid_argument if the argument is less or equal to zero. *)
+    val list : int -> 'a encoding -> 'a list encoding
+
+    (** See [list] above.
+
+      @raise Invalid_argument if the argument is less or equal to zero. *)
+    val array : int -> 'a encoding -> 'a array encoding
   end
 
   (** Create encodings that produce data of a variable length when binary encoded.

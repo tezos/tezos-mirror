@@ -307,8 +307,10 @@ let rec json : type a. a Encoding.desc -> a Json_encoding.encoding =
   | Bytes _ -> bytes_jsont
   | String_enum (tbl, _) ->
       string_enum (Hashtbl.fold (fun a (str, _) acc -> (str, a) :: acc) tbl [])
-  | Array (_, e) -> array (get_json e) (* FIXME TODO enforce max_length *)
-  | List (_, e) -> list (get_json e)
+  | Array {elts = e; length_limit = _} ->
+      array (get_json e) (* FIXME TODO enforce length_limit *)
+  | List {elts = e; length_limit = _} ->
+      list (get_json e) (* FIXME TODO enforce length_limit *)
   | Obj f -> obj1 (field_json f)
   | Objs {left; right; _} -> merge_objs (get_json left) (get_json right)
   | Tup e -> tup1 (get_json e)

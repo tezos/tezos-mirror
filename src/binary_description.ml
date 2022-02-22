@@ -337,10 +337,10 @@ let describe (type x) (encoding : x Encoding.t) =
     | Splitted {encoding; _} ->
         fields ref_name recursives references encoding.encoding
     | Delayed func -> fields ref_name recursives references (func ()).encoding
-    | List (len, {encoding; _}) ->
+    | List {length_limit = len; elts = {encoding; _}} ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
-    | Array (len, {encoding; _}) ->
+    | Array {length_limit = len; elts = {encoding; _}} ->
         let layout, references = layout None recursives references encoding in
         ([Anonymous_field (`Variable, Seq (layout, len))], references)
     | Bytes kind -> ([Anonymous_field ((kind :> Kind.t), Bytes)], references)
@@ -468,12 +468,12 @@ let describe (type x) (encoding : x Encoding.t) =
           add_reference name (Int_enum {size; cases}) references
         in
         (Enum (size, name), references)
-    | Array (len, data) ->
+    | Array {length_limit = len; elts = data} ->
         let descr, references =
           layout None recursives references data.encoding
         in
         (Seq (descr, len), references)
-    | List (len, data) ->
+    | List {length_limit = len; elts = data} ->
         let layout, references =
           layout None recursives references data.encoding
         in

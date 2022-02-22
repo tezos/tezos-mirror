@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type limit = No_limit | At_most of int | Exactly of int
+
 module Kind = struct
   type t = [`Fixed of int | `Dynamic | `Variable]
 
@@ -107,8 +109,8 @@ type 'a desc =
   | String : Kind.length -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : int option * 'a t -> 'a array desc
-  | List : int option * 'a t -> 'a list desc
+  | Array : {length_limit : limit; elts : 'a t} -> 'a array desc
+  | List : {length_limit : limit; elts : 'a t} -> 'a list desc
   | Obj : 'a field -> 'a desc
   | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
@@ -242,7 +244,17 @@ and classify_desc : type a. a desc -> Kind.t =
   | Mu {kind; _} -> (kind :> Kind.t)
   (* Variable *)
   | Ignore -> `Fixed 0
+  | Array {length_limit = Exactly l; elts} -> (
+      match classify_desc elts.encoding with
+      | `Fixed e -> `Fixed (l * e)
+      | `Dynamic -> `Dynamic
+      | `Variable -> `Variable)
   | Array _ -> `Variable
+  | List {length_limit = Exactly l; elts} -> (
+      match classify_desc elts.encoding with
+      | `Fixed e -> `Fixed (l * e)
+      | `Dynamic -> `Dynamic
+      | `Variable -> `Variable)
   | List _ -> `Variable
   (* Recursive *)
   | Obj (Req {encoding; _}) -> classify encoding
@@ -276,6 +288,18 @@ module Fixed = struct
     match classify e with
     | `Fixed _ -> make @@ Padded (e, n)
     | _ -> invalid_arg "Cannot pad non-fixed size encoding"
+
+  let list n e =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create a list encoding of negative or null fixed length." ;
+    make @@ List {length_limit = Exactly n; elts = e}
+
+  let array n e =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create an array encoding of negative or null fixed length." ;
+    make @@ Array {length_limit = Exactly n; elts = e}
 end
 
 (* [Mu_visited] is intended for internal use only. It is used to record visit
@@ -331,8 +355,16 @@ let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
   | Padded _ -> false
   | String_enum _ -> false
   (* true in some cases, but in practice always protected by Dynamic *)
-  | Array _ -> true (* 0-element array *)
-  | List _ -> true (* 0-element list *)
+  | Array {length_limit = Exactly l; elts = _} ->
+      assert (l > 0) ;
+      false
+  | Array {length_limit = No_limit | At_most _; elts = _} ->
+      true (* 0-element array *)
+  | List {length_limit = Exactly l; elts = _} ->
+      assert (l > 0) ;
+      false
+  | List {length_limit = No_limit | At_most _; elts = _} ->
+      true (* 0-element list *)
   (* represented as whatever is inside: truth mostly propagates *)
   | Obj (Req {encoding = e; _}) -> is_zeroable visited e (* represented as-is *)
   | Obj (Opt {kind = `Variable; _}) -> true (* optional field omitted *)
@@ -387,7 +419,10 @@ module Variable = struct
   let array ?max_length e =
     check_not_variable "an array" e ;
     check_not_zeroable "an array" e ;
-    let encoding = make @@ Array (max_length, e) in
+    let length_limit =
+      match max_length with None -> No_limit | Some l -> At_most l
+    in
+    let encoding = make @@ Array {length_limit; elts = e} in
     match (classify e, max_length) with
     | `Fixed n, Some max_length ->
         let limit = n * max_length in
@@ -397,7 +432,10 @@ module Variable = struct
   let list ?max_length e =
     check_not_variable "a list" e ;
     check_not_zeroable "a list" e ;
-    let encoding = make @@ List (max_length, e) in
+    let length_limit =
+      match max_length with None -> No_limit | Some l -> At_most l
+    in
+    let encoding = make @@ List {length_limit; elts = e} in
     match (classify e, max_length) with
     | `Fixed n, Some max_length ->
         let limit = n * max_length in

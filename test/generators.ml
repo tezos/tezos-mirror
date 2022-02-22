@@ -88,7 +88,9 @@ type _ ty =
   | Option : 'a ty -> 'a option ty
   | Result : 'a ty * 'b ty -> ('a, 'b) result ty
   | List : 'a ty -> 'a list ty
+  | FixedList : int * 'a ty -> 'a list ty
   | Array : 'a ty -> 'a array ty
+  | FixedArray : int * 'a ty -> 'a array ty
   | Dynamic_size : 'a ty -> 'a ty
   | Tup1 : 'a ty -> 'a ty
   | Tup2 : 'a ty * 'b ty -> ('a * 'b) ty
@@ -133,7 +135,9 @@ let rec pp_ty : type a. a ty Crowbar.printer =
   | Option ty -> Crowbar.pp ppf "option(%a)" pp_ty ty
   | Result (tya, tyb) -> Crowbar.pp ppf "result(%a,%a)" pp_ty tya pp_ty tyb
   | List ty -> Crowbar.pp ppf "list(%a)" pp_ty ty
+  | FixedList (n, ty) -> Crowbar.pp ppf "fixedlist(%d)(%a)" n pp_ty ty
   | Array ty -> Crowbar.pp ppf "array(%a)" pp_ty ty
+  | FixedArray (n, ty) -> Crowbar.pp ppf "fixedarray(%d)(%a)" n pp_ty ty
   | Dynamic_size ty -> Crowbar.pp ppf "dynamic_size(%a)" pp_ty ty
   | Tup1 ty -> Crowbar.pp ppf "tup1(%a)" pp_ty ty
   | Tup2 (tya, tyb) -> Crowbar.pp ppf "tup2(%a,%a)" pp_ty tya pp_ty tyb
@@ -199,7 +203,13 @@ let any_ty_gen =
                 AnyTy (Result (ty_ok, ty_error)));
             map [g] (fun (AnyTy ty_both) -> AnyTy (Result (ty_both, ty_both)));
             map [g] (fun (AnyTy ty) -> AnyTy (List ty));
+            map
+              [range ~min:1 4; g]
+              (fun n (AnyTy ty) -> AnyTy (FixedList (n, ty)));
             map [g] (fun (AnyTy ty) -> AnyTy (Array ty));
+            map
+              [range ~min:1 4; g]
+              (fun n (AnyTy ty) -> AnyTy (FixedArray (n, ty)));
             map [g] (fun (AnyTy ty) -> AnyTy (Dynamic_size ty));
             map [g] (fun (AnyTy ty) -> AnyTy (Tup1 ty));
             map [g; g] (fun (AnyTy ty_a) (AnyTy ty_b) ->
@@ -471,6 +481,41 @@ let full_list : type a. a full -> a list full =
     let encoding = Data_encoding.(list (dynamic_if_needed Full.encoding))
   end)
 
+let list_n_gen n gen =
+  (* NOTE: always called with 1-4 *)
+  let open Crowbar in
+  match n with
+  | 1 -> map [gen] (fun e -> [e])
+  | 2 -> map [gen; gen] (fun e e' -> [e; e'])
+  | 3 -> map [gen; gen; gen] (fun e e' e'' -> [e; e'; e''])
+  | 4 -> map [gen; gen; gen; gen] (fun e e' e'' e''' -> [e; e'; e''; e'''])
+  | _ -> assert false
+
+let full_fixed_list : type a. int -> a full -> a list full =
+ fun fix full ->
+  let module Full = (val full) in
+  (module struct
+    type t = Full.t list
+
+    let ty = FixedList (fix, Full.ty)
+
+    let eq xs ys = List.compare_lengths xs ys = 0 && List.for_all2 Full.eq xs ys
+
+    let pp ppf v =
+      Crowbar.pp
+        ppf
+        "fixedlist(%d)(%a)"
+        fix
+        Format.(
+          pp_print_list ~pp_sep:(fun fmt () -> pp_print_char fmt ',') Full.pp)
+        v
+
+    let gen = list_n_gen fix Full.gen
+
+    let encoding =
+      Data_encoding.(Fixed.list fix (dynamic_if_needed Full.encoding))
+  end)
+
 let full_array : type a. a full -> a array full =
  fun full ->
   let module Full = (val full) in
@@ -494,6 +539,35 @@ let full_array : type a. a full -> a array full =
     let gen = Crowbar.(map [list Full.gen] Array.of_list)
 
     let encoding = Data_encoding.(array (dynamic_if_needed Full.encoding))
+  end)
+
+let full_fixed_array : type a. int -> a full -> a array full =
+ fun fixen full ->
+  let module Full = (val full) in
+  (module struct
+    type t = Full.t array
+
+    let ty = FixedArray (fixen, Full.ty)
+
+    let eq xs ys =
+      Array.length xs = Array.length ys
+      && Array.for_all Fun.id (Array.map2 Full.eq xs ys)
+
+    let pp ppf v =
+      Crowbar.pp
+        ppf
+        "fixedarray(%d)(%a)"
+        fixen
+        Format.(
+          pp_print_list ~pp_sep:(fun fmt () -> pp_print_char fmt ',') Full.pp)
+        (Array.to_list v)
+
+    let gen =
+      let open Crowbar in
+      map [list_n_gen fixen Full.gen] Array.of_list
+
+    let encoding =
+      Data_encoding.(Fixed.array fixen (dynamic_if_needed Full.encoding))
   end)
 
 let full_dynamic_size : type a. a full -> a full =
@@ -865,7 +939,9 @@ let rec full_of_ty : type a. a ty -> a full = function
   | Option ty -> full_option (full_of_ty ty)
   | Result (tya, tyb) -> full_result (full_of_ty tya) (full_of_ty tyb)
   | List ty -> full_list (full_of_ty ty)
+  | FixedList (n, ty) -> full_fixed_list n (full_of_ty ty)
   | Array ty -> full_array (full_of_ty ty)
+  | FixedArray (n, ty) -> full_fixed_array n (full_of_ty ty)
   | Dynamic_size ty -> full_dynamic_size (full_of_ty ty)
   | Tup1 ty -> full_tup1 (full_of_ty ty)
   | Tup2 (tya, tyb) -> full_tup2 (full_of_ty tya) (full_of_ty tyb)

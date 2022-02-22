@@ -42,4 +42,6 @@ let () =
       ("int31_int32", Int31_int32.tests);
       ("inline_phantom", Reference_check.Inline_phantom.tests);
       ("mu_phantom", Reference_check.Mu_phantom.tests);
+      ("fixed_list", Fixed_list.tests);
+      ("fixed_array", Fixed_array.tests);
     ]

@@ -248,13 +248,26 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum state value
   | String_enum (tbl, arr) -> Atom.string_enum tbl arr state value
-  | Array (Some max_length, _e) when Array.length value > max_length ->
-      raise Array_too_long
-  | Array (_, e) -> Array.iter (write_rec e state) value
-  | List (Some max_length, _e)
-    when List.compare_length_with value max_length > 0 ->
-      raise List_too_long
-  | List (_, e) -> List.iter (write_rec e state) value
+  | Array {length_limit; elts} -> (
+      match length_limit with
+      | No_limit -> Array.iter (write_rec elts state) value
+      | At_most max_length ->
+          if Array.length value > max_length then raise Array_too_long ;
+          Array.iter (write_rec elts state) value
+      | Exactly exact_length ->
+          if Array.length value <> exact_length then raise Array_too_long ;
+          Array.iter (write_rec elts state) value)
+  | List {length_limit; elts} -> (
+      match length_limit with
+      | No_limit -> List.iter (write_rec elts state) value
+      | At_most max_length ->
+          if List.compare_length_with value max_length > 0 then
+            raise List_too_long ;
+          List.iter (write_rec elts state) value
+      | Exactly exact_length ->
+          if List.compare_length_with value exact_length <> 0 then
+            raise List_too_long ;
+          List.iter (write_rec elts state) value)
   | Obj (Req {encoding = e; _}) -> write_rec e state value
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) -> (
       match value with
