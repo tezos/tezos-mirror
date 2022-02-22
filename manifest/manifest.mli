@@ -455,7 +455,7 @@ val pps : ?args:string list -> target -> preprocessor
       the library includes an [index.mld] file.
 
     - [linkall]: if [true], add [-linkall] to the list of flags to be passed
-      to the OCaml compiler. In executables and tests, it is added to the [(flags ...)]
+      to the OCaml compiler. In executables and tests, it is added to the [(link_flags ...)]
       stanza, causing all modules of all dependencies to be linked unconditionally,
       even if they are not referenced directly in the code.
       In libraries, it is added to the [(library_flags ...)] stanza,

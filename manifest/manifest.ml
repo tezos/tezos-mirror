@@ -174,11 +174,11 @@ module Dune = struct
 
   let executable_or_library kind ?(public_names = Stdlib.List.[]) ?package
       ?(instrumentation = Stdlib.List.[]) ?(libraries = []) ?flags
-      ?library_flags ?(inline_tests = false) ?(preprocess = Stdlib.List.[])
-      ?(preprocessor_deps = Stdlib.List.[]) ?(wrapped = true) ?modules
-      ?modules_without_implementation ?modes ?foreign_stubs ?c_library_flags
-      ?(private_modules = Stdlib.List.[]) ?(deps = Stdlib.List.[]) ?js_of_ocaml
-      (names : string list) =
+      ?library_flags ?link_flags ?(inline_tests = false)
+      ?(preprocess = Stdlib.List.[]) ?(preprocessor_deps = Stdlib.List.[])
+      ?(wrapped = true) ?modules ?modules_without_implementation ?modes
+      ?foreign_stubs ?c_library_flags ?(private_modules = Stdlib.List.[])
+      ?(deps = Stdlib.List.[]) ?js_of_ocaml (names : string list) =
     [
       V
         [
@@ -224,6 +224,7 @@ module Dune = struct
           | None -> E
           | Some flags -> S "js_of_ocaml" :: flags);
           opt library_flags (fun x -> [S "library_flags"; x]);
+          opt link_flags (fun x -> [S "link_flags"; x]);
           opt flags (fun x -> [S "flags"; x]);
           (if not wrapped then [S "wrapped"; S "false"] else E);
           opt modules (fun x -> S "modules" :: x);
@@ -1301,10 +1302,14 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
     if internal.linkall && is_lib then Some Dune.[S ":standard"; S "-linkall"]
     else None
   in
+  let link_flags =
+    if internal.linkall && not is_lib then
+      Some Dune.[S ":standard"; S "-linkall"]
+    else None
+  in
   let flags =
     internal.opens
     |> List.map (fun m -> Dune.(G [S "-open"; S m]))
-    |> cons_if (internal.linkall && not is_lib) (Dune.S "-linkall")
     |> cons_if internal.nopervasives (Dune.S "-nopervasives")
     |> cons_if internal.nostdlib (Dune.S "-nostdlib")
     |> cons_if internal.opaque (Dune.S "-opaque")
@@ -1411,6 +1416,7 @@ let generate_dune ~dune_file_has_static_profile (internal : Target.internal) =
       ~instrumentation
       ~libraries
       ?library_flags
+      ?link_flags
       ?flags
       ~inline_tests:internal.inline_tests
       ~preprocess

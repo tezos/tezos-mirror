@@ -111,9 +111,9 @@
   (select void_for_linking-tezos-protocol-plugin-alpha-registerer from
    (tezos-protocol-plugin-alpha-registerer -> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)
    (-> void_for_linking-tezos-protocol-plugin-alpha-registerer.empty)))
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_base.TzPervasives
    -open Tezos_base
    -open Tezos_stdlib_unix
