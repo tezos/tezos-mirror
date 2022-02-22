@@ -81,31 +81,29 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Bytes `Variable -> Bytes.length value
   | String `Variable -> String.length value
   | Array {length_limit; elts} -> (
-      match length_limit with
-      | No_limit -> Array.fold_left (fun acc v -> length elts v + acc) 0 value
+      (match length_limit with
+      | No_limit -> ()
       | At_most max_length ->
           if Array.length value > max_length then
-            raise (Write_error Array_invalid_length) ;
-          Array.fold_left (fun acc v -> length elts v + acc) 0 value
-      | Exactly exact_length -> (
+            raise (Write_error Array_invalid_length)
+      | Exactly exact_length ->
           if Array.length value <> exact_length then
-            raise (Write_error Array_invalid_length) ;
-          match fixed_length elts with
-          | Some s -> exact_length * s
-          | None -> Array.fold_left (fun acc v -> length elts v + acc) 0 value))
+            raise (Write_error Array_invalid_length)) ;
+      match fixed_length elts with
+      | Some s -> Array.length value * s
+      | None -> Array.fold_left (fun acc v -> length elts v + acc) 0 value)
   | List {length_limit; elts} -> (
-      match length_limit with
-      | No_limit -> List.fold_left (fun acc v -> length elts v + acc) 0 value
+      (match length_limit with
+      | No_limit -> ()
       | At_most max_length ->
-          if List.length value > max_length then
-            raise (Write_error List_invalid_length) ;
-          List.fold_left (fun acc v -> length elts v + acc) 0 value
-      | Exactly exact_length -> (
-          if List.length value <> exact_length then
-            raise (Write_error List_invalid_length) ;
-          match fixed_length elts with
-          | Some s -> exact_length * s
-          | None -> List.fold_left (fun acc v -> length elts v + acc) 0 value))
+          if List.compare_length_with value max_length > 0 then
+            raise (Write_error List_invalid_length)
+      | Exactly exact_length ->
+          if List.compare_length_with value exact_length <> 0 then
+            raise (Write_error List_invalid_length)) ;
+      match fixed_length elts with
+      | Some s -> List.length value * s
+      | None -> List.fold_left (fun acc v -> length elts v + acc) 0 value)
   | Objs {kind = `Variable; left; right} ->
       let v1, v2 = value in
       length left v1 + length right v2
