@@ -278,8 +278,31 @@ module Fixed = struct
     | _ -> invalid_arg "Cannot pad non-fixed size encoding"
 end
 
-let rec is_zeroable : type t. t encoding -> bool =
- fun e ->
+(* [Mu_visited] is intended for internal use only. It is used to record visit
+   to recursion nodes ([Mu]) to avoid infinite recursion. See [is_zeroable] for
+   an example of use. *)
+module Mu_visited : sig
+  type t
+
+  val empty : t
+
+  val mem : _ desc -> t -> bool
+
+  (* Raise an exception if called with a node different than [Mu]. *)
+  val add : _ desc -> t -> t
+end = struct
+  type t = Obj.t list
+
+  let empty = []
+
+  let mem x m =
+    match x with Mu _ -> List.memq (Obj.repr x) m | _ -> assert false
+
+  let add x m = match x with Mu _ -> Obj.repr x :: m | _ -> assert false
+end
+
+let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
+ fun visited e ->
   (* Whether an encoding can ever produce zero-byte of encoding. It is dangerous
      to place zero-size elements in a collection (list/array) because
      they are indistinguishable from the absence of elements. *)
@@ -311,25 +334,31 @@ let rec is_zeroable : type t. t encoding -> bool =
   | Array _ -> true (* 0-element array *)
   | List _ -> true (* 0-element list *)
   (* represented as whatever is inside: truth mostly propagates *)
-  | Obj (Req {encoding = e; _}) -> is_zeroable e (* represented as-is *)
+  | Obj (Req {encoding = e; _}) -> is_zeroable visited e (* represented as-is *)
   | Obj (Opt {kind = `Variable; _}) -> true (* optional field omitted *)
-  | Obj (Dft {encoding = e; _}) -> is_zeroable e (* represented as-is *)
+  | Obj (Dft {encoding = e; _}) -> is_zeroable visited e (* represented as-is *)
   | Obj _ -> false
-  | Objs {left; right; _} -> is_zeroable left && is_zeroable right
-  | Tup e -> is_zeroable e
-  | Tups {left; right; _} -> is_zeroable left && is_zeroable right
+  | Objs {left; right; _} ->
+      is_zeroable visited left && is_zeroable visited right
+  | Tup e -> is_zeroable visited e
+  | Tups {left; right; _} ->
+      is_zeroable visited left && is_zeroable visited right
   | Union _ -> false (* includes a tag *)
   (* other recursive cases: truth propagates *)
   | Mu {kind = `Dynamic; _} -> false (* size prefix *)
-  | Mu {kind = `Variable; fix; _} -> is_zeroable (fix e)
-  | Conv {encoding; _} -> is_zeroable encoding
-  | Describe {encoding; _} -> is_zeroable encoding
-  | Splitted {encoding; _} -> is_zeroable encoding
-  | Check_size {encoding; _} -> is_zeroable encoding
+  | Mu {kind = `Variable; fix; _} ->
+      if Mu_visited.mem e.encoding visited then true
+      else is_zeroable (Mu_visited.add e.encoding visited) (fix e)
+  | Conv {encoding; _} -> is_zeroable visited encoding
+  | Describe {encoding; _} -> is_zeroable visited encoding
+  | Splitted {encoding; _} -> is_zeroable visited encoding
+  | Check_size {encoding; _} -> is_zeroable visited encoding
   (* Unscrutable: true by default *)
-  | Delayed f -> is_zeroable (f ())
+  | Delayed f -> is_zeroable visited (f ())
   (* Protected against zeroable *)
   | Dynamic_size _ -> false
+
+let is_zeroable e = is_zeroable Mu_visited.empty e
 
 (* always some data for size *)
 
@@ -486,37 +515,45 @@ let raw_splitted ~json ~binary =
   @@ Splitted
        {encoding = binary; json_encoding = json; is_obj = false; is_tup = false}
 
-let rec is_obj : type a. a t -> bool =
- fun e ->
+let rec is_obj : type a. Mu_visited.t -> a t -> bool =
+ fun visited e ->
   match e.encoding with
   | Obj _ -> true
   | Objs _ (* by construction *) -> true
-  | Conv {encoding = e; _} -> is_obj e
-  | Dynamic_size {encoding = e; _} -> is_obj e
+  | Conv {encoding = e; _} -> is_obj visited e
+  | Dynamic_size {encoding = e; _} -> is_obj visited e
   | Union {cases; _} ->
-      List.for_all (fun (Case {encoding = e; _}) -> is_obj e) cases
+      List.for_all (fun (Case {encoding = e; _}) -> is_obj visited e) cases
   | Empty -> true
   | Ignore -> true
-  | Mu {fix; _} -> is_obj (fix e)
+  | Mu {fix; _} ->
+      if Mu_visited.mem e.encoding visited then false
+      else is_obj (Mu_visited.add e.encoding visited) (fix e)
   | Splitted {is_obj; _} -> is_obj
-  | Delayed f -> is_obj (f ())
-  | Describe {encoding; _} -> is_obj encoding
+  | Delayed f -> is_obj visited (f ())
+  | Describe {encoding; _} -> is_obj visited encoding
   | _ -> false
 
-let rec is_tup : type a. a t -> bool =
- fun e ->
+let is_obj e = is_obj Mu_visited.empty e
+
+let rec is_tup : type a. Mu_visited.t -> a t -> bool =
+ fun visited e ->
   match e.encoding with
   | Tup _ -> true
   | Tups _ (* by construction *) -> true
-  | Conv {encoding = e; _} -> is_tup e
-  | Dynamic_size {encoding = e; _} -> is_tup e
+  | Conv {encoding = e; _} -> is_tup visited e
+  | Dynamic_size {encoding = e; _} -> is_tup visited e
   | Union {cases; _} ->
-      List.for_all (function Case {encoding = e; _} -> is_tup e) cases
-  | Mu {fix; _} -> is_tup (fix e)
+      List.for_all (function Case {encoding = e; _} -> is_tup visited e) cases
+  | Mu {fix; _} ->
+      if Mu_visited.mem e.encoding visited then false
+      else is_tup (Mu_visited.add e.encoding visited) (fix e)
   | Splitted {is_tup; _} -> is_tup
-  | Delayed f -> is_tup (f ())
-  | Describe {encoding; _} -> is_tup encoding
+  | Delayed f -> is_tup visited (f ())
+  | Describe {encoding; _} -> is_tup visited encoding
   | _ -> false
+
+let is_tup e = is_tup Mu_visited.empty e
 
 let raw_merge_objs left right =
   let kind = Kind.combine "objects" (classify left) (classify right) in
@@ -760,8 +797,8 @@ let matched ?(tag_size : [`Uint8 | `Uint16] = `Uint8) tag encoding v =
   valid_tag tag_size tag ;
   Matched (tag, encoding, v)
 
-let rec is_nullable : type t. t encoding -> bool =
- fun e ->
+let rec is_nullable : type t. Mu_visited.t -> t encoding -> bool =
+ fun visited e ->
   match e.encoding with
   | Null -> true
   | Empty -> false
@@ -782,7 +819,7 @@ let rec is_nullable : type t. t encoding -> bool =
   | Float -> false
   | Bytes _ -> false
   | String _ -> false
-  | Padded (e, _) -> is_nullable e
+  | Padded (e, _) -> is_nullable visited e
   | String_enum _ -> false
   | Array _ -> false
   | List _ -> false
@@ -791,14 +828,18 @@ let rec is_nullable : type t. t encoding -> bool =
   | Tup _ -> false
   | Tups _ -> false
   | Union {cases; _} ->
-      List.exists (fun (Case {encoding = e; _}) -> is_nullable e) cases
-  | Mu {fix; _} -> is_nullable (fix e)
-  | Conv {encoding = e; _} -> is_nullable e
-  | Describe {encoding = e; _} -> is_nullable e
+      List.exists (fun (Case {encoding = e; _}) -> is_nullable visited e) cases
+  | Mu {fix; _} ->
+      if Mu_visited.mem e.encoding visited then false
+      else is_nullable (Mu_visited.add e.encoding visited) (fix e)
+  | Conv {encoding = e; _} -> is_nullable visited e
+  | Describe {encoding = e; _} -> is_nullable visited e
   | Splitted {json_encoding; _} -> Json_encoding.is_nullable json_encoding
-  | Dynamic_size {encoding = e; _} -> is_nullable e
-  | Check_size {encoding = e; _} -> is_nullable e
+  | Dynamic_size {encoding = e; _} -> is_nullable visited e
+  | Check_size {encoding = e; _} -> is_nullable visited e
   | Delayed _ -> true
+
+let is_nullable e = is_nullable Mu_visited.empty e
 
 let option ty =
   if is_nullable ty then
@@ -828,24 +869,31 @@ let mu name ?title ?description fix =
      This partial memoization only takes a bounded amount of memory
      and is useful because in practice we decode many values before
      applying [fix] to a new argument. *)
+  let fixing = ref false in
   let self = ref None in
   let fix_f = fix in
   let fix e =
     match !self with
     | Some (e0, e') when e == e0 -> e'
     | _ ->
-        let e' = fix_f e in
-        self := Some (e, e') ;
-        e'
+        if !fixing then (
+          fixing := false ;
+          invalid_arg "infinite recursion in mu initialisation")
+        else (
+          fixing := true ;
+          let e' = fix_f e in
+          fixing := false ;
+          self := Some (e, e') ;
+          e')
   in
-  (* Attempt to determine kind. Note that this can results in memoisation
+  (* Attempt to determine the kind. Note that this can result in memoisation
      misses: the [fix] function might be called multiple times. *)
   try
     let precursor =
       make @@ Mu {kind = `Dynamic; name; title; description; fix}
     in
     let fixed_precursor = fix precursor in
-    match classify @@ fixed_precursor with
+    match classify fixed_precursor with
     | `Fixed _ | `Dynamic -> fixed_precursor
     | `Variable -> raise Exit
   with

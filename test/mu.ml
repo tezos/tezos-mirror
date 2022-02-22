@@ -163,10 +163,116 @@ let big_test () =
   assert (!forest_points = forest_points_done) ;
   ()
 
+type foo = Foo of foo option
+
+let doesnt_terminate () =
+  let es =
+    let open Data_encoding in
+    [
+      (fun () ->
+        mu "foo" (fun e ->
+            conv_with_guard
+              Option.some
+              (Option.to_result ~none:"NONE")
+              (option e)));
+      (fun () ->
+        mu "fool" (fun e -> conv (fun (Foo x) -> x) (fun x -> Foo x) (option e)));
+      (fun () ->
+        mu "foolish" (fun e ->
+            conv
+              (fun (Foo x) -> x)
+              (fun x -> Foo x)
+              (obj1 (req "foolishness" (option e)))));
+    ]
+  in
+  let check f =
+    match f () with
+    | exception Invalid_argument _ -> ()
+    | _ -> failwith "Expected to not terminate but did"
+  in
+  List.iter check es
+
+let discriminated_option e =
+  let open Data_encoding in
+  union
+    ~tag_size:`Uint8
+    [
+      case
+        (Tag 1)
+        (obj1 (req "some" e))
+        ~title:"Some"
+        (fun x -> x)
+        (fun x -> Some x);
+      case
+        (Tag 0)
+        (obj1 (req "none" unit))
+        ~title:"None"
+        (function None -> Some () | Some _ -> None)
+        (fun () -> None);
+    ]
+
+let terminates () =
+  let es =
+    let open Data_encoding in
+    [
+      (fun () ->
+        mu "foocustom" (fun e ->
+            conv (fun (Foo x) -> x) (fun x -> Foo x) (discriminated_option e)));
+      (fun () -> mu "funid" Fun.id);
+    ]
+  in
+  let es2 =
+    let open Data_encoding in
+    [
+      (fun () ->
+        list
+          (mu "foocustom" (fun e ->
+               conv (fun (Foo x) -> x) (fun x -> Foo x) (discriminated_option e))));
+      (fun () ->
+        list
+          (tup1
+             (mu "foocustom" (fun e ->
+                  conv
+                    (fun (Foo x) -> x)
+                    (fun x -> Foo x)
+                    (discriminated_option e)))));
+      (fun () ->
+        list
+          (conv
+             (fun x -> ((), x))
+             snd
+             (tup2
+                empty
+                (mu "foocustom" (fun e ->
+                     conv
+                       (fun (Foo x) -> x)
+                       (fun x -> Foo x)
+                       (discriminated_option e))))));
+      (fun () ->
+        list
+          (mu "foocustom" (fun e ->
+               conv
+                 (fun x -> ((), x))
+                 snd
+                 (tup2
+                    empty
+                    (conv
+                       (fun (Foo x) -> x)
+                       (fun x -> Foo x)
+                       (discriminated_option e))))));
+      (fun () -> mu "funid" Fun.id);
+    ]
+  in
+  let check f = ignore @@ f () in
+  List.iter check es ;
+  List.iter check es2
+
 let tests =
   [
     ("points", `Quick, points);
     ("tiny", `Quick, tiny_test);
     ("flip-flop", `Quick, flip_flop);
     ("big", `Quick, big_test);
+    ("doesnt_terminate", `Quick, doesnt_terminate);
+    ("terminates", `Quick, terminates);
   ]
