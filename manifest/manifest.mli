@@ -466,10 +466,15 @@ val pps : ?args:string list -> target -> preprocessor
 
     - [modules]: list of modules to include in this target.
 
+    - [modules_without_implementation]: list of modules without implementation to include in this target.
+
     - [node_wrapper_flags]: flags to add to the [node_wrapper] executable
       command in [runtest_js] aliases. Only used for test and executable test targets.
 
     - [nopervasives]: if [true], add [-nopervasives] to the list of flags to
+      be passed to the OCaml compiler (in the [(flags ...)] stanza).
+
+    - [nostdlib]: if [true], add [-nostdlib] to the list of flags to
       be passed to the OCaml compiler (in the [(flags ...)] stanza).
 
     - [ocaml]: constraints for the version of the [ocaml] opam package,
@@ -538,8 +543,10 @@ type 'a maker =
   ?linkall:bool ->
   ?modes:Dune.mode list ->
   ?modules:string list ->
+  ?modules_without_implementation:string list ->
   ?node_wrapper_flags:string list ->
   ?nopervasives:bool ->
+  ?nostdlib:bool ->
   ?ocaml:Version.constraints ->
   ?opam:string ->
   ?opaque:bool ->
