@@ -53,10 +53,10 @@ let test_array_too_long len () =
   assert (Array.length data = len) ;
   (match Data_encoding.Binary.to_string_exn encodinglong data with
   | _ -> assert false
-  | exception Data_encoding.Binary.Write_error Array_too_long -> ()) ;
+  | exception Data_encoding.Binary.Write_error Array_invalid_length -> ()) ;
   (match Data_encoding.Binary.to_string_exn encodingshort data with
   | _ -> assert false
-  | exception Data_encoding.Binary.Write_error Array_too_long -> ()) ;
+  | exception Data_encoding.Binary.Write_error Array_invalid_length -> ()) ;
   let blob = Data_encoding.Binary.to_string_exn encoding data in
   (match Data_encoding.Binary.of_string_exn encodinglong blob with
   | _ -> assert false

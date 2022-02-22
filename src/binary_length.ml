@@ -85,11 +85,11 @@ let rec length : type x. x Encoding.t -> x -> int =
       | No_limit -> Array.fold_left (fun acc v -> length elts v + acc) 0 value
       | At_most max_length ->
           if Array.length value > max_length then
-            raise (Write_error Array_too_long) ;
+            raise (Write_error Array_invalid_length) ;
           Array.fold_left (fun acc v -> length elts v + acc) 0 value
       | Exactly exact_length -> (
           if Array.length value <> exact_length then
-            raise (Write_error Array_too_long) ;
+            raise (Write_error Array_invalid_length) ;
           match fixed_length elts with
           | Some s -> exact_length * s
           | None -> Array.fold_left (fun acc v -> length elts v + acc) 0 value))
@@ -98,11 +98,11 @@ let rec length : type x. x Encoding.t -> x -> int =
       | No_limit -> List.fold_left (fun acc v -> length elts v + acc) 0 value
       | At_most max_length ->
           if List.length value > max_length then
-            raise (Write_error List_too_long) ;
+            raise (Write_error List_invalid_length) ;
           List.fold_left (fun acc v -> length elts v + acc) 0 value
       | Exactly exact_length -> (
           if List.length value <> exact_length then
-            raise (Write_error List_too_long) ;
+            raise (Write_error List_invalid_length) ;
           match fixed_length elts with
           | Some s -> exact_length * s
           | None -> List.fold_left (fun acc v -> length elts v + acc) 0 value))

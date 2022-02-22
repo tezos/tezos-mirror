@@ -252,21 +252,21 @@ let rec write_rec : type a. a Encoding.t -> writer_state -> a -> unit =
       match length_limit with
       | No_limit -> Array.iter (write_rec elts state) value
       | At_most max_length ->
-          if Array.length value > max_length then raise Array_too_long ;
+          if Array.length value > max_length then raise Array_invalid_length ;
           Array.iter (write_rec elts state) value
       | Exactly exact_length ->
-          if Array.length value <> exact_length then raise Array_too_long ;
+          if Array.length value <> exact_length then raise Array_invalid_length ;
           Array.iter (write_rec elts state) value)
   | List {length_limit; elts} -> (
       match length_limit with
       | No_limit -> List.iter (write_rec elts state) value
       | At_most max_length ->
           if List.compare_length_with value max_length > 0 then
-            raise List_too_long ;
+            raise List_invalid_length ;
           List.iter (write_rec elts state) value
       | Exactly exact_length ->
           if List.compare_length_with value exact_length <> 0 then
-            raise List_too_long ;
+            raise List_invalid_length ;
           List.iter (write_rec elts state) value)
   | Obj (Req {encoding = e; _}) -> write_rec e state value
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) -> (

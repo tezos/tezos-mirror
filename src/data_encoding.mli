@@ -691,7 +691,7 @@ let encoding_t =
 
     (** [list n e] is an encoding for lists of exactly [n] elements. If a list
         of more or fewer elements is provided, then the encoding fails with the
-        [write_error List_too_long]. For decoding, it can fail with
+        [write_error List_invalid_length]. For decoding, it can fail with
         [read_error Not_enough_data] or [read_error Extra_bytes], or it may
         cause other failures further down the line when the AST traversal
         becomes out-of-sync with the underlying byte-stream traversal.
@@ -1123,8 +1123,8 @@ module Binary : sig
     | Invalid_bytes_length of {expected : int; found : int}
     | Invalid_string_length of {expected : int; found : int}
     | Invalid_natural
-    | List_too_long
-    | Array_too_long
+    | List_invalid_length
+    | Array_invalid_length
     | Exception_raised_in_user_function of string
 
   val pp_write_error : Format.formatter -> write_error -> unit
