@@ -77,7 +77,7 @@ def add_bakers(sandbox: Sandbox, nodes: Iterable[int]) -> None:
             [account],
             proto=protocol.DAEMON,
             log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
 
 
@@ -155,7 +155,7 @@ class TestAllDaemonsWithOperations:
                     [f'bootstrap{dead_baker+1}'],
                     proto=protocol.DAEMON,
                     log_levels=constants.TENDERBAKE_BAKER_LOG_LEVELS,
-                    run_params=['--liquidity-baking-escape-vote', 'pass'],
+                    run_params=['--liquidity-baking-toggle-vote', 'pass'],
                 )
                 # set the next baker to die
                 dead_baker = baker

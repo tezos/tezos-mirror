@@ -34,20 +34,20 @@
 open Protocol
 
 let ema_of_int32 ema =
-  Liquidity_baking_repr.Escape_EMA.of_int32 ema >|= Environment.wrap_tzresult
+  Liquidity_baking_repr.Toggle_EMA.of_int32 ema >|= Environment.wrap_tzresult
 
-let ema_to_int32 = Liquidity_baking_repr.Escape_EMA.to_int32
+let ema_to_int32 = Liquidity_baking_repr.Toggle_EMA.to_int32
 
-let compute_new_ema ~escape_vote ema =
-  Liquidity_baking_repr.compute_new_ema ~escape_vote ema |> ema_to_int32
+let compute_new_ema ~toggle_vote ema =
+  Liquidity_baking_repr.compute_new_ema ~toggle_vote ema |> ema_to_int32
 
 (* Folds compute_new_ema on a list of votes *)
-let compute_new_ema_n escape_votes initial_ema =
+let compute_new_ema_n toggle_votes initial_ema =
   List.fold_left
-    (fun ema escape_vote ->
-      Liquidity_baking_repr.compute_new_ema ~escape_vote ema)
+    (fun ema toggle_vote ->
+      Liquidity_baking_repr.compute_new_ema ~toggle_vote ema)
     initial_ema
-    escape_votes
+    toggle_votes
   |> ema_to_int32
 
 let ema_range =
@@ -98,7 +98,7 @@ let test_ema_pass () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.equal_int32
         ~loc:__LOC__
-        (compute_new_ema ~escape_vote:LB_pass ema)
+        (compute_new_ema ~toggle_vote:LB_pass ema)
         old_ema)
     ema_range
 
@@ -121,7 +121,7 @@ let test_ema_increases_off () =
       Assert.lt_int32
         ~loc:__LOC__
         old_ema
-        (compute_new_ema ~escape_vote:LB_off ema))
+        (compute_new_ema ~toggle_vote:LB_off ema))
     (List.filter (fun ema -> Compare.Int32.(ema < 1_999_999_000l)) ema_range)
 
 (* Test that the increase in EMA caused by an Off vote is bounded by 1,000,000 *)
@@ -131,7 +131,7 @@ let test_ema_increases_off_bound () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.leq_int32
         ~loc:__LOC__
-        (Int32.sub (compute_new_ema ~escape_vote:LB_off ema) old_ema)
+        (Int32.sub (compute_new_ema ~toggle_vote:LB_off ema) old_ema)
         1_000_000l)
     ema_range
 
@@ -153,7 +153,7 @@ let test_ema_decreases_on () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.lt_int32
         ~loc:__LOC__
-        (compute_new_ema ~escape_vote:LB_on ema)
+        (compute_new_ema ~toggle_vote:LB_on ema)
         old_ema)
     (List.filter (fun ema -> Compare.Int32.(ema > 1000l)) ema_range)
 
@@ -164,7 +164,7 @@ let test_ema_decreases_on_bound () =
       ema_of_int32 old_ema >>=? fun ema ->
       Assert.leq_int32
         ~loc:__LOC__
-        (Int32.sub (compute_new_ema ~escape_vote:LB_on ema) old_ema)
+        (Int32.sub (compute_new_ema ~toggle_vote:LB_on ema) old_ema)
         1_000_000l)
     ema_range
 
@@ -207,8 +207,8 @@ let test_ema_symmetry () =
       let opposite_ema = Int32.(sub 2_000_000_000l ema) in
       ema_of_int32 ema >>=? fun ema ->
       ema_of_int32 opposite_ema >>=? fun opposite_ema ->
-      let new_ema = compute_new_ema ~escape_vote:LB_on ema in
-      let new_opposite_ema = compute_new_ema ~escape_vote:LB_off opposite_ema in
+      let new_ema = compute_new_ema ~toggle_vote:LB_on ema in
+      let new_opposite_ema = compute_new_ema ~toggle_vote:LB_off opposite_ema in
       Assert.equal_int32
         ~loc:__LOC__
         Int32.(add new_ema new_opposite_ema)

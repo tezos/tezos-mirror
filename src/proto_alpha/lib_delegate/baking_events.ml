@@ -806,18 +806,18 @@ module Liquidity_baking = struct
       ~section
       ~name:"reading_liquidity_baking"
       ~level:Notice
-      ~msg:"reading liquidity baking escape vote"
+      ~msg:"reading liquidity baking toggle vote"
       ()
 
-  let liquidity_baking_escape_vote =
+  let liquidity_baking_toggle_vote =
     declare_1
       ~section
-      ~name:"liquidity_baking_escape_vote"
+      ~name:"liquidity_baking_toggle_vote"
       ~level:Notice
-      ~msg:"liquidity baking escape vote = {value}"
+      ~msg:"liquidity baking toggle vote = {value}"
       ( "value",
         Protocol.Alpha_context.Liquidity_baking
-        .liquidity_baking_escape_vote_encoding )
+        .liquidity_baking_toggle_vote_encoding )
 
   let per_block_vote_file_fail =
     declare_1
@@ -828,19 +828,19 @@ module Liquidity_baking = struct
       ~pp1:pp_print_top_error_of_trace
       ("errors", Error_monad.(TzTrace.encoding error_encoding))
 
-  let liquidity_baking_escape =
+  let liquidity_baking_off =
     declare_0
       ~section
-      ~name:"liquidity_baking_continue"
+      ~name:"liquidity_baking_off"
       ~level:Notice
-      ~msg:"Will vote to escape Liquidity Baking"
+      ~msg:"Will vote to stop Liquidity Baking"
       ()
 
-  let liquidity_baking_continue =
+  let liquidity_baking_on =
     declare_0
       ~section
-      ~name:"liquidity_baking_escape"
+      ~name:"liquidity_baking_on"
       ~level:Notice
-      ~msg:"Will vote to continue Liquidity Baking"
+      ~msg:"Will vote to continue or restart Liquidity Baking"
       ()
 end

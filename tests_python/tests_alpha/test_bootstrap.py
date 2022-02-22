@@ -24,7 +24,7 @@ def add_fully_delegated_baker(sandbox: Sandbox, node: int, protocol: str):
         node,
         [],
         proto=protocol,
-        run_params=['--liquidity-baking-escape-vote', 'pass'],
+        run_params=['--liquidity-baking-toggle-vote', 'pass'],
     )
 
 
@@ -39,7 +39,7 @@ class TestThresholdZero:
             0,
             ['bootstrap5'],
             proto=protocol.DAEMON,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
 
     def test_bootstrap(self, sandbox: Sandbox):
@@ -60,7 +60,7 @@ class TestThresholdOne:
             0,
             ['bootstrap5'],
             proto=protocol.DAEMON,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
 
     def test_bootstrap(self, sandbox: Sandbox):
@@ -86,7 +86,7 @@ class TestThresholdTwo:
             0,
             ['bootstrap5'],
             proto=protocol.DAEMON,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
 
     def test_add_nodes(self, sandbox: Sandbox):

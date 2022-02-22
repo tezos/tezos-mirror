@@ -108,9 +108,9 @@ let liquidity_baking_sunset_level c =
   let constants = Raw_context.constants c in
   constants.liquidity_baking_sunset_level
 
-let liquidity_baking_escape_ema_threshold c =
+let liquidity_baking_toggle_ema_threshold c =
   let constants = Raw_context.constants c in
-  constants.liquidity_baking_escape_ema_threshold
+  constants.liquidity_baking_toggle_ema_threshold
 
 let parametric c = Raw_context.constants c
 

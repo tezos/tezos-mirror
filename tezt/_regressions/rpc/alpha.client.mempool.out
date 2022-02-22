@@ -733,8 +733,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "seed_nonce_hash": {
                             "$ref": "#/definitions/cycle_nonce"
                           },
-                          "liquidity_baking_escape_vote": {
-                            "$ref": "#/definitions/alpha.liquidity_baking_escape_vote"
+                          "liquidity_baking_toggle_vote": {
+                            "$ref": "#/definitions/alpha.liquidity_baking_toggle_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -742,7 +742,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         },
                         "required": [
                           "signature",
-                          "liquidity_baking_escape_vote",
+                          "liquidity_baking_toggle_vote",
                           "proof_of_work_nonce",
                           "payload_round",
                           "payload_hash",
@@ -926,7 +926,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "alpha.liquidity_baking_escape_vote": {
+                      "alpha.liquidity_baking_toggle_vote": {
                         "type": "string",
                         "enum": [
                           "off",
@@ -4139,7 +4139,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               "kind": "named"
                             },
                             {
-                              "name": "liquidity_baking_escape_vote",
+                              "name": "liquidity_baking_toggle_vote",
                               "layout": {
                                 "size": "Int8",
                                 "kind": "Int"
@@ -7163,8 +7163,8 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           "seed_nonce_hash": {
                             "$ref": "#/definitions/cycle_nonce"
                           },
-                          "liquidity_baking_escape_vote": {
-                            "$ref": "#/definitions/alpha.liquidity_baking_escape_vote"
+                          "liquidity_baking_toggle_vote": {
+                            "$ref": "#/definitions/alpha.liquidity_baking_toggle_vote"
                           },
                           "signature": {
                             "$ref": "#/definitions/Signature"
@@ -7172,7 +7172,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         },
                         "required": [
                           "signature",
-                          "liquidity_baking_escape_vote",
+                          "liquidity_baking_toggle_vote",
                           "proof_of_work_nonce",
                           "payload_round",
                           "payload_hash",
@@ -7356,7 +7356,7 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                           }
                         ]
                       },
-                      "alpha.liquidity_baking_escape_vote": {
+                      "alpha.liquidity_baking_toggle_vote": {
                         "type": "string",
                         "enum": [
                           "off",

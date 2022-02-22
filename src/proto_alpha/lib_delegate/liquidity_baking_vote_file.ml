@@ -27,21 +27,21 @@ open Protocol_client_context
 module Events = Baking_events.Liquidity_baking
 
 type per_block_votes = {
-  liquidity_baking_escape_vote :
-    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_escape_vote option;
+  liquidity_baking_toggle_vote :
+    Protocol.Alpha_context.Liquidity_baking.liquidity_baking_toggle_vote option;
 }
 
 let per_block_votes_encoding =
   let open Data_encoding in
   def "per_block_votes.alpha"
   @@ conv
-       (fun {liquidity_baking_escape_vote} -> liquidity_baking_escape_vote)
-       (fun liquidity_baking_escape_vote -> {liquidity_baking_escape_vote})
+       (fun {liquidity_baking_toggle_vote} -> liquidity_baking_toggle_vote)
+       (fun liquidity_baking_toggle_vote -> {liquidity_baking_toggle_vote})
        (obj1
           (opt
-             "liquidity_baking_escape_vote"
+             "liquidity_baking_toggle_vote"
              Protocol.Alpha_context.Liquidity_baking
-             .liquidity_baking_escape_vote_encoding))
+             .liquidity_baking_toggle_vote_encoding))
 
 type error += Block_vote_file_not_found of string
 
@@ -49,7 +49,7 @@ type error += Block_vote_file_invalid of string
 
 type error += Block_vote_file_wrong_content of string
 
-type error += Block_vote_file_missing_liquidity_baking_escape_vote of string
+type error += Block_vote_file_missing_liquidity_baking_toggle_vote of string
 
 let () =
   register_error_kind
@@ -99,9 +99,9 @@ let () =
         ppf
         "@[The provided block vote file \"%s\" is a valid JSON file but its \
          content is unexpected. Expecting a JSON file containing either \
-         '{\"liquidity_baking_escape_vote\": \"on\"}', or \
-         '{\"liquidity_baking_escape_vote\": \"off\"}', or \
-         '{\"liquidity_baking_escape_vote\": \"pass\"}'.@]"
+         '{\"liquidity_baking_toggle_vote\": \"on\"}', or \
+         '{\"liquidity_baking_toggle_vote\": \"off\"}', or \
+         '{\"liquidity_baking_toggle_vote\": \"pass\"}'.@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function
@@ -110,29 +110,29 @@ let () =
   register_error_kind
     `Permanent
     ~id:
-      "Client_baking_forge.block_vote_file_missing_liquidity_baking_escape_vote"
+      "Client_baking_forge.block_vote_file_missing_liquidity_baking_toggle_vote"
     ~title:
-      "In the provided block vote file, no entry for liquidity baking escape \
+      "In the provided block vote file, no entry for liquidity baking toggle \
        vote was found"
     ~description:
-      "In the provided block vote file, no entry for liquidity baking escape \
+      "In the provided block vote file, no entry for liquidity baking toggle \
        vote was found."
     ~pp:(fun ppf file_path ->
       Format.fprintf
         ppf
         "@[In the provided block vote file \"%s\", the \
-         \"liquidity_baking_escape_vote\" boolean field is missing. Expecting \
-         a JSON file containing either '{\"liquidity_baking_escape_vote\": \
-         \"on\"}', or '{\"liquidity_baking_escape_vote\": \"off\"}', or \
-         '{\"liquidity_baking_escape_vote\": \"pass\"}'.@]"
+         \"liquidity_baking_toggle_vote\" boolean field is missing. Expecting \
+         a JSON file containing either '{\"liquidity_baking_toggle_vote\": \
+         \"on\"}', or '{\"liquidity_baking_toggle_vote\": \"off\"}', or \
+         '{\"liquidity_baking_toggle_vote\": \"pass\"}'.@]"
         file_path)
     Data_encoding.(obj1 (req "file_path" string))
     (function
-      | Block_vote_file_missing_liquidity_baking_escape_vote file_path ->
+      | Block_vote_file_missing_liquidity_baking_toggle_vote file_path ->
           Some file_path
       | _ -> None)
     (fun file_path ->
-      Block_vote_file_missing_liquidity_baking_escape_vote file_path)
+      Block_vote_file_missing_liquidity_baking_toggle_vote file_path)
 
 let traced_option_to_result ~error =
   Option.fold ~some:ok ~none:(Error_monad.error error)
@@ -141,7 +141,7 @@ let check_file_exists file =
   if Sys.file_exists file then Result.return_unit
   else error (Block_vote_file_not_found file)
 
-let read_liquidity_baking_escape_vote ~per_block_vote_file =
+let read_liquidity_baking_toggle_vote ~per_block_vote_file =
   Events.(emit reading_per_block) per_block_vote_file >>= fun () ->
   check_file_exists per_block_vote_file >>?= fun () ->
   trace (Block_vote_file_invalid per_block_vote_file)
@@ -156,15 +156,15 @@ let read_liquidity_baking_escape_vote ~per_block_vote_file =
   Events.(emit per_block_vote_file_notice) "JSON decoded" >>= fun () ->
   traced_option_to_result
     ~error:
-      (Block_vote_file_missing_liquidity_baking_escape_vote per_block_vote_file)
-    votes.liquidity_baking_escape_vote
-  >>?= fun liquidity_baking_escape_vote ->
+      (Block_vote_file_missing_liquidity_baking_toggle_vote per_block_vote_file)
+    votes.liquidity_baking_toggle_vote
+  >>?= fun liquidity_baking_toggle_vote ->
   Events.(emit reading_liquidity_baking) () >>= fun () ->
-  Events.(emit liquidity_baking_escape_vote) liquidity_baking_escape_vote
-  >>= fun () -> return liquidity_baking_escape_vote
+  Events.(emit liquidity_baking_toggle_vote) liquidity_baking_toggle_vote
+  >>= fun () -> return liquidity_baking_toggle_vote
 
-let read_liquidity_baking_escape_vote_no_fail ~default ~per_block_vote_file =
-  read_liquidity_baking_escape_vote ~per_block_vote_file >>= function
+let read_liquidity_baking_toggle_vote_no_fail ~default ~per_block_vote_file =
+  read_liquidity_baking_toggle_vote ~per_block_vote_file >>= function
   | Ok vote -> Lwt.return vote
   | Error errs ->
       Events.(emit per_block_vote_file_fail) errs >>= fun () ->

@@ -28,9 +28,9 @@ open Liquidity_baking_repr
 
 let get_cpmm_address = Storage.Liquidity_baking.Cpmm_address.get
 
-let get_escape_ema ctxt =
-  Storage.Liquidity_baking.Escape_ema.get ctxt >>=? fun ema ->
-  Escape_EMA.of_int32 ema
+let get_toggle_ema ctxt =
+  Storage.Liquidity_baking.Toggle_ema.get ctxt >>=? fun ema ->
+  Toggle_EMA.of_int32 ema
 
 let on_cpmm_exists ctxt f =
   get_cpmm_address ctxt >>=? fun cpmm_contract ->
@@ -45,19 +45,19 @@ let check_below_sunset ctxt =
   let level = Raw_level_repr.to_int32 (Level_storage.current ctxt).level in
   Compare.Int32.(level < sunset_level)
 
-let update_escape_ema ctxt ~escape_vote =
-  get_escape_ema ctxt >>=? fun old_ema ->
-  let new_ema = compute_new_ema ~escape_vote old_ema in
-  Storage.Liquidity_baking.Escape_ema.update ctxt (Escape_EMA.to_int32 new_ema)
+let update_toggle_ema ctxt ~toggle_vote =
+  get_toggle_ema ctxt >>=? fun old_ema ->
+  let new_ema = compute_new_ema ~toggle_vote old_ema in
+  Storage.Liquidity_baking.Toggle_ema.update ctxt (Toggle_EMA.to_int32 new_ema)
   >|=? fun ctxt -> (ctxt, new_ema)
 
 let check_ema_below_threshold ctxt ema =
-  Escape_EMA.(
-    ema < Constants_storage.liquidity_baking_escape_ema_threshold ctxt)
+  Toggle_EMA.(
+    ema < Constants_storage.liquidity_baking_toggle_ema_threshold ctxt)
 
-let on_subsidy_allowed ctxt ~escape_vote f =
-  update_escape_ema ctxt ~escape_vote >>=? fun (ctxt, escape_ema) ->
-  if check_ema_below_threshold ctxt escape_ema && check_below_sunset ctxt then
+let on_subsidy_allowed ctxt ~toggle_vote f =
+  update_toggle_ema ctxt ~toggle_vote >>=? fun (ctxt, toggle_ema) ->
+  if check_ema_below_threshold ctxt toggle_ema && check_below_sunset ctxt then
     on_cpmm_exists ctxt f >|=? fun (ctxt, operation_results) ->
-    (ctxt, operation_results, escape_ema)
-  else return (ctxt, [], escape_ema)
+    (ctxt, operation_results, toggle_ema)
+  else return (ctxt, [], toggle_ema)

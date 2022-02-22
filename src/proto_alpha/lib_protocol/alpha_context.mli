@@ -775,7 +775,7 @@ module Constants : sig
     min_proposal_quorum : int32;
     liquidity_baking_subsidy : Tez.t;
     liquidity_baking_sunset_level : int32;
-    liquidity_baking_escape_ema_threshold : int32;
+    liquidity_baking_toggle_ema_threshold : int32;
     max_operations_time_to_live : int;
     minimal_block_delay : Period.t;
     delay_increment_per_round : Period.t;
@@ -862,7 +862,7 @@ module Constants : sig
 
   val liquidity_baking_sunset_level : context -> int32
 
-  val liquidity_baking_escape_ema_threshold : context -> int32
+  val liquidity_baking_toggle_ema_threshold : context -> int32
 
   val minimal_block_delay : context -> Period.t
 
@@ -1897,8 +1897,8 @@ module Block_header : sig
     payload_round : Round.t;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
-    liquidity_baking_escape_vote :
-      Liquidity_baking_repr.liquidity_baking_escape_vote;
+    liquidity_baking_toggle_vote :
+      Liquidity_baking_repr.liquidity_baking_toggle_vote;
   }
 
   type protocol_data = {contents : contents; signature : Signature.t}
@@ -3032,18 +3032,18 @@ module Parameters : sig
 end
 
 module Liquidity_baking : sig
-  type liquidity_baking_escape_vote =
-        Liquidity_baking_repr.liquidity_baking_escape_vote =
+  type liquidity_baking_toggle_vote =
+        Liquidity_baking_repr.liquidity_baking_toggle_vote =
     | LB_on
     | LB_off
     | LB_pass
 
-  val liquidity_baking_escape_vote_encoding :
-    liquidity_baking_escape_vote Data_encoding.encoding
+  val liquidity_baking_toggle_vote_encoding :
+    liquidity_baking_toggle_vote Data_encoding.encoding
 
   val get_cpmm_address : context -> Contract.t tzresult Lwt.t
 
-  module Escape_EMA : sig
+  module Toggle_EMA : sig
     type t
 
     val zero : t
@@ -3055,9 +3055,9 @@ module Liquidity_baking : sig
 
   val on_subsidy_allowed :
     context ->
-    escape_vote:liquidity_baking_escape_vote ->
+    toggle_vote:liquidity_baking_toggle_vote ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
-    (context * 'a list * Escape_EMA.t) tzresult Lwt.t
+    (context * 'a list * Toggle_EMA.t) tzresult Lwt.t
 end
 
 (** This module re-exports functions from [Ticket_storage]. See

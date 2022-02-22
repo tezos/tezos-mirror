@@ -338,7 +338,7 @@ class TestBakerExternalOperations:
             run_params=[
                 '--operations-pool',
                 session['operations_file'],
-                '--liquidity-baking-escape-vote',
+                '--liquidity-baking-toggle-vote',
                 'pass',
             ],
         )

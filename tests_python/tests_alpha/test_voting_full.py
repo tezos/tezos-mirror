@@ -116,7 +116,7 @@ class TestVotingFull:
     #     """Add a baker per node"""
     #     sandbox.add_baker(
     #         1, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_B_DAEMON,
-    #         run_params=['--liquidity-baking-escape-vote', 'pass'],
+    #         run_params=['--liquidity-baking-toggle-vote', 'pass'],
     #     )
 
     def test_client_knows_proto_b(self, sandbox: Sandbox):
@@ -187,12 +187,12 @@ class TestVotingFull:
         # we let a PROTO_A baker bake the last blocks of PROTO_A
         # sandbox.add_baker(
         #     0, [f"bootstrap{i}" for i in range(1, 6)], proto=PROTO_A_DAEMON,
-        #     run_params=['--liquidity-baking-escape-vote', 'pass'],
+        #     run_params=['--liquidity-baking-toggle-vote', 'pass'],
         # )
         # for i in range(1,NUM_NODES):
         #     sandbox.add_baker(
         #         i, [f"bootstrap{i}"], proto=PROTO_B_DAEMON,
-        #         run_params=['--liquidity-baking-escape-vote', 'pass'],
+        #         run_params=['--liquidity-baking-toggle-vote', 'pass'],
         #     )
         clients = sandbox.all_clients()
         client = clients[0]

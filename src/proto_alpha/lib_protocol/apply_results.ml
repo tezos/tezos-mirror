@@ -2342,7 +2342,7 @@ type block_metadata = {
   consumed_gas : Gas.Arith.fp;
   deactivated : Signature.Public_key_hash.t list;
   balance_updates : Receipt.balance_updates;
-  liquidity_baking_escape_ema : Liquidity_baking.Escape_EMA.t;
+  liquidity_baking_toggle_ema : Liquidity_baking.Toggle_EMA.t;
   implicit_operations_results : packed_successful_manager_operation_result list;
 }
 
@@ -2359,7 +2359,7 @@ let block_metadata_encoding =
               consumed_gas;
               deactivated;
               balance_updates;
-              liquidity_baking_escape_ema;
+              liquidity_baking_toggle_ema;
               implicit_operations_results;
             } ->
          ( ( proposer,
@@ -2370,7 +2370,7 @@ let block_metadata_encoding =
              consumed_gas,
              deactivated,
              balance_updates,
-             liquidity_baking_escape_ema,
+             liquidity_baking_toggle_ema,
              implicit_operations_results ),
            consumed_gas ))
        (fun ( ( proposer,
@@ -2381,7 +2381,7 @@ let block_metadata_encoding =
                 consumed_gas,
                 deactivated,
                 balance_updates,
-                liquidity_baking_escape_ema,
+                liquidity_baking_toggle_ema,
                 implicit_operations_results ),
               _consumed_millgas ) ->
          {
@@ -2393,7 +2393,7 @@ let block_metadata_encoding =
            consumed_gas;
            deactivated;
            balance_updates;
-           liquidity_baking_escape_ema;
+           liquidity_baking_toggle_ema;
            implicit_operations_results;
          })
        (merge_objs
@@ -2407,8 +2407,8 @@ let block_metadata_encoding =
              (req "deactivated" (list Signature.Public_key_hash.encoding))
              (dft "balance_updates" Receipt.balance_updates_encoding [])
              (req
-                "liquidity_baking_escape_ema"
-                Liquidity_baking.Escape_EMA.encoding)
+                "liquidity_baking_toggle_ema"
+                Liquidity_baking.Toggle_EMA.encoding)
              (req
                 "implicit_operations_results"
                 (list successful_manager_operation_result_encoding)))

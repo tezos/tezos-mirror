@@ -196,7 +196,7 @@ let init ctxt ~typecheck =
   (* We use a custom origination nonce because it is unset when stitching from 009 *)
   let nonce = Operation_hash.hash_string ["Drip, drip, drip."] in
   let ctxt = Raw_context.init_origination_nonce ctxt nonce in
-  Storage.Liquidity_baking.Escape_ema.init ctxt 0l >>=? fun ctxt ->
+  Storage.Liquidity_baking.Toggle_ema.init ctxt 0l >>=? fun ctxt ->
   let current_level =
     Raw_level_repr.to_int32 (Level_storage.current ctxt).level
   in
@@ -242,11 +242,11 @@ let init ctxt ~typecheck =
       (ctxt, [cpmm_result; lqt_result] @ token_result))
 
 module Migration_from_Ithaca = struct
-  (* When migrating from Ithaca, a protocol already containing liquidity baking but with a slightly different escape hatch mechanism, we need to update the EMA (which has been rescaled by a factor of 1000) and if it was permanently deactivated we need to prevent it to be reactivated. *)
+  (* When migrating from Ithaca, a protocol already containing liquidity baking but with a slightly different toggle mechanism (was an escape hatch), we need to update the EMA (which has been rescaled by a factor of 1000) and if it was permanently deactivated we need to prevent it to be reactivated. *)
 
   let update ctxt =
     let ithaca_threshold = 666_667l in
-    Storage.Liquidity_baking.Escape_ema.find ctxt >>=? fun ema_opt ->
+    Storage.Liquidity_baking.Toggle_ema.find ctxt >>=? fun ema_opt ->
     let ema = Option.value ~default:0l ema_opt in
     let is_already_permanently_deactivated =
       Compare.Int32.(ema >= ithaca_threshold)
@@ -258,5 +258,5 @@ module Migration_from_Ithaca = struct
          {c with liquidity_baking_sunset_level = 0l})
     else Lwt.return ctxt)
     >>= fun ctxt ->
-    Storage.Liquidity_baking.Escape_ema.add ctxt Int32.(mul ema 1000l) >|= ok
+    Storage.Liquidity_baking.Toggle_ema.add ctxt Int32.(mul ema 1000l) >|= ok
 end

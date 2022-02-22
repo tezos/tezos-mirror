@@ -57,7 +57,7 @@ module Protocol_constants_overrides = struct
     min_proposal_quorum : int32 option;
     liquidity_baking_subsidy : Tez.t option;
     liquidity_baking_sunset_level : int32 option;
-    liquidity_baking_escape_ema_threshold : int32 option;
+    liquidity_baking_toggle_ema_threshold : int32 option;
     max_operations_time_to_live : int option;
     minimal_block_delay : Period.t option;
     delay_increment_per_round : Period.t option;
@@ -117,7 +117,7 @@ module Protocol_constants_overrides = struct
                 c.min_proposal_quorum,
                 c.liquidity_baking_subsidy,
                 c.liquidity_baking_sunset_level,
-                c.liquidity_baking_escape_ema_threshold,
+                c.liquidity_baking_toggle_ema_threshold,
                 c.max_operations_time_to_live,
                 c.minimal_block_delay,
                 c.delay_increment_per_round,
@@ -168,7 +168,7 @@ module Protocol_constants_overrides = struct
                    min_proposal_quorum,
                    liquidity_baking_subsidy,
                    liquidity_baking_sunset_level,
-                   liquidity_baking_escape_ema_threshold,
+                   liquidity_baking_toggle_ema_threshold,
                    max_operations_time_to_live,
                    minimal_block_delay,
                    delay_increment_per_round,
@@ -220,7 +220,7 @@ module Protocol_constants_overrides = struct
           min_proposal_quorum;
           liquidity_baking_subsidy;
           liquidity_baking_sunset_level;
-          liquidity_baking_escape_ema_threshold;
+          liquidity_baking_toggle_ema_threshold;
           max_operations_time_to_live;
           minimal_block_delay;
           delay_increment_per_round;
@@ -278,7 +278,7 @@ module Protocol_constants_overrides = struct
                   (opt "min_proposal_quorum" int32)
                   (opt "liquidity_baking_subsidy" Tez.encoding)
                   (opt "liquidity_baking_sunset_level" int32)
-                  (opt "liquidity_baking_escape_ema_threshold" int32)
+                  (opt "liquidity_baking_toggle_ema_threshold" int32)
                   (opt "max_operations_time_to_live" int16)
                   (opt "minimal_block_delay" Period.encoding)
                   (opt "delay_increment_per_round" Period.encoding)
@@ -360,8 +360,8 @@ module Protocol_constants_overrides = struct
         liquidity_baking_subsidy = Some parametric.liquidity_baking_subsidy;
         liquidity_baking_sunset_level =
           Some parametric.liquidity_baking_sunset_level;
-        liquidity_baking_escape_ema_threshold =
-          Some parametric.liquidity_baking_escape_ema_threshold;
+        liquidity_baking_toggle_ema_threshold =
+          Some parametric.liquidity_baking_toggle_ema_threshold;
         max_operations_time_to_live =
           Some parametric.max_operations_time_to_live;
         minimal_block_delay = Some parametric.minimal_block_delay;
@@ -429,7 +429,7 @@ module Protocol_constants_overrides = struct
       min_proposal_quorum = None;
       liquidity_baking_subsidy = None;
       liquidity_baking_sunset_level = None;
-      liquidity_baking_escape_ema_threshold = None;
+      liquidity_baking_toggle_ema_threshold = None;
       max_operations_time_to_live = None;
       minimal_block_delay = None;
       delay_increment_per_round = None;
@@ -612,8 +612,8 @@ module Protocol_constants_overrides = struct
           };
         O
           {
-            name = "liquidity_baking_escape_ema_threshold";
-            override_value = o.liquidity_baking_escape_ema_threshold;
+            name = "liquidity_baking_toggle_ema_threshold";
+            override_value = o.liquidity_baking_toggle_ema_threshold;
             pp = pp_print_int32;
           };
         O
@@ -818,10 +818,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.liquidity_baking_sunset_level
              o.liquidity_baking_sunset_level;
-         liquidity_baking_escape_ema_threshold =
+         liquidity_baking_toggle_ema_threshold =
            Option.value
-             ~default:c.liquidity_baking_escape_ema_threshold
-             o.liquidity_baking_escape_ema_threshold;
+             ~default:c.liquidity_baking_toggle_ema_threshold
+             o.liquidity_baking_toggle_ema_threshold;
          max_operations_time_to_live =
            Option.value
              ~default:c.max_operations_time_to_live
@@ -1300,8 +1300,8 @@ let mem_init :
         payload_hash;
         seed_nonce_hash = None;
         proof_of_work_nonce;
-        (* following Baking_configuration.escape_votes in lib_delegate *)
-        liquidity_baking_escape_vote = Liquidity_baking.LB_pass;
+        (* following Baking_configuration.toggle_votes in lib_delegate *)
+        liquidity_baking_toggle_vote = Liquidity_baking.LB_pass;
       }
     in
     let unsigned_bytes =

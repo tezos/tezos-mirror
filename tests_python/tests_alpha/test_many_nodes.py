@@ -34,7 +34,7 @@ class TestManyNodesBootstrap:
                 i,
                 [f'bootstrap{i + 1}'],
                 proto=protocol.DAEMON,
-                run_params=['--liquidity-baking-escape-vote', 'pass'],
+                run_params=['--liquidity-baking-toggle-vote', 'pass'],
             )
 
     def test_add_nodes(self, sandbox: Sandbox):

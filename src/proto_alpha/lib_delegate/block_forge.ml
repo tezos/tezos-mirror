@@ -41,7 +41,7 @@ type simulation_kind =
 type simulation_mode = Local of Context.index | Node
 
 let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
-    ~payload_round ~seed_nonce_hash ~liquidity_baking_escape_vote () =
+    ~payload_round ~seed_nonce_hash ~liquidity_baking_toggle_vote () =
   Block_header.
     {
       contents =
@@ -50,7 +50,7 @@ let forge_faked_protocol_data ?(payload_hash = Block_payload_hash.zero)
           payload_round;
           seed_nonce_hash;
           proof_of_work_nonce = Baking_pow.empty_proof_of_work_nonce;
-          liquidity_baking_escape_vote;
+          liquidity_baking_toggle_vote;
         };
       signature = Signature.zero;
     }
@@ -116,7 +116,7 @@ let retain_live_operations_only ~live_blocks operation_pool =
     operation_pool
 
 let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
-    ~timestamp ~liquidity_baking_escape_vote ~user_activated_upgrades
+    ~timestamp ~liquidity_baking_toggle_vote ~user_activated_upgrades
     fees_config ~seed_nonce_hash ~payload_round simulation_mode simulation_kind
     constants =
   let predecessor_block = (pred_info : Baking_state.block_info) in
@@ -147,7 +147,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       forge_faked_protocol_data
         ~payload_round
         ~seed_nonce_hash
-        ~liquidity_baking_escape_vote
+        ~liquidity_baking_toggle_vote
         ()
     in
     Node_rpc.preapply_block
@@ -180,7 +180,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
       forge_faked_protocol_data
         ~payload_round
         ~seed_nonce_hash
-        ~liquidity_baking_escape_vote
+        ~liquidity_baking_toggle_vote
         ()
     in
     Baking_simulator.begin_construction
@@ -254,7 +254,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     let faked_protocol_data =
       forge_faked_protocol_data
         ~seed_nonce_hash
-        ~liquidity_baking_escape_vote
+        ~liquidity_baking_toggle_vote
         ~payload_hash
         ~payload_round
         ()
@@ -274,7 +274,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
     let faked_protocol_data =
       forge_faked_protocol_data
         ~seed_nonce_hash
-        ~liquidity_baking_escape_vote
+        ~liquidity_baking_toggle_vote
         ~payload_hash
         ~payload_round
         ()
@@ -377,7 +377,7 @@ let forge (cctxt : #Protocol_client_context.full) ~chain_id ~pred_info
         payload_round;
         seed_nonce_hash;
         proof_of_work_nonce;
-        liquidity_baking_escape_vote;
+        liquidity_baking_toggle_vote;
       })
   >>=? fun contents ->
   let unsigned_block_header =

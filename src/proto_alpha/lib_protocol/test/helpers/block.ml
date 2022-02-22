@@ -122,7 +122,7 @@ module Forge = struct
 
   let make_contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
       ~payload_hash ~payload_round
-      ?(liquidity_baking_escape_vote = Liquidity_baking.LB_pass)
+      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass)
       ~seed_nonce_hash () =
     Block_header.
       {
@@ -130,7 +130,7 @@ module Forge = struct
         payload_round;
         proof_of_work_nonce;
         seed_nonce_hash;
-        liquidity_baking_escape_vote;
+        liquidity_baking_toggle_vote;
       }
 
   let make_shell ~level ~predecessor ~timestamp ~fitness ~operations_hash =
@@ -181,7 +181,7 @@ module Forge = struct
 
   let forge_header ?(locked_round = None) ?(payload_round = None)
       ?(policy = By_round 0) ?timestamp ?(operations = [])
-      ?liquidity_baking_escape_vote pred =
+      ?liquidity_baking_toggle_vote pred =
     let pred_fitness =
       match Fitness.from_raw pred.header.shell.fitness with
       | Ok pred_fitness -> pred_fitness
@@ -230,7 +230,7 @@ module Forge = struct
     let contents =
       make_contents
         ~seed_nonce_hash
-        ?liquidity_baking_escape_vote
+        ?liquidity_baking_toggle_vote
         ~payload_hash
         ~payload_round
         ()
@@ -240,12 +240,12 @@ module Forge = struct
   (* compatibility only, needed by incremental *)
   let contents ?(proof_of_work_nonce = default_proof_of_work_nonce)
       ?seed_nonce_hash
-      ?(liquidity_baking_escape_vote = Liquidity_baking.LB_pass) ~payload_hash
+      ?(liquidity_baking_toggle_vote = Liquidity_baking.LB_pass) ~payload_hash
       ~payload_round () =
     {
       Block_header.proof_of_work_nonce;
       seed_nonce_hash;
-      liquidity_baking_escape_vote;
+      liquidity_baking_toggle_vote;
       payload_hash;
       payload_round;
     }
@@ -639,7 +639,7 @@ let apply header ?(operations = []) pred =
   >>=? fun (t, _metadata) -> return t
 
 let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
-    ?payload_round ~baking_mode ?liquidity_baking_escape_vote pred =
+    ?payload_round ~baking_mode ?liquidity_baking_toggle_vote pred =
   let operations =
     match (operation, operations) with
     | (Some op, Some ops) -> Some (op :: ops)
@@ -653,14 +653,14 @@ let bake_with_metadata ?locked_round ?policy ?timestamp ?operation ?operations
     ?timestamp
     ?policy
     ?operations
-    ?liquidity_baking_escape_vote
+    ?liquidity_baking_toggle_vote
     pred
   >>=? fun header ->
   Forge.sign_header header >>=? fun header ->
   apply_with_metadata ?policy ~baking_mode header ?operations pred
 
 let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
-    ?timestamp ?operation ?operations ?liquidity_baking_escape_vote pred =
+    ?timestamp ?operation ?operations ?liquidity_baking_toggle_vote pred =
   bake_with_metadata
     ?payload_round
     ~baking_mode
@@ -669,7 +669,7 @@ let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
     ?timestamp
     ?operation
     ?operations
-    ?liquidity_baking_escape_vote
+    ?liquidity_baking_toggle_vote
     pred
   >>=? fun (t, (_metadata : block_header_metadata)) -> return t
 
@@ -678,18 +678,18 @@ let bake ?(baking_mode = Application) ?payload_round ?locked_round ?policy
 (* This function is duplicated from Context to avoid a cyclic dependency *)
 let get_constants b = Alpha_services.Constants.all rpc_ctxt b
 
-let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_escape_vote n
+let bake_n ?(baking_mode = Application) ?policy ?liquidity_baking_toggle_vote n
     b =
   List.fold_left_es
-    (fun b _ -> bake ~baking_mode ?policy ?liquidity_baking_escape_vote b)
+    (fun b _ -> bake ~baking_mode ?policy ?liquidity_baking_toggle_vote b)
     b
     (1 -- n)
 
 let bake_n_with_all_balance_updates ?(baking_mode = Application) ?policy
-    ?liquidity_baking_escape_vote n b =
+    ?liquidity_baking_toggle_vote n b =
   List.fold_left_es
     (fun (b, balance_updates_rev) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_escape_vote b
+      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
       >>=? fun (b, metadata) ->
       let balance_updates_rev =
         List.rev_append metadata.balance_updates balance_updates_rev
@@ -759,13 +759,13 @@ let bake_n_with_origination_results ?(baking_mode = Application) ?policy n b =
     (1 -- n)
   >|=? fun (b, origination_results_rev) -> (b, List.rev origination_results_rev)
 
-let bake_n_with_liquidity_baking_escape_ema ?(baking_mode = Application) ?policy
-    ?liquidity_baking_escape_vote n b =
-  let initial_ema = Liquidity_baking.Escape_EMA.zero in
+let bake_n_with_liquidity_baking_toggle_ema ?(baking_mode = Application) ?policy
+    ?liquidity_baking_toggle_vote n b =
+  let initial_ema = Liquidity_baking.Toggle_EMA.zero in
   List.fold_left_es
-    (fun (b, _escape_ema) _ ->
-      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_escape_vote b
-      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_escape_ema))
+    (fun (b, _toggle_ema) _ ->
+      bake_with_metadata ~baking_mode ?policy ?liquidity_baking_toggle_vote b
+      >|=? fun (b, metadata) -> (b, metadata.liquidity_baking_toggle_ema))
     (b, initial_ema)
     (1 -- n)
 

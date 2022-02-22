@@ -16,7 +16,7 @@ def sandbox() -> Iterator[Sandbox]:
             0,
             [],
             proto=constants.ALPHA_DAEMON,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
         yield sandbox
         assert sandbox.are_daemons_alive()

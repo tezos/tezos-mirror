@@ -48,7 +48,7 @@ class TestAllDaemonsWithOperations:
                 i,
                 [f'bootstrap{5 - i}'],
                 protocol.DAEMON,
-                run_params=['--liquidity-baking-escape-vote', 'pass'],
+                run_params=['--liquidity-baking-toggle-vote', 'pass'],
             )
 
     def test_wait_for_protocol(self, sandbox: Sandbox):

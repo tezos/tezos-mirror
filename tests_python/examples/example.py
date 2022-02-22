@@ -18,7 +18,7 @@ def scenario():
             0,
             ['bootstrap5'],
             proto=constants.ALPHA_DAEMON,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
         # Wait for second node to update its protocol to alpha, if not
         # it may not know yet the `wait_for_inclusion` operation which is

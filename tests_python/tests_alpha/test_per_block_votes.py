@@ -22,7 +22,7 @@ def run_vote_file(sandbox: Sandbox, filename: str) -> None:
         run_params=[
             "--votefile",
             filename,
-            '--liquidity-baking-escape-vote',
+            '--liquidity-baking-toggle-vote',
             'pass',
         ],
     )
@@ -107,7 +107,7 @@ class TestAllPerBlockVotes:
             0,
             ['bootstrap1'],
             proto=protocol.DAEMON,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
 
     def test_wait_for_protocol(self, sandbox: Sandbox):

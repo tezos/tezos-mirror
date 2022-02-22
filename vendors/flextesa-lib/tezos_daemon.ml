@@ -43,7 +43,7 @@ let to_script state (t : t) =
       let lb_vote =
         match lb_vote with
         | None -> []
-        | Some vote -> ["--liquidity-baking-escape-vote"; vote]
+        | Some vote -> ["--liquidity-baking-toggle-vote"; vote]
       in
       call t @@
         [ "--endpoint"

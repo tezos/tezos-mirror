@@ -1336,9 +1336,10 @@ module Pending_migration = struct
 end
 
 module Liquidity_baking = struct
-  module Escape_ema =
+  module Toggle_ema =
     Make_single_data_storage (Registered) (Raw_context)
       (struct
+        (* The old "escape" name is kept here to avoid migrating this. *)
         let name = ["liquidity_baking_escape_ema"]
       end)
       (Encoding.Int32)

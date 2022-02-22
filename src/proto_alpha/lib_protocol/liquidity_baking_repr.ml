@@ -26,24 +26,24 @@
 
 (** Options available for the Liquidity Baking per-block vote *)
 
-type liquidity_baking_escape_vote = LB_on | LB_off | LB_pass
+type liquidity_baking_toggle_vote = LB_on | LB_off | LB_pass
 
-let liquidity_baking_escape_vote_encoding =
+let liquidity_baking_toggle_vote_encoding =
   let of_int8 = function
     | 0 -> Ok LB_on
     | 1 -> Ok LB_off
     | 2 -> Ok LB_pass
-    | _ -> Error "liquidity_baking_escape_vote_of_int8"
+    | _ -> Error "liquidity_baking_toggle_vote_of_int8"
   in
   let to_int8 = function LB_on -> 0 | LB_off -> 1 | LB_pass -> 2 in
   let open Data_encoding in
   (* union *)
-  def "liquidity_baking_escape_vote"
+  def "liquidity_baking_toggle_vote"
   @@ splitted
        ~binary:(conv_with_guard to_int8 of_int8 int8)
        ~json:(string_enum [("on", LB_on); ("off", LB_off); ("pass", LB_pass)])
 
-module Escape_EMA : sig
+module Toggle_EMA : sig
   (* The exponential moving average is represented as an Int32 between 0l and 2_000_000_000l *)
 
   type t
@@ -66,13 +66,13 @@ end = struct
 
   (* This error is not registered because we don't expect it to be
      raised. *)
-  type error += Liquidity_baking_escape_ema_out_of_bound of Int32.t
+  type error += Liquidity_baking_toggle_ema_out_of_bound of Int32.t
 
   let check_bounds x = Compare.Int32.(0l <= x && x <= 2_000_000_000l)
 
   let of_int32 x =
     if check_bounds x then return x
-    else fail @@ Liquidity_baking_escape_ema_out_of_bound x
+    else fail @@ Liquidity_baking_toggle_ema_out_of_bound x
 
   let zero = Int32.zero
 
@@ -115,8 +115,8 @@ end = struct
 end
 
 (* Invariant: 0 <= ema <= 2_000_000 *)
-let compute_new_ema ~escape_vote ema =
-  match escape_vote with
+let compute_new_ema ~toggle_vote ema =
+  match toggle_vote with
   | LB_pass -> ema
-  | LB_off -> Escape_EMA.update_ema_off ema
-  | LB_on -> Escape_EMA.update_ema_on ema
+  | LB_off -> Toggle_EMA.update_ema_off ema
+  | LB_on -> Toggle_EMA.update_ema_on ema

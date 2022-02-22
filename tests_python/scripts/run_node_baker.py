@@ -29,7 +29,7 @@ def scenario(contract, storage, round_duration, proto):
             1,
             accounts,
             proto=proto_daemon,
-            run_params=['--liquidity-baking-escape-vote', 'pass'],
+            run_params=['--liquidity-baking-toggle-vote', 'pass'],
         )
         client = sandbox.client(1)
         if contract:

@@ -71,7 +71,7 @@ let constants_mainnet =
     liquidity_baking_sunset_level = 3_063_809l;
     (* 1/2 window size of 2000 blocks with precision of 1_000_000
        for integer computation *)
-    liquidity_baking_escape_ema_threshold = 1_000_000_000l;
+    liquidity_baking_toggle_ema_threshold = 1_000_000_000l;
     (* The rationale behind the value of this constant is that an
        operation should be considered alive for about one hour:
 
