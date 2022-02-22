@@ -887,8 +887,8 @@ module Tx_rollup : sig
     Client.t ->
     Process.t
 
-  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/commitments *)
-  val get_commitments :
+  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/commitment *)
+  val get_commitment :
     ?endpoint:Client.endpoint ->
     ?hooks:Process.hooks ->
     ?chain:string ->

@@ -644,16 +644,13 @@ module Tx_rollup : sig
     f:(Tx_rollup_repr.t -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
 
-  (* A list of the commitments for each rollup and level.  The level,
+  (* A commitments for each rollup and level.  The level,
      here, is the level committed to (not the level the commitment was
-     submitted).  Usually this list will be of size zero or one, since
-     there is only one valid commitment for each level.  The list is
-     ordered by reverse priority -- that is, the first-submitted one is
-     last. *)
-  module Commitment_list :
+     submitted). *)
+  module Commitment :
     Non_iterable_indexed_carbonated_data_storage
       with type key = Raw_level_repr.t * Tx_rollup_repr.t
-       and type value = Tx_rollup_commitments_repr.t
+       and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
        and type t := Raw_context.t
 end
 

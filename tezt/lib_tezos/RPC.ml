@@ -567,9 +567,9 @@ module Tx_rollup = struct
     let path = sub_path ?chain ?block ~rollup "inbox" in
     Client.spawn_rpc ?endpoint ?hooks GET path client
 
-  let get_commitments ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+  let get_commitment ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ?(offset = 0) ~rollup client =
-    let path = sub_path ~chain ~block ~rollup "commitments" in
+    let path = sub_path ~chain ~block ~rollup "commitment" in
     let query_string = [("offset", string_of_int offset)] in
     Client.rpc ?endpoint ?hooks ~query_string GET path client
 end

@@ -1468,12 +1468,12 @@ module Tx_rollup = struct
                (Raw_level_repr.Index))
                (Make_index (Tx_rollup_repr.Index)))
 
-  module Commitment_list =
+  module Commitment =
     Level_indexed_context.Make_carbonated_map
       (struct
-        let name = ["commitment_list"]
+        let name = ["commitment"]
       end)
-      (Tx_rollup_commitments_repr)
+      (Tx_rollup_commitment_repr.Submitted_commitment)
 end
 
 module Sc_rollup = struct

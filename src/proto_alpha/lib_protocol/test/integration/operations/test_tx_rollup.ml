@@ -135,10 +135,8 @@ let init_originate_and_submit ?(batch = String.make 5 'c') () =
   Block.bake ~operation b >>=? fun b ->
   return ((contract, balance), state, tx_rollup, b)
 
-let commitment_hash_testable =
-  Alcotest.testable
-    Tx_rollup_commitments.Commitment_hash.pp
-    Tx_rollup_commitments.Commitment_hash.( = )
+let commitment_testable =
+  Alcotest.testable Tx_rollup_commitment.pp Tx_rollup_commitment.( = )
 
 let public_key_hash_testable =
   Alcotest.testable Signature.Public_key_hash.pp Signature.Public_key_hash.( = )
@@ -689,13 +687,13 @@ let test_deposit_by_non_internal_operation () =
   Op.unsafe_transaction (B b) account (Tx_rollup tx_rollup) Tez.zero
   >>=? fun operation ->
   Incremental.begin_construction b >>=? fun i ->
-  Incremental.add_operation i operation ~expect_failure:(function
-      | Environment.Ecoproto_error
-          (Apply.Tx_rollup_non_internal_transaction as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | _ -> failwith "It should not be possible to send a rollup_operation ")
+  Incremental.add_operation
+    i
+    operation
+    ~expect_failure:
+      (check_proto_error (function
+          | Apply.Tx_rollup_non_internal_transaction -> true
+          | _ -> false))
   >>=? fun _i -> return_unit
 
 (** Test that block finalization changes gas rates *)
@@ -838,10 +836,9 @@ let test_inbox_linked_list () =
   assert_level_equals ~loc:__LOC__ (raw_level 4l) after >>=? fun () -> return ()
 
 (** [test_commitment_duplication] originates a rollup, and makes a
-   commitment. It attempts to have a second contract make the same
-   commitment, and ensures that this fails (and the second contract is
-   not charged). It also tests that the same contract can't submit
-   a different commitment*)
+    commitment. It attempts to add a second commitment for the same
+    level, and ensures that this fails.  It adds a commitment with
+    the wrong batch count and ensures that that fails. *)
 let test_commitment_duplication () =
   context_init 2 >>=? fun (b, contracts) ->
   let contract1 =
@@ -869,10 +866,10 @@ let test_commitment_duplication () =
   let level =
     match level_opt with None -> assert false | Some level -> level
   in
-  let batches : Tx_rollup_commitments.Commitment.batch_commitment list =
+  let batches : Tx_rollup_commitment.batch_commitment list =
     [{root = Bytes.make 20 '0'}]
   in
-  let commitment : Tx_rollup_commitments.Commitment.t =
+  let commitment : Tx_rollup_commitment.t =
     {level; batches; predecessor = None}
   in
   let submitted_level = (Level.current (Incremental.alpha_ctxt i)).level in
@@ -883,68 +880,50 @@ let test_commitment_duplication () =
   >>= fun _ ->
   (* Successfully fail to submit a duplicate commitment *)
   Op.tx_rollup_commit (I i) contract2 tx_rollup commitment >>=? fun op ->
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error
-          (Tx_rollup_commitments.Commitment_hash_already_submitted as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ function
+       | Tx_rollup_commitment.Level_already_has_commitment level1 ->
+           level = level1
+       | _ -> false)
   >>=? fun i ->
-  let batches2 : Tx_rollup_commitments.Commitment.batch_commitment list =
-    [{root = Bytes.make 20 '1'}]
-  in
-  let commitment2 : Tx_rollup_commitments.Commitment.t =
-    {level; batches = batches2; predecessor = None}
-  in
-  (* Successfully fail to submit a different commitment from contract1 *)
-  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment2 >>=? fun op ->
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error
-          (Tx_rollup_commitments.Two_commitments_from_one_committer as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
-  >>=? fun i ->
-  let batches3 : Tx_rollup_commitments.Commitment.batch_commitment list =
+  let batches3 : Tx_rollup_commitment.batch_commitment list =
     [{root = Bytes.make 20 '1'}; {root = Bytes.make 20 '2'}]
   in
-  let commitment3 : Tx_rollup_commitments.Commitment.t =
+  let commitment3 : Tx_rollup_commitment.t =
     {level; batches = batches3; predecessor = None}
   in
   (* Successfully fail to submit a different commitment from contract2 *)
   Op.tx_rollup_commit (I i) contract2 tx_rollup commitment3 >>=? fun op ->
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error
-          (Tx_rollup_commitments.Wrong_batch_count as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | t -> failwith "Unexpected error: %a" Error_monad.pp_print_trace t)
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ function
+       | Tx_rollup_commitment.Wrong_batch_count -> true
+       | _ -> false)
   >>=? fun i ->
   (* No charge. *)
   Assert.balance_was_debited ~loc:__LOC__ (I i) contract2 balance2 Tez.zero
   >>=? fun () ->
   let ctxt = Incremental.alpha_ctxt i in
-  wrap (Tx_rollup_commitments.get_commitments ctxt tx_rollup level)
-  >>=? fun (_, commitments) ->
-  (Alcotest.(check int "Expected one commitment" 1 (List.length commitments)) ;
-   let expected_hash = Tx_rollup_commitments.Commitment.hash commitment in
-   match List.nth commitments 0 with
-   | None -> assert false
-   | Some {hash; committer; submitted_at; _} ->
-       Alcotest.(
-         check commitment_hash_testable "Commitment hash" expected_hash hash) ;
+  wrap (Tx_rollup_commitment.get_commitment ctxt tx_rollup level)
+  >>=? fun (_, commitment_opt) ->
+  match commitment_opt with
+  | None -> assert false
+  | Some {commitment = expected_commitment; committer; submitted_at} ->
+      Alcotest.(
+        check commitment_testable "Commitment" expected_commitment commitment) ;
 
-       Alcotest.(check public_key_hash_testable "Committer" pkh1 committer) ;
+      Alcotest.(check public_key_hash_testable "Committer" pkh1 committer) ;
 
-       Alcotest.(
-         check raw_level_testable "Submitted" submitted_level submitted_at) ;
-       return ())
-  >>=? fun () ->
-  ignore i ;
-  return ()
+      Alcotest.(
+        check raw_level_testable "Submitted" submitted_level submitted_at) ;
+      return () >>=? fun () ->
+      ignore i ;
+      return ()
 
 let make_transactions_in tx_rollup contract blocks b =
   let contents = "batch " in
@@ -976,65 +955,69 @@ let test_commitment_predecessor () =
   make_transactions_in tx_rollup contract1 [2; 3; 6] b >>=? fun b ->
   Incremental.begin_construction b >>=? fun i ->
   (* Check error: Commitment with predecessor for first block *)
-  let batches : Tx_rollup_commitments.Commitment.batch_commitment list =
+  let batches : Tx_rollup_commitment.batch_commitment list =
     [{root = Bytes.make 20 '0'}]
   in
-  let some_hash =
-    Tx_rollup_commitments.Commitment_hash.of_bytes_exn
+  let bogus_hash =
+    Tx_rollup_commitment.Commitment_hash.of_bytes_exn
       (Bytes.of_string "tcu1deadbeefdeadbeefdeadbeefdead")
   in
-  let commitment : Tx_rollup_commitments.Commitment.t =
-    {level = raw_level 1l; batches; predecessor = Some some_hash}
+  let commitment : Tx_rollup_commitment.t =
+    {level = raw_level 1l; batches; predecessor = Some bogus_hash}
   in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   let error =
     Tx_rollup_inbox.Tx_rollup_inbox_does_not_exist (tx_rollup, raw_level 1l)
   in
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error e :: _ when e = error ->
-          Assert.test_error_encodings error ;
-          return_unit
-      | _ -> failwith "Need to check commitment predecessor")
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:(check_proto_error (( = ) error))
   >>=? fun i ->
+  (* Now we create a real commitment *)
+  let commitment : Tx_rollup_commitment.t =
+    {level = raw_level 2l; batches; predecessor = None}
+  in
+  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
   (* Commitment without predecessor for block with predecessor*)
-  let commitment : Tx_rollup_commitments.Commitment.t =
+  let commitment : Tx_rollup_commitment.t =
     {level = raw_level 3l; batches; predecessor = None}
   in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error
-          (Tx_rollup_commitments.Wrong_commitment_predecessor_level as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | _ -> failwith "Need to check commitment predecessor")
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ function
+       | Tx_rollup_commitment.Wrong_commitment_predecessor_level -> true
+       | _ -> false)
   >>=? fun i ->
-  (* Commitment  refers to a predecessor which does not exist *)
-  let commitment : Tx_rollup_commitments.Commitment.t =
-    {level = raw_level 3l; batches; predecessor = Some some_hash}
+  (* Commitment refers to a predecessor which does not exist *)
+  let commitment : Tx_rollup_commitment.t =
+    {level = raw_level 3l; batches; predecessor = Some bogus_hash}
   in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error
-          (Tx_rollup_commitments.Missing_commitment_predecessor as e)
-        :: _ ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | _ -> failwith "Need to check commitment predecessor")
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:
+      (check_proto_error @@ function
+       | Tx_rollup_commitment.Missing_commitment_predecessor -> true
+       | _ -> false)
   >>=? fun i ->
-  (* Try to commit to an empty level between full ones *)
-  let commitment : Tx_rollup_commitments.Commitment.t =
-    {level = raw_level 5l; batches; predecessor = Some some_hash}
+  (* Try to commit to an empty level. *)
+  let commitment : Tx_rollup_commitment.t =
+    {level = raw_level 5l; batches; predecessor = Some bogus_hash}
   in
   Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
   let error =
     Tx_rollup_inbox.Tx_rollup_inbox_does_not_exist (tx_rollup, raw_level 5l)
   in
-  Incremental.add_operation i op ~expect_failure:(function
-      | Environment.Ecoproto_error e :: _ when e = error ->
-          Assert.test_error_encodings e ;
-          return_unit
-      | _ -> failwith "Need to check for skipped levels")
+  Incremental.add_operation
+    i
+    op
+    ~expect_failure:(check_proto_error (( = ) error))
   >>=? fun i ->
   ignore i ;
   return ()

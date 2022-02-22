@@ -31,21 +31,32 @@
 (** [add_commitment context tx_rollup contract commitment] adds a
     commitment to a rollup.
 
-    FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2468
+    This functions returns the errors
 
-    We should document better the invariants. *)
+    {ul {li [Level_already_has_commitment] iff there is already a
+            commitment at this level.}
+        {li [Missing_commitment_predecessor] iff the predecessor does
+            not match the already-stored predecessor commitment.}
+        {li [Wrong_commitment_predecessor_level] iff there is no
+            predecessor level, but a predecessor commitment is
+            provided (or no predecessor commitment is provided but
+            there is a precessor level)}
+        {li [Wrong_batch_count] iff the number of batches does not
+            equal the length of the inbox.}} *)
 val add_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Signature.Public_key_hash.t ->
-  Tx_rollup_commitments_repr.Commitment.t ->
+  Tx_rollup_commitment_repr.t ->
   Raw_context.t tzresult Lwt.t
 
-(** [get_commitments context tx_rollup level] returns the list of
-   non-rejected commitments for a rollup at a level, first-submitted
-   first. *)
-val get_commitments :
+(** [get_commitment context tx_rollup level] returns the commitment
+    for a level, if any exists.  If the rollup does not exist,
+    the error [Tx_rollup_does_not_exist] is returned. *)
+val get_commitment :
   Raw_context.t ->
   Tx_rollup_repr.t ->
   Raw_level_repr.t ->
-  (Raw_context.t * Tx_rollup_commitments_repr.t) tzresult Lwt.t
+  (Raw_context.t * Tx_rollup_commitment_repr.Submitted_commitment.t option)
+  tzresult
+  Lwt.t

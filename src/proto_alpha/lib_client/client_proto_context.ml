@@ -866,7 +866,7 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
   List.map_es
     (fun root ->
       match Hex.to_bytes (`Hex root) with
-      | Some content -> return Tx_rollup_commitments.Commitment.{root = content}
+      | Some content -> return Tx_rollup_commitment.{root = content}
       | None ->
           failwith
             "%s is not a valid binary text encoded using the hexadecimal \
@@ -877,13 +877,11 @@ let submit_tx_rollup_commitment (cctxt : #full) ~chain ~block ?confirmations
   let predecessor =
     Option.map
       (fun pred_str ->
-        Tx_rollup_commitments.Commitment_hash.of_bytes_exn
+        Tx_rollup_commitment.Commitment_hash.of_bytes_exn
           (Bytes.of_string pred_str))
       predecessor
   in
-  let commitment : Tx_rollup_commitments.Commitment.t =
-    {level; batches; predecessor}
-  in
+  let commitment : Tx_rollup_commitment.t = {level; batches; predecessor} in
   let contents :
       Kind.tx_rollup_commit Annotated_manager_operation.annotated_list =
     Annotated_manager_operation.Single_manager
