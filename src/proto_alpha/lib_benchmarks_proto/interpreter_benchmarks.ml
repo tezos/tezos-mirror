@@ -2242,6 +2242,12 @@ module Registration_section = struct
 
     let () =
       simple_benchmark
+        ~name:Interpreter_workload.N_IMin_block_time
+        ~kinstr:(IMin_block_time (kinfo bot, halt (nat @$ bot)))
+        ()
+
+    let () =
+      simple_benchmark
         ~name:Interpreter_workload.N_IBalance
         ~kinstr:(IBalance (kinfo (unit @$ bot), halt (mutez @$ unit @$ bot)))
         ()
