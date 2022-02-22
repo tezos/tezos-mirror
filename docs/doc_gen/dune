@@ -18,9 +18,3 @@
                    -open Tezos_store
                    -open Tezos_protocol_updater
                    -linkall)))
-
-(rule
- (alias buildtest)
- (deps rpc_doc.exe
-       p2p_doc.exe)
- (action (progn)))
