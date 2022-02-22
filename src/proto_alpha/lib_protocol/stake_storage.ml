@@ -164,6 +164,13 @@ let snapshot ctxt =
   Storage.Stake.Staking_balance.snapshot ctxt index >>=? fun ctxt ->
   Storage.Stake.Active_delegate_with_one_roll.snapshot ctxt index
 
+let compute_snapshot_index ctxt cycle ~max_snapshot_index =
+  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
+  let rd = Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"] in
+  let seq = Seed_repr.sequence rd 0l in
+  Seed_repr.take_int32 seq (Int32.of_int max_snapshot_index)
+  |> fst |> Int32.to_int |> return
+
 let get_stakes_for_selected_index ctxt index =
   Storage.Stake.Active_delegate_with_one_roll.fold_snapshot
     ctxt
@@ -217,13 +224,9 @@ let get_stakes_for_selected_index ctxt index =
       return ((delegate, stake_for_cycle) :: acc, total_stake))
 
 let select_distribution_for_cycle ctxt cycle pubkey =
-  Storage.Stake.Last_snapshot.get ctxt >>=? fun max_index ->
-  Storage.Seed.For_cycle.get ctxt cycle >>=? fun seed ->
-  let rd = Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"] in
-  let seq = Seed_repr.sequence rd 0l in
-  let selected_index =
-    Seed_repr.take_int32 seq (Int32.of_int max_index) |> fst |> Int32.to_int
-  in
+  Storage.Stake.Last_snapshot.get ctxt >>=? fun max_snapshot_index ->
+  compute_snapshot_index ctxt ~max_snapshot_index cycle
+  >>=? fun selected_index ->
   List.fold_left_es
     (fun ctxt index ->
       (if Compare.Int.(index = selected_index) then
@@ -249,7 +252,7 @@ let select_distribution_for_cycle ctxt cycle pubkey =
       Storage.Stake.Active_delegate_with_one_roll.delete_snapshot ctxt index
       >>= fun ctxt -> return ctxt)
     ctxt
-    Misc.(0 --> (max_index - 1))
+    Misc.(0 --> (max_snapshot_index - 1))
   >>=? fun ctxt -> Storage.Stake.Last_snapshot.update ctxt 0
 
 let select_distribution_for_cycle_do_not_call_except_for_migration =

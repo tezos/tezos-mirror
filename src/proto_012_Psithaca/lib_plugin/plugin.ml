@@ -3656,9 +3656,19 @@ module RPC = struct
         ~query:RPC_query.empty
         ~output:Round.encoding
         RPC_path.(path / "round")
+
+    let selected_snapshot =
+      RPC_service.get_service
+        ~description:
+          "Returns the index of the selected snapshot for the current cycle."
+        ~query:RPC_query.empty
+        ~output:Data_encoding.int32
+        RPC_path.(open_root / "context" / "selected_snapshot")
   end
 
-  type Environment.Error_monad.error += Negative_level_offset
+  type Environment.Error_monad.error +=
+    | Negative_level_offset
+    | No_available_snapshots of {min_cycle : int32}
 
   let () =
     Environment.Error_monad.register_error_kind
@@ -3670,7 +3680,49 @@ module RPC = struct
         Format.fprintf ppf "The specified level offset should be positive.")
       Data_encoding.unit
       (function Negative_level_offset -> Some () | _ -> None)
-      (fun () -> Negative_level_offset)
+      (fun () -> Negative_level_offset) ;
+    Environment.Error_monad.register_error_kind
+      `Permanent
+      ~id:"no_available_snapshots"
+      ~title:"No available snapshots"
+      ~description:"No available snapshots"
+      ~pp:(fun ppf min_cycle ->
+        Format.fprintf ppf "No available snapshots until cycle %ld" min_cycle)
+      Data_encoding.(obj1 (req "min_cycle" int32))
+      (function
+        | No_available_snapshots {min_cycle} -> Some min_cycle | _ -> None)
+      (fun min_cycle -> No_available_snapshots {min_cycle})
+
+  let get_selected_snapshot ctxt =
+    (* Copy-pasted the logic from [select_distribution_for_cycle]
+       in [stake_storage.ml] *)
+    (* max_index can be determined by using constants only *)
+    let blocks_per_stake_snapshot =
+      Alpha_context.Constants.blocks_per_stake_snapshot ctxt
+    in
+    let blocks_per_cycle = Alpha_context.Constants.blocks_per_cycle ctxt in
+    let preserved_cycles =
+      Int32.of_int (Alpha_context.Constants.preserved_cycles ctxt)
+    in
+    let current_cycle = Level.(current ctxt).cycle in
+    if Compare.Int32.(Cycle.to_int32 current_cycle <= preserved_cycles) then
+      (* Early cycles do not have snapshots, fail if requested *)
+      fail (No_available_snapshots {min_cycle = Int32.succ preserved_cycles})
+    else
+      let max_index = Int32.div blocks_per_cycle blocks_per_stake_snapshot in
+      Alpha_context.Seed.for_cycle ctxt current_cycle >>=? fun seed ->
+      let seed =
+        (* Hackish cast *)
+        Data_encoding.Binary.to_bytes_exn Seed.seed_encoding seed
+        |> Data_encoding.Binary.of_bytes_opt Seed_repr.seed_encoding
+        |> WithExceptions.Option.get ~loc:__LOC__
+      in
+      let rd =
+        Seed_repr.initialize_new seed [Bytes.of_string "stake_snapshot"]
+      in
+      let seq = Seed_repr.sequence rd 0l in
+      let selected_index = Seed_repr.take_int32 seq max_index |> fst in
+      return selected_index
 
   let register () =
     Scripts.register () ;
@@ -3704,7 +3756,9 @@ module RPC = struct
             let first = List.last default_first rest in
             return (Some (first.level, last.level))) ;
     Registration.register0 ~chunked:false S.round (fun ctxt () () ->
-        Round.get ctxt)
+        Round.get ctxt) ;
+    Registration.register0 ~chunked:false S.selected_snapshot (fun ctxt () () ->
+        get_selected_snapshot ctxt)
 
   let current_level ctxt ?(offset = 0l) block =
     RPC_context.make_call0 S.current_level ctxt block {offset} ()

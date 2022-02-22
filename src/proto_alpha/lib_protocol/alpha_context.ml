@@ -377,6 +377,8 @@ end
 module Stake_distribution = struct
   let snapshot = Stake_storage.snapshot
 
+  let compute_snapshot_index = Stake_storage.compute_snapshot_index
+
   let baking_rights_owner = Delegate.baking_rights_owner
 
   let slot_owner = Delegate.slot_owner

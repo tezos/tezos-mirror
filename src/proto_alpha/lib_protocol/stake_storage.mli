@@ -62,6 +62,9 @@ val get_staking_balance :
 
 val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+val compute_snapshot_index :
+  Raw_context.t -> Cycle_repr.t -> max_snapshot_index:int -> int tzresult Lwt.t
+
 val select_distribution_for_cycle_do_not_call_except_for_migration :
   Raw_context.t ->
   Cycle_repr.t ->
