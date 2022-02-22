@@ -116,7 +116,7 @@ receives for that role. The slot owner is obtained by running a PRNG
 
 Let `n` be the cycle the level belongs to.
 The seed of the PRNG is the :ref:`random seed <random_seed_012>` associated with cycle ``n-PRESERVED_CYCLES``.
-The PRNG selects a snapshot from cycle ``n-PRESERVED_CYCLES-2`` and then it selects a stake in the selected snapshot.
+The PRNG selects a snapshot from cycle ``n - PRESERVED_CYCLES - 1`` and then it selects a stake in the selected snapshot.
 The slot owner is then the stake owner.
 
 .. _protocol_constants_012:
