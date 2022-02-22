@@ -145,3 +145,9 @@ Minor Changes
   :gl:`!3529`, :gl:`!3739`, :gl:`!3741`, :gl:`!3695`, :gl:`!3763`,
   :gl:`!3779`, :gl:`!3745`, :gl:`!3256`, :gl:`!3326`, :gl:`!3812`,
   :gl:`!3920`, :gl:`!3929`)
+
+- Add ``/chains/main/blocks/<block>/context/selected_snapshot`` RPC to
+  retrieve the snapshot index used to compute baking right for the
+  given block's cycle. Context entry at
+  ``/chains/main/blocks/<block>/context/raw/bytes/cycle/<cycle>/roll_snapshot``
+  are no longer accessible in Tenderbake.
