@@ -33,6 +33,10 @@ type transfer_strategy =
       (** Maximum fraction of current wealth to transfer.
           Minimum amount is 1 mutez regardless of total wealth. *)
 
+type limit =
+  | Abs of int  (** Absolute level at which we should stop  *)
+  | Rel of int  (** Relative number of levels before stopping *)
+
 type parameters = {
   seed : int;
   fresh_probability : float;
@@ -52,6 +56,8 @@ type parameters = {
       (** if true, a single operation will be injected by pkh by block to
           improve the chance for the injected operations to be included in the
           next block *)
+  level_limit : limit option;
+      (** total number of levels during which the stresstest is run; unbounded if None *)
   smart_contracts : Smart_contracts.t;
       (** An opaque type that stores all the information that is necessary for
     efficient sampling of smart contract calls. *)
@@ -97,6 +103,7 @@ type state = {
   mutable shuffled_pool : source list option;
   mutable revealed : Signature.Public_key_hash.Set.t;
   mutable last_block : Block_hash.t;
+  mutable last_level : int;
   mutable target_block : Block_hash.t;
       (** The block on top of which we are injecting transactions (HEAD~2). *)
   new_block_condition : unit Lwt_condition.t;
@@ -135,6 +142,7 @@ let default_parameters =
        It was obtained by simulating the operation using the client. *)
     total_transfers = None;
     single_op_per_pkh_per_block = false;
+    level_limit = None;
     smart_contracts = Smart_contracts.no_contracts;
   }
 
@@ -694,14 +702,41 @@ let stat_on_exit (cctxt : Protocol_client_context.full) state =
 let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
     state rng save_pool_callback =
   let injected = ref 0 in
+  let target_level =
+    match parameters.level_limit with
+    | None -> None
+    | Some (Abs target) -> Some target
+    | Some (Rel offset) -> Some (state.last_level + offset)
+  in
   let dt = 1. /. parameters.tps in
   let terminated () =
-    match parameters.total_transfers with
-    | None -> false
-    | Some bound -> bound <= !injected
+    if
+      match parameters.total_transfers with
+      | None -> false
+      | Some bound -> bound <= !injected
+    then
+      cctxt#message
+        "Stopping after %d injections (target %a)."
+        !injected
+        Format.(pp_print_option pp_print_int)
+        parameters.total_transfers
+      >>= fun () -> Lwt.return_true
+    else
+      match target_level with
+      | None -> Lwt.return_false
+      | Some target ->
+          if target <= state.last_level then
+            cctxt#message
+              "Stopping at level %d (target level: %d)."
+              state.last_level
+              target
+            >>= fun () -> Lwt.return_true
+          else Lwt.return_false
   in
+
   let rec loop () =
-    if terminated () then
+    terminated () >>= fun terminated ->
+    if terminated then
       save_pool_callback () >>= fun () ->
       save_injected_operations cctxt state >>= fun () ->
       stat_on_exit cctxt state
@@ -737,9 +772,10 @@ let launch (cctxt : Protocol_client_context.full) (parameters : parameters)
   if Option.is_some state.shuffled_pool then
     dont_wait
       (fun () ->
-        on_new_head cctxt (fun (block, _) ->
+        on_new_head cctxt (fun (block, new_block_header) ->
             if not (Block_hash.equal block state.last_block) then (
               state.last_block <- block ;
+              state.last_level <- Int32.to_int new_block_header.shell.level ;
               state.shuffled_pool <-
                 Some
                   (List.shuffle
@@ -937,6 +973,22 @@ let single_op_per_pkh_per_block_arg =
        to 1 operation per public_key_hash per block."
     ()
 
+let level_limit_arg =
+  let open Clic in
+  arg
+    ~long:"level-limit"
+    ~placeholder:"integer | +integer"
+    ~doc:
+      "Level at which the stresstest will stop (if prefixed by '+', the level \
+       is relative to the current head)"
+    (parameter (fun (cctxt : Protocol_client_context.full) s ->
+         match int_of_string s with
+         | exception _ ->
+             cctxt#error "While parsing --levels: invalid integer literal"
+         | i when i <= 0 ->
+             cctxt#error "While parsing --levels: negative integer or zero"
+         | i -> if String.get s 0 = '+' then return (Rel i) else return (Abs i)))
+
 let verbose_arg =
   Clic.switch
     ~long:"verbose"
@@ -980,7 +1032,7 @@ let generate_random_transactions =
   command
     ~group
     ~desc:"Generate random transactions"
-    (args12
+    (args13
        seed_arg
        tps_arg
        fresh_probability_arg
@@ -991,6 +1043,7 @@ let generate_random_transactions =
        storage_limit_arg
        transfers_arg
        single_op_per_pkh_per_block_arg
+       level_limit_arg
        verbose_arg
        debug_arg)
     (prefixes ["stresstest"; "transfer"; "using"]
@@ -1010,6 +1063,7 @@ let generate_random_transactions =
            storage_limit,
            transfers,
            single_op_per_pkh_per_block,
+           level_limit,
            verbose_flag,
            debug_flag )
          sources_json
@@ -1036,7 +1090,10 @@ let generate_random_transactions =
                {parameter with storage_limit})
         |> set_option transfers (fun parameter transfers ->
                {parameter with total_transfers = Some transfers})
-        |> fun parameter -> {parameter with single_op_per_pkh_per_block}
+        |> fun parameter ->
+        {parameter with single_op_per_pkh_per_block}
+        |> set_option level_limit (fun parameter level_limit ->
+               {parameter with level_limit = Some level_limit})
       in
       match
         Data_encoding.Json.destruct
@@ -1058,6 +1115,8 @@ let generate_random_transactions =
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
           Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
           >>=? fun current_target_block ->
+          Shell_services.Blocks.Header.shell_header cctxt ()
+          >>=? fun header_on_start ->
           let state =
             {
               current_head_on_start;
@@ -1073,6 +1132,7 @@ let generate_random_transactions =
                 else None);
               revealed = Signature.Public_key_hash.Set.empty;
               last_block = current_head_on_start;
+              last_level = Int32.to_int header_on_start.level;
               target_block = current_target_block;
               new_block_condition = Lwt_condition.create ();
               injected_operations = Block_hash.Table.create 1023;
@@ -1126,7 +1186,9 @@ let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
   | [] -> cctxt#error "It is required to provide sources"
   | sources0 -> (
       List.filter_map_p (normalize_source cctxt) sources0 >>= fun sources ->
-      Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
+      Protocol_client_context.Alpha_block_services.header cctxt ()
+      >>=? fun header_on_start ->
+      let current_head_on_start = header_on_start.hash in
       let counters = Signature.Public_key_hash.Table.create 1023 in
       Shell_services.Blocks.hash cctxt ~block:(`Head 2) ()
       >>=? fun current_target_block ->
@@ -1139,6 +1201,7 @@ let estimate_transaction_cost parameters (cctxt : Protocol_client_context.full)
           shuffled_pool = None;
           revealed = Signature.Public_key_hash.Set.empty;
           last_block = current_head_on_start;
+          last_level = Int32.to_int header_on_start.shell.level;
           target_block = current_target_block;
           new_block_condition = Lwt_condition.create ();
           injected_operations = Block_hash.Table.create 1023;
