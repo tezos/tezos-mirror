@@ -3193,6 +3193,7 @@ let _tezos_proxy_server =
          tezos_stdlib_unix |> open_;
          cmdliner;
          lwt_exit;
+         lwt_unix;
          tezos_proxy;
          tezos_proxy_server_config;
          tezos_rpc_http_client_unix;

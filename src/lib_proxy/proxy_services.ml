@@ -116,7 +116,10 @@ end
 type mode =
   | Light_client of Light.sources
   | Proxy_client
-  | Proxy_server of {sym_block_caching_time : int option}
+  | Proxy_server of {
+      sleep : float -> unit Lwt.t;
+      sym_block_caching_time : int option;
+    }
 
 let to_client_server_mode = function
   | Light_client _ | Proxy_client -> Proxy.Client
@@ -176,7 +179,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
            Remember that contexts are kept in an LRU cache though, so clearing
            will eventually happen; but we don't schedule it. *)
       Lwt.return_unit
-  | (Proxy_server {sym_block_caching_time}, _) ->
+  | (Proxy_server {sleep; sym_block_caching_time}, _) ->
       let (chain_string, block_string) =
         Tezos_shell_services.Block_services.
           (chain_to_string chain, to_string block)
@@ -209,7 +212,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
             | Ok (Some x) -> Lwt.return (Int64.to_float x))
       in
       let schedule () : _ Lwt.t =
-        let* () = Lwt_unix.sleep time_between_blocks in
+        let* () = sleep time_between_blocks in
         Env_cache_lwt.remove envs_cache key ;
         Events.(emit clearing_data (chain_string, block_string))
       in
