@@ -29,20 +29,15 @@ open Tx_rollup_l2_context_sig
 
 let tag_size = `Uint8
 
-(** FIXME/TORU: https://gitlab.com/tezos/tezos/-/merge_requests/4383
-    Don’t hard-code the size of the BLS public key by relying on
-    the variable exposed by the environment. *)
-let bls_public_key_size = 48
-
 let signer_encoding =
-  Data_encoding.(
-    conv_with_guard
-      Bls_signature.pk_to_bytes
-      (fun x ->
-        match Bls_signature.pk_of_bytes_opt x with
-        | Some x -> ok x
-        | None -> Error "not a BLS public key")
-      (Fixed.bytes bls_public_key_size))
+  let open Data_encoding in
+  conv_with_guard
+    Bls_signature.pk_to_bytes
+    (fun x ->
+      match Bls_signature.pk_of_bytes_opt x with
+      | Some x -> ok x
+      | None -> Error "not a BLS public key")
+    (Fixed.bytes Bls_signature.pk_size_in_bytes)
 
 module Signer_indexable = Indexable.Make (struct
   type t = Bls_signature.pk
