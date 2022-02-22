@@ -1649,105 +1649,16 @@ module Compact_list = struct
 
   (** ---- Partial encoding ------------------------------------------------- *)
 
-  let list bits encoding =
-    let rec aux m =
-      Encoding.(
-        match m with
-        | 0 ->
-            conv_partial
-              (function [] -> Some () | _ -> None)
-              (fun () -> [])
-              unit
-        | 1 ->
-            conv_partial
-              (function [x] -> Some x | _ -> None)
-              (fun x -> [x])
-              (tup1 encoding)
-        | 2 ->
-            conv_partial
-              (function [x1; x2] -> Some (x1, x2) | _ -> None)
-              (fun (x1, x2) -> [x1; x2])
-              (tup2 encoding encoding)
-        | 3 ->
-            conv_partial
-              (function [x1; x2; x3] -> Some (x1, x2, x3) | _ -> None)
-              (fun (x1, x2, x3) -> [x1; x2; x3])
-              (tup3 encoding encoding encoding)
-        | 4 ->
-            conv_partial
-              (function [x1; x2; x3; x4] -> Some (x1, x2, x3, x4) | _ -> None)
-              (fun (x1, x2, x3, x4) -> [x1; x2; x3; x4])
-              (tup4 encoding encoding encoding encoding)
-        | 5 ->
-            conv_partial
-              (function
-                | [x1; x2; x3; x4; x5] -> Some (x1, x2, x3, x4, x5) | _ -> None)
-              (fun (x1, x2, x3, x4, x5) -> [x1; x2; x3; x4; x5])
-              (tup5 encoding encoding encoding encoding encoding)
-        | 6 ->
-            conv_partial
-              (function
-                | [x1; x2; x3; x4; x5; x6] -> Some (x1, x2, x3, x4, x5, x6)
-                | _ -> None)
-              (fun (x1, x2, x3, x4, x5, x6) -> [x1; x2; x3; x4; x5; x6])
-              (tup6 encoding encoding encoding encoding encoding encoding)
-        | 7 ->
-            conv_partial
-              (function
-                | [x1; x2; x3; x4; x5; x6; x7] ->
-                    Some (x1, x2, x3, x4, x5, x6, x7)
-                | _ -> None)
-              (fun (x1, x2, x3, x4, x5, x6, x7) -> [x1; x2; x3; x4; x5; x6; x7])
-              (tup7
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding)
-        | 8 ->
-            conv_partial
-              (function
-                | [x1; x2; x3; x4; x5; x6; x7; x8] ->
-                    Some (x1, x2, x3, x4, x5, x6, x7, x8)
-                | _ -> None)
-              (fun (x1, x2, x3, x4, x5, x6, x7, x8) ->
-                [x1; x2; x3; x4; x5; x6; x7; x8])
-              (tup8
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding
-                 encoding)
-        | m ->
-            conv_partial
-              (function
-                | x1 :: x2 :: x3 :: x4 :: x5 :: x6 :: x7 :: x8 :: rst ->
-                    Some ((x1, x2, x3, x4, x5, x6, x7, x8), rst)
-                | _ -> None)
-              (fun ((x1, x2, x3, x4, x5, x6, x7, x8), rst) ->
-                x1 :: x2 :: x3 :: x4 :: x5 :: x6 :: x7 :: x8 :: rst)
-              (merge_tups
-                 (tup8
-                    encoding
-                    encoding
-                    encoding
-                    encoding
-                    encoding
-                    encoding
-                    encoding
-                    encoding)
-                 (aux (m - 8))))
-    in
-    aux bits
+  let specialised_list bits encoding =
+    let open Encoding in
+    match bits with
+    | 0 ->
+        conv_partial (function [] -> Some () | _ -> None) (fun () -> []) unit
+    | n -> Fixed.list n encoding
 
   let partial_encoding : 'a Encoding.t -> layout -> 'a list Encoding.t =
    fun encoding -> function
-    | Small_list bits -> list bits encoding
+    | Small_list bits -> specialised_list bits encoding
     | Big_list -> Encoding.list encoding
 
   let json_encoding = Encoding.list
@@ -1766,6 +1677,8 @@ end
 
 let list : type a. bits:int -> a Encoding.t -> a list t =
  fun ~bits encoding ->
+  if bits < 0 then
+    raise (Invalid_argument "Data_encoding.Compact.list: negative bit-length") ;
   (module struct
     type input = a list
 
