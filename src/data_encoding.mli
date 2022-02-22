@@ -1133,7 +1133,10 @@ module Binary : sig
 
   exception Write_error of write_error
 
-  (** Compute the expected length of the binary representation of a value *)
+  (** Compute the expected length of the binary representation of a value.
+
+      @raise Write_error in case some size/length invariants are broken.
+   *)
   val length : 'a Encoding.t -> 'a -> int
 
   (** Returns the size of the binary representation that the given
