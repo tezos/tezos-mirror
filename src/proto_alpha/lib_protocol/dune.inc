@@ -114,8 +114,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
@@ -286,8 +286,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
@@ -458,8 +458,8 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml
@@ -652,8 +652,8 @@ include Tezos_raw_protocol_alpha.Main
    Commitment_storage
    Voting_period_storage
    Cache_repr
-   Stake_storage
    Contract_delegate_storage
+   Stake_storage
    Contract_storage
    Token
    Delegate_storage
@@ -865,8 +865,8 @@ include Tezos_raw_protocol_alpha.Main
    commitment_storage.mli commitment_storage.ml
    voting_period_storage.mli voting_period_storage.ml
    cache_repr.mli cache_repr.ml
-   stake_storage.mli stake_storage.ml
    contract_delegate_storage.mli contract_delegate_storage.ml
+   stake_storage.mli stake_storage.ml
    contract_storage.mli contract_storage.ml
    token.mli token.ml
    delegate_storage.mli delegate_storage.ml

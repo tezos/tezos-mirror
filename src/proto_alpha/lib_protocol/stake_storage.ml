@@ -193,3 +193,13 @@ let prepare_stake_distribution ctxt =
        stake_distribution)
 
 let get_total_active_stake = Storage.Total_active_stake.get
+
+let remove_contract_stake ctxt contract amount =
+  Contract_delegate_storage.find ctxt contract >>=? function
+  | None -> return ctxt
+  | Some delegate -> remove_stake ctxt delegate amount
+
+let add_contract_stake ctxt contract amount =
+  Contract_delegate_storage.find ctxt contract >>=? function
+  | None -> return ctxt
+  | Some delegate -> add_stake ctxt delegate amount

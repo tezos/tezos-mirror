@@ -92,8 +92,8 @@
         "Voting_period_storage",
         "Cache_repr",
 
-        "Stake_storage",
         "Contract_delegate_storage",
+        "Stake_storage",
         "Contract_storage",
         "Token",
         "Delegate_storage",

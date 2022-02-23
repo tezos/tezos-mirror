@@ -118,3 +118,15 @@ val prepare_stake_distribution : Raw_context.t -> Raw_context.t tzresult Lwt.t
     active stake at [cycle] from [ctxt]. *)
 val get_total_active_stake :
   Raw_context.t -> Cycle_repr.t -> Tez_repr.t tzresult Lwt.t
+
+(** [add_contract_stake ctxt contract amount] calls
+    [Stake_storage.add_stake ctxt delegate amount] if [contract] has a
+    [delegate]. Otherwise this function does nothing. *)
+val add_contract_stake :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [remove_contract_stake ctxt contract amount] calls
+    [Stake_storage.remove_stake ctxt delegate amount] if [contract] has a
+    [delegate]. Otherwise this function does nothing. *)
+val remove_contract_stake :
+  Raw_context.t -> Contract_repr.t -> Tez_repr.t -> Raw_context.t tzresult Lwt.t

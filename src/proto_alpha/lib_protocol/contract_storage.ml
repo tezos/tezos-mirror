@@ -567,8 +567,7 @@ let spend_only_call_from_token c contract amount =
   | Ok new_balance -> (
       Storage.Contract.Spendable_balance.update c contract new_balance
       >>=? fun c ->
-      Contract_delegate_storage.remove_contract_stake c contract amount
-      >>=? fun c ->
+      Stake_storage.remove_contract_stake c contract amount >>=? fun c ->
       if Tez_repr.(new_balance > Tez_repr.zero) then return c
       else
         match Contract_repr.is_implicit contract with
@@ -596,7 +595,7 @@ let credit_only_call_from_token c contract amount =
   | Some balance ->
       Tez_repr.(amount +? balance) >>?= fun balance ->
       Storage.Contract.Spendable_balance.update c contract balance >>=? fun c ->
-      Contract_delegate_storage.add_contract_stake c contract amount
+      Stake_storage.add_contract_stake c contract amount
 
 let init c =
   Storage.Contract.Global_counter.init c Z.zero >>=? fun c ->
