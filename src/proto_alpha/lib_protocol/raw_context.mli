@@ -23,6 +23,25 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** State of the validation.
+
+    Two parts:
+
+    1. Context.t: what is stored between blocks, this includes an
+    Irmin tree typically stored on disk and the cache (stored in
+    RAM).
+
+    2. Additional information needed during the validation of a
+    block but not persisted across blocks, always stored in
+    RAM. The gas counter is here.
+
+    [Alpha_context.t] is actually implemented as [Raw_context.t].
+    The difference is that Alpha_context.mli does not expose this
+    so functions manipulating an Alpha_context.t are guaranteed
+    to only access the context through the storage modules
+    exposed in Alpha_context.mli. These modules are in charge of
+    maintaining invariants over the structure of the context. *)
+
 (** {1 Errors} *)
 
 type error += Too_many_internal_operations (* `Permanent *)

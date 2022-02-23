@@ -26,6 +26,9 @@
 
 (** Tezos Protocol Implementation - Typed storage builders.
 
+    Contains functors used by [Storage] to create the structure on
+    disk.
+
   @see [Make_subcontext]
  *)
 

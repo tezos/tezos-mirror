@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Low-level handlers of raw contexts for base operations on
+    contracts. *)
+
 type error +=
   | (* `Branch *)
       Counter_in_the_future of Contract_repr.contract * Z.t * Z.t
@@ -65,6 +68,8 @@ val check_counter_increment :
 val increment_counter :
   Raw_context.t -> Signature.Public_key_hash.t -> Raw_context.t tzresult Lwt.t
 
+(** [get_balance c contract] returns the balance of [contract] given raw
+    context [c]. *)
 val get_balance : Raw_context.t -> Contract_repr.t -> Tez_repr.t tzresult Lwt.t
 
 val get_balance_carbonated :

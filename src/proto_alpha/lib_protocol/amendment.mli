@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Only delegates with at least one roll take part in the amendment
+(**
+   Amendments and proposals.
+
+   Only delegates with at least one roll take part in the amendment
    procedure.  It works as follows:
 
    - Proposal period: delegates can submit protocol amendment
@@ -39,9 +42,12 @@
    period. Otherwise we go back to a proposal period.  In any case, if
    there is enough participation the quorum is updated.
 
-   - Cooldown period: Nothing happens, this period is only a time gap
-   between exploration and promotion periods. At the end of a cooldown
-   period we move to a promotion period.
+   - Cooldown period: business as usual for the main chain. This
+   period is only a time gap between exploration and promotion
+   periods intended to provide the community with extra time to
+   continue testing the new protocol proposal, and start adapting
+   their infrastructure in advance.  At the end of the Cooldown
+   period we move to the Promotion period.
 
    - Promotion period: delegates can cast votes to promote or not the
    proposal using the ballot operation.  At the end of a promotion
@@ -51,7 +57,16 @@
    participation the quorum is updated.
 
    - Adoption period: At the end of an adoption period, the proposal
-   is activated as the new protocol.  *)
+   is activated as the new protocol.
+
+   The current protocol parameters are documented in
+   src/proto_alpha/lib_parameters/default_parameters.ml
+
+   In practice, the real constants used are defined in the
+   migration code. In src/proto_alpha/lib_protocol/init_storage.ml,
+   function [prepare_first_block] introduces new constants and
+   redefines the existing ones.
+*)
 
 open Alpha_context
 
@@ -71,6 +86,13 @@ type error +=
   | Unauthorized_ballot
   | Duplicate_ballot
 
+(** Records a vote for a delegate if the current voting period is
+    Exploration or Promotion.
+    @raise Invalid_proposal if [proposal] ≠ [current_proposal].
+    @raise Duplicate_ballot if delegate already voted.
+    @raise Unauthorized_ballot if delegate is not listed to vote,
+    or if current period differs from Exploration or Promotion.
+*)
 val record_ballot :
   context ->
   public_key_hash ->
