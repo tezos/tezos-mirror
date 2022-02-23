@@ -273,6 +273,9 @@ struct
   module Syntax = struct
     include S.Syntax
 
+    let ( let*? ) res f =
+      match res with Result.Ok v -> f v | Result.Error error -> fail error
+
     let fail_unless cond error =
       let open S.Syntax in
       if cond then return () else fail error

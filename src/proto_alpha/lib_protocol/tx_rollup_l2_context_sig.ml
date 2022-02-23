@@ -100,6 +100,10 @@ module type CONTEXT = sig
 
     val ( let* ) : 'a m -> ('a -> 'b m) -> 'b m
 
+    (** [let*?] is for binding the value from Result-only
+        expressions into the storage monad. *)
+    val ( let*? ) : ('a, error) result -> ('a -> 'b m) -> 'b m
+
     (** [fail err] shortcuts the current computation by raising an
         error.
 
