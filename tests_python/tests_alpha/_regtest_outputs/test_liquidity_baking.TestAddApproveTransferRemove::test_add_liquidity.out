@@ -1,7 +1,7 @@
 tests_alpha/test_liquidity_baking.py::TestAddApproveTransferRemove::test_add_liquidity
 
 Node is bootstrapped.
-Estimated gas: 11824.095 units (will add 100 for safety)
+Estimated gas: 11830.990 units (will add 100 for safety)
 Estimated storage: 141 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
@@ -12,13 +12,13 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001548
+    Fee to the baker: ꜩ0.001549
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 11925
+    Gas limit: 11931
     Storage limit: 161 bytes
     Balance updates:
-      [CONTRACT_HASH] ... -ꜩ0.001548
-      payload fees(the block proposer) ....... +ꜩ0.001548
+      [CONTRACT_HASH] ... -ꜩ0.001549
+      payload fees(the block proposer) ....... +ꜩ0.001549
     Transaction:
       Amount: ꜩ9001
       From: [CONTRACT_HASH]
@@ -34,7 +34,7 @@ This sequence of operations was run:
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
       Paid storage size diff: 3 bytes
-      Consumed gas: 2912.646
+      Consumed gas: 5089.349
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.00075
         storage fees ........................... +ꜩ0.00075
@@ -58,7 +58,7 @@ This sequence of operations was run:
           Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 721
         Storage size: 2263 bytes
         Paid storage size diff: 68 bytes
-        Consumed gas: 4394.836
+        Consumed gas: 4396.776
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.017
           storage fees ........................... +ꜩ0.017
@@ -75,7 +75,7 @@ This sequence of operations was run:
           Set map(2)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 72007
         Storage size: 2048 bytes
         Paid storage size diff: 70 bytes
-        Consumed gas: 4516.613
+        Consumed gas: 2344.865
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.0175
           storage fees ........................... +ꜩ0.0175
