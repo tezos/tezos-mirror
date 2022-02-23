@@ -884,7 +884,7 @@ module Tx_rollup : sig
     unit Process.runnable
 
   (** Run [tezos-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
-  val submit_tx_rollup_commitment :
+  val submit_commitment :
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->

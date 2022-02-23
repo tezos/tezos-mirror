@@ -110,7 +110,7 @@ module Regressions = struct
 
   let submit_commitment ~level ~roots ~predecessor {rollup; client; node} =
     let*! () =
-      Client.Tx_rollup.submit_tx_rollup_commitment
+      Client.Tx_rollup.submit_commitment
         ~hooks
         ~level
         ~roots

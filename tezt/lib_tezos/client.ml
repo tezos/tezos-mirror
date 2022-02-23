@@ -1180,8 +1180,8 @@ module Tx_rollup = struct
     let parse process = Process.check process in
     {value = process; run = parse}
 
-  let submit_tx_rollup_commitment ?(wait = "none") ?burn_cap ?storage_limit
-      ?hooks ~level ~roots ~predecessor ~rollup ~src client =
+  let submit_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
+      ~roots ~predecessor ~rollup ~src client =
     let process =
       let predecessor = Option.value ~default:"" predecessor in
 
