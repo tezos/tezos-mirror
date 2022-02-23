@@ -221,49 +221,67 @@ module Config_file = struct
     in
     JSON.put ("shell", peer_validator) old_config
 
+  let sandbox_network_config =
+    `O
+      [
+        ( "genesis",
+          `O
+            [
+              ("timestamp", `String "2018-06-30T16:07:32Z");
+              ( "block",
+                `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2" );
+              ("protocol", `String Protocol.genesis_hash);
+            ] );
+        ( "genesis_parameters",
+          `O
+            [
+              ( "values",
+                `O [("genesis_pubkey", `String Constant.activator.public_key)]
+              );
+            ] );
+        ("chain_name", `String "TEZOS");
+        ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
+      ]
+
   let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
       =
     let network =
-      `O
-        [
-          ( "genesis",
-            `O
-              [
-                ("timestamp", `String "2018-06-30T16:07:32Z");
-                ( "block",
-                  `String "BLockGenesisGenesisGenesisGenesisGenesisf79b5d1CoW2"
-                );
-                ( "protocol",
-                  `String "ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im"
-                );
-              ] );
-          ( "genesis_parameters",
-            `O
-              [
-                ( "values",
-                  `O
-                    [
-                      ( "genesis_pubkey",
-                        `String
-                          "edpkuSLWfVU1Vq7Jg9FucPyKmma6otcMHac9zG4oU1KMHSTBpJuGQ2"
-                      );
-                    ] );
-              ] );
-          ("chain_name", `String "TEZOS");
-          ("sandboxed_chain_name", `String "SANDBOXED_TEZOS");
-          ( "user_activated_upgrades",
-            `A
-              (List.map
-                 (fun (level, protocol) ->
-                   `O
-                     [
-                       ("level", `Float (float level));
-                       ("replacement_protocol", `String (Protocol.hash protocol));
-                     ])
-                 upgrade_points) );
-        ]
+      sandbox_network_config
       |> JSON.annotate
            ~origin:"set_sandbox_network_with_user_activated_upgrades"
+      |> JSON.put
+           ( "user_activated_upgrades",
+             JSON.annotate ~origin:"user_activated_upgrades"
+             @@ `A
+                  (List.map
+                     (fun (level, protocol) ->
+                       `O
+                         [
+                           ("level", `Float (float level));
+                           ( "replacement_protocol",
+                             `String (Protocol.hash protocol) );
+                         ])
+                     upgrade_points) )
+    in
+    JSON.put ("network", network) old_config
+
+  let set_sandbox_network_with_user_activated_overrides overrides old_config =
+    let network =
+      sandbox_network_config
+      |> JSON.annotate
+           ~origin:"set_sandbox_network_with_user_activated_overrides"
+      |> JSON.put
+           ( "user_activated_protocol_overrides",
+             JSON.annotate ~origin:"user_activated_overrides"
+             @@ `A
+                  (List.map
+                     (fun (replaced_protocol, replacement_protocol) ->
+                       `O
+                         [
+                           ("replaced_protocol", `String replaced_protocol);
+                           ("replacement_protocol", `String replacement_protocol);
+                         ])
+                     overrides) )
     in
     JSON.put ("network", network) old_config
 end

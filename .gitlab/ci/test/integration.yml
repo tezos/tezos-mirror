@@ -69,33 +69,6 @@ integration:sandboxes:acc-endorsement:
     expire_in: 1 day
     when: always
 
-integration:sandboxes:u-a-u:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_next
-    - TMP=$PWD make -f sandbox.Makefile user_activated_upgrade_alpha
-  artifacts:
-    paths:
-      - flextesa-hard-fork
-      - flextesa-hard-fork-alpha
-      # FIXME https://gitlab.com/tezos/tezos/-/issues/2189
-      # This job can produce corrupted coverage file
-      # - $BISECT_FILE
-    expire_in: 1 day
-    when: always
-
-integration:sandboxes:daemons-upgrade:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_next
-    - TMP=$PWD make -f sandbox.Makefile daemons_upgrade_alpha
-  artifacts:
-    paths:
-      - flextesa-daemons-upgrade
-      - flextesa-daemons-upgrade-alpha
-    expire_in: 1 day
-    when: always
-
 ############################################################
 ## Stage: run python integration tests                    ##
 ############################################################

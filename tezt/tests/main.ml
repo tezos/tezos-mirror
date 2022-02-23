@@ -102,6 +102,10 @@ let () =
     ~from_protocol:Hangzhou
     ~to_protocol:Injected_test
     ~loser_protocols:[Alpha; Hangzhou] ;
+  Voting.register
+    ~from_protocol:Ithaca
+    ~to_protocol:(Known Alpha)
+    ~loser_protocols:[Ithaca; Hangzhou] ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
