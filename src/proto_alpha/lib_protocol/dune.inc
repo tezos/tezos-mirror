@@ -57,6 +57,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
+   skip_list_repr.mli skip_list_repr.ml
    sc_rollup_inbox_repr.mli sc_rollup_inbox_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
@@ -236,6 +237,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
+   skip_list_repr.mli skip_list_repr.ml
    sc_rollup_inbox_repr.mli sc_rollup_inbox_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
@@ -415,6 +417,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
+   skip_list_repr.mli skip_list_repr.ml
    sc_rollup_inbox_repr.mli sc_rollup_inbox_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml
@@ -616,6 +619,7 @@ include Tezos_raw_protocol_alpha.Main
    Cycle_repr
    Level_repr
    Sc_rollup_repr
+   Skip_list_repr
    Sc_rollup_inbox_repr
    Seed_repr
    Sampler
@@ -836,6 +840,7 @@ include Tezos_raw_protocol_alpha.Main
    cycle_repr.mli cycle_repr.ml
    level_repr.mli level_repr.ml
    sc_rollup_repr.mli sc_rollup_repr.ml
+   skip_list_repr.mli skip_list_repr.ml
    sc_rollup_inbox_repr.mli sc_rollup_inbox_repr.ml
    seed_repr.mli seed_repr.ml
    sampler.mli sampler.ml

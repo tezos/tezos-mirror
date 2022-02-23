@@ -75,5 +75,6 @@ let () =
       Unit_test.spec "sc rollup arith" Test_sc_rollup_arith.tests;
       Unit_test.spec "merkle list" Test_merkle_list.tests;
       Unit_test.spec "sc rollup inbox" Test_sc_rollup_inbox.tests;
+      Unit_test.spec "skip list" Test_skip_list_repr.tests;
     ]
   |> Lwt_main.run

@@ -32,6 +32,7 @@
         "Cycle_repr",
         "Level_repr",
         "Sc_rollup_repr",
+        "Skip_list_repr",
         "Sc_rollup_inbox_repr",
         "Seed_repr",
         "Sampler",
