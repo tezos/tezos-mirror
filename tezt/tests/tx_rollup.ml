@@ -103,7 +103,7 @@ module Regressions = struct
     (* The content of the batch does not matter for the regression test. *)
     let batch = "blob" in
     let* () = submit_batch ~batch state in
-    let*! _state = Rollup.get_inbox ~hooks ~rollup client in
+    let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
     unit
 
   let submit_commitment ~level ~roots ~predecessor {rollup; client; node} =
@@ -155,7 +155,7 @@ module Regressions = struct
         state
     in
     let offset = Node.get_level node - batch_level in
-    let*! _state =
+    let*! _commitment =
       Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
     in
     unit
