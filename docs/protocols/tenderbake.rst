@@ -21,11 +21,20 @@ Rolls still play the following roles:
 
 - A delegate's voting power in the governance process is still in terms of rolls, as in Hangzhou.
 
+Baking and endorsing rights are no longer independent of each other:
+delegates that participate in consensus at a given level are called
+:ref:`validators<tb_validator>` in Tenderbake and validator rights in
+Tenderbake are similar to endorsing rights in Emmy*. Baking rights are
+deduced from endorsing rights: the baker at round ``r`` is the
+validator that has endorsing slot ``r``.
 
 Operations
 ~~~~~~~~~~
 
 The layout of the endorsement operations has changed. It consists of a level, a round, a slot, and a payload hash.
+A validator emits at most one endorsement per round, but can emit more
+endorsements per level; therefore, the current high-water mark
+mechanism used by the signer has been adapted (see :ref:`Signer<signer_chgs>`).
 
 There is a new consensus operation, `preendorsement`, with the same layout as an endorsement.
 
@@ -43,6 +52,33 @@ the Octez client to ``HEAD~2``. Setting the ``branch`` field to
 because it will not be anchored on a block belonging to the
 chain. (The blocks at the current and previous levels are not
 necessary final.)
+
+Block headers
+~~~~~~~~~~~~~
+
+The block fitness (included in the shell part of the block header)
+changes, mainly to allow block
+:ref:`candidates<candidate_block>` to be accepted by nodes.
+
+The protocol part of the block header changes as follows:
+
+- it no longer contains the priority entry.
+- it contains two additional fields:
+
+ - ``payload_hash`` is the hash of the sequence of the block's
+   non-consensus operations
+ - ``payload_round`` is the round at which the block's payload has
+   been first proposed (at the current level); it is equal to the
+   block's round in case of a fresh
+   :ref:`proposal<candidate_block>` and it is strictly smaller
+   in case of a reproposal.
+
+As in Emmy*, a block includes a set of endorsements for the
+predecessor block. These endorsements constitute a
+:ref:`quorum<quorum>` and serve as a justification that the previous
+block has been agreed upon. In case of a reproposal, a block also
+includes a quorum of preendorsements for the same round to justify
+that the payload is indeed a reproposal.
 
 Parameters
 ~~~~~~~~~~
@@ -209,6 +245,8 @@ The following RPCs are new:
     activity is already known to be below the required minimum, then
     the rewards are zero.
 
+
+.. _signer_chgs:
 
 Signer
 ------
