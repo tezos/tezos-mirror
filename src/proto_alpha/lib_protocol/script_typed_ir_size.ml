@@ -316,19 +316,9 @@ let rec value_size :
     | Operation_t -> ret_succ (accu ++ operation_size x)
     | Chain_id_t -> ret_succ_adding accu chain_id_size
     | Never_t -> ( match x with _ -> .)
-    (* Related to https://gitlab.com/dannywillems/ocaml-bls12-381/-/issues/56.
-       Since the update to blst as a backend for bls12-381, size_in_bytes is not
-       the correct value for the allocated memory.
-       There is 1 word for the OCaml block header, 1 word for the C pointer and
-       a certain number of words for the actual value of the algebraic object
-       whose size is fixed and defined by the object itself.
-       For G1, it allocates 3 C values of type blst_fp which is 48 bytes.
-       For G2, it allocates 3 C values of type blst_fp2 which is 48 * 2 bytes.
-       For Fr, it allocates 1 C value of type blst_fr which is 32 bytes.
-    *)
-    | Bls12_381_g1_t -> ret_succ_adding accu !!((2 * 8) + (3 * 48))
-    | Bls12_381_g2_t -> ret_succ_adding accu !!((2 * 8) + (3 * 48 * 2))
-    | Bls12_381_fr_t -> ret_succ_adding accu !!((2 * 8) + 32)
+    | Bls12_381_g1_t -> ret_succ_adding accu !!Bls12_381.G1.size_in_memory
+    | Bls12_381_g2_t -> ret_succ_adding accu !!Bls12_381.G2.size_in_memory
+    | Bls12_381_fr_t -> ret_succ_adding accu !!Bls12_381.Fr.size_in_memory
     | Ticket_t (_, _) -> ret_succ_adding accu (ticket_size x)
     | Chest_key_t -> ret_succ_adding accu (chest_key_size x)
     | Chest_t -> ret_succ_adding accu (chest_size x)
