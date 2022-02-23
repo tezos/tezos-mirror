@@ -45,6 +45,9 @@ let default_rpc_port = 9999
 
 let default_reconnection_delay = 2.0
 
+let get_configuration_filename data_dir =
+  Filename.Infix.(data_dir // "config.json")
+
 let project
     {
       data_dir;
@@ -81,67 +84,42 @@ let inject
     reconnection_delay;
   }
 
-let encoding_data_dir =
-  Data_encoding.dft
-    ~description:"Location of the data dir"
-    "data-dir"
-    Data_encoding.string
-    default_data_dir
-
-let encoding_client_keys =
-  Data_encoding.req
-    ~description:"Client keys"
-    "client-keys"
-    Client_keys.Public_key_hash.encoding
-
-let encoding_rollup_id =
-  Data_encoding.req
-    ~description:"Rollup id of the rollup to target"
-    "rollup-id"
-    Protocol.Alpha_context.Tx_rollup.encoding
-
-let encoding_rollup_genesis =
-  Data_encoding.opt
-    ~description:"Hash of the block where the rollup was created"
-    "block-hash"
-    Block_hash.encoding
-
-let encoding_rpc_addr =
-  Data_encoding.dft
-    ~description:"RPC address listens by the node"
-    "rpc-addr"
-    Data_encoding.string
-    default_rpc_addr
-
-let encoding_rpc_port =
-  Data_encoding.dft
-    ~description:"RPC port listens by the node"
-    "rpc-port"
-    Data_encoding.int16
-    default_rpc_port
-
-let encoding_reconnection_delay =
-  Data_encoding.dft
-    ~description:"The reconnection delay when the connection is lost"
-    "reconnection-delay"
-    Data_encoding.float
-    default_reconnection_delay
-
 let encoding =
   let open Data_encoding in
   conv project inject
   @@ obj7
-       encoding_data_dir
-       encoding_client_keys
-       encoding_rollup_id
-       encoding_rollup_genesis
-       encoding_rpc_addr
-       encoding_rpc_port
-       encoding_reconnection_delay
-
-let get_configuration_filename data_dir =
-  let filename = "config.json" in
-  Filename.concat data_dir filename
+       (dft
+          ~description:"Location of the data dir"
+          "data-dir"
+          string
+          default_data_dir)
+       (req
+          ~description:"Client keys"
+          "client-keys"
+          Client_keys.Public_key_hash.encoding)
+       (req
+          ~description:"Rollup id of the rollup to target"
+          "rollup-id"
+          Protocol.Alpha_context.Tx_rollup.encoding)
+       (opt
+          ~description:"Hash of the block where the rollup was created"
+          "block-hash"
+          Block_hash.encoding)
+       (dft
+          ~description:"RPC address listens by the node"
+          "rpc-addr"
+          string
+          default_rpc_addr)
+       (dft
+          ~description:"RPC port listens by the node"
+          "rpc-port"
+          int16
+          default_rpc_port)
+       (dft
+          ~description:"The reconnection delay when the connection is lost"
+          "reconnection-delay"
+          float
+          default_reconnection_delay)
 
 let save configuration =
   let open Lwt_result_syntax in
