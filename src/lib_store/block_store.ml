@@ -78,6 +78,7 @@ let status {status_data; _} = Stored_data.get status_data
 let write_savepoint {savepoint; _} v =
   let open Lwt_result_syntax in
   let* () = Stored_data.write savepoint v in
+  let*! () = Store_events.(emit set_savepoint v) in
   Prometheus.Gauge.set
     Store_metrics.metrics.savepoint_level
     (Int32.to_float (snd v)) ;
@@ -86,6 +87,7 @@ let write_savepoint {savepoint; _} v =
 let write_caboose {caboose; _} v =
   let open Lwt_result_syntax in
   let* () = Stored_data.write caboose v in
+  let*! () = Store_events.(emit set_caboose v) in
   Prometheus.Gauge.set
     Store_metrics.metrics.caboose_level
     (Int32.to_float (snd v)) ;
@@ -432,26 +434,30 @@ let read_block_range_in_floating_stores block_store ~ro_store ~rw_store ~head
    [target_offset] cannot be satisfied, the previous savepoint is
    returned.*)
 let expected_savepoint block_store ~target_offset =
-  let open Lwt_syntax in
-  let cemented_store = cemented_block_store block_store in
-  match Cemented_block_store.cemented_blocks_files cemented_store with
+  let open Lwt_tzresult_syntax in
+  let cemented_dir = Naming.cemented_blocks_dir block_store.chain_dir in
+  let* metadata_table = Cemented_block_store.load_metadata_table cemented_dir in
+  match metadata_table with
   | None ->
-      let* current_savepoint = savepoint block_store in
-      Lwt.return (snd current_savepoint)
-  | Some cemented_block_files ->
-      let nb_files = Array.length cemented_block_files in
-      if target_offset > nb_files || nb_files = 0 then
-        (* We cannot provide a savepoint from the cemented block store *)
-        let* current_savepoint = savepoint block_store in
-        Lwt.return (snd current_savepoint)
+      let*! current_savepoint = savepoint block_store in
+      return (snd current_savepoint)
+  | Some cemented_block_metadata_files ->
+      let nb_files = Array.length cemented_block_metadata_files in
+      if target_offset >= nb_files || nb_files = 0 then
+        (* If cannot provide a savepoint from the cemented block store
+            or if the target_offset is equal to the current one then we
+            return the current savepoint. *)
+        let*! current_savepoint = savepoint block_store in
+        return (snd current_savepoint)
       else if target_offset = 0 then
         (* We get the successor of the highest cemented level *)
-        let cycle = cemented_block_files.(nb_files - 1) in
-        Lwt.return (Int32.succ cycle.end_level)
+        let cycle = cemented_block_metadata_files.(nb_files - 1) in
+        return (Int32.succ cycle.end_level)
       else
-        (* We get the lowest block of the targeted cycle *)
-        let cycle = cemented_block_files.(nb_files - target_offset) in
-        Lwt.return cycle.start_level
+        (* We get the lowest block of the targeted cycle which
+           contains metadata *)
+        let cycle = cemented_block_metadata_files.(nb_files - target_offset) in
+        return cycle.start_level
 
 (* [available_savepoint block_store current_head savepoint_candidate]
    aims to check that the [savepoint_candidate] can be used as a valid
@@ -502,7 +508,7 @@ let preserved_block block_store current_head =
    the savepoint candidate for an history mode switch. *)
 let infer_savepoint block_store current_head ~target_offset =
   let open Lwt_tzresult_syntax in
-  let*! expected_savepoint_level =
+  let* expected_savepoint_level =
     expected_savepoint block_store ~target_offset
   in
   let* preserved_savepoint_level = preserved_block block_store current_head in
@@ -576,10 +582,10 @@ let infer_caboose block_store savepoint current_head ~target_offset
           return (descriptor block)
       | None -> return savepoint)
   | Rolling r ->
-      let offset =
+      let current_offset =
         Option.value r ~default:History_mode.default_additional_cycles
       in
-      if offset.offset < target_offset then
+      if current_offset.offset < target_offset then
         let*! b = caboose block_store in
         return b
       else return savepoint
