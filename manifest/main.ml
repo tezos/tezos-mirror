@@ -47,11 +47,9 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
-  external_lib "bls12-381" V.(at_least "2.0.0" && less_than "2.1.0")
+  external_lib "bls12-381" V.(at_least "3.0.0" && less_than "3.1.0")
 
 let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
-
-let bls12_381_unix = external_lib "bls12-381-unix" V.True
 
 let camlzip = external_lib "camlzip" V.(exactly "1.11")
 
@@ -893,7 +891,6 @@ let tezos_base_unix =
         tezos_error_monad |> open_;
         tezos_crypto |> open_;
         tezos_base |> open_;
-        bls12_381_unix;
         tezos_hacl;
         tezos_stdlib |> open_;
         tezos_stdlib_unix |> open_;
@@ -1612,7 +1609,6 @@ let _tezos_protocol_environment_tests =
     ~opam:"src/lib_protocol_environment/tezos-protocol-environment"
     ~deps:
       [
-        bls12_381_unix;
         tezos_base |> open_ ~m:"TzPervasives";
         tezos_base_unix;
         tezos_protocol_environment |> open_;

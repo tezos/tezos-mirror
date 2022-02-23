@@ -17,7 +17,7 @@ depends: [
   "bls12-381-legacy"
   "zarith" { >= "1.12" & < "1.13" }
   "zarith_stubs_js"
-  "bls12-381" { >= "2.0.0" & < "2.1.0" }
+  "bls12-381" { >= "3.0.0" & < "3.1.0" }
   "ringo" { = "0.7" }
   "ringo-lwt" { = "0.7" }
   "tezos-base"
@@ -25,7 +25,6 @@ depends: [
   "tezos-micheline"
   "tezos-context"
   "tezos-event-logging"
-  "bls12-381-unix" {with-test}
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "tezos-test-helpers" {with-test}
   "qcheck-alcotest" { with-test & >= "0.15" }
