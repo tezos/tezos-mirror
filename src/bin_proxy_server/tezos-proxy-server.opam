@@ -13,6 +13,7 @@ depends: [
   "tezos-stdlib-unix"
   "cmdliner"
   "lwt-exit"
+  "lwt" { >= "5.4.0" }
   "tezos-proxy"
   "tezos-proxy-server-config"
   "tezos-rpc-http-client-unix"

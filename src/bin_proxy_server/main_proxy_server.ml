@@ -152,10 +152,11 @@ let main_promise (config_file : string option)
       None
   in
   let dir =
+    let sleep = Lwt_unix.sleep in
     Tezos_proxy.Proxy_services.build_directory
       printer
       http_ctxt
-      (Tezos_proxy.Proxy_services.Proxy_server sym_block_caching_time)
+      (Tezos_proxy.Proxy_services.Proxy_server {sleep; sym_block_caching_time})
       proxy_env
   in
   let server_args : Proxy_server_main_run.args =
