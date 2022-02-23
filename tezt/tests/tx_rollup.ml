@@ -162,6 +162,21 @@ module Regressions = struct
     in
     unit
 
+  module Limits = struct
+    let submit_empty_batch ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_limit_empty_batch"
+        ~title:"Submit empty batch"
+        ~tags:["tx_rollup"; "batch"; "client"]
+        ~protocols
+      @@ fun protocol ->
+      let* state = init_with_tx_rollup ~protocol in
+      let batch = "" in
+      let* () = submit_batch ~batch state in
+      unit
+  end
+
   module Fail = struct
     let client_submit_batch_invalid_rollup_address ~protocols =
       let open Tezt_tezos in
@@ -201,6 +216,7 @@ module Regressions = struct
     rpc_state ~protocols ;
     rpc_inbox ~protocols ;
     rpc_commitment ~protocols ;
+    Limits.submit_empty_batch ~protocols ;
     Fail.client_submit_batch_invalid_rollup_address ~protocols
 end
 
