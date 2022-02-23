@@ -64,11 +64,9 @@ let validation_passes = []
 
 let acceptable_passes _op = []
 
-let compare_operations _ _ = 0
+let relative_position_within_block _ _ = 0
 
 type validation_state = {context : Context.t; fitness : Int64.t}
-
-let current_context {context} = return context
 
 module Fitness = struct
   type error += Invalid_fitness
@@ -118,7 +116,7 @@ let begin_construction ~chain_id:_ ~predecessor_context:context
 
 let apply_operation ctxt _ = return (ctxt, ())
 
-let finalize_block ctxt =
+let finalize_block ctxt _block_header =
   let fitness = Fitness.get ctxt in
   let message = Some (Format.asprintf "fitness <- %Ld" fitness) in
   let fitness = Fitness.from_int64 fitness in
@@ -145,3 +143,9 @@ let init ctxt block_header =
       max_operations_ttl = 0;
       last_allowed_fork_level = 0l;
     }
+
+type error += Missing_value_in_cache
+
+let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+    ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+  return (fun _ -> fail Missing_value_in_cache)

@@ -39,7 +39,7 @@ let init ~protocol =
      (hundreds of entries) *)
   let* parameter_file =
     Protocol.write_parameter_file
-      ~protocol
+      ~base:(Either.right (protocol, None))
       [(["hard_storage_limit_per_operation"], Some "\"99999999\"")]
   in
   let* () = Client.activate_protocol ~protocol ~parameter_file client in

@@ -45,3 +45,19 @@ val all_media_types : t list
 val accept_header : t list -> string
 
 val first_complete_media : t list -> ((string * string) * t) option
+
+val encoding : t RPC_encoding.t
+
+module Content_type : sig
+  type t = string * string
+
+  val json : t
+
+  val bson : t
+
+  val octet_stream : t
+
+  val pp : Format.formatter -> t -> unit
+end
+
+val of_content_type : Content_type.t -> t option

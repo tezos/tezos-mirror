@@ -1,11 +1,15 @@
-open Js_of_ocaml
 open Tezos_hacl_glue
 
-let log x = Firebug.console##log x
-
-let log_s x = log (Js.bytestring x)
+let log_s = print_endline
 
 let init_bytes len = Bytes.make len '\x00'
+
+let assert_failure f =
+  assert (
+    try
+      let _ = f () in
+      false
+    with _ -> true)
 
 (* this from hacl-star test suite *)
 type 'a ed25519_test = {
@@ -269,6 +273,9 @@ let test_ed25519 (v : Bytes.t ed25519_test) : unit =
   assert (Bytes.compare signature v.expected_sig = 0) ;
   log_s "[Ed25519.sign] Success" ;
   assert (Hacl.Ed25519.verify ~pk ~msg:v.msg ~signature) ;
+  (* negative test *)
+  let random_pk = Option.get @@ Hacl.Ed25519.pk_of_bytes (Hacl.Rand.gen 32) in
+  assert (not (Hacl.Ed25519.verify ~pk:random_pk ~msg:v.msg ~signature)) ;
   log_s "[Ed25519.verify] Success"
 
 let test_p256 (v : Bytes.t p256_test) : unit =
@@ -283,6 +290,22 @@ let test_p256 (v : Bytes.t p256_test) : unit =
   assert (Hacl.P256.equal pk pk_unsafe) ;
   let sk = Option.get @@ Hacl.P256.sk_of_bytes v.sk in
   assert (pk = Hacl.P256.neuterize sk) ;
+  (* negative test for js_Hacl_P256_decompress_c and js_Hacl_P256_decompress_n *)
+  let invalid_pk_uncompressed = Bytes.copy v.pk in
+  Bytes.set_int8 invalid_pk_uncompressed 0 7 ;
+  assert (
+    Option.is_none
+      (Hacl.P256.pk_of_bytes_without_validation invalid_pk_uncompressed)) ;
+  let invalid_pk_compressed = Bytes.sub invalid_pk_uncompressed 0 33 in
+  assert (
+    Option.is_none
+      (Hacl.P256.pk_of_bytes_without_validation invalid_pk_compressed)) ;
+  (* negative test for js_Hacl_P256_valid_sk *)
+  let invalid_sk = Bytes.make Hacl.P256.sk_size '\x00' in
+  assert (Option.is_none (Hacl.P256.sk_of_bytes invalid_sk)) ;
+  (* negative test for js_Hacl_P256_valid_pk *)
+  let invalid_pk = Bytes.make Hacl.P256.pk_size '\x00' in
+  assert (Option.is_none (Hacl.P256.pk_of_bytes invalid_pk)) ;
   log_s "[P256.neuterize] Success" ;
   let sk_bytes = Hacl.P256.to_bytes sk in
   assert (sk_bytes = v.sk) ;
@@ -299,6 +322,8 @@ let test_p256 (v : Bytes.t p256_test) : unit =
   assert (pk_bytes_blit = pk_bytes) ;
   log_s "[P256.blit_to_bytes] Success" ;
   assert (Hacl.P256.verify ~pk ~msg:v.msg ~signature:v.expected_sig) ;
+  (* negative test *)
+  assert (not (Hacl.P256.verify ~pk ~msg:invalid_pk ~signature:v.expected_sig)) ;
   log_s "[P256.verify] Success"
 
 let test_curve25519 (v : Bytes.t curve25519_test) : unit =
@@ -368,23 +393,24 @@ let test_hmac_sha512 (v : Bytes.t hmac_test) : unit =
 
 let test_secretbox (v : Bytes.t secretbox_test) : unit =
   log_s (String.concat ": " ["Testing NaCl.Secretbox"; v.name]) ;
+  let key = Hacl.Secretbox.unsafe_of_bytes v.key in
   let ct = init_bytes (Bytes.length v.pt + 16) in
-  Hacl.Secretbox.secretbox
-    ~key:(Hacl.Secretbox.unsafe_of_bytes v.key)
-    ~nonce:v.n
-    ~msg:v.pt
-    ~cmsg:ct ;
+  Hacl.Secretbox.secretbox ~key ~nonce:v.n ~msg:v.pt ~cmsg:ct ;
   assert (ct = v.expected_ct) ;
   log_s "[NaCl.secretbox] Success" ;
   let pt = init_bytes (Bytes.length v.pt) in
   let b =
-    Hacl.Secretbox.secretbox_open
-      ~key:(Hacl.Secretbox.unsafe_of_bytes v.key)
-      ~nonce:v.n
-      ~msg:pt
-      ~cmsg:v.expected_ct
+    Hacl.Secretbox.secretbox_open ~key ~nonce:v.n ~msg:pt ~cmsg:v.expected_ct
   in
   assert (b && pt = v.pt) ;
+  (* negative test *)
+  assert (
+    not
+      (Hacl.Secretbox.secretbox_open
+         ~key:(Hacl.Secretbox.unsafe_of_bytes (Bytes.make 32 '\x00'))
+         ~nonce:v.n
+         ~msg:pt
+         ~cmsg:v.expected_ct)) ;
   log_s "[NaCl.secretbox_open] Success"
 
 let test_box (v : Bytes.t box_test) : unit =
@@ -394,6 +420,12 @@ let test_box (v : Bytes.t box_test) : unit =
       (Hacl.Box.unsafe_pk_of_bytes v.pk)
       (Hacl.Box.unsafe_sk_of_bytes v.sk)
   in
+  (* negative test *)
+  assert_failure (fun () ->
+      Hacl.Box.dh
+        (Hacl.Box.unsafe_pk_of_bytes (Bytes.make 32 '\x00'))
+        (Hacl.Box.unsafe_sk_of_bytes (Bytes.make 32 '\x00'))) ;
+
   log_s "[NaCl.box_beforenm] Success" ;
   let cmsg = init_bytes (Bytes.length v.pt + 16) in
   Hacl.Box.box ~k ~nonce:v.n ~msg:v.pt ~cmsg ;
@@ -402,6 +434,10 @@ let test_box (v : Bytes.t box_test) : unit =
   let msg = init_bytes (Bytes.length v.pt) in
   assert (Hacl.Box.box_open ~k ~nonce:v.n ~msg ~cmsg:v.expected_ct) ;
   assert (msg = v.pt) ;
+  (* negative test *)
+  assert (
+    not
+      (Hacl.Box.box_open ~k ~nonce:(Hacl.Rand.gen 24) ~msg ~cmsg:v.expected_ct)) ;
   log_s "[NaCl.box_open_easy_afternm] Success" ;
   let buf = Bytes.copy v.pt in
   let tag = init_bytes 16 in
@@ -413,9 +449,11 @@ let test_box (v : Bytes.t box_test) : unit =
   log_s "[NaCl.box_detached_afternm] Success" ;
   assert (Hacl.Box.box_open_noalloc ~k ~nonce:v.n ~tag ~buf) ;
   assert (buf = v.pt) ;
+  (* negative test *)
+  assert (not (Hacl.Box.box_open_noalloc ~k ~nonce:(Hacl.Rand.gen 24) ~tag ~buf)) ;
   log_s "[NaCl.box_open_detached_afternm] Success"
 
-let main () =
+let () =
   let () = log_s "STARTING TESTS" in
   List.iter test_ed25519 ed25519_tests ;
   List.iter test_p256 p256_tests ;
@@ -432,22 +470,3 @@ let main () =
   List.iter test_box box_tests ;
   let () = log_s "ENDING TESTS" in
   ()
-
-let[@ocaml.warning "-21"] () =
-  let () = log_s "LOADING @nomadic-labs/tezos-hacl-glue" in
-  Js.Unsafe.eval_string
-    "global._HACL_loader = require('@nomadic-labs/hacl-wasm');" ;
-  let () = log_s "INITIALISING hacl-wasm" in
-  Js.Unsafe.eval_string "_HACL_loader.setMyPrint(() => { return; })" ;
-  let init_promise =
-    Js.Unsafe.eval_string "_HACL_loader.getInitializedHaclModule()"
-  in
-  let global_setter =
-    Js.Unsafe.inject @@ Js.wrap_callback
-    @@ fun hacl -> Js.Unsafe.(set global (Js.string "_HACL") hacl)
-  in
-  let main = Js.Unsafe.inject @@ Js.wrap_callback main in
-  init_promise |> fun p ->
-  Js.Unsafe.meth_call p "then" [|global_setter|] |> fun p ->
-  Js.Unsafe.meth_call p "then" [|main|] |> fun p ->
-  Js.Unsafe.meth_call p "catch" [|Js.Unsafe.inject @@ Js.wrap_callback log|]

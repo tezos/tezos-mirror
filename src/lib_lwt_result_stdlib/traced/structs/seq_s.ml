@@ -31,6 +31,7 @@ module Make (Monad : Traced_sigs.Monad.S) :
   include Bare_structs.Seq_s
 
   let iter_ep f seq =
-    let open Monad in
-    fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq >>= join_ep
+    let open Monad.Lwt_syntax in
+    let* ps = fold_left (fun acc x -> Lwt.apply f x :: acc) [] seq in
+    Monad.Lwt_traced_result_syntax.join ps
 end

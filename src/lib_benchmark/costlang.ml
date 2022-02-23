@@ -400,7 +400,7 @@ struct
           linear_comb = Free_variable.Sparse_vec.zero;
           const = min a1.const a2.const;
         }
-    else raise (Eval_linear_combination "max")
+    else raise (Eval_linear_combination "min")
 
   let log2 (x : size repr) subst =
     let (Affine a) = x subst in
@@ -410,7 +410,7 @@ struct
           linear_comb = Free_variable.Sparse_vec.zero;
           const = log a.const /. log 2.;
         }
-    else raise (Eval_linear_combination "max")
+    else raise (Eval_linear_combination "log2")
 
   let free ~name subst =
     match subst name with

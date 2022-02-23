@@ -279,10 +279,8 @@ let overrides_table (overrides : float Free_variable.Map.t) =
 module Int_set = Set.Make (Int)
 
 let average_qty (qtyies : float list) =
-  StaTz.Stats.(
-    mean
-      (module StaTz.Structures.Float)
-      (empirical_of_raw_data (Array.of_list qtyies)))
+  let open Stats in
+  Emp.of_raw_data (Array.of_list qtyies) |> Emp.Float.empirical_mean
 
 let pp_vec =
   Sparse_vec.String.pp
@@ -403,13 +401,62 @@ let create_empty ~name = Latex_syntax.{title = name; sections = []}
 
 let add_section ~(measure : Measure.packed_measurement) ~(model_name : string)
     ~(problem : Inference.problem) ~(solution : Inference.solution)
-    ~overrides_map ~short document =
+    ~overrides_map ~short ?report_folder document =
+  let (Measure.Measurement ((module Bench), _)) = measure in
+  let name = Bench.name ^ "_" ^ model_name in
   let figs_file =
-    let filename = Filename.temp_file "figure" ".pdf" in
-    let plot_target = Display.Save {file = Some filename} in
-    if Display.perform_plot ~measure ~model_name ~problem ~solution ~plot_target
-    then Some filename
-    else None
+    match report_folder with
+    | None ->
+        let filename = Filename.temp_file "figure" ".pdf" in
+        let plot_target = Display.Save {file = Some filename} in
+        if
+          Display.perform_plot
+            ~measure
+            ~model_name
+            ~problem
+            ~solution
+            ~plot_target
+        then Some filename
+        else None
+    | Some folder -> (
+        (match Unix.stat folder with
+        | exception Unix.Unix_error _ ->
+            Format.eprintf "Folder %s does not exist, creating it.\n" folder ;
+            Unix.mkdir folder 0o700
+        | {st_kind = S_DIR; _} -> ()
+        | _ ->
+            Format.eprintf "%s is not a folder, exiting.\n" folder ;
+            exit 1) ;
+        let filename = Filename.Infix.(folder // (name ^ ".pdf")) in
+        Format.eprintf "Saving plot in %s\n" filename ;
+        match Unix.stat filename with
+        | exception Unix.Unix_error _ ->
+            let fd = Unix.openfile filename [O_CREAT; O_EXCL; O_WRONLY] 0o600 in
+            Unix.close fd ;
+            let plot_target = Display.Save {file = Some filename} in
+            if
+              Display.perform_plot
+                ~measure
+                ~model_name
+                ~problem
+                ~solution
+                ~plot_target
+            then Some (name ^ ".pdf")
+            else None
+        | {st_size; _} when st_size > 0 ->
+            Format.eprintf "Plot exists, skipping.\n" ;
+            Some (name ^ ".pdf")
+        | _ ->
+            let plot_target = Display.Save {file = Some filename} in
+            if
+              Display.perform_plot
+                ~measure
+                ~model_name
+                ~problem
+                ~solution
+                ~plot_target
+            then Some (name ^ ".pdf")
+            else None)
   in
   let section = report ~measure ~solution ~figs_file ~overrides_map ~short in
   let open Latex_syntax in

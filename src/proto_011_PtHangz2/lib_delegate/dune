@@ -15,6 +15,7 @@
             tezos-stdlib-unix
             tezos-context
             tezos-rpc-http
+            tezos-rpc-http-client-unix
             tezos-rpc
             lwt-canceler
             lwt-exit)

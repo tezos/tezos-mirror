@@ -73,6 +73,7 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
+  | Reconfigure_event_logging of Internal_event_unix.Configuration.t
 
 val request_pp : Format.formatter -> request -> unit
 

@@ -30,9 +30,13 @@ module Store =
     (Branch)
     (Hash)
 
-type t = Store.tree
+type index = Store.Repo.t
 
-type tree = t
+type context = {repo : index; parents : Store.Commit.t list; tree : Store.tree}
+
+type t = context
+
+type tree = Store.tree
 
 type key = string list
 
@@ -41,36 +45,111 @@ type value = bytes
 module Tree = Tezos_context_helpers.Context.Make_tree (Store)
 include Tree
 
+let index {repo; _} = repo
+
+let exists index key =
+  Store.Commit.of_hash index (Hash.of_context_hash key) >|= function
+  | None -> false
+  | Some _ -> true
+
+let checkout index key =
+  Store.Commit.of_hash index (Hash.of_context_hash key) >>= function
+  | None -> Lwt.return_none
+  | Some commit ->
+      let tree = Store.Commit.tree commit in
+      let ctxt = {repo = index; tree; parents = [commit]} in
+      Lwt.return_some ctxt
+
+let checkout_exn index key =
+  checkout index key >>= function
+  | None -> Lwt.fail Not_found
+  | Some p -> Lwt.return p
+
+(* unshallow possible 1-st level objects from previous partial
+   checkouts ; might be better to pass directly the list of shallow
+   objects. *)
+let unshallow context =
+  Store.Tree.list context.tree [] >>= fun children ->
+  Store.Private.Repo.batch context.repo (fun x y _ ->
+      List.iter_s
+        (fun (s, k) ->
+          match Store.Tree.destruct k with
+          | `Contents _ -> Lwt.return ()
+          | `Node _ ->
+              Store.Tree.get_tree context.tree [s] >>= fun tree ->
+              Store.save_tree ~clear:true context.repo x y tree >|= fun _ -> ())
+        children)
+
+let raw_commit ~time ?(message = "") context =
+  let info =
+    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
+  in
+  let parents = List.map Store.Commit.hash context.parents in
+  unshallow context >>= fun () ->
+  Store.Commit.v context.repo ~info ~parents context.tree >|= fun h ->
+  Store.Tree.clear context.tree ;
+  h
+
+let hash ~time ?(message = "") context =
+  let info =
+    Irmin.Info.v ~date:(Time.Protocol.to_seconds time) ~author:"Tezos" message
+  in
+  let parents = List.map (fun c -> Store.Commit.hash c) context.parents in
+  let node = Store.Tree.hash context.tree in
+  let commit = Store.Private.Commit.Val.v ~parents ~node ~info in
+  let x = Store.Private.Commit.Key.hash commit in
+  Hash.to_context_hash x
+
+let commit ~time ?message context =
+  raw_commit ~time ?message context >|= fun commit ->
+  Hash.to_context_hash (Store.Commit.hash commit)
+
+(*-- Generic Store Primitives ------------------------------------------------*)
+
 let data_key key = "data" :: key
 
-let mem t key = Tree.mem t (data_key key)
+let mem ctxt key = Tree.mem ctxt.tree (data_key key)
 
-let mem_tree t key = Tree.mem_tree t (data_key key)
+let mem_tree ctxt key = Tree.mem_tree ctxt.tree (data_key key)
 
-let list t ?offset ?length key = Tree.list t ?offset ?length (data_key key)
+let list ctxt ?offset ?length key =
+  Tree.list ctxt.tree ?offset ?length (data_key key)
 
-let find t key = Tree.find t (data_key key)
+let find ctxt key = Tree.find ctxt.tree (data_key key)
 
-let add t key data = Tree.add t (data_key key) data
+let raw_add ctxt key data =
+  Tree.add ctxt.tree key data >|= fun tree -> {ctxt with tree}
 
-let remove t key = Tree.remove t (data_key key)
+let add ctxt key data = raw_add ctxt (data_key key) data
 
-let find_tree t key = Tree.find_tree t (data_key key)
+let raw_remove ctxt k = Tree.remove ctxt.tree k >|= fun tree -> {ctxt with tree}
 
-let add_tree t key tree = Tree.add_tree t (data_key key) tree
+let remove ctxt key = raw_remove ctxt (data_key key)
 
-let fold ?depth t key ~init ~f = Tree.fold ?depth t (data_key key) ~init ~f
+let find_tree ctxt key = Tree.find_tree ctxt.tree (data_key key)
+
+let add_tree ctxt key tree =
+  Tree.add_tree ctxt.tree (data_key key) tree >|= fun tree -> {ctxt with tree}
+
+let fold ?depth ctxt key ~order ~init ~f =
+  Tree.fold ?depth ctxt.tree (data_key key) ~order ~init ~f
 
 let current_protocol_key = ["protocol"]
 
-let get_protocol t =
-  Tree.find t current_protocol_key >>= function
+let current_predecessor_block_metadata_hash_key =
+  ["predecessor_block_metadata_hash"]
+
+let current_predecessor_ops_metadata_hash_key =
+  ["predecessor_ops_metadata_hash"]
+
+let get_protocol ctxt =
+  Tree.find ctxt.tree current_protocol_key >>= function
   | None -> assert false
   | Some data -> Lwt.return (Protocol_hash.of_bytes_exn data)
 
-let add_protocol t key =
+let add_protocol ctxt key =
   let key = Protocol_hash.to_bytes key in
-  Tree.add t current_protocol_key key
+  raw_add ctxt current_protocol_key key
 
 let get_hash_version _c = Context_hash.Version.of_int 0
 
@@ -78,7 +157,34 @@ let set_hash_version c v =
   if Context_hash.Version.(of_int 0 = v) then return c
   else fail (Tezos_context_helpers.Context.Unsupported_context_hash_version v)
 
-let empty = Store.Tree.empty
+let add_predecessor_block_metadata_hash v hash =
+  let data =
+    Data_encoding.Binary.to_bytes_exn Block_metadata_hash.encoding hash
+  in
+  raw_add v current_predecessor_block_metadata_hash_key data
+
+let add_predecessor_ops_metadata_hash v hash =
+  let data =
+    Data_encoding.Binary.to_bytes_exn
+      Operation_metadata_list_list_hash.encoding
+      hash
+  in
+  raw_add v current_predecessor_ops_metadata_hash_key data
+
+let create () =
+  let cfg = Irmin_pack.config "/tmp" in
+  let promise =
+    Store.Repo.v cfg >>= fun repo ->
+    Lwt.return {repo; parents = []; tree = Store.Tree.empty}
+  in
+  match Lwt.state promise with
+  | Lwt.Return result -> result
+  | Lwt.Fail exn -> raise exn
+  | Lwt.Sleep ->
+      (* The in-memory context should never block *)
+      assert false
+
+let empty = create ()
 
 let concrete_encoding : Store.Tree.concrete Data_encoding.t =
   let open Data_encoding in
@@ -103,12 +209,34 @@ let concrete_encoding : Store.Tree.concrete Data_encoding.t =
 let encoding : t Data_encoding.t =
   Data_encoding.conv
     (fun t ->
-      let tree = Store.Tree.to_concrete t in
+      let tree = Store.Tree.to_concrete t.tree in
       let tree =
         (* This is safe as store.Tree will never call any blocking
            functions. *)
         match Lwt.state tree with Return t -> t | _ -> assert false
       in
       tree)
-    Store.Tree.of_concrete
+    (fun t ->
+      let tree = Store.Tree.of_concrete t in
+      let ctxt = create () in
+      {ctxt with tree})
     concrete_encoding
+
+let current_test_chain_key = ["test_chain"]
+
+let get_test_chain v =
+  Tree.find v.tree current_test_chain_key >>= function
+  | None -> Lwt.fail (Failure "Unexpected error (Context.get_test_chain)")
+  | Some data -> (
+      match Data_encoding.Binary.of_bytes Test_chain_status.encoding data with
+      | Error re ->
+          Format.kasprintf
+            (fun s -> Lwt.fail (Failure s))
+            "Error in Context.get_test_chain: %a"
+            Data_encoding.Binary.pp_read_error
+            re
+      | Ok r -> Lwt.return r)
+
+let add_test_chain v id =
+  let id = Data_encoding.Binary.to_bytes_exn Test_chain_status.encoding id in
+  raw_add v current_test_chain_key id

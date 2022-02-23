@@ -35,6 +35,7 @@ type validation_store = {
   message : string option;
   max_operations_ttl : int;
   last_allowed_fork_level : Int32.t;
+      (** Oldest block for which reorganizations can happen *)
 }
 
 val may_patch_protocol :
@@ -133,7 +134,6 @@ val precheck :
 
 val preapply :
   chain_id:Chain_id.t ->
-  cache:Environment_context.Context.source_of_cache ->
   user_activated_upgrades:Tezos_base.User_activated.upgrades ->
   user_activated_protocol_overrides:Tezos_base.User_activated.protocol_overrides ->
   timestamp:Time.Protocol.t ->

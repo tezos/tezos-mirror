@@ -91,6 +91,11 @@ module type S = sig
     'a list ->
     ('b list, 'error trace) result Lwt.t
 
+  val concat_map_ep :
+    ('a -> ('b list, 'error trace) result Lwt.t) ->
+    'a list ->
+    ('b list, 'error trace) result Lwt.t
+
   val for_all_ep :
     ('a -> (bool, 'error trace) result Lwt.t) ->
     'a list ->

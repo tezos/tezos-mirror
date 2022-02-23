@@ -120,7 +120,7 @@ let error_encoding =
         "error"
         ~description:
           (Printf.sprintf
-             "The full list of error is available with the global RPC `%s %s`"
+             "The full list of errors is available with the global RPC `%s %s`"
              (string_of_meth meth)
              (Uri.path_and_query uri))
       @@ conv
@@ -130,6 +130,38 @@ let error_encoding =
              | `A [] -> [Empty_error_list]
              | `A errors -> List.map Error_monad.error_of_json errors
              | msg -> [Unparsable_RPC_error msg])
+           json)
+
+let error_opt_encoding =
+  let open Data_encoding in
+  delayed (fun () ->
+      let {meth; uri; _} =
+        match !error_path with None -> assert false | Some p -> p
+      in
+      def
+        "error_opt"
+        ~description:
+          (Printf.sprintf
+             "An optional error-trace (None indicates no error). The full list \
+              of errors is available with the global RPC `%s %s`"
+             (string_of_meth meth)
+             (Uri.path_and_query uri))
+      @@ conv
+           ~schema:Json_schema.any
+           (function
+             | None | Some [] -> `Null
+             | Some (_ :: _ as errors) ->
+                 `A (List.map Error_monad.json_of_error errors))
+           (function
+             | `A [] | `Null | `O [] ->
+                 (* in BSON, which is used as an intermediate step when
+                    serialising in binary, [`A []] and [`O []] are
+                    indistinguishable. For this reason, we add [`O []] as a
+                    pattern to match. *)
+                 None
+             | `A (_ :: _ as errors) ->
+                 Some (List.map Error_monad.error_of_json errors)
+             | msg -> Some [Unparsable_RPC_error msg])
            json)
 
 let get_service = get_service ~error:error_encoding

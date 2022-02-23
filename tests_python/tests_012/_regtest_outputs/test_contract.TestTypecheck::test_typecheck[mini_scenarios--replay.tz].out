@@ -1,0 +1,33 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/replay.tz]
+
+Well typed
+Gas remaining: 1039989.740 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { CDR
+         /* [ @storage unit ] */ ;
+         NIL operation
+         /* [ list operation : @storage unit ] */ ;
+         SOURCE
+         /* [ @source address : list operation : @storage unit ] */ ;
+         CONTRACT
+           unit
+         /* [ @source.contract option (contract unit) : list operation : @storage unit ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez
+              1
+         /* [ mutez : @source.contract.some contract unit : list operation
+            : @storage unit ] */ ;
+         UNIT
+         /* [ unit : mutez : @source.contract.some contract unit : list operation
+            : @storage unit ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation : list operation : @storage unit ] */ ;
+         DUP
+         /* [ operation : operation : list operation : @storage unit ] */ ;
+         DIP { CONS /* [ list operation : @storage unit ] */ }
+         /* [ operation : list operation : @storage unit ] */ ;
+         CONS
+         /* [ list operation : @storage unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @storage) ] */ } }

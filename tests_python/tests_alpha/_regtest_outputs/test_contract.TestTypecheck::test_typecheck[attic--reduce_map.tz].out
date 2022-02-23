@@ -1,0 +1,58 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[attic/reduce_map.tz]
+
+Well typed
+Gas remaining: 1039975.926 units remaining
+{ parameter (pair (lambda int int) (list int)) ;
+  storage (list int) ;
+  code { DIP { NIL int /* [ list int ] */ }
+         /* [ pair (pair @parameter (lambda int int) (list int)) (list @storage int)
+            : list int ] */ ;
+         CAR
+         /* [ @parameter pair (lambda int int) (list int) : list int ] */ ;
+         DUP
+         /* [ @parameter pair (lambda int int) (list int)
+            : @parameter pair (lambda int int) (list int) : list int ] */ ;
+         DIP { CAR
+               /* [ lambda int int : list int ] */ ;
+               PAIR
+               /* [ pair (lambda int int) (list int) ] */ }
+         /* [ @parameter pair (lambda int int) (list int)
+            : pair (lambda int int) (list int) ] */ ;
+         CDR
+         /* [ list int : pair (lambda int int) (list int) ] */ ;
+         ITER { PAIR
+                /* [ pair (int @elt) (lambda int int) (list int) ] */ ;
+                DUP
+                /* [ pair (int @elt) (lambda int int) (list int)
+                   : pair (int @elt) (lambda int int) (list int) ] */ ;
+                CDAR ;
+                DIP { DUP
+                      /* [ pair (int @elt) (lambda int int) (list int)
+                         : pair (int @elt) (lambda int int) (list int) ] */ ;
+                      DIP { CDAR }
+                      /* [ pair (int @elt) (lambda int int) (list int) : lambda int int ] */ ;
+                      DUP
+                      /* [ pair (int @elt) (lambda int int) (list int)
+                         : pair (int @elt) (lambda int int) (list int) : lambda int int ] */ ;
+                      CAR
+                      /* [ @elt int : pair (int @elt) (lambda int int) (list int) : lambda int int ] */ ;
+                      DIP { CDDR ; SWAP /* [ lambda int int : list int ] */ }
+                      /* [ @elt int : lambda int int : list int ] */ ;
+                      EXEC
+                      /* [ int : list int ] */ ;
+                      CONS
+                      /* [ list int ] */ }
+                /* [ lambda int int : list int ] */ ;
+                PAIR
+                /* [ pair (lambda int int) (list int) ] */ }
+         /* [ pair (lambda int int) (list int) ] */ ;
+         CDR
+         /* [ list int ] */ ;
+         DIP { NIL int /* [ list int ] */ }
+         /* [ list int : list int ] */ ;
+         ITER { CONS /* [ list int ] */ }
+         /* [ list int ] */ ;
+         NIL operation
+         /* [ list operation : list int ] */ ;
+         PAIR
+         /* [ pair (list operation) (list int) ] */ } }

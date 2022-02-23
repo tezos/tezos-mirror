@@ -157,7 +157,7 @@ module Scheduler (IO : IO) = struct
     if st.max_speed <> None && st.quota < 0 then
       Events.(emit wait_quota) IO.name >>= fun () ->
       Lwt_condition.wait st.quota_updated
-    else Lwt_unix.yield ()
+    else Lwt.pause ()
 
   (* Main worker loop:
 
@@ -360,17 +360,20 @@ module ReadIO = struct
             fail P2p_errors.Connection_closed
         | exn -> fail_with_exn exn)
 
-  type out_param = Circular_buffer.data tzresult Lwt_pipe.t
+  type out_param = Circular_buffer.data tzresult Lwt_pipe.Maybe_bounded.t
 
   (* [push] data to the pipe, feeding the application's data consumer. *)
   let push p msg =
     Lwt.catch
-      (fun () -> Lwt_pipe.push p (Ok msg) >>= fun () -> return_unit)
+      (fun () ->
+        Lwt_pipe.Maybe_bounded.push p (Ok msg) >>= fun () -> return_unit)
       (fun exn -> fail (Exn exn))
 
   (* on [close] we push the given [err] toward the data consumer. *)
   let close p err =
-    Lwt.catch (fun () -> Lwt_pipe.push p (Error err)) (fun _ -> Lwt.return_unit)
+    Lwt.catch
+      (fun () -> Lwt_pipe.Maybe_bounded.push p (Error err))
+      (fun _ -> Lwt.return_unit)
 end
 
 module ReadScheduler = Scheduler (ReadIO)
@@ -387,7 +390,7 @@ module WriteIO = struct
 
   let name = "io_scheduler(write)"
 
-  type in_param = Bytes.t Lwt_pipe.t
+  type in_param = Bytes.t Lwt_pipe.Maybe_bounded.t
 
   type data = Bytes.t
 
@@ -396,7 +399,7 @@ module WriteIO = struct
   (* [pop] bytes to be sent from the queue. *)
   let pop p =
     Lwt.catch
-      (fun () -> Lwt_pipe.pop p >>= return)
+      (fun () -> Lwt_pipe.Maybe_bounded.pop p >>= return)
       (function
         | Lwt_pipe.Closed -> fail (Exn Lwt_pipe.Closed) | _ -> assert false)
 
@@ -427,7 +430,7 @@ type connection = {
   readable : P2p_buffer_reader.readable;
   read_conn : ReadScheduler.connection;
   write_conn : WriteScheduler.connection;
-  write_queue : Bytes.t Lwt_pipe.t;
+  write_queue : Bytes.t Lwt_pipe.Maybe_bounded.t;
   remove_from_connection_table : unit -> unit;
 }
 
@@ -509,14 +512,15 @@ let read_size = function
   | Ok data ->
       (Sys.word_size / 8 * 8)
       + Circular_buffer.length data
-      + Lwt_pipe.push_overhead
+      + Lwt_pipe.Maybe_bounded.push_overhead
   | Error _ -> 0
 
 (* we push Error only when we close the socket, we don't fear memory
    leaks in that case... *)
 
 let write_size bytes =
-  (Sys.word_size / 8 * 6) + Bytes.length bytes + Lwt_pipe.push_overhead
+  (Sys.word_size / 8 * 6)
+  + Bytes.length bytes + Lwt_pipe.Maybe_bounded.push_overhead
 
 (* [register] a socket for scheduling by [st].
 
@@ -544,8 +548,8 @@ let register st fd =
     let write_size =
       Option.map (fun v -> (v, write_size)) st.write_queue_size
     in
-    let read_queue = Lwt_pipe.create ?size:read_size () in
-    let write_queue = Lwt_pipe.create ?size:write_size () in
+    let read_queue = Lwt_pipe.Maybe_bounded.create ?bound:read_size () in
+    let write_queue = Lwt_pipe.Maybe_bounded.create ?bound:write_size () in
     (* This buffer is allocated once and is reused every time we read
        a message from the corresponding file descriptor. *)
     let read_buffer =
@@ -570,8 +574,8 @@ let register st fd =
         P2p_fd.Table.remove st.connected fd ;
         Moving_average.destroy st.ma_state read_conn.counter ;
         Moving_average.destroy st.ma_state write_conn.counter ;
-        Lwt_pipe.close write_queue ;
-        Lwt_pipe.close read_queue ;
+        Lwt_pipe.Maybe_bounded.close write_queue ;
+        Lwt_pipe.Maybe_bounded.close read_queue ;
         P2p_fd.close fd >>= function
         | Error trace ->
             Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
@@ -598,10 +602,11 @@ let register st fd =
 let write ?canceler {write_queue; _} msg =
   trace P2p_errors.Connection_closed
   @@ protect ?canceler (fun () ->
-         Lwt_pipe.push write_queue msg >>= fun () -> return_unit)
+         Lwt_pipe.Maybe_bounded.push write_queue msg >>= fun () -> return_unit)
 
 (* pushing bytes in the pipe or return false if it is bounded and full *)
-let write_now {write_queue; _} msg = Lwt_pipe.push_now write_queue msg
+let write_now {write_queue; _} msg =
+  Lwt_pipe.Maybe_bounded.push_now write_queue msg
 
 let convert ~ws ~rs =
   {
@@ -626,7 +631,7 @@ let stat {read_conn; write_conn; _} =
 let close ?timeout conn =
   let id = P2p_fd.id conn.fd in
   conn.remove_from_connection_table () ;
-  Lwt_pipe.close conn.write_queue ;
+  Lwt_pipe.Maybe_bounded.close conn.write_queue ;
   (* Here, the WriteScheduler will drain the write_queue, then get a
      [Exn Lwt_pipe.Closed;...] trace and thus cancel the
      [write_conn.canceler] which is the connections canceler (by

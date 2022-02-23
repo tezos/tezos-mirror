@@ -38,17 +38,22 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
   @@ fun () ->
   let node = Node.create [] in
   let* () = Node.config_init node [] in
-  Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-    node
-    [(3, migrate_to)] ;
+  let migration_level = 3 in
+  Node.Config_file.(
+    update
+      node
+      (set_sandbox_network_with_user_activated_upgrades
+         [(migration_level, migrate_to)])) ;
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
   let* client = Client.(init ~endpoint:(Node node) ()) in
   let* () = Client.activate_protocol ~protocol:migrate_from client in
-  let* () = repeat 2 (fun () -> Client.bake_for client) in
-  let* non_migration_block = RPC.get_block_metadata ~block:"2" client in
+  let* () = repeat (migration_level - 1) (fun () -> Client.bake_for client) in
+  let* non_migration_block =
+    RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) client
+  in
   let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
-  Log.info "checking consistency of block at level 2" ;
+  Log.info "checking consistency of block at level %d" (migration_level - 1) ;
   Check.(
     (protocol = Protocol.hash migrate_from)
       string
@@ -60,8 +65,10 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
     (next_protocol = Protocol.hash migrate_from)
       string
       ~error_msg:"expected next_protocol = %R, got %L") ;
-  Log.info "checking consistency of block at level 3" ;
-  let* migration_block = RPC.get_block_metadata ~block:"3" client in
+  Log.info "checking consistency of block at level %d" migration_level ;
+  let* migration_block =
+    RPC.get_block_metadata ~block:(string_of_int migration_level) client
+  in
   let protocol = JSON.(migration_block |-> "protocol" |> as_string) in
   Check.(
     (protocol = Protocol.hash migrate_from)
@@ -74,8 +81,12 @@ let test_metadata_consistency ~migrate_from ~migrate_to =
       ~error_msg:"expected next_protocol = %R, got %L") ;
   (* We call the RPC again to make sure that no side-effect occured
      that would break the next_protocol expected field. *)
-  Log.info "checking consistency of block at level 2 (again)" ;
-  let* non_migration_block = RPC.get_block_metadata ~block:"2" client in
+  Log.info
+    "checking consistency of block at level %d (again)"
+    (migration_level - 1) ;
+  let* non_migration_block =
+    RPC.get_block_metadata ~block:(string_of_int (migration_level - 1)) client
+  in
   let protocol = JSON.(non_migration_block |-> "protocol" |> as_string) in
   Check.(
     (protocol = Protocol.hash migrate_from)

@@ -30,9 +30,15 @@ open Base
    Those outputs are duplicated: one copy is automatically logged,
    the other goes into [lwt_channel] so that the user can read it.
 
-   Strings of [queue] are never empty. *)
+   [queue] is the bytes that have been received from the process, but that
+   have not yet been read by the user of this module. Those bytes are
+   split into chunks ([string]s). Those chunks are never empty.
+
+   Strings of [queue] are references so that we can replace them when we
+   read them partially. If efficiency becomes a concern, we could store
+   a reference to an offset to avoid a call to String.sub. *)
 type echo = {
-  queue : string Queue.t;
+  queue : string ref Queue.t;
   mutable lwt_channel : Lwt_io.input_channel option;
   mutable closed : bool;
   mutable pending : unit Lwt.u list;
@@ -44,8 +50,9 @@ let wake_up_echo echo =
   List.iter (fun pending -> Lwt.wakeup_later pending ()) pending
 
 let push_to_echo echo string =
+  (* Maintain the invariant that strings in the queue are never empty. *)
   if String.length string > 0 then (
-    Queue.push string echo.queue ;
+    Queue.push (ref string) echo.queue ;
     wake_up_echo echo)
 
 let close_echo echo =
@@ -58,7 +65,7 @@ let create_echo () =
     {queue = Queue.create (); lwt_channel = None; closed = false; pending = []}
   in
   let rec read bytes ofs len =
-    match Queue.take_opt echo.queue with
+    match Queue.peek_opt echo.queue with
     | None ->
         if echo.closed then return 0
         else
@@ -67,20 +74,27 @@ let create_echo () =
           echo.pending <- resolver :: echo.pending ;
           let* () = promise in
           read bytes ofs len
-    | Some str ->
-        (* We won't use [str] after that so [Bytes.unsafe_from_string] is safe. *)
-        let str_len = String.length str in
+    | Some str_ref ->
+        (* Note: we rely on the invariant that strings in the queue are never empty. *)
+        let str_len = String.length !str_ref in
         if str_len <= len then (
+          (* Caller requested more bytes than available in this item of the queue:
+             return the item in full and remove it from the queue. *)
+          (* use [Lwt_bytes.blit_from_string] once available *)
           Lwt_bytes.blit_from_bytes
-            (Bytes.unsafe_of_string str)
+            (Bytes.of_string !str_ref)
             0
             bytes
             ofs
             str_len ;
+          let (_ : string ref option) = Queue.take_opt echo.queue in
           return str_len)
         else (
-          Lwt_bytes.blit_from_bytes (Bytes.unsafe_of_string str) 0 bytes ofs len ;
-          push_to_echo echo (String.sub str len (str_len - len)) ;
+          (* Caller requested strictly less bytes than available in this item of the queue:
+             return what caller requested, and only keep the remainder. *)
+          (* use [Lwt_bytes.blit_from_string] once available *)
+          Lwt_bytes.blit_from_bytes (Bytes.of_string !str_ref) 0 bytes ofs len ;
+          str_ref := String.sub !str_ref len (str_len - len) ;
           return len)
   in
   let lwt_channel = Lwt_io.(make ~mode:input) read in

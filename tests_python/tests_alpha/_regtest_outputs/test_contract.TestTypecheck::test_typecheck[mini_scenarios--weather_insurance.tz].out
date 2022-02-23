@@ -1,0 +1,259 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/weather_insurance.tz]
+
+Well typed
+Gas remaining: 1039960.200 units remaining
+{ parameter (pair (signature %signed_weather_data) (nat :rain %actual_level)) ;
+  storage
+    (pair (pair (address %under_key) (address %over_key))
+          (pair (nat :rain %rain_level) (key %weather_service_key))) ;
+  code { DUP
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         DUP
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         CAR
+         /* [ @parameter pair (signature %signed_weather_data) (nat :rain %actual_level)
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         MAP_CDR
+           { PACK
+             /* [ @packed bytes
+                : @parameter pair (signature %signed_weather_data) (nat :rain %actual_level)
+                : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                     (pair @storage
+                        (pair (address %under_key) (address %over_key))
+                        (nat :rain %rain_level)
+                        (key %weather_service_key))
+                : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                     (pair @storage
+                        (pair (address %under_key) (address %over_key))
+                        (nat :rain %rain_level)
+                        (key %weather_service_key)) ] */ ;
+             BLAKE2B
+             /* [ bytes
+                : @parameter pair (signature %signed_weather_data) (nat :rain %actual_level)
+                : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                     (pair @storage
+                        (pair (address %under_key) (address %over_key))
+                        (nat :rain %rain_level)
+                        (key %weather_service_key))
+                : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                     (pair @storage
+                        (pair (address %under_key) (address %over_key))
+                        (nat :rain %rain_level)
+                        (key %weather_service_key)) ] */ } ;
+         SWAP
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : @parameter pair (signature %signed_weather_data @parameter.signed_weather_data) bytes
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         CDDDR %weather_service_key ;
+         DIP { UNPAIR
+               /* [ @parameter.signed_weather_data signature : bytes
+                  : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                       (pair @storage
+                          (pair (address %under_key) (address %over_key))
+                          (nat :rain %rain_level)
+                          (key %weather_service_key)) ] */ }
+         /* [ key : @parameter.signed_weather_data signature : bytes
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         CHECK_SIGNATURE @sigok
+         /* [ @sigok bool
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         ASSERT ;
+         DUP
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         DUP
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         DUP
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ ;
+         DIIIP
+           { CDR %storage
+             /* [ @storage pair (pair (address %under_key) (address %over_key))
+                     (nat :rain %rain_level)
+                     (key %weather_service_key) ] */ }
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         DIIP { CDAR }
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key))
+            : pair (address %under_key) (address %over_key)
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         DIP { CADR %actual_level }
+         /* [ pair (pair @parameter (signature %signed_weather_data) (nat :rain %actual_level))
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) : nat :rain
+            : pair (address %under_key) (address %over_key)
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         CDDAR %rain_level ;
+         CMPLT ;
+         IF { CAR %under_key
+              /* [ address
+                 : @storage pair (pair (address %under_key) (address %over_key))
+                      (nat :rain %rain_level)
+                      (key %weather_service_key) ] */ }
+            { CDR %over_key
+              /* [ address
+                 : @storage pair (pair (address %under_key) (address %over_key))
+                      (nat :rain %rain_level)
+                      (key %weather_service_key) ] */ } ;
+         CONTRACT
+           unit
+         /* [ @contract option (contract unit)
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         ASSERT_SOME ;
+         BALANCE
+         /* [ @balance mutez : @contract.some contract unit
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         UNIT
+         /* [ unit : @balance mutez : @contract.some contract unit
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         TRANSFER_TOKENS @trans.op
+         /* [ @trans.op operation
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         NIL operation
+         /* [ list operation : @trans.op operation
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         SWAP
+         /* [ @trans.op operation : list operation
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         CONS
+         /* [ list operation
+            : @storage pair (pair (address %under_key) (address %over_key))
+                 (nat :rain %rain_level)
+                 (key %weather_service_key) ] */ ;
+         PAIR
+         /* [ pair (list operation)
+                 (pair @storage
+                    (pair (address %under_key) (address %over_key))
+                    (nat :rain %rain_level)
+                    (key %weather_service_key)) ] */ } }

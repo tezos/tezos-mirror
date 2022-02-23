@@ -76,15 +76,19 @@ val burn_cap_arg : (Tez.t, full) Clic.arg
 
 val no_waiting_for_endorsements_arg : (bool, full) Clic.arg
 
+val replace_by_fees_arg : (bool, full) Clic.arg
+
 val await_endorsements_arg : (bool, full) Clic.arg
 
 val force_switch : (bool, full) Clic.arg
+
+val no_endorse_switch : (bool, full) Clic.arg
 
 val minimal_timestamp_switch : (bool, full) Clic.arg
 
 val endorsement_delay_arg : (int, full) Clic.arg
 
-val preserved_levels_arg : (int, full) Clic.arg
+val preserved_levels_arg : (int option, full) Clic.arg
 
 val no_print_source_flag : (bool, full) Clic.arg
 
@@ -117,6 +121,8 @@ end
 
 val int_parameter : (int, full) Clic.parameter
 
+val uri_parameter : (Uri.t, full) Clic.parameter
+
 val string_parameter : (string, full) Clic.parameter
 
 val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t
@@ -131,3 +137,7 @@ val unparsing_mode_arg :
 val enforce_indentation_flag : (bool, full) Clic.arg
 
 val display_names_flag : (bool, full) Clic.arg
+
+val level_arg : (Script_int.n Script_int.num option, full) Clic.arg
+
+val now_arg : (Script_timestamp.t option, full) Clic.arg

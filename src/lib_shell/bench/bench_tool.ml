@@ -120,8 +120,6 @@ let choose_exp_nat n =
   let u = Random.float 1. in
   -.log u /. lambda |> int_of_float
 
-let pi = 3.1415926502
-
 let two_pi = 2. *. 3.1415926502
 
 let round x = x +. 0.5 |> int_of_float
@@ -150,25 +148,25 @@ type gen_state = {
   mutable nonce_to_reveal : (Cycle.t * Raw_level.t * Nonce.t) list;
 }
 
-let get_n_endorsements ctxt n =
-  Context.get_endorsers ctxt >>=? fun endorsing_rights ->
-  let endorsing_rights = List.sub endorsing_rights n in
+let get_n_endorsements ~endorsed_block ctxt n =
+  Context.get_endorsers ctxt >>=? fun validators_rights ->
+  let validators_rights = List.sub validators_rights n in
   List.map_es
-    (fun {Plugin.RPC.Endorsing_rights.delegate; level; _} ->
-      Op.endorsement ~delegate ~level ctxt ())
-    endorsing_rights
+    (fun {Plugin.RPC.Validators.delegate; level; slots; _} ->
+      Op.endorsement ~delegate:(delegate, slots) ~level ~endorsed_block ctxt ())
+    validators_rights
 
-let generate_and_add_random_endorsements inc =
+let generate_and_add_random_endorsements inc ctxt =
   let pred inc = Incremental.predecessor inc in
   let nb_endorsements =
-    let n = args.params.constants.endorsers_per_block in
+    let n = args.params.constants.consensus_committee_size in
     n - choose_exp_nat n
   in
   if_debug (fun () ->
       Format.printf
         "[DEBUG] Generating up to %d endorsements...\n%!"
         nb_endorsements) ;
-  get_n_endorsements (B (pred inc)) (nb_endorsements - 1)
+  get_n_endorsements ~endorsed_block:(pred inc) ctxt (nb_endorsements - 1)
   >>=? fun endorsements ->
   let compare op1 op2 =
     Operation_hash.compare (Operation.hash op1) (Operation.hash op2)
@@ -212,8 +210,8 @@ let generate_random_operation (inc : Incremental.t) gen_state =
   | _ -> generate_random_transfer gen_state (I inc)
 
 (* Build a random block *)
-let step gen_state blk : Block.t tzresult Lwt.t =
-  let priority = choose_exp_nat 5 in
+let step gen_state blk ctxt : Block.t tzresult Lwt.t =
+  let round = choose_exp_nat 5 in
   (* let nb_operations_per_block = choose_gaussian_nat (10, List.length (Account.get_known_accounts ())) in *)
   let nb_operations_per_block = choose_gaussian_nat (10, 100) in
   if !regenerate_transfers then (
@@ -241,7 +239,8 @@ let step gen_state blk : Block.t tzresult Lwt.t =
        Some hash
    | _ -> None)
   >>=? fun seed_nonce_hash ->
-  Incremental.begin_construction ~priority ?seed_nonce_hash blk >>=? fun inc ->
+  Incremental.begin_construction ~policy:(By_round round) ?seed_nonce_hash blk
+  >>=? fun inc ->
   let open Cycle in
   if_debug (fun () ->
       Format.printf
@@ -259,7 +258,7 @@ let step gen_state blk : Block.t tzresult Lwt.t =
     (1 -- nb_operations)
   >>=? fun inc ->
   (* Endorsements *)
-  generate_and_add_random_endorsements inc >>=? fun inc ->
+  generate_and_add_random_endorsements inc ctxt >>=? fun inc ->
   (* Revelations *)
   (* TODO debug cycle *)
   (Plugin.RPC.current_level ~offset:1l Incremental.rpc_ctxt inc >|=? function
@@ -412,7 +411,8 @@ let init () =
     | 0 -> return (gen_state, blk)
     | n ->
         print_block blk ;
-        step gen_state blk >>=? fun blk' -> loop gen_state blk' (n - 1)
+        step gen_state blk (B genesis) >>=? fun blk' ->
+        loop gen_state blk' (n - 1)
   in
   return (loop gen_state genesis args.length)
 

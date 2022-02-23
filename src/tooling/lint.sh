@@ -79,7 +79,7 @@ update_all_dot_ocamlformats () {
                 ;;
             src/proto_00{0..6}_*/lib_protocol )
                 make_dot_ocamlformat "$ofmt"
-                ( cd "$d" ; ls -1 *.mli *.ml | LC_COLLATE=C sort > .ocamlformat-ignore ; )
+                ( find "$d" -maxdepth 1 -name "*.ml*"  | LC_COLLATE=C sort > "$d/.ocamlformat-ignore" ; )
                 git add "$d/.ocamlformat-ignore"
                 ;;
             * )
@@ -88,6 +88,10 @@ update_all_dot_ocamlformats () {
         esac
         git add "$ofmt"
     done
+}
+
+function shellcheck_script () {
+    shellcheck --external-sources "$1"
 }
 
 check_scripts () {
@@ -114,12 +118,18 @@ check_scripts () {
 
     for script in ${scripts}; do
         if [[ "${shellcheck_skips}" == *"${script}"* ]]; then
-          # script is skipped, we leave a log however, to incite
-          # devs to enhance the scripts
-          say "$script shellcheck SKIPPED ⚠️"
+          # check whether the skipped script, in reality, is warning-free
+          if shellcheck_script "${script}" > /dev/null; then
+              say "$script shellcheck marked as SKIPPED but actually pass: update shellcheck_skips ❌️"
+              exit_code=1
+          else
+              # script is skipped, we leave a log however, to incite
+              # devs to enhance the scripts
+              say "$script shellcheck SKIPPED ⚠️"
+          fi
         else
           # script is not skipped, let's shellcheck it
-          if shellcheck --external-sources "${script}"; then
+          if shellcheck_script "${script}"; then
             say "$script shellcheck PASSED ✅"
           else
             say "$script shellcheck FAILED ❌"
@@ -148,7 +158,7 @@ check_redirects () {
     fi
 
     exit_code=0
-    while read old new code; do
+    while read -r old new code; do
         re='^[0-9]+$'
         if ! [[ $code =~ $re && $code -ge 300 ]] ; then
             say "in docs/_redirects: redirect $old -> $new has erroneous status code \"$code\""
@@ -172,11 +182,6 @@ update_gitlab_ci_yml () {
         echo "$repeated"
         exit 1
     fi
-    # Update generated test sections
-    for script in scripts/update_*_test.sh; do
-        echo "Running $script..."
-        $script
-    done
 }
 
 if [ $# -eq 0 ] || [[ "$1" != --* ]]; then

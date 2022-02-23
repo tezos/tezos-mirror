@@ -56,17 +56,6 @@ let simple_test () =
 
 let contract_test () =
   (* Parse a Michelson contract from string. *)
-  let toplevel_from_string str =
-    let (ast, errs) = Michelson_v1_parser.parse_toplevel ~check:true str in
-    match errs with [] -> ast.expanded | _ -> Stdlib.failwith "parse toplevel"
-  in
-  (* Parse a Michelson expression from string, useful for call parameters. *)
-  let expression_from_string str =
-    let (ast, errs) = Michelson_v1_parser.parse_expression ~check:true str in
-    match errs with
-    | [] -> ast.expanded
-    | _ -> Stdlib.failwith "parse expression"
-  in
   let originate_contract file storage src b =
     let load_file f =
       let ic = open_in f in
@@ -75,18 +64,18 @@ let contract_test () =
       res
     in
     let contract_string = load_file file in
-    let code = toplevel_from_string contract_string in
-    let storage = expression_from_string storage in
+    let code = Expr.toplevel_from_string contract_string in
+    let storage = Expr.from_string storage in
     let script =
       Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
     in
-    Op.origination (B b) src ~fee:(Test_tez.Tez.of_int 10) ~script
+    Op.contract_origination (B b) src ~fee:(Test_tez.of_int 10) ~script
     >>=? fun (operation, dst) ->
     Incremental.begin_construction b >>=? fun incr ->
     Incremental.add_operation incr operation >>=? fun incr ->
     Incremental.finalize_block incr >|=? fun b -> (dst, b)
   in
-  Context.init 3 >>=? fun (b, contracts) ->
+  Context.init ~consensus_threshold:0 3 >>=? fun (b, contracts) ->
   let src = match contracts with hd :: _ -> hd | _ -> assert false in
   originate_contract "contracts/timelock.tz" "0xaa" src b >>=? fun (dst, b) ->
   let (public, secret) = Timelock.gen_rsa_keys () in
@@ -114,14 +103,14 @@ let contract_test () =
           (Hex.of_bytes
              (Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding chest))
     in
-    let micheslon_string =
+    let michelson_string =
       Format.sprintf "(Pair %s %s )" chest_key_bytes chest_bytes
     in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string micheslon_string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string michelson_string))
     in
-    let fee = Test_tez.Tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst (Test_tez.Tez.of_int 3) ~parameters
+    let fee = Test_tez.of_int 10 in
+    Op.transaction ~fee (B b) src dst (Test_tez.of_int 3) ~parameters
     >>=? fun operation ->
     Incremental.begin_construction b >>=? fun incr ->
     Incremental.add_operation incr operation >>=? fun incr ->

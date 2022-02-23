@@ -49,14 +49,27 @@
  * used for separate chains (e.g., mainchain vs testchain). *)
 type t
 
+(** This record contains the differents limits and settings that can be updated
+    from a node configuration for a prevalidator *)
 type limits = {
   max_refused_operations : int;
+      (** The maximum number of operations tracked by the mempool for each of
+          the [refused], [branch delayed], [branch refused] and [outdated]
+          operation classifications. Default is [1000] *)
   operation_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
+      (** The maximum time allowed to fetch the contents of an operation
+          advertised by a remote peer. Default is [10] seconds *)
   operations_batch_size : int;
+      (** Maximum number of pending operations processed (or classified) at the
+          end of each request to the prevalidator worker. Default is [50] *)
+  disable_precheck : bool;
+      (** If [disable_precheck] is [true] (default is [false]) operations are
+          executed by the protocol before being propagated. This flag is
+          intended to be used for testing and debugging. *)
 }
 
-type parameters = {limits : limits; chain_db : Distributed_db.chain_db}
+(** Sane default values for {!limits} *)
+val default_limits : limits
 
 (** Creates/tear-down a new prevalidator context. *)
 val create :
@@ -71,8 +84,10 @@ val shutdown : t -> unit Lwt.t
  * operations relevant to the specified context. *)
 val notify_operations : t -> P2p_peer.Id.t -> Mempool.t -> unit Lwt.t
 
-(** Notify the prevalidator worker of a new injected operation. *)
-val inject_operation : t -> Operation.t -> unit tzresult Lwt.t
+(** [inject_operation t ~force op] notifies the prevalidator worker of a new
+    injected operation. If [force] is set to [true] the operation is injected
+    without any check. [force] should be used for test purpose only. *)
+val inject_operation : t -> force:bool -> Operation.t -> unit tzresult Lwt.t
 
 (** Notify the prevalidator that a new head has been selected.
     [update] is used as an optimisation to know which operations
@@ -88,15 +103,6 @@ val flush :
 (** Returns the list of prevalidation contexts running and their associated chain *)
 val running_workers : unit -> (Chain_id.t * Protocol_hash.t * t) list
 
-(** Two functions that are useful for managing the prevalidator's transition
- * from one protocol to the next. *)
-
-(** Returns the hash of the protocol the prevalidator was instantiated with *)
-val protocol_hash : t -> Protocol_hash.t
-
-(** Returns the parameters the prevalidator was created with. *)
-val parameters : t -> parameters
-
 (** Worker status and events *)
 
 (* None indicates the there are no workers for the current protocol. *)
@@ -109,13 +115,6 @@ val current_request :
   t ->
   (Time.System.t * Time.System.t * Prevalidator_worker_state.Request.view)
   option
-
-(** [DEPRECATED] This function is legacy and should be removed. Currently, it
-   always answers `[]`.
-
-    See https://gitlab.com/tezos/tezos/-/issues/1714 *)
-val last_events :
-  t -> (Internal_event.level * Prevalidator_worker_state.Event.t list) list
 
 val information : t -> Worker_types.worker_information
 

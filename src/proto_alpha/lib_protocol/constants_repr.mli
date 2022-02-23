@@ -24,9 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val version_number_004 : string
-
-val version_number : string
+val fitness_version_number : string
 
 val proof_of_work_nonce_size : int
 
@@ -72,94 +70,124 @@ val cache_layout : int list
 
 val michelson_maximum_type_size : int
 
-type fixed = {
-  proof_of_work_nonce_size : int;
-  nonce_length : int;
-  max_anon_ops_per_block : int;
-  max_operation_data_length : int;
-  max_proposals_per_delegate : int;
-  max_micheline_node_count : int;
-  max_micheline_bytes_limit : int;
-  max_allowed_global_constant_depth : int;
-}
+type fixed
 
 val fixed_encoding : fixed Data_encoding.encoding
 
-val fixed : fixed
+type ratio = {numerator : int; denominator : int}
+
+val ratio_encoding : ratio Data_encoding.t
+
+val pp_ratio : Format.formatter -> ratio -> unit
 
 type parametric = {
   preserved_cycles : int;
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
-  blocks_per_roll_snapshot : int32;
+  blocks_per_stake_snapshot : int32;
   blocks_per_voting_period : int32;
-  time_between_blocks : Period_repr.t list;
-  minimal_block_delay : Period_repr.t;
-  endorsers_per_block : int;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
   tokens_per_roll : Tez_repr.t;
   seed_nonce_revelation_tip : Tez_repr.t;
   origination_size : int;
-  block_security_deposit : Tez_repr.t;
-  endorsement_security_deposit : Tez_repr.t;
-  baking_reward_per_endorsement : Tez_repr.t list;
-  endorsement_reward : Tez_repr.t list;
+  baking_reward_fixed_portion : Tez_repr.t;
+  baking_reward_bonus_per_slot : Tez_repr.t;
+  endorsing_reward_per_slot : Tez_repr.t;
   cost_per_byte : Tez_repr.t;
   hard_storage_limit_per_operation : Z.t;
-  (* in seconds *)
   quorum_min : int32;
+  (* in centile of a percentage *)
   quorum_max : int32;
   min_proposal_quorum : int32;
-  initial_endorsers : int;
-  delay_per_missing_endorsement : Period_repr.t;
   liquidity_baking_subsidy : Tez_repr.t;
   liquidity_baking_sunset_level : int32;
   liquidity_baking_escape_ema_threshold : int32;
+  max_operations_time_to_live : int;
+  minimal_block_delay : Period_repr.t;
+  delay_increment_per_round : Period_repr.t;
+  minimal_participation_ratio : ratio;
+  consensus_committee_size : int;
+  (* in slots *)
+  consensus_threshold : int;
+  (* in slots *)
+  max_slashing_period : int;
+  (* in cycles *)
+  frozen_deposits_percentage : int;
+  (* that is, (100 * delegated tz / own tz) *)
+  double_baking_punishment : Tez_repr.t;
+  ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+  initial_seed : State_hash.t option;
+  tx_rollup_enable : bool;
+  tx_rollup_origination_size : int;
 }
 
 val parametric_encoding : parametric Data_encoding.encoding
 
-type t = {fixed : fixed; parametric : parametric}
+type t = private {fixed : fixed; parametric : parametric}
+
+val all : parametric -> t
 
 val encoding : t Data_encoding.encoding
 
-(** performs some consistency on the protocol parameters *)
+type error += (* `Permanent *) Invalid_protocol_constants of string
+
+(** performs some consistency checks on the protocol parameters *)
 val check_constants : parametric -> unit tzresult
 
+module Generated : sig
+  type t = {
+    consensus_threshold : int;
+    baking_reward_fixed_portion : Tez_repr.t;
+    baking_reward_bonus_per_slot : Tez_repr.t;
+    endorsing_reward_per_slot : Tez_repr.t;
+  }
+
+  (* This function is meant to be used just in lib_parameters and in the
+     migration code to be sure that the parameters are consistent. *)
+  val generate : consensus_committee_size:int -> blocks_per_minute:ratio -> t
+end
+
 module Proto_previous : sig
+  type delegate_selection =
+    | Random
+    | Round_robin_over of Signature.Public_key.t list list
+
   type parametric = {
     preserved_cycles : int;
     blocks_per_cycle : int32;
     blocks_per_commitment : int32;
-    blocks_per_roll_snapshot : int32;
+    blocks_per_stake_snapshot : int32;
     blocks_per_voting_period : int32;
-    time_between_blocks : Period_repr.t list;
-    minimal_block_delay : Period_repr.t;
-    endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
     hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez_repr.t;
-    michelson_maximum_type_size : int;
     seed_nonce_revelation_tip : Tez_repr.t;
     origination_size : int;
-    block_security_deposit : Tez_repr.t;
-    endorsement_security_deposit : Tez_repr.t;
-    baking_reward_per_endorsement : Tez_repr.t list;
-    endorsement_reward : Tez_repr.t list;
+    baking_reward_fixed_portion : Tez_repr.t;
+    baking_reward_bonus_per_slot : Tez_repr.t;
+    endorsing_reward_per_slot : Tez_repr.t;
     cost_per_byte : Tez_repr.t;
     hard_storage_limit_per_operation : Z.t;
-    (* in seconds *)
     quorum_min : int32;
     quorum_max : int32;
     min_proposal_quorum : int32;
-    initial_endorsers : int;
-    delay_per_missing_endorsement : Period_repr.t;
     liquidity_baking_subsidy : Tez_repr.t;
     liquidity_baking_sunset_level : int32;
     liquidity_baking_escape_ema_threshold : int32;
+    max_operations_time_to_live : int;
+    minimal_block_delay : Period_repr.t;
+    delay_increment_per_round : Period_repr.t;
+    minimal_participation_ratio : ratio;
+    consensus_committee_size : int;
+    consensus_threshold : int;
+    max_slashing_period : int;
+    frozen_deposits_percentage : int;
+    double_baking_punishment : Tez_repr.t;
+    ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+    delegate_selection : delegate_selection;
   }
 
   val parametric_encoding : parametric Data_encoding.encoding

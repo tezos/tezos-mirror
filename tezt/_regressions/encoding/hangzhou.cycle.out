@@ -1,0 +1,13 @@
+tezt/_regressions/encoding/hangzhou.cycle.out
+
+./tezos-codec encode 011-PtHangz2.cycle from 2147483647
+7fffffff
+
+./tezos-codec decode 011-PtHangz2.cycle from 7fffffff
+2147483647
+
+./tezos-codec encode 011-PtHangz2.cycle from 0
+00000000
+
+./tezos-codec decode 011-PtHangz2.cycle from 00000000
+0

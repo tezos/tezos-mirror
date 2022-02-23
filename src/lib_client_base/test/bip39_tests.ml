@@ -266,13 +266,15 @@ let pp_diff ppf (l1, l2) =
 let vectors () =
   ListLabels.iteri vectors ~f:(fun _ {entropy; words; seed} ->
       let words = String.split_on_char ' ' words in
-      let mnemonic = Bip39.of_entropy (Hex.to_bytes entropy) in
+      let mnemonic = Bip39.of_entropy (Tezos_stdlib.Hex.to_bytes_exn entropy) in
       let words_computed = Bip39.to_words mnemonic in
-      assert (words = words_computed) ;
+      if words <> words_computed then (
+        Format.printf "%a\n" pp_diff (words, words_computed) ;
+        failwith "unexpected difference") ;
       let seed_computed =
         Bip39.to_seed ~passphrase:(Bytes.of_string "TREZOR") mnemonic
       in
-      assert (Hex.to_bytes seed = seed_computed))
+      assert (Tezos_stdlib.Hex.to_bytes_exn seed = seed_computed))
 
 let basic = [("vectors", `Quick, vectors)]
 

@@ -87,29 +87,55 @@ let merge f oa ob =
   | (Some a, Some b) -> Some (f a b)
 
 let merge_e f oa ob =
+  let open Result_syntax in
   match (oa, ob) with
-  | (None, None) -> none_e
-  | (Some r, None) | (None, Some r) -> some_e r
-  | (Some a, Some b) -> f a b >>? some_e
+  | (None, None) -> return_none
+  | (Some r, None) | (None, Some r) -> return_some r
+  | (Some a, Some b) ->
+      let* r = f a b in
+      return_some r
 
 let merge_s f oa ob =
+  let open Lwt_syntax in
   match (oa, ob) with
-  | (None, None) -> none_s
-  | (Some r, None) | (None, Some r) -> some_s r
-  | (Some a, Some b) -> f a b >>= some_s
+  | (None, None) -> return_none
+  | (Some r, None) | (None, Some r) -> return_some r
+  | (Some a, Some b) ->
+      let* r = f a b in
+      return_some r
 
 let merge_es f oa ob =
+  let open Lwt_result_syntax in
   match (oa, ob) with
-  | (None, None) -> none_es
-  | (Some r, None) | (None, Some r) -> some_es r
-  | (Some a, Some b) -> f a b >>=? some_es
+  | (None, None) -> return_none
+  | (Some r, None) | (None, Some r) -> return_some r
+  | (Some a, Some b) ->
+      let* r = f a b in
+      return_some r
+
+let map_e f o =
+  let open Result_syntax in
+  match o with
+  | None -> return_none
+  | Some v ->
+      let* r = f v in
+      return_some r
 
 let map_s f o =
-  match o with None -> Lwt.return_none | Some v -> f v >>= Lwt.return_some
+  let open Lwt_syntax in
+  match o with
+  | None -> return_none
+  | Some v ->
+      let* r = f v in
+      return_some r
 
-let map_e f o = match o with None -> none_e | Some v -> Result.map some (f v)
-
-let map_es f o = match o with None -> none_es | Some v -> f v >|=? some
+let map_es f o =
+  let open Lwt_result_syntax in
+  match o with
+  | None -> return_none
+  | Some v ->
+      let* r = f v in
+      return_some r
 
 let fold_s ~none ~some = function None -> Lwt.return none | Some v -> some v
 
@@ -118,19 +144,28 @@ let fold_f ~none ~some = function None -> none () | Some v -> some v
 let filter p o = match o with Some x when p x -> o | Some _ | None -> None
 
 let filter_s p o =
+  let open Lwt_syntax in
   match o with
-  | None -> none_s
-  | Some x -> ( p x >>= function true -> Lwt.return o | false -> none_s)
+  | None -> return_none
+  | Some x ->
+      let* b = p x in
+      if b then return o else return_none
 
 let filter_e p o =
+  let open Result_syntax in
   match o with
-  | None -> none_e
-  | Some x -> ( p x >>? function true -> Ok o | false -> none_e)
+  | None -> return_none
+  | Some x ->
+      let* b = p x in
+      if b then return o else return_none
 
 let filter_es p o =
+  let open Lwt_result_syntax in
   match o with
-  | None -> none_es
-  | Some x -> ( p x >>=? function true -> Monad.return o | false -> none_es)
+  | None -> return_none
+  | Some x ->
+      let* b = p x in
+      if b then return o else return_none
 
 let filter_map f o = bind o f
 

@@ -161,32 +161,36 @@ let watcher {valid_block_input; _} = Lwt_watcher.create_stream valid_block_input
 
 let chains_watcher {chains_input; _} = Lwt_watcher.create_stream chains_input
 
-let inject_operation v ?chain_id op =
-  (match chain_id with
+let inject_operation v ?chain_id ~force op =
+  let inject_operation_on nv ~handle_missing_prevalidator =
+    match Chain_validator.prevalidator nv with
+    | Some pv -> Prevalidator.inject_operation pv ~force op
+    | None -> handle_missing_prevalidator
+  in
+  let handle_missing_prevalidator =
+    failwith "Prevalidator is not running, cannot inject the operation."
+  in
+  match chain_id with
   | None -> (
       read_block_header v.db op.Operation.shell.branch >>= function
       | None ->
-          failwith
-            "Unknown branch (%a), cannot inject the operation."
-            Block_hash.pp_short
-            op.shell.branch
-      | Some (chain_id, _bh) -> Lwt.return (get v chain_id))
-  | Some chain_id -> (
-      Lwt.return (get v chain_id) >>=? fun nv ->
-      Distributed_db.Block_header.known
-        (Chain_validator.chain_db nv)
-        op.shell.branch
-      >>= function
-      | true -> return nv
-      | false ->
-          failwith
-            "Unknown branch (%a), cannot inject the operation."
-            Block_hash.pp_short
-            op.shell.branch))
-  >>=? fun nv ->
-  let pv_opt = Chain_validator.prevalidator nv in
-  match pv_opt with
-  | Some pv -> Prevalidator.inject_operation pv op
-  | None -> failwith "Prevalidator is not running, cannot inject the operation."
+          if force then
+            Chain_id.Table.iter_es
+              (fun _chain_id chain ->
+                inject_operation_on
+                  chain
+                  ~handle_missing_prevalidator:return_unit)
+              v.active_chains
+          else
+            failwith
+              "Unknown branch (%a), cannot inject the operation."
+              Block_hash.pp_short
+              op.shell.branch
+      | Some (chain_id, _bh) ->
+          get v chain_id >>?= fun nv ->
+          inject_operation_on nv ~handle_missing_prevalidator)
+  | Some chain_id ->
+      get v chain_id >>?= fun nv ->
+      inject_operation_on nv ~handle_missing_prevalidator
 
 let distributed_db {db; _} = db

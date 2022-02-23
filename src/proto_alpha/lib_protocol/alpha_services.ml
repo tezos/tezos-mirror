@@ -103,6 +103,7 @@ module Constants = Constants_services
 module Delegate = Delegate_services
 module Voting = Voting_services
 module Sapling = Sapling_services
+module Tx_rollup = Tx_rollup_services
 
 module Liquidity_baking = struct
   module S = struct
@@ -156,7 +157,7 @@ module Cache = struct
         ~query:RPC_query.empty
         ~input:Alpha_context.Contract.encoding
         ~output:Data_encoding.(option int31)
-        RPC_path.(custom_root / "context" / "cache" / "contract_rank")
+        RPC_path.(custom_root / "context" / "cache" / "contracts" / "rank")
   end
 
   let register () =
@@ -191,4 +192,5 @@ let register () =
   Voting.register () ;
   Sapling.register () ;
   Liquidity_baking.register () ;
-  Cache.register ()
+  Cache.register () ;
+  Tx_rollup.register ()

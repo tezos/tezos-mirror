@@ -59,61 +59,26 @@ let () =
     (function Storage_limit_too_high -> Some () | _ -> None)
     (fun () -> Storage_limit_too_high)
 
-let origination_burn c =
-  let origination_size = Constants_storage.origination_size c in
-  let cost_per_byte = Constants_storage.cost_per_byte c in
-  (* the origination burn, measured in bytes *)
-  Tez_repr.(cost_per_byte *? Int64.of_int origination_size)
-  >|? fun to_be_paid ->
-  (Raw_context.update_allocated_contracts_count c, to_be_paid)
-
-let start_counting_storage_fees c = Raw_context.init_storage_space_to_pay c
-
-(* TODO: https://gitlab.com/tezos/tezos/-/issues/1615
-   Refactor other functions in module to use this one.
- 
-   This function was added when adding the table
-   of globals feature. In principle other parts of this module
-   could be refactored to use this function. *)
-let cost_of_bytes c n =
-  let cost_per_byte = Constants_storage.cost_per_byte c in
-  Tez_repr.(cost_per_byte *? Z.to_int64 n)
-
-let record_paid_storage_space c contract =
-  Contract_storage.used_storage_space c contract >>=? fun size ->
-  Contract_storage.set_paid_storage_space_and_return_fees_to_pay c contract size
-  >>=? fun (to_be_paid, c) ->
-  let c = Raw_context.update_storage_space_to_pay c to_be_paid in
-  let cost_per_byte = Constants_storage.cost_per_byte c in
-  Lwt.return
-    ( Tez_repr.(cost_per_byte *? Z.to_int64 to_be_paid) >|? fun to_burn ->
-      (c, size, to_be_paid, to_burn) )
-
 let record_global_constant_storage_space context size =
   (* Following the precedent of big_map, a key in the
      global table of constants costs 65 bytes (see
      [Lazy_storage_diff.Big_map.bytes_size_for_big_map_key])*)
   let cost_of_key = Z.of_int 65 in
   let to_be_paid = Z.add size cost_of_key in
-  (Raw_context.update_storage_space_to_pay context to_be_paid, to_be_paid)
+  (context, to_be_paid)
 
-let record_paid_storage_space_subsidy c contract =
-  let c = start_counting_storage_fees c in
-  record_paid_storage_space c contract >>=? fun (c, size, to_be_paid, _) ->
-  let (c, _, _) = Raw_context.clear_storage_space_to_pay c in
-  return (c, size, to_be_paid)
+let record_paid_storage_space c contract =
+  Contract_storage.used_storage_space c contract >>=? fun size ->
+  Contract_storage.set_paid_storage_space_and_return_fees_to_pay c contract size
+  >>=? fun (to_be_paid, c) -> return (c, size, to_be_paid)
 
-let burn_storage_fees c ~storage_limit ~payer =
-  let origination_size = Constants_storage.origination_size c in
-  let (c, storage_space_to_pay, allocated_contracts) =
-    Raw_context.clear_storage_space_to_pay c
-  in
-  let storage_space_for_allocated_contracts =
-    Z.mul (Z.of_int allocated_contracts) (Z.of_int origination_size)
-  in
-  let consumed =
-    Z.add storage_space_to_pay storage_space_for_allocated_contracts
-  in
+let source_must_exist c src =
+  match src with
+  | `Contract src -> Contract_storage.must_exist c src
+  | _ -> return_unit
+
+let burn_storage_fees ?(origin = Receipt_repr.Block_application) c
+    ~storage_limit ~payer consumed =
   let remaining = Z.sub storage_limit consumed in
   if Compare.Z.(remaining < Z.zero) then fail Operation_quota_exceeded
   else
@@ -121,14 +86,33 @@ let burn_storage_fees c ~storage_limit ~payer =
     Tez_repr.(cost_per_byte *? Z.to_int64 consumed) >>?= fun to_burn ->
     (* Burning the fees... *)
     if Tez_repr.(to_burn = Tez_repr.zero) then
-      (* If the payer was was deleted by transferring all its balance, and no space was used,
-         burning zero would fail *)
-      return c
+      (* If the payer was deleted by transferring all its balance, and no space
+         was used, burning zero would fail *)
+      return (c, remaining, [])
     else
       trace
         Cannot_pay_storage_fee
-        ( Contract_storage.must_exist c payer >>=? fun () ->
-          Contract_storage.spend c payer to_burn )
+        ( source_must_exist c payer >>=? fun () ->
+          Token.transfer ~origin c payer `Storage_fees to_burn
+          >>=? fun (ctxt, balance_updates) ->
+          return (ctxt, remaining, balance_updates) )
+
+let burn_origination_fees ?(origin = Receipt_repr.Block_application) c
+    ~storage_limit ~payer =
+  let origination_size = Constants_storage.origination_size c in
+  burn_storage_fees ~origin c ~storage_limit ~payer (Z.of_int origination_size)
+
+let burn_tx_rollup_origination_fees ?(origin = Receipt_repr.Block_application) c
+    ~storage_limit ~payer =
+  let tx_rollup_origination_size =
+    Constants_storage.tx_rollup_origination_size c
+  in
+  burn_storage_fees
+    ~origin
+    c
+    ~storage_limit
+    ~payer
+    (Z.of_int tx_rollup_origination_size)
 
 let check_storage_limit c ~storage_limit =
   if
@@ -136,4 +120,4 @@ let check_storage_limit c ~storage_limit =
       storage_limit > (Raw_context.constants c).hard_storage_limit_per_operation)
     || Compare.Z.(storage_limit < Z.zero)
   then error Storage_limit_too_high
-  else ok_unit
+  else Result.return_unit

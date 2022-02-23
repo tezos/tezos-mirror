@@ -60,16 +60,14 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
-  fitness:Fitness.t ->
   Context.t ->
   t tzresult Lwt.t
 
-type previous_protocol = Genesis of Parameters_repr.t | Granada_010
+type previous_protocol = Genesis of Parameters_repr.t | Ithaca_012
 
 val prepare_first_block :
   level:int32 ->
   timestamp:Time.t ->
-  fitness:Fitness.t ->
   Context.t ->
   (previous_protocol * t) tzresult Lwt.t
 
@@ -85,29 +83,27 @@ val predecessor_timestamp : t -> Time.t
 
 val current_timestamp : t -> Time.t
 
-val current_fitness : t -> Int64.t
-
-val set_current_fitness : t -> Int64.t -> t
-
 val constants : t -> Constants_repr.parametric
 
 val patch_constants :
   t -> (Constants_repr.parametric -> Constants_repr.parametric) -> t Lwt.t
 
+val round_durations : t -> Round_repr.Durations.t
+
 (** Retrieve the cycle eras. *)
 val cycle_eras : t -> Level_repr.cycle_eras
 
-(** Increment the current block fee stash that will be credited to baker's
-    frozen_fees account at finalize_application *)
-val add_fees : t -> Tez_repr.t -> t tzresult
+(** Increment the current block fee stash that will be credited to the payload
+    producer's account at finalize_application *)
+val credit_collected_fees_only_call_from_token : t -> Tez_repr.t -> t tzresult
 
-(** Increment the current block reward stash that will be credited to baker's
-    frozen_fees account at finalize_application *)
-val add_rewards : t -> Tez_repr.t -> t tzresult
+(** Decrement the current block fee stash that will be credited to the payload
+    producer's account at finalize_application *)
+val spend_collected_fees_only_call_from_token : t -> Tez_repr.t -> t tzresult
 
-val get_fees : t -> Tez_repr.t
-
-val get_rewards : t -> Tez_repr.t
+(** Returns the current block fee stash that will be credited to the payload
+    producer's account at finalize_application *)
+val get_collected_fees : t -> Tez_repr.t
 
 type error += Gas_limit_too_high (* `Permanent *)
 
@@ -127,29 +123,23 @@ val remaining_operation_gas : t -> Gas_limit_repr.Arith.fp
 
 val update_remaining_operation_gas : t -> Gas_limit_repr.Arith.fp -> t
 
-val gas_exhausted_error : t -> 'a tzresult
-
 val block_gas_level : t -> Gas_limit_repr.Arith.fp
 
-val storage_space_to_pay : t -> Z.t option
-
-val init_storage_space_to_pay : t -> t
-
-val update_storage_space_to_pay : t -> Z.t -> t
-
-val update_allocated_contracts_count : t -> t
-
-val clear_storage_space_to_pay : t -> t * Z.t * int
+val update_remaining_block_gas : t -> Gas_limit_repr.Arith.fp -> t
 
 type error += Undefined_operation_nonce (* `Permanent *)
 
+(** [init_origination_nonce ctxt hash] initialise the origination nonce in
+    memory from [hash]. See [Origination_nonce.t] for more information. *)
 val init_origination_nonce : t -> Operation_hash.t -> t
 
-val get_origination_nonce : t -> Contract_repr.origination_nonce tzresult
+val get_origination_nonce : t -> Origination_nonce.t tzresult
 
-val increment_origination_nonce :
-  t -> (t * Contract_repr.origination_nonce) tzresult
+val increment_origination_nonce : t -> (t * Origination_nonce.t) tzresult
 
+(** [unset_origination_nonce ctxt] unset the origination nonce in memory. To be
+    used only when no more origination can be done in that operation. See
+    [Origination_nonce.t] for more information. *)
 val unset_origination_nonce : t -> t
 
 (** {1 Generic accessors} *)
@@ -182,25 +172,6 @@ val record_internal_nonce : t -> int -> t
 (** Check is the internal operation nonce has been taken. *)
 val internal_nonce_already_recorded : t -> int -> bool
 
-(** Returns a map where to each endorser's pkh is associated the list of its
-    endorsing slots (in increasing order) for a given level. *)
-val allowed_endorsements :
-  t ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
-
-(** Keep track of the number of endorsements that are included in a block *)
-val included_endorsements : t -> int
-
-(** Initializes the map of allowed endorsements, this function must only be
-    called once. *)
-val init_endorsements :
-  t ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
-  t
-
-(** Marks an endorsement in the map as used. *)
-val record_endorsement : t -> Signature.Public_key_hash.t -> t
-
 val fold_map_temporary_lazy_storage_ids :
   t ->
   (Lazy_storage_kind.Temp_ids.t -> Lazy_storage_kind.Temp_ids.t * 'res) ->
@@ -219,3 +190,135 @@ module Cache :
      and type identifier := string
      and type key = Context.Cache.key
      and type value = Context.Cache.value
+
+(* Hashes of non-consensus operations are stored so that, when
+   finalizing the block, we can compute the block's payload hash. *)
+val record_non_consensus_operation_hash : t -> Operation_hash.t -> t
+
+val non_consensus_operations : t -> Operation_hash.t list
+
+(** [set_sampler_for_cycle ctxt cycle sampler] evaluates to
+    [Ok c] with [c] verifying [sampler_for_cycle c cycle = sampler]
+    if no sampler was set for the same [cycle] beforehand.
+    In the other case, it returns [Error `Sampler_already_set]. *)
+val set_sampler_for_cycle :
+  t ->
+  Cycle_repr.t ->
+  Seed_repr.seed * (Signature.public_key * Signature.public_key_hash) Sampler.t ->
+  (t, [`Sampler_already_set]) result
+
+(** [sampler_for_cycle ctxt cycle] evaluates to [Ok sampler] if a sampler was
+    set for [cycle] using [set_sampler_for_cycle].
+    Otherwise, it returns [Error `Sampler_not_set]. *)
+val sampler_for_cycle :
+  t ->
+  Cycle_repr.t ->
+  ( Seed_repr.seed * (Signature.public_key * Signature.public_key_hash) Sampler.t,
+    [`Sampler_not_set] )
+  result
+
+(* The stake distribution is stored both in [t] and in the cache. It
+   may be sufficient to only store it in the cache. *)
+val stake_distribution_for_current_cycle :
+  t -> Tez_repr.t Signature.Public_key_hash.Map.t tzresult
+
+val init_stake_distribution_for_current_cycle :
+  t -> Tez_repr.t Signature.Public_key_hash.Map.t -> t
+
+module type CONSENSUS = sig
+  type t
+
+  type 'value slot_map
+
+  type slot_set
+
+  type slot
+
+  type round
+
+  (** Returns a map where each endorser's pkh is associated to the
+     list of its endorsing slots (in decreasing order) for a given
+     level. *)
+  val allowed_endorsements :
+    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+
+  (** Returns a map where each endorser's pkh is associated to the
+     list of its endorsing slots (in decreasing order) for a given
+     level. *)
+  val allowed_preendorsements :
+    t -> (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map
+
+  (** [endorsement power ctx] returns the endorsement power of the
+     current block. *)
+  val current_endorsement_power : t -> int
+
+  (** Initializes the map of allowed endorsements and preendorsements,
+     this function must be called only once and before applying
+     any consensus operation.  *)
+  val initialize_consensus_operation :
+    t ->
+    allowed_endorsements:
+      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
+    allowed_preendorsements:
+      (Signature.Public_key.t * Signature.Public_key_hash.t * int) slot_map ->
+    t
+
+  (** [record_grand_parent_endorsement ctx pkh] records an
+      grand_parent_endorsement for the current block. This is only
+      useful for the partial construction mode. *)
+  val record_grand_parent_endorsement :
+    t -> Signature.Public_key_hash.t -> t tzresult
+
+  (** [record_endorsement ctx ~initial_slot ~power] records an
+     endorsement for the current block.
+
+      The endorsement should be valid in the sense that
+      [Int_map.find_opt initial_slot allowed_endorsement ctx = Some
+      (pkh, power)].  *)
+  val record_endorsement : t -> initial_slot:slot -> power:int -> t tzresult
+
+  (** [record_preendorsement ctx ~initial_slot ~power round
+     payload_hash power] records a preendorsement for a proposal at
+     [round] with payload [payload_hash].
+
+      The preendorsement should be valid in the sense that
+     [Int_map.find_opt initial_slot allowed_preendorsement ctx = Some
+     (pkh, power)].  *)
+  val record_preendorsement :
+    t -> initial_slot:slot -> power:int -> round -> t tzresult
+
+  val endorsements_seen : t -> slot_set
+
+  (** [get_preendorsements_quorum_round ctx] returns [None] if no
+     preendorsement are included in the current block. Otherwise,
+     return [Some r] where [r] is the round of the preendorsements
+     included in the block. *)
+  val get_preendorsements_quorum_round : t -> round option
+
+  (** [set_preendorsements_quorum_round ctx round] sets the round for
+     preendorsements included in this block. This function should be
+     called only once.
+
+      This function is only used in [Full_construction] mode.  *)
+  val set_preendorsements_quorum_round : t -> round -> t
+
+  (** [locked_round_evidence ctx] returns the round of the recorded
+     preendorsements as well as their power. *)
+  val locked_round_evidence : t -> (round * int) option
+
+  val set_endorsement_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+
+  val endorsement_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+
+  val set_grand_parent_branch : t -> Block_hash.t * Block_payload_hash.t -> t
+
+  val grand_parent_branch : t -> (Block_hash.t * Block_payload_hash.t) option
+end
+
+module Consensus :
+  CONSENSUS
+    with type t := t
+     and type slot := Slot_repr.t
+     and type 'a slot_map := 'a Slot_repr.Map.t
+     and type slot_set := Slot_repr.Set.t
+     and type round := Round_repr.t

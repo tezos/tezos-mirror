@@ -14,4 +14,4 @@ COPY --chown=tezos:nogroup src tezos/src
 COPY --chown=tezos:nogroup vendors tezos/vendors
 ENV GIT_SHORTREF=${GIT_SHORTREF}
 ENV GIT_DATETIME=${GIT_DATETIME}
-RUN opam exec -- make -C tezos all build-test
+RUN opam exec -- make -C tezos release build-test

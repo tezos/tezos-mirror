@@ -65,8 +65,6 @@ module Testing = struct
       | Ok o -> "ok(" ^ f o ^ ")"
       | Error e -> "error(" ^ g e ^ ")"
 
-    let str = Fun.id
-
     let unit _ = "()"
 
     let t _ _ = "T"
@@ -76,10 +74,6 @@ module Testing = struct
     let e n m = if n = m then Error m else Ok ()
 
     let es n m = Lwt.return @@ if n = m then Error m else Ok ()
-
-    let exn n m = if n = m then raise (Nope m) else ()
-
-    let exn_s n m = Lwt.return @@ if n = m then raise (Nope m) else ()
 
     let exn_es n m = Lwt.return_ok @@ if n = m then raise (Nope m) else ()
 
@@ -103,10 +97,6 @@ module Testing = struct
 
     let es n _acc m = Lwt.return @@ if n = m then Error m else Ok m
 
-    let exn n m = if n = m then raise (Nope m) else m
-
-    let exn_s n _acc m = Lwt.return @@ if n = m then raise (Nope m) else m
-
     let exn_es n _acc m = Lwt.return_ok @@ if n = m then raise (Nope m) else m
 
     let exn_now _ _ = raise (Nope 2048)
@@ -129,10 +119,6 @@ module Testing = struct
     let e n m = if n = m then Error m else Ok (m + 1000)
 
     let es n m = Lwt.return @@ if n = m then Error m else Ok (m + 1000)
-
-    let exn n m = if n = m then raise (Nope m) else m + 1000
-
-    let exn_s n m = Lwt.return @@ if n = m then raise (Nope m) else m + 1000
 
     let exn_es n m = Lwt.return_ok @@ if n = m then raise (Nope m) else m + 1000
 
@@ -293,19 +279,21 @@ struct
 end
 
 let flip_e seq_e =
-  let open Support.Lib.Monad in
-  Support.Lib.Seq_e.fold_left (fun acc item -> item :: acc) [] seq_e
-  >|? List.rev >|? List.to_seq
+  let open Support.Lib.Monad.Result_syntax in
+  let+ r = Support.Lib.Seq_e.fold_left (fun acc item -> item :: acc) [] seq_e in
+  List.to_seq (List.rev r)
 
 let flip_s seq_s =
-  let open Support.Lib.Monad in
-  Support.Lib.Seq_s.fold_left (fun acc item -> item :: acc) [] seq_s
-  >|= List.rev >|= List.to_seq
+  let open Support.Lib.Monad.Lwt_syntax in
+  let+ r = Support.Lib.Seq_s.fold_left (fun acc item -> item :: acc) [] seq_s in
+  List.to_seq (List.rev r)
 
 let flip_es seq_es =
-  let open Support.Lib.Monad in
-  Support.Lib.Seq_es.fold_left (fun acc item -> item :: acc) [] seq_es
-  >|=? List.rev >|=? List.to_seq
+  let open Support.Lib.Monad.Lwt_result_syntax in
+  let+ r =
+    Support.Lib.Seq_es.fold_left (fun acc item -> item :: acc) [] seq_es
+  in
+  List.to_seq (List.rev r)
 
 module SeqMapTest = MakeMapperTest (struct
   include SeqGen

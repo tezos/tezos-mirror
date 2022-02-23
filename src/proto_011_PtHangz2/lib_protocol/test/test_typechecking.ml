@@ -1,36 +1,15 @@
 (** Testing
     -------
     Component:    Protocol (type-checking)
-    Invocation:   cd src/proto_alpha/lib_protocol/test
+    Invocation:   cd src/proto_011_PtHangz2/lib_protocol/test
                   dune exec ./main.exe -- test "^typechecking$"
     Subject:      Type-checking
 *)
 
 open Protocol
 open Alpha_context
-open Script_interpreter
 open Micheline
-
-exception Expression_from_string
-
-let expression_from_string str : Script.expr tzresult Lwt.t =
-  let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
-  (match errs with
-  | [] -> ()
-  | trace ->
-      Format.printf "expr_from_string: %a\n" Error_monad.pp_print_trace trace ;
-      raise Expression_from_string) ;
-  return ast.expanded
-
-let ( >>=?? ) x y =
-  x >>= function
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
-
-let ( >>??= ) x y =
-  match x with
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+open Error_monad_operators
 
 let wrap_error_lwt x = x >>= fun x -> Lwt.return @@ Environment.wrap_tzresult x
 
@@ -46,7 +25,9 @@ let test_unparse_view () =
   let script =
     Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
   in
-  Test_interpretation.test_context () >>=? fun ctx ->
+  Context.init 3 >>=? fun (b, _cs) ->
+  Incremental.begin_construction b >>=? fun v ->
+  let ctx = Incremental.alpha_ctxt v in
   Script_ir_translator.parse_script
     ctx
     ~legacy:true
@@ -90,39 +71,6 @@ let test_context_with_nat_nat_big_map () =
   @@ Contract.update_script_storage ctxt originated nat_ty_expr (Some diffs)
   >>=? fun ctxt -> return (ctxt, id)
 
-let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
-
-let default_step_constants =
-  {
-    source = default_source;
-    payer = default_source;
-    self = default_source;
-    amount = Tez.zero;
-    chain_id = Chain_id.zero;
-  }
-
-(** Helper function that parses and types a script, its initial storage and
-   parameters from strings. It then executes the typed script with the storage
-   and parameter and returns the result. *)
-let run_script ctx ?(step_constants = default_step_constants) contract
-    ?(entrypoint = "default") ~storage ~parameter () =
-  expression_from_string contract >>=? fun contract_expr ->
-  expression_from_string storage >>=? fun storage_expr ->
-  expression_from_string parameter >>=? fun parameter_expr ->
-  let script =
-    Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
-  in
-  Script_interpreter.execute
-    ctx
-    Readable
-    step_constants
-    ~script
-    ~cached_script:None
-    ~entrypoint
-    ~parameter:parameter_expr
-    ~internal:false
-  >>=?? fun res -> return res
-
 let read_file filename =
   let ch = open_in filename in
   let s = really_input_string ch (in_channel_length ch) in
@@ -136,7 +84,7 @@ let test_typecheck_stack_overflow () =
   let storage = "Unit" in
   let parameter = "Unit" in
   let script = read_file "./contracts/big_interpreter_stack.tz" in
-  run_script ctxt script ~storage ~parameter () >>= function
+  Contract_helpers.run_script ctxt script ~storage ~parameter () >>= function
   | Ok _ -> Alcotest.fail "expected an error"
   | Error lst
     when List.mem

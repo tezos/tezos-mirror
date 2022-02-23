@@ -86,15 +86,18 @@ open Alpha_context
 open Script
 open Script_typed_ir
 open Script_ir_translator
+open Local_gas_counter
 open Script_interpreter_defs
 module S = Saturation_repr
 
-type step_constants = Script_interpreter_defs.step_constants = {
+type step_constants = Script_typed_ir.step_constants = {
   source : Contract.t;
   payer : Contract.t;
   self : Contract.t;
   amount : Tez.t;
   chain_id : Chain_id.t;
+  now : Script_timestamp.t;
+  level : Script_int.n Script_int.num;
 }
 
 (* ---- Run-time errors -----------------------------------------------------*)
@@ -320,7 +323,7 @@ and next :
     (r * f * outdated_context * local_gas_counter) tzresult Lwt.t =
  fun ((ctxt, _) as g) gas ks0 accu stack ->
   match consume_control gas ks0 with
-  | None -> Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
+  | None -> fail Gas.Operation_quota_exceeded
   | Some gas -> (
       match ks0 with
       | KLog (ks, logger) ->
@@ -330,6 +333,7 @@ and next :
       | KLoop_in (ki, ks') ->
           (kloop_in [@ocaml.tailcall]) g gas ks0 ki ks' accu stack
       | KReturn (stack', ks) -> (next [@ocaml.tailcall]) g gas ks accu stack'
+      | KMap_head (f, ks) -> (next [@ocaml.tailcall]) g gas ks (f accu) stack
       | KLoop_in_left (ki, ks') ->
           (kloop_in_left [@ocaml.tailcall]) g gas ks0 ki ks' accu stack
       | KUndip (x, ks) -> (next [@ocaml.tailcall]) g gas ks x (accu, stack)
@@ -347,7 +351,10 @@ and next :
           (kmap_enter [@ocaml.tailcall]) id g gas extra ks accu stack
       | KMap_exit_body (body, xs, ys, yk, ks) ->
           let extra = (body, xs, ys, yk) in
-          (kmap_exit [@ocaml.tailcall]) id g gas extra ks accu stack)
+          (kmap_exit [@ocaml.tailcall]) id g gas extra ks accu stack
+      | KView_exit (orig_step_constants, ks) ->
+          let g = (fst g, orig_step_constants) in
+          (next [@ocaml.tailcall]) g gas ks accu stack)
 
 (*
 
@@ -466,8 +473,8 @@ and iexec : type a b c d e f g. (a, b, c, d, e, f, g) iexec_type =
 
 and step : type a s b t r f. (a, s, b, t, r, f) step_type =
  fun ((ctxt, sc) as g) gas i ks accu stack ->
-  match consume gas i accu stack with
-  | None -> Lwt.return (Gas.gas_exhausted_error (update_context gas ctxt))
+  match consume_instr gas i accu stack with
+  | None -> fail Gas.Operation_quota_exceeded
   | Some gas -> (
       match i with
       | ILog (_, event, logger, k) ->
@@ -506,6 +513,12 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                 (KCons (k, ks))
                 v
                 stack)
+      | IOpt_map {body; k; kinfo = _} -> (
+          match accu with
+          | None -> (step [@ocaml.tailcall]) g gas k ks None stack
+          | Some v ->
+              let ks' = KMap_head (Option.some, KCons (k, ks)) in
+              (step [@ocaml.tailcall]) g gas body ks' v stack)
       (* pairs *)
       | ICons_pair (_, k) ->
           let (b, stack) = stack in
@@ -693,8 +706,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               S.zero
               ss.elements
           in
-          consume' ctxt gas (Interp_costs.concat_string total_length)
-          >>?= fun gas ->
+          consume gas (Interp_costs.concat_string total_length) >>?= fun gas ->
           let s = Script_string.concat ss.elements in
           (step [@ocaml.tailcall]) g gas k ks s stack
       | ISlice_string (_, k) ->
@@ -726,8 +738,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
               S.zero
               ss.elements
           in
-          consume' ctxt gas (Interp_costs.concat_string total_length)
-          >>?= fun gas ->
+          consume gas (Interp_costs.concat_string total_length) >>?= fun gas ->
           let s = Bytes.concat Bytes.empty ss.elements in
           (step [@ocaml.tailcall]) g gas k ks s stack
       | ISlice_bytes (_, k) ->
@@ -751,6 +762,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           Tez.(x +? y) >>?= fun res ->
           (step [@ocaml.tailcall]) g gas k ks res stack
       | ISub_tez (_, k) ->
+          let x = accu in
+          let (y, stack) = stack in
+          let res = Tez.sub_opt x y in
+          (step [@ocaml.tailcall]) g gas k ks res stack
+      | ISub_tez_legacy (_, k) ->
           let x = accu in
           let (y, stack) = stack in
           Tez.(x -? y) >>?= fun res ->
@@ -789,27 +805,15 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let x = accu in
           let res = Script_int.int x in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | INeg_int (_, k) ->
+      | INeg (_, k) ->
           let x = accu in
           let res = Script_int.neg x in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | INeg_nat (_, k) ->
-          let x = accu in
-          let res = Script_int.neg x in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_intint (_, k) ->
+      | IAdd_int (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.add x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_intnat (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.add x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_natint (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.add x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IAdd_natnat (_, k) ->
+      | IAdd_nat (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.add_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -817,19 +821,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let x = accu and (y, stack) = stack in
           let res = Script_int.sub x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_intint (_, k) ->
+      | IMul_int (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.mul x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_intnat (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.mul x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_natint (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.mul x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IMul_natnat (_, k) ->
+      | IMul_nat (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.mul_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -866,19 +862,11 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                     | Some r -> Some (q, r)))
           in
           (step [@ocaml.tailcall]) g gas k ks result stack
-      | IEdiv_intint (_, k) ->
+      | IEdiv_int (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.ediv x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
-      | IEdiv_intnat (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.ediv x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IEdiv_natint (_, k) ->
-          let x = accu and (y, stack) = stack in
-          let res = Script_int.ediv x y in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | IEdiv_natnat (_, k) ->
+      | IEdiv_nat (_, k) ->
           let x = accu and (y, stack) = stack in
           let res = Script_int.ediv_n x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -901,10 +889,6 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let res = Script_int.logxor x y in
           (step [@ocaml.tailcall]) g gas k ks res stack
       | INot_int (_, k) ->
-          let x = accu in
-          let res = Script_int.lognot x in
-          (step [@ocaml.tailcall]) g gas k ks res stack
-      | INot_nat (_, k) ->
           let x = accu in
           let res = Script_int.lognot x in
           (step [@ocaml.tailcall]) g gas k ks res stack
@@ -1068,9 +1052,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                   in
                   trace_eval
                     (fun () ->
-                      return
-                      @@ Script_tc_errors.Ill_typed_contract
-                           (Micheline.strip_locations view.view_code, []))
+                      Script_tc_errors.Ill_typed_contract
+                        (Micheline.strip_locations view.view_code, []))
                     view_result
                   >>=? fun (Ex_view f, ctxt) ->
                   match f with
@@ -1125,7 +1108,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
                                   } )
                                 (update_local_gas_counter ctxt)
                                 kinstr
-                                (KReturn (stack, ks))
+                                (KView_exit (sc, KReturn (stack, ks)))
                                 (input, storage)
                                 (EmptyCell, EmptyCell))))))
       | ICreate_contract
@@ -1175,14 +1158,8 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let g = (ctxt, sc) in
           (step [@ocaml.tailcall]) g gas k ks balance (accu, stack)
       | ILevel (_, k) ->
-          let level =
-            (Level.current (context_from_outdated_context ctxt)).level
-            |> Raw_level.to_int32 |> Script_int.of_int32 |> Script_int.abs
-          in
-          (step [@ocaml.tailcall]) g gas k ks level (accu, stack)
-      | INow (_, k) ->
-          let now = Script_timestamp.now (context_from_outdated_context ctxt) in
-          (step [@ocaml.tailcall]) g gas k ks now (accu, stack)
+          (step [@ocaml.tailcall]) g gas k ks sc.level (accu, stack)
+      | INow (_, k) -> (step [@ocaml.tailcall]) g gas k ks sc.now (accu, stack)
       | ICheck_signature (_, k) ->
           let key = accu and (signature, (message, stack)) = stack in
           let res = Signature.check key signature message in
@@ -1361,15 +1338,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IPairing_check_bls12_381 (_, k) ->
           let pairs = accu in
-          let check =
-            match pairs.elements with
-            | [] -> true
-            | pairs ->
-                Bls12_381.(
-                  miller_loop pairs |> final_exponentiation_opt
-                  |> Option.map Gt.(eq one))
-                |> Option.value ~default:false
-          in
+          let check = Bls12_381.pairing_check pairs.elements in
           (step [@ocaml.tailcall]) g gas k ks check stack
       | IComb (_, _, witness, k) ->
           let rec aux :
@@ -1442,13 +1411,13 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
       (* Tickets *)
       | ITicket (_, k) ->
           let contents = accu and (amount, stack) = stack in
-          let ticketer = (sc.self, "default") in
+          let ticketer = sc.self in
           let accu = {ticketer; contents; amount} in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | IRead_ticket (_, k) ->
           let {ticketer; contents; amount} = accu in
           let stack = (accu, stack) in
-          let accu = (ticketer, (contents, amount)) in
+          let accu = ((ticketer, "default"), (contents, amount)) in
           (step [@ocaml.tailcall]) g gas k ks accu stack
       | ISplit_ticket (_, k) ->
           let ticket = accu and ((amount_a, amount_b), stack) = stack in
@@ -1468,10 +1437,7 @@ and step : type a s b t r f. (a, s, b, t, r, f) step_type =
           let result =
             if
               Compare.Int.(
-                Script_comparable.compare_address
-                  ticket_a.ticketer
-                  ticket_b.ticketer
-                = 0
+                Contract.compare ticket_a.ticketer ticket_b.ticketer = 0
                 && Script_comparable.compare_comparable
                      contents_ty
                      ticket_a.contents
@@ -1602,6 +1568,7 @@ and klog :
       let ks' = mk ks' in
       let ks = KReturn (stack', ks') in
       (next [@ocaml.tailcall]) g gas ks accu stack
+  | KMap_head (f, ks) -> (next [@ocaml.tailcall]) g gas ks (f accu) stack
   | KLoop_in_left (ki, ks') ->
       let ks' = mk ks' in
       let ki = enable_log ki in
@@ -1628,6 +1595,9 @@ and klog :
   | KMap_exit_body (body, xs, ys, yk, ks') ->
       let ks' = mk ks' in
       (kmap_exit [@ocaml.tailcall]) mk g gas (body, xs, ys, yk) ks' accu stack
+  | KView_exit (orig_step_constants, ks') ->
+      let g = (fst g, orig_step_constants) in
+      (next [@ocaml.tailcall]) g gas ks' accu stack
   | KLog (_, _) ->
       (* This case should never happen. *)
       (next [@ocaml.tailcall]) g gas ks accu stack
@@ -1719,7 +1689,10 @@ let execute logger ctxt mode step_constants ~entrypoint ~internal
     (Bad_contract_parameter step_constants.self)
     (parse_data ctxt ~legacy:false ~allow_forged:internal arg_type (box arg))
   >>=? fun (arg, ctxt) ->
-  Script.force_decode_in_context ctxt unparsed_script.code
+  Script.force_decode_in_context
+    ~consume_deserialization_gas:When_needed
+    ctxt
+    unparsed_script.code
   >>?= fun (script_code, ctxt) ->
   Script_ir_translator.collect_lazy_storage ctxt arg_type arg
   >>?= fun (to_duplicate, ctxt) ->

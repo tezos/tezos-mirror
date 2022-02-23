@@ -28,8 +28,11 @@ open Alpha_context
 
 exception Expression_from_string
 
-let from_string str : Script.expr =
-  let (ast, errs) = Michelson_v1_parser.parse_expression ~check:false str in
+(* Parse a Michelson expression from string, raising an exception on error. *)
+let from_string ?(check_micheline_indentation = false) str : Script.expr =
+  let (ast, errs) =
+    Michelson_v1_parser.parse_expression ~check:check_micheline_indentation str
+  in
   (match errs with
   | [] -> ()
   | trace ->
@@ -37,4 +40,11 @@ let from_string str : Script.expr =
       raise Expression_from_string) ;
   ast.expanded
 
-let to_string c = Fmt.str "%a" Michelson_v1_printer.print_expr c
+(** Parses a Michelson contract from string, raising an exception on error. *)
+let toplevel_from_string ?(check_micheline_indentation = false) str =
+  let (ast, errs) =
+    Michelson_v1_parser.parse_toplevel ~check:check_micheline_indentation str
+  in
+  match errs with [] -> ast.expanded | _ -> Stdlib.failwith "parse toplevel"
+
+let to_string c = Format.asprintf "%a" Michelson_v1_printer.print_expr c

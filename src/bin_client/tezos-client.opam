@@ -1,34 +1,28 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-base"
+  "tezos-rpc-http-client"
+  "tezos-shell-services"
   "tezos-client-base"
-
+  "tezos-client-commands"
+  "tezos-mockup-commands"
+  "tezos-proxy"
+  "tezos-stdlib-unix"
+  "tezos-client-base-unix"
+  "tezos-signer-backends"
+]
+depopts: [
   "tezos-client-genesis"
   "tezos-client-genesis-carthagenet"
-
-  "tezos-client-alpha"
-  "tezos-client-000-Ps9mPmXa"
-  "tezos-client-001-PtCJ7pwo"
-  "tezos-client-002-PsYLVpVv"
-  "tezos-client-003-PsddFKi3"
-  "tezos-client-004-Pt24m4xi"
-  "tezos-client-005-PsBabyM1"
-  "tezos-client-006-PsCARTHA"
-  "tezos-client-007-PsDELPH1"
-  "tezos-client-008-PtEdo2Zk"
-  "tezos-client-009-PsFLoren"
-  "tezos-client-010-PtGRANAD"
-  "tezos-client-011-PtHangz2"
   "tezos-client-demo-counter"
-
-  "tezos-client-alpha-commands"
+  "tezos-client-000-Ps9mPmXa"
   "tezos-client-001-PtCJ7pwo-commands"
   "tezos-client-002-PsYLVpVv-commands"
   "tezos-client-003-PsddFKi3-commands"
@@ -40,18 +34,18 @@ depends: [
   "tezos-client-009-PsFLoren-commands-registration"
   "tezos-client-010-PtGRANAD-commands-registration"
   "tezos-client-011-PtHangz2-commands-registration"
-
-  "tezos-baking-alpha-commands"
+  "tezos-client-012-Psithaca-commands-registration"
+  "tezos-client-alpha-commands-registration"
   "tezos-baking-010-PtGRANAD-commands"
   "tezos-baking-011-PtHangz2-commands"
-
-  "tezos-client-base-unix"
-  "tezos-mockup-commands"
-  "tezos-proxy"
-  "tezos-signer-backends"
-  "tezos-node" { with-test }
-  "tezos-protocol-compiler" { with-test }
-  "tezos-protocol-alpha-parameters" { with-test }
+  "tezos-baking-alpha-commands"
+  "tezos-protocol-plugin-007-PsDELPH1"
+  "tezos-protocol-plugin-008-PtEdo2Zk"
+  "tezos-protocol-plugin-009-PsFLoren"
+  "tezos-protocol-plugin-010-PtGRANAD"
+  "tezos-protocol-plugin-011-PtHangz2"
+  "tezos-protocol-plugin-012-Psithaca"
+  "tezos-protocol-plugin-alpha"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

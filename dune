@@ -1,5 +1,1 @@
-(env
- (release
-  (ocamlopt_flags (:standard -O3))))
-
 (vendored_dirs vendors)

@@ -1,24 +1,24 @@
 tests_alpha/test_liquidity_baking.py::TestTrades::test_sell_tok
 
 Node is bootstrapped.
-Estimated gas: 8023.492 units (will add 100 for safety)
+Estimated gas: 9818.099 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.001158
+    Fee to the baker: ꜩ0.001337
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 8124
+    Gas limit: 9919
     Storage limit: 0 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.001158
-      fees(the baker who will include this operation,1) ... +ꜩ0.001158
+      [CONTRACT_HASH] ... -ꜩ0.001337
+      payload fees(the block proposer) ....... +ꜩ0.001337
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -33,7 +33,7 @@ This sequence of operations was run:
           0x01e927f00ef734dfc85919635e9afc9166c83ef9fc00 ;
           0x0115eb0104481a6d7921160bc982c5e0a561cd8a3a00 }
       Storage size: 4633 bytes
-      Consumed gas: 1801.157
+      Consumed gas: 2403.612
     Internal operations:
       Transaction:
         Amount: ꜩ0
@@ -51,7 +51,7 @@ This sequence of operations was run:
           Unset map(0)[0x0000dac9f52543da1aed0bc1d6b46bf7c10db7014cd6]
           Set map(0)[0x01d496def47a3be89f5d54c6e6bb13cc6645d6e16600] to 461
         Storage size: 2331 bytes
-        Consumed gas: 3382.335
+        Consumed gas: 4574.487
       Transaction:
         Amount: ꜩ3891.966034
         From: [CONTRACT_HASH]
@@ -71,4 +71,4 @@ This sequence of operations was run:
           [CONTRACT_HASH] ... -ꜩ3.895862
           [CONTRACT_HASH] ... +ꜩ3.895862
 
-Injected block [BLOCK_HASH]
+Injected block at minimal timestamp

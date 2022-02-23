@@ -32,12 +32,19 @@ module Request : sig
         * Block_hash.Set.t
         * Operation_hash.Set.t
         -> unit t
+        (** The chain changed, the mempool is being notified of the new state. *)
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
+        (** The given peer sent this mempool. *)
     | Leftover : unit t
-    | Inject : Operation.t -> unit t
+        (** Operations not yet processed should be processed. *)
+    | Inject : {op : Operation.t; force : bool} -> unit t
+        (** Operation has been locally injected (sent) to the node. *)
     | Arrived : Operation_hash.t * Operation.t -> unit t
+        (** Operation was fetched by the node. *)
     | Advertise : unit t
+        (** Current mempool should be advertised to all known peers. *)
     | Ban : Operation_hash.t -> unit t
+        (** User requested the node to ban operation with this hash. *)
 
   type view = View : _ t -> view
 

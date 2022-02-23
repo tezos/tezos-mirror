@@ -144,6 +144,17 @@ val bytes_arb : bytes QCheck.arbitrary
     general [Uri.t] generator. Generalize it if needed. *)
 val endpoint_arb : Uri.t QCheck.arbitrary
 
+(** A generator that returns a sublist of the given list. Lists returned
+    by this generator are not in the same order as the given list
+    (they are shuffled). This generator can return a list equal to the input list
+    (this generator does not guarantee to return strict sublists of the input list). *)
+val sublist : 'a list -> 'a list QCheck.Gen.t
+
+(** A generator that returns lists whose elements are from the given list,
+    preserving the order. For example, given the input list [0, 1, 2],
+    this generator can produce [], [0], [0, 2], [1, 2], [1], etc. *)
+val holey : 'a list -> 'a list QCheck.Gen.t
+
 (** Map-related arbitraries/generators. *)
 module MakeMapArb (Map : Stdlib.Map.S) : sig
   (** [arb_of_size size_gen key_arb val_arb] is an arbitrary of Map

@@ -164,7 +164,9 @@ let pp_events_json =
       (fun fmt {json; _} -> Data_encoding.Json.pp fmt json))
 
 let testable_level : Internal_event.Level.t Alcotest.testable =
-  let level_pp = Fmt.of_to_string Internal_event.Level.to_string in
+  let level_pp fmt level =
+    Format.pp_print_string fmt (Internal_event.Level.to_string level)
+  in
   let level_eq l1 l2 = 0 == Internal_event.Level.compare l1 l2 in
   Alcotest.testable level_pp level_eq
 

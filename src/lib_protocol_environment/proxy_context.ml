@@ -182,11 +182,11 @@ module C = struct
   let list t ?offset ?length k =
     data_tree t >>= fun tree -> raw_list tree ?offset ?length k
 
-  let fold ?depth (t : t) root ~init ~f =
+  let fold ?depth (t : t) root ~order ~init ~f =
     find_tree t root >>= function
     | None -> Lwt.return init
     | Some tr ->
-        Local.Tree.fold ?depth tr.tree [] ~init ~f:(fun k tree acc ->
+        Local.Tree.fold ?depth tr.tree [] ~order ~init ~f:(fun k tree acc ->
             let tree = {proxy = t.proxy; path = root @ k; tree} in
             f k tree acc)
 
@@ -241,8 +241,8 @@ module C = struct
       Local.Tree.remove t.tree k >|= fun tree ->
       if tree == t.tree then t else {t with tree}
 
-    let fold ?depth (t : tree) k ~init ~f =
-      Local.Tree.fold ?depth t.tree k ~init ~f:(fun k tree acc ->
+    let fold ?depth (t : tree) k ~order ~init ~f =
+      Local.Tree.fold ?depth t.tree k ~order ~init ~f:(fun k tree acc ->
           let tree = {proxy = t.proxy; path = t.path @ k; tree} in
           f k tree acc)
 

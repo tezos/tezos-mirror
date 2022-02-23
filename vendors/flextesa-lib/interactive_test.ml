@@ -515,7 +515,7 @@ module Commands = struct
           match sexps with
           | [] -> List.nth_exn clients 0
           | [Atom s] -> List.nth_exn clients (Int.of_string s)
-          | _ -> Fmt.kstrf failwith "Wrong command line: %a" pp (List sexps)
+          | _ -> Fmt.kstr failwith "Wrong command line: %a" pp (List sexps)
         in
         protect_with_keyed_client "manual-baking" ~client ~f:(fun () ->
             Tezos_client.Keyed.bake state client "Manual baking !"))

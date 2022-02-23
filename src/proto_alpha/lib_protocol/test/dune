@@ -1,10 +1,14 @@
-(executables
+(tests
  (names main
         saturation_fuzzing
         test_gas_properties
         test_tez_repr
         liquidity_baking_pbt
-        test_script_comparison)
+        test_script_comparison
+        test_sampler
+        test_carbonated_map)
+ (package tezos-protocol-alpha-tests)
+ (deps (glob_files contracts/*))
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -25,6 +29,7 @@
                    -open Tezos_micheline
                    -open Tezos_client_alpha
                    -open Tezos_protocol_alpha
+                   -open Tezos_protocol_alpha_parameters
                    -open Tezos_protocol_plugin_alpha
                    -open Tezos_protocol_environment_alpha
                    -open Tezos_benchmark_alpha
@@ -36,24 +41,29 @@
  (copy %{lib:tezos-protocol-alpha-parameters:test-parameters.json}
        protocol_parameters.json))
 
-; runs only the `Quick tests
+; runs both `Quick and `Slow tests
 (rule
  (alias runtest_proto_alpha)
  (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
- (action (run %{exe:main.exe} -q)))
+ (action (run %{exe:main.exe})))
 
-; runs both `Quick and `Slow tests
+; runs only the `Quick tests
 (rule
- (alias runtest_slow)
+ (alias runtest_quick)
  (deps (glob_files contracts/*))
  (package tezos-protocol-alpha-tests)
- (action (run %{exe:main.exe})))
+ (action (run %{exe:main.exe} -q)))
 
 (rule
  (alias runtest_saturation_fuzzing)
  (package tezos-protocol-alpha-tests)
  (action (run %{exe:saturation_fuzzing.exe})))
+
+(rule
+ (alias runtest_sampler)
+ (package tezos-protocol-alpha-tests)
+ (action (run %{exe:test_sampler.exe})))
 
 (rule
  (alias runtest_test_script_comparison)
@@ -71,12 +81,7 @@
  (action (run %{exe:liquidity_baking_pbt.exe})))
 
 (rule
- (alias runtest)
+ (alias runtest_carbonated_map)
  (package tezos-protocol-alpha-tests)
- (deps
-  (alias runtest_proto_alpha)
-  (alias runtest_saturation_fuzzing)
-  (alias runtest_test_tez_repr)
-  (alias runtest_liquidity_baking_pbt)
-  (alias runtest_test_script_comparison))
- (action (progn)))
+ (action
+  (run %{exe:test_carbonated_map.exe})))

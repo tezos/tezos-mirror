@@ -1,0 +1,16 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/chain_id.tz]
+
+Well typed
+Gas remaining: 1039996.340 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { CHAIN_ID
+         /* [ chain_id : pair (unit @parameter) (unit @storage) ] */ ;
+         DROP
+         /* [ pair (unit @parameter) (unit @storage) ] */ ;
+         CAR
+         /* [ @parameter unit ] */ ;
+         NIL operation
+         /* [ list operation : @parameter unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @parameter) ] */ } }

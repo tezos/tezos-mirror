@@ -112,7 +112,7 @@ val authenticate :
   incoming:bool ->
   P2p_io_scheduler.connection ->
   P2p_point.Id.t ->
-  ?listening_port:int ->
+  ?advertised_port:int ->
   P2p_identity.t ->
   Network_version.t ->
   'meta P2p_params.conn_meta_config ->

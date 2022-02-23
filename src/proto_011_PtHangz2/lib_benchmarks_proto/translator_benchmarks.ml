@@ -193,9 +193,7 @@ module Typechecking_data : Benchmark.S = struct
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Michelson_generation.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
             Translator_workload.data_typechecker_workload
@@ -229,20 +227,19 @@ module Typechecking_data : Benchmark.S = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ} -> typechecking_data_benchmark rng_state term typ
-    | _ -> assert false
+    in
+    typechecking_data_benchmark rng_state term typ
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> typechecking_data_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -268,9 +265,7 @@ module Unparsing_data : Benchmark.S = struct
       (michelson_type : Protocol.Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Michelson_generation.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
             Translator_workload.data_typechecker_workload
@@ -311,20 +306,19 @@ module Unparsing_data : Benchmark.S = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ} -> unparsing_data_benchmark rng_state term typ
-    | _ -> assert false
+    in
+    unparsing_data_benchmark rng_state term typ
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> unparsing_data_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -334,10 +328,6 @@ module Unparsing_data : Benchmark.S = struct
 end
 
 let () = Registration_helpers.register (module Unparsing_data)
-
-(* The new elaborator expects one more element at the bottom of the stack. *)
-let cushion_stack_type type_list =
-  type_list @ [Michelson_generation.base_type_to_michelson_type Type.unit]
 
 module Typechecking_code : Benchmark.S = struct
   include Config
@@ -353,8 +343,8 @@ module Typechecking_code : Benchmark.S = struct
       (stack : Script_repr.expr list) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
-          Michelson_generation.michelson_type_list_to_ex_stack_ty stack ctxt
+        let ex_stack_ty =
+          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let workload =
           match
@@ -391,18 +381,19 @@ module Typechecking_code : Benchmark.S = struct
 
   let make_bench rng_state (cfg : Config.config) () =
     let open Michelson_generation in
-    match make_code_sampler rng_state cfg.generator_config with
-    | Code {term; bef} -> typechecking_code_benchmark rng_state term bef
-    | Data _ -> assert false
+    let Michelson_mcmc_samplers.{term; bef; aft = _} =
+      make_code_sampler rng_state cfg.generator_config
+    in
+    typechecking_code_benchmark rng_state term bef
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> typechecking_code_benchmark rng_state term bef)
             | _ -> None)
           terms
@@ -428,8 +419,8 @@ module Unparsing_code : Benchmark.S = struct
       (stack : Script_repr.expr list) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
-          Michelson_generation.michelson_type_list_to_ex_stack_ty stack ctxt
+        let ex_stack_ty =
+          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let workload =
           match
@@ -473,18 +464,19 @@ module Unparsing_code : Benchmark.S = struct
 
   let make_bench rng_state (cfg : Config.config) () =
     let open Michelson_generation in
-    match make_code_sampler rng_state cfg.generator_config with
-    | Code {term; bef} -> unparsing_code_benchmark rng_state term bef
-    | Data _ -> assert false
+    let Michelson_mcmc_samplers.{term; bef; aft = _} =
+      make_code_sampler rng_state cfg.generator_config
+    in
+    unparsing_code_benchmark rng_state term bef
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> unparsing_code_benchmark rng_state term bef)
             | _ -> None)
           terms

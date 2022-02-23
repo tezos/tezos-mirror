@@ -83,6 +83,11 @@ let () =
            ("sequence", Seq_kind);
          ]
   in
+  let context_desc_enc =
+    let open Data_encoding in
+    def "michelson_v1.context_desc"
+    @@ string_enum [("Lambda", Lambda); ("View", View)]
+  in
   (* -- Structure errors ---------------------- *)
   (* Invalid arity *)
   register_error_kind
@@ -456,15 +461,21 @@ let () =
     (obj1 (req "item_level" int16))
     (function Bad_stack_item n -> Some n | _ -> None)
     (fun n -> Bad_stack_item n) ;
-  (* SELF in lambda *)
+  (* Forbidden instruction in a context. *)
   register_error_kind
     `Permanent
-    ~id:"michelson_v1.self_in_lambda"
-    ~title:"SELF instruction in lambda"
-    ~description:"A SELF instruction was encountered in a lambda expression."
-    (located empty)
-    (function Self_in_lambda loc -> Some (loc, ()) | _ -> None)
-    (fun (loc, ()) -> Self_in_lambda loc) ;
+    ~id:"michelson_v1.forbidden_instr_in_context"
+    ~title:"Forbidden instruction in context"
+    ~description:
+      "An instruction was encountered in a context where it is forbidden."
+    (located
+       (obj2
+          (req "context" context_desc_enc)
+          (req "forbidden_instruction" prim_encoding)))
+    (function
+      | Forbidden_instr_in_context (loc, ctxt, prim) -> Some (loc, (ctxt, prim))
+      | _ -> None)
+    (fun (loc, (ctxt, prim)) -> Forbidden_instr_in_context (loc, ctxt, prim)) ;
   (* Bad stack length *)
   register_error_kind
     `Permanent
@@ -747,15 +758,6 @@ let () =
     (function
       | Ill_typed_contract (expr, type_map) -> Some (expr, type_map) | _ -> None)
     (fun (expr, type_map) -> Ill_typed_contract (expr, type_map)) ;
-  (* Cannot serialize error *)
-  register_error_kind
-    `Temporary
-    ~id:"michelson_v1.cannot_serialize_error"
-    ~title:"Not enough gas to serialize error"
-    ~description:"The error was too big to be serialized with the provided gas"
-    Data_encoding.empty
-    (function Cannot_serialize_error -> Some () | _ -> None)
-    (fun () -> Cannot_serialize_error) ;
   (* Deprecated instruction *)
   register_error_kind
     `Permanent

@@ -4,20 +4,44 @@
   test_tzList
   test_bounded_heap
   test_tzString
-  test_arrays
   test_fallbackArray
-  test_functionalArray
-  test_lwt_pipe
-  test_circular_buffer
-  test_circular_buffer_fuzzy)
+  test_functionalArray)
  (package tezos-stdlib)
+ (modes native js)
  (libraries
   tezos-stdlib
   alcotest
-  alcotest-lwt
-  lwt_log
   bigstring
-  lwt.unix
   tezos-test-helpers
   qcheck-alcotest)
  (flags (:standard -open Tezos_stdlib)))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_bits.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_tzList.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_bounded_heap.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_tzString.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_fallbackArray.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (package tezos-stdlib)
+ (action (run node %{dep:./test_functionalArray.bc.js})))

@@ -45,10 +45,15 @@ let () =
       panels = Prt_client.grafana_panels;
     }
 
+(* Executor for tests that don't take that long to run.
+   Very long tests (e.g. tests that take days to run) should run on their own executor. *)
+let default_executors = Long_test.[x86_executor1]
+
 let () =
+  Cli.init () ;
   (* Register your tests here. *)
   (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
-  Qcheck_rpc.register () ;
-  Prt_client.register () ;
+  Qcheck_rpc.register ~executors:default_executors () ;
+  Prt_client.register ~executors:default_executors () ;
   (* [Test.run] must be the last function to be called. *)
   Test.run ()

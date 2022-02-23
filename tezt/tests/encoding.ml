@@ -59,7 +59,7 @@ let rec equal_json (a : JSON.u) (b : JSON.u) =
       let sort_object =
         List.sort (fun (key_a, _) (key_b, _) -> compare key_a key_b)
       in
-      List.length object_a = List.length object_b
+      List.compare_lengths object_a object_b = 0
       && List.for_all2
            (fun (key_a, val_a) (key_b, val_b) ->
              key_a = key_b && equal_json val_a val_b)
@@ -109,73 +109,77 @@ let check_samples_encoding ~group_name ~protocols ~samples =
                ~file:(base_path // file)))
     samples
 
-let register () =
+let default_samples =
+  [
+    "block_header";
+    "block_header.raw";
+    "block_header.unsigned";
+    "contract";
+    "contract.big_map_diff";
+    "cycle";
+    "delegate.frozen_balance";
+    "delegate.frozen_balance_by_cycles";
+    "fitness";
+    "gas.cost";
+    "gas";
+    "level";
+    "nonce";
+    "operation.internal";
+    "operation";
+    "operation.raw";
+    "operation.unsigned";
+    "period";
+    "raw_level";
+    "roll";
+    "seed";
+    "tez";
+    "timestamp";
+    "vote.ballot";
+    "vote.ballots";
+    "vote.listings";
+    "voting_period.kind";
+    "voting_period";
+  ]
+
+let alpha_samples =
+  [
+    "block_header";
+    "block_header.raw";
+    "block_header.unsigned";
+    "contract";
+    "contract.big_map_diff";
+    "cycle";
+    "fitness";
+    "gas.cost";
+    "gas";
+    "level";
+    "nonce";
+    "operation.internal";
+    "operation";
+    "operation.raw";
+    "operation.unsigned";
+    "period";
+    "raw_level";
+    "seed";
+    "tez";
+    "timestamp";
+    "vote.ballot";
+    "vote.ballots";
+    "vote.listings";
+    "voting_period.kind";
+    "voting_period";
+  ]
+
+let register ~protocols =
   check_dump_encodings () ;
-  check_samples_encoding
-    ~group_name:"alpha"
-    ~protocols:[Alpha]
-    ~samples:
-      [
-        "block_header";
-        "block_header.raw";
-        "block_header.unsigned";
-        "contract";
-        "contract.big_map_diff";
-        "cycle";
-        "delegate.frozen_balance";
-        "delegate.frozen_balance_by_cycles";
-        "fitness";
-        "gas.cost";
-        "gas";
-        "level";
-        "nonce";
-        "operation.internal";
-        "operation";
-        "operation.raw";
-        "operation.unsigned";
-        "period";
-        "raw_level";
-        "roll";
-        "seed";
-        "tez";
-        "timestamp";
-        "vote.ballot";
-        "vote.ballots";
-        "vote.listings";
-        "voting_period.kind";
-        "voting_period";
-      ] ;
-  check_samples_encoding
-    ~group_name:"current"
-    ~protocols:[Protocol.current_mainnet]
-    ~samples:
-      [
-        "block_header";
-        "block_header.raw";
-        "block_header.unsigned";
-        "contract";
-        "contract.big_map_diff";
-        "cycle";
-        "delegate.frozen_balance";
-        "delegate.frozen_balance_by_cycles";
-        "fitness";
-        "gas.cost";
-        "gas";
-        "level";
-        "nonce";
-        "operation.internal";
-        "operation";
-        "operation.raw";
-        "operation.unsigned";
-        "period";
-        "raw_level";
-        "roll";
-        "seed";
-        "tez";
-        "timestamp";
-        "vote.ballot";
-        "vote.ballots";
-        "vote.listings";
-        "voting_period.kind";
-        "voting_period";
-      ]
+  List.iter
+    (fun protocol ->
+      let samples =
+        if Protocol.(protocol = Alpha || protocol = Ithaca) then alpha_samples
+        else default_samples
+      in
+      check_samples_encoding
+        ~group_name:(Protocol.tag protocol)
+        ~protocols:[protocol]
+        ~samples)
+    protocols

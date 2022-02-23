@@ -30,21 +30,22 @@ such by emitting a delegate registration operation.
 Any :ref:`accounts <Account>` (implicit or originated) can specify a delegate
 through a delegation operation.
 
-
 Any account can change or revoke its delegate at any time. However, the change
 only becomes effective after ``PRESERVED_CYCLES + 2`` :ref:`cycles <Cycle>`.
 The value ``PRESERVED_CYCLES`` is a
 :ref:`protocol constant <protocol_constants_alpha>`.
 
 A delegate participates in consensus and in governance with a weight
-proportional with their delegated stake, which includes the balances of
-all the accounts that delegate to it, and also the balance of the
-delegate itself.
+proportional with their delegated stake, which includes the balances
+of all the accounts that delegate to it, and also the balance of the
+delegate itself. To participate in consensus or in governance, a
+delegate needs to have at least a minimal stake, which is given by the
+``TOKENS_PER_ROLL`` :ref:`protocol constant
+<protocol_constants_alpha>`.
 
 Delegates place security deposits that may be forfeited in case they do not
 follow (some particular rules of) the protocol. Security deposits are deduced
-from the delegates' own balance. Therefore delegates may be subject to
-:ref:`over-delegation<over_delegation>`.
+from the delegates' own balance.
 
 
 Active and passive delegates
@@ -66,39 +67,7 @@ Delegates' rights selection
 ---------------------------
 
 Tezos being proof-of-stake, the delegates' rights are selected at random based on their
-stake. In theory, it would be possible to give each token a serial number and
-track the specific tokens assigned to specific delegates. However, it would be
-too demanding of nodes to track assignments at such a granular level. Instead,
-Tezos works with *sets of tokens* which are called *rolls*.
-
-.. _roll_pos_alpha:
-
-Rolls
-^^^^^
-
-A roll holds ``TOKENS_PER_ROLL`` tokens. When tokens are moved, or a delegate for an
-account is changed, the rolls change delegate according to the following
-algorithm.
-
-Each delegate has a stack of roll identifiers plus some "change" which is always
-an amount smaller than ``TOKENS_PER_ROLL``. When tokens are moved from one
-delegate to the other, first, the change is used. If it is not enough, rolls
-need to be "broken" which means that they move from the delegate stack to a
-global, unallocated, roll stack. This is done until the amount is covered, and
-some change possibly remains.
-
-Then, the other delegate is credited. First, the amount is added to the
-"change". If it becomes greater than ``TOKENS_PER_ROLL``, then rolls are
-unstacked from the global unallocated roll stack onto the delegate stack. If the
-global stack is empty, a fresh roll is created.
-
-This preserves the property that if the delegate is changed through several
-transactions, the roll assignment is preserved, even if each operation moves
-less than a full roll.
-
-The advantage of tracking tokens in this way is that a delegate creating a
-malicious fork cannot easily change the specific rolls assigned to them, even if
-they control the underlying tokens and shuffle them around.
+stake.
 
 .. _random_seed_alpha:
 
@@ -116,7 +85,7 @@ The committed nonce must be revealed by the original block proposer during cycle
 ``n-1`` under penalty of forfeiting the rewards and fees of the block that
 included the commitment. The associated security deposit is not forfeited.
 
-A *nonce revelation* is an operation, and multiple nonce revelations can thus be
+A *nonce revelation* is an operation and multiple nonce revelations can thus be
 included in a block. A reward ``SEED_NONCE_REVELATION_TIP`` is given for
 including a revelation. Revelations are free operations which do not compete
 with transactions for block space. Up to ``MAX_ANON_OPS_PER_BLOCK`` revelations,
@@ -131,9 +100,9 @@ Slot selection
 ^^^^^^^^^^^^^^
 
 To return to the rights selection mechanism, we first introduce a new
-terminology, *roll snapshot*, to denote the stored (in the
-:ref:`context <Context>`) distribution of rolls for a given block. Roll
-snapshots are taken (and stored) every ``BLOCKS_PER_ROLL_SNAPSHOT``
+terminology, *stake snapshot*, to denote the stored (in the
+:ref:`context <Context>`) stake distribution for a given block. Stake
+snapshots are taken (and stored) every ``BLOCKS_PER_STAKE_SNAPSHOT``
 blocks.
 
 The delegates' rights at a given level and for a particular role in
@@ -147,8 +116,8 @@ receives for that role. The slot owner is obtained by running a PRNG
 
 Let `n` be the cycle the level belongs to.
 The seed of the PRNG is the :ref:`random seed <random_seed_alpha>` associated with cycle ``n-PRESERVED_CYCLES``.
-The PRNG first selects a snapshot from cycle ``n-PRESERVED_CYCLES-2`` and then it selects a roll in the selected snapshot.
-The slot owner is then the roll owner.
+The PRNG selects a snapshot from cycle ``n - PRESERVED_CYCLES - 1`` and then it selects a stake in the selected snapshot.
+The slot owner is then the stake owner.
 
 .. _protocol_constants_alpha:
 
@@ -156,7 +125,6 @@ Protocol constants
 ------------------
 
 Protocols are parameterized by several parameters called *protocol constants*, which may vary from one protocol to another or from one network to another (for instance, test networks move faster).
-An example of a parameter is the number of tez constituting a roll. This number is given by the constant named ``TOKENS_PER_ROLL``.
 
 The list of protocol constants can be found in the API of the `Constants module <https://tezos.gitlab.io/api/odoc/_html/tezos-protocol-alpha/Tezos_raw_protocol_alpha/Alpha_context/Constants/index.html>`__.
 
@@ -186,8 +154,8 @@ Proof-of-stake parameters
    * - ``SEED_NONCE_REVELATION_TIP``
      -  1/8 ꜩ
    * - ``TOKENS_PER_ROLL``
-     - 8,000 ꜩ
-   * - ``BLOCKS_PER_ROLL_SNAPSHOT``
+     - 6,000 ꜩ
+   * - ``BLOCKS_PER_STAKE_SNAPSHOT``
      - 512 blocks
 
 

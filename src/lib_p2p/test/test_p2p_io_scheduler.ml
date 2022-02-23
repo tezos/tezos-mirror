@@ -139,7 +139,7 @@ let max_size ?max_upload_speed () =
       loop nb_simple_msgs
 
 let rec send conn nb_simple_msgs =
-  Lwt_main.yield () >>= fun () ->
+  Lwt.pause () >>= fun () ->
   let msg = simple_msgs.(Random.int nb_simple_msgs) in
   P2p_io_scheduler.write conn msg >>=? fun () -> send conn nb_simple_msgs
 

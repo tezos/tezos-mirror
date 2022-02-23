@@ -153,7 +153,7 @@ let code_typechecker_workload (ctxt : Protocol.Alpha_context.context)
   let (Script_ir_translator.Ex_stack_ty stack_ty) = bef in
   Lwt_main.run
     ( Script_ir_translator.parse_instr
-        Script_ir_translator.Lambda
+        Script_tc_context.data
         ctxt
         ~legacy:false
         code

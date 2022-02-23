@@ -1,10 +1,12 @@
-(executables
+(tests
  (names main
         saturation_fuzzing
         test_gas_properties
         test_tez_repr
         liquidity_baking_pbt
         test_script_comparison)
+ (package tezos-protocol-011-PtHangz2-tests)
+ (deps (glob_files contracts/*))
  (libraries tezos-base
             tezos-micheline
             tezos-protocol-environment
@@ -36,19 +38,19 @@
  (copy %{lib:tezos-protocol-011-PtHangz2-parameters:test-parameters.json}
        protocol_parameters.json))
 
-; runs only the `Quick tests
+; runs both `Quick and `Slow tests
 (rule
  (alias runtest_proto_011_PtHangz2)
  (deps (glob_files contracts/*))
  (package tezos-protocol-011-PtHangz2-tests)
- (action (run %{exe:main.exe} -q)))
+ (action (run %{exe:main.exe})))
 
-; runs both `Quick and `Slow tests
+; runs only `Quick tests
 (rule
- (alias runtest_slow)
+ (alias runtest_quick)
  (deps (glob_files contracts/*))
  (package tezos-protocol-011-PtHangz2-tests)
- (action (run %{exe:main.exe})))
+ (action (run %{exe:main.exe} -q)))
 
 (rule
  (alias runtest_saturation_fuzzing)
@@ -69,14 +71,3 @@
  (alias runtest_liquidity_baking_pbt)
  (package tezos-protocol-011-PtHangz2-tests)
  (action (run %{exe:liquidity_baking_pbt.exe})))
-
-(rule
- (alias runtest)
- (package tezos-protocol-011-PtHangz2-tests)
- (deps
-  (alias runtest_proto_011_PtHangz2)
-  (alias runtest_saturation_fuzzing)
-  (alias runtest_test_tez_repr)
-  (alias runtest_liquidity_baking_pbt)
-  (alias runtest_test_script_comparison))
- (action (progn)))

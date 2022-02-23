@@ -13,15 +13,19 @@ let little_mesh_with_bakers ?base_port ?generate_kiln_config state ~protocol
   >>= fun () ->
   let block_interval = 1 in
   let (protocol, baker_list) =
-    let d = protocol in
     let open Tezos_protocol in
-    let bakers = List.take d.bootstrap_accounts bakers in
+    let bakers = List.take protocol.bootstrap_accounts bakers in
+    let timestamp_delay =
+      let year = 3600 * 24 * 365 in
+      Some (-year)
+    in
     ( {
-        d with
+        protocol with
         time_between_blocks = [block_interval; 0];
         minimal_block_delay = block_interval;
+        timestamp_delay;
         bootstrap_accounts =
-          List.map d.bootstrap_accounts ~f:(fun (n, v) ->
+          List.map protocol.bootstrap_accounts ~f:(fun (n, v) ->
               if List.exists bakers ~f:(fun baker -> Poly.equal n (fst baker))
               then (n, v)
               else (n, 1_000L));
@@ -177,13 +181,38 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
   let number_of_lonely_bakes = 1 in
   kill_nth 1 >>= fun () ->
   kill_nth 2 >>= fun () ->
+  (* Bake one block less i.e., (number_of_lonely_bakes - 1) inject an operation
+     (here a transfer) to generate a different block hash for the next baking
+     command *)
   Loop.n_times (number_of_lonely_bakes - 1) (fun _ ->
       Tezos_client.Keyed.bake state baker_0 "Bake-on-0")
   >>= fun () ->
-  (* Bake one block less and inject an operation to generate a different
-     block's hash *)
-  Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
-  >>= fun () ->
+  let transfer client =
+    match protocol.Tezos_protocol.bootstrap_accounts with
+    | (src, _) :: (dst, _) :: _ ->
+        let src_key = Tezos_protocol.Account.pubkey_hash src
+        and dst_key = Tezos_protocol.Account.pubkey_hash dst in
+        Tezos_client.successful_client_cmd
+          state
+          ~client
+          [
+            "--wait";
+            "none";
+            "transfer";
+            "1";
+            "from";
+            src_key;
+            "to";
+            dst_key;
+            "--fee";
+            "0.05";
+          ]
+        >>= fun _ -> Asynchronous_result.return ()
+    | _ ->
+        (* This case should not happen with bootstrap_accounts *)
+        Asynchronous_result.return ()
+  in
+  transfer client_0 >>= fun () ->
   Tezos_client.Keyed.bake state baker_0 "Bake-on-0" >>= fun () ->
   Tezos_client.get_block_header state ~client:client_0 `Head
   >>= fun baking_0_header ->
@@ -224,40 +253,37 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
         ef_json "Head hash" head_hash_json;
       ]
   >>= fun () ->
-  Tezos_client.Keyed.forge_and_inject
-    state
-    baker_1
-    ~json:
-      (let clean header =
-         let open Jqo in
-         remove_field header ~name:"hash"
-         |> remove_field ~name:"chain_id"
-         |> remove_field ~name:"protocol"
-       in
-       `O
-         [
-           ("branch", head_hash_json);
-           ( "contents",
-             `A
-               [
-                 `O
-                   [
-                     ("kind", `String "double_baking_evidence");
-                     ("bh1", clean baking_0_header);
-                     ("bh2", clean baking_1_header);
-                   ];
-               ] );
-         ])
-  >>= fun result ->
+  let clean header =
+    let open Jqo in
+    remove_field header ~name:"hash"
+    |> remove_field ~name:"chain_id"
+    |> remove_field ~name:"protocol"
+  in
+  let json =
+    `O
+      [
+        ("branch", head_hash_json);
+        ( "contents",
+          `A
+            [
+              `O
+                [
+                  ("kind", `String "double_baking_evidence");
+                  ("bh1", clean baking_0_header);
+                  ("bh2", clean baking_1_header);
+                ];
+            ] );
+      ]
+  in
+  Tezos_client.Keyed.forge_and_inject state baker_1 ~json >>= fun result ->
+  let next_level = starting_level + number_of_lonely_bakes + 1 in
   Interactive_test.Pauser.generic
     state
     EF.
       [
         af "Waiting for accuser to notice double baking";
         ef_json "Result of injection" result;
-        af
-          "All nodes reaching level %d"
-          (starting_level + number_of_lonely_bakes + 1);
+        af "All nodes reaching level %d" next_level;
       ]
   >>= fun () ->
   wait_for_operation_in_mempools
@@ -267,24 +293,22 @@ let simple_double_baking ~starting_level ?generate_kiln_config ~state ~protocol
     ~client_exec
     `All
   >>= fun () ->
-  Tezos_client.Keyed.bake
-    state
-    baker_2
-    (sprintf "all at lvl %d" (starting_level + number_of_lonely_bakes + 1))
+  Tezos_client.Keyed.bake state baker_2 (sprintf "all at lvl %d" next_level)
   >>= fun () ->
-  let last_level = starting_level + number_of_lonely_bakes + 2 in
-  Interactive_test.Pauser.generic
-    state
-    EF.[af "Just baked what's the level? Vs %d" last_level]
+  let next_level = next_level + 1 in
+  Tezos_client.Keyed.bake state baker_2 (sprintf "all at lvl %d" next_level)
+  >>= fun () ->
+  let last_level = next_level + 1 in
+  Interactive_test.Pauser.generic state EF.[af "Just baked level %d" last_level]
   >>= fun () ->
   Test_scenario.Queries.wait_for_all_levels_to_be
     state
     ~attempts:default_attempts
     ~seconds:8.
     all_nodes
-    (`Equal_to last_level)
+    (`At_least last_level)
   >>= fun () ->
-  Helpers.wait_for state ~attempts:10 ~seconds:4. (fun _ ->
+  Helpers.wait_for state ~attempts:5 ~seconds:3. (fun _ ->
       Tezos_client.block_has_operation
         state
         ~client:client_2
@@ -314,159 +338,182 @@ let find_endorsement_in_mempool state ~client =
 
 let simple_double_endorsement ~starting_level ?generate_kiln_config ~state
     ~protocol ~base_port node_exec client_exec () =
-  little_mesh_with_bakers
-    ~bakers:2
-    ~protocol
-    state
-    ~node_exec
-    ~client_exec
-    ()
-    ~starting_level
-    ~base_port
-    ?generate_kiln_config
-  >>= fun (all_nodes, client_0, baker_0, client_1, baker_1, client_2, baker_2)
-    ->
-  (* 2 bakers ⇒ baker_0 and baker_2 are for the same key on ≠ nodes *)
-  assert (
-    Tezos_client.Keyed.(
-      String.equal baker_0.key_name baker_2.key_name
-      && String.equal baker_0.secret_key baker_2.secret_key)) ;
-  let node_0 = List.nth_exn all_nodes 0 in
-  let node_1 = List.nth_exn all_nodes 1 in
-  let node_2 = List.nth_exn all_nodes 2 in
-  let baker_1_n0 =
-    let open Tezos_client.Keyed in
-    let {key_name; secret_key; _} = baker_1 in
-    make client_0 ~key_name ~secret_key
-  in
-  Tezos_client.Keyed.initialize state baker_1_n0 >>= fun _ ->
-  Helpers.kill_node state node_1 >>= fun () ->
-  Helpers.kill_node state node_2 >>= fun () ->
-  (* Inject an operation to generate a different block's hash *)
-  Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
-  >>= fun () ->
-  Tezos_client.Keyed.bake state baker_0 "baker-0 baking with node 0"
-  >>= fun () ->
-  Tezos_client.Keyed.endorse state baker_0 "baker-0 endorsing with node 0"
-  >>= fun () ->
-  find_endorsement_in_mempool state ~client:client_0 >>= fun endorsement_0 ->
-  Tezos_client.Keyed.endorse state baker_1_n0 "baker-1 endorsing with node 0"
-  >>= fun () ->
-  Helpers.kill_node state node_0 >>= fun () ->
-  Helpers.restart_node state node_2 ~client_exec >>= fun () ->
-  Tezos_client.Keyed.bake state baker_2 "baker-0 baking with node 2"
-  >>= fun () ->
-  Tezos_client.Keyed.endorse state baker_2 "baker-0 endorsing with node 2"
-  >>= fun () ->
-  find_endorsement_in_mempool state ~client:client_2 >>= fun endorsement_1 ->
-  say
-    state
-    EF.(
-      list
-        [
-          ef_json "Endorsement 0:" endorsement_0;
-          ef_json "Endorsement 1:" endorsement_1;
-        ])
-  >>= fun () ->
-  Helpers.restart_node state node_1 ~client_exec >>= fun () ->
-  Test_scenario.Queries.wait_for_all_levels_to_be
-    state
-    ~attempts:default_attempts
-    ~seconds:8.
-    [node_1; node_2]
-    (`Equal_to (starting_level + 1))
-  >>= fun () ->
-  Helpers.restart_node state node_0 ~client_exec >>= fun () ->
-  (* TODO: understand why this kick in the butt is necessary for node
-     2 (seems like the node was not getting to level starting+2 without
-     this). *)
-  Helpers.kill_node state node_2 >>= fun () ->
-  Helpers.restart_node state node_2 ~client_exec >>= fun () ->
-  Test_scenario.Queries.wait_for_all_levels_to_be
-    state
-    ~attempts:default_attempts
-    ~seconds:8.
-    all_nodes
-    (`Equal_to (starting_level + 1))
-  >>= fun () ->
-  Tezos_client.rpc
-    state
-    ~client:client_1
-    `Get
-    ~path:"/chains/main/blocks/head/hash"
-  >>= fun head_hash_json ->
-  let double_endorsement =
-    let transform_endorsement endorsement =
-      match Jqo.field ~k:"contents" endorsement with
-      | `A [one] -> (Jqo.field ~k:"endorsement" one, Jqo.field ~k:"slot" one)
-      | _ -> assert false
-    in
-    let (inlined_endorsement_1, slot) = transform_endorsement endorsement_0 in
-    let (inlined_endorsement_2, _) = transform_endorsement endorsement_1 in
-    `O
-      [
-        ("branch", head_hash_json);
-        ( "contents",
-          `A
-            [
-              `O
-                [
-                  ("kind", `String "double_endorsement_evidence");
-                  ("op1", inlined_endorsement_1);
-                  ("op2", inlined_endorsement_2);
-                  ("slot", slot);
-                ];
-            ] );
-      ]
-  in
-  Interactive_test.Pauser.generic
-    state
-    EF.[ef_json "About to forge" double_endorsement]
-  >>= fun () ->
-  Tezos_client.Keyed.forge_and_inject state baker_1 ~json:double_endorsement
-  >>= fun result ->
-  Interactive_test.Pauser.generic
-    state
-    EF.[ef_json "Result of injection" result]
-  >>= fun () ->
-  wait_for_operation_in_mempools
-    state
-    ~nodes:[node_1]
-    ~kind:"double_endorsement_evidence"
-    ~client_exec
-    `All
-  >>= fun () ->
-  let last_level = starting_level + 2 in
-  Tezos_client.Keyed.bake state baker_1 (sprintf "level %d" last_level)
-  >>= fun () ->
-  Tezos_client.Keyed.endorse
-    state
-    baker_1
-    (sprintf "endorse level %d" last_level)
-  >>= fun () ->
-  Test_scenario.Queries.wait_for_all_levels_to_be
-    state
-    ~attempts:default_attempts
-    ~seconds:8.
-    all_nodes
-    (`Equal_to last_level)
-  >>= fun () ->
-  Helpers.wait_for state ~attempts:10 ~seconds:4. (fun _ ->
-      (* We check that client-2 sees the evidence from baker-1 *)
-      Tezos_client.block_has_operation
+  (* skip for alpha/Tenderbake *)
+  match protocol.Tezos_protocol.kind with
+  | `Ithaca | `Alpha ->
+      (* The same reason as for tests_python/tests_alpha/test_double_endorsement.py applies here *)
+      say
         state
-        ~client:client_2
-        ~level:last_level
+        (EF.atom
+           "Skipping simple_double_endorsement test: irrelevant to Tenderbake \
+            (alpha)")
+      >>= fun () -> Asynchronous_result.return ()
+  | _ ->
+      little_mesh_with_bakers
+        ~bakers:2
+        ~protocol
+        state
+        ~node_exec
+        ~client_exec
+        ()
+        ~starting_level
+        ~base_port
+        ?generate_kiln_config
+      >>= fun ( all_nodes,
+                client_0,
+                baker_0,
+                client_1,
+                baker_1,
+                client_2,
+                baker_2 ) ->
+      (* 2 bakers ⇒ baker_0 and baker_2 are for the same key on ≠ nodes *)
+      assert (
+        Tezos_client.Keyed.(
+          String.equal baker_0.key_name baker_2.key_name
+          && String.equal baker_0.secret_key baker_2.secret_key)) ;
+      let node_0 = List.nth_exn all_nodes 0 in
+      let node_1 = List.nth_exn all_nodes 1 in
+      let node_2 = List.nth_exn all_nodes 2 in
+      let baker_1_n0 =
+        let open Tezos_client.Keyed in
+        let {key_name; secret_key; _} = baker_1 in
+        make client_0 ~key_name ~secret_key
+      in
+      Tezos_client.Keyed.initialize state baker_1_n0 >>= fun _ ->
+      Helpers.kill_node state node_1 >>= fun () ->
+      Helpers.kill_node state node_2 >>= fun () ->
+      (* Inject an operation to generate a different block's hash *)
+      Tezos_client.Keyed.endorse state baker_0 "endorsing lonely bake-on-0"
+      >>= fun () ->
+      Tezos_client.Keyed.bake state baker_0 "baker-0 baking with node 0"
+      >>= fun () ->
+      Tezos_client.Keyed.endorse state baker_0 "baker-0 endorsing with node 0"
+      >>= fun () ->
+      find_endorsement_in_mempool state ~client:client_0
+      >>= fun endorsement_0 ->
+      Tezos_client.Keyed.endorse
+        state
+        baker_1_n0
+        "baker-1 endorsing with node 0"
+      >>= fun () ->
+      Helpers.kill_node state node_0 >>= fun () ->
+      Helpers.restart_node state node_2 ~client_exec >>= fun () ->
+      Tezos_client.Keyed.bake state baker_2 "baker-0 baking with node 2"
+      >>= fun () ->
+      Tezos_client.Keyed.endorse state baker_2 "baker-0 endorsing with node 2"
+      >>= fun () ->
+      find_endorsement_in_mempool state ~client:client_2
+      >>= fun endorsement_1 ->
+      say
+        state
+        EF.(
+          list
+            [
+              ef_json "Endorsement 0:" endorsement_0;
+              ef_json "Endorsement 1:" endorsement_1;
+            ])
+      >>= fun () ->
+      Helpers.restart_node state node_1 ~client_exec >>= fun () ->
+      Test_scenario.Queries.wait_for_all_levels_to_be
+        state
+        ~attempts:default_attempts
+        ~seconds:8.
+        [node_1; node_2]
+        (`Equal_to (starting_level + 1))
+      >>= fun () ->
+      Helpers.restart_node state node_0 ~client_exec >>= fun () ->
+      (* TODO: understand why this kick in the butt is necessary for node
+         2 (seems like the node was not getting to level starting+2 without
+         this). *)
+      Helpers.kill_node state node_2 >>= fun () ->
+      Helpers.restart_node state node_2 ~client_exec >>= fun () ->
+      Test_scenario.Queries.wait_for_all_levels_to_be
+        state
+        ~attempts:default_attempts
+        ~seconds:8.
+        all_nodes
+        (`Equal_to (starting_level + 1))
+      >>= fun () ->
+      Tezos_client.rpc
+        state
+        ~client:client_1
+        `Get
+        ~path:"/chains/main/blocks/head/hash"
+      >>= fun head_hash_json ->
+      let double_endorsement =
+        let transform_endorsement endorsement =
+          match Jqo.field ~k:"contents" endorsement with
+          | `A [one] -> (Jqo.field ~k:"endorsement" one, Jqo.field ~k:"slot" one)
+          | _ -> assert false
+        in
+        let (inlined_endorsement_1, slot) =
+          transform_endorsement endorsement_0
+        in
+        let (inlined_endorsement_2, _) = transform_endorsement endorsement_1 in
+        `O
+          [
+            ("branch", head_hash_json);
+            ( "contents",
+              `A
+                [
+                  `O
+                    [
+                      ("kind", `String "double_endorsement_evidence");
+                      ("op1", inlined_endorsement_1);
+                      ("op2", inlined_endorsement_2);
+                      ("slot", slot);
+                    ];
+                ] );
+          ]
+      in
+      Interactive_test.Pauser.generic
+        state
+        EF.[ef_json "About to forge" double_endorsement]
+      >>= fun () ->
+      Tezos_client.Keyed.forge_and_inject state baker_1 ~json:double_endorsement
+      >>= fun result ->
+      Interactive_test.Pauser.generic
+        state
+        EF.[ef_json "Result of injection" result]
+      >>= fun () ->
+      wait_for_operation_in_mempools
+        state
+        ~nodes:[node_1]
         ~kind:"double_endorsement_evidence"
-      >>= function
-      | true -> return (`Done ())
-      | false ->
-          return
-            (`Not_done
-              (sprintf
-                 "Waiting for accusation to show up in block %d"
-                 last_level)))
-  >>= fun () -> say state EF.(af "Test done.")
+        ~client_exec
+        `All
+      >>= fun () ->
+      let last_level = starting_level + 2 in
+      Tezos_client.Keyed.bake state baker_1 (sprintf "level %d" last_level)
+      >>= fun () ->
+      Tezos_client.Keyed.endorse
+        state
+        baker_1
+        (sprintf "endorse level %d" last_level)
+      >>= fun () ->
+      Test_scenario.Queries.wait_for_all_levels_to_be
+        state
+        ~attempts:default_attempts
+        ~seconds:8.
+        all_nodes
+        (`Equal_to last_level)
+      >>= fun () ->
+      Helpers.wait_for state ~attempts:10 ~seconds:4. (fun _ ->
+          (* We check that client-2 sees the evidence from baker-1 *)
+          Tezos_client.block_has_operation
+            state
+            ~client:client_2
+            ~level:last_level
+            ~kind:"double_endorsement_evidence"
+          >>= function
+          | true -> return (`Done ())
+          | false ->
+              return
+                (`Not_done
+                  (sprintf
+                     "Waiting for accusation to show up in block %d"
+                     last_level)))
+      >>= fun () -> say state EF.(af "Test done.")
 
 let with_accusers ~state ~protocol ~base_port node_exec accuser_exec client_exec
     () =
@@ -756,7 +803,7 @@ let cmd () =
         "Simple Network With Manual Double Endorsing Accusation"
         (pf
            "This test builds a very simple 3-piece network, makes a baker \
-            double endorse and $(i,manually) inserts a double-baking \
+            double endorse and $(i,manually) inserts a double-endorsement \
             accusation.");
     ]
   in

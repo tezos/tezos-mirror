@@ -11,8 +11,6 @@ protocol itself. Consequently the amendment rules themselves are subject to
 amendments.
 
 The rest of this page gives more details about the amendment and voting process.
-Other than this page, there is an excellent overview from `Jacob
-Arluck on medium <https://medium.com/tezos/amending-tezos-b77949d97e1e>`__.
 
 Periods
 -------
@@ -35,7 +33,7 @@ The five periods are as follows:
 
   At the end of a **proposal period**, the proposal with most support is
   selected and we move to an **exploration period**. Note that support is
-  measured in the cumulated number of rolls that delegates supporting the
+  measured in the cumulated number of :ref:`rolls <Roll>` that delegates supporting the
   proposal have. E.g., a proposal supported by a single delegate with 100 rolls
   has more support than a proposal supported by two delegates with 20 rolls
   each.
@@ -179,8 +177,8 @@ fails.
 
 A protocol is *invalid* if its code cannot be compiled (e.g., if the code is not
 valid source code), if its code uses functions not present in the
-:ref:`protocol environment <protocol_environment>`, or if it downgrades the
-:ref:`protocol environment <protocol_environment>` version.
+:doc:`protocol environment <../developer/protocol_environment>`, or if it
+downgrades the protocol environment version.
 
 If an invalid protocol is voted in, then the activation fails for all the nodes,
 and then the chain becomes stuck. This is why it is important to vote for hashes
@@ -252,7 +250,7 @@ Show
 ~~~~
 
 Tezos' client provides a command to show the status of a voting period.
-It displays different informations for different kind of periods, as
+It displays different information for different kind of periods, as
 in the following samples::
 
   $ tezos-client show voting period
@@ -315,8 +313,13 @@ ballots can be submitted once with::
 
     tezos-client submit ballot for <delegate> <proposal> <yay|nay|pass>
 
-Other resources
-~~~~~~~~~~~~~~~
+Further External Resources
+--------------------------
+
+Further details and explanations on the voting procedure can be found at:
+
+- `Governance on-chain <https://opentezos.com/tezos-basics/governance-on-chain>`_ on Open Tezos
+- `Tezos Governance <https://www.tezosagora.org/learn#an-introduction-to-tezos-governance>`_ on Tezos Agora.
 
 For more details on the client commands refer to the manual at
 :ref:`client_manual_alpha`.

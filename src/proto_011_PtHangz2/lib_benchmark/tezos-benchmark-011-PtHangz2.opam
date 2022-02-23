@@ -7,7 +7,7 @@ dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
   "tezos-tooling" { with-test }
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-base"
   "tezos-benchmark"
   "tezos-protocol-environment"
@@ -19,7 +19,7 @@ depends: [
   "hashcons"
   "benchmark-utils"
   "tezos-011-PtHangz2-test-helpers"
-  "staTz"
+  "prbnmcn-stats" { = "0.0.2" }
   "tezos-micheline" { with-test }
   "tezos-error-monad" { with-test }
   "alcotest-lwt" { with-test }

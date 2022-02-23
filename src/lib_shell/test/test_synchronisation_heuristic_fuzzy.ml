@@ -26,11 +26,12 @@
 (* Testing
    -------
    Component:    Shell
-   Invocation:   dune exec src/lib_shell/runtest
+   Invocation:   dune exec \
+                 src/lib_shell/test/test_synchronisation_heuristic_fuzzy.exe
    Subject:      Test the synchronisation heuristic with a reference implementation
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
 
 (* Interface implemented by the synchronisation heuristic. *)
 
@@ -51,7 +52,7 @@ end
 (* This is a reference implementation for the synchronisation
    heuristic. It should behave exactly as the one provided in the
    [Synchronisation_heuristic] module but it is less efficient. With
-   QCheck, we check that both implementations have the same
+   QCheck2, we check that both implementations have the same
    behavior. *)
 module Reference : S = struct
   type status = Chain_validator_worker_state.Event.synchronisation_status =
@@ -104,7 +105,7 @@ module Reference : S = struct
     else if threshold = 0 then Synchronised {is_chain_stuck = false}
     else
       let now = Time.System.to_protocol @@ Systime_os.now () in
-      if List.length candidates < threshold then Not_synchronised
+      if Compare.List_length_with.(candidates < threshold) then Not_synchronised
       else
         match (best_of candidates, least_of candidates) with
         | ((best, _), (least, _)) ->
@@ -126,63 +127,44 @@ let forge_peer_id () =
   identity.peer_id
 
 let peer_id =
-  let open QCheck in
-  let p1 = forge_peer_id () in
-  let p2 = forge_peer_id () in
-  let p3 = forge_peer_id () in
-  let p4 = forge_peer_id () in
-  let p5 = forge_peer_id () in
-  let p6 = forge_peer_id () in
-  let p7 = forge_peer_id () in
-  let p8 = forge_peer_id () in
-  let p9 = forge_peer_id () in
-  let pp_peer_id pid =
-    let id =
-      if pid == p1 then "P1"
-      else if pid == p2 then "P2"
-      else if pid == p3 then "P3"
-      else if pid == p4 then "P4"
-      else if pid == p5 then "P5"
-      else if pid == p6 then "P6"
-      else if pid == p7 then "P7"
-      else if pid == p8 then "P8"
-      else if pid == p9 then "P9"
-      else "fresh"
-    in
-    Format.asprintf "peer: %s" id
+  let open QCheck2.Gen in
+  (* These are generated upfront *)
+  let static =
+    ["P1"; "P2"; "P3"; "P4"; "P5"; "P6"; "P7"; "P8"; "P9"]
+    |> List.map (fun name -> pure (forge_peer_id (), name))
   in
-  (map (fun () -> forge_peer_id ()) unit |> set_print pp_peer_id)
-  ::
-  List.map
-    (fun p -> make ~print:pp_peer_id (Gen.return p))
-    [p1; p2; p3; p4; p5; p6; p7; p8; p9]
-  |> choose
+  (* The returned generator either produces one of [P1] to [P9] or a fresh one *)
+  delay (fun () -> oneof (pure (forge_peer_id (), "fresh") :: static))
 
 let now = Time.System.to_protocol @@ Systime_os.now ()
 
 let forge_timestamp ~delay = Time.Protocol.add now (Int64.of_int delay)
 
+let timestamp_pp n =
+  let delay = Time.Protocol.diff n now in
+  Format.asprintf "delay: %Ld" delay
+
 let timestamp =
-  let open QCheck in
-  let timestamp_pp n =
-    let delay = Time.Protocol.diff n now in
-    Format.asprintf "delay: %Ld" delay
-  in
-  map
+  let open QCheck2 in
+  Gen.map
     (fun pre_delay ->
       let delay = (pre_delay * 20) - 300 in
       (* ~ [ -300; 100] with a step of 20 *)
       forge_timestamp ~delay)
-    (make (Gen.oneof [Gen.return 5; Gen.int_range 0 20]))
-  |> set_print timestamp_pp
+    Gen.(oneof [pure 5; 0 -- 20])
 
 let value =
-  let open QCheck in
+  let open QCheck2.Gen in
   pair timestamp peer_id
 
+let print_value (time_stamp, (_, peer_id_str)) =
+  Printf.sprintf "(%s, %s)" (timestamp_pp time_stamp) peer_id_str
+
 let values =
-  let open QCheck in
+  let open QCheck2.Gen in
   list value
+
+let print_values = QCheck2.Print.list print_value
 
 let pp fmt =
   let open Reference in
@@ -194,15 +176,17 @@ let pp fmt =
       Format.fprintf fmt "Synchronised (not stuck)"
 
 let make_tests check_update lcreate rcreate threshold latency =
+  let open QCheck2 in
   let threshold_1 =
-    QCheck.Test.make
+    Test.make
       ~name:
         (Format.asprintf
            "Shell.synchronisation_heuristic.equivalence-with-reference-implementation \
             (threshold %d) (latency %d)"
            1
            latency)
-      QCheck.(pair value value)
+      ~print:Print.(pair print_value print_value)
+      Gen.(pair value value)
       (fun (v1, v2) ->
         let state_left = lcreate ~threshold:1 ~latency in
         let state_right = rcreate ~threshold:1 ~latency in
@@ -212,13 +196,14 @@ let make_tests check_update lcreate rcreate threshold latency =
   let threshold_n =
     List.map
       (fun threshold ->
-        QCheck.Test.make
+        Test.make
           ~name:
             (Format.asprintf
                "Shell.synchronisation_heuristic.equivalence-with-reference-implementation \
                 (threshold %d) (latency %d)"
                threshold
                latency)
+          ~print:print_values
           values
           (fun values ->
             let state_left = lcreate ~threshold ~latency in
@@ -233,11 +218,12 @@ let make_tests check_update lcreate rcreate threshold latency =
 let tests =
   (* The module Synchronisation_heuristic should have the same
      semantics as the reference implementation given in the Reference
-     module. We use QCheck to generate a bunch of updates and check
+     module. We use QCheck2 to generate a bunch of updates and check
      that both implementations send the same result. *)
   let module L = Synchronisation_heuristic.Core in
   let module R = Reference in
-  let check_update state_left state_right value =
+  let check_update state_left state_right (time_stamp, (peer_id, _)) =
+    let value = (time_stamp, peer_id) in
     L.update state_left value ;
     R.update state_right value ;
     qcheck_eq'

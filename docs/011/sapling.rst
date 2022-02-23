@@ -155,7 +155,7 @@ amounts that Alice transferred 15.3 tez to Bob.
 To decorrelate the two transfers it is important to change the
 amounts, let some time pass between the two and perform the
 transactions when there is traffic in the pool.
-Similar problems exist in ZCash and they are illustrated in this
+Similar problems exist in Zcash and they are illustrated in this
 introductory `blog post
 <https://electriccoin.co/blog/transaction-linkability/>`_.
 
@@ -165,7 +165,7 @@ clients and analysis of number of inputs/outputs just to mention a few
 (`A fistful of Bitcoins
 <https://dblp.org/rec/journals/cacm/MeiklejohnPJLMV16.html>`_ is a good
 first read).
-We advice users to be familiar with the use of the TOR network and to
+We advise users to be familiar with the use of the TOR network and to
 use clients developed specifically to protect their privacy.
 
 
@@ -195,7 +195,7 @@ signature that binds the whole transaction together and guarantees the
 correctness of the balance.
 All the signatures are over the hash of the data that we wish to sign
 and the hash function used is Blake2-b, prefixed with the anti-replay string.
-The anti-replay string is the the concatenation of the chain id and
+The anti-replay string is the concatenation of the chain id and
 the smart contract address. The same string has to be used by the client for
 signing.
 

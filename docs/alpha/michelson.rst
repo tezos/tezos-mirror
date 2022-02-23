@@ -1587,6 +1587,17 @@ Operations on optional values
     > COMPARE / (Some _) : None : S  =>  1 : S
     > COMPARE / (Some a) : (Some b) : S  =>  COMPARE / a : b : S
 
+- ``MAP body``: Apply the body expression to the value inside the option if there is one.
+
+::
+
+   :: option 'a : 'S -> option 'b : 'S
+      iff    body :: [ 'a : 'S -> 'b : 'S ]
+
+   > MAP body / None : S => None : S
+   > MAP body / (Some a) : S => (Some b) : S'
+      where body / a : S => b : S'
+
 Operations on unions
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -1801,15 +1812,15 @@ for under/overflows.
     > ADD / x : y : S  =>  [FAILED]   on overflow
     > ADD / x : y : S  =>  (x + y) : S
 
--  ``SUB``
+-  ``SUB_MUTEZ``
 
 ::
 
-    :: mutez : mutez : 'S   ->   mutez : 'S
+    :: mutez : mutez : 'S   ->   option mutez : 'S
 
-    > SUB / x : y : S  =>  [FAILED]
+    > SUB_MUTEZ / x : y : S  =>  None
         iff   x < y
-    > SUB / x : y : S  =>  (x - y) : S
+    > SUB_MUTEZ / x : y : S  =>  Some (x - y) : S
 
 -  ``MUL``
 
@@ -2677,6 +2688,10 @@ language can only be one of the five following constructs.
 5. A sequence of expressions.
 
 This simple five cases notation is called :doc:`../shell/micheline`.
+
+In the Tezos protocol, the primitive ``constant`` with a single
+character string applied has special meaning. See
+:doc:`global_constants`.
 
 Constants
 ~~~~~~~~~

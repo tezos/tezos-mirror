@@ -6,17 +6,24 @@
 # Ideally we should also check that the baker / accuser / endorser
 # exist (some tests use them) but their actual name depend on the protocol.
 .integration_template:
-  extends: .test_template
+  extends:
+    - .test_template
+    - .template__coverage_files
+  dependencies: ["build_x86_64"]
   before_script:
     - if [ ! -f tezos-node ] || [ ! -f tezos-client ] || [ ! -f tezos-codec ] || [ ! -f tezos-sandbox ]; then make; fi
 
+# integration:proto:sandbox and integration:compiler-rejections do not
+# require access to the binaries like the "true" integration tests
+# below. Therefore, they do not extend the .integration_template.
+
 integration:proto:sandbox:
-  extends: .integration_template
+  extends: .test_template
   script:
     - dune build @runtest_sandbox
 
 integration:compiler-rejections:
-  extends: .integration_template
+  extends: .test_template
   script:
     - dune build @runtest_rejections
 
@@ -36,38 +43,18 @@ script:prepare_migration_test:
 
 script:snapshot_alpha_and_link:
   extends: .test_template
-  before_script:
+  script:
     - last_proto_name=$(find src -name "proto_[0-9][0-9][0-9]_*" | awk -F'/' '{print $NF}' | sort -r | head -1)
     - last_proto_version=$(echo $last_proto_name | cut -d'_' -f2)
     - new_proto_version=$(printf "%03d" $((10#$last_proto_version + 1)))
-    - make
-  script:
+    - make tezos-protocol-compiler
     - ./scripts/snapshot_alpha_and_link.sh "$new_proto_version" next
     - make
+    - dune build src/proto_"$new_proto_version"_*/
 
 ############################################################
 ## Stage: run OCaml integration tests                     ##
 ############################################################
-
-integration:sandboxes:voting:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile voting_demo_noops
-  artifacts:
-    paths:
-      - flextesa-voting-demo-noops
-    expire_in: 1 day
-    when: on_failure
-
-integration:sandboxes:acc-baking:
-  extends: .integration_template
-  script:
-    - TMP=$PWD make -f sandbox.Makefile accusations_simple_double_baking
-  artifacts:
-    paths:
-      - flextesa-acc-sdb
-    expire_in: 1 day
-    when: on_failure
 
 integration:sandboxes:acc-endorsement:
   extends: .integration_template
@@ -76,8 +63,9 @@ integration:sandboxes:acc-endorsement:
   artifacts:
     paths:
       - flextesa-acc-sde
+      - $BISECT_FILE
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 integration:sandboxes:u-a-u:
   extends: .integration_template
@@ -88,8 +76,11 @@ integration:sandboxes:u-a-u:
     paths:
       - flextesa-hard-fork
       - flextesa-hard-fork-alpha
+      # FIXME https://gitlab.com/tezos/tezos/-/issues/2189
+      # This job can produce corrupted coverage file
+      # - $BISECT_FILE
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 integration:sandboxes:daemons-upgrade:
   extends: .integration_template
@@ -101,7 +92,7 @@ integration:sandboxes:daemons-upgrade:
       - flextesa-daemons-upgrade
       - flextesa-daemons-upgrade-alpha
     expire_in: 1 day
-    when: on_failure
+    when: always
 
 ############################################################
 ## Stage: run python integration tests                    ##
@@ -110,384 +101,45 @@ integration:sandboxes:daemons-upgrade:
 # definition for the environment to run all integration tests
 # integration tests are run only on x86_64 architectures (for now)
 .integration_python_template:
-  extends: .test_template
+  extends:
+    - .test_template
   needs:
+    - build_x86_64
+  dependencies:
     - build_x86_64
   before_script:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
     - . $HOME/.venv/bin/activate
     - mkdir tests_python/tmp
-    - touch tests_python/tmp/empty__to_avoid_glob_failing
     - cd tests_python
-  after_script:
-    - tail -n 100 tests_python/tmp/*
-  artifacts:
-    paths:
-      - tests_python/tmp/
-    reports:
-      junit: tests_python/reports/*.xml
-    expire_in: 7 day
-    when: always
   # python scripts don't need the _build directory
   # but only the binaries in the artifacts
   cache: {}
 
-# this section is updated using the script scripts/update_integration_test.sh
-##BEGIN_INTEGRATION_PYTHON##
-integration:010_batch:
-  extends: .integration_python_template
+integration:pytest:
+  extends:
+    - .integration_python_template
+    - .template__coverage_files
+  # the number of jobs have been choosen to give jobs of maximal
+  # length ~10 minutes and to accommodate the addition of new protocol
+  # test suites without increasing wall time of the test stage.
+  parallel: 25
   script:
-    - poetry run pytest "tests_010" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/010_batch.xml" 2>&1 | tee "tmp/010_batch.out" | tail
-  stage: test
+    - poetry run pytest --exitfirst --prev-junit-xml test-results.xml --job $CI_NODE_INDEX/$CI_NODE_TOTAL --color=yes --log-dir=tmp "--junitxml=reports/report_${CI_NODE_INDEX}_${CI_NODE_TOTAL}.xml" --timeout 1800
+  artifacts:
+    paths:
+      - tests_python/tmp/
+      - tests_python/reports/*.xml
+      - $BISECT_FILE
+    reports:
+      junit: tests_python/reports/*.xml
+    expire_in: 7 day
+    when: always
 
-integration:010_baker_endorser:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_baker_endorser.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_baker_endorser.xml" 2>&1 | tee "tmp/010_baker_endorser.out" | tail
-  stage: test
-
-integration:010_block_times_ideal_scenario:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_block_times_ideal_scenario.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_block_times_ideal_scenario.xml" 2>&1 | tee "tmp/010_block_times_ideal_scenario.out" | tail
-  stage: test
-
-integration:010_bootstrap:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_bootstrap.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_bootstrap.xml" 2>&1 | tee "tmp/010_bootstrap.out" | tail
-  stage: test
-
-integration:010_contract:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_contract.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_contract.xml" 2>&1 | tee "tmp/010_contract.out" | tail
-  stage: test
-
-integration:010_contract_annotations:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_contract_annotations.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_contract_annotations.xml" 2>&1 | tee "tmp/010_contract_annotations.out" | tail
-  stage: test
-
-integration:010_contract_macros:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_contract_macros.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_contract_macros.xml" 2>&1 | tee "tmp/010_contract_macros.out" | tail
-  stage: test
-
-integration:010_contract_onchain_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_contract_onchain_opcodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_contract_onchain_opcodes.xml" 2>&1 | tee "tmp/010_contract_onchain_opcodes.out" | tail
-  stage: test
-
-integration:010_contract_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_contract_opcodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_contract_opcodes.xml" 2>&1 | tee "tmp/010_contract_opcodes.out" | tail
-  stage: test
-
-integration:010_forge_block:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_forge_block.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_forge_block.xml" 2>&1 | tee "tmp/010_forge_block.out" | tail
-  stage: test
-
-integration:010_many_bakers:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_many_bakers.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_many_bakers.xml" 2>&1 | tee "tmp/010_many_bakers.out" | tail
-  stage: test
-
-integration:010_many_nodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_many_nodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_many_nodes.xml" 2>&1 | tee "tmp/010_many_nodes.out" | tail
-  stage: test
-
-integration:010_mempool:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_mempool.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_mempool.xml" 2>&1 | tee "tmp/010_mempool.out" | tail
-  stage: test
-
-integration:010_nonce_seed_revelation:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_nonce_seed_revelation.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_nonce_seed_revelation.xml" 2>&1 | tee "tmp/010_nonce_seed_revelation.out" | tail
-  stage: test
-
-integration:010_perf_endorsement:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_perf_endorsement.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_perf_endorsement.xml" 2>&1 | tee "tmp/010_perf_endorsement.out" | tail
-  stage: test
-
-integration:010_rpc:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_010/test_rpc.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/010_rpc.xml" 2>&1 | tee "tmp/010_rpc.out" | tail
-  stage: test
-
-integration:011_batch:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/011_batch.xml" 2>&1 | tee "tmp/011_batch.out" | tail
-  stage: test
-
-integration:011_baker_endorser:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_baker_endorser.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_baker_endorser.xml" 2>&1 | tee "tmp/011_baker_endorser.out" | tail
-  stage: test
-
-integration:011_block_times_ideal_scenario:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_block_times_ideal_scenario.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_block_times_ideal_scenario.xml" 2>&1 | tee "tmp/011_block_times_ideal_scenario.out" | tail
-  stage: test
-
-integration:011_bootstrap:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_bootstrap.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_bootstrap.xml" 2>&1 | tee "tmp/011_bootstrap.out" | tail
-  stage: test
-
-integration:011_contract:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_contract.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_contract.xml" 2>&1 | tee "tmp/011_contract.out" | tail
-  stage: test
-
-integration:011_contract_annotations:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_contract_annotations.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_contract_annotations.xml" 2>&1 | tee "tmp/011_contract_annotations.out" | tail
-  stage: test
-
-integration:011_contract_macros:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_contract_macros.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_contract_macros.xml" 2>&1 | tee "tmp/011_contract_macros.out" | tail
-  stage: test
-
-integration:011_contract_onchain_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_contract_onchain_opcodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_contract_onchain_opcodes.xml" 2>&1 | tee "tmp/011_contract_onchain_opcodes.out" | tail
-  stage: test
-
-integration:011_contract_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_contract_opcodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_contract_opcodes.xml" 2>&1 | tee "tmp/011_contract_opcodes.out" | tail
-  stage: test
-
-integration:011_forge_block:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_forge_block.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_forge_block.xml" 2>&1 | tee "tmp/011_forge_block.out" | tail
-  stage: test
-
-integration:011_legacy_snapshots:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_legacy_snapshots.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_legacy_snapshots.xml" 2>&1 | tee "tmp/011_legacy_snapshots.out" | tail
-  stage: test
-
-integration:011_legacy_upgrade:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_legacy_upgrade.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_legacy_upgrade.xml" 2>&1 | tee "tmp/011_legacy_upgrade.out" | tail
-  stage: test
-
-integration:011_many_bakers:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_many_bakers.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_many_bakers.xml" 2>&1 | tee "tmp/011_many_bakers.out" | tail
-  stage: test
-
-integration:011_many_nodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_many_nodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_many_nodes.xml" 2>&1 | tee "tmp/011_many_nodes.out" | tail
-  stage: test
-
-integration:011_mempool:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_mempool.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_mempool.xml" 2>&1 | tee "tmp/011_mempool.out" | tail
-  stage: test
-
-integration:011_multinode_snapshot:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_multinode_snapshot.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_multinode_snapshot.xml" 2>&1 | tee "tmp/011_multinode_snapshot.out" | tail
-  stage: test
-
-integration:011_multinode_storage_reconstruction:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_multinode_storage_reconstruction.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_multinode_storage_reconstruction.xml" 2>&1 | tee "tmp/011_multinode_storage_reconstruction.out" | tail
-  stage: test
-
-integration:011_nonce_seed_revelation:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_nonce_seed_revelation.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_nonce_seed_revelation.xml" 2>&1 | tee "tmp/011_nonce_seed_revelation.out" | tail
-  stage: test
-
-integration:011_perf_endorsement:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_perf_endorsement.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_perf_endorsement.xml" 2>&1 | tee "tmp/011_perf_endorsement.out" | tail
-  stage: test
-
-integration:011_rpc:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_rpc.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_rpc.xml" 2>&1 | tee "tmp/011_rpc.out" | tail
-  stage: test
-
-integration:011_voting_full:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_011/test_voting_full.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/011_voting_full.xml" 2>&1 | tee "tmp/011_voting_full.out" | tail
-  stage: test
-
-integration:alpha_batch:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha" --exitfirst -m "not slow" -s --log-dir=tmp "--junitxml=reports/alpha_batch.xml" 2>&1 | tee "tmp/alpha_batch.out" | tail
-  stage: test
-
-integration:alpha_baker_endorser:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_baker_endorser.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_baker_endorser.xml" 2>&1 | tee "tmp/alpha_baker_endorser.out" | tail
-  stage: test
-
-integration:alpha_block_times_ideal_scenario:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_block_times_ideal_scenario.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_block_times_ideal_scenario.xml" 2>&1 | tee "tmp/alpha_block_times_ideal_scenario.out" | tail
-  stage: test
-
-integration:alpha_bootstrap:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_bootstrap.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_bootstrap.xml" 2>&1 | tee "tmp/alpha_bootstrap.out" | tail
-  stage: test
-
-integration:alpha_contract:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_contract.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_contract.xml" 2>&1 | tee "tmp/alpha_contract.out" | tail
-  stage: test
-
-integration:alpha_contract_annotations:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_contract_annotations.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_contract_annotations.xml" 2>&1 | tee "tmp/alpha_contract_annotations.out" | tail
-  stage: test
-
-integration:alpha_contract_macros:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_contract_macros.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_contract_macros.xml" 2>&1 | tee "tmp/alpha_contract_macros.out" | tail
-  stage: test
-
-integration:alpha_contract_onchain_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_contract_onchain_opcodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_contract_onchain_opcodes.xml" 2>&1 | tee "tmp/alpha_contract_onchain_opcodes.out" | tail
-  stage: test
-
-integration:alpha_contract_opcodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_contract_opcodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_contract_opcodes.xml" 2>&1 | tee "tmp/alpha_contract_opcodes.out" | tail
-  stage: test
-
-integration:alpha_forge_block:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_forge_block.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_forge_block.xml" 2>&1 | tee "tmp/alpha_forge_block.out" | tail
-  stage: test
-
-integration:alpha_legacy_snapshots:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_legacy_snapshots.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_legacy_snapshots.xml" 2>&1 | tee "tmp/alpha_legacy_snapshots.out" | tail
-  stage: test
-
-integration:alpha_legacy_upgrade:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_legacy_upgrade.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_legacy_upgrade.xml" 2>&1 | tee "tmp/alpha_legacy_upgrade.out" | tail
-  stage: test
-
-integration:alpha_many_bakers:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_many_bakers.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_many_bakers.xml" 2>&1 | tee "tmp/alpha_many_bakers.out" | tail
-  stage: test
-
-integration:alpha_many_nodes:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_many_nodes.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_many_nodes.xml" 2>&1 | tee "tmp/alpha_many_nodes.out" | tail
-  stage: test
-
-integration:alpha_mempool:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_mempool.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_mempool.xml" 2>&1 | tee "tmp/alpha_mempool.out" | tail
-  stage: test
-
-integration:alpha_multinode_snapshot:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_multinode_snapshot.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_multinode_snapshot.xml" 2>&1 | tee "tmp/alpha_multinode_snapshot.out" | tail
-  stage: test
-
-integration:alpha_multinode_storage_reconstruction:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_multinode_storage_reconstruction.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_multinode_storage_reconstruction.xml" 2>&1 | tee "tmp/alpha_multinode_storage_reconstruction.out" | tail
-  stage: test
-
-integration:alpha_nonce_seed_revelation:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_nonce_seed_revelation.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_nonce_seed_revelation.xml" 2>&1 | tee "tmp/alpha_nonce_seed_revelation.out" | tail
-  stage: test
-
-integration:alpha_perf_endorsement:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_perf_endorsement.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_perf_endorsement.xml" 2>&1 | tee "tmp/alpha_perf_endorsement.out" | tail
-  stage: test
-
-integration:alpha_rpc:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_rpc.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_rpc.xml" 2>&1 | tee "tmp/alpha_rpc.out" | tail
-  stage: test
-
-integration:alpha_voting_full:
-  extends: .integration_python_template
-  script:
-    - poetry run pytest "tests_alpha/test_voting_full.py" --exitfirst -m "slow" -s --log-dir=tmp "--junitxml=reports/alpha_voting_full.xml" 2>&1 | tee "tmp/alpha_voting_full.out" | tail
-  stage: test
-
-integration:examples:
+integration:pytest_examples:
   extends: .integration_python_template
   script:
     - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/forge_transfer.py
     - PYTHONPATH=$PYTHONPATH:./ poetry run python examples/example.py
     - PYTHONPATH=./ poetry run pytest --exitfirst examples/test_example.py
-  stage: test
-##END_INTEGRATION_PYTHON##

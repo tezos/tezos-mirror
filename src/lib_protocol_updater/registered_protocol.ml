@@ -34,10 +34,6 @@ module type T = sig
     include P
   end
 
-  module Block_services : module type of struct
-    include Block_services.Make (P) (P)
-  end
-
   val complete_b58prefix :
     Tezos_protocol_environment.Context.t -> string -> string list Lwt.t
 end
@@ -64,7 +60,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -85,7 +80,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -106,7 +100,6 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -127,7 +120,26 @@ let build hash =
           end
 
           include P
-          module Block_services = Block_services.Make (P) (P)
+
+          let complete_b58prefix = Env.Context.complete
+        end : T)
+  | Some (V4 protocol) ->
+      let (module F) = protocol in
+      let module Name = struct
+        let name = Protocol_hash.to_b58check hash
+      end in
+      let module Env = Tezos_protocol_environment.MakeV4 (Name) () in
+      Some
+        (module struct
+          module Raw = F (Env)
+
+          module P = struct
+            let hash = hash
+
+            include Env.Lift (Raw)
+          end
+
+          include P
 
           let complete_b58prefix = Env.Context.complete
         end : T)
@@ -205,7 +217,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -235,7 +246,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -265,7 +275,6 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
 
     let complete_b58prefix = Env.Context.complete
   end
@@ -295,7 +304,35 @@ struct
     end
 
     include P
-    module Block_services = Block_services.Make (P) (P)
+
+    let complete_b58prefix = Env.Context.complete
+  end
+
+  let () =
+    VersionTable.add sources hash Source.sources ;
+    VersionTable.add versions hash (module Self : T)
+
+  include Self
+end
+
+module Register_embedded_V4
+    (Env : Tezos_protocol_environment.V4)
+    (Proto : Env.Updater.PROTOCOL)
+    (Source : Source_sig) =
+struct
+  let hash =
+    match Source.hash with
+    | None -> Protocol.hash Source.sources
+    | Some hash -> hash
+
+  module Self = struct
+    module P = struct
+      let hash = hash
+
+      include Env.Lift (Proto)
+    end
+
+    include P
 
     let complete_b58prefix = Env.Context.complete
   end

@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 from typing import Any, List, Optional, Tuple
 
 from process.process_utils import format_command
@@ -112,6 +113,14 @@ class Client:
         self._admin_client = admin_client
         self.rpc_port = rpc_port
 
+        if endpoint is not None:
+            self.endpoint = endpoint
+        else:
+            protocol = 'https' if use_tls else 'http'
+            host = host if host else '127.0.0.1'
+            rpc_port = rpc_port if rpc_port else 8732
+            self.endpoint = f'{protocol}://{host}:{rpc_port}'
+
     def run_generic(
         self,
         params: List[str],
@@ -208,6 +217,26 @@ class Client:
         compl_pr = self.run(params)
         return client_output.extract_rpc_answer(compl_pr)
 
+    def rpc_raw(self, verb: str, path: str, data: Any = None):
+        """Run an arbitrary RPC request directly to the client's endpoint
+        without going through the client.
+
+        Args:
+            verb (str): either `get`, `post`, `put`, `patch` or `delete`
+            path (str): rpc path
+            data (dict): json data for post
+        Returns:
+            dict representing the json output, raise exception
+            if output isn't json.
+        """
+        url = self.endpoint + path
+        print(format_command(['raw rpc', verb, url]))
+        request = urllib.request.Request(url, method=verb.upper(), data=data)
+        with urllib.request.urlopen(request) as results:
+            body = results.read()
+            print(body)
+            return json.loads(body.decode())
+
     def remember_contract(
         self, alias: str, contract_address: str, force: bool = False
     ):
@@ -220,12 +249,16 @@ class Client:
         assert os.path.isfile(contract), f'{contract} is not a file'
         return self.run(['remember', 'script', alias, f'file:{contract}'])
 
-    def typecheck(self, contract: str, file: bool = True, legacy=False) -> str:
+    def typecheck(
+        self, contract: str, file: bool = True, legacy=False, details=False
+    ) -> str:
         if file:
             assert os.path.isfile(contract), f'{contract} is not a file'
         params = ['typecheck', 'script', contract]
         if legacy:
             params += ['--legacy']
+        if details:
+            params += ['--details']
         return self.run(params)
 
     def typecheck_data(self, data: str, typ: str, legacy=False) -> str:
@@ -244,6 +277,8 @@ class Client:
         inp: str,
         amount: float = None,
         balance: float = None,
+        now: str = None,
+        level: int = None,
         trace_stack: bool = False,
         gas: int = None,
         file: bool = True,
@@ -265,6 +300,10 @@ class Client:
             cmd += ['-z', '%.6f' % amount]
         if balance is not None:
             cmd += ['--balance', '%.6f' % balance]
+        if now is not None:
+            cmd += ['--now', now]
+        if level is not None:
+            cmd += ['--level', f'{level}']
         if trace_stack:
             cmd += ['--trace-stack']
         if gas is not None:
@@ -432,6 +471,31 @@ class Client:
             args = []
         cmd += args
         return client_output.BakeForResult(self.run(cmd))
+
+    def multibake(
+        self, delegates: List[str] = None, args: List[str] = None
+    ) -> client_output.BakeForResult:
+        """The empty list for delegates means 'all known delegates'"""
+        cmd = ['bake', 'for']
+        if delegates is None:
+            delegates = []
+        cmd += delegates
+        if args is None:
+            args = []
+        cmd += args
+        return client_output.BakeForResult(self.run(cmd))
+
+    def propose(
+        self, delegates: List[str] = None, args: List[str] = None
+    ) -> client_output.ProposeForResult:
+        cmd = ['propose', 'for']
+        if delegates is None:
+            delegates = []
+        cmd += delegates
+        if args is None:
+            args = []
+        cmd += args
+        return client_output.ProposeForResult(self.run(cmd))
 
     def originate(
         self,
@@ -645,24 +709,6 @@ class Client:
 
         return timestamp_date
 
-    def get_now(self) -> str:
-        """Returns the timestamp of next-to-last block,
-        offset by time_between_blocks"""
-
-        timestamp_date = self.get_block_timestamp(block='head~1')
-
-        constants = self.rpc(
-            'get', '/chains/main/blocks/head/context/constants'
-        )
-        delta = datetime.timedelta(
-            seconds=int(constants['time_between_blocks'][0])
-        )
-
-        now_date = timestamp_date + delta
-
-        rfc3399_format = "%Y-%m-%dT%H:%M:%SZ"
-        return now_date.strftime(rfc3399_format)
-
     def get_receipt(
         self, operation: str, args: List[str] = None
     ) -> client_output.GetReceiptResult:
@@ -759,12 +805,13 @@ class Client:
         metadata = self.get_metadata(params=params)
         return metadata['next_protocol']
 
-    def get_current_level(self, offset=0) -> dict:
+    def get_current_level(self, block='head', offset=0) -> dict:
         return self.rpc(
             'get',
-            '/chains/main/blocks/head/helpers/current_level'
-            + '?offset='
-            + str(offset),
+            (
+                f'/chains/main/blocks/{block}/helpers/'
+                f'current_level?offset={str(offset)}'
+            ),
         )
 
     def get_period_position(self) -> str:
@@ -779,6 +826,17 @@ class Client:
             'get', f'/chains/{chain}/blocks/{block}/header/shell', params=params
         )
         return int(rpc_res['level'])
+
+    def get_tenderbake_round(
+        self, params: List[str] = None, chain: str = 'main', level: str = 'head'
+    ) -> int:
+        assert chain in {'main', 'test'}
+        rpc_res = self.rpc(
+            'get',
+            f'/chains/{chain}/blocks/{level}/helpers/' 'round',
+            params=params,
+        )
+        return int(rpc_res)
 
     def get_checkpoint(self) -> dict:
         rpc_res = self.rpc('get', '/chains/main/checkpoint')
@@ -1806,3 +1864,17 @@ class Client:
         args = args or []
         cmd += args
         return client_output.ViewResult(self.run(cmd))
+
+    def frozen_deposits(self, delegate: str, level: str = None) -> int:
+        """ returns deposits (in mutez) held for account for given level """
+        if level:
+            level_arg = f'/?level={level}'
+        else:
+            level_arg = ''
+        return int(
+            self.rpc(
+                'get',
+                f'/chains/main/blocks/head/context/delegates/'
+                f'{delegate}/frozen_deposits{level_arg}',
+            )
+        )

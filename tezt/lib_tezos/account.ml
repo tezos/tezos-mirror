@@ -24,9 +24,18 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type secret_key = Unencrypted of string
+
 type key = {
   alias : string;
   public_key_hash : string;
-  public_key : string option;
-  secret_key : string option;
+  public_key : string;
+  secret_key : secret_key;
 }
+
+let sign_bytes ~watermark ~signer (message : Bytes.t) =
+  let (Unencrypted b58_secret_key) = signer.secret_key in
+  let secret_key =
+    Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
+  in
+  Tezos_crypto.Signature.sign ~watermark secret_key message

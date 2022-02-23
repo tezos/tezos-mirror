@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (Helpers RPCs)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^helpers rpcs$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^helpers rpcs$"
     Subject:    On RPCs.
 *)
 
@@ -41,11 +41,11 @@ let test_baking_rights () =
   let open Plugin.RPC.Baking_rights in
   (* default max_priority returns 65 results *)
   get Block.rpc_ctxt b ~all:true >>=? fun rights ->
-  assert (List.length rights = 65) ;
+  assert (Compare.List_length_with.(rights = 65)) ;
   (* arbitrary max_priority *)
   let max_priority = 15 in
   get Block.rpc_ctxt b ~all:true ~max_priority >>=? fun rights ->
-  assert (List.length rights = max_priority + 1) ;
+  assert (Compare.List_length_with.(rights = max_priority + 1)) ;
   (* filtering by delegate *)
   let d =
     Option.bind (List.nth contracts 0) Contract.is_implicit

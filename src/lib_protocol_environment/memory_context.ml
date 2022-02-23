@@ -59,3 +59,7 @@ let inject : t -> Context.t =
 let encoding : Context.t Data_encoding.t =
   let open Data_encoding in
   conv project inject M.encoding
+
+let wrap_memory_context = inject
+
+let unwrap_memory_context = project

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_benchmark
+
 (* Input parameter parsing *)
 
 let verbose =
@@ -37,43 +39,39 @@ let verbose =
 (* ------------------------------------------------------------------------- *)
 (* MCMC instantiation *)
 
-let sampling_parameters =
-  let open Michelson_samplers_parameters in
-  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32} in
-  {
-    int_size = size;
-    string_size = size;
-    bytes_size = size;
-    stack_size = size;
-    type_size = size;
-    list_size = size;
-    set_size = size;
-    map_size = size;
-  }
-
 let state = Random.State.make [|42; 987897; 54120|]
 
-module Full = Michelson_samplers_base.Make_full (struct
-  let parameters = sampling_parameters
-
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
   let algo = `Default
 
   let size = 16
 end)
 
-module Gen = Generators.Data (struct
-  module Samplers = Full
-
-  let rng_state = state
-
-  let target_size = 500
-
-  let verbosity = if verbose then `Trace else `Silent
+module Michelson_base_samplers = Michelson_samplers_base.Make (struct
+  let parameters =
+    let size = {Base_samplers.min = 4; max = 32} in
+    {
+      Michelson_samplers_base.int_size = size;
+      string_size = size;
+      bytes_size = size;
+    }
 end)
+
+module Data =
+  Michelson_mcmc_samplers.Make_data_sampler
+    (Michelson_base_samplers)
+    (Crypto_samplers)
+    (struct
+      let rng_state = state
+
+      let target_size = 500
+
+      let verbosity = if verbose then `Trace else `Silent
+    end)
 
 let start = Unix.gettimeofday ()
 
-let generator = Gen.generator ~burn_in:(200 * 7)
+let generator = Data.generator ~burn_in:(200 * 7) state
 
 let stop = Unix.gettimeofday ()
 
@@ -81,14 +79,9 @@ let () = Format.printf "Burn in time: %f seconds@." (stop -. start)
 
 let _ =
   for _i = 0 to 1000 do
-    let (michelson, typ) = StaTz.Stats.sample_gen generator in
-    let printable =
-      Micheline_printer.printable
-        Protocol.Michelson_v1_primitives.string_of_prim
-        michelson
-    in
+    let Michelson_mcmc_samplers.{term = michelson; typ} = generator state in
     if verbose then (
       Format.eprintf "result:@." ;
-      Format.eprintf "type: %a@." Type.Base.pp typ ;
-      Format.eprintf "%a@." Micheline_printer.print_expr printable)
+      Format.eprintf "type: %a@." Test_helpers.print_script_expr typ ;
+      Format.eprintf "%a@." Test_helpers.print_script_expr michelson)
   done

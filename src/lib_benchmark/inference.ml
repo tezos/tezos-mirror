@@ -30,7 +30,7 @@ type constrnt = Full of (Costlang.affine * quantity)
 
 and quantity = Quantity of float
 
-module NMap = StaTz.Finbij.Make (Free_variable)
+module NMap = Stats.Finbij.Make (Free_variable)
 
 type problem =
   | Non_degenerate of {

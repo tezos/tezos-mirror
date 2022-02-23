@@ -28,10 +28,7 @@
 open Block_validator_worker_state
 open Block_validator_errors
 
-type limits = {
-  protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-}
+type limits = {protocol_timeout : Time.System.Span.t}
 
 type result =
   | Already_commited
@@ -379,7 +376,6 @@ let create limits db validation_process ~start_testchain =
   end in
   Worker.launch
     table
-    limits.worker_limits
     ()
     (limits, start_testchain, db, validation_process)
     (module Handlers)
@@ -475,5 +471,3 @@ let running_worker () =
 let pending_requests t = Worker.Queue.pending_requests t
 
 let current_request t = Worker.current_request t
-
-let last_events = Worker.last_events

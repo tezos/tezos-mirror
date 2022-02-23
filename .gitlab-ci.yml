@@ -29,8 +29,8 @@ workflow:
 # manual and non-manual jobs.
 stages:
   - bootstrap
+  - sanity
   - build
-  - sanity_ci
   - test
   - doc
   - packaging
@@ -45,6 +45,7 @@ include:
 # Actual jobs are defined in these included files
 
   - .gitlab/ci/bootstrap-opam-pipeline.yml
+  - .gitlab/ci/sanity.yml
   - .gitlab/ci/build.yml
   - .gitlab/ci/lints.yml
   - .gitlab/ci/unittest.yml

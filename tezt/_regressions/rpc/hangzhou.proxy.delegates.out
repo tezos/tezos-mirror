@@ -1,0 +1,125 @@
+tezt/_regressions/rpc/hangzhou.proxy.delegates.out
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/contracts
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[CONTRACT_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client --mode proxy rpc get /chains/main/blocks/head/context/delegates
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]",
+  "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+{ "balance": "4000000000000", "frozen_balance": "0",
+  "frozen_balance_by_cycle": [], "staking_balance": "4000000000000",
+  "delegated_contracts": [ "[PUBLIC_KEY_HASH]" ],
+  "delegated_balance": "0", "deactivated": false, "grace_period": 5,
+  "voting_power": 500 }
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+"4000000000000"
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+"0"
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance_by_cycle'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[]
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+"4000000000000"
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+[ "[PUBLIC_KEY_HASH]" ]
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+"0"
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+false
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+5
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+500
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The implicit account ([PUBLIC_KEY_HASH]) whose balance was requested is not a registered delegate. To get the balance of this account you can use the ../context/contracts/[PUBLIC_KEY_HASH]/balance RPC.
+                  The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/deactivated'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/delegated_contracts'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/frozen_balance_by_cycle'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/grace_period'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/staking_balance'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  
+
+./tezos-client --mode proxy rpc get '/chains/main/blocks/head/context/delegates/[PUBLIC_KEY_HASH]/voting_power'
+protocol of proxy unspecified, using the node's protocol: ProtoGenesisGenesisGenesisGenesisGenesisGenesk612im
+Fatal error:
+  Command failed: The provided public key hash ([PUBLIC_KEY_HASH]) is not the address of a registered delegate. If you own this account and want to register it as a delegate, use a delegation operation to delegate the account to itself.
+  

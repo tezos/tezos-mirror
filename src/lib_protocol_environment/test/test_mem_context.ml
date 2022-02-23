@@ -149,7 +149,7 @@ let test_replay {genesis = ctxt0; _} =
   Lwt.return_unit
 
 let fold_keys s root ~init ~f =
-  Context.fold s root ~init ~f:(fun k v acc ->
+  Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
       match Context.Tree.kind v with
       | `Value -> f (root @ k) acc
       | `Tree -> Lwt.return acc)
@@ -197,6 +197,7 @@ let test_fold {genesis = ctxt; _} =
         match Context.Tree.kind tree with
         | `Value -> Lwt.return (path :: cs, ns)
         | `Tree -> Lwt.return (cs, path :: ns))
+      ~order:`Sorted
       ~init:([], [])
     >>= fun (cs, ns) ->
     Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;
@@ -257,11 +258,12 @@ let test_fold_order {genesis = ctxt; _} =
 let test_trees {genesis = ctxt; _} =
   Context.Tree.fold
     ~depth:(`Eq 1)
+    ~order:`Sorted
     ~init:()
     (Context.Tree.empty ctxt)
     []
     ~f:(fun k _ () ->
-      assert (List.length k = 1) ;
+      assert (Compare.List_length_with.(k = 1)) ;
       Assert.fail_msg "empty")
   >>= fun () ->
   let foo1 = Bytes.of_string "foo1" in
@@ -278,6 +280,7 @@ let test_trees {genesis = ctxt; _} =
         match Context.Tree.kind tree with
         | `Value -> Lwt.return (path :: cs, ns)
         | `Tree -> Lwt.return (cs, path :: ns))
+      ~order:`Sorted
       ~init:([], [])
     >>= fun (cs, ns) ->
     Assert.equal_string_list_list ~msg:__LOC__ ecs cs ;

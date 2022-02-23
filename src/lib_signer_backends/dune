@@ -1,17 +1,20 @@
 (library
  (name tezos_signer_backends)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-signer-backends)
- (libraries tezos-base
-            tezos-stdlib
-            tezos-client-base
-            tezos-rpc-http-client
-            tezos-signer-services
-            tezos-shell-services)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib
-                   -open Tezos_client_base
-                   -open Tezos_rpc_http
-                   -open Tezos_rpc_http_client
-                   -open Tezos_signer_services
-                   -open Tezos_shell_services)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib
+  tezos-client-base
+  tezos-rpc-http-client
+  tezos-signer-services
+  tezos-shell-services)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib
+   -open Tezos_client_base
+   -open Tezos_rpc_http
+   -open Tezos_rpc_http_client
+   -open Tezos_signer_services
+   -open Tezos_shell_services)))

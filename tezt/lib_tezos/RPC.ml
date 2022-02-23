@@ -44,6 +44,10 @@ let get_block ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block] in
   Client.rpc ?endpoint ?hooks GET path client
 
+let get_block_hash ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
+  let path = ["chains"; chain; "blocks"; block; "hash"] in
+  Client.rpc ?endpoint ?hooks GET path client
+
 let get_block_metadata ?endpoint ?hooks ?(chain = "main") ?(block = "head")
     client =
   let path = ["chains"; chain; "blocks"; block; "metadata"] in
@@ -76,17 +80,54 @@ let get_protocol_data ?endpoint ?hooks ?(chain = "main") ?(block = "head")
   let query_string = [("offset", string_of_int offset)] in
   Client.rpc ?endpoint ?hooks GET path ~query_string client
 
-let get_branch ?endpoint ?hooks ?(chain = "main") client =
-  let path = ["chains"; chain; "blocks"; "head"; "hash"] in
+let get_branch ?(offset = 2) ?endpoint ?hooks ?(chain = "main") client =
+  (* By default, we use offset = 2 for Tenderbake, to pick the latest finalized
+     branch *)
+  let block = sf "head~%d" offset in
+  let path = ["chains"; chain; "blocks"; block; "hash"] in
   Client.rpc ?endpoint ?hooks GET path client
 
 let get_operations ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "operations"] in
   Client.rpc ?endpoint ?hooks GET path client
 
-let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") client =
+let get_mempool_pending_operations ?endpoint ?hooks ?(chain = "main") ?version
+    client =
   let path = ["chains"; chain; "mempool"; "pending_operations"] in
-  Client.rpc ?endpoint ?hooks GET path client
+  Client.rpc
+    ?endpoint
+    ?hooks
+    ~query_string:(match version with None -> [] | Some v -> [("version", v)])
+    GET
+    path
+    client
+
+let get_mempool ?endpoint ?hooks ?chain client =
+  let* pending_ops =
+    get_mempool_pending_operations ?endpoint ?hooks ?chain ~version:"1" client
+  in
+  let get_hash op = JSON.(op |-> "hash" |> as_string) in
+  let get_hashes classification =
+    List.map get_hash JSON.(pending_ops |-> classification |> as_list)
+  in
+  let applied = get_hashes "applied" in
+  let branch_delayed = get_hashes "branch_delayed" in
+  let branch_refused = get_hashes "branch_refused" in
+  let refused = get_hashes "refused" in
+  let outdated = get_hashes "outdated" in
+  let unprocessed = get_hashes "unprocessed" in
+  return
+    Mempool.
+      {applied; branch_delayed; branch_refused; refused; outdated; unprocessed}
+
+let mempool_request_operations ?endpoint ?(chain = "main") ?peer client =
+  let path = ["chains"; chain; "mempool"; "request_operations"] in
+  Client.rpc
+    ?endpoint
+    POST
+    path
+    ~query_string:(match peer with None -> [] | Some p -> [("peer_id", p)])
+    client
 
 let mempool_ban_operation ?endpoint ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "ban_operation"] in
@@ -99,6 +140,16 @@ let mempool_unban_operation ?endpoint ?(chain = "main") ~data client =
 let mempool_unban_all_operations ?endpoint ?(chain = "main") client =
   let path = ["chains"; chain; "mempool"; "unban_all_operations"] in
   Client.rpc ?endpoint POST path client
+
+let get_mempool_filter ?endpoint ?hooks ?(chain = "main") ?include_default
+    client =
+  let path = ["chains"; chain; "mempool"; "filter"] in
+  let query_string =
+    Option.map
+      (fun b -> [("include_default", string_of_bool b)])
+      include_default
+  in
+  Client.rpc ?endpoint ?hooks ?query_string GET path client
 
 let post_mempool_filter ?endpoint ?hooks ?(chain = "main") ~data client =
   let path = ["chains"; chain; "mempool"; "filter"] in
@@ -115,9 +166,26 @@ let inject_block ?endpoint ?hooks ~data client =
   let path = ["injection"; "block"] in
   Client.rpc ?endpoint ?hooks ~data POST path client
 
-let inject_operation ?endpoint ?hooks ~data client =
+let inject_operation ?endpoint ?hooks ?(async = false) ~data client =
   let path = ["injection"; "operation"] in
-  Client.rpc ?endpoint ?hooks ~data POST path client
+  let query_string = if async then [("async", "")] else [] in
+  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
+
+let spawn_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
+  let path = ["injection"; "operation"] in
+  let query_string = if async then [("async", "")] else [] in
+  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
+
+let private_inject_operation ?endpoint ?hooks ?(async = false) ~data client =
+  let path = ["private"; "injection"; "operation"] in
+  let query_string = if async then [("async", "")] else [] in
+  Client.rpc ?endpoint ?hooks ~query_string ~data POST path client
+
+let spawn_private_inject_operation ?endpoint ?hooks ?(async = false) ~data
+    client =
+  let path = ["private"; "injection"; "operation"] in
+  let query_string = if async then [("async", "")] else [] in
+  Client.spawn_rpc ?endpoint ?hooks ~query_string ~data POST path client
 
 let get_constants ?endpoint ?hooks ?(chain = "main") ?(block = "head") client =
   let path = ["chains"; chain; "blocks"; block; "context"; "constants"] in
@@ -407,6 +475,22 @@ module Delegates = struct
       client =
     get_sub ?endpoint ?hooks ~chain ~block ~pkh "balance" client
 
+  let spawn_get_full_balance ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~pkh client =
+    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "full_balance" client
+
+  let get_full_balance ?endpoint ?hooks ?(chain = "main") ?(block = "head") ~pkh
+      client =
+    get_sub ?endpoint ?hooks ~chain ~block ~pkh "full_balance" client
+
+  let spawn_get_frozen_deposits ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~pkh client =
+    spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_deposits" client
+
+  let get_frozen_deposits ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~pkh client =
+    get_sub ?endpoint ?hooks ~chain ~block ~pkh "frozen_deposits" client
+
   let spawn_get_deactivated ?endpoint ?hooks ?(chain = "main") ?(block = "head")
       ~pkh client =
     spawn_get_sub ?endpoint ?hooks ~chain ~block ~pkh "deactivated" client
@@ -531,5 +615,24 @@ module Votes = struct
   let get_total_voting_power ?endpoint ?hooks ?(chain = "main")
       ?(block = "head") client =
     let path = sub_path ~chain ~block "total_voting_power" in
+    Client.rpc ?endpoint ?hooks GET path client
+end
+
+module Tx_rollup = struct
+  let sub_path ~chain ~block ~tx_rollup_hash sub =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "tx_rollup";
+      tx_rollup_hash;
+      sub;
+    ]
+
+  let get_state ?endpoint ?hooks ?(chain = "main") ?(block = "head")
+      ~tx_rollup_hash client =
+    let path = sub_path ~chain ~block ~tx_rollup_hash "state" in
     Client.rpc ?endpoint ?hooks GET path client
 end

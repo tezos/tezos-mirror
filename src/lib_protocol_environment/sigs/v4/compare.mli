@@ -78,3 +78,39 @@ module Z : S with type t = Z.t
 module List (P : COMPARABLE) : S with type t = P.t list
 
 module Option (P : COMPARABLE) : S with type t = P.t option
+
+module List_length_with : sig
+  val ( = ) : 'a list -> int -> bool
+
+  val ( <> ) : 'a list -> int -> bool
+
+  val ( < ) : 'a list -> int -> bool
+
+  val ( <= ) : 'a list -> int -> bool
+
+  val ( >= ) : 'a list -> int -> bool
+
+  val ( > ) : 'a list -> int -> bool
+
+  val compare : 'a list -> int -> int
+
+  val equal : 'a list -> int -> bool
+end
+
+module List_lengths : sig
+  val ( = ) : 'a list -> 'b list -> bool
+
+  val ( <> ) : 'a list -> 'b list -> bool
+
+  val ( < ) : 'a list -> 'b list -> bool
+
+  val ( <= ) : 'a list -> 'b list -> bool
+
+  val ( >= ) : 'a list -> 'b list -> bool
+
+  val ( > ) : 'a list -> 'b list -> bool
+
+  val compare : 'a list -> 'b list -> int
+
+  val equal : 'a list -> 'b list -> bool
+end

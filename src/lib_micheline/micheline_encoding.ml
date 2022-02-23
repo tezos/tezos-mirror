@@ -82,11 +82,14 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
   let annots_encoding =
     match semantics with
     | V0 | V1 ->
-        (* in V0 there was a bug whereby an empty list of annotation ([[]])
-           would be decoded as a list containing one empty string ([[""]]).
-           Thus, the special case for [semantics <> V0]) *)
         let split s =
-          if s = "" && semantics <> V0 then []
+          if s = "" then
+            if semantics = V0 then
+              (* in V0 there was a bug whereby an empty list of annotation ([[]])
+                 would be decoded as a list containing one empty string ([[""]]).
+                 Thus, the special case for [semantics <> V0]) *)
+              [""]
+            else []
           else
             let annots = String.split_on_char ' ' s in
             List.iter
@@ -125,7 +128,9 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
   let application_encoding tag expr_encoding =
     case
       tag
-      ~title:"Generic prim (any number of args with or without annot)"
+      ~title:"Prim__generic"
+      ~description:
+        "Generic primitive (any number of args with or without annotations)"
       (obj3
          (req "prim" prim_encoding)
          (dft "args" (list expr_encoding) [])
@@ -156,35 +161,41 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                  int_encoding (Tag 0);
                  string_encoding (Tag 1);
                  seq_encoding (Tag 2) expr_encoding;
-                 (* No args, no annot *)
+                 (* No args, no annots *)
                  case
                    (Tag 3)
-                   ~title:"Prim (no args, annot)"
+                   ~title:"Prim__no_args__no_annots"
+                   ~description:"Primitive with no arguments and no annotations"
                    (obj1 (req "prim" prim_encoding))
                    (function Prim (_, v, [], []) -> Some v | _ -> None)
                    (fun v -> Prim (0, v, [], []));
                  (* No args, with annots *)
                  case
                    (Tag 4)
-                   ~title:"Prim (no args + annot)"
+                   ~title:"Prim__no_args__some_annots"
+                   ~description:
+                     "Primitive with no arguments and some annotations"
                    (obj2
                       (req "prim" prim_encoding)
                       (req "annots" annots_encoding))
                    (function
                      | Prim (_, v, [], annots) -> Some (v, annots) | _ -> None)
                    (function (prim, annots) -> Prim (0, prim, [], annots));
-                 (* Single arg, no annot *)
+                 (* Single arg, no annots *)
                  case
                    (Tag 5)
-                   ~title:"Prim (1 arg, no annot)"
+                   ~title:"Prim__1_arg__no_annots"
+                   ~description:"Primitive with one argument and no annotations"
                    (obj2 (req "prim" prim_encoding) (req "arg" expr_encoding))
                    (function
                      | Prim (_, v, [arg], []) -> Some (v, arg) | _ -> None)
                    (function (prim, arg) -> Prim (0, prim, [arg], []));
-                 (* Single arg, with annot *)
+                 (* Single arg, with annots *)
                  case
                    (Tag 6)
-                   ~title:"Prim (1 arg + annot)"
+                   ~title:"Prim__1_arg__some_annots"
+                   ~description:
+                     "Primitive with one argument and some annotations"
                    (obj3
                       (req "prim" prim_encoding)
                       (req "arg" expr_encoding)
@@ -193,10 +204,12 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                      | Prim (_, prim, [arg], annots) -> Some (prim, arg, annots)
                      | _ -> None)
                    (fun (prim, arg, annots) -> Prim (0, prim, [arg], annots));
-                 (* Two args, no annot *)
+                 (* Two args, no annots *)
                  case
                    (Tag 7)
-                   ~title:"Prim (2 args, no annot)"
+                   ~title:"Prim__2_args__no_annots"
+                   ~description:
+                     "Primitive with two arguments and no annotations"
                    (obj3
                       (req "prim" prim_encoding)
                       (req "arg1" expr_encoding)
@@ -209,7 +222,9 @@ let internal_canonical_encoding ~semantics ~variant prim_encoding =
                  (* Two args, with annots *)
                  case
                    (Tag 8)
-                   ~title:"Prim (2 args + annot)"
+                   ~title:"Prim__2_args__some_annots"
+                   ~description:
+                     "Primitive with two arguments and some annotations"
                    (obj4
                       (req "prim" prim_encoding)
                       (req "arg1" expr_encoding)

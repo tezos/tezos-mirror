@@ -39,7 +39,32 @@ include module type of Tezos_crypto
 
 module Data_encoding = Data_encoding
 
-include module type of Tezos_error_monad.TzLwtreslib
+(** The following modules are part of [TzLwtreslib]. We just remove
+    - the [Monad] module (already available, with some name simplifications,
+      from [Error_monad]), and
+    - the [List] module (exported just afterwards with a small addition). *)
+module Hashtbl : module type of Tezos_error_monad.TzLwtreslib.Hashtbl
+
+module Map : module type of Tezos_error_monad.TzLwtreslib.Map
+
+module Option : module type of Tezos_error_monad.TzLwtreslib.Option
+
+module Result : module type of Tezos_error_monad.TzLwtreslib.Result
+
+module Seq : module type of Tezos_error_monad.TzLwtreslib.Seq
+
+module Seq_e : module type of Tezos_error_monad.TzLwtreslib.Seq_e
+
+module Seq_s : module type of Tezos_error_monad.TzLwtreslib.Seq_s
+
+module Seq_es : module type of Tezos_error_monad.TzLwtreslib.Seq_es
+
+module Set : module type of Tezos_error_monad.TzLwtreslib.Set
+
+module Unit : module type of Tezos_error_monad.TzLwtreslib.Unit
+
+module WithExceptions :
+    module type of Tezos_error_monad.TzLwtreslib.WithExceptions
 
 module List : sig
   include module type of Tezos_stdlib.TzList

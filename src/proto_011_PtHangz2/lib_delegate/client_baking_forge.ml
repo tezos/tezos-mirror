@@ -28,6 +28,138 @@ open Alpha_context
 open Protocol_client_context
 module Events = Delegate_events.Baking_forge
 
+module Operations_source = struct
+  type t =
+    | Local of {filename : string}
+    | Remote of {uri : Uri.t; http_headers : (string * string) list option}
+
+  let encoding =
+    let open Data_encoding in
+    union
+      ~tag_size:`Uint8
+      [
+        case
+          (Tag 1)
+          ~title:"Local"
+          (obj2 (req "filename" string) (req "kind" (constant "Local")))
+          (function Local {filename} -> Some (filename, ()) | _ -> None)
+          (fun (filename, ()) -> Local {filename});
+        case
+          (Tag 2)
+          ~title:"Remote"
+          (obj3
+             (req "uri" string)
+             (opt "http_headers" (list (tup2 string string)))
+             (req "kind" (constant "Remote")))
+          (function
+            | Remote {uri; http_headers} ->
+                Some (Uri.to_string uri, http_headers, ())
+            | _ -> None)
+          (fun (uri_str, http_headers, ()) ->
+            Remote {uri = Uri.of_string uri_str; http_headers});
+      ]
+
+  type error +=
+    | Failed_mempool_fetch of {
+        path : string;
+        reason : string;
+        details : Data_encoding.json option;
+      }
+
+  let () =
+    register_error_kind
+      `Permanent
+      ~id:(Format.sprintf "baker-%s.failed_to_get_mempool" Protocol.name)
+      ~title:"Failed to get mempool"
+      ~description:"Failed to retrieve the mempool from the given file or uri."
+      ~pp:(fun fmt (path, reason, details) ->
+        Format.fprintf
+          fmt
+          "@[<v 2>Failed to retrieve the mempool from %s:@ @[%s%a@]@]"
+          path
+          reason
+          (fun fmt -> function
+            | None -> ()
+            | Some json -> Format.fprintf fmt ": %a" Data_encoding.Json.pp json)
+          details)
+      Data_encoding.(
+        obj3
+          (req "path" string)
+          (req "reason" string)
+          (opt "details" Data_encoding.json))
+      (function
+        | Failed_mempool_fetch {path; reason; details} ->
+            Some (path, reason, details)
+        | _ -> None)
+      (fun (path, reason, details) ->
+        Failed_mempool_fetch {path; reason; details})
+
+  let operations_encoding =
+    Data_encoding.(list (dynamic_size Alpha_context.Operation.encoding))
+
+  let retrieve mempool =
+    match mempool with
+    | None -> Lwt.return_none
+    | Some mempool -> (
+        let fail reason details =
+          let path =
+            match mempool with
+            | Local {filename} -> filename
+            | Remote {uri; _} -> Uri.to_string uri
+          in
+          fail (Failed_mempool_fetch {path; reason; details})
+        in
+        let decode_mempool json =
+          protect
+            ~on_error:(fun _ ->
+              fail "cannot decode the received JSON into mempool" (Some json))
+            (fun () ->
+              return (Data_encoding.Json.destruct operations_encoding json))
+        in
+        match mempool with
+        | Local {filename} ->
+            if Sys.file_exists filename then
+              Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file filename
+              >>= function
+              | Error _ ->
+                  Events.(emit invalid_json_file filename) >>= fun () ->
+                  Lwt.return_none
+              | Ok json -> (
+                  decode_mempool json >>= function
+                  | Ok mempool -> Lwt.return_some mempool
+                  | Error _ -> assert false)
+            else
+              Events.(emit no_mempool_found_in_file filename) >>= fun () ->
+              Lwt.return_none
+        | Remote {uri; http_headers} -> (
+            ( ((with_timeout
+                  (Systime_os.sleep (Time.System.Span.of_seconds_exn 5.))
+                  (fun _ ->
+                    Tezos_rpc_http_client_unix.RPC_client_unix
+                    .generic_media_type_call
+                      ~accept:[Media_type.json]
+                      ?headers:http_headers
+                      `GET
+                      uri)
+                >>=? function
+                | `Json json -> return json
+                | _ -> fail "json not returned" None)
+               >>=? function
+               | `Ok json -> return json
+               | `Unauthorized json -> fail "unauthorized request" json
+               | `Gone json -> fail "gone" json
+               | `Error json -> fail "error" json
+               | `Not_found json -> fail "not found" json
+               | `Forbidden json -> fail "forbidden" json
+               | `Conflict json -> fail "conflict" json)
+            >>=? fun json -> decode_mempool json )
+            >>= function
+            | Ok mempool -> Lwt.return_some mempool
+            | Error errs ->
+                Events.(emit cannot_fetch_mempool errs) >>= fun () ->
+                Lwt.return_none))
+end
+
 (* The index of the different components of the protocol's validation passes *)
 (* TODO: ideally, we would like this to be more abstract and possibly part of
    the protocol, while retaining the generality of lists *)
@@ -72,13 +204,14 @@ type state = {
   (* truly mutable *)
   mutable best_slot : slot option;
   mutable retry_counter : int;
+  extra_operations : Operations_source.t option;
 }
 
 let create_state ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte)
-    ?(retry_counter = default_retry_counter) context_path index nonces_location
-    delegates constants =
+    ?(retry_counter = default_retry_counter) ?extra_operations context_path
+    index nonces_location delegates constants =
   {
     context_path;
     index;
@@ -90,6 +223,7 @@ let create_state ?(minimal_fees = default_minimal_fees)
     minimal_nanotez_per_byte;
     best_slot = None;
     retry_counter;
+    extra_operations;
   }
 
 let get_delegates cctxt state =
@@ -224,8 +358,40 @@ type manager_content = {
   counter : counter;
 }
 
+module PrioritizedOperation : sig
+  type t = private High of packed_operation | Low of packed_operation
+
+  (** prioritize operations coming from an external source (file, uri, ...)*)
+  val extern : packed_operation -> t
+
+  (** prioritize operations coming from a node *)
+  val node : packed_operation -> t
+
+  (** [packed t] is [t.operation]*)
+  val packed : t -> packed_operation
+
+  val compare_priority : t -> t -> int
+end = struct
+  (* Higher priority operations will be included first *)
+  type t = High of packed_operation | Low of packed_operation
+
+  let extern op = High op
+
+  let node op = Low op
+
+  let packed = function High op | Low op -> op
+
+  let compare_priority t1 t2 =
+    match (t1, t2) with
+    | (High _, Low _) -> 1
+    | (Low _, High _) -> -1
+    | (Low _, Low _) | (High _, High _) -> 0
+end
+
 let get_manager_content op =
-  let {protocol_data = Operation_data {contents; _}; _} = op in
+  let {protocol_data = Operation_data {contents; _}; _} =
+    PrioritizedOperation.packed op
+  in
   let open Operation in
   let l = to_list (Contents_list contents) in
   List.fold_left_e
@@ -255,7 +421,7 @@ let get_manager_content op =
    Weight = fee / (max ( (size/size_total), (gas/gas_total))) *)
 let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
     ~minimal_nanotez_per_gas_unit ~minimal_nanotez_per_byte
-    (operations : packed_operation list) =
+    (operations : PrioritizedOperation.t list) =
   let compute_weight op (fee, gas) =
     let size = Data_encoding.Binary.length Operation.encoding op in
     let size_f = Q.of_int size in
@@ -275,7 +441,9 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
           if Tez.(total_fee < minimal_fees) then None
           else
             let (size, gas, weight_ratio) =
-              compute_weight op (total_fee, total_gas)
+              compute_weight
+                (PrioritizedOperation.packed op)
+                (total_fee, total_gas)
             in
             let fees_in_nanotez =
               Q.mul (Q.of_int64 (Tez.to_mutez total_fee)) (Q.of_int 1000)
@@ -302,15 +470,26 @@ let sort_manager_operations ~max_size ~hard_gas_limit_per_block ~minimal_fees
   (* We order the operations by their weights except if they belong
      to the same manager, if they do, we order them by their
      counter. *)
-  let compare (_op, weight_ratio, source, counter)
-      (_op', weight_ratio', source', counter') =
+  let compare (op, weight_ratio, source, counter)
+      (op', weight_ratio', source', counter') =
     (* Be careful with the [compare]s *)
-    if Signature.Public_key_hash.equal source source' then
+    let cmp_src = Signature.Public_key_hash.compare source source' in
+    if cmp_src = 0 then
       (* we want the smallest counter first *)
-      Z.compare counter counter'
+      let c = Z.compare counter counter' in
+      if c <> 0 then c
+      else
+        (* Higher priority first *)
+        let c = PrioritizedOperation.compare_priority op' op in
+        if c <> 0 then c else Q.compare weight_ratio' weight_ratio
     else
-      (* We want the biggest weight first *)
-      Q.compare weight_ratio' weight_ratio
+      (* Higher priority first *)
+      let c = PrioritizedOperation.compare_priority op' op in
+      if c <> 0 then c
+      else
+        (* We want the biggest weight first *)
+        let c = Q.compare weight_ratio' weight_ratio in
+        if c <> 0 then c else cmp_src
   in
   List.sort compare operations |> List.map (fun (op, _, _, _) -> op)
 
@@ -343,7 +522,11 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
       (fun op ->
         match get_manager_content op with
         | Some {total_gas; _} ->
-            let size = Data_encoding.Binary.length Operation.encoding op in
+            let size =
+              Data_encoding.Binary.length
+                Operation.encoding
+                (PrioritizedOperation.packed op)
+            in
             Some (op, (size, total_gas))
         | None -> None)
       manager_operations
@@ -374,23 +557,25 @@ let trim_manager_operations ~max_size ~hard_gas_limit_per_block
     - Potentially overflowing operations *)
 let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
     ~hard_gas_limit_per_block ~minimal_fees ~minimal_nanotez_per_gas_unit
-    ~minimal_nanotez_per_byte (ops : packed_operation list) =
+    ~minimal_nanotez_per_byte (ops : PrioritizedOperation.t list) =
   Alpha_block_services.live_blocks cctxt ~chain ~block ()
   >>=? fun live_blocks ->
   let t =
     (* Remove operations that are too old *)
     let ops =
       List.filter
-        (fun {shell = {branch; _}; _} -> Block_hash.Set.mem branch live_blocks)
+        (fun pop ->
+          let {shell = {branch; _}; _} = PrioritizedOperation.packed pop in
+          Block_hash.Set.mem branch live_blocks)
         ops
     in
     let validation_passes_len = List.length Main.validation_passes in
     let t = Array.make validation_passes_len [] in
     List.iter
-      (fun (op : packed_operation) ->
+      (fun (op : PrioritizedOperation.t) ->
         List.iter
           (fun pass -> t.(pass) <- op :: t.(pass))
-          (Main.acceptable_passes op))
+          (Main.acceptable_passes (PrioritizedOperation.packed op)))
       ops ;
     Array.map List.rev t
   in
@@ -420,9 +605,12 @@ let classify_operations (cctxt : #Protocol_client_context.full) ~chain ~block
     t.(managers_index) <- desired_manager_operations ;
     ok overflowing_manager_operations
   in
+
   Lwt.return
     ( overflowing_manager_operations >>? fun overflowing_manager_operations ->
-      ok (Array.to_list t, overflowing_manager_operations) )
+      ok
+        ( Array.to_list t |> List.map (List.map PrioritizedOperation.packed),
+          overflowing_manager_operations ) )
 
 let forge (op : Operation.packed) : Operation.raw =
   {
@@ -436,30 +624,27 @@ let forge (op : Operation.packed) : Operation.raw =
 let ops_of_mempool (ops : Alpha_block_services.Mempool.t) =
   (* We only retain the applied, unprocessed and delayed operations *)
   List.rev
-    (Operation_hash.Map.fold (fun _ op acc -> op :: acc) ops.unprocessed
+    (Operation_hash.Map.fold
+       (fun _ op acc -> PrioritizedOperation.node op :: acc)
+       ops.unprocessed
     @@ Operation_hash.Map.fold
-         (fun _ (op, _) acc -> op :: acc)
+         (fun _ (op, _) acc -> PrioritizedOperation.node op :: acc)
          ops.branch_delayed
-    @@ List.rev_map (fun (_, op) -> op) ops.applied)
+    @@ List.rev_map (fun (_, op) -> PrioritizedOperation.node op) ops.applied)
 
-let unopt_operations cctxt chain mempool = function
-  | None -> (
-      match mempool with
-      | None ->
-          Alpha_block_services.Mempool.pending_operations cctxt ~chain ()
-          >>=? fun mpool ->
-          let ops = ops_of_mempool mpool in
-          return ops
-      | Some file ->
-          Tezos_stdlib_unix.Lwt_utils_unix.Json.read_file file >>=? fun json ->
-          let mpool =
-            Data_encoding.Json.destruct
-              Alpha_block_services.S.Mempool.encoding
-              json
-          in
-          let ops = ops_of_mempool mpool in
-          return ops)
-  | Some operations -> return operations
+let get_operations cctxt ~ignore_node_mempool chain mempool =
+  Operations_source.retrieve mempool >>= fun mempool_ops_opt ->
+  let mempool_ops =
+    match mempool_ops_opt with
+    | None -> []
+    | Some ops -> List.map PrioritizedOperation.extern ops
+  in
+  if ignore_node_mempool then return mempool_ops
+  else
+    Alpha_block_services.Mempool.pending_operations cctxt ~chain ()
+    >>=? fun mpool ->
+    let ops = ops_of_mempool mpool in
+    return (mempool_ops @ ops)
 
 let all_ops_valid (results : error Preapply_result.t list) =
   let open Operation_hash.Map in
@@ -525,6 +710,7 @@ let merge_preapps (old : error Preapply_result.t)
   (* merge preapplies *)
   {
     Preapply_result.applied = [];
+    outdated = merge old.outdated neu.outdated;
     refused = merge old.refused neu.refused;
     branch_refused = merge old.branch_refused neu.branch_refused;
     branch_delayed = merge old.branch_delayed neu.branch_delayed;
@@ -560,13 +746,13 @@ let compute_endorsement_powers cctxt constants ~chain ~block =
 
 let compute_endorsing_power endorsement_powers operations =
   List.fold_left
-    (fun sum -> function
+    (fun sum op ->
+      match op with
       | {
-          Alpha_context.protocol_data =
-            Operation_data
-              {contents = Single (Endorsement_with_slot {slot; _}); _};
-          _;
-        } -> (
+       Alpha_context.protocol_data =
+         Operation_data {contents = Single (Endorsement_with_slot {slot; _}); _};
+       _;
+      } -> (
           try
             let endorsement_power = endorsement_powers.(slot) in
             sum + endorsement_power
@@ -756,20 +942,25 @@ let finalize_block_header shell_header ~timestamp validation_result
   let context = Context.hash ~time:timestamp ?message context in
   return {header with context}
 
-let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
-    ?(sort = best_effort) ?(minimal_fees = default_minimal_fees)
+let forge_block cctxt ?force ?(best_effort = true) ?(sort = best_effort)
+    ?(minimal_fees = default_minimal_fees)
     ?(minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit)
     ?(minimal_nanotez_per_byte = default_minimal_nanotez_per_byte) ?timestamp
-    ?mempool ?context_path ?seed_nonce_hash ~liquidity_baking_escape_vote ~chain
-    ~priority ~delegate_pkh ~delegate_sk block =
+    ?(ignore_node_mempool = false) ?extra_operations ?context_path
+    ?seed_nonce_hash ~liquidity_baking_escape_vote ~chain ~priority
+    ~delegate_pkh ~delegate_sk block =
   Alpha_services.Constants.all cctxt (chain, block) >>=? fun constants ->
   (* making the arguments usable *)
-  unopt_operations cctxt chain mempool operations >>=? fun operations_arg ->
+  get_operations cctxt ~ignore_node_mempool chain extra_operations
+  >>=? fun operations_arg ->
   Client_baking_blocks.info cctxt ~chain block >>=? fun block_info ->
   compute_endorsement_powers cctxt constants.parametric ~chain ~block:block_info
   >>=? fun endorsement_powers ->
+  let untagged_operations =
+    List.map PrioritizedOperation.packed operations_arg
+  in
   let endorsing_power =
-    compute_endorsing_power endorsement_powers operations_arg
+    compute_endorsing_power endorsement_powers untagged_operations
   in
   decode_priority cctxt chain block ~priority ~endorsing_power
   >>=? fun (priority, minimal_timestamp) ->
@@ -837,7 +1028,8 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
         let result =
           List.fold_left merge_preapps Preapply_result.empty result
         in
-        Lwt.return_error @@ List.filter_map (error_of_op result) operations_arg
+        Lwt.return_error
+        @@ List.filter_map (error_of_op result) untagged_operations
   | Some context_path ->
       assert sort ;
       assert best_effort ;
@@ -856,6 +1048,7 @@ let forge_block cctxt ?force ?operations ?(best_effort = operations = None)
           minimal_nanotez_per_gas_unit = default_minimal_nanotez_per_gas_unit;
           minimal_nanotez_per_byte = default_minimal_nanotez_per_byte;
           retry_counter = default_retry_counter;
+          extra_operations;
         }
       in
       compute_endorsement_powers
@@ -1134,10 +1327,10 @@ let fetch_operations (cctxt : #Protocol_client_context.full) ~chain state
     with consistent operations that went through the client-side
     validation *)
 let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
-    ((slot_timestamp, (bi, priority, delegate)) as slot)
+    ((slot_timestamp, (block_info, priority, delegate)) as slot)
     ~liquidity_baking_escape_vote =
-  let chain = `Hash bi.Client_baking_blocks.chain_id in
-  let block = `Hash (bi.hash, 0) in
+  let chain = `Hash block_info.Client_baking_blocks.chain_id in
+  let block = `Hash (block_info.hash, 0) in
   Plugin.RPC.current_level cctxt ~offset:1l (chain, block)
   >>=? fun next_level ->
   let seed_nonce_hash =
@@ -1145,12 +1338,27 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
   in
   Client_keys.Public_key_hash.name cctxt delegate >>=? fun name ->
   let time = Time.System.of_protocol_exn slot_timestamp in
-  Events.(emit try_baking) (bi.hash, priority, name, time) >>= fun () ->
-  compute_endorsement_powers cctxt state.constants.parametric ~chain ~block:bi
+  Events.(emit try_baking) (block_info.hash, priority, name, time) >>= fun () ->
+  compute_endorsement_powers
+    cctxt
+    state.constants.parametric
+    ~chain
+    ~block:block_info
   >>=? fun endorsement_powers ->
+  (* if --ignore-node-mempool was implemented for the baker, this is
+     approximately where it would step in *)
   fetch_operations cctxt ~chain state endorsement_powers slot >>=? function
   | None -> Events.(emit new_head_received) () >>= fun () -> return_none
   | Some (operations, timestamp) -> (
+      Operations_source.retrieve state.extra_operations
+      >>= fun external_mempool_ops_opt ->
+      (* prepend external mempool operations *)
+      let operations =
+        let mops = List.map PrioritizedOperation.node operations in
+        match external_mempool_ops_opt with
+        | None -> mops
+        | Some ops -> List.map PrioritizedOperation.extern ops @ mops
+      in
       classify_operations
         cctxt
         ~chain
@@ -1168,7 +1376,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             ~user_activated_upgrades
             ~level:(Raw_level.to_int32 next_level.level)
         with
-        | None -> bi.next_protocol
+        | None -> block_info.next_protocol
         | Some hash -> hash
       in
       if Protocol_hash.(Protocol.hash <> next_version) then
@@ -1196,7 +1404,7 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
           ~block
           ~priority
           ~protocol_data
-          bi
+          block_info
           (operations, overflowing_ops)
         >>= function
         | Error errs ->
@@ -1224,9 +1432,12 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
             else Lwt.return_unit)
             >>= fun () ->
             Events.(emit try_forging)
-              (bi.hash, priority, name, Time.System.of_protocol_exn timestamp)
+              ( block_info.hash,
+                priority,
+                name,
+                Time.System.of_protocol_exn timestamp )
             >>= fun () ->
-            let current_protocol = bi.next_protocol in
+            let current_protocol = block_info.next_protocol in
             let context =
               Shell_context.unwrap_disk_context validation_result.context
             in
@@ -1236,14 +1447,14 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
                 final_context.header
                 ~timestamp:valid_timestamp
                 validation_result
-                bi.predecessor_block_metadata_hash
-                bi.predecessor_operations_metadata_hash
+                block_info.predecessor_block_metadata_hash
+                block_info.predecessor_operations_metadata_hash
               >>= function
               | Error _ as errs -> Lwt.return errs
               | Ok shell_header ->
                   let raw_ops = List.map (List.map forge) operations in
                   return_some
-                    ( bi,
+                    ( block_info,
                       priority,
                       shell_header,
                       raw_ops,
@@ -1576,8 +1787,8 @@ let reveal_potential_nonces (cctxt : #Client_context.full) constants ~chain
     the [delegates] *)
 let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ?minimal_fees ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte
-    ?max_priority ?per_block_vote_file ~chain ~context_path delegates
-    block_stream =
+    ?max_priority ?per_block_vote_file ?extra_operations ~chain ~context_path
+    delegates block_stream =
   let state_maker bi =
     Alpha_services.Constants.all cctxt (chain, `Head 0) >>=? fun constants ->
     Client_baking_simulator.load_context ~context_path >>= fun index ->
@@ -1592,6 +1803,7 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
         ?minimal_fees
         ?minimal_nanotez_per_gas_unit
         ?minimal_nanotez_per_byte
+        ?extra_operations
         context_path
         index
         nonces_location
@@ -1663,3 +1875,14 @@ let create (cctxt : #Protocol_client_context.full) ~user_activated_upgrades
     ~timeout_k
     ~event_k
     ~finalizer
+
+module Internal_for_tests = struct
+  module PrioritizedOperation = PrioritizedOperation
+
+  let get_manager_content op =
+    match get_manager_content op with
+    | Some {source; counter; _} -> Some (source, counter)
+    | None -> None
+
+  let sort_manager_operations = sort_manager_operations
+end

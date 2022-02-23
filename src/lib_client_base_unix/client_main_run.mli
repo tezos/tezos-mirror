@@ -52,6 +52,8 @@ sig
        define your own one. *)
     string
 
+  val default_media_type : Media_type.t list
+
   val other_registrations :
     (* You may give an **optional** function that will work on the
        configuration file and the remote parameters. *)

@@ -1,4 +1,4 @@
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 .. _test-networks:
 
@@ -16,7 +16,7 @@ former is obviously important as users need to test their development
 with the current protocol. The latter is also needed to test the proposed
 protocol and its new features, both to decide whether to vote yes and
 to prepare for its activation. After the intended protocol of a test
-network is activated (such as Granada for granadanet), the protocol
+network is activated (such as Hangzhou for hangzhounet), the protocol
 no longer changes because this could break the workflow of some users
 while they are testing their development, as they may not be ready for
 the new protocol. So every time a new protocol is proposed on Mainnet,
@@ -26,24 +26,44 @@ faster than with a long-lived network.
 Get Free Funds
 ==============
 
-Test networks have a list of built-in accounts with some funds.
-You can obtain the key to these accounts from a faucet to claim the funds.
-All networks share the same faucet: https://faucet.tzalpha.net/.
-The keys obtained from this faucet can be used in all test networks.
+Test networks have a list of built-in accounts with some funds. You
+can obtain the key to these accounts from a faucet to claim the funds.
+Faucets can be accessed from https://teztnets.xyz/. Each of the test
+network listed there, including the active test networks described
+below, have independent faucets.
 
-Granadanet
-==========
+Hangzhounet
+===========
 
-- Built-in network alias: ``granadanet`` (see :ref:`builtin_networks`)
+- Built-in network alias: ``hangzhounet`` (see :ref:`builtin_networks`)
 
-  * Available in version 9.2
+  * Available from version 11.0~rc2.
 
-- Run Docker image: ``wget -O granadanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+- Run Docker image: ``wget -O hangzhounet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
 
-Granadanet is a test network running the ``PtGRANAD`` protocol.
-Granadanet will run until Granadanet is rejected or replaced by another protocol on Mainnet.
+Hangzhounet is a test network running the ``PtHangz2`` protocol.
+Hangzhounet will run until Hangzhou is replaced by another protocol on Mainnet.
 
-On Granadanet, some constants differ from Mainnet.
+On Hangzhounet, some constants differ from Mainnet.
+This results in a faster chain than Mainnet.
+See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
+
+Ithacanet
+=========
+
+- Built-in network alias: ``ithacanet`` (see :ref:`builtin_networks`)
+
+  * Available from version 12.0~rc1 but 12.0~rc2 updated it to refer
+    to the second version of Ithacanet which runs ``Psithaca2`` instead
+    of ``PsiThaCa``.
+
+- Run Docker image: ``wget -O ithacanet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh``
+
+Ithacanet is a test network which ran the Ithaca protocol and which was reset
+to run on the Ithaca2 protocol.
+Ithacanet will run until Ithaca2 is rejected or replaced by another protocol on Mainnet.
+
+On Ithacanet, some constants differ from Mainnet.
 This results in a faster chain than Mainnet.
 See :ref:`protocol constants <protocol_constants>` to learn how to find out their values.
 
@@ -60,28 +80,37 @@ P is activated, the previous test network will end and P-net will continue on it
 Old Networks
 ============
 
+Granadanet
+==========
+
+Granadanet was a test network running the Granada protocol.
+Following the activation of the Hangzhou protocol replacing Granada on Mainnet,
+Granadanet stopped being maintained on December 4, 2021 (the bootstrap baker
+is no longer producing blocks).
+
 Florencenet
 -----------
 
 Florencenet was a test network running the Florence protocol.
 Following the activation of the Granada protocol replacing Florence on Mainnet,
-Florencenet stopped being maintained on August 6, 2021.
+Florencenet stopped being maintained on August 6, 2021 (the bootstrap baker
+is no longer producing blocks).
 
 Edo2net
 -------
 
 Edo2net was a test network running the Edo protocol.
 Following the activation of the Florence protocol replacing Edo on Mainnet,
-Edo2net stopped being maintained on May 11th, 2021 (the bootstrap baker will
-no longer be producing blocks).
+Edo2net stopped being maintained on May 11th, 2021 (the bootstrap baker is
+no longer producing blocks).
 
 Delphinet
 ---------
 
 Delphinet was a test network running the Delphi protocol.
 Following the activation of the Edo protocol replacing Delphi on Mainnet,
-Delphinet stopped being maintained on Febuary 28th, 2021 (the bootstrap baker
-will no longer be producing blocks).
+Delphinet stopped being maintained on February 28th, 2021 (the bootstrap baker
+is no longer producing blocks).
 
 Dalphanet
 ---------
@@ -96,8 +125,7 @@ Carthagenet
 
 Carthagenet was a test network running the Carthage protocol.
 Following the activation of the Delphi protocol replacing Carthage on Mainnet,
-Carthagenet stopped being maintained on December 12th, 2020 (the bootstrap
-baker will no longer be producing blocks).
+Carthagenet stopped being maintained on December 12th, 2020.
 
 Babylonnet
 ----------

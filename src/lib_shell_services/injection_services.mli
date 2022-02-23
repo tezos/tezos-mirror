@@ -46,6 +46,13 @@ val operation :
   Bytes.t ->
   Operation_hash.t tzresult Lwt.t
 
+val private_operation :
+  #simple ->
+  ?async:bool ->
+  ?chain:Chain_services.chain ->
+  Bytes.t ->
+  Operation_hash.t tzresult Lwt.t
+
 val protocol :
   #simple -> ?async:bool -> Protocol.t -> Protocol_hash.t tzresult Lwt.t
 
@@ -60,6 +67,15 @@ module S : sig
     RPC_service.t
 
   val operation :
+    ( [`POST],
+      unit,
+      unit,
+      < async : bool ; chain : Chain_services.chain option >,
+      Bytes.t,
+      Operation_hash.t )
+    RPC_service.t
+
+  val private_operation :
     ( [`POST],
       unit,
       unit,

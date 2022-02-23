@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:    Script_comparison
-    Invocation:   dune build @src/proto_alpha/lib_protocol/runtest_test_script_comparison
+    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/test_script_comparison.exe
     Subject:      PBT of the Script_comparable.compare_comparable function.
 *)
 
@@ -92,32 +92,35 @@ type ex_comparable_data_3 =
 
 (* We use the Michelson samplers from lib_benchmark and turn them into QCheck
    generators *)
-module Parameters : Michelson_samplers_parameters.S = struct
+module Parameters = struct
   let atom_size_range : Tezos_benchmark.Base_samplers.range =
     {min = 0; max = 10}
 
-  let type_size : Tezos_benchmark.Base_samplers.range = {min = 1; max = 1000}
-
   let other_size : Tezos_benchmark.Base_samplers.range = {min = 0; max = 100}
 
-  let parameters : Michelson_samplers_parameters.t =
+  let parameters : Michelson_samplers.parameters =
     {
-      int_size = atom_size_range;
-      string_size = atom_size_range;
-      bytes_size = atom_size_range;
-      stack_size = other_size;
-      type_size;
+      base_parameters =
+        {
+          int_size = atom_size_range;
+          string_size = atom_size_range;
+          bytes_size = atom_size_range;
+        };
       list_size = other_size;
       set_size = other_size;
       map_size = other_size;
     }
+end
 
+module Crypto_samplers =
+Tezos_benchmark.Crypto_samplers.Make_finite_key_pool (struct
   let size = 1000
 
   let algo = `Default
-end
+end)
 
-module Samplers : Michelson_samplers.S = Michelson_samplers.Make (Parameters)
+module Samplers : Michelson_samplers.S =
+  Michelson_samplers.Make (Parameters) (Crypto_samplers)
 
 let ex_comparable_data_sampler :
     ex_comparable_data Tezos_benchmark.Base_samplers.sampler =
@@ -352,7 +355,7 @@ let test_pack_unpack =
         (Some x)
         (unpack_comparable_data ty (pack_comparable_data ty x)))
 
-let tests =
+let () =
   Alcotest.run
     "Script_comparison"
     [

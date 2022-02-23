@@ -1,52 +1,46 @@
-# This job is scheduled. It instruments the code with bisect_ppx and
-# runs the full test suite (sequentially).
+# This job fetchs coverage files by precedent test stage. It creates the html,
+# summary and cobertura reports. It also provide a coverage % for the merge request.
 
-test_coverage:
+unified_coverage:
   extends:
     - .default_settings_template
+    - .rules_template__development_unified_coverage
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development_coverage
+    - .template__coverage
   stage: test_coverage
-  needs: []
-  parallel:
-    matrix:
-      # Set up tests suites to run. Note that each of these make will
-      # create a separate report.
-      - TEST_TARGET:
-        - test-unit
-        # Running the full set of python tests take more than 4 hours
-        # triggering a timeout. We only run the tests for tests_alpha
-        # in the mean time
-        - test-python-alpha
-        # Tezt tests are run with an individual timeout, to work around
-        # https://gitlab.com/tezos/tezos/-/issues/1652
-        - test-tezt-coverage
-  variables:
-    COVERAGE_OPTIONS: "--instrument-with bisect_ppx"
-    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
-  script:
-    - make
+  # This job requires all artifacts from the stage test, so we override
+  # the `dependencies: []` in `.default_settings` by setting `dependencies` 
+  # to `null`.
+  dependencies:
+  before_script:
     # Load the environment poetry previously created in the docker image.
     # Give access to the Python dependencies/executables
-    - . $HOME/.venv/bin/activate
-    # A failing test shouldn't prevent the generation of the report (|| true)
-    - make $TEST_TARGET || true
-    - make coverage-report
-    - make coverage-report-summary
-    # hack to capture script success in after_script script
-    - touch $CI_PROJECT_DIR/__success
-  after_script:
-    - |
-      if [ ! -f __success ]; then
-        echo "Job was unable to generate the coverage report."
-        echo "Check http://tezos.gitlab.io/developer/testing.html#measuring-test-coverage"
-        echo "for a list of known issues."
+    - . "$HOME"/.venv/bin/activate
+  script: >
+    if [ "$CI_COMMIT_BRANCH" = "$TEZOS_DEFAULT_BRANCH" ] || [ "$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME" = "$TEZOS_DEFAULT_BRANCH" ]; then
+      # On the default branch (master), we fetch coverage from the latest merged MR.
+      COVERAGE_START_COMMIT=$CI_COMMIT_SHA poetry run python3 scripts/ci/coverage.py;
+    else
+      # On the development branches, we compute coverage
+      CORRUPTED_FILES=$(find "$BISECT_FILE" -name \*.corrupted.coverage -type f -print | wc -l);
+      if [ "$CORRUPTED_FILES" != 0 ]; then
+        echo "Corrupted files were found, please report this in https://gitlab.com/tezos/tezos/-/issues/1529:";
+        find "$BISECT_FILE" -name \*.corrupted.coverage -type f -print;
+        scripts/send_slack_alert_coverage.sh $SLACK_COVERAGE_TOKEN $SLACK_COVERAGE_CHANNEL $CI_PIPELINE_URL;
+        exit 1;
       fi
-  # This is for gitlab to extract the coverage summary and display it
-  # to the user as a badge.
-  coverage: '/Coverage: \d+\/\d+ \(([^%]+%)\)/'
+      make coverage-report;
+      # We rewrite the output of the summary to remove the points information
+      # matching the coverage regexp below.
+      make coverage-report-summary | sed 's@Coverage: [[:digit:]]\+/[[:digit:]]\+ (\(.*%\))@Coverage: \1@';
+      make coverage-report-cobertura
+    fi
+  coverage: '/Coverage: ([^%]+%)/'
   artifacts:
+    expose_as: 'Coverage report'
     when: always
+    reports:
+      cobertura: _coverage_report/cobertura.xml
     paths:
       - _coverage_report/
     expire_in: 15 days

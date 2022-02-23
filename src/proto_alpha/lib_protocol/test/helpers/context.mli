@@ -33,9 +33,14 @@ val branch : t -> Block_hash.t
 
 val get_level : t -> Raw_level.t tzresult
 
-val get_endorsers : t -> Plugin.RPC.Endorsing_rights.t list tzresult Lwt.t
+val get_endorsers : t -> Plugin.RPC.Validators.t list tzresult Lwt.t
 
-val get_endorser : t -> (public_key_hash * int list) tzresult Lwt.t
+val get_endorser : t -> (public_key_hash * Slot.t list) tzresult Lwt.t
+
+val get_endorser_n : t -> int -> (public_key_hash * Slot.t list) tzresult Lwt.t
+
+val get_endorsing_power_for_delegate :
+  t -> ?levels:Raw_level.t list -> public_key_hash -> int tzresult Lwt.t
 
 val get_voting_power :
   t -> public_key_hash -> int32 Environment.Error_monad.shell_tzresult Lwt.t
@@ -43,7 +48,12 @@ val get_voting_power :
 val get_total_voting_power :
   t -> int32 Environment.Error_monad.shell_tzresult Lwt.t
 
-val get_bakers : t -> public_key_hash list tzresult Lwt.t
+val get_bakers :
+  ?filter:(Plugin.RPC.Baking_rights.t -> bool) ->
+  t ->
+  public_key_hash list tzresult Lwt.t
+
+val get_baker : t -> round:int -> public_key_hash tzresult Lwt.t
 
 val get_seed_nonce_hash : t -> Nonce_hash.t tzresult Lwt.t
 
@@ -53,14 +63,12 @@ val get_seed : t -> Seed.seed tzresult Lwt.t
 (** Returns all the constants of the protocol *)
 val get_constants : t -> Constants.t tzresult Lwt.t
 
-val get_minimal_valid_time :
-  t -> priority:int -> endorsing_power:int -> Time.t tzresult Lwt.t
+val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 
-val get_baking_reward :
-  t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
+val get_bonus_reward : t -> endorsing_power:int -> Tez.t tzresult Lwt.t
 
 val get_endorsing_reward :
-  t -> priority:int -> endorsing_power:int -> Tez.t tzresult Lwt.t
+  t -> expected_endorsing_power:int -> Tez.t tzresult Lwt.t
 
 val get_liquidity_baking_subsidy : t -> Tez.t tzresult Lwt.t
 
@@ -97,12 +105,10 @@ module Contract : sig
 
   val pkh : Contract.t -> public_key_hash tzresult Lwt.t
 
-  type balance_kind = Main | Deposit | Fees | Rewards
-
   (** Returns the balance of a contract, by default the main balance.
       If the contract is implicit the frozen balances are available too:
       deposit, fees or rewards. *)
-  val balance : ?kind:balance_kind -> t -> Contract.t -> Tez.t tzresult Lwt.t
+  val balance : t -> Contract.t -> Tez.t tzresult Lwt.t
 
   val counter : t -> Contract.t -> Z.t tzresult Lwt.t
 
@@ -123,10 +129,11 @@ end
 
 module Delegate : sig
   type info = Delegate_services.info = {
-    balance : Tez.t;
-    frozen_balance : Tez.t;
-    frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+    full_balance : Tez.t;
+    current_frozen_deposits : Tez.t;
+    frozen_deposits : Tez.t;
     staking_balance : Tez.t;
+    frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
@@ -135,23 +142,52 @@ module Delegate : sig
   }
 
   val info : t -> public_key_hash -> Delegate_services.info tzresult Lwt.t
+
+  val full_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  val current_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  (** calls the RPC [frozen_deposits]: we're using a different name to
+     be more easily distinguishable from [current_frozen_deposits] *)
+  val initial_frozen_deposits : t -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  val staking_balance : t -> public_key_hash -> Tez.t tzresult Lwt.t
+
+  val frozen_deposits_limit :
+    t -> public_key_hash -> Tez.t option tzresult Lwt.t
+
+  val deactivated : t -> public_key_hash -> bool tzresult Lwt.t
+
+  val participation :
+    t -> public_key_hash -> Delegate.participation_info tzresult Lwt.t
+end
+
+module Tx_rollup : sig
+  val state : t -> Tx_rollup.t -> Tx_rollup.state option tzresult Lwt.t
 end
 
 (** [init n] : returns an initial block with [n] initialized accounts
     and the associated implicit contracts *)
 val init :
   ?rng_state:Random.State.t ->
-  ?endorsers_per_block:int ->
-  ?with_commitments:bool ->
+  ?commitments:Commitment.t list ->
   ?initial_balances:int64 list ->
-  ?initial_endorsers:int ->
+  ?consensus_threshold:int ->
   ?min_proposal_quorum:int32 ->
-  ?time_between_blocks:Period.t list ->
-  ?minimal_block_delay:Period.t ->
-  ?delay_per_missing_endorsement:Period.t ->
   ?bootstrap_contracts:Parameters.bootstrap_contract list ->
   ?level:int32 ->
   ?cost_per_byte:Tez.t ->
   ?liquidity_baking_subsidy:Tez.t ->
+  ?endorsing_reward_per_slot:Tez.t ->
+  ?baking_reward_bonus_per_slot:Tez.t ->
+  ?baking_reward_fixed_portion:Tez.t ->
+  ?origination_size:int ->
+  ?blocks_per_cycle:int32 ->
+  ?tx_rollup_enable:bool ->
+  int ->
+  (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t
+
+val init_with_constants :
+  Constants.parametric ->
   int ->
   (Block.t * Alpha_context.Contract.t list) tzresult Lwt.t

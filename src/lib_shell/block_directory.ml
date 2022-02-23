@@ -42,6 +42,7 @@ let read_partial_context =
             ~depth:(`Le depth)
             context
             path
+            ~order:`Sorted
             ~init
             ~f:(fun k tree acc ->
               let open Block_services in
@@ -328,10 +329,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
   (* context *)
   register1 S.Context.read (fun (chain_store, block) path q () ->
       let depth = Option.value ~default:max_int q#depth in
-      fail_unless
-        (depth >= 0)
-        (Tezos_shell_services.Block_services.Invalid_depth_arg depth)
-      >>=? fun () ->
+      (* [depth] is defined as a [uint] not an [int] *)
+      assert (depth >= 0) ;
       Store.Block.context chain_store block >>=? fun context ->
       Context.mem context path >>= fun mem ->
       Context.mem_tree context path >>= fun dir_mem ->
@@ -489,6 +488,7 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
              ~timestamp
            >>=? fun value_of_key ->
            Tezos_protocol_environment.Context.load_cache
+             predecessor
              predecessor_context
              `Lazy
              value_of_key
@@ -559,56 +559,8 @@ let get_directory chain_store block =
               dir
             >>= fun () -> Lwt.return dir)
 
-let get_block chain_store = function
-  | `Genesis ->
-      Store.Chain.genesis_block chain_store >>= fun block ->
-      Lwt.return_some block
-  | `Head n ->
-      Store.Chain.current_head chain_store >>= fun current_head ->
-      if n < 0 then Lwt.return_none
-      else if n = 0 then Lwt.return_some current_head
-      else
-        Store.Block.read_block_opt
-          chain_store
-          ~distance:n
-          (Store.Block.hash current_head)
-  | (`Alias (_, n) | `Hash (_, n)) as b ->
-      (match b with
-      | `Alias (`Checkpoint, _) ->
-          Store.Chain.checkpoint chain_store >>= fun (checkpoint_hash, _) ->
-          Lwt.return checkpoint_hash
-      | `Alias (`Savepoint, _) ->
-          Store.Chain.savepoint chain_store >>= fun (savepoint_hash, _) ->
-          Lwt.return savepoint_hash
-      | `Alias (`Caboose, _) ->
-          Store.Chain.caboose chain_store >>= fun (caboose_hash, _) ->
-          Lwt.return caboose_hash
-      | `Hash (h, _) -> Lwt.return h)
-      >>= fun hash ->
-      if n < 0 then
-        Store.Block.read_block_opt chain_store hash >>= function
-        | None -> Lwt.fail Not_found
-        | Some block ->
-            Store.Chain.current_head chain_store >>= fun current_head ->
-            let head_level = Store.Block.level current_head in
-            let block_level = Store.Block.level block in
-            let distance =
-              Int32.(to_int (sub head_level (sub block_level (of_int n))))
-            in
-            if distance < 0 then Lwt.return_none
-            else
-              Store.Block.read_block_opt
-                chain_store
-                ~distance
-                (Store.Block.hash current_head)
-      else if n = 0 then Store.Block.read_block_opt chain_store hash
-      else Store.Block.read_block_opt chain_store ~distance:n hash
-  | `Level i ->
-      if Compare.Int32.(i < 0l) then Lwt.fail Not_found
-      else Store.Block.read_block_by_level_opt chain_store i
-
 let build_rpc_directory chain_store block =
-  get_block chain_store block >>= function
+  Store.Chain.block_of_identifier_opt chain_store block >>= function
   | None -> Lwt.fail Not_found
   | Some b ->
       get_directory chain_store b >>= fun dir ->

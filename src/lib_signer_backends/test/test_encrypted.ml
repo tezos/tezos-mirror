@@ -20,7 +20,7 @@ let loops = 10
 
 let passwords =
   List.map
-    Bytes.unsafe_of_string
+    Bytes.of_string
     [
       "ahThie5H";
       "aVah7eid";
@@ -82,7 +82,7 @@ let fake_ctx () =
   end
 
 let make_sk_uris =
-  List.map_ep (fun path ->
+  List.map_e (fun path ->
       Client_keys.make_sk_uri (Uri.make ~scheme:"encrypted" ~path ()))
 
 let ed25519_sks =
@@ -139,7 +139,7 @@ let test_vectors () =
     (fun (sks, encrypted_sks) ->
       let ctx = fake_ctx () in
       let sks = List.map Signature.Secret_key.of_b58check_exn sks in
-      encrypted_sks >>=? List.map_es (decrypt ctx) >>=? fun decs ->
+      encrypted_sks >>?= List.map_es (decrypt ctx) >>=? fun decs ->
       assert (decs = sks) ;
       return_unit)
     [

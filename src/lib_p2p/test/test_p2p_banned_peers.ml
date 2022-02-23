@@ -110,7 +110,10 @@ let test_clear _ =
     The GC is configured to run 16 times in 0.1 seconds. Since
     16 is hardcoded as the number of GCs to evict a peer from the
     table (see p2p_acl.ml), the table must be empty at the end. *)
-let test_gc _ =
+
+(* flaky test, see below *)
+
+let _test_gc _ =
   let set =
     P2p_acl.create
       ~peer_id_size:10
@@ -143,7 +146,7 @@ let () =
             ("empty", test_empty);
             ("ban", test_ban);
             ("clear", test_clear);
-            (* FIXME flappy test:
+            (* FIXME flaky test:
                ("test_gc", test_gc)
             *)
           ] );

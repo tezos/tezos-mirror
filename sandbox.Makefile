@@ -1,30 +1,24 @@
 TMP=/tmp
 
-CURRENT_PROTO=010-PtGRANAD
-CURRENT_PROTO_HASH=PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
-CURRENT_PROTO_NAME=Granada
-## To be recommented when protocol G is over
-NEXT_PROTO=011-PtHangz2
-NEXT_PROTO_HASH=PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
-NEXT_PROTO_NAME=Hangzhou
+CURRENT_PROTO=011-PtHangz2
+CURRENT_PROTO_HASH=PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
+CURRENT_PROTO_NAME=Hangzhou
+NEXT_PROTO=012-Psithaca
+NEXT_PROTO_HASH=Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
+NEXT_PROTO_NAME=Ithaca
 ALPHA_PROTO=alpha
 ALPHA_PROTO_HASH=ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
 
 .PHONY: all
-all: accusations_simple_double_baking \
-	accusations_simple_double_endorsing \
-	voting_demo_noops \
-	user_activated_upgrade_alpha \
-	daemons_upgrade_alpha \
-	node_synchronization
-all: accusations_simple_double_baking \
-	accusations_simple_double_endorsing \
-	voting_demo_noops \
+all: accusations_simple_double_endorsing \
 	user_activated_upgrade_next \
 	user_activated_upgrade_alpha \
 	daemons_upgrade_next \
-	daemons_upgrade_alpha \
-	node_synchronization
+	daemons_upgrade_alpha
+
+# These are the targets that are actually run in ./.gitlab/ci/integration.yml
+ci: all
+
 
 # The following rules define how to build Tezos binaries if they are
 # missing.
@@ -65,15 +59,6 @@ tezos-sandbox:
 #
 # Those rules are directly translated from src/bin_sandbox/dune rules.
 
-.PHONY: accusations_simple_double_baking
-accusations_simple_double_baking: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox accusations simple-double-baking \
-	  --root-path ${TMP}/flextesa-acc-sdb/ \
-	  --with-timestamp \
-	  --base-port 10_000 \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node
-
 .PHONY: accusations_simple_double_endorsing
 accusations_simple_double_endorsing: tezos-sandbox tezos-client tezos-node
 	./tezos-sandbox accusations simple-double-endorsing \
@@ -81,28 +66,21 @@ accusations_simple_double_endorsing: tezos-sandbox tezos-client tezos-node
 	  --with-timestamp \
 	  --base-port 11_000 \
 	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node
+	  --tezos-node-binary ./tezos-node \
+	  --protocol-hash ${CURRENT_PROTO_HASH} \
+	  --protocol-kind ${CURRENT_PROTO_NAME}
 
-.PHONY: voting_demo_noops
-voting_demo_noops: tezos-sandbox tezos-client tezos-admin-client tezos-node
-	./tezos-sandbox voting \
-	  src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL \
-	  src/proto_demo_noops/lib_protocol/TEZOS_PROTOCOL \
-	  --root-path ${TMP}/flextesa-voting-demo-noops/ \
-	  --base-port 12_000 \
-	  --size 3 \
-	  --with-timestamp \
-	  --winning-client-is-clueless \
-	  --winner-client-binary ./tezos-client \
-	  --current-client-binary ./tezos-client \
-	  --current-admin-client-binary ./tezos-admin-client \
-	  --current-node-binary ./tezos-node \
-	  --timestamp-delay=-600
-
+# The use of --second-endorser ./tezos-baker-${NEXT_PROTO} is a hack since
+# there is no endorser binary on Tenderbake.
+#
+# Since user_activated_upgrade_* tests do not really use the endorsers but
+# nonetheless check the presence of the file, we can substitute it by another
+# file that we know to exist The same hack is applied for the
+# daemons_upgrade_* target below
 .PHONY: user_activated_upgrade_next
 user_activated_upgrade_next: tezos-sandbox tezos-client tezos-node \
 	tezos-baker-${CURRENT_PROTO} tezos-endorser-${CURRENT_PROTO} tezos-accuser-${CURRENT_PROTO} \
-	tezos-baker-${NEXT_PROTO} tezos-endorser-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO}
+	tezos-baker-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO}
 	./tezos-sandbox mini-net \
 	  --root-path ${TMP}/flextesa-hard-fork/ \
 	  --base-port 13_000 \
@@ -119,13 +97,13 @@ user_activated_upgrade_next: tezos-sandbox tezos-client tezos-node \
 	  --tezos-accuser ./tezos-accuser-${CURRENT_PROTO} \
 	  --hard-fork 8:${NEXT_PROTO_HASH} \
 	  --hard-fork-baker ./tezos-baker-${NEXT_PROTO} \
-	  --hard-fork-endorser ./tezos-endorser-${NEXT_PROTO} \
+	  --hard-fork-endorser ./tezos-baker-${NEXT_PROTO} \
 	  --hard-fork-accuser ./tezos-accuser-${NEXT_PROTO}
 
 .PHONY: user_activated_upgrade_alpha
 user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
-	tezos-baker-${CURRENT_PROTO} tezos-endorser-${CURRENT_PROTO} tezos-accuser-${CURRENT_PROTO} \
-	tezos-baker-${ALPHA_PROTO} tezos-endorser-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
+	tezos-baker-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \
+	tezos-baker-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
 	./tezos-sandbox mini-net \
 	  --root-path ${TMP}/flextesa-hard-fork-alpha/ \
 	  --base-port 14_000 \
@@ -133,22 +111,23 @@ user_activated_upgrade_alpha: tezos-sandbox tezos-client tezos-node \
 	  --number-of-b 2 \
 	  --with-timestamp \
 	  --until 20 \
-	  --protocol-hash ${CURRENT_PROTO_HASH} \
-	  --protocol-kind ${CURRENT_PROTO_NAME} \
+	  --protocol-hash ${NEXT_PROTO_HASH} \
+	  --protocol-kind ${NEXT_PROTO_NAME} \
 	  --tezos-client ./tezos-client \
 	  --tezos-node ./tezos-node \
-	  --tezos-baker ./tezos-baker-${CURRENT_PROTO} \
-	  --tezos-endorser ./tezos-endorser-${CURRENT_PROTO} \
-	  --tezos-accuser ./tezos-accuser-${CURRENT_PROTO} \
+	  --tezos-baker ./tezos-baker-${NEXT_PROTO} \
+	  --tezos-endorser ./tezos-baker-${NEXT_PROTO} \
+	  --tezos-accuser ./tezos-accuser-${NEXT_PROTO} \
 	  --hard-fork 8:${ALPHA_PROTO_HASH} \
 	  --hard-fork-baker ./tezos-baker-${ALPHA_PROTO} \
-	  --hard-fork-endorser ./tezos-endorser-${ALPHA_PROTO} \
+	  --hard-fork-endorser ./tezos-baker-${ALPHA_PROTO} \
 	  --hard-fork-accuser ./tezos-accuser-${ALPHA_PROTO}
 
+# See above the reason for --second-endorser ./tezos-baker-${NEXT_PROTO}
 .PHONY: daemons_upgrade_next
 daemons_upgrade_next: tezos-sandbox tezos-client tezos-admin-client tezos-node \
 	tezos-baker-${CURRENT_PROTO} tezos-endorser-${CURRENT_PROTO} tezos-accuser-${CURRENT_PROTO} \
-	tezos-baker-${NEXT_PROTO} tezos-endorser-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO}
+	tezos-baker-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO}
 	./tezos-sandbox daemons-upgrade \
 	  src/proto_${subst -,_,${NEXT_PROTO}}/lib_protocol/TEZOS_PROTOCOL \
 	  --root-path ${TMP}/flextesa-daemons-upgrade/ \
@@ -169,13 +148,13 @@ daemons_upgrade_next: tezos-sandbox tezos-client tezos-admin-client tezos-node \
 	  --first-endorser ./tezos-endorser-${CURRENT_PROTO} \
 	  --first-accuser ./tezos-accuser-${CURRENT_PROTO} \
 	  --second-baker ./tezos-baker-${NEXT_PROTO} \
-	  --second-endorser ./tezos-endorser-${NEXT_PROTO} \
+	  --second-endorser ./tezos-baker-${NEXT_PROTO} \
 	  --second-accuser ./tezos-accuser-${NEXT_PROTO}
 
 .PHONY: daemons_upgrade_alpha
 daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node \
-	tezos-baker-${CURRENT_PROTO} tezos-endorser-${CURRENT_PROTO} tezos-accuser-${CURRENT_PROTO} \
-	tezos-baker-${ALPHA_PROTO} tezos-endorser-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
+	tezos-baker-${NEXT_PROTO} tezos-accuser-${NEXT_PROTO} \
+	tezos-baker-${ALPHA_PROTO} tezos-accuser-${ALPHA_PROTO}
 	./tezos-sandbox daemons-upgrade \
 	  src/proto_${subst -,_,${ALPHA_PROTO}}/lib_protocol/TEZOS_PROTOCOL \
 	  --root-path ${TMP}/flextesa-daemons-upgrade-alpha/ \
@@ -187,87 +166,14 @@ daemons_upgrade_alpha: tezos-sandbox tezos-client tezos-admin-client tezos-node 
 	  --time-betw 3 \
 	  --blocks-per-vot 14 \
 	  --with-timestamp \
-	  --protocol-hash ${CURRENT_PROTO_HASH} \
-	  --protocol-kind ${CURRENT_PROTO_NAME} \
+	  --protocol-hash ${NEXT_PROTO_HASH} \
+	  --protocol-kind ${NEXT_PROTO_NAME} \
 	  --tezos-client ./tezos-client \
 	  --tezos-admin ./tezos-admin-client \
 	  --tezos-node ./tezos-node \
-	  --first-baker ./tezos-baker-${CURRENT_PROTO} \
-	  --first-endorser ./tezos-endorser-${CURRENT_PROTO} \
-	  --first-accuser ./tezos-accuser-${CURRENT_PROTO} \
+	  --first-baker ./tezos-baker-${NEXT_PROTO} \
+	  --first-endorser ./tezos-baker-${NEXT_PROTO} \
+	  --first-accuser ./tezos-accuser-${NEXT_PROTO} \
 	  --second-baker ./tezos-baker-${ALPHA_PROTO} \
-	  --second-endorser ./tezos-endorser-${ALPHA_PROTO} \
+	  --second-endorser ./tezos-baker-${ALPHA_PROTO} \
 	  --second-accuser ./tezos-accuser-${ALPHA_PROTO}
-
-# The following tests (node synchronization) cannot be run in parallel
-# because they don't support --base-port.
-# They are also not run in the CI, probably because an equivalent Tezt test exists.
-
-.PHONY: node_synchronization_archive_full
-node_synchronization_archive_full: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-archive-full/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode archive \
-	  --secondary-history-mode full \
-	  --should-synch true
-
-.PHONY: node_synchronization_archive_rolling
-node_synchronization_archive_rolling: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-archive-rolling/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode archive \
-	  --secondary-history-mode rolling \
-	  --should-synch true
-
-.PHONY: node_synchronization_full_archive
-node_synchronization_full_archive: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-full-archive/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode full \
-	  --secondary-history-mode archive \
-	  --should-synch true
-
-.PHONY: node_synchronization_full_rolling
-node_synchronization_full_rolling: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-full-rolling/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode full \
-	  --secondary-history-mode rolling \
-	  --should-synch true
-
-.PHONY: node_synchronization_rolling_archive
-node_synchronization_rolling_archive: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-rolling-archive/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode rolling \
-	  --secondary-history-mode archive \
-	  --should-synch false
-
-.PHONY: node_synchronization_rolling_full
-node_synchronization_rolling_full: tezos-sandbox tezos-client tezos-node
-	./tezos-sandbox node-synchronization \
-	  --root-path ${TMP}/flextesa-node-synchronization-rolling-full/ \
-	  --tezos-client-binary ./tezos-client \
-	  --tezos-node-binary ./tezos-node \
-	  --primary-history-mode rolling \
-	  --secondary-history-mode full \
-	  --should-synch false
-
-# The full "node synchronization" collection.
-.PHONY: node_synchronization
-node_synchronization: node_synchronization_archive_full \
-	node_synchronization_archive_rolling \
-	node_synchronization_full_archive \
-	node_synchronization_full_rolling \
-	node_synchronization_rolling_archive \
-	node_synchronization_rolling_full

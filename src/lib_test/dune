@@ -2,5 +2,16 @@
  (name lib_test)
  (public_name tezos-test-helpers)
  (instrumentation (backend bisect_ppx))
- (libraries uri qcheck-alcotest alcotest alcotest-lwt)
+ (libraries
+  uri
+  fmt
+  qcheck-alcotest
+  alcotest
+  lwt
+  pure-splitmix)
+ (js_of_ocaml)
  (flags (:standard -linkall)))
+
+;; This rule is necessary for `make lint-tests-pkg`, without it dune
+;; complains that the alias is empty
+(rule (alias runtest_js) (action progn))

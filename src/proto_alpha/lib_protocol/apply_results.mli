@@ -55,21 +55,27 @@ and packed_contents_result_list =
 
 (** Result of applying an {!Operation.contents}. Follows the same structure. *)
 and 'kind contents_result =
+  | Preendorsement_result : {
+      balance_updates : Receipt.balance_updates;
+      delegate : Signature.Public_key_hash.t;
+      preendorsement_power : int;
+    }
+      -> Kind.preendorsement contents_result
   | Endorsement_result : {
       balance_updates : Receipt.balance_updates;
       delegate : Signature.Public_key_hash.t;
-      slots : int list;
+      endorsement_power : int;
     }
       -> Kind.endorsement contents_result
   | Seed_nonce_revelation_result :
       Receipt.balance_updates
       -> Kind.seed_nonce_revelation contents_result
-  | Endorsement_with_slot_result :
-      Kind.endorsement contents_result
-      -> Kind.endorsement_with_slot contents_result
   | Double_endorsement_evidence_result :
       Receipt.balance_updates
       -> Kind.double_endorsement_evidence contents_result
+  | Double_preendorsement_evidence_result :
+      Receipt.balance_updates
+      -> Kind.double_preendorsement_evidence contents_result
   | Double_baking_evidence_result :
       Receipt.balance_updates
       -> Kind.double_baking_evidence contents_result
@@ -148,6 +154,16 @@ and _ successful_manager_operation_result =
       global_address : Script_expr_hash.t;
     }
       -> Kind.register_global_constant successful_manager_operation_result
+  | Set_deposits_limit_result : {
+      consumed_gas : Gas.Arith.fp;
+    }
+      -> Kind.set_deposits_limit successful_manager_operation_result
+  | Tx_rollup_origination_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      originated_tx_rollup : Tx_rollup.t;
+    }
+      -> Kind.tx_rollup_origination successful_manager_operation_result
 
 and packed_successful_manager_operation_result =
   | Successful_manager_result :
@@ -206,6 +222,7 @@ val kind_equal_list :
   ('kind, 'kind2) eq option
 
 type block_metadata = {
+  proposer : Signature.Public_key_hash.t;
   baker : Signature.Public_key_hash.t;
   level_info : Level.t;
   voting_period_info : Voting_period.info;
@@ -218,3 +235,22 @@ type block_metadata = {
 }
 
 val block_metadata_encoding : block_metadata Data_encoding.encoding
+
+type precheck_result = {
+  consumed_gas : Gas.Arith.fp;
+  balance_updates : Receipt.balance_updates;
+}
+
+type 'kind prechecked_contents = {
+  contents : 'kind contents;
+  result : precheck_result;
+}
+
+type _ prechecked_contents_list =
+  | PrecheckedSingle :
+      'kind prechecked_contents
+      -> 'kind prechecked_contents_list
+  | PrecheckedCons :
+      'kind Kind.manager prechecked_contents
+      * 'rest Kind.manager prechecked_contents_list
+      -> ('kind * 'rest) Kind.manager prechecked_contents_list

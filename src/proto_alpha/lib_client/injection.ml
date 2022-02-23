@@ -29,17 +29,21 @@ open Alpha_context
 open Apply_results
 open Protocol_client_context
 
-(* Under normal network conditions and an attacker with less
-   than 33% of stake, an operation can be considered final with
-   quasi-certainty if there are at least 5 blocks built on top of it.
-   See Emmy* TZIP for more detailed explanations. *)
-let num_confirmation_blocks = 5
-
 let get_branch (rpc_config : #Protocol_client_context.full) ~chain
     ~(block : Block_services.block) branch =
+  (* The default branch is set to HEAD~2, because with Tenderbake the
+     same transaction may be included again in another block candidate
+     at the same level, so the operation branch should not point to
+     the current head. It's not a good idea if it points to the head's
+     predecessor as well, as the predecessor hash may still change
+     because of potential reorgs (only the predecessor payload is
+     finalized, not the whole block). *)
   let branch = Option.value ~default:0 branch in
   (* TODO export parameter *)
   (match block with
+  | `Head 0 ->
+      (* Default client's block value: we branch to head's grandfather *)
+      return (`Head (2 + branch))
   | `Head n -> return (`Head (n + branch))
   | `Hash (h, n) -> return (`Hash (h, n + branch))
   | `Alias (a, n) -> return (`Alias (a, n))
@@ -58,9 +62,8 @@ type 'kind result_list =
 
 type 'kind result = Operation_hash.t * 'kind contents * 'kind contents_result
 
-let get_manager_operation_gas_and_fee contents =
-  let open Operation in
-  let l = to_list (Contents_list contents) in
+let get_manager_operation_gas_and_fee (contents : packed_contents_list) =
+  let l = Operation.to_list contents in
   List.fold_left
     (fun acc -> function
       | Contents (Manager_operation {fee; gas_limit; _}) -> (
@@ -106,7 +109,7 @@ let check_fees :
     int ->
     unit Lwt.t =
  fun cctxt config op size ->
-  match get_manager_operation_gas_and_fee op with
+  match Contents_list op |> get_manager_operation_gas_and_fee with
   | Error _ -> assert false (* FIXME *)
   | Ok (fee, gas) ->
       if Tez.compare fee config.fee_cap > 0 then
@@ -229,7 +232,7 @@ let print_for_verbose_signing ppf ~watermark ~bytes ~branch ~contents =
 let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
     ?(verbose_signing = false) ?fee_parameter ?branch ?src_sk
     (contents : t contents_list) =
-  get_branch cctxt ~chain ~block branch >>=? fun (chain_id, branch) ->
+  get_branch cctxt ~chain ~block branch >>=? fun (_chain_id, branch) ->
   let bytes =
     Data_encoding.Binary.to_bytes_exn
       Operation.unsigned_encoding
@@ -240,7 +243,7 @@ let preapply (type t) (cctxt : #Protocol_client_context.full) ~chain ~block
   | Some src_sk ->
       let watermark =
         match contents with
-        | Single (Endorsement _) -> Signature.(Endorsement chain_id)
+        (* TODO-TB sign endosrement? *)
         | _ -> Signature.Generic_operation
       in
       (if verbose_signing then
@@ -314,6 +317,9 @@ let estimated_gas_single (type kind)
     | Applied (Delegation_result {consumed_gas}) -> Ok consumed_gas
     | Applied (Register_global_constant_result {consumed_gas; _}) ->
         Ok consumed_gas
+    | Applied (Set_deposits_limit_result {consumed_gas}) -> Ok consumed_gas
+    | Applied (Tx_rollup_origination_result {consumed_gas; _}) ->
+        Ok consumed_gas
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Gas.Arith.zero (* there must be another error for this to happen *)
@@ -327,7 +333,8 @@ let estimated_gas_single (type kind)
     (consumed_gas operation_result)
     internal_operation_results
 
-let estimated_storage_single (type kind) origination_size
+let estimated_storage_single (type kind) ~tx_rollup_origination_size
+    ~origination_size
     (Manager_operation_result {operation_result; internal_operation_results; _} :
       kind Kind.manager contents_result) =
   let storage_size_diff (type kind) (result : kind manager_operation_result) =
@@ -344,6 +351,8 @@ let estimated_storage_single (type kind) origination_size
     | Applied (Delegation_result _) -> Ok Z.zero
     | Applied (Register_global_constant_result {size_of_constant; _}) ->
         Ok size_of_constant
+    | Applied (Set_deposits_limit_result _) -> Ok Z.zero
+    | Applied (Tx_rollup_origination_result _) -> Ok tx_rollup_origination_size
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok Z.zero (* there must be another error for this to happen *)
@@ -357,14 +366,21 @@ let estimated_storage_single (type kind) origination_size
     (storage_size_diff operation_result)
     internal_operation_results
 
-let estimated_storage origination_size res =
+let estimated_storage ~tx_rollup_origination_size ~origination_size res =
   let rec estimated_storage : type kind. kind contents_result_list -> _ =
     function
     | Single_result (Manager_operation_result _ as res) ->
-        estimated_storage_single origination_size res
+        estimated_storage_single
+          ~tx_rollup_origination_size
+          ~origination_size
+          res
     | Single_result _ -> Ok Z.zero
     | Cons_result (res, rest) ->
-        estimated_storage_single origination_size res >>? fun storage1 ->
+        estimated_storage_single
+          ~tx_rollup_origination_size
+          ~origination_size
+          res
+        >>? fun storage1 ->
         estimated_storage rest >>? fun storage2 -> Ok (Z.add storage1 storage2)
   in
   estimated_storage res >>? fun diff -> Ok (Z.max Z.zero diff)
@@ -382,6 +398,8 @@ let originated_contracts_single (type kind)
     | Applied (Register_global_constant_result _) -> Ok []
     | Applied (Reveal_result _) -> Ok []
     | Applied (Delegation_result _) -> Ok []
+    | Applied (Set_deposits_limit_result _) -> Ok []
+    | Applied (Tx_rollup_origination_result _) -> Ok []
     | Skipped _ -> assert false
     | Backtracked (_, None) ->
         Ok [] (* there must be another error for this to happen *)
@@ -448,6 +466,29 @@ let detect_script_failure : type kind. kind operation_metadata -> _ =
 (* This value is used as a safety guard for gas limit. *)
 let safety_guard = Gas.Arith.(integral_of_int_exn 100)
 
+(*
+
+   {2 High-level description of the automatic gas patching algorithm}
+
+   When the user wants to inject a list of operations, some of which
+   might have unspecified gas, fees or storage limit, the client
+   performs a {e simulation} to estimate those limits and assign
+   sensible values to them.
+
+   The simulation works as follows:
+   1. limits are assigned to dummy, high values to ensure that the operations
+      can be simulated
+      - 1.a) when a list of operations is partially specified, the algorithm
+        allocates to each unspecified operation an equal portion of the
+        maximum gas per block minus the gas consumed by the operations that
+        do specify their limit
+   2. the algorithm retrieves the effectively consumed gas and storage from the
+      receipt
+   3. the algorithm assigns slight overapproximations to the operation
+   4. a default fee is computed and set
+
+*)
+
 let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
     ~fee_parameter ~chain ~block ?branch
     (annotated_contents : kind Annotated_manager_operation.annotated_list) :
@@ -459,8 +500,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
              parametric =
                {
                  hard_gas_limit_per_operation;
+                 hard_gas_limit_per_block;
                  hard_storage_limit_per_operation;
                  origination_size;
+                 tx_rollup_origination_size;
                  cost_per_byte;
                  _;
                };
@@ -480,10 +523,39 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           user_storage_limit < Z.zero
           || hard_storage_limit_per_operation < user_storage_limit))
   in
+  let gas_patching_stats (Annotated_manager_operation.Manager_info c)
+      need_patching gas_consumed =
+    if user_gas_limit_needs_patching c.gas_limit then
+      (need_patching + 1, gas_consumed)
+    else
+      ( need_patching,
+        Gas.Arith.add
+          gas_consumed
+          (Limit.value ~when_unknown:Gas.Arith.zero c.gas_limit) )
+  in
+  let rec gas_patching_stats_list :
+      type kind.
+      kind Annotated_manager_operation.annotated_list ->
+      int ->
+      Saturation_repr.may_saturate Saturation_repr.t ->
+      int * Saturation_repr.may_saturate Saturation_repr.t =
+   fun op need_patching gas_consumed ->
+    match op with
+    | Single_manager minfo ->
+        gas_patching_stats minfo need_patching gas_consumed
+    | Cons_manager (minfo, rest) ->
+        let (need_patching, gas_consumed) =
+          gas_patching_stats minfo need_patching gas_consumed
+        in
+        gas_patching_stats_list rest need_patching gas_consumed
+  in
   let may_need_patching_single :
       type kind.
+      Gas.Arith.integral ->
       kind Annotated_manager_operation.t ->
-      kind Annotated_manager_operation.t option = function
+      kind Annotated_manager_operation.t option =
+   fun gas_limit_per_patched_op op ->
+    match op with
     | Manager_info c ->
         let needs_patching =
           Limit.is_unknown c.fee
@@ -495,7 +567,7 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           (* Set limits for simulation purposes *)
           let gas_limit =
             if user_gas_limit_needs_patching c.gas_limit then
-              Limit.known hard_gas_limit_per_operation
+              Limit.known gas_limit_per_patched_op
             else c.gas_limit
           in
           let storage_limit =
@@ -508,24 +580,39 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
             (Manager_info
                {c with gas_limit; storage_limit; fee = Limit.known fee})
   in
-  let rec may_need_patching :
-      type kind.
-      kind Annotated_manager_operation.annotated_list ->
-      kind Annotated_manager_operation.annotated_list option = function
-    | Single_manager annotated_op -> (
-        match may_need_patching_single annotated_op with
-        | None -> None
-        | Some annotated_op -> Some (Single_manager annotated_op))
-    | Cons_manager (annotated_op, rest) -> (
-        let annotated_op_opt = may_need_patching_single annotated_op in
-        let rest_opt = may_need_patching rest in
-        match (annotated_op_opt, rest_opt) with
-        | (None, None) -> None
-        | _ ->
-            let op = Option.value ~default:annotated_op annotated_op_opt in
-            let rest = Option.value ~default:rest rest_opt in
-            Some (Cons_manager (op, rest)))
+  let may_need_patching gas_limit_per_patched_op ops =
+    let rec loop :
+        type kind.
+        kind Annotated_manager_operation.annotated_list ->
+        kind Annotated_manager_operation.annotated_list option = function
+      | Single_manager annotated_op ->
+          Option.map (fun op -> Annotated_manager_operation.Single_manager op)
+          @@ may_need_patching_single gas_limit_per_patched_op annotated_op
+      | Cons_manager (annotated_op, rest) -> (
+          let annotated_op_opt =
+            may_need_patching_single gas_limit_per_patched_op annotated_op
+          in
+          let rest_opt = loop rest in
+          match (annotated_op_opt, rest_opt) with
+          | (None, None) -> None
+          | _ ->
+              let op = Option.value ~default:annotated_op annotated_op_opt in
+              let rest = Option.value ~default:rest rest_opt in
+              Some (Cons_manager (op, rest)))
+    in
+    loop ops
   in
+  (*
+    The recursion here handles the case where an increased fee might increase the
+    size of the operation, and so require a recalculation of the gas costs.
+    Rationale for termination:
+    - the fee for size increases linearly with the size of the operation.
+    - however, when the size of the operation increase to make space for an
+      increased fee, the amount of new fee that can be added without increasing
+      the size of the block again increases exponentially.
+    - hence, there will eventually be a increase of size that will fit any new
+      fee without having to increase the size of the operation again.
+  *)
   let rec patch_fee : type kind. first:bool -> kind contents -> kind contents =
    fun ~first -> function
     | Manager_operation c as op -> (
@@ -603,7 +690,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         >>=? fun op ->
         (if user_storage_limit_needs_patching c.storage_limit then
          Lwt.return
-           (estimated_storage_single (Z.of_int origination_size) result)
+           (estimated_storage_single
+              ~tx_rollup_origination_size:(Z.of_int tx_rollup_origination_size)
+              ~origination_size:(Z.of_int origination_size)
+              result)
          >>=? fun storage ->
          if Z.equal storage Z.zero then
            cctxt#message "Estimated storage: no bytes added" >>= fun () ->
@@ -652,7 +742,22 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         return (Cons (op, rest))
     | _ -> assert false
   in
-  match may_need_patching annotated_contents with
+  let gas_limit_per_patched_op =
+    let (need_gas_patching, gas_consumed) =
+      gas_patching_stats_list annotated_contents 0 Gas.Arith.zero
+    in
+    if need_gas_patching = 0 then hard_gas_limit_per_operation
+    else
+      let remaining_gas = Gas.Arith.sub hard_gas_limit_per_block gas_consumed in
+      let average_per_operation_gas =
+        Gas.Arith.integral_exn
+        @@ Z.div
+             (Gas.Arith.integral_to_z remaining_gas)
+             (Z.of_int need_gas_patching)
+      in
+      Gas.Arith.min hard_gas_limit_per_operation average_per_operation_gas
+  in
+  match may_need_patching gas_limit_per_patched_op annotated_contents with
   | Some annotated_for_simulation ->
       Lwt.return
         (Annotated_manager_operation.manager_list_from_annotated
@@ -670,7 +775,10 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
           >>= fun () -> return_unit)
       >>=? fun () ->
       ( Lwt.return
-          (estimated_storage (Z.of_int origination_size) result.contents)
+          (estimated_storage
+             ~tx_rollup_origination_size:(Z.of_int tx_rollup_origination_size)
+             ~origination_size:(Z.of_int origination_size)
+             result.contents)
       >>=? fun storage ->
         Lwt.return
           (Environment.wrap_tzresult Tez.(cost_per_byte *? Z.to_int64 storage))
@@ -696,6 +804,27 @@ let may_patch_limits (type kind) (cctxt : #Protocol_client_context.full)
         (Annotated_manager_operation.manager_list_from_annotated
            annotated_contents)
 
+let tenderbake_finality_confirmations = 1
+
+let tenderbake_adjust_confirmations (cctxt : #Client_context.full) = function
+  | None -> Lwt.return_none
+  | Some cli_confirmations ->
+      if cli_confirmations > tenderbake_finality_confirmations then
+        cctxt#message
+          "Tenderbake needs at most %d confirmations for finality (%d given). \
+           Using %d confirmations."
+          tenderbake_finality_confirmations
+          cli_confirmations
+          tenderbake_finality_confirmations
+        >>= fun () -> Lwt.return_some tenderbake_finality_confirmations
+      else Lwt.return_some cli_confirmations
+
+(* For Tenderbake we restrain the interval of confirmations to be [0,
+   tenderbake_finality_confirmations]
+
+   Any value greater than the tenderbake_finality_confirmations is treated as if it
+   were tenderbake_finality_confirmations.
+ *)
 let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     ?(dry_run = false) ?(simulation = false) ?branch ?src_sk ?verbose_signing
     ~fee_parameter (contents : kind contents_list) =
@@ -741,6 +870,8 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     Shell_services.Injection.operation cctxt ~chain bytes >>=? fun oph ->
     cctxt#message "Operation successfully injected in the node." >>= fun () ->
     cctxt#message "Operation hash is '%a'" Operation_hash.pp oph >>= fun () ->
+    (* Adjust user-provided confirmations with respect to Alpha protocol finality properties *)
+    tenderbake_adjust_confirmations cctxt confirmations >>= fun confirmations ->
     (match confirmations with
     | None ->
         cctxt#message
@@ -752,7 +883,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
            included.@]"
           Operation_hash.pp
           oph
-          num_confirmation_blocks
+          tenderbake_finality_confirmations
           Block_hash.pp
           op.shell.branch
         >>= fun () -> return result
@@ -796,7 +927,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
     (match confirmations with
     | None -> Lwt.return_unit
     | Some number ->
-        if number >= num_confirmation_blocks then
+        if number >= tenderbake_finality_confirmations then
           cctxt#message
             "The operation was included in a block %d blocks ago."
             number
@@ -811,7 +942,7 @@ let inject_operation_internal (type kind) cctxt ~chain ~block ?confirmations
             number
             Operation_hash.pp
             oph
-            num_confirmation_blocks
+            tenderbake_finality_confirmations
             Block_hash.pp
             op.shell.branch)
     >>= fun () -> return (oph, op.protocol_data.contents, result.contents)
@@ -853,10 +984,183 @@ let reveal_error_message =
 let reveal_error (cctxt : #Protocol_client_context.full) =
   cctxt#error "%s" reveal_error_message
 
+(* This function first gets the pending operations in the prevalidator. Then,
+   it filters those that have an applied status from the given src. *)
+let pending_applied_operations_of_source (cctxt : #full) chain src :
+    packed_contents_list list Lwt.t =
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/2273
+     Be able to get pending/applied/prechecked operation of an implicit account.
+  *)
+  Alpha_block_services.Mempool.pending_operations cctxt ~chain () >>= function
+  | Error e ->
+      cctxt#error
+        "Error while fetching pending operations: %a@."
+        Error_monad.pp_print_trace
+        e
+      >>= fun () -> exit 1
+  | Ok ops ->
+      Lwt.return
+      @@ List.fold_left
+           (fun acc (_oph, {protocol_data = Operation_data {contents; _}; _}) ->
+             match contents with
+             | Single (Manager_operation {source; _} as _op)
+               when Signature.Public_key_hash.equal source src ->
+                 Contents_list contents :: acc
+             | Cons (Manager_operation {source; _}, _rest) as _op
+               when Signature.Public_key_hash.equal source src ->
+                 Contents_list contents :: acc
+             | _ -> acc)
+           []
+           ops.Alpha_block_services.Mempool.applied
+
+(* Given the gas and fee of an applied operation in the mempool, and the
+   estimated gas of a new operation to inject, this function returns
+   the amount of fee to put in the new operation to be able to replace
+   the one already in the mempool *)
+let compute_replacement_fees =
+  let q_fee_from_tez f = Tez.to_mutez f |> Z.of_int64 |> Q.of_bigint in
+  let q_gas g = Gas.Arith.integral_to_z g |> Q.of_bigint in
+  fun (cctxt : #full) old_op_fee old_op_gas new_op_gas ->
+    (* convert quantities to rationals *)
+    let old_op_fee = q_fee_from_tez old_op_fee in
+    let old_op_gas = q_gas old_op_gas in
+    let new_op_gas = q_gas new_op_gas in
+
+    (* compute the fee / gas ratio of the old operation *)
+    let old_op_ratio = Q.div old_op_fee old_op_gas in
+
+    (* compute the equivalent (proportional) in fees of the new operation using
+       the old operation's ratio *)
+    let proportional_fee = Q.mul old_op_ratio new_op_gas in
+
+    (* Fees cannot be smaller than estimated fees of the old or new op *)
+    let max_fee = Q.max proportional_fee old_op_fee in
+
+    (* TODO: https://gitlab.com/tezos/tezos/-/issues/2274
+       Get the factor 1.05% from the plugin via an RPC *)
+    let repl_q_fee = Q.mul max_fee (Q.make (Z.of_int 105) (Z.of_int 100)) in
+    let repl_z_fee = Z.cdiv (Q.num repl_q_fee) (Q.den repl_q_fee) in
+    try
+      match Z.to_int64 repl_z_fee |> Tez.of_mutez with
+      | Some replacement_fee -> Lwt.return replacement_fee
+      | None ->
+          cctxt#error "Tez underflow while computing replacement fee@."
+          >>= fun () -> exit 1
+    with Z.Overflow ->
+      cctxt#error "Tez overflow while computing replacement fee@." >>= fun () ->
+      exit 1
+
+(* Given an operation to inject whose gas and fee are set, and the amount
+   of fee the operation should pay to replace an existing applied operation
+   in the mempool, this function computes the delta "replacement fee -
+   operation's fee" and adds it to the operation. *)
+let bump_manager_op_fee =
+  (* Internal function to bump the fee of a manager operation by a delta *)
+  let bump_manager (cctxt : #full) delta = function
+    | Manager_operation
+        {source; fee; counter; operation; gas_limit; storage_limit} ->
+        (match Tez.( +? ) fee delta with
+        | Error _ ->
+            cctxt#error "Tez overflow while computing replacement fee@."
+            >>= fun () -> exit 1
+        | Ok new_fee -> Lwt.return new_fee)
+        >>= fun fee ->
+        Lwt.return
+        @@ Manager_operation
+             {source; fee; counter; operation; gas_limit; storage_limit}
+  in
+  fun (type kind)
+      (cctxt : #full)
+      (contents : kind Kind.manager contents_list)
+      new_fee
+      replacement_fee
+      ~user_fee ->
+    (* We compute delta replacement_fee - new_fee *)
+    match Tez.sub_opt replacement_fee new_fee with
+    | None ->
+        (* This can happen for instance if the user provided fee with
+           command-line that are higher than the replacement threshold *)
+        Lwt.return_ok contents
+    | Some delta ->
+        if Tez.equal delta Tez.zero then
+          (* This can happen for instance if the user provided fee with
+             command-line that are equal to the replacement threshold *)
+          Lwt.return_ok contents
+        else if Limit.is_unknown user_fee then
+          match contents with
+          | Single (Manager_operation _ as op) ->
+              (* We add the delta to the op in case it's a Single *)
+              bump_manager (cctxt : #full) delta op >>= fun op ->
+              Lwt.return_ok @@ Single op
+          | Cons ((Manager_operation _ as op), rest) ->
+              (* We add the delta to the first op in case it's a batch *)
+              bump_manager (cctxt : #full) delta op >>= fun op ->
+              Lwt.return_ok @@ Cons (op, rest)
+        else
+          cctxt#error
+            "The fee provided by the user is lower than the expected \
+             replacement fee. Threshold is %a but got %a.@."
+            Tez.pp
+            replacement_fee
+            Tez.pp
+            new_fee
+          (* New fee in this case correspond to provided user fee *)
+          >>= fun () -> exit 1
+
+(* Bump the fee of the given operation whose fee have been computed by
+   simulation, to be able to replace an existing applied operation in the
+   mempool from the same source *)
+let replace_operation (type kind) (cctxt : #full) chain source
+    (contents : kind Kind.manager contents_list) ~user_fee :
+    kind Kind.manager contents_list tzresult Lwt.t =
+  let exit_err ~is_new_op e =
+    cctxt#error
+      "Unexpected error while getting gas and fees of user's %s operation.@.\n\
+       Error: %a@."
+      (if is_new_op then "new" else "old")
+      Error_monad.pp_print_trace
+      (Environment.wrap_tztrace e)
+    >>= fun () -> exit 1
+  in
+  match Contents_list contents |> get_manager_operation_gas_and_fee with
+  | Error e -> exit_err ~is_new_op:true e
+  | Ok (new_op_fee, new_op_gas) -> (
+      pending_applied_operations_of_source cctxt chain source >>= function
+      | [] ->
+          cctxt#error
+            "Cannot replace! No applied manager operation found for %a in \
+             mempool@."
+            Signature.Public_key_hash.pp
+            source
+          >>= fun () -> exit 1
+      | _ :: _ :: _ as l ->
+          cctxt#error
+            "More than one applied manager operation found for %a in mempool. \
+             Found %d operations. Are you sure the node is in precheck mode?@."
+            Signature.Public_key_hash.pp
+            source
+            (List.length l)
+          >>= fun () -> exit 1
+      | [old_contents] -> (
+          get_manager_operation_gas_and_fee old_contents |> function
+          | Error e -> exit_err ~is_new_op:false e
+          | Ok (old_op_fee, old_op_gas) ->
+              compute_replacement_fees cctxt old_op_fee old_op_gas new_op_gas
+              >>= bump_manager_op_fee cctxt contents new_op_fee ~user_fee))
+
+(* TODO: https://gitlab.com/tezos/tezos/-/issues/2276
+   https://gitlab.com/tezos/tezos/-/issues/2276 *)
+let may_replace_operation (type kind) (cctxt : #full) chain from
+    ~replace_by_fees ~user_fee (contents : kind Kind.manager contents_list) :
+    kind Kind.manager contents_list tzresult Lwt.t =
+  if replace_by_fees then replace_operation cctxt chain from contents ~user_fee
+  else (* No replace by fees requested *)
+    Lwt.return_ok contents
+
 let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
     ?verbose_signing ?simulation ~source ~src_pk ~src_sk ~fee ~gas_limit
-    ~storage_limit ?counter ~fee_parameter (type kind)
-    (operations : kind Annotated_manager_operation.annotated_list) :
+    ~storage_limit ?counter ?(replace_by_fees = false) ~fee_parameter
+    (type kind) (operations : kind Annotated_manager_operation.annotated_list) :
     (Operation_hash.t
     * kind Kind.manager contents_list
     * kind Kind.manager contents_result_list)
@@ -919,6 +1223,12 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
       build_contents (Z.succ counter) operations >>?= fun rest ->
       let contents = Annotated_manager_operation.Cons_manager (reveal, rest) in
       may_patch_limits cctxt ~fee_parameter ~chain ~block ?branch contents
+      >>=? may_replace_operation
+             cctxt
+             chain
+             source
+             ~replace_by_fees
+             ~user_fee:fee
       >>=? fun contents ->
       inject_operation_internal
         cctxt
@@ -943,6 +1253,12 @@ let inject_manager_operation cctxt ~chain ~block ?branch ?confirmations ?dry_run
   | _ ->
       build_contents counter operations >>?= fun contents ->
       may_patch_limits cctxt ~fee_parameter ~chain ~block ?branch contents
+      >>=? may_replace_operation
+             cctxt
+             chain
+             source
+             ~replace_by_fees
+             ~user_fee:fee
       >>=? fun contents ->
       inject_operation_internal
         cctxt

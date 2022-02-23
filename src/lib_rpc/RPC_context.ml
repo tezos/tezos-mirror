@@ -73,7 +73,7 @@ class type t =
     inherit streamed
   end
 
-type ('o, 'e) rest_result =
+type ('o, 'e) rest =
   [ `Ok of 'o
   | `Conflict of 'e
   | `Error of 'e
@@ -81,7 +81,13 @@ type ('o, 'e) rest_result =
   | `Not_found of 'e
   | `Gone of 'e
   | `Unauthorized of 'e ]
-  tzresult
+
+type ('o, 'e) rest_result = ('o, 'e) rest tzresult
+
+type generic_call_result =
+  [ `Json of (Data_encoding.json, Data_encoding.json option) rest
+  | `Binary of (string, string option) rest
+  | `Other of (string * string) option * (string, string option) rest ]
 
 class type json =
   object
@@ -92,6 +98,12 @@ class type json =
       ?body:Data_encoding.json ->
       Uri.t ->
       (Data_encoding.json, Data_encoding.json option) rest_result Lwt.t
+
+    method generic_media_type_call :
+      RPC_service.meth ->
+      ?body:Data_encoding.json ->
+      Uri.t ->
+      generic_call_result tzresult Lwt.t
 
     method base : Uri.t
   end

@@ -23,9 +23,15 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Basic
+   Invocation:   dune exec tezt/tests/main.exe -- --file basic.ml
+   Subject:      .
+*)
+
 (* This example is included in the documentation (docs/developers/tezt.rst).
    It is part of the tests to ensure we keep it up-to-date. *)
-
 let check_node_initialization history_mode =
   Protocol.register_test
     ~__FILE__
@@ -48,5 +54,5 @@ let check_node_initialization history_mode =
 
 let register ~protocols =
   check_node_initialization Archive ~protocols ;
-  check_node_initialization Full ~protocols ;
-  check_node_initialization Rolling ~protocols
+  check_node_initialization (Full None) ~protocols ;
+  check_node_initialization (Rolling None) ~protocols

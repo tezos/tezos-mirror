@@ -49,6 +49,12 @@ module Timestamp = struct
   let predecessor = Raw_context.predecessor_timestamp
 end
 
+module Slot = struct
+  include Slot_repr
+
+  let slot_range = List.slot_range
+end
+
 include Operation_repr
 
 module Operation = struct
@@ -71,6 +77,14 @@ module Vote = struct
   include Vote_storage
 end
 
+module Block_payload = struct
+  include Block_payload_repr
+end
+
+module First_level_of_tenderbake = struct
+  let get = Storage.Tenderbake.First_level.get
+end
+
 module Raw_level = Raw_level_repr
 module Cycle = Cycle_repr
 module Script_string = Script_string_repr
@@ -81,18 +95,24 @@ module Script_timestamp = struct
 
   let now ctxt =
     let {Constants_repr.minimal_block_delay; _} = Raw_context.constants ctxt in
+    let first_delay = Period_repr.to_seconds minimal_block_delay in
     let current_timestamp = Raw_context.predecessor_timestamp ctxt in
-    Time.add current_timestamp (Period_repr.to_seconds minimal_block_delay)
-    |> Timestamp.to_seconds |> of_int64
+    Time.add current_timestamp first_delay |> Timestamp.to_seconds |> of_int64
 end
 
 module Script = struct
   include Michelson_v1_primitives
   include Script_repr
 
-  let force_decode_in_context ctxt lexpr =
-    Raw_context.consume_gas ctxt (Script_repr.force_decode_cost lexpr)
-    >>? fun ctxt ->
+  type consume_deserialization_gas = Always | When_needed
+
+  let force_decode_in_context ~consume_deserialization_gas ctxt lexpr =
+    let gas_cost =
+      match consume_deserialization_gas with
+      | Always -> Script_repr.stable_force_decode_cost lexpr
+      | When_needed -> Script_repr.force_decode_cost lexpr
+    in
+    Raw_context.consume_gas ctxt gas_cost >>? fun ctxt ->
     Script_repr.force_decode lexpr >|? fun v -> (v, ctxt)
 
   let force_bytes_in_context ctxt lexpr =
@@ -112,11 +132,32 @@ type signature = Signature.t
 module Constants = struct
   include Constants_repr
   include Constants_storage
+
+  let round_durations ctxt = Raw_context.round_durations ctxt
+
+  let all ctxt = all (parametric ctxt)
 end
 
 module Voting_period = struct
   include Voting_period_repr
   include Voting_period_storage
+end
+
+module Round = struct
+  include Round_repr
+  module Durations = Durations
+
+  type round_durations = Durations.t
+
+  let pp_round_durations = Durations.pp
+
+  let round_durations_encoding = Durations.encoding
+
+  let round_duration = Round_repr.Durations.round_duration
+
+  let update ctxt round = Storage.Block_round.update ctxt round
+
+  let get ctxt = Storage.Block_round.get ctxt
 end
 
 module Gas = struct
@@ -143,7 +184,9 @@ module Gas = struct
   let update_remaining_operation_gas =
     Raw_context.update_remaining_operation_gas
 
-  let gas_exhausted_error = Raw_context.gas_exhausted_error
+  let reset_block_gas ctxt =
+    let gas = Constants.hard_gas_limit_per_block ctxt in
+    Raw_context.update_remaining_block_gas ctxt gas
 
   let level = Raw_context.gas_level
 
@@ -172,16 +215,31 @@ module Lazy_storage = struct
       Contract_storage.Legacy_big_map_diff.encoding
 end
 
+module Origination_nonce = struct
+  let init = Raw_context.init_origination_nonce
+
+  let unset = Raw_context.unset_origination_nonce
+
+  module Internal_for_tests = Origination_nonce
+end
+
 module Contract = struct
   include Contract_repr
   include Contract_storage
 
-  let originate c contract ~balance ~script ~delegate =
-    raw_originate c contract ~balance ~script ~delegate
+  let is_manager_key_revealed = Contract_manager_storage.is_manager_key_revealed
 
-  let init_origination_nonce = Raw_context.init_origination_nonce
+  let reveal_manager_key = Contract_manager_storage.reveal_manager_key
 
-  let unset_origination_nonce = Raw_context.unset_origination_nonce
+  let get_manager_key = Contract_manager_storage.get_manager_key
+
+  module Internal_for_tests = Contract_repr
+end
+
+module Tx_rollup = struct
+  include Tx_rollup_repr
+  include Tx_rollup_storage
+  module Internal_for_tests = Tx_rollup_repr
 end
 
 module Global_constants_storage = Global_constants_storage
@@ -259,11 +317,36 @@ module Sapling = struct
 end
 
 module Receipt = Receipt_repr
-module Delegate = Delegate_storage
 
-module Roll = struct
-  include Roll_repr
-  include Roll_storage
+module Delegate = struct
+  include Delegate_storage
+
+  type deposits = Storage.deposits = {
+    initial_amount : Tez.t;
+    current_amount : Tez.t;
+  }
+
+  let grace_period = Delegate_activation_storage.grace_period
+
+  let prepare_stake_distribution = Stake_storage.prepare_stake_distribution
+
+  let registered = Contract_delegate_storage.registered
+
+  let find = Contract_delegate_storage.find
+
+  let delegated_contracts = Contract_delegate_storage.delegated_contracts
+end
+
+module Stake_distribution = struct
+  let snapshot = Stake_storage.snapshot
+
+  let baking_rights_owner = Delegate.baking_rights_owner
+
+  let slot_owner = Delegate.slot_owner
+
+  let delegate_pubkey = Delegate.pubkey
+
+  let get_staking_balance = Delegate.staking_balance
 end
 
 module Nonce = Nonce_storage
@@ -274,12 +357,9 @@ module Seed = struct
 end
 
 module Fitness = struct
+  type raw = Fitness.t
+
   include Fitness_repr
-  include Fitness
-
-  type fitness = t
-
-  include Fitness_storage
 end
 
 module Bootstrap = Bootstrap_storage
@@ -289,48 +369,62 @@ module Commitment = struct
   include Commitment_storage
 end
 
-module Global = struct
-  let get_block_priority = Storage.Block_priority.get
-
-  let set_block_priority = Storage.Block_priority.update
-end
-
 module Migration = Migration_repr
+
+module Consensus = struct
+  include Raw_context.Consensus
+
+  let load_endorsement_branch ctxt =
+    Storage.Tenderbake.Endorsement_branch.find ctxt >>=? function
+    | Some endorsement_branch ->
+        Raw_context.Consensus.set_endorsement_branch ctxt endorsement_branch
+        |> return
+    | None -> return ctxt
+
+  let store_endorsement_branch ctxt branch =
+    let ctxt = set_endorsement_branch ctxt branch in
+    Storage.Tenderbake.Endorsement_branch.add ctxt branch
+
+  let load_grand_parent_branch ctxt =
+    Storage.Tenderbake.Grand_parent_branch.find ctxt >>=? function
+    | Some grand_parent_branch ->
+        Raw_context.Consensus.set_grand_parent_branch ctxt grand_parent_branch
+        |> return
+    | None -> return ctxt
+
+  let store_grand_parent_branch ctxt branch =
+    let ctxt = set_grand_parent_branch ctxt branch in
+    Storage.Tenderbake.Grand_parent_branch.add ctxt branch
+end
 
 let prepare_first_block = Init_storage.prepare_first_block
 
-let prepare = Init_storage.prepare
+let prepare ctxt ~level ~predecessor_timestamp ~timestamp =
+  Init_storage.prepare ctxt ~level ~predecessor_timestamp ~timestamp
+  >>=? fun (ctxt, balance_updates, origination_results) ->
+  Consensus.load_endorsement_branch ctxt >>=? fun ctxt ->
+  Consensus.load_grand_parent_branch ctxt >>=? fun ctxt ->
+  return (ctxt, balance_updates, origination_results)
 
-(* The rationale behind the value of this constant is that an
-   operation should be considered as alive for about one hour:
-
-   minimal_block_delay context *  max_operations_ttl = 3600
-
-   To avoid an unecessary computation, we have hard-coded the value of
-   this constant.  *)
-let max_operations_ttl = 120
-
-let finalize ?commit_message:message c =
-  let fitness = Fitness.from_int64 (Fitness.current c) in
+let finalize ?commit_message:message c fitness =
   let context = Raw_context.recover c in
   {
     Updater.context;
     fitness;
     message;
-    max_operations_ttl;
+    max_operations_ttl = (Raw_context.constants c).max_operations_time_to_live;
     last_allowed_fork_level =
       Raw_level.to_int32 @@ Level.last_allowed_fork_level c;
   }
 
+let current_context c = Raw_context.recover c
+
+let record_non_consensus_operation_hash =
+  Raw_context.record_non_consensus_operation_hash
+
+let non_consensus_operations = Raw_context.non_consensus_operations
+
 let activate = Raw_context.activate
-
-let record_endorsement = Raw_context.record_endorsement
-
-let allowed_endorsements = Raw_context.allowed_endorsements
-
-let init_endorsements = Raw_context.init_endorsements
-
-let included_endorsements = Raw_context.included_endorsements
 
 let reset_internal_nonce = Raw_context.reset_internal_nonce
 
@@ -341,208 +435,14 @@ let record_internal_nonce = Raw_context.record_internal_nonce
 let internal_nonce_already_recorded =
   Raw_context.internal_nonce_already_recorded
 
-let add_fees = Raw_context.add_fees
-
-let add_rewards = Raw_context.add_rewards
-
-let get_fees = Raw_context.get_fees
-
-let get_rewards = Raw_context.get_rewards
-
 let description = Raw_context.description
 
 module Parameters = Parameters_repr
 module Liquidity_baking = Liquidity_baking_repr
 
-module Cache = struct
-  type index = int
-
-  type size = int
-
-  type identifier = string
-
-  type namespace = string
-
-  let compare_namespace = Compare.String.compare
-
-  type internal_identifier = {namespace : namespace; id : identifier}
-
-  let separator = '@'
-
-  let sanitize namespace =
-    if String.contains namespace separator then
-      invalid_arg
-        (Format.asprintf
-           "Invalid cache namespace: '%s'. Character %c is forbidden."
-           namespace
-           separator)
-    else namespace
-
-  let string_of_internal_identifier {namespace; id} =
-    namespace ^ String.make 1 separator ^ id
-
-  let internal_identifier_of_string raw =
-    match String.split_on_char separator raw with
-    | [] -> assert false
-    | namespace :: id ->
-        (* An identifier may contain [separator], hence we concatenate
-           possibly splitted parts of [id]. *)
-        {namespace = sanitize namespace; id = String.concat "" id}
-
-  let internal_identifier_of_key key =
-    let raw = Raw_context.Cache.identifier_of_key key in
-    internal_identifier_of_string raw
-
-  let key_of_internal_identifier ~cache_index identifier =
-    let raw = string_of_internal_identifier identifier in
-    Raw_context.Cache.key_of_identifier ~cache_index raw
-
-  let make_key =
-    let namespaces = ref [] in
-    fun ~cache_index ~namespace ->
-      let namespace = sanitize namespace in
-      if List.mem ~equal:String.equal namespace !namespaces then
-        invalid_arg
-          (Format.sprintf
-             "Cache key namespace %s already exist."
-             (namespace :> string))
-      else (
-        namespaces := namespace :: !namespaces ;
-        fun ~id ->
-          let identifier = {namespace; id} in
-          key_of_internal_identifier ~cache_index identifier)
-
-  module NamespaceMap = Map.Make (struct
-    type t = namespace
-
-    let compare = compare_namespace
-  end)
-
-  type partial_key_handler = t -> string -> Context.Cache.value tzresult Lwt.t
-
-  let value_of_key_handlers : partial_key_handler NamespaceMap.t ref =
-    ref NamespaceMap.empty
-
-  module Admin = struct
-    include Raw_context.Cache
-
-    let list_keys context ~cache_index =
-      Raw_context.Cache.list_keys context ~cache_index
-
-    let key_rank context key = Raw_context.Cache.key_rank context key
-
-    let value_of_key ctxt key =
-      (* [value_of_key] is a maintainance operation: it is typically run
-         when a node reboots. For this reason, this operation is not
-         carbonated. *)
-      let ctxt = Gas.set_unlimited ctxt in
-      let {namespace; id} = internal_identifier_of_key key in
-      match NamespaceMap.find namespace !value_of_key_handlers with
-      | Some value_of_key -> value_of_key ctxt id
-      | None ->
-          failwith
-            (Format.sprintf
-               "No handler for key `%s%c%s'"
-               namespace
-               separator
-               id)
-  end
-
-  module type CLIENT = sig
-    val cache_index : int
-
-    val namespace : namespace
-
-    type cached_value
-
-    val value_of_identifier : t -> identifier -> cached_value tzresult Lwt.t
-  end
-
-  module type INTERFACE = sig
-    type cached_value
-
-    val update : t -> identifier -> (cached_value * int) option -> t tzresult
-
-    val find : t -> identifier -> cached_value option tzresult Lwt.t
-
-    val list_identifiers : t -> (identifier * int) list
-
-    val identifier_rank : t -> identifier -> int option
-
-    val size : context -> size
-
-    val size_limit : context -> size
-  end
-
-  let register_exn (type cvalue)
-      (module C : CLIENT with type cached_value = cvalue) :
-      (module INTERFACE with type cached_value = cvalue) =
-    if
-      Compare.Int.(
-        C.cache_index < 0
-        || C.cache_index >= List.length Constants_repr.cache_layout)
-    then invalid_arg "Cache index is invalid" ;
-    let mk = make_key ~cache_index:C.cache_index ~namespace:C.namespace in
-    (module struct
-      type cached_value = C.cached_value
-
-      type Admin.value += K of cached_value
-
-      let () =
-        let voi ctxt i =
-          C.value_of_identifier ctxt i >>=? fun v -> return (K v)
-        in
-        value_of_key_handlers :=
-          NamespaceMap.add C.namespace voi !value_of_key_handlers
-
-      let size ctxt =
-        Option.value ~default:max_int
-        @@ Admin.cache_size ctxt ~cache_index:C.cache_index
-
-      let size_limit ctxt =
-        Option.value ~default:max_int
-        @@ Admin.cache_size_limit ctxt ~cache_index:C.cache_index
-
-      let update ctxt id v =
-        let cache_size_in_bytes = size ctxt in
-        Raw_context.consume_gas
-          ctxt
-          (Cache_costs.cache_update ~cache_size_in_bytes)
-        >|? fun ctxt ->
-        let v = Option.map (fun (v, size) -> (K v, size)) v in
-        Admin.update ctxt (mk ~id) v
-
-      let find ctxt id =
-        let cache_size_in_bytes = size ctxt in
-        Raw_context.consume_gas
-          ctxt
-          (Cache_costs.cache_update ~cache_size_in_bytes)
-        >>?= fun ctxt ->
-        Admin.find ctxt (mk ~id) >>= function
-        | None -> return None
-        | Some (K v) -> return (Some v)
-        | _ ->
-            (* This execution path is impossible because all the keys of
-               C's namespace (which is unique to C) are constructed with
-               [K]. This [assert false] could have been pushed into the
-               environment in exchange for extra complexity. The
-               argument that justifies this [assert false] seems
-               simple enough to keep the current design though. *)
-            assert false
-
-      let list_identifiers ctxt =
-        Admin.list_keys ctxt ~cache_index:C.cache_index |> function
-        | None ->
-            (* `cache_index` is valid. *)
-            assert false
-        | Some list ->
-            List.filter_map
-              (fun (key, age) ->
-                let {namespace; id} = internal_identifier_of_key key in
-                if String.equal namespace C.namespace then Some (id, age)
-                else None)
-              list
-
-      let identifier_rank ctxt id = Admin.key_rank ctxt (mk ~id)
-    end)
+module Ticket_balance = struct
+  include Ticket_storage
 end
+
+module Token = Token
+module Cache = Cache_repr

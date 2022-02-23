@@ -36,13 +36,20 @@ let json_pp id description encoding ppf data =
    shell's and the protocols'). See below for use. *)
 let set_error_encoding_cache_dirty = ref (fun () -> ())
 
-module Make (Prefix : Sig.PREFIX) : sig
+module Make (Prefix : Sig.PREFIX) (Error_category : Sig.ERROR_CATEGORY) : sig
   type error = ..
 
-  include Sig.CORE with type error := error
+  type error_category = Error_category.t
+
+  include
+    Sig.CORE with type error := error and type error_category := error_category
 
   include Sig.WITH_WRAPPED with type error := error
 end = struct
+  type error_category = Error_category.t
+
+  include (Error_category : Sig.ERROR_CATEGORY with type t := error_category)
+
   type error = ..
 
   let error_encoding_name =
@@ -59,7 +66,7 @@ end = struct
   end
 
   type full_error_category =
-    | Main of Sig.error_category
+    | Main of Error_category.t
     | Wrapped of (module Wrapped_error_monad)
 
   type encoding_case =
@@ -80,7 +87,7 @@ end = struct
         -> error_kind
 
   type error_info = {
-    category : Sig.error_category;
+    category : error_category;
     id : string;
     title : string;
     description : string;
@@ -135,8 +142,14 @@ end = struct
                    ])
            | Error_kind {category = Wrapped (module WEM); _} ->
                List.map
-                 (fun {WEM.id; title; description; category; schema} ->
-                   {id; title; description; category; schema})
+                 (fun {WEM.id; title; description; category = _; schema} ->
+                   {
+                     id;
+                     title;
+                     description;
+                     category = (* Can we do better ? *) default_category;
+                     schema;
+                   })
                  (WEM.get_registered_errors ()))
          !error_kinds)
 
@@ -149,11 +162,6 @@ end = struct
         set_older_caches_dirty () ;
         error_encoding_cache := None
 
-  let string_of_category = function
-    | `Permanent -> "permanent"
-    | `Temporary -> "temporary"
-    | `Branch -> "branch"
-
   let pp_info ppf {category; id; title; description; schema} =
     Format.fprintf
       ppf
@@ -162,7 +170,7 @@ end = struct
        title : %s\n\
        description : %s\n\
        schema : %a@]"
-      (string_of_category category)
+      (Error_category.string_of_category category)
       id
       title
       description
@@ -174,7 +182,7 @@ end = struct
 
   let () =
     let id = "" in
-    let category = Main `Temporary in
+    let category = Main Error_category.default_category in
     let to_error msg = Unclassified msg in
     let from_error = function
       | Unclassified msg -> Some msg
@@ -207,7 +215,7 @@ end = struct
 
   let () =
     let id = "" in
-    let category = Main `Temporary in
+    let category = Main Error_category.default_category in
     let to_error msg = Unregistered_error msg in
     let from_error = function
       | Unregistered_error json -> Some json
@@ -290,7 +298,7 @@ end = struct
     let with_id_and_kind_encoding =
       merge_objs
         (obj2
-           (req "kind" (constant (string_of_category category)))
+           (req "kind" (constant (Error_category.string_of_category category)))
            (req "id" (constant name)))
         encoding
     in
@@ -378,14 +386,13 @@ end = struct
             in
             let union_encoding = Data_encoding.union cases in
             let open Data_encoding in
-            dynamic_size
-            @@ splitted
-                 ~json:union_encoding
-                 ~binary:
-                   (conv
-                      (Json.construct union_encoding)
-                      (Json.destruct union_encoding)
-                      json)
+            splitted
+              ~json:union_encoding
+              ~binary:
+                (conv
+                   (Json.construct union_encoding)
+                   (Json.destruct union_encoding)
+                   json)
           else
             let cases =
               List.map
@@ -397,14 +404,13 @@ end = struct
             in
             let union_encoding = Data_encoding.union cases in
             let open Data_encoding in
-            dynamic_size
-            @@ splitted
-                 ~json:union_encoding
-                 ~binary:
-                   (conv
-                      (Json.construct union_encoding)
-                      (Json.destruct union_encoding)
-                      json)
+            splitted
+              ~json:union_encoding
+              ~binary:
+                (conv
+                   (Json.construct union_encoding)
+                   (Json.destruct union_encoding)
+                   json)
         in
         error_encoding_cache := Some encoding ;
         encoding
@@ -427,10 +433,16 @@ end = struct
             match WEM.unwrap error with
             | None -> failwith "incorrectly registered wrapped error"
             | Some error ->
-                let {WEM.id; title; description; category; schema} =
+                let {WEM.id; title; description; category = _; schema} =
                   WEM.find_info_of_error error
                 in
-                {id; title; description; category; schema})
+                {
+                  id;
+                  title;
+                  description;
+                  category = (* Can we do better ? *) default_category;
+                  schema;
+                })
         | Main category -> (
             match encoding_case with
             | Non_recursive encoding_case ->
@@ -459,12 +471,12 @@ end = struct
 
   let classify_error error =
     let rec find e = function
-      | [] -> `Temporary
+      | [] -> Error_classification.default
       | Error_kind {from_error; category; _} :: rest -> (
           match from_error e with
           | Some _ -> (
               match category with
-              | Main error_category -> error_category
+              | Main error_category -> Error_category.classify error_category
               | Wrapped (module WEM) -> (
                   match WEM.unwrap e with
                   | Some e -> WEM.classify_error e

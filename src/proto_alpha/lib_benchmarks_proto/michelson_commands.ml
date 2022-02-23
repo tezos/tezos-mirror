@@ -33,8 +33,8 @@ let group =
 
 module Michelson_concat_cmd = struct
   let handler () file1 file2 file3 () =
-    let trace1 = Michelson_generation.load ~filename:file1 in
-    let trace2 = Michelson_generation.load ~filename:file2 in
+    let trace1 = Michelson_mcmc_samplers.load ~filename:file1 in
+    let trace2 = Michelson_mcmc_samplers.load ~filename:file2 in
     let terms = trace1 @ trace2 in
     let l1 = List.length trace1 in
     let l2 = List.length trace2 in
@@ -45,7 +45,7 @@ module Michelson_concat_cmd = struct
       l2
       file2
       (l1 + l2) ;
-    Michelson_generation.save ~filename:file3 ~terms ;
+    Michelson_mcmc_samplers.save ~filename:file3 ~terms ;
     return_unit
 
   let params =
@@ -117,16 +117,18 @@ module Michelson_gen_cmd = struct
       | "data" ->
           Stdlib.List.init terms_count (fun _i ->
               progress () ;
-              Michelson_generation.make_data_sampler rng_state cfg)
+              Michelson_mcmc_samplers.Data
+                (Michelson_generation.make_data_sampler rng_state cfg))
       | "code" ->
           Stdlib.List.init terms_count (fun _i ->
               progress () ;
-              Michelson_generation.make_code_sampler rng_state cfg)
+              Michelson_mcmc_samplers.Code
+                (Michelson_generation.make_code_sampler rng_state cfg))
       | _ ->
           Format.eprintf "Term kind must be either \"data\" or \"code\"@." ;
           exit 1
     in
-    Michelson_generation.save ~filename ~terms ;
+    Michelson_mcmc_samplers.save ~filename ~terms ;
     return_unit
 
   let min_size_arg =

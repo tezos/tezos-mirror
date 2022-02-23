@@ -25,7 +25,7 @@ class TestThresholdZero:
 
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -41,7 +41,7 @@ class TestThresholdOne:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_bootstrap(self, sandbox: Sandbox):
         client = sandbox.client(0)
@@ -61,7 +61,7 @@ class TestThresholdTwo:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(0), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_add_nodes(self, sandbox: Sandbox):
         sandbox.add_node(
@@ -91,7 +91,7 @@ class TestStuck:
     def test_setup_network(self, sandbox: Sandbox):
         sandbox.add_node(0, params=params(), log_levels=LOG_LEVEL)
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     def test_kill_baker(self, sandbox: Sandbox):
         """Bake a few blocks and kill baker"""
@@ -134,7 +134,7 @@ class TestSplitView:
             config_client=False,
             log_levels=LOG_LEVEL,
         )
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
 
     @pytest.mark.timeout(10)
     def test_all_nodes_boostrap(self, sandbox: Sandbox):
@@ -173,7 +173,7 @@ class TestManyNodesBootstrap:
         parameters = dict(protocol.PARAMETERS)
         parameters["time_between_blocks"] = ["1", "0"]
         protocol.activate(sandbox.client(0))
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
         sandbox.add_node(
             1, params=params(), log_levels=LOG_LEVEL, config_client=False
         )

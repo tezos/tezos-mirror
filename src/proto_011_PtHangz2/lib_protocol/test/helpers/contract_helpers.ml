@@ -24,6 +24,8 @@
 (*****************************************************************************)
 
 open Protocol
+open Alpha_context
+open Error_monad_operators
 
 (** Initializes 2 addresses to do only operations plus one that will be
     used to bake. *)
@@ -41,16 +43,6 @@ let init () =
   in
   (b, baker, src1, src2)
 
-(** Parses a Michelson contract from string. *)
-let toplevel_from_string str =
-  let (ast, errs) = Michelson_v1_parser.parse_toplevel ~check:true str in
-  match errs with [] -> ast.expanded | _ -> Stdlib.failwith "parse toplevel"
-
-(** Parses a Michelson expression from string, useful for call parameters. *)
-let expression_from_string str =
-  let (ast, errs) = Michelson_v1_parser.parse_expression ~check:true str in
-  match errs with [] -> ast.expanded | _ -> Stdlib.failwith "parse expression"
-
 (** Returns a block in which the contract is originated. *)
 let originate_contract file storage src b baker =
   let load_file f =
@@ -60,8 +52,8 @@ let originate_contract file storage src b baker =
     res
   in
   let contract_string = load_file file in
-  let code = toplevel_from_string contract_string in
-  let storage = expression_from_string storage in
+  let code = Expr.toplevel_from_string contract_string in
+  let storage = Expr.from_string storage in
   let script =
     Alpha_context.Script.{code = lazy_expr code; storage = lazy_expr storage}
   in
@@ -71,3 +63,37 @@ let originate_contract file storage src b baker =
   >>=? fun incr ->
   Incremental.add_operation incr operation >>=? fun incr ->
   Incremental.finalize_block incr >|=? fun b -> (dst, b)
+
+let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
+
+let default_step_constants =
+  Script_interpreter.
+    {
+      source = default_source;
+      payer = default_source;
+      self = default_source;
+      amount = Tez.zero;
+      chain_id = Chain_id.zero;
+    }
+
+(** Helper function that parses and types a script, its initial storage and
+   parameters from strings. It then executes the typed script with the storage
+   and parameter and returns the result. *)
+let run_script ctx ?(step_constants = default_step_constants) contract
+    ?(entrypoint = "default") ~storage ~parameter () =
+  let contract_expr = Expr.from_string contract in
+  let storage_expr = Expr.from_string storage in
+  let parameter_expr = Expr.from_string parameter in
+  let script =
+    Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
+  in
+  Script_interpreter.execute
+    ctx
+    Readable
+    step_constants
+    ~script
+    ~cached_script:None
+    ~entrypoint
+    ~parameter:parameter_expr
+    ~internal:false
+  >>=?? fun res -> return res

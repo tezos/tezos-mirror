@@ -1,9 +1,10 @@
 (library
  (name tezos_benchmark_examples)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark-examples)
- (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-crypto
-            tezos-benchmark)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-crypto
+  tezos-benchmark)
  (flags (:standard -open Tezos_base__TzPervasives)))

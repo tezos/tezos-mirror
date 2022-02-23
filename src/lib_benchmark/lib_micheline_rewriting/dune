@@ -1,15 +1,12 @@
 (library
  (name tezos_micheline_rewriting)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-micheline-rewriting)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  ;; External
   zarith
-  ;; Internal
+  zarith_stubs_js
   tezos-stdlib
   tezos-error-monad
-  tezos-micheline
-  )
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_error_monad
-                   -open Tezos_micheline)))
+  tezos-micheline)
+ (flags
+  (:standard -open Tezos_stdlib -open Tezos_error_monad -open Tezos_micheline)))

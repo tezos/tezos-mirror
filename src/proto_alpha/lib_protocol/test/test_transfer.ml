@@ -55,7 +55,7 @@ open Test_tez
    - a valid operation *)
 let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
     ?expect_failure src dst amount =
-  Tez.( +? ) fee amount >>?= fun amount_fee ->
+  fee +? amount >>?= fun amount_fee ->
   Context.Contract.balance (I b) src >>=? fun bal_src ->
   Context.Contract.balance (I b) dst >>=? fun bal_dst ->
   Op.transaction
@@ -69,8 +69,7 @@ let transfer_and_check_balances ?(with_burn = false) ~loc b ?(fee = Tez.zero)
   Incremental.add_operation ?expect_failure b op >>=? fun b ->
   Context.get_constants (I b)
   >>=? fun {parametric = {origination_size; cost_per_byte; _}; _} ->
-  Tez.(cost_per_byte *? Int64.of_int origination_size)
-  >>?= fun origination_burn ->
+  cost_per_byte *? Int64.of_int origination_size >>?= fun origination_burn ->
   let amount_fee_maybe_burn =
     if with_burn then
       match Tez.(amount_fee +? origination_burn) with
@@ -120,21 +119,21 @@ let n_transactions n b ?fee source dest amount =
     b
     (1 -- n)
 
-let ten_tez = Tez.of_int 10
+let ten_tez = of_int 10
 
 (*********************************************************************)
 (* Tests                                                             *)
 (*********************************************************************)
 
-let register_two_contracts () =
-  Context.init 2 >|=? function
+let register_two_contracts ?consensus_threshold () =
+  Context.init ?consensus_threshold 2 >|=? function
   | (_, []) | (_, [_]) -> assert false
   | (b, contract_1 :: contract_2 :: _) -> (b, contract_1, contract_2)
 
 (** Compute a fraction of 2/[n] of the balance of [contract] *)
 let two_over_n_of_balance incr contract n =
   Context.Contract.balance (I incr) contract >>=? fun balance ->
-  Lwt.return (Tez.( /? ) balance n >>? fun res -> Tez.( *? ) res 2L)
+  Lwt.return (balance /? n >>? fun res -> res *? 2L)
 
 (********************)
 (** Single transfer *)
@@ -166,8 +165,8 @@ let test_block_with_a_single_transfer_with_fee () =
 let test_transfer_zero_tez () =
   single_transfer
     ~expect_failure:(function
-      | Environment.Ecoproto_error (Contract_storage.Empty_transaction _) :: _
-        ->
+      | Environment.Ecoproto_error (Apply.Empty_transaction _ as e) :: _ ->
+          Assert.test_error_encodings e ;
           return_unit
       | _ -> failwith "Empty transaction should fail")
     Tez.zero
@@ -194,7 +193,7 @@ let test_transfer_to_originate_with_fee () =
   Incremental.begin_construction b >>=? fun b ->
   two_over_n_of_balance b contract 10L >>=? fun fee ->
   (* originated contract, paying a fee to originated this contract *)
-  Op.origination (I b) ~fee:ten_tez contract ~script:Op.dummy_script
+  Op.contract_origination (I b) ~fee:ten_tez contract ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_over_n_of_balance b contract 3L >>=? fun amount ->
@@ -246,6 +245,58 @@ let test_missing_transaction () =
   (* do the fourth transfer from source contract to destination contract *)
   Op.transaction (I b) contract_1 contract_2 amount >>=? fun _ ->
   Incremental.finalize_block b >>=? fun _ -> return_unit
+
+(** Transfer zero tez to an implicit contract, with fee equals balance of src. *)
+let test_transfer_zero_implicit_with_bal_src_as_fee () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun i ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Context.Contract.balance (I i) src >>=? fun bal_src ->
+  Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
+  Op.transaction (I i) ~fee:bal_src src dest Tez.zero >>=? fun op ->
+  Incremental.add_operation i op >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Apply.Empty_transaction _ -> true
+      | _ -> false)
+
+(** Transfer zero tez to an originated contract, with fee equals balance of src. *)
+let test_transfer_zero_to_originated_with_bal_src_as_fee () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun i ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.contract_origination (I i) dest ~script:Op.dummy_script
+  >>=? fun (op, new_contract) ->
+  Incremental.add_operation i op >>=? fun i ->
+  Context.Contract.balance (I i) src >>=? fun bal_src ->
+  Op.transaction (I i) ~fee:bal_src src new_contract Tez.zero >>=? fun op ->
+  Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
+  Incremental.add_operation i op >>=? fun i ->
+  Incremental.finalize_block i >>=? fun _ -> return_unit
+
+(** Transfer one tez to an implicit contract, with fee equals balance of src. *)
+let test_transfer_one_to_implicit_with_bal_src_as_fee () =
+  Context.init 1 >>=? fun (b, contracts) ->
+  let dest = WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0 in
+  let account = Account.new_account () in
+  Incremental.begin_construction b >>=? fun i ->
+  let src = Contract.implicit_contract account.Account.pkh in
+  Op.transaction (I i) dest src (Tez.of_mutez_exn 100L) >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Context.Contract.balance (I i) src >>=? fun bal_src ->
+  Assert.equal_tez ~loc:__LOC__ bal_src (Tez.of_mutez_exn 100L) >>=? fun () ->
+  Op.transaction (I i) ~fee:bal_src src dest Tez.one >>=? fun op ->
+  Incremental.add_operation i op >>= fun res ->
+  Assert.proto_error ~loc:__LOC__ res (function
+      | Contract_storage.Balance_too_low _ -> true
+      | _ -> false)
 
 (********************)
 (* The following tests are for different kind of contracts:
@@ -316,7 +367,7 @@ let test_transfer_from_implicit_to_originated_contract () =
     amount1
   >>=? fun (b, _) ->
   (* originated contract *)
-  Op.origination (I b) contract ~script:Op.dummy_script
+  Op.contract_origination (I b) contract ~script:Op.dummy_script
   >>=? fun (operation, new_contract) ->
   Incremental.add_operation b operation >>=? fun b ->
   two_over_n_of_balance b bootstrap_contract 4L >>=? fun amount2 ->
@@ -339,13 +390,12 @@ let multiple_transfer n ?fee amount =
 (** 1- Create a block with two contracts;
     2- Apply 100 transfers.
 *)
-let test_block_with_multiple_transfers () =
-  multiple_transfer 99 (Tez.of_int 1000)
+let test_block_with_multiple_transfers () = multiple_transfer 99 (of_int 1000)
 
 (** 1- Create a block with two contracts;
     2- Apply 100 transfers with 10tz fee. *)
 let test_block_with_multiple_transfers_pay_fee () =
-  multiple_transfer 10 ~fee:ten_tez (Tez.of_int 1000)
+  multiple_transfer 10 ~fee:ten_tez (of_int 1000)
 
 (* TODO : increase the number of operations and add a `Slow tag to it in `tests` *)
 
@@ -356,9 +406,9 @@ let test_block_with_multiple_transfers_with_without_fee () =
   Context.init 8 >>=? fun (b, contracts) ->
   let contracts = Array.of_list contracts in
   Incremental.begin_construction b >>=? fun b ->
-  let hundred = Tez.of_int 100 in
-  let ten = Tez.of_int 10 in
-  let twenty = Tez.of_int 20 in
+  let hundred = of_int 100 in
+  let ten = of_int 10 in
+  let twenty = of_int 20 in
   n_transactions 10 b contracts.(0) contracts.(1) Tez.one >>=? fun b ->
   n_transactions 30 b contracts.(1) contracts.(2) hundred >>=? fun b ->
   n_transactions 30 b contracts.(1) contracts.(3) hundred >>=? fun b ->
@@ -379,8 +429,9 @@ let test_block_with_multiple_transfers_with_without_fee () =
 
 (** Build a chain that has 10 blocks. *)
 let test_build_a_chain () =
-  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
-  let ten = Tez.of_int 10 in
+  register_two_contracts ~consensus_threshold:0 ()
+  >>=? fun (b, contract_1, contract_2) ->
+  let ten = of_int 10 in
   List.fold_left_es
     (fun b _ ->
       Incremental.begin_construction b >>=? fun b ->
@@ -416,9 +467,11 @@ let test_balance_too_low fee () =
   Context.Contract.balance (I i) contract_1 >>=? fun balance1 ->
   Context.Contract.balance (I i) contract_2 >>=? fun balance2 ->
   (* transfer the amount of tez that is bigger than the balance in the source contract *)
-  Op.transaction ~fee (I i) contract_1 contract_2 Tez.max_tez >>=? fun op ->
+  Op.transaction ~fee (I i) contract_1 contract_2 max_tez >>=? fun op ->
   let expect_failure = function
-    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as e) :: _
+      ->
+        Assert.test_error_encodings e ;
         return_unit
     | _ -> failwith "balance too low should fail"
   in
@@ -453,8 +506,8 @@ let test_balance_too_low_two_transfers fee () =
   in
   Incremental.begin_construction b >>=? fun i ->
   Context.Contract.balance (I i) contract_1 >>=? fun balance ->
-  Tez.( /? ) balance 3L >>?= fun res ->
-  Tez.( *? ) res 2L >>?= fun two_third_of_balance ->
+  balance /? 3L >>?= fun res ->
+  res *? 2L >>?= fun two_third_of_balance ->
   transfer_and_check_balances
     ~loc:__LOC__
     i
@@ -467,7 +520,9 @@ let test_balance_too_low_two_transfers fee () =
   Op.transaction ~fee (I i) contract_1 contract_3 two_third_of_balance
   >>=? fun operation ->
   let expect_failure = function
-    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _) :: _ ->
+    | Environment.Ecoproto_error (Contract_storage.Balance_too_low _ as e) :: _
+      ->
+        Assert.test_error_encodings e ;
         return_unit
     | _ -> failwith "balance too low should fail"
   in
@@ -502,6 +557,19 @@ let test_add_the_same_operation_twice () =
   Assert.proto_error ~loc:__LOC__ b (function
       | Contract_storage.Counter_in_the_past _ -> true
       | _ -> false)
+
+(** The counter is in the future *)
+let invalid_counter_in_the_future () =
+  register_two_contracts () >>=? fun (b, contract_1, contract_2) ->
+  Incremental.begin_construction b >>=? fun b ->
+  Context.Contract.counter (I b) contract_1 >>=? fun cpt ->
+  let counter = Z.add cpt (Z.of_int 10) in
+  Op.transaction (I b) contract_1 contract_2 Tez.one ~counter >>=? fun op ->
+  Incremental.add_operation b op >>= fun b ->
+  Assert.proto_error_with_info
+    ~loc:__LOC__
+    b
+    "Invalid counter (not yet reached) in a manager operation"
 
 (** Check ownership. *)
 let test_ownership_sender () =
@@ -554,9 +622,78 @@ let test_random_transfer () =
 (** Transfer random transactions. *)
 let test_random_multi_transactions () =
   let n = random_range (1, 100) in
-  multiple_transfer n (Tez.of_int 100)
+  multiple_transfer n (of_int 100)
 
 (*********************************************************************)
+
+let test_bad_entrypoint () =
+  Context.init 1 >>=? fun (b, _cs) ->
+  Incremental.begin_construction b >>=? fun v ->
+  let ctxt = Incremental.alpha_ctxt v in
+  let storage = "Unit" in
+  let parameter = "Unit" in
+  let entrypoint = "bad entrypoint" in
+  (* bad entrypoint *)
+  Contract_helpers.run_script
+    ctxt
+    "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
+    ~entrypoint
+    ~storage
+    ~parameter
+    ()
+  >>= function
+  | Ok _ -> Alcotest.fail "expected error"
+  | Error lst
+    when List.mem
+           ~equal:( = )
+           (Environment.Ecoproto_error
+              (Script_tc_errors.No_such_entrypoint entrypoint))
+           lst ->
+      return ()
+  | Error errs ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
+
+let test_bad_parameter () =
+  Context.init 1 >>=? fun (b, _cs) ->
+  Incremental.begin_construction b >>=? fun v ->
+  let ctxt = Incremental.alpha_ctxt v in
+  let storage = "Unit" in
+  let parameter = "1" in
+  (* bad parameter *)
+  Contract_helpers.run_script
+    ctxt
+    "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
+    ~storage
+    ~parameter
+    ()
+  >>= function
+  | Ok _ -> Alcotest.fail "expected error"
+  | Error lst
+    when List.mem
+           ~equal:( = )
+           (Environment.Ecoproto_error
+              (Script_interpreter.Bad_contract_parameter
+                 (Contract.implicit_contract Signature.Public_key_hash.zero)))
+           lst ->
+      return ()
+  | Error errs ->
+      Alcotest.failf "Unexpected error: %a" Error_monad.pp_print_trace errs
+
+let transfer_to_itself_with_no_such_entrypoint () =
+  let entrypoint = "bad entrypoint" in
+  Context.init 1 >>=? fun (b, contract) ->
+  Incremental.begin_construction b >>=? fun i ->
+  let addr = match contract with [hd] -> hd | _ -> assert false in
+  Op.transaction (B b) addr addr Tez.one ~entrypoint >>=? fun transaction ->
+  let expect_failure = function
+    | Environment.Ecoproto_error (Script_tc_errors.No_such_entrypoint _ as e)
+      :: _ ->
+        Assert.test_error_encodings e ;
+        return ()
+    | _ -> failwith "no such entrypoint should fail"
+  in
+  Incremental.add_operation ~expect_failure i transaction >>= fun _res ->
+  return ()
 
 let tests =
   [
@@ -572,11 +709,19 @@ let tests =
       "transfer zero tez from implicit contract"
       `Quick
       test_transfer_zero_implicit;
+    Tztest.tztest
+      "transfer zero tez to an implicit contract with balance of src as fee"
+      `Quick
+      test_transfer_zero_implicit_with_bal_src_as_fee;
     (* transfer to originated contract *)
     Tztest.tztest
       "transfer to originated contract paying transaction fee"
       `Quick
       test_transfer_to_originate_with_fee;
+    Tztest.tztest
+      "transfer zero tez to an originated contract with balance of src as fee"
+      `Quick
+      test_transfer_zero_to_originated_with_bal_src_as_fee;
     (* transfer by the balance of contract *)
     Tztest.tztest
       "transfer the amount from source contract balance"
@@ -621,7 +766,7 @@ let tests =
     Tztest.tztest
       "balance too low (max fee)"
       `Quick
-      (test_balance_too_low Tez.max_tez);
+      (test_balance_too_low max_tez);
     Tztest.tztest
       "balance too low with two transfers - transfer zero"
       `Quick
@@ -630,13 +775,27 @@ let tests =
       "balance too low with two transfers"
       `Quick
       (test_balance_too_low_two_transfers Tez.one);
+    Tztest.tztest
+      "transfer one tez to an implicit contract with balance of src as fee"
+      `Quick
+      test_transfer_one_to_implicit_with_bal_src_as_fee;
     Tztest.tztest "invalid_counter" `Quick invalid_counter;
     Tztest.tztest
       "add the same operation twice"
       `Quick
       test_add_the_same_operation_twice;
+    Tztest.tztest
+      "invalid_counter_in_the_future"
+      `Quick
+      invalid_counter_in_the_future;
     Tztest.tztest "ownership sender" `Quick test_ownership_sender;
     (* Random tests *)
     Tztest.tztest "random transfer" `Quick test_random_transfer;
     Tztest.tztest "random multi transfer" `Quick test_random_multi_transactions;
+    Tztest.tztest "bad entrypoint" `Quick test_bad_entrypoint;
+    Tztest.tztest "bad parameter" `Quick test_bad_parameter;
+    Tztest.tztest
+      "no such entrypoint"
+      `Quick
+      transfer_to_itself_with_no_such_entrypoint;
   ]

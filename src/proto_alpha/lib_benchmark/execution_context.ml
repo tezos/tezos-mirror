@@ -50,6 +50,10 @@ let context_init ~rng_state = context_init_memory ~rng_state
 
 let make ~rng_state =
   context_init_memory ~rng_state >>=? fun context ->
+  let amount = Alpha_context.Tez.one in
+  let chain_id = Chain_id.zero in
+  let now = Alpha_context.Script_timestamp.of_zint Z.zero in
+  let level = Alpha_context.Script_int.zero_n in
   let open Script_interpreter in
   (match context with
   | `Mem_block (block, (bs1, bs2, bs3, _, _)) ->
@@ -57,37 +61,22 @@ let make ~rng_state =
       let payer = bs2 in
       let self = bs3 in
       let step_constants =
-        {
-          source;
-          payer;
-          self;
-          amount = Alpha_context.Tez.one;
-          chain_id = Chain_id.zero;
-        }
+        {source; payer; self; amount; chain_id; now; level}
       in
       return (block, step_constants)
   | `Disk_block (block, source) ->
       let step_constants =
-        {
-          source;
-          payer = source;
-          self = source;
-          amount = Alpha_context.Tez.one;
-          chain_id = Chain_id.zero;
-        }
+        {source; payer = source; self = source; amount; chain_id; now; level}
       in
       return (block, step_constants))
   >>=? fun (block, step_constants) ->
   Incremental.begin_construction
-    ~priority:0
     ~timestamp:(Time.Protocol.add block.header.shell.timestamp 30L)
     block
   >>=? fun vs ->
   let ctxt = Incremental.alpha_ctxt vs in
   let ctxt =
     (* Required for eg Create_contract *)
-    Protocol.Alpha_context.Contract.init_origination_nonce
-      ctxt
-      Operation_hash.zero
+    Protocol.Alpha_context.Origination_nonce.init ctxt Operation_hash.zero
   in
   return (ctxt, step_constants)

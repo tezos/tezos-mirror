@@ -43,11 +43,13 @@ let key_arb =
   QCheck.(small_list string)
 
 let tree_arb =
+  let open Lwt_syntax in
   let rec mk_tree acc sets =
     match sets with
     | [] -> Lwt.return acc
     | (key, value) :: tl -> (
-        Tree.set_leaf acc key value >>= function
+        let* v = Tree.set_leaf acc key value in
+        match v with
         | Tezos_proxy.Proxy.Mutation -> (mk_tree [@ocaml.tailcall]) acc tl
         | Tezos_proxy.Proxy.Value acc' -> (mk_tree [@ocaml.tailcall]) acc' tl)
   in

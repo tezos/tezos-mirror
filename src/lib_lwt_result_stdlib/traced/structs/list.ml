@@ -29,43 +29,62 @@ module Make (Monad : Traced_sigs.Monad.S) :
   include Bare_structs.List
 
   let init_ep ~when_negative_length l f =
+    let open Lwt_traced_result_syntax in
     let rec aux acc i =
-      if i >= l then all_ep (rev acc)
+      if i >= l then all (rev acc)
       else (aux [@ocaml.tailcall]) (Lwt.apply f i :: acc) (i + 1)
     in
-    if l < 0 then Monad.fail_trace when_negative_length
+    if l < 0 then fail when_negative_length
     else if l = 0 then nil_es
     else aux [] 0
 
-  let iter_ep f l = join_ep (rev_map (Lwt.apply f) l)
+  let iter_ep f l = Lwt_traced_result_syntax.join (rev_map (Lwt.apply f) l)
 
   let lwt_apply2 f x y = try f x y with exn -> Lwt.fail exn
 
-  let iteri_ep f l = join_ep (mapi (lwt_apply2 f) l)
+  let iteri_ep f l = Lwt_traced_result_syntax.join (mapi (lwt_apply2 f) l)
 
-  let rev_map_ep f l = all_ep @@ rev_map (Lwt.apply f) l
+  let rev_map_ep f l = Lwt_traced_result_syntax.all @@ rev_map (Lwt.apply f) l
 
-  let map_ep f l = rev_map_ep f l >|=? rev
+  let map_ep f l = rev_map_ep f l |> Lwt_result.map rev
 
-  let rev_mapi_ep f l = all_ep @@ rev_mapi f l
+  let rev_mapi_ep f l = Lwt_traced_result_syntax.all @@ rev_mapi f l
 
-  let mapi_ep f l = rev_mapi_ep f l >|=? rev
+  let mapi_ep f l = rev_mapi_ep f l |> Lwt_result.map rev
 
   let filter_ep f l =
-    rev_map_ep (fun x -> f x >|=? fun b -> if b then Some x else None) l
-    >|=? rev_filter_some
+    rev_map_ep
+      (fun x ->
+        let open Lwt_traced_result_syntax in
+        let* b = f x in
+        if b then return_some x else return_none)
+      l
+    |> Lwt_result.map rev_filter_some
 
-  let filter_map_ep f l = rev_map_ep f l >|=? rev_filter_some
+  let filter_map_ep f l = rev_map_ep f l |> Lwt_result.map rev_filter_some
 
-  let for_all_ep f l = rev_map_ep f l >|=? for_all Fun.id
+  let concat_map_ep f xs =
+    let open Lwt_traced_result_syntax in
+    let+ r = all (map f xs) in
+    flatten r
 
-  let exists_ep f l = rev_map_ep f l >|=? exists Fun.id
+  let for_all_ep f l = rev_map_ep f l |> Lwt_result.map (for_all Fun.id)
+
+  let exists_ep f l = rev_map_ep f l |> Lwt_result.map (exists Fun.id)
 
   let partition_ep f l =
-    rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l >|=? fun bxs ->
-    fold_left
-      (fun (trues, falses) (b, x) ->
-        if b then (x :: trues, falses) else (trues, x :: falses))
-      ([], [])
-      bxs
+    let open Lwt_traced_result_syntax in
+    let* bxs =
+      rev_map_ep
+        (fun x ->
+          let* b = f x in
+          return (b, x))
+        l
+    in
+    return
+    @@ fold_left
+         (fun (trues, falses) (b, x) ->
+           if b then (x :: trues, falses) else (trues, x :: falses))
+         ([], [])
+         bxs
 end

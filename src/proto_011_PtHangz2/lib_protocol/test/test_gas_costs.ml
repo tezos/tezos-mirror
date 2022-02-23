@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (gas costs)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^gas cost functions$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^gas cost functions$"
     Subject:    Gas costs
                 Current limitations: for maps, sets & compare, we only test
                 integer comparable keys.

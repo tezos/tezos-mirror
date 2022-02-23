@@ -1,7 +1,7 @@
 (library
  (name tezos_proxy)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-proxy)
+ (instrumentation (backend bisect_ppx))
  (libraries
   ringo-lwt
   tezos-base
@@ -12,5 +12,4 @@
   tezos-rpc
   tezos-shell-services
   tezos-context)
- (flags
-  (:standard -open Tezos_base__TzPervasives)))
+ (flags (:standard -open Tezos_base__TzPervasives)))

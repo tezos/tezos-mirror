@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 type error +=
-  | Block_not_found of Block_hash.t
+  | Block_not_found of {hash : Block_hash.t; distance : int}
   | Bad_level of {head_level : Int32.t; given_level : Int32.t}
   | Block_metadata_not_found of Block_hash.t
   | Cannot_switch_history_mode of {
@@ -47,11 +47,18 @@ let () =
     ~id:"store.not_found"
     ~title:"Block not found"
     ~description:"Block not found"
-    ~pp:(fun ppf block_hash ->
-      Format.fprintf ppf "Cannot find block %a" Block_hash.pp block_hash)
-    Data_encoding.(obj1 (req "block_not_found" @@ Block_hash.encoding))
-    (function Block_not_found block_hash -> Some block_hash | _ -> None)
-    (fun block_hash -> Block_not_found block_hash) ;
+    ~pp:(fun ppf (block_hash, distance) ->
+      Format.fprintf
+        ppf
+        "Cannot find block at distance %d from block %a."
+        distance
+        Block_hash.pp
+        block_hash)
+    Data_encoding.(
+      obj1 (req "block_not_found" @@ tup2 Block_hash.encoding int8))
+    (function
+      | Block_not_found {hash; distance} -> Some (hash, distance) | _ -> None)
+    (fun (hash, distance) -> Block_not_found {hash; distance}) ;
   register_error_kind
     `Permanent
     ~id:"store.bad_level"
@@ -335,8 +342,6 @@ type error +=
   | Cannot_load_testchain of string
   | Missing_activation_block of Block_hash.t * Protocol_hash.t * History_mode.t
   | Inconsistent_protocol_commit_info of Block_hash.t * Protocol_hash.t
-  | Missing_activation_block_legacy of
-      Int32.t * Protocol_hash.t * History_mode.t
   | Missing_stored_data of string
   | Failed_to_get_live_blocks of Block_hash.t
   | Target_mismatch
@@ -350,7 +355,7 @@ let () =
     ~description:"Cannot write data in store when in readonly"
     ~pp:(fun ppf () ->
       Format.fprintf ppf "Cannot write data in store when in readonly.")
-    Data_encoding.unit
+    Data_encoding.empty
     (function Cannot_write_in_readonly -> Some () | _ -> None)
     (fun () -> Cannot_write_in_readonly) ;
   Error_monad.register_error_kind
@@ -425,7 +430,7 @@ let () =
     ~title:"Merge error"
     ~description:"Error while merging the store"
     ~pp:(fun ppf () -> Format.fprintf ppf "Error while merging the store.")
-    Data_encoding.(unit)
+    Data_encoding.empty
     (function Merge_error -> Some () | _ -> None)
     (fun () -> Merge_error) ;
   Error_monad.register_error_kind
@@ -435,7 +440,7 @@ let () =
     ~description:"The store's merge is already running"
     ~pp:(fun ppf () ->
       Format.fprintf ppf "The store's merge is already running.")
-    Data_encoding.(unit)
+    Data_encoding.empty
     (function Merge_already_running -> Some () | _ -> None)
     (fun () -> Merge_already_running) ;
   Error_monad.register_error_kind
@@ -607,7 +612,7 @@ let () =
         ppf
         "Current head's last allowed fork level block or (its associated \
          metadata) cannot be found in the store.")
-    Data_encoding.unit
+    Data_encoding.empty
     (function Missing_last_allowed_fork_level_block -> Some () | _ -> None)
     (fun () -> Missing_last_allowed_fork_level_block) ;
   Error_monad.register_error_kind
@@ -904,30 +909,6 @@ let () =
     (fun (bh, ph) -> Inconsistent_protocol_commit_info (bh, ph)) ;
   Error_monad.register_error_kind
     `Temporary
-    ~id:"store.missing_activation_block_legacy"
-    ~title:"Missing activation block legacy"
-    ~description:"Missing activation block while restoring a legacy snapshot"
-    ~pp:(fun ppf (bl, ph, hm) ->
-      Format.fprintf
-        ppf
-        "Failed to restore legacy snapshot: the expected activation block \
-         (level %ld) originating the protocol %a was not found for %a."
-        bl
-        Protocol_hash.pp
-        ph
-        History_mode.pp
-        hm)
-    Data_encoding.(
-      obj3
-        (req "block_hash" int32)
-        (req "protocol_hash" Protocol_hash.encoding)
-        (req "history_mode" History_mode.encoding))
-    (function
-      | Missing_activation_block_legacy (bl, ph, hm) -> Some (bl, ph, hm)
-      | _ -> None)
-    (fun (bl, ph, hm) -> Missing_activation_block_legacy (bl, ph, hm)) ;
-  Error_monad.register_error_kind
-    `Temporary
     ~id:"store.missing_stored_data"
     ~title:"Missing stored data"
     ~description:"Failed to load stored data"
@@ -1166,8 +1147,105 @@ let () =
       Bad_ordering_invariant
         {genesis; caboose; savepoint; cementing_highwatermark; checkpoint; head})
 
-(* FIXME: proper thing*)
-type error += Corrupted_store of string
+type corruption_kind =
+  | Inferred_head of Block_hash.t * Int32.t
+  | Cannot_find_cemented_savepoint of string
+  | Cannot_find_savepoint_candidate
+  | Cannot_find_caboose_candidate
+  | Cannot_find_block_with_metadata
+  | Cannot_find_activation_block of Block_hash.t * int
+  | Missing_genesis
+
+let corruption_kind_encoding =
+  let open Data_encoding in
+  union
+    [
+      case
+        (Tag 0)
+        ~title:"Inferred_head"
+        (obj2 (req "hash" Block_hash.encoding) (req "level" int32))
+        (function
+          | Inferred_head (hash, level) -> Some (hash, level) | _ -> None)
+        (fun (hash, level) -> Inferred_head (hash, level));
+      case
+        (Tag 1)
+        ~title:"Cannot_find_cemented_savepoint"
+        (obj1 (req "cemented_metadata_file" string))
+        (function Cannot_find_cemented_savepoint s -> Some s | _ -> None)
+        (fun s -> Cannot_find_cemented_savepoint s);
+      case
+        (Tag 2)
+        ~title:"Cannot_find_savepoint_candidate"
+        Data_encoding.empty
+        (function Cannot_find_savepoint_candidate -> Some () | _ -> None)
+        (fun () -> Cannot_find_savepoint_candidate);
+      case
+        (Tag 3)
+        ~title:"Cannot_find_caboose_candidate"
+        Data_encoding.empty
+        (function Cannot_find_caboose_candidate -> Some () | _ -> None)
+        (fun () -> Cannot_find_caboose_candidate);
+      case
+        (Tag 4)
+        ~title:"Cannot_find_block_with_metadata"
+        Data_encoding.empty
+        (function Cannot_find_block_with_metadata -> Some () | _ -> None)
+        (fun () -> Cannot_find_block_with_metadata);
+      case
+        (Tag 5)
+        ~title:"Cannot_find_activation_block"
+        (obj2 (req "block_hash" Block_hash.encoding) (req "proto_level" int31))
+        (function
+          | Cannot_find_activation_block (block_hash, proto_level) ->
+              Some (block_hash, proto_level)
+          | _ -> None)
+        (fun (block_hash, proto_level) ->
+          Cannot_find_activation_block (block_hash, proto_level));
+      case
+        (Tag 6)
+        ~title:"Missing_genesis"
+        Data_encoding.empty
+        (function Missing_genesis -> Some () | _ -> None)
+        (fun () -> Missing_genesis);
+    ]
+
+let pp_corruption_kind ppf = function
+  | Inferred_head (hash, level) ->
+      Format.fprintf
+        ppf
+        "inferred head (%a, %ld) must have metadata"
+        Block_hash.pp
+        hash
+        level
+  | Cannot_find_cemented_savepoint s ->
+      Format.fprintf
+        ppf
+        "failed to find a valid savepoint in the cemented store as metadata %s \
+         are corrupted"
+        s
+  | Cannot_find_savepoint_candidate ->
+      Format.fprintf
+        ppf
+        "failed to find a valid savepoint candidate in the store"
+  | Cannot_find_caboose_candidate ->
+      Format.fprintf ppf "failed to find a valid caboose candidate in the store"
+  | Cannot_find_block_with_metadata ->
+      Format.fprintf
+        ppf
+        "cannot find block with metadata in the store. At least the head must \
+         have metadata"
+  | Cannot_find_activation_block (block_hash, proto_level) ->
+      Format.fprintf
+        ppf
+        "failed to find a valid activation block for protocol %d of the \
+         current head (%a)"
+        proto_level
+        Block_hash.pp
+        block_hash
+  | Missing_genesis ->
+      Format.fprintf ppf "the genesis block is not available in the store"
+
+type error += Corrupted_store of corruption_kind
 
 let () =
   Error_monad.register_error_kind
@@ -1175,8 +1253,12 @@ let () =
     ~id:"store.corrupted_store"
     ~title:"Corrupted store"
     ~description:"The store is corrupted"
-    ~pp:(fun ppf reason ->
-      Format.fprintf ppf "The store is corrupted irremediably: %s." reason)
-    Data_encoding.(obj1 (req "reason" string))
-    (function Corrupted_store i -> Some i | _ -> None)
-    (fun i -> Corrupted_store i)
+    ~pp:(fun ppf kind ->
+      Format.fprintf
+        ppf
+        "The store is corrupted irremediably: %a."
+        pp_corruption_kind
+        kind)
+    Data_encoding.(obj1 (req "kind" corruption_kind_encoding))
+    (function Corrupted_store k -> Some k | _ -> None)
+    (fun k -> Corrupted_store k)

@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open StaTz
+open Stats
 
 type determinizer_option = Percentile of int | Mean
 
@@ -338,9 +338,9 @@ let save :
     | Ok res -> res
   in
   let serialized_workload = {bench_name = Bench.name; measurement_bytes} in
-  let bytes =
+  let str =
     match
-      Data_encoding.Binary.to_bytes
+      Data_encoding.Binary.to_string
         serialized_workload_encoding
         serialized_workload
     with
@@ -353,9 +353,7 @@ let save :
     | Ok res -> res
   in
   Lwt_main.run
-    ( Tezos_stdlib_unix.Lwt_utils_unix.create_file
-        filename
-        (Bytes.unsafe_to_string bytes)
+    ( Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str
     >>= fun _nwritten -> Lwt.return_unit )
 
 let load : filename:string -> packed_measurement =
@@ -370,9 +368,8 @@ let load : filename:string -> packed_measurement =
   Lwt_main.run
   @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
        Format.eprintf "Measure.load: loaded %s\n" filename ;
-       let bytes = Bytes.unsafe_of_string str in
        match
-         Data_encoding.Binary.of_bytes serialized_workload_encoding bytes
+         Data_encoding.Binary.of_string serialized_workload_encoding str
        with
        | Ok {bench_name; measurement_bytes} -> (
            match Registration.find_benchmark bench_name with
@@ -461,9 +458,9 @@ let collect_stats : 'a workload_data -> workloads_stats =
     List.rev_map (fun {qty; _} -> qty) workload_data |> Array.of_list
   in
   let (min, max) = farray_min_max time_dist_data in
-  let dist = Stats.empirical_of_raw_data time_dist_data in
-  let mean = Stats.mean (module Structures.Float) dist in
-  let var = Stats.variance dist in
+  let dist = Emp.of_raw_data time_dist_data in
+  let mean = Emp.Float.empirical_mean dist in
+  let var = Emp.Float.empirical_variance dist in
   {max_time = max; min_time = min; mean_time = mean; variance = var}
 
 (* ------------------------------------------------------------------------- *)
@@ -509,7 +506,7 @@ let reset_memory ~stabilize_gc ~flush_cache =
   | `Cache_megabytes mb ->
       Stubs.Cache.flush_cache Int64.(mul 1048576L (of_int mb))
 
-let make_sampler ~stabilize_gc ~flush_cache closure () =
+let make_sampler ~stabilize_gc ~flush_cache closure _rng_state =
   reset_memory ~stabilize_gc ~flush_cache ;
   let (_, dt) = Stubs.Time.duration closure in
   float_of_int dt
@@ -519,17 +516,18 @@ let compute_empirical_timing_distribution :
     nsamples:int ->
     flush_cache:[`Cache_megabytes of int | `Dont] ->
     stabilize_gc:bool ->
-    float Stats.emp =
+    float Emp.t =
  fun ~closure ~nsamples ~flush_cache ~stabilize_gc ->
   let sampler = make_sampler ~stabilize_gc ~flush_cache closure in
-  Stats.empirical_of_generative ~nsamples (Stats.generative ~sampler)
+  let dummy_rng_state = Random.State.make [|1; 2; 3|] in
+  Emp.of_generative ~nsamples sampler dummy_rng_state
 
 let determinizer_from_options options =
   match options.determinizer with
   | Percentile i ->
       let perc = float_of_int i *. 0.01 in
-      fun dist -> Stats.(quantile (module Structures.Float) dist perc)
-  | Mean -> fun dist -> Stats.(mean (module Structures.Float) dist)
+      fun dist -> Emp.quantile (module Basic_structures.Std.Float) dist perc
+  | Mean -> Emp.Float.empirical_mean
 
 let seed_init_from_options (options : options) =
   match options.seed with
@@ -638,9 +636,7 @@ let perform_benchmark (type c t) (options : options)
             List.fold_left
               (fun acc aspect ->
                 let results = probe.Generator.get aspect in
-                let qty_dist =
-                  Stats.empirical_of_raw_data (Array.of_list results)
-                in
+                let qty_dist = Emp.of_raw_data (Array.of_list results) in
                 let qty = determinizer qty_dist in
                 let workload = workload aspect in
                 {workload; qty} :: acc)

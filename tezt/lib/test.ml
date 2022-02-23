@@ -55,7 +55,16 @@ let () =
   | Failed message -> Some message
   | _ -> None
 
-let fail x = Printf.ksprintf (fun message -> raise (Failed message)) x
+let fail ?__LOC__ x =
+  Format.kasprintf
+    (fun message ->
+      let message =
+        match __LOC__ with
+        | None -> message
+        | Some loc -> sf "%s: %s" loc message
+      in
+      raise (Failed message))
+    x
 
 let global_starting_time = Unix.gettimeofday ()
 

@@ -1,0 +1,21 @@
+tezt/_regressions/encoding/hangzhou.delegate.frozen_balance_by_cycles.out
+
+./tezos-codec encode 011-PtHangz2.delegate.frozen_balance_by_cycles from '[
+  {
+    "cycle": 12,
+    "deposits": "0",
+    "fees": "128",
+    "rewards": "512000"
+  },
+  {
+    "cycle": 13,
+    "deposits": "256000",
+    "fees": "128",
+    "rewards": "1"
+  }
+]'
+000000140000000c00800180a01f0000000d80d00f800101
+
+./tezos-codec decode 011-PtHangz2.delegate.frozen_balance_by_cycles from 000000140000000c00800180a01f0000000d80d00f800101
+[ { "cycle": 12, "deposits": "0", "fees": "128", "rewards": "512000" },
+  { "cycle": 13, "deposits": "256000", "fees": "128", "rewards": "1" } ]

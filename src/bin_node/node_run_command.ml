@@ -138,12 +138,15 @@ module Event = struct
       ("tls", Data_encoding.bool)
 
   let starting_node =
-    declare_1
+    declare_3
       ~section
       ~name:"starting_node"
-      ~msg:"starting the Tezos node"
+      ~msg:"starting the Tezos node v{version} ({git_info})"
       ~level:Notice
       ("chain", Distributed_db_version.Name.encoding)
+      ~pp2:Tezos_version.Version.pp
+      ("version", Tezos_version.Node_version.version_encoding)
+      ("git_info", Data_encoding.string)
 
   let node_is_ready =
     declare_0
@@ -243,10 +246,14 @@ let init_node ?sandbox ?target ~identity ~singleprocess
       Node_config_file.resolve_bootstrap_addrs
         (Node_config_file.bootstrap_peers config)
       >>=? fun trusted_points ->
+      let advertised_port : P2p_addr.port option =
+        Option.either config.p2p.advertised_net_port listening_port
+      in
       let p2p_config : P2p.config =
         {
           listening_addr;
           listening_port;
+          advertised_port;
           discovery_addr;
           discovery_port;
           trusted_points;
@@ -405,7 +412,11 @@ let run ?verbosity ?sandbox ?target ~singleprocess ~force_history_mode_switch
   Node_config_validation.check config >>=? fun () ->
   init_identity_file config >>=? fun identity ->
   Updater.init (Node_data_version.protocol_dir config.data_dir) ;
-  Event.(emit starting_node) config.blockchain_network.chain_name >>= fun () ->
+  Event.(emit starting_node)
+    ( config.blockchain_network.chain_name,
+      Tezos_version.Version.current,
+      Tezos_version.Current_git_info.abbreviated_commit_hash )
+  >>= fun () ->
   (init_node
      ?sandbox
      ?target
@@ -470,7 +481,7 @@ let process sandbox verbosity target singleprocess force_history_mode_switch
         let l = String.split_on_char ',' s in
         Lwt.catch
           (fun () ->
-            assert (List.length l = 2) ;
+            assert (Compare.List_length_with.(l = 2)) ;
             let target =
               match l with
               | [block_hash; level] ->

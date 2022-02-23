@@ -83,7 +83,7 @@ class TestTrustedRing:
     def test_set_expected_peers(self, sandbox: Sandbox):
         """For all nodes, we add one expected peer_id
         for the successor node."""
-        peers_id = dict()
+        peers_id = {}
         for i in range(NUM_NODES):
             client = sandbox.client(i)
             peers_id[i] = client.rpc('get', '/network/self')
@@ -98,7 +98,7 @@ class TestTrustedRing:
     def test_expected_peers(self, sandbox: Sandbox):
         """For all nodes, we check that expected peer_id was
         set properly."""
-        peers_id = dict()
+        peers_id = {}
         for i in range(NUM_NODES):
             client = sandbox.client(i)
             peers_id[i] = client.rpc('get', '/network/self')
@@ -113,7 +113,7 @@ class TestTrustedRing:
     def test_wrong_expected_peer(self, sandbox: Sandbox):
         """We change the expected peer_id set previously to a wrong
         expected peer_id."""
-        peers_id = dict()
+        peers_id = {}
         for i in range(NUM_NODES):
             client = sandbox.client(i)
             peers_id[i] = client.rpc('get', '/network/self')

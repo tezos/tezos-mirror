@@ -27,23 +27,34 @@ open Protocol
 open Alpha_context
 
 val endorsement :
-  ?delegate:public_key_hash ->
+  ?delegate:public_key_hash * Slot.t list ->
+  ?slot:Slot.t ->
   ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  endorsed_block:Block.t ->
   Context.t ->
   ?signing_context:Context.t ->
   unit ->
   Kind.endorsement Operation.t tzresult Lwt.t
 
-val endorsement_with_slot :
-  ?delegate:public_key_hash * int list ->
+val preendorsement :
+  ?delegate:public_key_hash * Slot.t list ->
+  ?slot:Slot.t ->
   ?level:Raw_level.t ->
+  ?round:Round.t ->
+  ?block_payload_hash:Block_payload_hash.t ->
+  endorsed_block:Block.t ->
   Context.t ->
   ?signing_context:Context.t ->
   unit ->
-  Kind.endorsement_with_slot Operation.t tzresult Lwt.t
+  Kind.preendorsement Operation.t tzresult Lwt.t
 
 val miss_signed_endorsement :
-  ?level:Raw_level.t -> Context.t -> Kind.endorsement Operation.t tzresult Lwt.t
+  ?level:Raw_level.t ->
+  endorsed_block:Block.t ->
+  Context.t ->
+  Kind.endorsement Operation.t tzresult Lwt.t
 
 val transaction :
   ?counter:Z.t ->
@@ -65,13 +76,26 @@ val delegation :
   public_key_hash option ->
   Operation.packed tzresult Lwt.t
 
+val set_deposits_limit :
+  ?fee:Tez.tez ->
+  Context.t ->
+  Contract.t ->
+  Tez.tez option ->
+  Operation.packed tzresult Lwt.t
+
 val revelation :
   ?fee:Tez.tez -> Context.t -> public_key -> Operation.packed tzresult Lwt.t
 
 val failing_noop :
   Context.t -> public_key_hash -> string -> Operation.packed tzresult Lwt.t
 
-val origination :
+(** [contract_origination ctxt source] Create a new contract origination
+    operation, sign it with [source] and returns it alongside the contract
+    address. The contract address is using the initial origination nonce with the
+    hash of the operation. If this operation is combine with [combine_operations]
+    then the contract address is false as the nonce is not based on the correct
+    operation hash. *)
+val contract_origination :
   ?counter:Z.t ->
   ?delegate:public_key_hash ->
   script:Script.t ->
@@ -90,8 +114,8 @@ val originated_contract : Operation.packed -> Contract.contract
 val register_global_constant :
   ?counter:Z.t ->
   ?public_key:Signature.public_key ->
-  ?fee:Test_tez.Tez.tez ->
-  ?gas_limit:Tezos_raw_protocol_alpha.Alpha_context.Gas.Arith.integral ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Alpha_context.Gas.Arith.integral ->
   ?storage_limit:Z.t ->
   Context.t ->
   (* Account doing the registration *)
@@ -104,7 +128,12 @@ val double_endorsement :
   Context.t ->
   Kind.endorsement Operation.t ->
   Kind.endorsement Operation.t ->
-  slot:int ->
+  Operation.packed
+
+val double_preendorsement :
+  Context.t ->
+  Kind.preendorsement Operation.t ->
+  Kind.preendorsement Operation.t ->
   Operation.packed
 
 val double_baking :
@@ -149,4 +178,19 @@ val ballot :
 
 val dummy_script : Script.t
 
-val dummy_script_cost : Test_tez.Tez.t
+val dummy_script_cost : Tez.t
+
+(** [tx_rollup_origination ctxt source] Originate a new tx rollup operation,
+    sign it with [source] and returns it alongside the tx rollup address. The
+    tx_rollup address is using the initial origination nonce with the hash of the
+    operation. If this operation is combined with [combine_operations] then the
+    tx rollup address is false as the nonce is not based on the correct operation
+    hash. *)
+val tx_rollup_origination :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  (Operation.packed * Tx_rollup.t) tzresult Lwt.t

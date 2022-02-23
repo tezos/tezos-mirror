@@ -25,8 +25,7 @@
 
 (** {2:lru-generic An LRU inter-blocks cache for the economic protocol} *)
 
-(** {b This is for use *within* the {!module:Environment_context}
-   only. *)
+(** {b This is for use *within* the {!module:Environment_context} only.} *)
 
 (**
 

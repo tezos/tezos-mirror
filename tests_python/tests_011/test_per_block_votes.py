@@ -13,7 +13,7 @@ def run_vote_file_test(sandbox, filename):
     sandbox.rm_baker(0, proto=protocol.DAEMON)
     sandbox.add_baker(
         0,
-        'bootstrap1',
+        ['bootstrap1'],
         proto=protocol.DAEMON,
         run_params=["--votefile", filename],
     )
@@ -28,7 +28,7 @@ def run_vote_file_test_error(sandbox, filename, error_pattern):
     sandbox.rm_baker(0, proto=protocol.DAEMON)
     sandbox.add_baker(
         0,
-        'bootstrap1',
+        ['bootstrap1'],
         proto=protocol.DAEMON,
         run_params=["--votefile", filename],
     )
@@ -86,7 +86,7 @@ class TestAllPerBlockVotes:
         parameters["time_between_blocks"] = ["1"]
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap1', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap1'], proto=protocol.DAEMON)
 
     def test_wait_for_protocol(self, sandbox: Sandbox):
         clients = sandbox.all_clients()

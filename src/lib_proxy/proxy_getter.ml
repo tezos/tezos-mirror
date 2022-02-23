@@ -95,14 +95,18 @@ let rec raw_context_to_tree
       Lwt.return (Some (Local.Tree.of_raw (`Value bytes)))
   | Cut -> Lwt.return None
   | Dir map ->
+      let open Lwt_syntax in
       let add_to_tree tree (string, raw_context) =
-        raw_context_to_tree raw_context >>= function
+        let* u = raw_context_to_tree raw_context in
+        match u with
         | None -> Lwt.return tree
         | Some u -> Local.Tree.add_tree tree [string] u
       in
-      TzString.Map.bindings map
-      |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
-      >|= fun dir -> if Local.Tree.is_empty dir then None else Some dir
+      let* dir =
+        TzString.Map.bindings map
+        |> List.fold_left_s add_to_tree (Local.Tree.empty Local.empty)
+      in
+      if Local.Tree.is_empty dir then return_none else return_some dir
 
 module type M = sig
   val proxy_dir_mem :
@@ -129,10 +133,14 @@ struct
   let get = Local.Tree.find_tree
 
   let set_leaf tree key raw_context : t Proxy.update Lwt.t =
-    (raw_context_to_tree raw_context >>= function
-     | None -> Lwt.return tree
-     | Some sub_tree -> Local.Tree.add_tree tree key sub_tree)
-    >|= fun updated_tree -> Proxy.Value updated_tree
+    let open Lwt_syntax in
+    let* tree_opt = raw_context_to_tree raw_context in
+    let* updated_tree =
+      match tree_opt with
+      | None -> Lwt.return tree
+      | Some sub_tree -> Local.Tree.add_tree tree key sub_tree
+    in
+    Lwt.return (Proxy.Value updated_tree)
 end
 
 module type REQUESTS_TREE = sig
@@ -188,14 +196,18 @@ module Core
         Lwt.return e
     | Some e -> Lwt.return e
 
-  let get key = lazy_load_store () >>= fun store -> T.get store key
+  let get key =
+    let open Lwt_syntax in
+    let* store = lazy_load_store () in
+    T.get store key
 
   let do_rpc : Proxy.proxy_getter_input -> Local.key -> unit tzresult Lwt.t =
    fun pgi key ->
-    X.do_rpc pgi key >>=? fun tree ->
-    lazy_load_store () >>= fun current_store ->
+    let open Lwt_tzresult_syntax in
+    let* tree = X.do_rpc pgi key in
+    let*! current_store = lazy_load_store () in
     (* Update cache with data obtained *)
-    T.set_leaf current_store key tree >>= fun updated ->
+    let*! updated = T.set_leaf current_store key tree in
     (match updated with Mutation -> () | Value cache' -> store := Some cache') ;
     return_unit
 end
@@ -235,13 +247,16 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
        and hence 'key' here differs from the key received as parameter) *)
     if split && is_all key_to_get then return_unit
     else
-      (if split then
-       Events.(emit split_key_triggers (key_to_get, requested_key))
-      else Lwt.return_unit)
-      >>= fun () ->
-      C.do_rpc pgi key_to_get >>= function
+      let open Lwt_syntax in
+      let* () =
+        if split then
+          Events.(emit split_key_triggers (key_to_get, requested_key))
+        else Lwt.return_unit
+      in
+      let* r = C.do_rpc pgi key_to_get in
+      match r with
       | Ok _ -> remember_request ()
-      | _ when X.failure_is_permanent requested_key -> remember_request ()
+      | Error _ when X.failure_is_permanent requested_key -> remember_request ()
       | Error err ->
           (* Don't remember the request, maybe it will succeed in the future *)
           Lwt.return_error err
@@ -259,28 +274,38 @@ module Make (C : Proxy.CORE) (X : Proxy_proto.PROTO_RPC) : M = struct
       Local.key ->
       Local.tree option tzresult Lwt.t =
    fun (kind : kind) (pgi : Proxy.proxy_getter_input) (key : Local.key) ->
-    (if is_all key then
-     (* This exact request was done already.
-        So data was obtained already. Note that this does not imply
-        that this function will return [Some] (maybe the node doesn't
-        map this key). *)
-     Events.(emit cache_hit (kind, key)) >>= fun () -> return_unit
-    else
-      (* This exact request was NOT done already (either a longer request
-         was done or no related request was done at all).
-         An RPC MUST be done. *)
-      Events.(emit cache_miss (kind, key)) >>= fun () -> do_rpc pgi kind key)
-    >>=? fun () -> C.get key >>= return
+    let open Lwt_tzresult_syntax in
+    let* () =
+      if is_all key then
+        (* This exact request was done already.
+           So data was obtained already. Note that this does not imply
+           that this function will return [Some] (maybe the node doesn't
+           map this key). *)
+        Lwt_result.ok @@ Events.(emit cache_hit (kind, key))
+      else
+        (* This exact request was NOT done already (either a longer request
+           was done or no related request was done at all).
+           An RPC MUST be done. *)
+        let*! () = Events.(emit cache_miss (kind, key)) in
+        do_rpc pgi kind key
+    in
+    Lwt_result.ok @@ C.get key
 
   let proxy_get pgi key = generic_call Get pgi key
 
   let proxy_dir_mem pgi key =
-    generic_call Mem pgi key
-    >|=? Option.fold ~none:false ~some:(fun tree ->
-             Local.Tree.kind tree = `Tree)
+    let open Lwt_tzresult_syntax in
+    let* tree_opt = generic_call Mem pgi key in
+    match tree_opt with
+    | None -> return_false
+    | Some tree -> (
+        match Local.Tree.kind tree with
+        | `Tree -> return_true
+        | `Value -> return_false)
 
   let proxy_mem pgi key =
-    generic_call Mem pgi key >>=? fun tree_opt ->
+    let open Lwt_tzresult_syntax in
+    let* tree_opt = generic_call Mem pgi key in
     match tree_opt with
     | None -> return_false
     | Some tree -> (

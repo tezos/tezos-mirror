@@ -52,15 +52,16 @@ let migrate_mockup ~(cctxt : Tezos_client_base.Client_context.full)
   | Base_dir_is_mockup -> return_unit)
   >>=? fun () ->
   get_mockup_context_from_disk ~base_dir ~protocol_hash cctxt
-  >>=? fun ((module Current_mockup_env), (chain_id, rpc_context)) ->
+  >>=? fun ((module Current_mockup_env), registration_data) ->
   get_registered_mockup (Some next_protocol_hash) cctxt
   >>=? fun (module Next_mockup_env) ->
-  Next_mockup_env.migrate (chain_id, rpc_context)
-  >>=? fun (chain_id, rpc_context) ->
+  Next_mockup_env.migrate registration_data
+  >>=? fun {chain = chain_id; rpc_context; protocol_data} ->
   overwrite_mockup
     ~protocol_hash:next_protocol_hash
     ~chain_id
     ~rpc_context
+    ~protocol_data
     ~base_dir
   >>=? fun () ->
   cctxt#message "Migration successful." >>= fun () -> return_unit

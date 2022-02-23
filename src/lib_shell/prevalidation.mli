@@ -29,64 +29,104 @@
     consistency. This module is stateless and creates and manipulates the
     prevalidation_state. *)
 
-type 'operation_data operation = private {
+type 'protocol_operation operation = private {
   hash : Operation_hash.t;  (** Hash of an operation. *)
   raw : Operation.t;
       (** Raw representation of an operation (from the point view of the
-     shell). *)
-  protocol_data : 'operation_data;
+          shell). *)
+  protocol : 'protocol_operation;
       (** Economic protocol specific data of an operation. It is the
-     unserialized representation of [raw.protocol_data]. For
-     convenience, the type associated to this type may be [unit] if we
-     do not have deserialized the operation yet. *)
+          unserialized representation of [raw.protocol_data]. For
+          convenience, the type associated to this type may be [unit] if we
+          do not have deserialized the operation yet. *)
 }
 
 module type T = sig
-  module Proto : Tezos_protocol_environment.PROTOCOL
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL.operation} *)
+  type protocol_operation
 
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL} *)
+  type operation_receipt
+
+  (** Similar to the same type in the protocol,
+      see {!Tezos_protocol_environment.PROTOCOL} *)
+  type validation_state
+
+  (** The type implemented by {!Tezos_store.Store.chain_store} in
+      production, and mocked in tests *)
+  type chain_store
+
+  (** The type used internally by this module. Created by {!create} and
+      then passed back and possibly updated by {!apply_operation}. *)
   type t
 
-  val parse : Operation.t -> Proto.operation_data operation tzresult
+  (** [parse hash op] reads a usual {!Operation.t} and lifts it to the
+      type {!protocol_operation} used by this module. This function is in the
+      {!tzresult} monad, because it can return the following errors:
 
-  (** [parse_unsafe bytes] parses [bytes] as operation data. Any error
-     happening during parsing becomes {!Parse_error}.
-
-      [unsafe] because there are no length checks, unlike {!parse}.
-
-     @deprecated You should use [parse] instead. *)
-  val parse_unsafe : bytes -> Proto.operation_data tzresult
+      - {!Validation_errors.Oversized_operation} if the size of the operation
+        data within [op] is too large (to protect against DoS attacks), and
+      - {!Validation_errors.Parse_error} if serialized data cannot be parsed. *)
+  val parse :
+    Operation_hash.t -> Operation.t -> protocol_operation operation tzresult
 
   (** Creates a new prevalidation context w.r.t. the protocol associate to the
       predecessor block . When ?protocol_data is passed to this function, it will
       be used to create the new block *)
   val create :
-    Store.chain_store ->
+    chain_store ->
     ?protocol_data:Bytes.t ->
     predecessor:Store.Block.t ->
-    live_blocks:Block_hash.Set.t ->
     live_operations:Operation_hash.Set.t ->
     timestamp:Time.Protocol.t ->
     unit ->
     t tzresult Lwt.t
 
+  (** Values returned by {!create}. They are obtained from the result
+      of the protocol [apply_operation] function and the classification of errors. *)
   type result =
-    | Applied of t * Proto.operation_receipt
-    | Branch_delayed of error list
-    | Branch_refused of error list
-    | Refused of error list
-    | Outdated
+    | Applied of t * operation_receipt
+    | Branch_delayed of tztrace
+    | Branch_refused of tztrace
+    | Refused of tztrace
+    | Outdated of tztrace
 
-  val apply_operation : t -> Proto.operation_data operation -> result Lwt.t
+  (** [apply_operation t op] calls the protocol [apply_operation] function
+      and handles possible errors, hereby yielding a classification *)
+  val apply_operation : t -> protocol_operation operation -> result Lwt.t
 
-  val validation_state : t -> Proto.validation_state
+  (** [validation_state t] returns the subset of [t] corresponding
+      to the type {!validation_state} of the protocol. *)
+  val validation_state : t -> validation_state
 
   val pp_result : Format.formatter -> result -> unit
+
+  module Internal_for_tests : sig
+    (** Returns operations for which {!apply_operation} returned [Applied _]
+        so far. *)
+    val to_applied :
+      t -> (protocol_operation operation * operation_receipt) list
+  end
 end
 
-module Make (Proto : Tezos_protocol_environment.PROTOCOL) :
-  T with module Proto = Proto
+(** How-to obtain an instance of this module's main module type: {!T} *)
+module Make : functor (Proto : Tezos_protocol_environment.PROTOCOL) ->
+  T
+    with type protocol_operation = Proto.operation
+     and type operation_receipt = Proto.operation_receipt
+     and type validation_state = Proto.validation_state
+     and type chain_store = Store.chain_store
 
 module Internal_for_tests : sig
+  (** Returns the {!Operation.t} underlying an {!operation} *)
+  val to_raw : _ operation -> Operation.t
+
+  (** A constructor for the [operation] datatype. It by-passes the
+     checks done by the [parse] function. *)
+  val make_operation : Operation.t -> Operation_hash.t -> 'a -> 'a operation
+
   (** [safe_binary_of_bytes encoding bytes] parses [bytes] using [encoding]. Any error happening during parsing becomes {!Parse_error}.
 
       If one day the functor signature is simplified, tests could use [parse_unsafe] directly rather than relying on this function to
@@ -96,4 +136,29 @@ module Internal_for_tests : sig
       Move this function to [data_encoding] or [tezos_base] and consider not catching some exceptions
       *)
   val safe_binary_of_bytes : 'a Data_encoding.t -> bytes -> 'a tzresult
+
+  module type CHAIN_STORE = sig
+    (** The [chain_store] type. Implemented by
+        {!Tezos_store.Store.chain_store} in production and mocked in
+        tests *)
+    type chain_store
+
+    (** [context store block] checkouts and returns the context of [block] *)
+    val context : chain_store -> Store.Block.t -> Context.t tzresult Lwt.t
+
+    (** [chain_id store] returns the {!Chain_id.t} to which [store] corresponds *)
+    val chain_id : chain_store -> Chain_id.t
+  end
+
+  (** A variant of [Make] above that is parameterized by {!CHAIN_STORE},
+      for mocking purposes. *)
+  module Make : functor
+    (Chain_store : CHAIN_STORE)
+    (Proto : Tezos_protocol_environment.PROTOCOL)
+    ->
+    T
+      with type protocol_operation = Proto.operation
+       and type operation_receipt = Proto.operation_receipt
+       and type validation_state = Proto.validation_state
+       and type chain_store = Chain_store.chain_store
 end

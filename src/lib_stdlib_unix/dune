@@ -1,23 +1,26 @@
 (library
  (name tezos_stdlib_unix)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-stdlib-unix)
- (flags (:standard -open Tezos_error_monad
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Tezos_event_logging
-                   -open Tezos_stdlib
-                   -open Data_encoding))
- (libraries data-encoding
-            tezos-error-monad
-            tezos-lwt-result-stdlib
-            tezos-event-logging
-            tezos-stdlib
-            lwt.unix
-            ipaddr.unix
-	    fmt
-            re
-            ptime
-            ptime.clock.os
-            mtime
-            mtime.clock.os
-            lwt_log))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  unix
+  data-encoding
+  tezos-error-monad
+  tezos-lwt-result-stdlib
+  tezos-event-logging
+  tezos-stdlib
+  lwt.unix
+  ipaddr.unix
+  re
+  ptime
+  ptime.clock.os
+  mtime
+  mtime.clock.os
+  lwt_log)
+ (flags
+  (:standard
+   -open Tezos_error_monad
+   -open Tezos_error_monad.TzLwtreslib
+   -open Tezos_event_logging
+   -open Tezos_stdlib
+   -open Data_encoding)))

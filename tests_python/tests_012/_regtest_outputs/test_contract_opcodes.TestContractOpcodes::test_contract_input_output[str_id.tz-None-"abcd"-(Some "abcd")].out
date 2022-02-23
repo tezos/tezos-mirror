@@ -1,0 +1,21 @@
+tests_012/test_contract_opcodes.py::TestContractOpcodes::test_contract_input_output[str_id.tz-None-"abcd"-(Some "abcd")]
+
+storage
+  (Some "abcd")
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 8 (remaining gas: 1039994.501 units remaining)
+    [ (Pair "abcd" None)  	 ]
+  - location: 8 (remaining gas: 1039994.491 units remaining)
+    [ "abcd"  	@parameter ]
+  - location: 9 (remaining gas: 1039994.476 units remaining)
+    [ (Some "abcd")  	 ]
+  - location: 10 (remaining gas: 1039994.461 units remaining)
+    [ {}  	
+      (Some "abcd")  	 ]
+  - location: 12 (remaining gas: 1039994.446 units remaining)
+    [ (Pair {} (Some "abcd"))  	 ]
+

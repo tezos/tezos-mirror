@@ -267,9 +267,62 @@ module Maintenance = struct
   let tests () = test_expected_connections ()
 end
 
-let register_protocol_independent () = Maintenance.tests ()
+let port_from_peers_file file_name =
+  JSON.parse_file file_name |> JSON.geti 0
+  |> JSON.get "last_established_connection"
+  |> JSON.geti 0 |> JSON.get "port" |> JSON.as_int
 
-let register ~protocols =
+(*
+  - node_2 connects to the peer node_1 and advertises different listening port
+  - after node_1 receives advertised net port from node_2 (maintenance_ended),
+    terminate node_1 to force it saving peer metadata;
+  - check that saved node_1 peer metadata contains net port advertised by node_2,
+    not its actual listening net port
+*)
+let test_advertised_port () =
+  Test.register
+    ~__FILE__
+    ~title:"check --advertised-net-port=PORT option"
+    ~tags:["p2p"; "cli"; "connections"]
+  @@ fun () ->
+  let* node_1 = Node.init [Connections 1] in
+  let maintenance_p =
+    Node.wait_for node_1 "maintenance_ended.v0" (fun _ -> Some ())
+  in
+
+  let advertised_net_port = Node.fresh_port () in
+  let node_2 = Node.create ~advertised_net_port [] in
+  let* () = Node.identity_generate node_2 in
+  let* () = Node.config_init node_2 [] in
+  let () = Node.add_peer node_2 node_1 in
+
+  let* () = Node.run node_2 [] in
+  let* () = maintenance_p in
+
+  let wait_for_save_p =
+    Node.wait_for node_1 "save_metadata.v0" (fun json ->
+        Some (JSON.as_string json))
+  in
+
+  let* () = Node.terminate node_1 in
+
+  let* path = wait_for_save_p in
+  let advertised_port_from_peers_file = port_from_peers_file path in
+  if advertised_port_from_peers_file <> advertised_net_port then
+    Test.fail
+      "advertised-net-port: Unexcpected port number received (got %d, expeted \
+       %d)"
+      advertised_port_from_peers_file
+      advertised_net_port
+  else () ;
+
+  unit
+
+let register_protocol_independent () =
+  Maintenance.tests () ;
+  ACL.tests () ;
+  test_advertised_port ()
+
+let register ~(protocols : Protocol.t list) =
   check_peer_option ~protocols ;
-  test_one_connection ~protocols ;
-  ACL.tests ()
+  test_one_connection ~protocols

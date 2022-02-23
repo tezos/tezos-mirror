@@ -1,22 +1,23 @@
 opam-version: "2.0"
-name: "tezos-micheline-rewriting"
-version: "1.0"
-authors: [ "Tezos devteam" ]
 maintainer: "contact@tezos.com"
-license: "MIT"
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
-build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
-run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
+license: "MIT"
 depends: [
-  "dune" {build & >= "2.0"}
-  "tezos-micheline"
+  "dune" { >= "2.9" }
   "zarith" { >= "1.12" & < "1.13" }
+  "zarith_stubs_js"
   "tezos-stdlib"
   "tezos-error-monad"
-  "alcotest-lwt" {with-test}
-  "tezos-client-alpha" {with-test}
+  "tezos-micheline"
   "tezos-protocol-alpha" {with-test}
+  "tezos-client-alpha" {with-test}
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
 ]
 synopsis: "Tezos: library for rewriting Micheline expressions"

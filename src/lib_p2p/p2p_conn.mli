@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -38,7 +38,7 @@ val create :
   conn:('msg P2p_message.t, 'conn) P2p_socket.t ->
   point_info:('msg, 'peer, 'conn) t P2p_point_state.Info.t option ->
   peer_info:(('msg, 'peer, 'conn) t, 'peer, 'conn) P2p_peer_state.Info.t ->
-  messages:(int * 'msg) Lwt_pipe.t ->
+  messages:(int * 'msg) Lwt_pipe.Maybe_bounded.t ->
   canceler:Lwt_canceler.t ->
   greylister:(unit -> unit) ->
   callback:'msg P2p_answerer.t ->

@@ -45,7 +45,16 @@
     These conventions are also followed in the [Client] module. *)
 
 (** History modes for the node. *)
-type history_mode = Archive | Full | Rolling
+
+(** The parameter for [Full] And [Rolling] mode is called
+   [additional_cycles].
+
+    For the [Full] (resp. [Rolling]) mode it controls the number of
+   contexts (resp. blocks) we preserved behind the [checkpoint] (aka
+   the no fork point]). Default in sandbox mode is [2] and [5] for
+   mainnet parameters (see [preserved_cycles] in the protocol
+   parameters). *)
+type history_mode = Archive | Full of int option | Rolling of int option
 
 (** Tezos node command-line arguments.
 
@@ -64,6 +73,7 @@ type argument =
   | Private_mode  (** [--private-mode] *)
   | Peer of string  (** [--peer] *)
   | No_bootstrap_peers  (** [--no-bootstrap-peers] *)
+  | Disable_operations_precheck  (** [--disable-mempool-precheck] *)
 
 (** Tezos node states. *)
 type t
@@ -106,6 +116,7 @@ val create :
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
   argument list ->
@@ -153,6 +164,9 @@ val name : t -> string
 (** Get the network port given as [--net-addr] to a node. *)
 val net_port : t -> int
 
+(** Get the network port given as [--advertised-net-port] to a node. *)
+val advertised_net_port : t -> int option
+
 (** Get the RPC host given as [--rpc-addr] to a node. *)
 val rpc_host : t -> string
 
@@ -189,8 +203,8 @@ val fresh_port : unit -> int
    running, make the test fail. *)
 val wait : t -> Unix.process_status Lwt.t
 
-(** Send SIGTERM to a node and wait for it to terminate. *)
-val terminate : t -> unit Lwt.t
+(** Send SIGTERM (or SIGKILL) to a node and wait for it to terminate. *)
+val terminate : ?kill:bool -> t -> unit Lwt.t
 
 (** {2 Commands} *)
 
@@ -217,7 +231,8 @@ module Config_file : sig
   (** Write the configuration file of a node, replacing the existing one. *)
   val write : t -> JSON.t -> unit
 
-  (** Update the configuration file of a node.
+  (** Update the configuration file of a node. If the node is already
+     running, it needs to be restarted manually.
 
       Example: [Node.Config_file.update node (JSON.put ("p2p", new_p2p_config))] *)
   val update : t -> (JSON.t -> JSON.t) -> unit
@@ -225,7 +240,19 @@ module Config_file : sig
   (** Set the network config to a sandbox with the given user
       activated upgrades. *)
   val set_sandbox_network_with_user_activated_upgrades :
-    t -> (int * Protocol.t) list -> unit
+    (int * Protocol.t) list -> JSON.t -> JSON.t
+
+  (** Set the prevalidator configuration in the given configuration. *)
+  val set_prevalidator :
+    ?operations_request_timeout:float ->
+    ?max_refused_operations:int ->
+    ?operations_batch_size:int ->
+    ?disable_operations_precheck:bool ->
+    JSON.t ->
+    JSON.t
+
+  (** Set the peer_validator configuration in the given configuration. *)
+  val set_peer_validator : ?new_head_request_timeout:float -> JSON.t -> JSON.t
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)
@@ -237,25 +264,39 @@ val spawn_config_init : t -> argument list -> Process.t
     It continues running in the background.
 
     [event_level] specifies the verbosity of the file descriptor sink.
-    This must be at least ["notice"], which is the level of event
+    This must be at least [`Notice], which is the level of event
     ["node_is_ready.v0"], needed for {!wait_for_ready}.
-    Possible values are therefore: ["debug"], ["info"], and ["notice"].
-    Other values are ignored (verbosity then stays at default ["notice"]). *)
+    The default value is [`Info] which is also the default event level
+    of the node.
+
+    [event_sections_levels] specifies the verbosity for events in sections whose
+    prefix is in the list. For instance
+    [~event_sections_levels:[("prevalidator", `Debug); ("validator.block", `Debug)]]
+    will activate the logs at debug level for events whose section starts with
+    ["prevalidator"] or ["validator.block"].
+    See {!Tezos_stdlib_unix.File_descriptor_sink} and
+    {{:https://tezos.gitlab.io/user/logging.html#file-descriptor-sinks}the logging documentation}
+    for a more precise semantic.
+ *)
 val run :
   ?on_terminate:(Unix.process_status -> unit) ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   t ->
   argument list ->
   unit Lwt.t
 
 (** Spawn [tezos-node replay].
 
-    Same as [run] but for the [replay] command.
+    Same as {!run} but for the [replay] command.
     In particular it also supports events.
-    One key difference is that the node will eventually stop. *)
+    One key difference is that the node will eventually stop.
+
+    See {!run} for a description of the arguments. *)
 val replay :
   ?on_terminate:(Unix.process_status -> unit) ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   ?blocks:string list ->
   t ->
   argument list ->
@@ -289,6 +330,13 @@ val wait_for_ready : t -> unit Lwt.t
     If such an event already occurred, return immediately. *)
 val wait_for_level : t -> int -> int Lwt.t
 
+(** Get the current known level of a node.
+
+    Returns [0] if the node is not running or if no [node_chain_validator] event
+    was received yet. This makes this function equivalent to [wait_for_level node 0]
+    except that it does not actually wait for the level to be known. *)
+val get_level : t -> int
+
 (** Wait for the node to read its identity.
 
     More precisely, wait until a [read_identity] event occurs.
@@ -296,6 +344,11 @@ val wait_for_level : t -> int -> int Lwt.t
 
     Return the identity. *)
 val wait_for_identity : t -> string Lwt.t
+
+(** [wait_for_request ?level ~request node] waits for [request] event
+   on the [node]. *)
+val wait_for_request :
+  request:[< `Flush | `Inject | `Notify | `Arrived] -> t -> unit Lwt.t
 
 (** Wait for a custom event to occur.
 
@@ -374,9 +427,11 @@ val init :
   ?data_dir:string ->
   ?event_pipe:string ->
   ?net_port:int ->
+  ?advertised_net_port:int ->
   ?rpc_host:string ->
   ?rpc_port:int ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
   argument list ->
   t Lwt.t
 

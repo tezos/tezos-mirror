@@ -1,24 +1,25 @@
 (library
  (name yes_wallet_lib)
- (flags (:standard
-          -open Tezos_stdlib
-          -open Data_encoding))
- (libraries tezos-base
-            tezos-base.unix
-            lwt.unix
-            ezjsonm
-            tezos-store
-            tezos-shell-context
-            tezos-context
-            tezos-protocol-009-PsFLoren
-            tezos-protocol-010-PtGRANAD
-            tezos-protocol-alpha
-)
-(modules yes_wallet_lib))
+ (flags
+  (:standard -open Tezos_stdlib -open Data_encoding))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  lwt.unix
+  ezjsonm
+  tezos-store
+  tezos-shell-context
+  tezos-context
+  tezos-protocol-009-PsFLoren
+  tezos-protocol-010-PtGRANAD
+  tezos-protocol-011-PtHangz2
+  tezos-protocol-012-Psithaca
+  tezos-protocol-alpha)
+ (modules yes_wallet_lib))
 
 (executable
  (name yes_wallet)
- (flags (:standard
-          -open Yes_wallet_lib))
+ (flags
+  (:standard -open Yes_wallet_lib))
  (libraries yes_wallet_lib)
  (modules yes_wallet))

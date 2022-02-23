@@ -1,0 +1,79 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[attic/king_of_tez.tz]
+
+Well typed
+Gas remaining: 1039971.047 units remaining
+{ parameter key_hash ;
+  storage (pair timestamp (pair mutez key_hash)) ;
+  code { DUP
+         /* [ pair (key_hash @parameter) (pair @storage timestamp mutez key_hash)
+            : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+         CDAR ;
+         NOW
+         /* [ @now timestamp : timestamp
+            : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+         CMPGT ;
+         IF { CAR
+              /* [ @parameter key_hash ] */ ;
+              AMOUNT
+              /* [ @amount mutez : @parameter key_hash ] */ ;
+              PAIR
+              /* [ pair (mutez @amount) (key_hash @parameter) ] */ ;
+              NOW
+              /* [ @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+              PUSH int
+                   604800
+              /* [ int : @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+              ADD
+              /* [ timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+              PAIR
+              /* [ pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+              NIL operation
+              /* [ list operation : pair timestamp (mutez @amount) (key_hash @parameter) ] */ }
+            { DUP
+              /* [ pair (key_hash @parameter) (pair @storage timestamp mutez key_hash)
+                 : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+              CDDAR ;
+              AMOUNT
+              /* [ @amount mutez : mutez
+                 : pair (key_hash @parameter) (pair @storage timestamp mutez key_hash) ] */ ;
+              CMPLT ;
+              IF { FAIL }
+                 { CAR
+                   /* [ @parameter key_hash ] */ ;
+                   DUP
+                   /* [ @parameter key_hash : @parameter key_hash ] */ ;
+                   DIP { AMOUNT
+                         /* [ @amount mutez : @parameter key_hash ] */ ;
+                         PAIR
+                         /* [ pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         NOW
+                         /* [ @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         PUSH int
+                              604800
+                         /* [ int : @now timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         ADD
+                         /* [ timestamp : pair (mutez @amount) (key_hash @parameter) ] */ ;
+                         PAIR
+                         /* [ pair timestamp (mutez @amount) (key_hash @parameter) ] */ }
+                   /* [ @parameter key_hash
+                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   IMPLICIT_ACCOUNT
+                   /* [ contract unit : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   AMOUNT
+                   /* [ @amount mutez : contract unit
+                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   UNIT
+                   /* [ unit : @amount mutez : contract unit
+                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   TRANSFER_TOKENS
+                   /* [ operation : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   NIL operation
+                   /* [ list operation : operation
+                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   SWAP
+                   /* [ operation : list operation
+                      : pair timestamp (mutez @amount) (key_hash @parameter) ] */ ;
+                   CONS
+                   /* [ list operation : pair timestamp (mutez @amount) (key_hash @parameter) ] */ } } ;
+         PAIR
+         /* [ pair (list operation) timestamp (mutez @amount) (key_hash @parameter) ] */ } }

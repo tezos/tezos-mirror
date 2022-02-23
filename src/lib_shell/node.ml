@@ -126,31 +126,11 @@ type config = {
   enable_testchain : bool;
 }
 
-let default_backlog_size = 300
-
-let default_backlog_level = Internal_event.Info
-
-let default_workers_limits =
-  {
-    Worker_types.backlog_size = default_backlog_size;
-    backlog_level = default_backlog_level;
-  }
-
 let default_block_validator_limits =
   let open Block_validator in
-  {
-    protocol_timeout = Time.System.Span.of_seconds_exn 120.;
-    worker_limits = default_workers_limits;
-  }
+  {protocol_timeout = Time.System.Span.of_seconds_exn 120.}
 
-let default_prevalidator_limits =
-  let open Prevalidator in
-  {
-    operation_timeout = Time.System.Span.of_seconds_exn 10.;
-    max_refused_operations = 1000;
-    worker_limits = default_workers_limits;
-    operations_batch_size = 50;
-  }
+let default_prevalidator_limits = Prevalidator.default_limits
 
 let default_peer_validator_limits =
   let open Peer_validator in
@@ -159,15 +139,11 @@ let default_peer_validator_limits =
     block_operations_timeout = Time.System.Span.of_seconds_exn 300.;
     protocol_timeout = Time.System.Span.of_seconds_exn 600.;
     new_head_request_timeout = Time.System.Span.of_seconds_exn 90.;
-    worker_limits = default_workers_limits;
   }
 
 let default_chain_validator_limits =
   let open Chain_validator in
-  {
-    synchronisation = {latency = 150; threshold = 4};
-    worker_limits = default_workers_limits;
-  }
+  {synchronisation = {latency = 150; threshold = 4}}
 
 (* These protocols are linked with the node and
    do not have their actual hash on purpose. *)
@@ -365,6 +341,7 @@ let build_rpc_directory node =
     (Config_directory.build_rpc_directory
        ~user_activated_upgrades:node.user_activated_upgrades
        ~user_activated_protocol_overrides:node.user_activated_protocol_overrides
+       ~mainchain_validator:node.mainchain_validator
        node.store) ;
   merge (Version_directory.rpc_directory node.p2p) ;
   register0 RPC_service.error_service (fun () () ->

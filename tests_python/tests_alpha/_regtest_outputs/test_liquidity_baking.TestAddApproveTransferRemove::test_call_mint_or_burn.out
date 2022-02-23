@@ -1,24 +1,24 @@
 tests_alpha/test_liquidity_baking.py::TestAddApproveTransferRemove::test_call_mint_or_burn
 
 Node is bootstrapped.
-Estimated gas: 3269.680 units (will add 100 for safety)
+Estimated gas: 4548.314 units (will add 100 for safety)
 Estimated storage: 71 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
-    Fee to the baker: ꜩ0.000649
+    Fee to the baker: ꜩ0.000777
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 3370
+    Gas limit: 4649
     Storage limit: 91 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000649
-      fees(the baker who will include this operation,0) ... +ꜩ0.000649
+      [CONTRACT_HASH] ... -ꜩ0.000777
+      payload fees(the block proposer) ....... +ꜩ0.000777
     Transaction:
       Amount: ꜩ0
       From: [CONTRACT_HASH]
@@ -32,8 +32,9 @@ This sequence of operations was run:
         Set map(0)[0x000002298c03ed7d454a101eb7022bc95f7e5f41ac78] to 100000000
       Storage size: 1982 bytes
       Paid storage size diff: 71 bytes
-      Consumed gas: 3270.307
+      Consumed gas: 4548.941
       Balance updates:
         [CONTRACT_HASH] ... -ꜩ0.01775
+        storage fees ........................... +ꜩ0.01775
 
-Injected block [BLOCK_HASH]
+Injected block at minimal timestamp

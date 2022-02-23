@@ -75,7 +75,26 @@ module Mempool = struct
     minimal_nanotez_per_gas_unit : nanotez;
     minimal_nanotez_per_byte : nanotez;
     allow_script_failure : bool;
+        (** If [true], this makes [post_filter_manager] unconditionally return
+            [`Passed_postfilter filter_state], no matter the operation's
+            success. *)
   }
+
+  type state = unit
+
+  let init config ?(validation_state : validation_state option) ~predecessor ()
+      =
+    ignore config ;
+    ignore validation_state ;
+    ignore predecessor ;
+    return ()
+
+  let on_flush config filter_state ?(validation_state : validation_state option)
+      ~predecessor () =
+    ignore filter_state ;
+    init config ?validation_state ~predecessor ()
+
+  let remove ~filter_state _ = filter_state
 
   let default_minimal_fees =
     match Tez.of_mutez 100L with None -> assert false | Some t -> t
@@ -162,10 +181,11 @@ module Mempool = struct
       config ->
       t Kind.manager contents_list ->
       int ->
-      [ `Undecided
+      [ `Passed_prefilter
       | `Branch_refused of tztrace
       | `Branch_delayed of tztrace
-      | `Refused of tztrace ] =
+      | `Refused of tztrace
+      | `Outdated of tztrace ] =
    fun config op size ->
     match get_manager_operation_gas_and_fee op with
     | Error err ->
@@ -195,7 +215,7 @@ module Mempool = struct
                   minimal_fees_for_gas_in_nanotez
                   minimal_fees_for_size_in_nanotez))
           >= 0
-        then `Undecided
+        then `Passed_prefilter
         else `Refused [Environment.wrap_tzerror Fees_too_low]
 
   type Environment.Error_monad.error += Outdated_endorsement
@@ -227,15 +247,23 @@ module Mempool = struct
       (function Wrong_operation -> Some () | _ -> None)
       (fun () -> Wrong_operation)
 
-  let pre_filter config ?validation_state_before
-      (Operation_data {contents; _} as op : Operation.packed_protocol_data) =
+  let pre_filter config ~filter_state:_ ?validation_state_before
+      ({shell = _; protocol_data = Operation_data {contents; _} as op} :
+        Main.operation) =
     let bytes =
       (WithExceptions.Option.get ~loc:__LOC__
       @@ Data_encoding.Binary.fixed_length
            Tezos_base.Operation.shell_header_encoding)
       + Data_encoding.Binary.length Operation.protocol_data_encoding op
     in
-    match contents with
+    let prefilter_manager_op op =
+      match pre_filter_manager config op bytes with
+      | `Passed_prefilter -> `Passed_prefilter (`Low [])
+      | (`Branch_refused _ | `Branch_delayed _ | `Refused _ | `Outdated _) as
+        err ->
+          err
+    in
+    (match contents with
     | Single (Endorsement _) | Single (Failing_noop _) ->
         `Refused [Environment.wrap_tzerror Wrong_operation]
     | Single
@@ -249,19 +277,19 @@ module Mempool = struct
             _;
           }) -> (
         match validation_state_before with
-        | None -> `Undecided
+        | None -> `Passed_prefilter `High
         | Some {ctxt; mode; _} -> (
             match mode with
             | Partial_construction {predecessor} ->
                 if Block_hash.(predecessor = branch) then
                   (* conensus operation for the current head. *)
-                  `Undecided
+                  `Passed_prefilter `High
                 else
                   let current_level = (Level.current ctxt).level in
                   let delta = Raw_level.diff current_level level in
                   if delta > 2l then
                     (* consensus operation too far in the past. *)
-                    `Refused [Environment.wrap_tzerror Outdated_endorsement]
+                    `Outdated [Environment.wrap_tzerror Outdated_endorsement]
                   else
                     (* consensus operation not too far in the past or in the
                        future. *)
@@ -274,54 +302,100 @@ module Mempool = struct
     | Single (Activate_account _)
     | Single (Proposals _)
     | Single (Ballot _) ->
-        `Undecided
-    | Single (Manager_operation _) as op -> pre_filter_manager config op bytes
-    | Cons (Manager_operation _, _) as op -> pre_filter_manager config op bytes
+        `Passed_prefilter (`Low [])
+    | Single (Manager_operation _) as op -> prefilter_manager_op op
+    | Cons (Manager_operation _, _) as op -> prefilter_manager_op op)
+    |> fun res -> Lwt.return res
+
+  let precheck _ ~filter_state:_ ~validation_state:_ _ _ = Lwt.return `Undecided
 
   open Apply_results
+
+  type Environment.Error_monad.error += Skipped_operation
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"postfilter.skipped_operation"
+      ~title:"The operation has been skipped by the protocol"
+      ~description:"The operation has been skipped by the protocol"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation has been skipped by the protocol")
+      Data_encoding.unit
+      (function Skipped_operation -> Some () | _ -> None)
+      (fun () -> Skipped_operation)
+
+  type Environment.Error_monad.error += Backtracked_operation
+
+  let () =
+    Environment.Error_monad.register_error_kind
+      `Temporary
+      ~id:"postfilter.backtracked_operation"
+      ~title:"The operation has been backtracked by the protocol"
+      ~description:"The operation has been backtracked by the protocol"
+      ~pp:(fun ppf () ->
+        Format.fprintf ppf "The operation has been backtracked by the protocol")
+      Data_encoding.unit
+      (function Backtracked_operation -> Some () | _ -> None)
+      (fun () -> Backtracked_operation)
 
   let rec post_filter_manager :
       type t.
       Alpha_context.t ->
+      state ->
       t Kind.manager contents_result_list ->
       config ->
-      bool Lwt.t =
-   fun ctxt op config ->
+      [`Passed_postfilter of state | `Refused of tztrace] =
+   fun ctxt filter_state op config ->
     match op with
     | Single_result (Manager_operation_result {operation_result; _}) -> (
+        let check_allow_script_failure errs =
+          if config.allow_script_failure then `Passed_postfilter filter_state
+          else `Refused errs
+        in
         match operation_result with
-        | Applied _ -> Lwt.return_true
-        | Skipped _ | Failed _ | Backtracked _ ->
-            Lwt.return config.allow_script_failure)
+        | Applied _ -> `Passed_postfilter filter_state
+        | Skipped _ ->
+            check_allow_script_failure
+              [Environment.wrap_tzerror Skipped_operation]
+        | Failed (_, errors) ->
+            check_allow_script_failure (Environment.wrap_tztrace errors)
+        | Backtracked (_, errors) ->
+            check_allow_script_failure
+              (match errors with
+              | Some e -> Environment.wrap_tztrace e
+              | None -> [Environment.wrap_tzerror Backtracked_operation]))
     | Cons_result (Manager_operation_result res, rest) -> (
         post_filter_manager
           ctxt
+          filter_state
           (Single_result (Manager_operation_result res))
           config
-        >>= function
-        | false -> Lwt.return_false
-        | true -> post_filter_manager ctxt rest config)
+        |> function
+        | `Passed_postfilter filter_state ->
+            post_filter_manager ctxt filter_state rest config
+        | res -> res)
 
-  let post_filter config ~validation_state_before:_
+  let post_filter config ~filter_state ~validation_state_before:_
       ~validation_state_after:({ctxt; _} : validation_state) (_op, receipt) =
     match receipt with
     | No_operation_metadata -> assert false (* only for multipass validator *)
     | Operation_metadata {contents} -> (
         match contents with
         | Single_result (Endorsement_result _) ->
-            Lwt.return_false (* legacy format *)
-        | Single_result (Endorsement_with_slot_result _) -> Lwt.return_true
-        | Single_result (Seed_nonce_revelation_result _) -> Lwt.return_true
-        | Single_result (Double_endorsement_evidence_result _) ->
-            Lwt.return_true
-        | Single_result (Double_baking_evidence_result _) -> Lwt.return_true
-        | Single_result (Activate_account_result _) -> Lwt.return_true
-        | Single_result Proposals_result -> Lwt.return_true
-        | Single_result Ballot_result -> Lwt.return_true
-        | Single_result (Manager_operation_result _) as op ->
-            post_filter_manager ctxt op config
-        | Cons_result (Manager_operation_result _, _) as op ->
-            post_filter_manager ctxt op config)
+            Lwt.return (`Refused []) (* legacy format *)
+        | Single_result (Endorsement_with_slot_result _)
+        | Single_result (Seed_nonce_revelation_result _)
+        | Single_result (Double_endorsement_evidence_result _)
+        | Single_result (Double_baking_evidence_result _)
+        | Single_result (Activate_account_result _)
+        | Single_result Proposals_result
+        | Single_result Ballot_result ->
+            Lwt.return (`Passed_postfilter filter_state)
+        | Single_result (Manager_operation_result _) as result ->
+            Lwt.return (post_filter_manager ctxt filter_state result config)
+        | Cons_result (Manager_operation_result _, _) as result ->
+            Lwt.return (post_filter_manager ctxt filter_state result config))
 end
 
 module View_helpers = struct

@@ -2,7 +2,7 @@
 Assertions are retried to avoid using arbitrary time constants in test.
 """
 import datetime
-from typing import Any, List, Tuple, Pattern
+from typing import Any, List, Tuple, Pattern, Callable
 import hashlib
 import contextlib
 import json
@@ -11,6 +11,7 @@ import re
 import subprocess
 import time
 
+import urllib.error
 import base58check
 import ed25519
 import pyblake2
@@ -129,28 +130,79 @@ def check_is_bootstrapped(client: Client, chain: str = 'main') -> bool:
     return client.is_bootstrapped(chain)
 
 
-def get_block_at_level(client: Client, level: int) -> dict:
+@contextlib.contextmanager
+def assert_request_failure(matcher: Callable[[urllib.error.HTTPError], None]):
+    """Context manager that checks enclosed code fails with expected
+    HTTP error.
+
+    This context manager checks the contextualized code (in the [with]
+    statement) raises [urllib.error.HTTPError] exception, and
+    that the string representation of the exception matches [pattern].
+
+    It fails with an [assert False] otherwise.
+
+    Args:
+        pattern (Pattern): the pattern that the HTTP exception should match
+    """
+
+    try:
+        yield None
+        assert False, "Code ran without throwing exception"
+    except urllib.error.HTTPError as exc:
+        matcher(exc)
+
+    except Exception as exc:  # pylint: disable=broad-except
+        assert_msg = f'Expected urllib.error.HTTPError but got {type(exc)}'
+        assert False, assert_msg
+
+
+def get_block_at_level(
+    client: Client, level: int, expect_failure: bool = False
+) -> dict:
     """Return the block at a given level, level must be less or equal
     than the current head. If the level is higher than the
-    current, it will fail"""
-    block = client.rpc('get', f'/chains/main/blocks/{level}')
-    return block
+    current, it will fail unless expect_failure is True"""
+
+    # Error that must be raised when a block is unknown
+    def error_matcher(exc: urllib.error.HTTPError) -> None:
+        assert str(exc) == 'HTTP Error 404: Not Found'
+
+    path = f'/chains/main/blocks/{level}'
+    if not expect_failure:
+        return client.rpc_raw('get', path)
+    with assert_request_failure(error_matcher):
+        client.rpc_raw('get', path)
+        assert False  # not reachable
 
 
 def get_block_header_at_level(client: Client, level: int) -> dict:
     """Return the block header at a given level, level must be less
     or equal than the current head. If the level is higher than
     the current, it will fail"""
-    block = client.rpc('get', f'/chains/main/blocks/{level}/header')
+    block = client.rpc_raw('get', f'/chains/main/blocks/{level}/header')
     return block
 
 
-def get_block_metadata_at_level(client: Client, level: int) -> dict:
+def get_block_metadata_at_level(
+    client: Client, level: int, expect_failure: bool = False
+) -> dict:
     """Return the block metadata at a given level, level must be less
     or equal than the current head. If the level is higher than
-    the current, it will fail"""
-    block = client.rpc('get', f'/chains/main/blocks/{level}/metadata')
-    return block
+    the current, it will fail unless expect_failure is True"""
+
+    # Error that must be raised when a block is not available
+    def error_matcher(exc: urllib.error.HTTPError) -> None:
+        assert str(exc) == 'HTTP Error 500: Internal Server Error'
+        errors = json.loads(exc.read().decode())
+        assert errors[0]['id'] == 'store.metadata_not_found'
+
+    path = f'/chains/main/blocks/{level}/metadata'
+    if not expect_failure:
+        block = client.rpc_raw('get', path)
+        return block
+    with assert_request_failure(error_matcher):
+        client.rpc_raw('get', path)
+        assert False  # not reachable
 
 
 def get_block_hash(client: Client, level: int) -> str:
@@ -420,11 +472,11 @@ def contract_name_of_file(contract_path: str) -> str:
 
 
 def bake(
-    client: Client, bake_for='bootstrap1', bake_args: List[str] = None
+    client: Client,
+    bake_for: str = 'bootstrap1',
+    bake_args: List[str] = None,
 ) -> BakeForResult:
     default_bake_args = [
-        '--max-priority',
-        '1024',
         '--minimal-timestamp',
         '--minimal-fees',
         '0',
@@ -537,6 +589,12 @@ def client_output_converter(pre):
     )
 
     # Scrub receipt
+    # FIXME: Maybe use something more specific like
+    # Injecting block for [CONTRACT_HASH] at [LEVEL], [ROUND],
+    # with [TIMESTAMP], on top of [BLOCK_HASH]
+    # [ROUND] and [TIMESTAMP] needs to be created above
+    pre = re.sub(r"Injecting block .+", "Injecting block ", pre)
+
     pre = re.sub(
         r"Operation hash is '\w+'", "Operation hash is '[OPERATION_HASH]'", pre
     )
@@ -604,15 +662,14 @@ def node_consistency_after_import(
 # - blocks before the savepoint (excluded) have pruned metadata,
 # - blocks from the savepoint (included) have metadata.
 def full_node_blocks_availability(node_id, sandbox, savepoint, head):
-    # Error that must be raised when a block is not available
-    expected_command_error = 'Command failed: Unable to find block'
     # Genesis is available with metadata
     assert get_block_at_level(sandbox.client(node_id), 0)
     # [1;…;savepoint[ headers are available but metadata are not
     for i in range(1, savepoint):
         get_block_header_at_level(sandbox.client(node_id), i)
-        with assert_run_failure(expected_command_error):
-            get_block_metadata_at_level(sandbox.client(node_id), i)
+        get_block_metadata_at_level(
+            sandbox.client(node_id), i, expect_failure=True
+        )
     # [savepoint;…;head] are available with metadata
     for i in range(savepoint, head + 1):
         get_block_metadata_at_level(sandbox.client(node_id), i)
@@ -628,8 +685,6 @@ def full_node_blocks_availability(node_id, sandbox, savepoint, head):
 def rolling_node_blocks_availability(
     node_id, sandbox, savepoint, caboose, head
 ):
-    # Error that must be raised when a block is unknown
-    expected_service_error = 'Did not find service'
     # Genesis is available with metadata
     assert get_block_at_level(sandbox.client(node_id), 0)
     if caboose == 0:
@@ -637,8 +692,7 @@ def rolling_node_blocks_availability(
     else:
         # [1;…;caboose[ blocks are unknown
         for i in range(1, caboose):
-            with assert_run_failure(expected_service_error):
-                get_block_at_level(sandbox.client(node_id), i)
+            get_block_at_level(sandbox.client(node_id), i, expect_failure=True)
     # [savepoint;…;head] are available with metadata
     for i in range(savepoint + 1, head):
         get_block_header_at_level(sandbox.client(node_id), i)

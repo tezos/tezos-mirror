@@ -55,7 +55,7 @@ end
 (* Transform a spending key to an uri, encrypted or not. *)
 let to_uri unencrypted cctxt sapling_key =
   if unencrypted then
-    return (Tezos_signer_backends.Unencrypted.make_sapling_key sapling_key)
+    Lwt.return (Tezos_signer_backends.Unencrypted.make_sapling_key sapling_key)
   else Tezos_signer_backends.Encrypted.encrypt_sapling_key cctxt sapling_key
 
 (** Transform an uri into a spending key, asking for a password if the uri was

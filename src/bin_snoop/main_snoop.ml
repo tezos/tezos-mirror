@@ -170,6 +170,11 @@ and infer_cmd_full_auto model_name workload_data solver
     | None -> Free_variable.Map.empty
     | Some filenames -> Override.load ~filenames
   in
+  let report_folder =
+    match infer_opts.report with
+    | Cmdline.ReportToFile s -> Some (Filename.dirname s)
+    | _ -> None
+  in
   let solver = solver_of_string solver infer_opts in
   let (graph, measurements) = Dep_graph.load_files model_name workload_files in
   if Dep_graph.G.is_empty graph then (
@@ -218,6 +223,7 @@ and infer_cmd_full_auto model_name workload_data solver
                ~problem
                ~solution
                ~overrides_map
+               ?report_folder
                ~short:true)
             report
         in
@@ -325,11 +331,6 @@ and get_all_workload_data_files directory =
         acc
   in
   loop []
-
-and workload_admits_model model workload_data =
-  let measure = Measure.load ~filename:workload_data in
-  match measure with
-  | Measure.Measurement ((module Bench), _) -> List.mem_assoc model Bench.models
 
 let cull_outliers_cmd workload_data nsigmas save_file =
   let measure = Measure.load ~filename:workload_data in

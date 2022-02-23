@@ -18,7 +18,7 @@ def clients(sandbox):
 
 PROTO = f'{paths.TEZOS_HOME}/src/bin_client/test/proto_test_injection'
 COMPILER = (
-    f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/'
+    f'{paths.TEZOS_HOME}/_build/default/src/lib_protocol_compiler/bin/'
     'main_native.exe'
 )
 PARAMS = ['-p', PROTO_GENESIS]
@@ -51,7 +51,7 @@ class TestInjectionAndActivation:
 
     def test_environment_version(self, clients: List[Client], session: dict):
         proto = session['proto_hash']
-        assert clients[0].environment_protocol(proto) == "V1"
+        assert clients[0].environment_protocol(proto) == "V3"
 
     def test_activation(self, clients: List[Client], session: dict):
         proto = session['proto_hash']

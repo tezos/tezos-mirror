@@ -1,23 +1,27 @@
 (library
  (name tezos_signer_backends_unix)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-signer-backends.unix)
- (libraries ocplib-endian.bigstring
-            tezos-signer-backends
-            tezos-base
-            tezos-base.unix
-            tezos-stdlib-unix
-            tezos-rpc-http-client-unix
-            (select ledger.ml from
-              (ledgerwallet-tezos -> ledger.available.ml)
-              (-> ledger.none.ml)))
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_stdlib
-                   -open Tezos_client_base
-                   -open Tezos_rpc_http
-                   -open Tezos_rpc_http_client
-                   -open Tezos_rpc_http_client_unix
-                   -open Tezos_signer_services
-                   -open Tezos_signer_backends
-                   -open Tezos_shell_services)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ocplib-endian.bigstring
+  fmt
+  tezos-signer-backends
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-rpc-http-client-unix
+  (select ledger.ml from
+   (ledgerwallet-tezos -> ledger.available.ml)
+   (-> ledger.none.ml)))
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_stdlib
+   -open Tezos_client_base
+   -open Tezos_rpc_http
+   -open Tezos_rpc_http_client
+   -open Tezos_rpc_http_client_unix
+   -open Tezos_signer_services
+   -open Tezos_signer_backends
+   -open Tezos_shell_services)))

@@ -26,11 +26,14 @@
 (** Testing
     -------
     Component:    Shell (Prevalidator classification)
-    Invocation:   dune build @src/lib_shell/test/runtest
+    Invocation:   dune exec src/lib_shell/test/test_prevalidator_classification.exe
     Subject:      Unit tests the Prevalidator classification APIs
 *)
 
-open Lib_test.Qcheck_helpers
+open Lib_test.Qcheck2_helpers
+module Classification = Prevalidator_classification
+
+let is_in_mempool oph t = Classification.is_in_mempool oph t <> None
 
 module Operation_map = struct
   let pp_with_trace ppf map =
@@ -44,7 +47,7 @@ module Operation_map = struct
              Operation_hash.pp
              oph
              Operation.pp
-             op))
+             op.Prevalidation.raw))
       (Operation_hash.Map.bindings map)
 
   let pp ppf map =
@@ -52,133 +55,45 @@ module Operation_map = struct
       ppf
       "[%a]"
       (Format.pp_print_list (fun ppf (oph, op) ->
-           Format.fprintf ppf "(%a: %a)" Operation_hash.pp oph Operation.pp op))
+           Format.fprintf
+             ppf
+             "(%a: %a)"
+             Operation_hash.pp
+             oph
+             Operation.pp
+             op.Prevalidation.raw))
       (Operation_hash.Map.bindings map)
 
   (* Uses polymorphic equality on tztraces! *)
   let eq =
     Operation_hash.Map.equal (fun (o1, t1) (o2, t2) ->
-        Operation.equal o1 o2 && t1 = t2)
+        Operation_hash.equal o1.Prevalidation.hash o2.hash && t1 = t2)
 end
-
-let add_if_not_present classification oph op t =
-  Prevalidator_classification.(
-    if not (is_in_mempool oph t) then
-      add ~notify:(fun () -> ()) classification oph op t)
 
 type classification_event =
   | Add_if_not_present of
-      Prevalidator_classification.classification
-      * Operation_hash.t
-      * Operation.t
+      Classification.classification * unit Prevalidation.operation
   | Remove of Operation_hash.t
   | Flush of bool
 
+let drop oph t =
+  let open Classification in
+  let (_ : (unit Prevalidation.operation * classification) option) =
+    remove oph t
+  in
+  ()
+
 let play_event event t =
-  let open Prevalidator_classification in
+  let open Classification in
   match event with
-  | Add_if_not_present (classification, oph, op) ->
-      add_if_not_present classification oph op t
-  | Remove oph -> remove oph t
-  | Flush handle_branch_refused -> flush ~handle_branch_refused t
+  | Add_if_not_present (classification, op) ->
+      Generators.add_if_not_present classification op t
+  | Remove oph -> drop oph t
+  | Flush handle_branch_refused ->
+      Internal_for_tests.flush ~handle_branch_refused t
 
-module Generators = struct
-  open Prevalidator_classification
-
-  let string_gen = QCheck.Gen.string ?gen:None
-
-  let operation_hash_gen : Operation_hash.t QCheck.Gen.t =
-    let open QCheck.Gen in
-    let+ key = opt (string_size (0 -- 64))
-    and+ path = list_size (0 -- 100) string_gen in
-    Operation_hash.hash_string ?key path
-
-  let block_hash_gen : Block_hash.t QCheck.Gen.t =
-    let open QCheck.Gen in
-    let+ key = opt (string_size (0 -- 64))
-    and+ path = list_size (0 -- 100) string_gen in
-    Block_hash.hash_string ?key path
-
-  (** Operations don't contain "valid" proto bytes but we don't care
-   *  as far as [Prevalidator_classification] is concerned. *)
-  let operation_gen : Operation.t QCheck.Gen.t =
-    let open QCheck.Gen in
-    let+ branch = block_hash_gen
-    and+ proto = string_gen >|= Bytes.unsafe_of_string in
-    Operation.{shell = {branch}; proto}
-
-  (** Do we need richer errors? If so, how to generate those? *)
-  let classification_gen : classification QCheck.Gen.t =
-    QCheck.Gen.oneofl
-      [`Applied; `Branch_delayed []; `Branch_refused []; `Refused []]
-
-  let unrefused_classification_gen : classification QCheck.Gen.t =
-    QCheck.Gen.oneofl [`Applied; `Branch_delayed []; `Branch_refused []]
-
-  let parameters_gen : parameters QCheck.Gen.t =
-    let open QCheck.Gen in
-    let+ map_size_limit = 1 -- 100 in
-    let on_discarded_operation _ = () in
-    {map_size_limit; on_discarded_operation}
-
-  let t_gen ?(can_be_full = true) () : t QCheck.Gen.t =
-    let open QCheck.Gen in
-    let* parameters = parameters_gen in
-    let+ inputs =
-      let limit = parameters.map_size_limit - if can_be_full then 0 else 1 in
-      list_size
-        (0 -- limit)
-        (triple classification_gen operation_hash_gen operation_gen)
-    in
-    let t = Prevalidator_classification.create parameters in
-    List.iter
-      (fun (classification, operation_hash, operation) ->
-        add_if_not_present classification operation_hash operation t)
-      inputs ;
-    t
-
-  (* With probability 1/2, we take an operation hash already present in the
-     classification. This operation is taken uniformly among the
-     different classes. *)
-  let with_t_operation_gen : t -> (Operation_hash.t * Operation.t) QCheck.Gen.t
-      =
-    let module Classification = Prevalidator_classification in
-    let open QCheck.Gen in
-    fun t ->
-      let to_ops map =
-        Operation_hash.Map.bindings map
-        |> List.map (fun (oph, (op, _)) -> (oph, op))
-      in
-      (* If map is empty, it cannot be used as a generator *)
-      let freq_of_map map = if Operation_hash.Map.is_empty map then 0 else 1 in
-      (* If list is empty, it cannot be used as a generator *)
-      let freq_of_list = function [] -> 0 | _ -> 1 in
-      (* If map is not empty, take one of its elements *)
-      let freq_and_gen_of_map map = (freq_of_map map, oneofl (to_ops map)) in
-      (* If list is not empty, take one of its elements *)
-      let freq_and_gen_of_list list = (freq_of_list list, oneofl list) in
-      (* We use max to ensure the ponderation is strictly greater than 0. *)
-      let freq_fresh t =
-        max
-          1
-          (freq_of_list t.applied_rev
-          + freq_of_map (Classification.map t.branch_refused)
-          + freq_of_map (Classification.map t.branch_delayed)
-          + freq_of_map (Classification.map t.refused))
-      in
-      frequency
-        [
-          freq_and_gen_of_list t.applied_rev;
-          freq_and_gen_of_map (Classification.map t.branch_refused);
-          freq_and_gen_of_map (Classification.map t.branch_delayed);
-          freq_and_gen_of_map (Classification.map t.refused);
-          (freq_fresh t, pair operation_hash_gen operation_gen);
-        ]
-
-  let t_with_operation_gen ?can_be_full () :
-      (t * (Operation_hash.t * Operation.t)) QCheck.Gen.t =
-    let open QCheck.Gen in
-    t_gen ?can_be_full () >>= fun t -> pair (return t) (with_t_operation_gen t)
+module Extra_generators = struct
+  open Classification
 
   (** Generates an [event].
       The operation hash for [Remove] events is generated using
@@ -186,16 +101,18 @@ module Generators = struct
       The classification, hash and operation for [Add_if_not_present]
       events are generated independently from [t]. *)
   let event_gen t =
-    let open QCheck.Gen in
+    let open QCheck2.Gen in
     let add_gen =
-      let+ (classification, oph, op) =
-        triple classification_gen operation_hash_gen operation_gen
+      let+ (classification, op) =
+        pair
+          Generators.classification_gen
+          (Generators.operation_with_hash_gen ())
       in
-      Add_if_not_present (classification, oph, op)
+      Add_if_not_present (classification, op)
     in
     let remove_gen =
-      let+ (oph, _op) = with_t_operation_gen t in
-      Remove oph
+      let+ op = Generators.with_t_operation_gen t in
+      Remove op.Prevalidation.hash
     in
     let flush_gen =
       let+ b = bool in
@@ -210,8 +127,8 @@ module Generators = struct
       operation hash in the case of a [Remove] event) is the [t]
       obtained by having applied all previous events to [t_initial]. *)
   let t_with_event_sequence_gen =
-    let open QCheck.Gen in
-    t_gen () >>= fun t ->
+    let open QCheck2.Gen in
+    Generators.t_gen () >>= fun t ->
     let t_initial = Internal_for_tests.copy t in
     let rec loop acc_gen n =
       if n <= 0 then acc_gen
@@ -239,36 +156,36 @@ let qcheck_eq_false ~actual =
 
 let qcheck_bounded_map_is_empty bounded_map =
   let actual =
-    bounded_map |> Prevalidator_classification.map
-    |> Operation_hash.Map.is_empty
+    bounded_map |> Classification.map |> Operation_hash.Map.is_empty
   in
   qcheck_eq_true ~actual
 
-(** Computes the set of operation hashes present in fields [refused;
-    branch_refused; branch_delayed; applied_rev] of [t]. Also checks
+(** Computes the set of operation hashes present in fields [refused; outdated;
+    branch_refused; branch_delayed; prechecked; applied_rev] of [t]. Also checks
     that these fields are disjoint. *)
-let disjoint_union_classified_fields ?fail_msg
-    (t : Prevalidator_classification.t) =
+let disjoint_union_classified_fields ?fail_msg (t : unit Classification.t) =
   let ( +> ) acc next_set =
     if not (Operation_hash.Set.disjoint acc next_set) then
-      QCheck.Test.fail_reportf
-        "Invariant 'The fields: [refused; branch_refused; branch_delayed; \
-         applied] are disjoint' broken by t =@.%a@.%s"
-        Prevalidator_classification.Internal_for_tests.pp
+      QCheck2.Test.fail_reportf
+        "Invariant 'The fields: [refused; outdated; branch_refused; \
+         branch_delayed; applied] are disjoint' broken by t =@.%a@.%s"
+        Classification.Internal_for_tests.pp
         t
         (match fail_msg with None -> "" | Some msg -> "\n" ^ msg ^ "@.") ;
     Operation_hash.Set.union acc next_set
   in
-  let to_set =
-    Prevalidator_classification.Internal_for_tests.set_of_bounded_map
-  in
-  to_set t.refused +> to_set t.branch_refused +> to_set t.branch_delayed
-  +> (Operation_hash.Set.of_list @@ List.rev_map fst t.applied_rev)
+  let to_set = Classification.Internal_for_tests.set_of_bounded_map in
+  to_set t.refused +> to_set t.outdated +> to_set t.branch_refused
+  +> to_set t.branch_delayed
+  +> (Operation_hash.Map.to_seq t.prechecked
+     |> Seq.map fst |> Operation_hash.Set.of_seq)
+  +> (Operation_hash.Set.of_list
+     @@ List.rev_map (fun op -> op.Prevalidation.hash) t.applied_rev)
 
 (** Checks both invariants of type [Prevalidator_classification.t]:
     - The field [in_mempool] is the set of all operation hashes present
-      in fields: [refused; branch_refused; branch_delayed; applied].
-    - The fields: [refused; branch_refused; branch_delayed; applied]
+      in fields: [refused; outdated; branch_refused; branch_delayed; applied].
+    - The fields: [refused; outdated; branch_refused; branch_delayed; applied]
       are disjoint.
     These invariants are enforced by [Prevalidator_classification]
     **as long as the caller does not [add] an operation which is already
@@ -278,15 +195,20 @@ let disjoint_union_classified_fields ?fail_msg
     the [prevalidator] module, which we cannot do at the moment (September
     2021). Instead, we run scenarios which might carry particular risks
     of breaking this using [Tezt]. *)
-let check_invariants ?fail_msg (t : Prevalidator_classification.t) =
+let check_invariants ?fail_msg (t : unit Classification.t) =
+  let to_set map =
+    Operation_hash.Map.to_seq map |> Seq.map fst |> Operation_hash.Set.of_seq
+  in
   let expected_in_mempool = disjoint_union_classified_fields ?fail_msg t in
-  if not (Operation_hash.Set.equal expected_in_mempool t.in_mempool) then
+  let mempool_as_set = to_set t.in_mempool in
+  if not (Operation_hash.Set.equal expected_in_mempool (to_set t.in_mempool))
+  then
     let set_pp ppf set =
       set |> Operation_hash.Set.elements
       |> Format.fprintf ppf "%a" (Format.pp_print_list Operation_hash.pp)
     in
-    let set1 = Operation_hash.Set.diff expected_in_mempool t.in_mempool in
-    let set2 = Operation_hash.Set.diff t.in_mempool expected_in_mempool in
+    let set1 = Operation_hash.Set.diff expected_in_mempool mempool_as_set in
+    let set2 = Operation_hash.Set.diff mempool_as_set expected_in_mempool in
     let sets_report =
       Format.asprintf
         "In individual fields but not in [in_mempool]:\n\
@@ -297,15 +219,15 @@ let check_invariants ?fail_msg (t : Prevalidator_classification.t) =
         set_pp
         set2
     in
-    QCheck.Test.fail_reportf
+    QCheck2.Test.fail_reportf
       "Invariant 'The field [in_mempool] is the set of all operation hashes \
-       present in fields: [refused; branch_refused; branch_delayed; applied]' \
-       broken by t =@.%a\n\
+       present in fields: [refused; outdated; branch_refused; branch_delayed; \
+       applied]' broken by t =@.%a\n\
        @.%s@.%a@.%s"
-      Prevalidator_classification.Internal_for_tests.pp
+      Classification.Internal_for_tests.pp
       t
       sets_report
-      Prevalidator_classification.Internal_for_tests.pp_t_sizes
+      Classification.Internal_for_tests.pp_t_sizes
       t
       (match fail_msg with
       | None -> ""
@@ -316,33 +238,38 @@ let classification_pp pp classification =
     pp
     (match classification with
     | `Applied -> "Applied"
+    | `Prechecked -> "Prechecked"
     | `Branch_delayed _ -> "Branch_delayed"
     | `Branch_refused _ -> "Branch_refused"
-    | `Refused _ -> "Refused")
+    | `Refused _ -> "Refused"
+    | `Outdated _ -> "Outdated")
 
 let event_pp pp = function
-  | Add_if_not_present (classification, oph, _op) ->
+  | Add_if_not_present (classification, op) ->
       Format.fprintf
         pp
         "Add_if_not_present %a %a"
         classification_pp
         classification
         Operation_hash.pp
-        oph
+        op.Prevalidation.hash
   | Remove oph -> Format.fprintf pp "Remove %a" Operation_hash.pp oph
   | Flush handle_branch_refused ->
       Format.fprintf pp "Flush ~handle_branch_refused:%b" handle_branch_refused
 
-let test_flush_empties_all_except_refused =
-  let open QCheck in
+let test_flush_empties_all_except_refused_and_outdated =
+  let open QCheck2 in
   Test.make
     ~name:
-      "[flush ~handle_branch_refused:true] empties everything except [refused]"
-    (make (Generators.t_gen ()))
+      "[flush ~handle_branch_refused:true] empties everything except [refused] \
+       and [outdated]"
+    (Generators.t_gen ())
   @@ fun t ->
-  let refused_before = t.refused |> Prevalidator_classification.map in
-  Prevalidator_classification.flush ~handle_branch_refused:true t ;
-  let refused_after = t.refused |> Prevalidator_classification.map in
+  let refused_before = t.refused |> Classification.map in
+  let outdated_before = t.outdated |> Classification.map in
+  Classification.Internal_for_tests.flush ~handle_branch_refused:true t ;
+  let refused_after = t.refused |> Classification.map in
+  let outdated_after = t.outdated |> Classification.map in
   qcheck_bounded_map_is_empty t.branch_refused ;
   qcheck_bounded_map_is_empty t.branch_delayed ;
   qcheck_eq_true ~actual:(t.applied_rev = []) ;
@@ -352,24 +279,28 @@ let test_flush_empties_all_except_refused =
     ~expected:refused_before
     ~actual:refused_after
     ()
+  && qcheck_eq'
+       ~pp:Operation_map.pp_with_trace
+       ~eq:Operation_map.eq
+       ~expected:outdated_before
+       ~actual:outdated_after
+       ()
 
 let test_flush_empties_all_except_refused_and_branch_refused =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:
       "[flush ~handle_branch_refused:false] empties everything except \
-       [refused] and [branch_refused]"
-    (make (Generators.t_gen ()))
+       [refused], [outdated] and [branch_refused]"
+    (Generators.t_gen ())
   @@ fun t ->
-  let refused_before = t.refused |> Prevalidator_classification.map in
-  let branch_refused_before =
-    t.branch_refused |> Prevalidator_classification.map
-  in
-  Prevalidator_classification.flush ~handle_branch_refused:false t ;
-  let refused_after = t.refused |> Prevalidator_classification.map in
-  let branch_refused_after =
-    t.branch_refused |> Prevalidator_classification.map
-  in
+  let refused_before = t.refused |> Classification.map in
+  let outdated_before = t.outdated |> Classification.map in
+  let branch_refused_before = t.branch_refused |> Classification.map in
+  Classification.Internal_for_tests.flush ~handle_branch_refused:false t ;
+  let refused_after = t.refused |> Classification.map in
+  let outdated_after = t.outdated |> Classification.map in
+  let branch_refused_after = t.branch_refused |> Classification.map in
   let _ =
     qcheck_eq'
       ~pp:Operation_map.pp_with_trace
@@ -386,46 +317,49 @@ let test_flush_empties_all_except_refused_and_branch_refused =
     ~expected:refused_before
     ~actual:refused_after
     ()
+  && qcheck_eq'
+       ~pp:Operation_map.pp_with_trace
+       ~eq:Operation_map.eq
+       ~expected:outdated_before
+       ~actual:outdated_after
+       ()
 
 let test_is_in_mempool_remove =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:"[is_in_mempool] and [remove_*] are well-behaved"
-    (make
-    @@ Generators.(
-         Gen.pair (t_with_operation_gen ()) unrefused_classification_gen))
-  @@ fun ((t, (oph, op)), unrefused_classification) ->
-  Prevalidator_classification.add
-    ~notify:(fun () -> ())
-    unrefused_classification
-    oph
-    op
-    t ;
-  qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  Prevalidator_classification.remove oph t ;
-  qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
+    Generators.(Gen.pair (t_with_operation_gen ()) unrefused_classification_gen)
+  @@ fun ((t, op), unrefused_classification) ->
+  Classification.add unrefused_classification op t ;
+  let oph = op.Prevalidation.hash in
+  qcheck_eq_true ~actual:(is_in_mempool oph t) ;
+  drop oph t ;
+  qcheck_eq_false ~actual:(is_in_mempool oph t) ;
   true
 
 let test_is_applied =
-  let open QCheck in
+  let open QCheck2 in
   Test.make
     ~name:"[is_applied] is well-behaved"
-    (make @@ Generators.(Gen.triple (t_gen ()) operation_hash_gen operation_gen))
-  @@ fun (t, oph, op) ->
-  Prevalidator_classification.add ~notify:(fun () -> ()) `Applied oph op t ;
-  qcheck_eq_true ~actual:(Prevalidator_classification.is_applied oph t) ;
-  qcheck_eq_true ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  Prevalidator_classification.remove oph t ;
-  qcheck_eq_false ~actual:(Prevalidator_classification.is_applied oph t) ;
-  qcheck_eq_false ~actual:(Prevalidator_classification.is_in_mempool oph t) ;
-  true
+    Generators.(Gen.pair (t_gen ()) (operation_with_hash_gen ()))
+  @@ fun (t, op) ->
+  Classification.add `Applied op t ;
+  let oph = op.Prevalidation.hash in
+  qcheck_eq_true ~actual:(is_in_mempool oph t) ;
+  match Classification.remove oph t with
+  | None -> false
+  | Some (_op, classification) ->
+      qcheck_eq_true ~actual:(classification = `Applied) ;
+      qcheck_eq_false ~actual:(is_in_mempool oph t) ;
+      true
 
 let test_invariants =
-  QCheck.Test.make
+  let open QCheck2 in
+  Test.make
     ~name:
       "invariants are preserved through any sequence of events (provided we do \
        not [add] already present operations)"
-    (QCheck.make Generators.t_with_event_sequence_gen)
+    Extra_generators.t_with_event_sequence_gen
   @@ fun (t, events) ->
   let _ =
     List.fold_left
@@ -441,34 +375,66 @@ let test_invariants =
   in
   true
 
+module Unparsable = struct
+  (** Tests the relationship between [Classification.add_unparsable]
+      and [Classification.is_known_unparsable] *)
+  let test_add_is_known =
+    let open QCheck2 in
+    Test.make
+      ~name:"[is_known_unparsable oph (add_unparsable oph t)] holds"
+      Generators.(t_with_operation_gen ())
+    @@ fun (t, op) ->
+    let oph = op.Prevalidation.hash in
+    Classification.add_unparsable oph t ;
+    qcheck_eq_true ~actual:(Classification.is_known_unparsable oph t) ;
+    true
+
+  (** Tests the relationship between [flush] and
+     [Classification.is_known_unparsable]. This test shows that
+     flushing does not put any previously classified operations into
+     the [unparsable] field. *)
+  let test_flush_is_known =
+    let open QCheck2 in
+    Test.make
+      ~name:"[is_known_unparsable _ (flush t)] does not hold"
+      (Gen.pair (Generators.t_with_operation_gen ()) Gen.bool)
+    @@ fun ((t, op), handle_branch_refused) ->
+    let oph = op.Prevalidation.hash in
+    Classification.Internal_for_tests.flush ~handle_branch_refused t ;
+    qcheck_eq_false ~actual:(Classification.is_known_unparsable oph t) ;
+    true
+end
+
 module Bounded = struct
-  type binding = Operation_hash.t * Operation.t
+  type binding = unit Prevalidation.operation
 
   type custom =
-    Prevalidator_classification.t
+    unit Classification.t
     * [ `Branch_delayed of tztrace
       | `Branch_refused of tztrace
-      | `Refused of tztrace ]
+      | `Refused of tztrace
+      | `Outdated of tztrace ]
     * binding list
     * binding list
 
-  let custom_print : custom QCheck.Print.t =
+  let custom_print : custom QCheck2.Print.t =
    fun (t, classification, first_bindings, other_bindings) ->
     let classification_string =
       match classification with
       | `Branch_delayed _ -> "Branch_delayed <tztrace>"
       | `Branch_refused _ -> "Branch_refused <tztrace>"
       | `Refused _ -> "Refused <tztrace>"
+      | `Outdated _ -> "Outdated <tztrace>"
     in
     let binding_pp ppf bindings =
       bindings
-      |> List.map (fun (key, _value) -> key)
+      |> List.map (fun value -> value.Prevalidation.hash)
       |> Format.pp_print_list Operation_hash.pp ppf
     in
     Format.asprintf
       "Prevalidator_classification.t:@.%a@.Classification:@.%s@.First \
        bindings:@.%a@.Other bindings:@.%a"
-      Prevalidator_classification.Internal_for_tests.pp
+      Classification.Internal_for_tests.pp
       t
       classification_string
       binding_pp
@@ -477,54 +443,37 @@ module Bounded = struct
       other_bindings
 
   let custom_gen (discarded_operations_rev : Operation_hash.t list ref) :
-      custom QCheck.Gen.t =
-    let open QCheck.Gen in
+      custom QCheck2.Gen.t =
+    let open QCheck2.Gen in
     let* map_size_limit = 1 -- 20 in
     let on_discarded_operation oph =
       discarded_operations_rev := oph :: !discarded_operations_rev
     in
-    let parameters =
-      Prevalidator_classification.{map_size_limit; on_discarded_operation}
-    in
+    let parameters = Classification.{map_size_limit; on_discarded_operation} in
     let* inputs =
       list_size
         (0 -- map_size_limit)
-        Generators.(triple classification_gen operation_hash_gen operation_gen)
+        Generators.(pair classification_gen (operation_with_hash_gen ()))
     in
-    let t = Prevalidator_classification.create parameters in
+    let t = Classification.create parameters in
     List.iter
-      (fun (classification, operation_hash, operation) ->
-        Prevalidator_classification.add
-          ~notify:(fun () -> ())
-          classification
-          operation_hash
-          operation
-          t)
+      (fun (classification, operation) ->
+        Classification.add classification operation t)
       inputs ;
     let+ error_classification =
-      oneofl [`Branch_delayed []; `Branch_refused []; `Refused []]
+      oneofl [`Branch_delayed []; `Branch_refused []; `Refused []; `Outdated []]
     and+ first_bindings =
-      list_size (1 -- 10) Generators.(pair operation_hash_gen operation_gen)
+      list_size (1 -- 10) Generators.(operation_with_hash_gen ())
     and+ other_bindings =
-      list_repeat
-        map_size_limit
-        Generators.(pair operation_hash_gen operation_gen)
+      list_repeat map_size_limit Generators.(operation_with_hash_gen ())
     in
     (t, error_classification, first_bindings, other_bindings)
 
-  let add_bindings bindings classification t =
-    List.iter
-      (fun (oph, op) ->
-        Prevalidator_classification.add
-          ~notify:(fun () -> ())
-          classification
-          oph
-          op
-          t)
-      bindings
+  let add_ops ops classification t =
+    List.iter (fun op -> Classification.add classification op t) ops
 
-  let check_discarded_contains_bindings ~discarded_hashes ~bindings =
-    let excess_hashes = bindings |> List.map (fun (oph, _op) -> oph) in
+  let check_discarded_contains_ops ~discarded_hashes ~ops =
+    let excess_hashes = List.map (fun op -> op.Prevalidation.hash) ops in
     if
       not
         (List.for_all
@@ -533,7 +482,7 @@ module Bounded = struct
            excess_hashes)
     then
       let hashes_pp = Format.pp_print_list Operation_hash.pp in
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "Expected all excess hashes to have been discarded but it was \
          not.@.Excess hashes:@.%a@.Discarded hashes:@.%a"
         hashes_pp
@@ -543,81 +492,85 @@ module Bounded = struct
 
   let check_map_is_full ~expected_size ~bounded_map =
     if
-      not
-        (List.length
-           (Operation_hash.Map.bindings
-              (Prevalidator_classification.map bounded_map))
-        = expected_size)
+      Compare.List_length_with.(
+        Operation_hash.Map.bindings (Classification.map bounded_map)
+        <> expected_size)
     then
-      QCheck.Test.fail_reportf
+      QCheck2.Test.fail_reportf
         "Expected bounded_map to be full (size = %i) but its actual size is \
          %i.@.Bounded_map content:@.%a"
         expected_size
         (List.length
-           (Operation_hash.Map.bindings
-              (Prevalidator_classification.map bounded_map)))
-        Prevalidator_classification.Internal_for_tests.bounded_map_pp
+           (Operation_hash.Map.bindings (Classification.map bounded_map)))
+        Classification.Internal_for_tests.bounded_map_pp
         bounded_map
 
   let test_bounded =
+    let open QCheck2 in
     let discarded_operations_rev = ref [] in
-    QCheck.Test.make
+    Test.make
       ~name:
         "When more error operations than the size limit are added, then the \
          first operations are discarded"
-      (QCheck.make ~print:custom_print @@ custom_gen discarded_operations_rev)
-    @@ fun (t, error_classification, first_bindings, other_bindings) ->
+      ~print:custom_print
+      (custom_gen discarded_operations_rev)
+    @@ fun (t, error_classification, first_ops, other_ops) ->
     (* We must not have duplicate operation hashes otherwise we may not go over the bound *)
     let hashes =
-      first_bindings @ other_bindings |> List.map (fun (hash, _) -> hash)
+      first_ops @ other_ops |> List.map (fun op -> op.Prevalidation.hash)
     in
     let unique_hashes = Operation_hash.Set.of_list hashes in
-    QCheck.assume
-      (Operation_hash.Set.cardinal unique_hashes = List.length hashes) ;
+    QCheck2.assume
+      Compare.List_length_with.(
+        hashes = Operation_hash.Set.cardinal unique_hashes) ;
     (* Remove all operations for the tested classification *)
     let bounded_map =
       match error_classification with
       | `Branch_delayed _ -> t.branch_delayed
       | `Branch_refused _ -> t.branch_refused
       | `Refused _ -> t.refused
+      | `Outdated _ -> t.outdated
     in
     let () =
       Operation_hash.Map.iter
-        (fun oph _op -> Prevalidator_classification.remove oph t)
-        (Prevalidator_classification.map bounded_map)
+        (fun oph _op -> drop oph t)
+        (Classification.map bounded_map)
     in
     discarded_operations_rev := [] ;
     (* Add the first bindings (the ones that will get discarded once the other bindings are added) *)
-    add_bindings
-      first_bindings
-      (error_classification :> Prevalidator_classification.classification)
-      t ;
+    add_ops first_ops (error_classification :> Classification.classification) t ;
     (* Now add the other bindings that should cause the first ones to get discarded *)
-    add_bindings
-      other_bindings
-      (error_classification :> Prevalidator_classification.classification)
-      t ;
-    (* [add] calls [on_discarded_operation] when adding any [Refused] operation,
-     * so the recorded discarded operations is a superset of the [first_bindings] ones. *)
-    check_discarded_contains_bindings
+    add_ops other_ops (error_classification :> Classification.classification) t ;
+    (* [add] calls [on_discarded_operation] when adding any [Refused] or
+       [Outdated] operation, so the recorded discarded operations is a superset
+       of the [first_bindings] ones. *)
+    check_discarded_contains_ops
       ~discarded_hashes:(!discarded_operations_rev |> List.rev)
-      ~bindings:first_bindings ;
+      ~ops:first_ops ;
     check_map_is_full ~expected_size:t.parameters.map_size_limit ~bounded_map ;
     true
 end
 
 (** Tests of [Prevalidator_classification.to_map] *)
 module To_map = struct
-  module Classification = Prevalidator_classification
-
   let map_pp fmt x =
-    let map_to_list m = Operation_hash.Map.to_seq m |> List.of_seq in
-    let pp_pair fmt (oph, op) =
-      Format.fprintf fmt "%a:%a" Operation_hash.pp oph Operation.pp op
+    let map_to_list m =
+      Operation_hash.Map.to_seq m |> Seq.map (fun (_, op) -> op) |> List.of_seq
+    in
+    let pp_pair fmt op =
+      Format.fprintf
+        fmt
+        "%a:%a"
+        Operation_hash.pp
+        op.Prevalidation.hash
+        Operation.pp
+        op.raw
     in
     Format.fprintf fmt "%a" (Format.pp_print_list pp_pair) (map_to_list x)
 
-  let map_eq = Operation_hash.Map.equal Operation.equal
+  let map_eq =
+    Operation_hash.Map.equal (fun op1 op2 ->
+        Operation.equal op1.Prevalidation.raw op2.raw)
 
   (** [remove_all m1 m2] returns the subset of [m1] thas is not within [m2].
       Said differently, [remove_all m1 m2] removes from [m1] all keys
@@ -637,12 +590,13 @@ module To_map = struct
       - [v_opt] is [Some v] and the union of [m1] and [(k,v)] equals [m2], or
       - [v_opt] is [None] and the union of [m1] and [(k,v)] equals [m2],
         for some unknown value [v]. *)
-  let eq_mod_binding m1 (k, v_opt) m2 =
+  let eq_mod_op m1 (k, v_opt) m2 =
     let diff = remove_all m2 m1 in
     match (Operation_hash.Map.bindings diff, v_opt) with
     | ([], _) -> true
     | ([(kdiff, vdiff)], Some v)
-      when Operation_hash.equal kdiff k && Operation.equal v vdiff ->
+      when Operation_hash.equal kdiff k
+           && Operation.equal v.Prevalidation.raw vdiff.Prevalidation.raw ->
         true
     | ([(kdiff, _)], None) when Operation_hash.equal kdiff k -> true
     | _ -> false
@@ -650,18 +604,21 @@ module To_map = struct
   (** [to_map_all] calls [Classification.to_map] with all named
       arguments set to [true] *)
   let to_map_all =
-    Classification.to_map
+    Classification.Internal_for_tests.to_map
       ~applied:true
+      ~prechecked:true
       ~branch_delayed:true
       ~branch_refused:true
       ~refused:true
+      ~outdated:true
 
   (** Tests the relationship between [Classification.create]
       and [Classification.to_map] *)
   let test_create =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[to_map_all (create params)] is empty"
-      (QCheck.make Generators.parameters_gen)
+      Generators.parameters_gen
     @@ fun parameters ->
     let t = Classification.create parameters in
     qcheck_eq'
@@ -674,49 +631,51 @@ module To_map = struct
   (** Tests the relationship between [Classification.add]
       and [Classification.to_map] *)
   let test_add =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[add] extends the size of [to_map] by 0 or 1"
-      (QCheck.make
-         (QCheck.Gen.pair
-            (Generators.t_with_operation_gen ())
-            Generators.classification_gen))
-    @@ fun ((t, (oph, op)), classification) ->
+      (Gen.pair
+         (Generators.t_with_operation_gen ())
+         Generators.classification_gen)
+    @@ fun ((t, op), classification) ->
     let initial = to_map_all t in
-    Classification.add ~notify:(Fun.const ()) classification oph op t ;
+    Classification.add classification op t ;
     (* We need to use [eq_mod_binding] because it covers the two possible cases:
        if [oph] is not in [initial], we have [initial @@ [(oph, op)] = to_map_all t]
        if [oph] is in [initial] already, we have [initial = to_map_all t] *)
     qcheck_eq'
       ~expected:true
-      ~actual:(eq_mod_binding initial (oph, Some op) (to_map_all t))
+      ~actual:
+        (eq_mod_op initial (op.Prevalidation.hash, Some op) (to_map_all t))
       ()
 
   (** Tests the relationship between [Classification.remove]
       and [Classification.to_map] *)
   let test_remove =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[remove] reduces the size of [to_map] by 0 or 1"
-      (QCheck.make (Generators.t_with_operation_gen ()))
-    @@ fun (t, (oph, _)) ->
+      (Generators.t_with_operation_gen ())
+    @@ fun (t, op) ->
     let initial = to_map_all t in
-    Classification.remove oph t ;
+    drop op.Prevalidation.hash t ;
     (* We need to use [eq_mod_binding] because it covers the two possible cases:
        if [oph] is not in [initial], we have [initial = to_map_all t]
        if [oph] is in [initial], we have [initial = to_map_all t @@ [(oph, op)] ] *)
     qcheck_eq'
       ~expected:true
-      ~actual:(eq_mod_binding (to_map_all t) (oph, None) initial)
+      ~actual:(eq_mod_op (to_map_all t) (op.Prevalidation.hash, None) initial)
       ()
 
+  let to_string ((t, op), _classification) =
+    Format.asprintf
+      "Starting with:@. %a@.and operation hash %a@. "
+      Operation_map.pp
+      (to_map_all t)
+      Operation_hash.pp
+      op.Prevalidation.hash
+
   let test_map_remove_add =
-    let to_string ((t, (oph, _op)), _classification) =
-      Format.asprintf
-        "Starting with:@. %a@.and operation hash %a@. "
-        Operation_map.pp
-        (to_map_all t)
-        Operation_hash.pp
-        oph
-    in
     (* Property checked:
 
        - \forall t oph class, C.to_map (C.remove t oph) + oph =
@@ -726,25 +685,27 @@ module To_map = struct
 
        This property is true only if [t] is not full with regard to
        the classification of the operation. *)
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"Check property between map, remove and add (1)"
       ~count:1000
-      (QCheck.make
-         ~print:to_string
-         (QCheck.Gen.pair
-            (Generators.t_with_operation_gen ~can_be_full:false ())
-            Generators.classification_gen))
-    @@ fun ((t, (oph, op)), classification) ->
+      ~print:to_string
+      (Gen.pair
+         (Generators.t_with_operation_gen ~can_be_full:false ())
+         Generators.classification_gen)
+    @@ fun ((t, op), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
-    Classification.remove oph t ;
+    drop op.Prevalidation.hash t ;
     let initial = to_map_all t in
-    let left = Operation_hash.Map.add oph op initial in
-    Classification.add ~notify:(Fun.const ()) classification oph op t' ;
+    let left = Operation_hash.Map.add op.Prevalidation.hash op initial in
+    Classification.add classification op t' ;
     let right = to_map_all t' in
     qcheck_eq'
       ~expected:left
       ~actual:right
-      ~eq:(Operation_hash.Map.equal Operation.equal)
+      ~eq:
+        (Operation_hash.Map.equal (fun op1 op2 ->
+             Operation_hash.equal op1.Prevalidation.hash op2.hash))
       ~pp:map_pp
       ()
 
@@ -758,84 +719,62 @@ module To_map = struct
 
        This property is true only if [t] is not full with regard to
        the classification of the operation. *)
-    let to_string ((t, (oph, _op)), _classification) =
-      Format.asprintf
-        "Starting with:@. %a@.and operation hash %a@. "
-        Operation_map.pp
-        (to_map_all t)
-        Operation_hash.pp
-        oph
-    in
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"Check property between map, remove and add (2)"
-      (QCheck.make
-         ~print:to_string
-         (QCheck.Gen.pair
-            (Generators.t_with_operation_gen ~can_be_full:false ())
-            Generators.classification_gen))
-    @@ fun ((t, (oph, op)), classification) ->
+      ~print:to_string
+      (Gen.pair
+         (Generators.t_with_operation_gen ~can_be_full:false ())
+         Generators.classification_gen)
+    @@ fun ((t, op), classification) ->
     let t' = Classification.Internal_for_tests.copy t in
-    Classification.add ~notify:(Fun.const ()) classification oph op t ;
+    Classification.add classification op t ;
     let initial = to_map_all t in
+    let oph = op.Prevalidation.hash in
     let left = Operation_hash.Map.remove oph initial in
-    Classification.remove oph t' ;
+    drop oph t' ;
     let right = to_map_all t' in
     qcheck_eq'
       ~expected:left
       ~actual:right
-      ~eq:(Operation_hash.Map.equal Operation.equal)
+      ~eq:
+        (Operation_hash.Map.equal (fun op1 op2 ->
+             Operation_hash.equal op1.Prevalidation.hash op2.Prevalidation.hash))
       ~pp:map_pp
       ()
 
   (** Tests the relationship between [Classification.flush]
       and [Classification.to_map] *)
   let test_flush =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[flush] can be emulated by [to_map ~refused:true ..]"
-      (QCheck.make (QCheck.Gen.pair (Generators.t_gen ()) QCheck.Gen.bool))
+      (Gen.pair (Generators.t_gen ()) Gen.bool)
     @@ fun (t, handle_branch_refused) ->
     let initial =
-      Classification.to_map
+      Classification.Internal_for_tests.to_map
         ~applied:false
+        ~prechecked:false
         ~branch_delayed:false
         ~branch_refused:(not handle_branch_refused)
         ~refused:true
+        ~outdated:true
         t
     in
-    Classification.flush ~handle_branch_refused t ;
+    Classification.Internal_for_tests.flush ~handle_branch_refused t ;
     let flushed = to_map_all t in
     qcheck_eq' ~pp:map_pp ~eq:map_eq ~expected:initial ~actual:flushed ()
 
-  (** Tests the relationship between [Classification.is_applied]
-      and [Classification.to_map] *)
-  let test_is_applied =
-    QCheck.Test.make
-      ~name:"[is_applied] can be emulated by [to_map ~applied:true]"
-      (QCheck.make (Generators.t_with_operation_gen ()))
-    @@ fun (t, (oph, _)) ->
-    let is_applied = Classification.is_applied oph t in
-    let map =
-      Classification.to_map
-        ~applied:true
-        ~branch_delayed:false
-        ~branch_refused:false
-        ~refused:false
-        t
-      |> Operation_hash.Map.filter (fun oph' _val -> oph' = oph)
-    in
-    qcheck_eq'
-      ~expected:is_applied
-      ~actual:(Operation_hash.Map.cardinal map = 1)
-      ()
-
-  (** Tests the relationship between [Classification.is_in_mempool]
+  (** Tests the relationship between [is_in_mempool]
       and [Classification.to_map] *)
   let test_is_in_mempool =
-    QCheck.Test.make
+    let open QCheck2 in
+    Test.make
       ~name:"[is_in_mempool] can be emulated by [to_map]"
-      (QCheck.make (Generators.t_with_operation_gen ()))
-    @@ fun (t, (oph, _)) ->
-    let is_in_mempool = Classification.is_in_mempool oph t in
+      (Generators.t_with_operation_gen ())
+    @@ fun (t, op) ->
+    let oph = op.Prevalidation.hash in
+    let is_in_mempool = is_in_mempool oph t in
     let map =
       to_map_all t |> Operation_hash.Map.filter (fun oph' _ -> oph' = oph)
     in
@@ -843,27 +782,81 @@ module To_map = struct
       ~expected:is_in_mempool
       ~actual:(Operation_hash.Map.cardinal map = 1)
       ()
+
+  (** Tests that [Classification.to_map] returns an empty map if all parameters
+      are set to [false]  *)
+  let test_none =
+    let open QCheck2 in
+    Test.make
+      ~name:"[to_map] returns an empty map if all parameters are set to [false]"
+      (Generators.t_gen ())
+    @@ fun t ->
+    qcheck_eq'
+      ~pp:map_pp
+      ~eq:map_eq
+      ~expected:Operation_hash.Map.empty
+      ~actual:
+        (Classification.Internal_for_tests.to_map
+           ~applied:false
+           ~prechecked:false
+           ~branch_delayed:false
+           ~branch_refused:false
+           ~refused:false
+           ~outdated:false
+           t)
+      ()
 end
 
+(** Tests the relationship between [Classification.create]
+      and [Classification.is_empty] *)
+let test_create_is_empty =
+  let open QCheck2 in
+  Test.make ~name:"[is_empty (create params)] holds" Generators.parameters_gen
+  @@ fun parameters ->
+  let t = Classification.create parameters in
+  qcheck_eq' ~expected:true ~actual:(Classification.is_empty t) ()
+
+(** Tests that after adding something to a classification, it is not empty. *)
+let test_create_add_not_empty =
+  let open QCheck2 in
+  Test.make
+    ~name:"[not (is_empty (add _ _ _ t))] holds"
+    (Gen.pair
+       (Generators.t_with_operation_gen ())
+       Generators.classification_gen)
+  @@ fun ((t, op), classification) ->
+  Classification.add classification op t ;
+  qcheck_eq' ~expected:false ~actual:(Classification.is_empty t) ()
+
 let () =
+  let mk_tests label tests = (label, qcheck_wrap tests) in
   Alcotest.run
     "Prevalidator_classification"
     [
-      ( "",
-        qcheck_wrap
+      mk_tests
+        "flush"
+        [
+          test_flush_empties_all_except_refused_and_outdated;
+          test_flush_empties_all_except_refused_and_branch_refused;
+        ];
+      mk_tests "is_in_mempool" [test_is_in_mempool_remove];
+      mk_tests "is_applied" [test_is_applied];
+      mk_tests "unparsable" Unparsable.[test_add_is_known; test_flush_is_known];
+      mk_tests "invariants" [test_invariants];
+      mk_tests "bounded" [Bounded.test_bounded];
+      mk_tests
+        "to_map"
+        To_map.
           [
-            test_flush_empties_all_except_refused;
-            test_flush_empties_all_except_refused_and_branch_refused;
-            test_is_in_mempool_remove;
+            test_create;
+            test_add;
+            test_remove;
+            test_map_remove_add;
+            test_map_add_remove;
+            test_flush;
             test_is_applied;
-            test_invariants;
-            Bounded.test_bounded;
-            To_map.test_create;
-            To_map.test_add;
-            To_map.test_remove;
-            To_map.test_map_remove_add;
-            To_map.test_map_add_remove;
-            To_map.test_flush;
-            To_map.test_is_in_mempool;
-          ] );
+            test_is_in_mempool;
+            test_none;
+          ];
+      mk_tests "is_empty" [test_create_is_empty; test_create_add_not_empty];
     ]

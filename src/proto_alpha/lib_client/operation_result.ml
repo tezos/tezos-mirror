@@ -142,6 +142,38 @@ let pp_manager_operation_content (type kind) source internal pp_result ppf
         Michelson_v1_printer.print_expr
         value
         pp_result
+        result
+  | Set_deposits_limit None ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:@,Delegate: %a@,Unlimited deposits%a@]"
+        (if internal then "Internal set deposits limit"
+        else "Set deposits limit")
+        Contract.pp
+        source
+        pp_result
+        result
+  | Set_deposits_limit (Some limit) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:@,Delegate: %a@,Limit: %a%a@]"
+        (if internal then "Internal set deposits limit"
+        else "Set deposits limit")
+        Contract.pp
+        source
+        Tez.pp
+        limit
+        pp_result
+        result
+  | Tx_rollup_origination ->
+      Format.fprintf
+        ppf
+        "@[<v 2>%s:@,From: %a%a@]"
+        (if internal then "Internal tx rollup origination"
+        else "Tx rollup origination")
+        Contract.pp
+        source
+        pp_result
         result) ;
   Format.fprintf ppf "@]"
 
@@ -163,18 +195,63 @@ let pp_balance_updates ppf = function
             let balance =
               match balance with
               | Contract c -> Format.asprintf "%a" Contract.pp c
-              | Rewards (pkh, l) ->
-                  Format.asprintf "rewards(%a,%a)" pp_baker pkh Cycle.pp l
-              | Fees (pkh, l) ->
-                  Format.asprintf "fees(%a,%a)" pp_baker pkh Cycle.pp l
-              | Deposits (pkh, l) ->
-                  Format.asprintf "deposits(%a,%a)" pp_baker pkh Cycle.pp l
+              | Legacy_rewards (pkh, l) ->
+                  Format.asprintf
+                    "legacy_rewards(%a,%a)"
+                    pp_baker
+                    pkh
+                    Cycle.pp
+                    l
+              | Block_fees -> "payload fees(the block proposer)"
+              | Legacy_deposits (pkh, l) ->
+                  Format.asprintf
+                    "legacy_deposits(%a,%a)"
+                    pp_baker
+                    pkh
+                    Cycle.pp
+                    l
+              | Deposits pkh -> Format.asprintf "deposits(%a)" pp_baker pkh
+              | Nonce_revelation_rewards -> "nonce revelation rewards"
+              | Double_signing_evidence_rewards ->
+                  "double signing evidence rewards"
+              | Endorsing_rewards -> "endorsing rewards"
+              | Baking_rewards -> "baking rewards"
+              | Baking_bonuses -> "baking bonuses"
+              | Legacy_fees (pkh, c) ->
+                  Format.asprintf "legacy_fees(%a,%a)" pp_baker pkh Cycle.pp c
+              | Storage_fees -> "storage fees"
+              | Double_signing_punishments -> "double signing punishments"
+              | Lost_endorsing_rewards (pkh, p, r) ->
+                  let reason =
+                    match (p, r) with
+                    | (false, false) -> ""
+                    | (false, true) -> ",revelation"
+                    | (true, false) -> ",participation"
+                    | (true, true) -> ",participation,revelation"
+                  in
+                  Format.asprintf
+                    "lost endorsing rewards(%a%s)"
+                    pp_baker
+                    pkh
+                    reason
+              | Liquidity_baking_subsidies -> "liquidity baking subsidies"
+              | Burned -> "burned"
+              | Commitments bpkh ->
+                  Format.asprintf
+                    "commitment(%a)"
+                    Blinded_public_key_hash.pp
+                    bpkh
+              | Bootstrap -> "bootstrap"
+              | Invoice -> "invoices"
+              | Initial_commitments -> "initial commitments"
+              | Minted -> "minted"
             in
             let balance =
               match origin with
               | Block_application -> balance
               | Protocol_migration -> Format.asprintf "migration %s" balance
               | Subsidy -> Format.asprintf "subsidy %s" balance
+              | Simulation -> Format.asprintf "simulation %s" balance
             in
             (balance, update))
           balance_updates
@@ -323,6 +400,21 @@ let pp_manager_operation_contents_and_result ppf
     Format.fprintf ppf "@,Storage size: %s bytes" (Z.to_string size_of_constant) ;
     Format.fprintf ppf "@,Global address: %a" Script_expr_hash.pp global_address
   in
+  let pp_tx_rollup_result
+      (Tx_rollup_origination_result
+        {balance_updates; consumed_gas; originated_tx_rollup}) =
+    Format.fprintf
+      ppf
+      "@,Balance updates:@,  %a"
+      pp_balance_updates
+      balance_updates ;
+    Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas ;
+    Format.fprintf
+      ppf
+      "@,Originated tx rollup: %a"
+      Tx_rollup.pp
+      originated_tx_rollup
+  in
   let pp_result (type kind) ppf (result : kind manager_operation_result) =
     Format.fprintf ppf "@," ;
     match result with
@@ -344,6 +436,14 @@ let pp_manager_operation_contents_and_result ppf
           ppf
           "@[<v 0>This delegation was BACKTRACKED, its expected effects were \
            NOT applied.@]"
+    | Applied (Set_deposits_limit_result {consumed_gas}) ->
+        Format.fprintf ppf "The deposits limit was successfully set" ;
+        Format.fprintf ppf "@,Consumed gas: %a" Gas.Arith.pp consumed_gas
+    | Backtracked (Set_deposits_limit_result _, _) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This deposits limit modification was BACKTRACKED, its \
+           expected effects were NOT applied.@]"
     | Applied (Transaction_result _ as tx) ->
         Format.fprintf ppf "This transaction was successfully applied" ;
         pp_transaction_result tx
@@ -373,7 +473,19 @@ let pp_manager_operation_contents_and_result ppf
           "@[<v 0>This registration of a global constant was BACKTRACKED, its \
            expected effects (as follow) were NOT applied.@]" ;
         pp_register_global_constant_result op
+    | Applied (Tx_rollup_origination_result _ as op) ->
+        Format.fprintf
+          ppf
+          "This tx rollup origination operation was successfully applied" ;
+        pp_tx_rollup_result op
+    | Backtracked ((Tx_rollup_origination_result _ as op), _err) ->
+        Format.fprintf
+          ppf
+          "@[<v 0>This rollup operation was BACKTRACKED, its expected effects \
+           (as follow) were NOT applied.@]" ;
+        pp_tx_rollup_result op
   in
+
   Format.fprintf
     ppf
     "@[<v 0>@[<v 2>Manager signed operations:@,\
@@ -435,7 +547,7 @@ let rec pp_contents_and_result_list :
          Level: %a@,\
          Nonce (hash): %a@,\
          Balance updates:@,\
-        \  %a@]"
+         %a@]"
         Raw_level.pp
         level
         Nonce_hash.pp
@@ -450,7 +562,7 @@ let rec pp_contents_and_result_list :
          Exhibit A: %a@,\
          Exhibit B: %a@,\
          Balance updates:@,\
-        \  %a@]"
+         %a@]"
         Block_hash.pp
         (Block_header.hash bh1)
         Block_hash.pp
@@ -458,11 +570,62 @@ let rec pp_contents_and_result_list :
         pp_balance_updates
         bus
   | Single_and_result
-      ( Double_endorsement_evidence {op1; op2; slot = _},
+      ( Preendorsement {level; _},
+        Preendorsement_result {balance_updates; delegate; preendorsement_power}
+      ) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Preendorsement:@,\
+         Level: %a@,\
+         Balance updates:%a@,\
+         Delegate: %a@,\
+         Preendorsement Power: %d@]"
+        Raw_level.pp
+        level
+        pp_balance_updates
+        balance_updates
+        Signature.Public_key_hash.pp
+        delegate
+        preendorsement_power
+  | Single_and_result
+      ( Endorsement {level; _},
+        Endorsement_result {balance_updates; delegate; endorsement_power} ) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Endorsement:@,\
+         Level: %a@,\
+         Balance updates:%a@,\
+         Delegate: %a@,\
+         Endorsement power: %d@]"
+        Raw_level.pp
+        level
+        pp_balance_updates
+        balance_updates
+        Signature.Public_key_hash.pp
+        delegate
+        endorsement_power
+  | Single_and_result
+      ( Double_endorsement_evidence {op1; op2},
         Double_endorsement_evidence_result bus ) ->
       Format.fprintf
         ppf
         "@[<v 2>Double endorsement evidence:@,\
+         Exhibit A: %a@,\
+         Exhibit B: %a@,\
+         Balance updates:@,\
+        \  %a@]"
+        Operation_hash.pp
+        (Operation.hash op1)
+        Operation_hash.pp
+        (Operation.hash op2)
+        pp_balance_updates
+        bus
+  | Single_and_result
+      ( Double_preendorsement_evidence {op1; op2},
+        Double_preendorsement_evidence_result bus ) ->
+      Format.fprintf
+        ppf
+        "@[<v 2>Double preendorsement evidence:@,\
          Exhibit A: %a@,\
          Exhibit B: %a@,\
          Balance updates:@,\
@@ -484,33 +647,6 @@ let rec pp_contents_and_result_list :
         id
         pp_balance_updates
         bus
-  | Single_and_result
-      ( Endorsement_with_slot
-          {
-            endorsement =
-              {protocol_data = {contents = Single (Endorsement {level}); _}; _};
-            _;
-          },
-        Endorsement_with_slot_result
-          (Endorsement_result {balance_updates; delegate; slots}) )
-  | Single_and_result
-      ( Endorsement {level},
-        Endorsement_result {balance_updates; delegate; slots} ) ->
-      Format.fprintf
-        ppf
-        "@[<v 2>Endorsement:@,\
-         Level: %a@,\
-         Balance updates:%a@,\
-         Delegate: %a@,\
-         Slots: %a@]"
-        Raw_level.pp
-        level
-        pp_balance_updates
-        balance_updates
-        Signature.Public_key_hash.pp
-        delegate
-        (Format.pp_print_list ~pp_sep:Format.pp_print_space Format.pp_print_int)
-        slots
   | Single_and_result (Proposals {source; period; proposals}, Proposals_result)
     ->
       Format.fprintf

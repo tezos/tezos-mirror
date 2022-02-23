@@ -1,26 +1,29 @@
 opam-version: "2.0"
-name: "tezos-sapling"
-authors: [ "Nomadic Labs <contact@nomadic-labs.com>" ]
-maintainer: "Nomadic Labs <contact@nomadic-labs.com>"
-synopsis: "OCaml library for the Sapling protocol, using librustzcash"
-homepage: "https://gitlab.com/nomadic-labs/tezos"
-bug-reports: "https://gitlab.com/tezos/nomadic-labs/issues"
-dev-repo: "git+https://gitlab.com/nomadic-labs/tezos.git"
+maintainer: "contact@tezos.com"
+authors: ["Tezos devteam"]
+homepage: "https://www.tezos.com/"
+bug-reports: "https://gitlab.com/tezos/tezos/issues"
+dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "conf-rust" {build}
-  "dune" {build & >= "2.0"}
-  "hex"
-  "ctypes"
-  "ctypes-foreign"
+  "dune" { >= "2.9" }
+  "conf-rust"
   "integers"
+  "ctypes"
+  "hex"
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-crypto"
   "tezos-stdlib"
   "tezos-error-monad"
   "tezos-rust-libs" { = "1.1" }
-  "alcotest-lwt" { with-test & >= "1.1.0" }
-  "tezos-base-test-helpers" { with-test }
+  "tezos-lwt-result-stdlib"
+  "tezos-base" {with-test}
+  "tezos-stdlib-unix" {with-test}
+  "tezos-base-test-helpers" {with-test}
+  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
-build: [[ "dune" "build" "-j" jobs "-p" name "@install" ]]
-run-test: [[ "dune" "runtest" "-p" name "-j" jobs ]]
+build: [
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]
+synopsis: "OCaml library for the Sapling protocol, using librustzcash"

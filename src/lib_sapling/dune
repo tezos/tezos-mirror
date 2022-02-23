@@ -1,19 +1,31 @@
 ;; This binding assumes that librustzcash.a is installed in the system default
 ;; directories or in $OPAM_SWITCH_PREFIX/lib
 
-(copy_files bindings/{rustzcash_ctypes_c_stubs.c,rustzcash_ctypes_stubs.ml,rustzcash_ctypes_bindings.ml})
-
 (library
  (name tezos_sapling)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-sapling)
- (libraries integers ctypes ctypes.foreign ctypes.stubs hex data-encoding tezos-crypto tezos-stdlib tezos-error-monad tezos-lwt-result-stdlib)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  integers
+  ctypes
+  ctypes.stubs
+  data-encoding
+  tezos-crypto
+  tezos-stdlib
+  tezos-error-monad
+  tezos-lwt-result-stdlib)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_crypto
+   -open Tezos_error_monad
+   -open Tezos_error_monad.TzLwtreslib))
  (foreign_stubs
   (language c)
-  (flags (-I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))
+  (flags (:standard -I%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs))
   (names rustzcash_ctypes_c_stubs))
- (c_library_flags (-L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs -lrustzcash -lpthread))
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_crypto
-                   -open Tezos_error_monad
-                   -open Tezos_error_monad.TzLwtreslib)))
+ (c_library_flags
+  (-L%{env:OPAM_SWITCH_PREFIX=}/lib/tezos-rust-libs -lrustzcash -lpthread)))
+
+(copy_files
+ bindings/{rustzcash_ctypes_c_stubs.c,rustzcash_ctypes_stubs.ml,rustzcash_ctypes_bindings.ml})

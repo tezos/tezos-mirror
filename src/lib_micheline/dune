@@ -1,20 +1,16 @@
 (library
  (name tezos_micheline)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-micheline)
+ (instrumentation (backend bisect_ppx))
  (libraries
-  ;; External
   uutf
   zarith
-  ;; Internal
+  zarith_stubs_js
   tezos-stdlib
   tezos-error-monad
-  data-encoding
-  ;; test
-  ppx_inline_test
-  )
+  data-encoding)
  (inline_tests)
  (preprocess (pps ppx_inline_test))
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_error_monad
-                   -open Data_encoding)))
+ (js_of_ocaml)
+ (flags
+  (:standard -open Tezos_stdlib -open Tezos_error_monad -open Data_encoding)))

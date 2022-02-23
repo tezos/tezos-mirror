@@ -117,6 +117,8 @@ end
 
 val int_parameter : (int, full) Clic.parameter
 
+val uri_parameter : (Uri.t, full) Clic.parameter
+
 val string_parameter : (string, full) Clic.parameter
 
 val bytes_of_prefixed_string : string -> Bytes.t tzresult Lwt.t

@@ -374,7 +374,9 @@ include Tezos_raw_protocol_006_PsCARTHA.Main
 
 (library
  (name tezos_protocol_006_PsCARTHA_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-006-PsCARTHA)
  (libraries
       tezos-protocol-environment

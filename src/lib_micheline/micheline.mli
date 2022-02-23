@@ -53,6 +53,9 @@ type 'p canonical
 (** Canonical integer locations that appear inside {!canonical} expressions. *)
 type canonical_location = int
 
+(** A location that won't exist in any well-formed canonical value *)
+val dummy_location : canonical_location
+
 (** Compute the canonical form of an expression.
     Drops the concrete locations completely. *)
 val strip_locations : (_, 'p) node -> 'p canonical

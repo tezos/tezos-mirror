@@ -17,7 +17,7 @@ shift
 
 mkdir -p test_results
 
-echo "Running test \"dune build @$nametest/runtest\" ..."
+echo "Running test \"dune build $* @$nametest/runtest\" ..."
 
 START=$(date +%s.%N)
 

@@ -1,0 +1,2 @@
+tests_012/test_contract_onchain_opcodes.py::TestContractOnchainOpcodes::test_gen_keys
+

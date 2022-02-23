@@ -14,14 +14,16 @@
             tezos-stdlib
             tezos-stdlib-unix
             tezos-context
+            tezos-context.memory
             tezos-rpc-http
+            tezos-rpc-http-client-unix
             tezos-rpc
             lwt-canceler
             lwt-exit)
  (library_flags (:standard -linkall))
  (modules (:standard \
-                     delegate_commands
-                     delegate_commands_registration))
+                     baking_commands
+                     baking_commands_registration))
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_alpha
                    -open Tezos_protocol_plugin_alpha
@@ -49,7 +51,7 @@
             tezos-client-commands
             tezos-baking-alpha)
  (library_flags (:standard -linkall))
- (modules delegate_commands)
+ (modules baking_commands)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_alpha
                    -open Tezos_stdlib_unix
@@ -75,7 +77,7 @@
             tezos-baking-alpha-commands
             tezos-rpc)
  (library_flags (:standard -linkall))
- (modules delegate_commands_registration)
+ (modules baking_commands_registration)
  (flags (:standard -open Tezos_base__TzPervasives
                    -open Tezos_protocol_alpha
                    -open Tezos_shell_services

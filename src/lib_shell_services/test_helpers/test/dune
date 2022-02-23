@@ -1,5 +1,5 @@
-(tests
- (names test_block_services)
+(test
+ (name test_block_services)
  (package tezos-shell-services-test-helpers)
  (libraries
   tezos-base
@@ -9,10 +9,4 @@
   tezos-shell-services-test-helpers
   qcheck-alcotest
   alcotest-lwt)
- (flags
-  (:standard -open Tezos_base__TzPervasives)))
-
-(rule
- (alias runtest_block_services)
- (action
-  (run %{exe:test_block_services.exe})))
+ (flags (:standard -open Tezos_base__TzPervasives)))

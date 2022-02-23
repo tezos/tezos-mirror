@@ -534,10 +534,17 @@ struct
   end
 
   module Error_core = struct
-    include Tezos_error_monad.Core_maker.Make (struct
-      let id = Format.asprintf "proto.%s." Param.name
-    end)
+    include
+      Tezos_error_monad.Core_maker.Make
+        (struct
+          let id = Format.asprintf "proto.%s." Param.name
+        end)
+        (Tezos_protocol_environment_structs.V2.M.Error_monad_classification)
+
+    let error_encoding = Data_encoding.dynamic_size error_encoding
   end
+
+  type error_category = Error_core.error_category
 
   type error += Ecoproto_error of Error_core.error
 
@@ -547,7 +554,10 @@ struct
     include (
       Error_core :
         sig
-          include Tezos_error_monad.Sig.CORE with type error := unwrapped
+          include
+            Tezos_error_monad.Sig.CORE
+              with type error := unwrapped
+               and type error_category = error_category
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -560,8 +570,6 @@ struct
 
     type 'a shell_tzresult = ('a, Error_monad.tztrace) result
 
-    type error_category = [`Branch | `Temporary | `Permanent]
-
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
@@ -571,6 +579,7 @@ struct
     (* Backwards compatibility additions (traversors, dont_wait, trace helpers) *)
     include Error_monad_traversors
     include Error_monad_preallocated_values
+    include Error_monad_trace_eval
 
     let dont_wait ex er f = dont_wait f er ex
 
@@ -579,6 +588,15 @@ struct
     let pp_trace = pp_print_trace
 
     type 'err trace = 'err TzTrace.trace
+
+    (* Shouldn't be used, only to keep the same environment interface *)
+    let classify_error error = (find_info_of_error error).category
+
+    let both_e = Tzresult_syntax.both
+
+    let join_e = Tzresult_syntax.join
+
+    let all_e = Tzresult_syntax.all
   end
 
   let () =
@@ -871,7 +889,7 @@ struct
     let fork_test_chain = Context.fork_test_chain
 
     module type PROTOCOL =
-      Environment_protocol_T_V2.T
+      Environment_protocol_T_V0.T
         with type context := Context.t
          and type quota := quota
          and type validation_result := validation_result
@@ -896,9 +914,57 @@ struct
   module Context = struct
     include Context
 
-    module type VIEW = Environment_context.VIEW
+    type depth = [`Eq of int | `Le of int | `Lt of int | `Ge of int | `Gt of int]
 
-    module type TREE = Environment_context.TREE
+    module type VIEW = sig
+      include Environment_context.VIEW
+
+      val fold :
+        ?depth:depth ->
+        t ->
+        key ->
+        init:'a ->
+        f:(key -> tree -> 'a -> 'a Lwt.t) ->
+        'a Lwt.t
+    end
+
+    module Kind = struct
+      type t = [`Value | `Tree]
+    end
+
+    module type TREE = sig
+      type t
+
+      type tree
+
+      include VIEW with type t := tree and type tree := tree
+
+      val empty : t -> tree
+
+      val is_empty : tree -> bool
+
+      val kind : tree -> Kind.t
+
+      val to_value : tree -> value option Lwt.t
+
+      val of_value : t -> value -> tree Lwt.t
+
+      val hash : tree -> Context_hash.t
+
+      val equal : tree -> tree -> bool
+
+      val clear : ?depth:int -> tree -> unit
+    end
+
+    let fold ?depth ctxt k ~init ~f =
+      Context.fold ?depth ctxt k ~order:`Sorted ~init ~f
+
+    module Tree = struct
+      include Tree
+
+      let fold ?depth ctxt k ~init ~f =
+        fold ?depth ctxt k ~order:`Sorted ~init ~f
+    end
 
     let register_resolver = Base58.register_resolver
 

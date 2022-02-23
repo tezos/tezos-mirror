@@ -125,7 +125,9 @@ let main_promise (config_file : string option)
     if log_requests then RPC_client_unix.full_logger Format.err_formatter
     else RPC_client_unix.null_logger
   in
-  let rpc_config : RPC_client_unix.config = {endpoint; logger} in
+  let rpc_config : RPC_client_unix.config =
+    {media_type = Media_type.all_media_types; endpoint; logger}
+  in
   let printer =
     let logger channel msg : unit Lwt.t =
       if channel = "stderr" then

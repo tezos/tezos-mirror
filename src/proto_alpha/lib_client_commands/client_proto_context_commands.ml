@@ -26,35 +26,13 @@
 
 open Protocol
 open Alpha_context
-open Tezos_micheline
 open Client_proto_context
 open Client_proto_contracts
-open Client_proto_programs
 open Client_keys
 open Client_proto_args
 
 let encrypted_switch =
   Clic.switch ~long:"encrypted" ~doc:"encrypt the key on-disk" ()
-
-let dry_run_switch =
-  Clic.switch
-    ~long:"dry-run"
-    ~short:'D'
-    ~doc:"don't inject the operation, just display it"
-    ()
-
-let verbose_signing_switch =
-  Clic.switch
-    ~long:"verbose-signing"
-    ~doc:"display extra information before signing the operation"
-    ()
-
-let simulate_switch =
-  Clic.switch
-    ~long:"simulation"
-    ~doc:
-      "Simulate the execution of the command, without needing any signatures."
-    ()
 
 let report_michelson_errors ?(no_print_source = false) ~msg
     (cctxt : #Client_context.printer) = function
@@ -104,91 +82,6 @@ let alphanet = {Clic.name = "alphanet"; title = "Alphanet only commands"}
 let binary_description =
   {Clic.name = "description"; title = "Binary Description"}
 
-let transfer_command amount source destination cctxt
-    ( fee,
-      dry_run,
-      verbose_signing,
-      simulation,
-      gas_limit,
-      storage_limit,
-      counter,
-      arg,
-      no_print_source,
-      minimal_fees,
-      minimal_nanotez_per_byte,
-      minimal_nanotez_per_gas_unit,
-      force_low_fee,
-      fee_cap,
-      burn_cap,
-      entrypoint ) =
-  let fee_parameter =
-    {
-      Injection.minimal_fees;
-      minimal_nanotez_per_byte;
-      minimal_nanotez_per_gas_unit;
-      force_low_fee;
-      fee_cap;
-      burn_cap;
-    }
-  in
-  (match Contract.is_implicit source with
-  | None ->
-      let contract = source in
-      Managed_contract.get_contract_manager cctxt source >>=? fun source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-      Managed_contract.transfer
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ?confirmations:cctxt#confirmations
-        ~dry_run
-        ~verbose_signing
-        ~simulation
-        ~fee_parameter
-        ?fee
-        ~contract
-        ~source
-        ~src_pk
-        ~src_sk
-        ~destination
-        ?entrypoint
-        ?arg
-        ~amount
-        ?gas_limit
-        ?storage_limit
-        ?counter
-        ()
-  | Some source ->
-      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
-      transfer
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ?confirmations:cctxt#confirmations
-        ~dry_run
-        ~simulation
-        ~verbose_signing
-        ~fee_parameter
-        ~source
-        ?fee
-        ~src_pk
-        ~src_sk
-        ~destination
-        ?entrypoint
-        ?arg
-        ~amount
-        ?gas_limit
-        ?storage_limit
-        ?counter
-        ())
-  >>= report_michelson_errors
-        ~no_print_source
-        ~msg:"transfer simulation failed"
-        cctxt
-  >>= function
-  | None -> return_unit
-  | Some (_res, _contracts) -> return_unit
-
 let tez_of_string_exn index field s =
   match Tez.of_string s with
   | Some t -> return t
@@ -204,47 +97,7 @@ let tez_of_opt_string_exn index field s =
   | None -> return None
   | Some s -> tez_of_string_exn index field s >>=? fun s -> return (Some s)
 
-let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
-    ?entrypoint source index batch =
-  Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
-  >>=? fun (_, destination) ->
-  tez_of_string_exn index "amount" batch.amount >>=? fun amount ->
-  tez_of_opt_string_exn index "fee" batch.fee >>=? fun batch_fee ->
-  let fee = Option.either batch_fee fee in
-  let arg = Option.either batch.arg arg in
-  let gas_limit = Option.either batch.gas_limit gas_limit in
-  let storage_limit = Option.either batch.storage_limit storage_limit in
-  let entrypoint = Option.either batch.entrypoint entrypoint in
-  parse_arg_transfer arg >>=? fun parameters ->
-  (match Contract.is_implicit source with
-  | None ->
-      Managed_contract.build_transaction_operation
-        cctxt
-        ~chain:cctxt#chain
-        ~block:cctxt#block
-        ~contract:source
-        ~destination
-        ?entrypoint
-        ?arg
-        ~amount
-        ?fee
-        ?gas_limit
-        ?storage_limit
-        ()
-  | Some _ ->
-      return
-        (build_transaction_operation
-           ~amount
-           ~parameters
-           ?entrypoint
-           ?fee
-           ?gas_limit
-           ?storage_limit
-           destination))
-  >>=? fun operation ->
-  return (Annotated_manager_operation.Annotated_manager_operation operation)
-
-let commands network () =
+let commands_ro () =
   let open Clic in
   [
     command
@@ -524,6 +377,423 @@ let commands network () =
               (match mn with None -> "unknown" | Some n -> "known as " ^ n)
             >>= fun () -> return_unit);
     command
+      ~desc:"Get receipt for past operation"
+      (args1
+         (default_arg
+            ~long:"check-previous"
+            ~placeholder:"num_blocks"
+            ~doc:"number of previous blocks to check"
+            ~default:"10"
+            non_negative_param))
+      (prefixes ["get"; "receipt"; "for"]
+      @@ param
+           ~name:"operation"
+           ~desc:"Operation to be looked up"
+           (parameter (fun _ x ->
+                match Operation_hash.of_b58check_opt x with
+                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | Some hash -> return hash))
+      @@ stop)
+      (fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
+        display_receipt_for_operation
+          ctxt
+          ~chain:ctxt#chain
+          ~predecessors
+          operation_hash
+        >>=? fun _ -> return_unit);
+    command
+      ~group
+      ~desc:"Summarize the current voting period"
+      no_options
+      (fixed ["show"; "voting"; "period"])
+      (fun () (cctxt : Protocol_client_context.full) ->
+        get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+        >>=? fun info ->
+        cctxt#message
+          "Current period: %a\nBlocks remaining until end of period: %ld"
+          Data_encoding.Json.pp
+          (Data_encoding.Json.construct
+             Alpha_context.Voting_period.kind_encoding
+             info.current_period_kind)
+          info.remaining
+        >>= fun () ->
+        Shell_services.Protocol.list cctxt >>=? fun known_protos ->
+        get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
+        >>=? fun props ->
+        let ranks =
+          Environment.Protocol_hash.Map.bindings props
+          |> List.sort (fun (_, v1) (_, v2) -> Int32.(compare v2 v1))
+        in
+        let print_proposal = function
+          | None ->
+              cctxt#message "The current proposal has already been cleared."
+          (* The proposal is cleared on the last block of adoption period, and
+             also on the last block of the exploration and promotion
+             periods when the proposal is not approved *)
+          | Some proposal ->
+              cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
+        in
+        match info.current_period_kind with
+        | Proposal ->
+            (* the current proposals are cleared on the last block of the
+               proposal period *)
+            if info.remaining <> 0l then
+              cctxt#answer
+                "Current proposals:%t"
+                Format.(
+                  fun ppf ->
+                    pp_print_cut ppf () ;
+                    pp_open_vbox ppf 0 ;
+                    List.iter
+                      (fun (p, w) ->
+                        fprintf
+                          ppf
+                          "* %a %ld (%sknown by the node)@."
+                          Protocol_hash.pp
+                          p
+                          w
+                          (if List.mem ~equal:Protocol_hash.equal p known_protos
+                          then ""
+                          else "not "))
+                      ranks ;
+                    pp_close_box ppf ())
+              >>= fun () -> return_unit
+            else
+              cctxt#message "The proposals have already been cleared."
+              >>= fun () -> return_unit
+        | Exploration | Promotion ->
+            print_proposal info.current_proposal >>= fun () ->
+            (* the ballots are cleared on the last block of these periods *)
+            if info.remaining <> 0l then
+              get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt
+              >>=? fun ballots_info ->
+              cctxt#answer
+                "Ballots: %a@,\
+                 Current participation %.2f%%, necessary quorum %.2f%%@,\
+                 Current in favor %ld, needed supermajority %ld"
+                Data_encoding.Json.pp
+                (Data_encoding.Json.construct
+                   Vote.ballots_encoding
+                   ballots_info.ballots)
+                (Int32.to_float ballots_info.participation /. 100.)
+                (Int32.to_float ballots_info.current_quorum /. 100.)
+                ballots_info.ballots.yay
+                ballots_info.supermajority
+              >>= fun () -> return_unit
+            else
+              cctxt#message "The ballots have already been cleared."
+              >>= fun () -> return_unit
+        | Cooldown ->
+            print_proposal info.current_proposal >>= fun () -> return_unit
+        | Adoption ->
+            print_proposal info.current_proposal >>= fun () -> return_unit);
+    command
+      ~group:binary_description
+      ~desc:"Describe unsigned block header"
+      no_options
+      (fixed ["describe"; "unsigned"; "block"; "header"])
+      (fun () (cctxt : Protocol_client_context.full) ->
+        cctxt#message
+          "%a"
+          Data_encoding.Binary_schema.pp
+          (Data_encoding.Binary.describe
+             Alpha_context.Block_header.unsigned_encoding)
+        >>= fun () -> return_unit);
+    command
+      ~group:binary_description
+      ~desc:"Describe unsigned operation"
+      no_options
+      (fixed ["describe"; "unsigned"; "operation"])
+      (fun () (cctxt : Protocol_client_context.full) ->
+        cctxt#message
+          "%a"
+          Data_encoding.Binary_schema.pp
+          (Data_encoding.Binary.describe
+             Alpha_context.Operation.unsigned_encoding)
+        >>= fun () -> return_unit);
+    command
+      ~group
+      ~desc:"Get the frozen deposits limit of a delegate."
+      no_options
+      (prefixes ["get"; "deposits"; "limit"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source delegate"
+      @@ stop)
+      (fun () (_, contract) (cctxt : Protocol_client_context.full) ->
+        match Contract.is_implicit contract with
+        | None ->
+            cctxt#error
+              "Cannot change deposits limit on contract %a. This operation is \
+               invalid on originated contracts."
+              Contract.pp
+              contract
+        | Some delegate -> (
+            get_frozen_deposits_limit
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              delegate
+            >>=? function
+            | None -> cctxt#answer "unlimited" >>= return
+            | Some limit ->
+                cctxt#answer "%a %s" Tez.pp limit Client_proto_args.tez_sym
+                >>= return));
+  ]
+
+(* ----------------------------------------------------------------------------*)
+(* After the activation of a new version of the protocol, the older protocols
+ are only kept in the code base to replay the history of the chain and to query
+ old states.
+
+ The commands that are not useful anymore in the old protocols are removed,
+ this is called protocol freezing. The commands below are those that can be
+ removed during protocol freezing.
+
+ The rule of thumb to know if a command should be kept at freezing is that all
+ commands that modify the state of the chain should be removed and conversely
+ all commands that are used to query the context should be kept. For this
+ reason, we call read-only (or RO for short) the commands that are kept and
+ read-write (or RW for short) the commands that are removed.
+
+ There are some exceptions to this rule however, for example the command
+ "tezos-client wait for <op> to be included" is classified as RW despite having
+ no effect on the context because it has no use case once all RW commands are
+ removed.
+
+ Keeping this in mind, the developer should decide where to add a new command.
+ At the end of the file, RO and RW commands are concatenated into one list that
+ is then exported in the mli file.  *)
+(* ----------------------------------------------------------------------------*)
+
+let dry_run_switch =
+  Clic.switch
+    ~long:"dry-run"
+    ~short:'D'
+    ~doc:"don't inject the operation, just display it"
+    ()
+
+let verbose_signing_switch =
+  Clic.switch
+    ~long:"verbose-signing"
+    ~doc:"display extra information before signing the operation"
+    ()
+
+let simulate_switch =
+  Clic.switch
+    ~long:"simulation"
+    ~doc:
+      "Simulate the execution of the command, without needing any signatures."
+    ()
+
+let transfer_command amount source destination cctxt
+    ( fee,
+      dry_run,
+      verbose_signing,
+      simulation,
+      gas_limit,
+      storage_limit,
+      counter,
+      arg,
+      no_print_source,
+      minimal_fees,
+      minimal_nanotez_per_byte,
+      minimal_nanotez_per_gas_unit,
+      force_low_fee,
+      fee_cap,
+      burn_cap,
+      entrypoint,
+      replace_by_fees ) =
+  let fee_parameter =
+    {
+      Injection.minimal_fees;
+      minimal_nanotez_per_byte;
+      minimal_nanotez_per_gas_unit;
+      force_low_fee;
+      fee_cap;
+      burn_cap;
+    }
+  in
+  (match Contract.is_implicit source with
+  | None ->
+      let contract = source in
+      Managed_contract.get_contract_manager cctxt source >>=? fun source ->
+      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      Managed_contract.transfer
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ?confirmations:cctxt#confirmations
+        ~dry_run
+        ~verbose_signing
+        ~simulation
+        ~fee_parameter
+        ?fee
+        ~contract
+        ~source
+        ~src_pk
+        ~src_sk
+        ~destination
+        ?entrypoint
+        ?arg
+        ~amount
+        ?gas_limit
+        ?storage_limit
+        ?counter
+        ()
+  | Some source ->
+      Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+      transfer
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ?confirmations:cctxt#confirmations
+        ~dry_run
+        ~simulation
+        ~verbose_signing
+        ~fee_parameter
+        ~source
+        ?fee
+        ~src_pk
+        ~src_sk
+        ~destination
+        ?entrypoint
+        ?arg
+        ~amount
+        ?gas_limit
+        ?storage_limit
+        ?counter
+        ~replace_by_fees
+        ())
+  >>= report_michelson_errors
+        ~no_print_source
+        ~msg:"transfer simulation failed"
+        cctxt
+  >>= function
+  | None -> return_unit
+  | Some (_res, _contracts) -> return_unit
+
+let prepare_batch_operation cctxt ?arg ?fee ?gas_limit ?storage_limit
+    ?entrypoint source index batch =
+  Client_proto_contracts.ContractAlias.find_destination cctxt batch.destination
+  >>=? fun (_, destination) ->
+  tez_of_string_exn index "amount" batch.amount >>=? fun amount ->
+  tez_of_opt_string_exn index "fee" batch.fee >>=? fun batch_fee ->
+  let fee = Option.either batch_fee fee in
+  let arg = Option.either batch.arg arg in
+  let gas_limit = Option.either batch.gas_limit gas_limit in
+  let storage_limit = Option.either batch.storage_limit storage_limit in
+  let entrypoint = Option.either batch.entrypoint entrypoint in
+  parse_arg_transfer arg >>=? fun parameters ->
+  (match Contract.is_implicit source with
+  | None ->
+      Managed_contract.build_transaction_operation
+        cctxt
+        ~chain:cctxt#chain
+        ~block:cctxt#block
+        ~contract:source
+        ~destination
+        ?entrypoint
+        ?arg
+        ~amount
+        ?fee
+        ?gas_limit
+        ?storage_limit
+        ()
+  | Some _ ->
+      return
+        (build_transaction_operation
+           ~amount
+           ~parameters
+           ?entrypoint
+           ?fee
+           ?gas_limit
+           ?storage_limit
+           destination))
+  >>=? fun operation ->
+  return (Annotated_manager_operation.Annotated_manager_operation operation)
+
+let commands_network network () =
+  let open Clic in
+  match network with
+  | Some `Testnet | None ->
+      [
+        command
+          ~group
+          ~desc:"Register and activate an Alphanet/Zeronet faucet account."
+          (args2 (Secret_key.force_switch ()) encrypted_switch)
+          (prefixes ["activate"; "account"]
+          @@ Secret_key.fresh_alias_param
+          @@ prefixes ["with"]
+          @@ param
+               ~name:"activation_key"
+               ~desc:
+                 "Activate an Alphanet/Zeronet faucet account from the JSON \
+                  (file or directly inlined)."
+               json_file_or_text_parameter
+          @@ stop)
+          (fun (force, encrypted) name activation_json cctxt ->
+            Secret_key.of_fresh cctxt force name >>=? fun name ->
+            match
+              Data_encoding.Json.destruct
+                Client_proto_context.activation_key_encoding
+                activation_json
+            with
+            | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
+                Format.kasprintf
+                  (fun s -> failwith "%s" s)
+                  "Invalid activation file: %a %a"
+                  (fun ppf -> Data_encoding.Json.print_error ppf)
+                  exn
+                  Data_encoding.Json.pp
+                  activation_json
+            | key ->
+                activate_account
+                  cctxt
+                  ~chain:cctxt#chain
+                  ~block:cctxt#block
+                  ?confirmations:cctxt#confirmations
+                  ~encrypted
+                  ~force
+                  key
+                  name
+                >>=? fun _res -> return_unit);
+      ]
+  | Some `Mainnet ->
+      [
+        command
+          ~group
+          ~desc:"Activate a fundraiser account."
+          (args1 dry_run_switch)
+          (prefixes ["activate"; "fundraiser"; "account"]
+          @@ Public_key_hash.alias_param
+          @@ prefixes ["with"]
+          @@ param
+               ~name:"code"
+               (Clic.parameter (fun _ctx code ->
+                    match
+                      Blinded_public_key_hash.activation_code_of_hex code
+                    with
+                    | Some c -> return c
+                    | None -> failwith "Hexadecimal parsing failure"))
+               ~desc:"Activation code obtained from the Tezos foundation."
+          @@ stop)
+          (fun dry_run (name, _pkh) code cctxt ->
+            activate_existing_account
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              name
+              code
+            >>=? fun _res -> return_unit);
+      ]
+
+let commands_rw () =
+  let open Client_proto_programs in
+  let open Tezos_micheline in
+  let open Clic in
+  [
+    command
       ~group
       ~desc:"Set the delegate of a contract."
       (args10
@@ -802,7 +1072,7 @@ let commands network () =
       ~desc:
         "Execute multiple transfers from a single source account.\n\
          If one of the transfers fails, none of them get executed."
-      (args16
+      (args17
          default_fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -818,7 +1088,8 @@ let commands network () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg
-         default_entrypoint_arg)
+         default_entrypoint_arg
+         replace_by_fees_arg)
       (prefixes ["multiple"; "transfers"; "from"]
       @@ ContractAlias.destination_param
            ~name:"src"
@@ -850,7 +1121,8 @@ let commands network () =
              force_low_fee,
              fee_cap,
              burn_cap,
-             entrypoint )
+             entrypoint,
+             replace_by_fees )
            (_, source)
            operations_json
            cctxt ->
@@ -912,6 +1184,7 @@ let commands network () =
               ?counter
               ~src_pk
               ~src_sk
+              ~replace_by_fees
               ~fee_parameter
               contents
             >>= report_michelson_errors
@@ -948,7 +1221,7 @@ let commands network () =
     command
       ~group
       ~desc:"Transfer tokens / call a smart contract."
-      (args16
+      (args17
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -964,7 +1237,8 @@ let commands network () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg
-         entrypoint_arg)
+         entrypoint_arg
+         replace_by_fees_arg)
       (prefixes ["transfer"]
       @@ tez_param ~name:"qty" ~desc:"amount taken from source"
       @@ prefix "from"
@@ -991,7 +1265,8 @@ let commands network () =
              force_low_fee,
              fee_cap,
              burn_cap,
-             entrypoint )
+             entrypoint,
+             replace_by_fees )
            amount
            (_, source)
            (_, destination)
@@ -1016,7 +1291,8 @@ let commands network () =
             force_low_fee,
             fee_cap,
             burn_cap,
-            entrypoint ));
+            entrypoint,
+            replace_by_fees ));
     command
       ~group
       ~desc:"Register a global constant"
@@ -1101,7 +1377,7 @@ let commands network () =
     command
       ~group
       ~desc:"Call a smart contract (same as 'transfer 0')."
-      (args16
+      (args17
          fee_arg
          dry_run_switch
          verbose_signing_switch
@@ -1117,7 +1393,8 @@ let commands network () =
          force_low_fee_arg
          fee_cap_arg
          burn_cap_arg
-         entrypoint_arg)
+         entrypoint_arg
+         replace_by_fees_arg)
       (prefixes ["call"]
       @@ ContractAlias.destination_param
            ~name:"dst"
@@ -1142,7 +1419,8 @@ let commands network () =
              force_low_fee,
              fee_cap,
              burn_cap,
-             entrypoint )
+             entrypoint,
+             replace_by_fees )
            (_, destination)
            (_, source)
            cctxt ->
@@ -1167,7 +1445,8 @@ let commands network () =
             force_low_fee,
             fee_cap,
             burn_cap,
-            entrypoint ));
+            entrypoint,
+            replace_by_fees ));
     command
       ~group
       ~desc:"Reveal the public key of the contract manager."
@@ -1281,490 +1560,478 @@ let commands network () =
             cctxt#message "Delegate already activated." >>= fun () ->
             return_unit
         | Error el -> Lwt.return_error el);
-  ]
-  @ (match network with
-    | Some `Mainnet -> []
-    | Some `Testnet | None ->
-        [
-          command
-            ~group
-            ~desc:"Register and activate an Alphanet/Zeronet faucet account."
-            (args2 (Secret_key.force_switch ()) encrypted_switch)
-            (prefixes ["activate"; "account"]
-            @@ Secret_key.fresh_alias_param
-            @@ prefixes ["with"]
-            @@ param
-                 ~name:"activation_key"
-                 ~desc:
-                   "Activate an Alphanet/Zeronet faucet account from the JSON \
-                    (file or directly inlined)."
-                 json_file_or_text_parameter
-            @@ stop)
-            (fun (force, encrypted) name activation_json cctxt ->
-              Secret_key.of_fresh cctxt force name >>=? fun name ->
-              match
-                Data_encoding.Json.destruct
-                  Client_proto_context.activation_key_encoding
-                  activation_json
-              with
-              | exception (Data_encoding.Json.Cannot_destruct _ as exn) ->
-                  Format.kasprintf
-                    (fun s -> failwith "%s" s)
-                    "Invalid activation file: %a %a"
-                    (fun ppf -> Data_encoding.Json.print_error ppf)
-                    exn
-                    Data_encoding.Json.pp
-                    activation_json
-              | key ->
-                  activate_account
-                    cctxt
-                    ~chain:cctxt#chain
-                    ~block:cctxt#block
-                    ?confirmations:cctxt#confirmations
-                    ~encrypted
-                    ~force
-                    key
-                    name
-                  >>=? fun _res -> return_unit);
-        ])
-  @ (match network with
-    | Some `Testnet | None -> []
-    | Some `Mainnet ->
-        [
-          command
-            ~group
-            ~desc:"Activate a fundraiser account."
-            (args1 dry_run_switch)
-            (prefixes ["activate"; "fundraiser"; "account"]
-            @@ Public_key_hash.alias_param
-            @@ prefixes ["with"]
-            @@ param
-                 ~name:"code"
-                 (Clic.parameter (fun _ctx code ->
-                      protect (fun () ->
-                          return
-                            (Blinded_public_key_hash.activation_code_of_hex
-                               code))))
-                 ~desc:"Activation code obtained from the Tezos foundation."
-            @@ stop)
-            (fun dry_run (name, _pkh) code cctxt ->
-              activate_existing_account
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ?confirmations:cctxt#confirmations
-                ~dry_run
-                name
-                code
-              >>=? fun _res -> return_unit);
-        ])
-  @ [
-      command
-        ~desc:"Wait until an operation is included in a block"
-        (args3
-           (default_arg
-              ~long:"confirmations"
-              ~placeholder:"num_blocks"
-              ~doc:
-                "wait until 'N' additional blocks after the operation appears \
-                 in the considered chain"
-              ~default:"0"
-              non_negative_param)
-           (default_arg
-              ~long:"check-previous"
-              ~placeholder:"num_blocks"
-              ~doc:"number of previous blocks to check"
-              ~default:"10"
-              non_negative_param)
-           (arg
-              ~long:"branch"
-              ~placeholder:"block_hash"
-              ~doc:
-                "hash of the oldest block where we should look for the \
-                 operation"
-              block_hash_param))
-        (prefixes ["wait"; "for"]
-        @@ param
-             ~name:"operation"
-             ~desc:"Operation to be included"
-             (parameter (fun _ x ->
-                  match Operation_hash.of_b58check_opt x with
-                  | None ->
-                      Error_monad.failwith "Invalid operation hash: '%s'" x
-                  | Some hash -> return hash))
-        @@ prefixes ["to"; "be"; "included"]
-        @@ stop)
-        (fun (confirmations, predecessors, branch)
-             operation_hash
-             (ctxt : Protocol_client_context.full) ->
-          Client_confirmations.wait_for_operation_inclusion
-            ctxt
-            ~chain:ctxt#chain
-            ~confirmations
-            ~predecessors
-            ?branch
-            operation_hash
-          >>=? fun _ -> return_unit);
-      command
-        ~desc:"Get receipt for past operation"
-        (args1
-           (default_arg
-              ~long:"check-previous"
-              ~placeholder:"num_blocks"
-              ~doc:"number of previous blocks to check"
-              ~default:"10"
-              non_negative_param))
-        (prefixes ["get"; "receipt"; "for"]
-        @@ param
-             ~name:"operation"
-             ~desc:"Operation to be looked up"
-             (parameter (fun _ x ->
-                  match Operation_hash.of_b58check_opt x with
-                  | None ->
-                      Error_monad.failwith "Invalid operation hash: '%s'" x
-                  | Some hash -> return hash))
-        @@ stop)
-        (fun predecessors operation_hash (ctxt : Protocol_client_context.full) ->
-          display_receipt_for_operation
-            ctxt
-            ~chain:ctxt#chain
-            ~predecessors
-            operation_hash
-          >>=? fun _ -> return_unit);
-      command
-        ~group:binary_description
-        ~desc:"Describe unsigned block header"
-        no_options
-        (fixed ["describe"; "unsigned"; "block"; "header"])
-        (fun () (cctxt : Protocol_client_context.full) ->
-          cctxt#message
-            "%a"
-            Data_encoding.Binary_schema.pp
-            (Data_encoding.Binary.describe
-               Alpha_context.Block_header.unsigned_encoding)
-          >>= fun () -> return_unit);
-      command
-        ~group:binary_description
-        ~desc:"Describe unsigned operation"
-        no_options
-        (fixed ["describe"; "unsigned"; "operation"])
-        (fun () (cctxt : Protocol_client_context.full) ->
-          cctxt#message
-            "%a"
-            Data_encoding.Binary_schema.pp
-            (Data_encoding.Binary.describe
-               Alpha_context.Operation.unsigned_encoding)
-          >>= fun () -> return_unit);
-      command
-        ~group
-        ~desc:"Submit protocol proposals"
-        (args3
-           dry_run_switch
-           verbose_signing_switch
-           (switch
-              ~doc:
-                "Do not fail when the checks that try to prevent the user from \
-                 shooting themselves in the foot do."
-              ~long:"force"
-              ()))
-        (prefixes ["submit"; "proposals"; "for"]
-        @@ ContractAlias.destination_param
-             ~name:"delegate"
-             ~desc:"the delegate who makes the proposal"
-        @@ seq_of_param
-             (param
-                ~name:"proposal"
-                ~desc:"the protocol hash proposal to be submitted"
-                (parameter (fun _ x ->
-                     match Protocol_hash.of_b58check_opt x with
-                     | None ->
-                         Error_monad.failwith "Invalid proposal hash: '%s'" x
-                     | Some hash -> return hash))))
-        (fun (dry_run, verbose_signing, force)
-             (_name, source)
-             proposals
-             (cctxt : Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None -> failwith "only implicit accounts can submit proposals"
-          | Some src_pkh -> (
-              Client_keys.get_key cctxt src_pkh
-              >>=? fun (src_name, _src_pk, src_sk) ->
-              get_period_info
-              (* Find period info of the successor, because the operation will
-                 be injected on the next block at the earliest *)
-                ~successor:true
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                cctxt
-              >>=? fun info ->
-              (match info.current_period_kind with
-              | Proposal -> return_unit
-              | _ -> cctxt#error "Not in a proposal period")
-              >>=? fun () ->
-              Shell_services.Protocol.list cctxt >>=? fun known_protos ->
-              get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
-              >>=? fun known_proposals ->
-              Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
-              >>=? fun listings ->
-              (* for a proposal to be valid it must either a protocol that was already
-                 proposed by somebody else or a protocol known by the node, because
-                 the user is the first proposer and just injected it with
-                 tezos-admin-client *)
-              let check_proposals proposals : bool tzresult Lwt.t =
-                let n = List.length proposals in
-                let errors = ref [] in
-                let error ppf =
-                  Format.kasprintf (fun s -> errors := s :: !errors) ppf
-                in
-                if n = 0 then error "Empty proposal list." ;
-                if n > Constants.fixed.max_proposals_per_delegate then
-                  error
-                    "Too many proposals: %d > %d."
-                    n
-                    Constants.fixed.max_proposals_per_delegate ;
-                (match
-                   Base.List.find_all_dups
-                     ~compare:Protocol_hash.compare
-                     proposals
-                 with
-                | [] -> ()
-                | dups ->
-                    error
-                      "There %s: %a."
-                      (if List.length dups = 1 then "is a duplicate proposal"
-                      else "are duplicate proposals")
-                      Format.(
-                        pp_print_list
-                          ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
-                          Protocol_hash.pp)
-                      dups) ;
-                List.iter
-                  (fun (p : Protocol_hash.t) ->
-                    if
-                      List.mem ~equal:Protocol_hash.equal p known_protos
-                      || Environment.Protocol_hash.Map.mem p known_proposals
-                    then ()
-                    else
-                      error
-                        "Protocol %a is not a known proposal."
-                        Protocol_hash.pp
-                        p)
-                  proposals ;
-                if
-                  not
-                    (List.exists
-                       (fun (pkh, _) ->
-                         Signature.Public_key_hash.equal pkh src_pkh)
-                       listings)
-                then
-                  error
-                    "Public-key-hash `%a` from account `%s` does not appear to \
-                     have voting rights."
-                    Signature.Public_key_hash.pp
-                    src_pkh
-                    src_name ;
-                if !errors <> [] then
-                  cctxt#message
-                    "There %s with the submission:%t"
-                    (if List.length !errors = 1 then "is an issue"
-                    else "are issues")
-                    Format.(
-                      fun ppf ->
-                        pp_print_cut ppf () ;
-                        pp_open_vbox ppf 0 ;
-                        List.iter
-                          (fun msg ->
-                            pp_open_hovbox ppf 2 ;
-                            pp_print_string ppf "* " ;
-                            pp_print_text ppf msg ;
-                            pp_close_box ppf () ;
-                            pp_print_cut ppf ())
-                          !errors ;
-                        pp_close_box ppf ())
-                  >>= fun () -> return_false
-                else return_true
+    command
+      ~desc:"Wait until an operation is included in a block"
+      (args3
+         (default_arg
+            ~long:"confirmations"
+            ~placeholder:"num_blocks"
+            ~doc:
+              "wait until 'N' additional blocks after the operation appears in \
+               the considered chain"
+            ~default:"0"
+            non_negative_param)
+         (default_arg
+            ~long:"check-previous"
+            ~placeholder:"num_blocks"
+            ~doc:"number of previous blocks to check"
+            ~default:"10"
+            non_negative_param)
+         (arg
+            ~long:"branch"
+            ~placeholder:"block_hash"
+            ~doc:
+              "hash of the oldest block where we should look for the operation"
+            block_hash_param))
+      (prefixes ["wait"; "for"]
+      @@ param
+           ~name:"operation"
+           ~desc:"Operation to be included"
+           (parameter (fun _ x ->
+                match Operation_hash.of_b58check_opt x with
+                | None -> Error_monad.failwith "Invalid operation hash: '%s'" x
+                | Some hash -> return hash))
+      @@ prefixes ["to"; "be"; "included"]
+      @@ stop)
+      (fun (confirmations, predecessors, branch)
+           operation_hash
+           (ctxt : Protocol_client_context.full) ->
+        Client_confirmations.wait_for_operation_inclusion
+          ctxt
+          ~chain:ctxt#chain
+          ~confirmations
+          ~predecessors
+          ?branch
+          operation_hash
+        >>=? fun _ -> return_unit);
+    command
+      ~group
+      ~desc:"Submit protocol proposals"
+      (args3
+         dry_run_switch
+         verbose_signing_switch
+         (switch
+            ~doc:
+              "Do not fail when the checks that try to prevent the user from \
+               shooting themselves in the foot do."
+            ~long:"force"
+            ()))
+      (prefixes ["submit"; "proposals"; "for"]
+      @@ ContractAlias.destination_param
+           ~name:"delegate"
+           ~desc:"the delegate who makes the proposal"
+      @@ seq_of_param
+           (param
+              ~name:"proposal"
+              ~desc:"the protocol hash proposal to be submitted"
+              (parameter (fun _ x ->
+                   match Protocol_hash.of_b58check_opt x with
+                   | None ->
+                       Error_monad.failwith "Invalid proposal hash: '%s'" x
+                   | Some hash -> return hash))))
+      (fun (dry_run, verbose_signing, force)
+           (_name, source)
+           proposals
+           (cctxt : Protocol_client_context.full) ->
+        match Contract.is_implicit source with
+        | None -> failwith "only implicit accounts can submit proposals"
+        | Some src_pkh -> (
+            Client_keys.get_key cctxt src_pkh
+            >>=? fun (src_name, _src_pk, src_sk) ->
+            get_period_info
+            (* Find period info of the successor, because the operation will
+               be injected on the next block at the earliest *)
+              ~successor:true
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              cctxt
+            >>=? fun info ->
+            (match info.current_period_kind with
+            | Proposal -> return_unit
+            | _ -> cctxt#error "Not in a proposal period")
+            >>=? fun () ->
+            Shell_services.Protocol.list cctxt >>=? fun known_protos ->
+            get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
+            >>=? fun known_proposals ->
+            Alpha_services.Voting.listings cctxt (cctxt#chain, cctxt#block)
+            >>=? fun listings ->
+            (* for a proposal to be valid it must either a protocol that was already
+               proposed by somebody else or a protocol known by the node, because
+               the user is the first proposer and just injected it with
+               tezos-admin-client *)
+            let check_proposals proposals : bool tzresult Lwt.t =
+              let errors = ref [] in
+              let error ppf =
+                Format.kasprintf (fun s -> errors := s :: !errors) ppf
               in
-              check_proposals proposals >>=? fun all_valid ->
-              (if all_valid then cctxt#message "All proposals are valid."
-              else if force then
+              if proposals = [] then error "Empty proposal list." ;
+              if
+                Compare.List_length_with.(
+                  proposals > Constants.max_proposals_per_delegate)
+              then
+                error
+                  "Too many proposals: %d > %d."
+                  (List.length proposals)
+                  Constants.max_proposals_per_delegate ;
+              (match
+                 Base.List.find_all_dups
+                   ~compare:Protocol_hash.compare
+                   proposals
+               with
+              | [] -> ()
+              | dups ->
+                  error
+                    "There %s: %a."
+                    (if Compare.List_length_with.(dups = 1) then
+                     "is a duplicate proposal"
+                    else "are duplicate proposals")
+                    Format.(
+                      pp_print_list
+                        ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+                        Protocol_hash.pp)
+                    dups) ;
+              List.iter
+                (fun (p : Protocol_hash.t) ->
+                  if
+                    List.mem ~equal:Protocol_hash.equal p known_protos
+                    || Environment.Protocol_hash.Map.mem p known_proposals
+                  then ()
+                  else
+                    error
+                      "Protocol %a is not a known proposal."
+                      Protocol_hash.pp
+                      p)
+                proposals ;
+              if
+                not
+                  (List.exists
+                     (fun (pkh, _) ->
+                       Signature.Public_key_hash.equal pkh src_pkh)
+                     listings)
+              then
+                error
+                  "Public-key-hash `%a` from account `%s` does not appear to \
+                   have voting rights."
+                  Signature.Public_key_hash.pp
+                  src_pkh
+                  src_name ;
+              if !errors <> [] then
                 cctxt#message
-                  "Some proposals are not valid, but `--force` was used."
-              else cctxt#error "Submission failed because of invalid proposals.")
-              >>= fun () ->
-              submit_proposals
-                ~dry_run
-                ~verbose_signing
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ~src_sk
-                src_pkh
-                proposals
-              >>= function
-              | Ok _res -> return_unit
-              | Error errs ->
-                  (match errs with
-                  | [
-                   Unregistered_error
-                     (`O [("kind", `String "generic"); ("error", `String msg)]);
-                  ] ->
-                      cctxt#message
-                        "Error:@[<hov>@.%a@]"
-                        Format.pp_print_text
-                        (String.split_on_char ' ' msg
-                        |> List.filter (function
-                               | "" | "\n" -> false
-                               | _ -> true)
-                        |> String.concat " "
-                        |> String.map (function '\n' | '\t' -> ' ' | c -> c))
-                  | el -> cctxt#message "Error:@ %a" pp_print_trace el)
-                  >>= fun () -> failwith "Failed to submit proposals"));
-      command
-        ~group
-        ~desc:"Submit a ballot"
-        (args2 verbose_signing_switch dry_run_switch)
-        (prefixes ["submit"; "ballot"; "for"]
-        @@ ContractAlias.destination_param
-             ~name:"delegate"
-             ~desc:"the delegate who votes"
-        @@ param
-             ~name:"proposal"
-             ~desc:"the protocol hash proposal to vote for"
-             (parameter (fun _ x ->
-                  match Protocol_hash.of_b58check_opt x with
-                  | None -> failwith "Invalid proposal hash: '%s'" x
-                  | Some hash -> return hash))
-        @@ param
-             ~name:"ballot"
-             ~desc:"the ballot value (yea/yay, nay, or pass)"
-             (parameter
-                ~autocomplete:(fun _ -> return ["yea"; "nay"; "pass"])
-                (fun _ s ->
-                  (* We should have [Vote.of_string]. *)
-                  match String.lowercase_ascii s with
-                  | "yay" | "yea" -> return Vote.Yay
-                  | "nay" -> return Vote.Nay
-                  | "pass" -> return Vote.Pass
-                  | s -> failwith "Invalid ballot: '%s'" s))
-        @@ stop)
-        (fun (verbose_signing, dry_run)
-             (_name, source)
-             proposal
-             ballot
-             (cctxt : Protocol_client_context.full) ->
-          match Contract.is_implicit source with
-          | None -> failwith "only implicit accounts can submit ballot"
-          | Some src_pkh ->
-              Client_keys.get_key cctxt src_pkh
-              >>=? fun (_src_name, _src_pk, src_sk) ->
-              get_period_info
-              (* Find period info of the successor, because the operation will
-                 be injected on the next block at the earliest *)
-                ~successor:true
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                cctxt
-              >>=? fun info ->
-              (match info.current_period_kind with
-              | Exploration | Promotion -> return_unit
-              | _ -> cctxt#error "Not in Exploration or Promotion period")
-              >>=? fun () ->
-              submit_ballot
-                cctxt
-                ~chain:cctxt#chain
-                ~block:cctxt#block
-                ~src_sk
-                src_pkh
-                ~verbose_signing
-                ~dry_run
-                proposal
-                ballot
-              >>=? fun _res -> return_unit);
-      command
-        ~group
-        ~desc:"Summarize the current voting period"
-        no_options
-        (fixed ["show"; "voting"; "period"])
-        (fun () (cctxt : Protocol_client_context.full) ->
-          get_period_info ~chain:cctxt#chain ~block:cctxt#block cctxt
-          >>=? fun info ->
-          cctxt#message
-            "Current period: %a\nBlocks remaining until end of period: %ld"
-            Data_encoding.Json.pp
-            (Data_encoding.Json.construct
-               Alpha_context.Voting_period.kind_encoding
-               info.current_period_kind)
-            info.remaining
-          >>= fun () ->
-          Shell_services.Protocol.list cctxt >>=? fun known_protos ->
-          get_proposals ~chain:cctxt#chain ~block:cctxt#block cctxt
-          >>=? fun props ->
-          let ranks =
-            Environment.Protocol_hash.Map.bindings props
-            |> List.sort (fun (_, v1) (_, v2) -> Int32.(compare v2 v1))
-          in
-          let print_proposal = function
-            | None ->
-                cctxt#message "The current proposal has already been cleared."
-            (* The proposal is cleared on the last block of adoption period, and
-               also on the last block of the exploration and promotion
-               periods when the proposal is not approved *)
-            | Some proposal ->
-                cctxt#message "Current proposal: %a" Protocol_hash.pp proposal
-          in
-          match info.current_period_kind with
-          | Proposal ->
-              (* the current proposals are cleared on the last block of the
-                 proposal period *)
-              if info.remaining <> 0l then
-                cctxt#answer
-                  "Current proposals:%t"
+                  "There %s with the submission:%t"
+                  (if Compare.List_length_with.(!errors = 1) then "is an issue"
+                  else "are issues")
                   Format.(
                     fun ppf ->
                       pp_print_cut ppf () ;
                       pp_open_vbox ppf 0 ;
                       List.iter
-                        (fun (p, w) ->
-                          fprintf
-                            ppf
-                            "* %a %ld (%sknown by the node)@."
-                            Protocol_hash.pp
-                            p
-                            w
-                            (if
-                             List.mem ~equal:Protocol_hash.equal p known_protos
-                            then ""
-                            else "not "))
-                        ranks ;
+                        (fun msg ->
+                          pp_open_hovbox ppf 2 ;
+                          pp_print_string ppf "* " ;
+                          pp_print_text ppf msg ;
+                          pp_close_box ppf () ;
+                          pp_print_cut ppf ())
+                        !errors ;
                       pp_close_box ppf ())
-                >>= fun () -> return_unit
-              else
-                cctxt#message "The proposals have already been cleared."
-                >>= fun () -> return_unit
-          | Exploration | Promotion ->
-              print_proposal info.current_proposal >>= fun () ->
-              (* the ballots are cleared on the last block of these periods *)
-              if info.remaining <> 0l then
-                get_ballots_info ~chain:cctxt#chain ~block:cctxt#block cctxt
-                >>=? fun ballots_info ->
-                cctxt#answer
-                  "Ballots: %a@,\
-                   Current participation %.2f%%, necessary quorum %.2f%%@,\
-                   Current in favor %ld, needed supermajority %ld"
-                  Data_encoding.Json.pp
-                  (Data_encoding.Json.construct
-                     Vote.ballots_encoding
-                     ballots_info.ballots)
-                  (Int32.to_float ballots_info.participation /. 100.)
-                  (Int32.to_float ballots_info.current_quorum /. 100.)
-                  ballots_info.ballots.yay
-                  ballots_info.supermajority
-                >>= fun () -> return_unit
-              else
-                cctxt#message "The ballots have already been cleared."
-                >>= fun () -> return_unit
-          | Cooldown ->
-              print_proposal info.current_proposal >>= fun () -> return_unit
-          | Adoption ->
-              print_proposal info.current_proposal >>= fun () -> return_unit);
-    ]
+                >>= fun () -> return_false
+              else return_true
+            in
+            check_proposals proposals >>=? fun all_valid ->
+            (if all_valid then cctxt#message "All proposals are valid."
+            else if force then
+              cctxt#message
+                "Some proposals are not valid, but `--force` was used."
+            else cctxt#error "Submission failed because of invalid proposals.")
+            >>= fun () ->
+            submit_proposals
+              ~dry_run
+              ~verbose_signing
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~src_sk
+              src_pkh
+              proposals
+            >>= function
+            | Ok _res -> return_unit
+            | Error errs ->
+                (match errs with
+                | [
+                 Unregistered_error
+                   (`O [("kind", `String "generic"); ("error", `String msg)]);
+                ] ->
+                    cctxt#message
+                      "Error:@[<hov>@.%a@]"
+                      Format.pp_print_text
+                      (String.split_on_char ' ' msg
+                      |> List.filter (function "" | "\n" -> false | _ -> true)
+                      |> String.concat " "
+                      |> String.map (function '\n' | '\t' -> ' ' | c -> c))
+                | el -> cctxt#message "Error:@ %a" pp_print_trace el)
+                >>= fun () -> failwith "Failed to submit proposals"));
+    command
+      ~group
+      ~desc:"Submit a ballot"
+      (args2 verbose_signing_switch dry_run_switch)
+      (prefixes ["submit"; "ballot"; "for"]
+      @@ ContractAlias.destination_param
+           ~name:"delegate"
+           ~desc:"the delegate who votes"
+      @@ param
+           ~name:"proposal"
+           ~desc:"the protocol hash proposal to vote for"
+           (parameter (fun _ x ->
+                match Protocol_hash.of_b58check_opt x with
+                | None -> failwith "Invalid proposal hash: '%s'" x
+                | Some hash -> return hash))
+      @@ param
+           ~name:"ballot"
+           ~desc:"the ballot value (yea/yay, nay, or pass)"
+           (parameter
+              ~autocomplete:(fun _ -> return ["yea"; "nay"; "pass"])
+              (fun _ s ->
+                (* We should have [Vote.of_string]. *)
+                match String.lowercase_ascii s with
+                | "yay" | "yea" -> return Vote.Yay
+                | "nay" -> return Vote.Nay
+                | "pass" -> return Vote.Pass
+                | s -> failwith "Invalid ballot: '%s'" s))
+      @@ stop)
+      (fun (verbose_signing, dry_run)
+           (_name, source)
+           proposal
+           ballot
+           (cctxt : Protocol_client_context.full) ->
+        match Contract.is_implicit source with
+        | None -> failwith "only implicit accounts can submit ballot"
+        | Some src_pkh ->
+            Client_keys.get_key cctxt src_pkh
+            >>=? fun (_src_name, _src_pk, src_sk) ->
+            get_period_info
+            (* Find period info of the successor, because the operation will
+               be injected on the next block at the earliest *)
+              ~successor:true
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              cctxt
+            >>=? fun info ->
+            (match info.current_period_kind with
+            | Exploration | Promotion -> return_unit
+            | _ -> cctxt#error "Not in Exploration or Promotion period")
+            >>=? fun () ->
+            submit_ballot
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ~src_sk
+              src_pkh
+              ~verbose_signing
+              ~dry_run
+              proposal
+              ballot
+            >>=? fun _res -> return_unit);
+    command
+      ~group
+      ~desc:"Set the deposits limit of a registered delegate."
+      (args10
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["set"; "deposits"; "limit"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ prefix "to"
+      @@ tez_param
+           ~name:"deposits limit"
+           ~desc:"the maximum amount of frozen deposits"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           (_, contract)
+           limit
+           (cctxt : Protocol_client_context.full) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        match Contract.is_implicit contract with
+        | None ->
+            cctxt#error
+              "Cannot change deposits limit on contract %a. This operation is \
+               invalid on originated contracts or unregistered delegate \
+               contracts."
+              Contract.pp
+              contract
+        | Some mgr ->
+            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            set_deposits_limit
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~simulation
+              ~fee_parameter
+              ?fee
+              mgr
+              ~src_pk
+              ~manager_sk
+              (Some limit)
+            >>=? fun _ -> return_unit);
+    command
+      ~group
+      ~desc:"Remove the deposits limit of a registered delegate."
+      (args10
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["unset"; "deposits"; "limit"; "for"]
+      @@ ContractAlias.destination_param ~name:"src" ~desc:"source contract"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           (_, contract)
+           (cctxt : Protocol_client_context.full) ->
+        let fee_parameter =
+          {
+            Injection.minimal_fees;
+            minimal_nanotez_per_byte;
+            minimal_nanotez_per_gas_unit;
+            force_low_fee;
+            fee_cap;
+            burn_cap;
+          }
+        in
+        match Contract.is_implicit contract with
+        | None ->
+            cctxt#error
+              "Cannot change deposits limit on contract %a. This operation is \
+               invalid on originated contracts or unregistered delegate \
+               contracts."
+              Contract.pp
+              contract
+        | Some mgr ->
+            Client_keys.get_key cctxt mgr >>=? fun (_, src_pk, manager_sk) ->
+            set_deposits_limit
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?confirmations:cctxt#confirmations
+              ~dry_run
+              ~verbose_signing
+              ~simulation
+              ~fee_parameter
+              ?fee
+              mgr
+              ~src_pk
+              ~manager_sk
+              None
+            >>=? fun _ -> return_unit);
+    command
+      ~group
+      ~desc:"Launch a new optimistic transaction rollup."
+      (args12
+         fee_arg
+         dry_run_switch
+         verbose_signing_switch
+         simulate_switch
+         minimal_fees_arg
+         minimal_nanotez_per_byte_arg
+         minimal_nanotez_per_gas_unit_arg
+         storage_limit_arg
+         counter_arg
+         force_low_fee_arg
+         fee_cap_arg
+         burn_cap_arg)
+      (prefixes ["originate"; "tx"; "rollup"]
+      @@ prefix "from"
+      @@ ContractAlias.destination_param
+           ~name:"src"
+           ~desc:"name of the account originating the transaction rollup"
+      @@ stop)
+      (fun ( fee,
+             dry_run,
+             verbose_signing,
+             simulation,
+             minimal_fees,
+             minimal_nanotez_per_byte,
+             minimal_nanotez_per_gas_unit,
+             storage_limit,
+             counter,
+             force_low_fee,
+             fee_cap,
+             burn_cap )
+           (_, source)
+           cctxt ->
+        match Contract.is_implicit source with
+        | None ->
+            failwith "Only implicit accounts can originate transaction rollups"
+        | Some source ->
+            Client_keys.get_key cctxt source >>=? fun (_, src_pk, src_sk) ->
+            let fee_parameter =
+              {
+                Injection.minimal_fees;
+                minimal_nanotez_per_byte;
+                minimal_nanotez_per_gas_unit;
+                force_low_fee;
+                fee_cap;
+                burn_cap;
+              }
+            in
+            originate_tx_rollup
+              cctxt
+              ~chain:cctxt#chain
+              ~block:cctxt#block
+              ?dry_run:(Some dry_run)
+              ?verbose_signing:(Some verbose_signing)
+              ?fee
+              ?storage_limit
+              ?counter
+              ?confirmations:cctxt#confirmations
+              ~simulation
+              ~source
+              ~src_pk
+              ~src_sk
+              ~fee_parameter
+              ()
+            >>=? fun _res -> return_unit);
+  ]
+
+let commands network () =
+  commands_rw () @ commands_network network () @ commands_ro ()

@@ -2,6 +2,11 @@
  (name tezos_stdlib)
  (public_name tezos-stdlib)
  (instrumentation (backend bisect_ppx))
- (libraries hex zarith lwt)
+ (libraries
+  hex
+  zarith
+  zarith_stubs_js
+  lwt)
  (inline_tests)
- (preprocess (pps ppx_inline_test)))
+ (preprocess (pps ppx_inline_test))
+ (js_of_ocaml))

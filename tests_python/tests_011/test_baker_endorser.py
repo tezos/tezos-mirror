@@ -42,8 +42,8 @@ class TestAllDaemonsWithOperations:
         for i in range(NUM_NODES):
             sandbox.add_node(i, params=constants.NODE_PARAMS)
         protocol.activate(sandbox.client(0), parameters)
-        sandbox.add_baker(0, 'bootstrap5', proto=protocol.DAEMON)
-        sandbox.add_baker(1, 'bootstrap4', proto=protocol.DAEMON)
+        sandbox.add_baker(0, ['bootstrap5'], proto=protocol.DAEMON)
+        sandbox.add_baker(1, ['bootstrap4'], proto=protocol.DAEMON)
         sandbox.add_endorser(
             0, account='bootstrap1', endorsement_delay=1, proto=protocol.DAEMON
         )

@@ -25,6 +25,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+module Shell_error_monad = Error_monad
+
+type shell_error = error = ..
+
 open Environment_context
 open Environment_protocol_T
 
@@ -72,6 +76,7 @@ module type V4 = sig
        and type Pvss_secp256k1.Clear_share.t = Pvss_secp256k1.Clear_share.t
        and type Pvss_secp256k1.Public_key.t = Pvss_secp256k1.Public_key.t
        and type Pvss_secp256k1.Secret_key.t = Pvss_secp256k1.Secret_key.t
+       and type Micheline.canonical_location = Micheline.canonical_location
        and type 'a Micheline.canonical = 'a Micheline.canonical
        and type Z.t = Z.t
        and type ('a, 'b) Micheline.node = ('a, 'b) Micheline.node
@@ -138,6 +143,12 @@ struct
         Stdlib.exit 1
 
   include Stdlib
+
+  (* The modules provided in the [_struct.V4.M] pack are meant specifically to
+     shadow modules from [Stdlib]/[Base]/etc. with backwards compatible
+     versions. Thus we open the module, hiding the incompatible, newer modules.
+  *)
+  open Tezos_protocol_environment_structs.V4.M
   module Pervasives = Stdlib
 
   module Logging = struct
@@ -610,12 +621,38 @@ struct
   end
 
   module Error_core = struct
-    include Tezos_error_monad.Core_maker.Make (struct
-      let id = Format.asprintf "proto.%s." Param.name
-    end)
+    include
+      Tezos_error_monad.Core_maker.Make
+        (struct
+          let id = Format.asprintf "proto.%s." Param.name
+        end)
+        (struct
+          type t =
+            [ `Branch  (** Errors that may not happen in another context *)
+            | `Temporary  (** Errors that may not happen in a later context *)
+            | `Permanent  (** Errors that will happen no matter the context *)
+            | `Outdated  (** Errors that happen when the context is too old *)
+            ]
+
+          let default_category = `Temporary
+
+          let string_of_category = function
+            | `Permanent -> "permanent"
+            | `Outdated -> "outdated"
+            | `Branch -> "branch"
+            | `Temporary -> "temporary"
+
+          let classify = function
+            | `Permanent -> Tezos_error_monad.Error_classification.Permanent
+            | `Branch -> Branch
+            | `Temporary -> Temporary
+            | `Outdated -> Outdated
+        end)
   end
 
-  type error += Ecoproto_error of Error_core.error
+  type error_category = Error_core.error_category
+
+  type shell_error += Ecoproto_error of Error_core.error
 
   module Wrapped_error_monad = struct
     type unwrapped = Error_core.error = ..
@@ -623,7 +660,10 @@ struct
     include (
       Error_core :
         sig
-          include Tezos_error_monad.Sig.CORE with type error := unwrapped
+          include
+            Tezos_error_monad.Sig.CORE
+              with type error := unwrapped
+               and type error_category = error_category
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -636,8 +676,6 @@ struct
 
     type 'a shell_tzresult = ('a, Error_monad.tztrace) result
 
-    type error_category = [`Branch | `Temporary | `Permanent]
-
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
@@ -645,9 +683,6 @@ struct
         (Tezos_error_monad.TzLwtreslib.Monad)
 
     (* Backwards compatibility additions (dont_wait, trace helpers) *)
-    include
-      Tezos_protocol_environment_structs.V4.M.Error_monad_preallocated_values
-
     let dont_wait ex er f = dont_wait f er ex
 
     let trace_of_error e = TzTrace.make e
@@ -688,11 +723,17 @@ struct
     let catch_s ?catch_only f =
       Result.catch_s ?catch_only f
       >|= Result.map_error (fun e -> error_of_exn e)
+
+    let both_e = Tzresult_syntax.both
+
+    let join_e = Tzresult_syntax.join
+
+    let all_e = Tzresult_syntax.all
   end
 
   let () =
     let id = Format.asprintf "proto.%s.wrapper" Param.name in
-    register_wrapped_error_kind
+    Shell_error_monad.register_wrapped_error_kind
       (module Wrapped_error_monad)
       ~id
       ~title:("Error returned by protocol " ^ Param.name)
@@ -968,11 +1009,14 @@ struct
     include Micheline
     include Micheline_encoding
 
-    let canonical_encoding_v1 ~variant encoding =
-      canonical_encoding_v2 ~variant:(Param.name ^ "." ^ variant) encoding
-
+    (* The environment exposes a single canonical encoding for Micheline
+       expression. For env-V4, it is encoding-v2 because this is the most
+       recent, most correct-at-time-of-writing encoding. For backwards
+       compatibility reason, you should never upgrade (nor downgrade) this.
+       Future fixes and improvements of the encoding should be made available in
+       future environments only. *)
     let canonical_encoding ~variant encoding =
-      canonical_encoding_v0 ~variant:(Param.name ^ "." ^ variant) encoding
+      canonical_encoding_v2 ~variant:(Param.name ^ "." ^ variant) encoding
   end
 
   module Updater = struct
@@ -995,7 +1039,7 @@ struct
     let activate = Context.set_protocol
 
     module type PROTOCOL =
-      Environment_protocol_T_V4.T
+      Environment_protocol_T_V3.T
         with type context := Context.t
          and type cache_value := Environment_context.Context.cache_value
          and type cache_key := Environment_context.Context.cache_key
@@ -1073,7 +1117,7 @@ struct
         ~predecessor
         ~timestamp
       >>=? fun value_of_key ->
-      Context.load_cache predecessor_context cache value_of_key
+      Context.load_cache predecessor predecessor_context cache value_of_key
 
     let begin_partial_application ~chain_id ~ancestor_context
         ~(predecessor : Block_header.t) ~predecessor_hash ~cache

@@ -23,7 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** In all RPCs, default [chain] is "main" and default [block] is "head". *)
+(** In all RPCs, default [chain] is "main" and default [block] is
+   "head~2" to pick the finalized branch for Tenderbake. *)
 
 (** {2 Shell RPCs} *)
 
@@ -49,6 +50,15 @@ val get_chain_id :
 
 (** Call RPC /chain/[chain]/blocks/[block] *)
 val get_block :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?block:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chain/[chain]/blocks/[block]/hash *)
+val get_block_hash :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
@@ -94,9 +104,37 @@ val get_checkpoint :
 val inject_operation :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
+  ?async:bool ->
   data:JSON.u ->
   Client.t ->
   JSON.t Lwt.t
+
+(** Same as {!inject_operation}, but do not wait for the process to exit. *)
+val spawn_inject_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?async:bool ->
+  data:JSON.u ->
+  Client.t ->
+  Process.t
+
+(** Call RPC /private/injection/operation *)
+val private_inject_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?async:bool ->
+  data:JSON.u ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Same as {!private_inject_operation}, but do not wait for the process to exit. *)
+val spawn_private_inject_operation :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?async:bool ->
+  data:JSON.u ->
+  Client.t ->
+  Process.t
 
 (** Call RPC /injection/block *)
 val inject_block :
@@ -125,8 +163,9 @@ val get_protocol_data :
   Client.t ->
   JSON.t Lwt.t
 
-(** Call RPC /chain/[chain]/blocks/head/hash *)
+(** Call RPC /chain/[chain]/blocks/head~[offset]/hash where default [offset] is [2]. *)
 val get_branch :
+  ?offset:int ->
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
@@ -147,6 +186,23 @@ val get_mempool_pending_operations :
   ?endpoint:Client.endpoint ->
   ?hooks:Process.hooks ->
   ?chain:string ->
+  ?version:string ->
+  Client.t ->
+  JSON.t Lwt.t
+
+(** Call RPC /chains/[chain]/mempool/pending_operations *)
+val get_mempool :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  Client.t ->
+  Mempool.t Lwt.t
+
+(** Call RPC /chains/[chain]/mempool/request_operations *)
+val mempool_request_operations :
+  ?endpoint:Client.endpoint ->
+  ?chain:string ->
+  ?peer:string ->
   Client.t ->
   JSON.t Lwt.t
 
@@ -169,6 +225,15 @@ val mempool_unban_operation :
 (** Call RPC /chains/[chain]/mempool/unban_all_operations *)
 val mempool_unban_all_operations :
   ?endpoint:Client.endpoint -> ?chain:string -> Client.t -> JSON.t Lwt.t
+
+(** Call RPC GET /chains/[chain]/mempool/filter *)
+val get_mempool_filter :
+  ?endpoint:Client.endpoint ->
+  ?hooks:Process.hooks ->
+  ?chain:string ->
+  ?include_default:bool ->
+  Client.t ->
+  JSON.t Lwt.t
 
 (** Call RPC POST /chains/[chain]/mempool/filter *)
 val post_mempool_filter :
@@ -601,6 +666,46 @@ module Delegates : sig
     Client.t ->
     Process.t
 
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/full_balance *)
+  val get_full_balance :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_full_balance], but do not wait for the process to exit. *)
+  val spawn_get_full_balance :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/frozen_deposits *)
+  val get_frozen_deposits :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    JSON.t Lwt.t
+
+  (** Same as [get_frozen_deposits], but do not wait for the process to exit. *)
+  val spawn_get_frozen_deposits :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    pkh:string ->
+    Client.t ->
+    Process.t
+
   (** Call RPC /chain/[chain]/blocks/[block]/context/delegates/[pkh]/deactivated *)
   val get_deactivated :
     ?endpoint:Client.endpoint ->
@@ -843,6 +948,18 @@ module Votes : sig
     ?hooks:Process.hooks ->
     ?chain:string ->
     ?block:string ->
+    Client.t ->
+    JSON.t Lwt.t
+end
+
+module Tx_rollup : sig
+  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/state *)
+  val get_state :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    tx_rollup_hash:string ->
     Client.t ->
     JSON.t Lwt.t
 end

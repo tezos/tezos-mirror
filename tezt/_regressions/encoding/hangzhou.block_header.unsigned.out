@@ -1,0 +1,31 @@
+tezt/_regressions/encoding/hangzhou.block_header.unsigned.out
+
+./tezos-codec encode 011-PtHangz2.block_header.unsigned from '{
+  "level": 1331,
+  "proto": 1,
+  "predecessor": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "timestamp": "2020-04-20T16:20:00Z",
+  "validation_pass": 2,
+  "operations_hash": "LLoZqBDX1E2ADRXbmwYo8VtMNeHG6Ygzmm4Zqv97i91UPBQHy9Vq3",
+  "fitness": [
+    "01",
+    "000000000000000a"
+  ],
+  "context": "CoVDyf9y9gHfAkPWofBJffo4X4bWjmehH2LeVonDcCKKzyQYwqdk",
+  "priority": 21021,
+  "proof_of_work_nonce": "101895ca00000000",
+  "seed_nonce_hash": "nceUFoeQDgkJCmzdMWh19ZjBYqQD3N9fe6bXQ1ZsUKKvMn7iun5Z3",
+  "liquidity_baking_escape_vote": false
+}'
+00000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00242e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c521d101895ca00000000ff043691f53c02ca1ac6f1a0c1586bf77973e04c2d9b618a8309e79651daf0d55800
+
+./tezos-codec decode 011-PtHangz2.block_header.unsigned from 00000533010e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8000000005e9dcbb00242e9bc4583d4f9fa6ba422733f45d3a44397141a953d2237bf8df62e5046eef700000011000000010100000008000000000000000a4c7319284b55068bb7c4e0b9f8585729db7fb27ab4ca9cff2038a1fc324f650c521d101895ca00000000ff043691f53c02ca1ac6f1a0c1586bf77973e04c2d9b618a8309e79651daf0d55800
+{ "level": 1331, "proto": 1,
+  "predecessor": "BKpbfCvh777DQHnXjU2sqHvVUNZ7dBAdqEfKkdw8EGSkD9LSYXb",
+  "timestamp": "2020-04-20T16:20:00Z", "validation_pass": 2,
+  "operations_hash": "LLoZqBDX1E2ADRXbmwYo8VtMNeHG6Ygzmm4Zqv97i91UPBQHy9Vq3",
+  "fitness": [ "01", "000000000000000a" ],
+  "context": "CoVDyf9y9gHfAkPWofBJffo4X4bWjmehH2LeVonDcCKKzyQYwqdk",
+  "priority": 21021, "proof_of_work_nonce": "101895ca00000000",
+  "seed_nonce_hash": "nceUFoeQDgkJCmzdMWh19ZjBYqQD3N9fe6bXQ1ZsUKKvMn7iun5Z3",
+  "liquidity_baking_escape_vote": false }

@@ -1,0 +1,45 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[macros/build_list.tz]
+
+Well typed
+Gas remaining: 1039982.791 units remaining
+{ parameter nat ;
+  storage (list nat) ;
+  code { CAR @counter
+         /* [ @counter nat ] */ ;
+         NIL @acc nat
+         /* [ @acc list nat : @counter nat ] */ ;
+         SWAP
+         /* [ @counter nat : @acc list nat ] */ ;
+         DUP @cmp_num
+         /* [ @cmp_num nat : @counter nat : @acc list nat ] */ ;
+         PUSH nat 0
+         /* [ nat : @cmp_num nat : @counter nat : @acc list nat ] */ ;
+         CMPNEQ ;
+         LOOP { DUP
+                /* [ @counter nat : @counter nat : @acc list nat ] */ ;
+                DIP { SWAP /* [ @acc list nat : @counter nat ] */ }
+                /* [ @counter nat : @acc list nat : @counter nat ] */ ;
+                CONS @acc
+                /* [ @acc list nat : @counter nat ] */ ;
+                SWAP
+                /* [ @counter nat : @acc list nat ] */ ;
+                PUSH nat 1
+                /* [ nat : @counter nat : @acc list nat ] */ ;
+                SWAP
+                /* [ @counter nat : nat : @acc list nat ] */ ;
+                SUB @counter
+                /* [ @counter int : @acc list nat ] */ ;
+                DUP
+                /* [ @counter int : @counter int : @acc list nat ] */ ;
+                DIP { ABS /* [ nat : @acc list nat ] */ }
+                /* [ @counter int : nat : @acc list nat ] */ ;
+                PUSH int 0
+                /* [ int : @counter int : nat : @acc list nat ] */ ;
+                CMPNEQ }
+         /* [ @counter nat : @acc list nat ] */ ;
+         CONS
+         /* [ list nat ] */ ;
+         NIL operation
+         /* [ list operation : list nat ] */ ;
+         PAIR
+         /* [ pair (list operation) (list nat) ] */ } }

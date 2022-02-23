@@ -15,7 +15,7 @@ let base_dir t ~state = Paths.root state // sprintf "Client-base-%s" t.id
 open Tezos_executable.Make_cli
 
 let client_call ?(wait = "none") state t args =
-  ("--wait" :: wait :: optf "port" "%d" t.port)
+  "--wait" :: wait :: optf "port" "%d" t.port
   @ opt "base-dir" (base_dir ~state t)
   @ args
 
@@ -28,11 +28,11 @@ module Command_error = struct
   let failf ?result ?client ?args fmt =
     let attach =
       Option.value_map ~default:[] args ~f:(fun l ->
-          [("arguments", `String_list l)])
+          [("arguments", `String_list l)] )
       @ Option.value_map ~default:[] client ~f:(fun c ->
-            [("client-id", `String_value c.id)])
+            [("client-id", `String_value c.id)] )
       @ Option.value_map ~default:[] result ~f:(fun res ->
-            [("stdout", `Verbatim res#out); ("stderr", `Verbatim res#err)])
+            [("stdout", `Verbatim res#out); ("stderr", `Verbatim res#err)] )
     in
     Process_result.Error.wrong_behavior ~attach fmt
 end
@@ -139,10 +139,8 @@ let activate_protocol state client protocol =
   successful_client_cmd state ~client
     ( opt "block" "genesis"
     @ [ "activate"; "protocol"; protocol.Tezos_protocol.hash; "with"; "fitness"
-      ; sprintf "%d" protocol.Tezos_protocol.expected_pow
-      ; "and"; "key"
-      ; Tezos_protocol.dictator_name protocol
-      ; "and"; "parameters"
+      ; sprintf "%d" protocol.Tezos_protocol.expected_pow; "and"; "key"
+      ; Tezos_protocol.dictator_name protocol; "and"; "parameters"
       ; Tezos_protocol.protocol_parameters_path state protocol ]
     @ timestamp )
   >>= fun _ ->
@@ -181,7 +179,7 @@ let mempool_has_operation state ~client ~kind =
   find_applied_in_mempool state ~client ~f:(fun o ->
       Jqo.field o ~k:"contents"
       |> Jqo.list_exists
-           ~f:Poly.(fun op -> Jqo.field op ~k:"kind" = `String kind))
+           ~f:Poly.(fun op -> Jqo.field op ~k:"kind" = `String kind) )
   >>= fun found_or_not -> return Poly.(found_or_not <> None)
 
 let block_has_operation state ~client ~level ~kind =
@@ -195,13 +193,13 @@ let block_has_operation state ~client ~level ~kind =
           Jqo.list_exists olist ~f:(fun o ->
               Jqo.field o ~k:"contents"
               |> Jqo.list_exists
-                   ~f:Poly.(fun op -> Jqo.field op ~k:"kind" = `String kind)))
+                   ~f:Poly.(fun op -> Jqo.field op ~k:"kind" = `String kind) ) )
     in
     say state
       EF.(
         desc
           (af "looking for %S in block %d: %sfound" kind level
-             (if found then "" else "not "))
+             (if found then "" else "not ") )
           (af "%s" (Ezjsonm.to_string json)))
     >>= fun () -> return found
   with e ->
@@ -225,10 +223,8 @@ let list_known_addresses state ~client =
     Re.(
       compile
         (seq
-           [ group (rep1 (alt [alnum; char '_']))
-           ; str ": "
-           ; group (rep1 alnum)
-           ; alt [space; eol; eos] ])) in
+           [ group (rep1 (alt [alnum; char '_'])); str ": "; group (rep1 alnum)
+           ; alt [space; eol; eos] ] )) in
   return
     (List.filter_map res#out
        ~f:
@@ -236,7 +232,7 @@ let list_known_addresses state ~client =
            fun line ->
              match exec_opt re line with
              | None -> None
-             | Some matches -> Some (Group.get matches 1, Group.get matches 2)))
+             | Some matches -> Some (Group.get matches 1, Group.get matches 2)) )
 
 module Ledger = struct
   type hwm = {main: int; test: int; chain: Tezos_crypto.Chain_id.t option}
@@ -261,10 +257,8 @@ module Ledger = struct
         let num = rep1 digit in
         compile
           (seq
-             [ group num
-             ; str " for the main-chain ("
-             ; group (rep1 alnum)
-             ; str ") and "; group num; str " for the test-chain." ])) in
+             [ group num; str " for the main-chain ("; group (rep1 alnum)
+             ; str ") and "; group num; str " for the test-chain." ] )) in
     let matches = Re.exec re (String.concat ~sep:" " res#out) in
     try
       return
@@ -272,7 +266,7 @@ module Ledger = struct
         ; chain=
             (let v = Re.Group.get matches 2 in
              if String.equal v "'Unspecified'" then None
-             else Some (Tezos_crypto.Chain_id.of_b58check_exn v))
+             else Some (Tezos_crypto.Chain_id.of_b58check_exn v) )
         ; test= Int.of_string (Re.Group.get matches 3) }
     with e ->
       failf
@@ -297,13 +291,13 @@ module Ledger = struct
       let name =
         match
           List.find known_addresses ~f:(fun (_, pkh) ->
-              String.equal pkh pubkey_hash)
+              String.equal pkh pubkey_hash )
         with
         | None -> ""
         | Some (alias, _) -> alias in
       return
         (Tezos_protocol.Account.key_pair name ~pubkey ~pubkey_hash
-           ~private_key:uri)
+           ~private_key:uri )
     with e ->
       failf "Couldn't understand result of 'show ledger %S': error %S: from %S"
         uri (Exn.to_string e)
@@ -363,7 +357,7 @@ module Keyed = struct
     say state
       EF.(
         desc
-          (af "Successful bake (%s: %s):" baker.client.id msg)
+          (af "Successful endorse (%s: %s):" baker.client.id msg)
           (ocaml_string_list res#out))
 
   let generate_nonce state {client; key_name; _} data =
@@ -392,8 +386,7 @@ module Keyed = struct
       |> Hex.of_string ?ignore:None |> Hex.show in
     say state EF.(desc (shout "DECODED:") (af "%S" decoded))
     >>= fun () ->
-    let actual_signature =
-      String.chop_prefix_exn ~prefix:"09f5cd8612" decoded in
+    let actual_signature = String.chop_prefix_exn ~prefix:"09f5cd8612" decoded in
     say state
       EF.(
         desc_list (af "Injecting Operation")
@@ -401,8 +394,7 @@ module Keyed = struct
           ; desc (haf "op:")
               (af "%d: %S" (String.length operation_bytes) operation_bytes)
           ; desc (haf "sign:")
-              (af "%d: %S" (String.length actual_signature) actual_signature)
-          ])
+              (af "%d: %S" (String.length actual_signature) actual_signature) ])
     >>= fun () ->
     rpc state ~client ~path:"/injection/operation?chain=main"
       (`Post (sprintf "\"%s%s\"" operation_bytes actual_signature))

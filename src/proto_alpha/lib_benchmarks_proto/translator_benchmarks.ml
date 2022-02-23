@@ -24,7 +24,6 @@
 (*****************************************************************************)
 
 open Protocol
-open Script_typed_ir
 
 (** {2 [Script_ir_translator] benchmarks} *)
 
@@ -193,9 +192,7 @@ module Typechecking_data : Benchmark.S = struct
       (michelson_type : Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Michelson_generation.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
             Translator_workload.data_typechecker_workload
@@ -229,20 +226,19 @@ module Typechecking_data : Benchmark.S = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ} -> typechecking_data_benchmark rng_state term typ
-    | _ -> assert false
+    in
+    typechecking_data_benchmark rng_state term typ
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> typechecking_data_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -268,9 +264,7 @@ module Unparsing_data : Benchmark.S = struct
       (michelson_type : Protocol.Script_repr.expr) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Michelson_generation.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         let workload =
           match
             Translator_workload.data_typechecker_workload
@@ -311,20 +305,19 @@ module Unparsing_data : Benchmark.S = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ} -> unparsing_data_benchmark rng_state term typ
-    | _ -> assert false
+    in
+    unparsing_data_benchmark rng_state term typ
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> unparsing_data_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -334,10 +327,6 @@ module Unparsing_data : Benchmark.S = struct
 end
 
 let () = Registration_helpers.register (module Unparsing_data)
-
-(* The new elaborator expects one more element at the bottom of the stack. *)
-let cushion_stack_type type_list =
-  type_list @ [Michelson_generation.base_type_to_michelson_type Type.unit]
 
 module Typechecking_code : Benchmark.S = struct
   include Config
@@ -353,8 +342,8 @@ module Typechecking_code : Benchmark.S = struct
       (stack : Script_repr.expr list) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
-          Michelson_generation.michelson_type_list_to_ex_stack_ty stack ctxt
+        let ex_stack_ty =
+          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let workload =
           match
@@ -372,7 +361,7 @@ module Typechecking_code : Benchmark.S = struct
           let result =
             Lwt_main.run
               (Script_ir_translator.parse_instr
-                 Script_ir_translator.Lambda
+                 Script_tc_context.data
                  ctxt
                  ~legacy:false
                  (Micheline.root node)
@@ -391,18 +380,19 @@ module Typechecking_code : Benchmark.S = struct
 
   let make_bench rng_state (cfg : Config.config) () =
     let open Michelson_generation in
-    match make_code_sampler rng_state cfg.generator_config with
-    | Code {term; bef} -> typechecking_code_benchmark rng_state term bef
-    | Data _ -> assert false
+    let Michelson_mcmc_samplers.{term; bef; aft = _} =
+      make_code_sampler rng_state cfg.generator_config
+    in
+    typechecking_code_benchmark rng_state term bef
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> typechecking_code_benchmark rng_state term bef)
             | _ -> None)
           terms
@@ -428,8 +418,8 @@ module Unparsing_code : Benchmark.S = struct
       (stack : Script_repr.expr list) =
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
-          Michelson_generation.michelson_type_list_to_ex_stack_ty stack ctxt
+        let ex_stack_ty =
+          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let workload =
           match
@@ -445,7 +435,7 @@ module Unparsing_code : Benchmark.S = struct
         let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
         (* We parse the code just to check it is well-typed. *)
         Script_ir_translator.parse_instr
-          Script_ir_translator.Lambda
+          Script_tc_context.data
           ctxt
           ~legacy:false
           (Micheline.root node)
@@ -473,18 +463,19 @@ module Unparsing_code : Benchmark.S = struct
 
   let make_bench rng_state (cfg : Config.config) () =
     let open Michelson_generation in
-    match make_code_sampler rng_state cfg.generator_config with
-    | Code {term; bef} -> unparsing_code_benchmark rng_state term bef
-    | Data _ -> assert false
+    let Michelson_mcmc_samplers.{term; bef; aft = _} =
+      make_code_sampler rng_state cfg.generator_config
+    in
+    unparsing_code_benchmark rng_state term bef
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> unparsing_code_benchmark rng_state term bef)
             | _ -> None)
           terms
@@ -617,22 +608,34 @@ end
 
 let () = Registration_helpers.register (module Merge_types)
 
-(* A dummy type generator, sampling linear terms of a given size. *)
-let rec dummy_type_generator depth =
-  let open Script_ir_translator in
-  if depth = 0 then Ex_ty (unit_t ~annot:None)
-  else
-    match dummy_type_generator (depth - 1) with
-    | Ex_ty something -> Ex_ty (Michelson_types.list something)
+(* A dummy type generator, sampling linear terms of a given size.
+   The generator always returns types of the shape:
 
-(* Generate combs; the size of a comb of depth d should be
-   d * 2 + 1. *)
-let rec dummy_comparable_type_generator depth =
+   [pair unit (pair unit (pair unit ...))]
+
+   This structure is the worse-case of the unparsing function for types because
+   an extra test is performed to determine if the comb type needs to be folded.
+ *)
+let rec dummy_type_generator size =
   let open Script_ir_translator in
   let open Script_typed_ir in
-  if depth = 0 then Ex_comparable_ty (unit_key ~annot:None)
+  if size <= 1 then Ex_ty (unit_t ~annot:None)
   else
-    match dummy_comparable_type_generator (depth - 1) with
+    match dummy_type_generator (size - 2) with
+    | Ex_ty r ->
+        let l = unit_t ~annot:None in
+        Ex_ty
+          (match pair_t (-1) (l, None, None) (r, None, None) ~annot:None with
+          | Error _ -> assert false
+          | Ok t -> t)
+
+(* A dummy comparable type generator, sampling linear terms of a given size. *)
+let rec dummy_comparable_type_generator size =
+  let open Script_ir_translator in
+  let open Script_typed_ir in
+  if size <= 0 then Ex_comparable_ty (unit_key ~annot:None)
+  else
+    match dummy_comparable_type_generator (size - 2) with
     | Ex_comparable_ty r ->
         let l = unit_key ~annot:None in
         Ex_comparable_ty
@@ -679,7 +682,7 @@ let parse_ty ctxt node =
     ~allow_ticket:true
     node
 
-let unparse_ty ctxt ty = Script_ir_translator.unparse_ty ctxt ty
+let unparse_ty ctxt ty = Script_ir_translator.unparse_ty ~loc:(-1) ctxt ty
 
 module Parse_type_benchmark : Benchmark.S = struct
   include Parse_type_shared
@@ -692,8 +695,8 @@ module Parse_type_benchmark : Benchmark.S = struct
     let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
-      let depth = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator depth in
+      let size = Random.State.int rng_state config.max_size in
+      let ty = dummy_type_generator size in
       match ty with
       | Ex_ty ty ->
           Environment.wrap_tzresult @@ unparse_ty ctxt ty
@@ -705,7 +708,11 @@ module Parse_type_benchmark : Benchmark.S = struct
               (Gas_helpers.fp_to_z
                  (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
           in
-          let workload = Type_workload {nodes = depth; consumed} in
+          let nodes =
+            let x = Script_typed_ir.ty_size ty in
+            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+          in
+          let workload = Type_workload {nodes; consumed} in
           let closure () = ignore (parse_ty ctxt unparsed) in
           ok (Generator.Plain {workload; closure}) )
     |> function
@@ -740,8 +747,8 @@ module Unparse_type_benchmark : Benchmark.S = struct
     let open Error_monad in
     ( Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
       let ctxt = Gas_helpers.set_limit ctxt in
-      let depth = Random.State.int rng_state config.max_size in
-      let ty = dummy_type_generator depth in
+      let size = Random.State.int rng_state config.max_size in
+      let ty = dummy_type_generator size in
       match ty with
       | Ex_ty ty ->
           Environment.wrap_tzresult @@ unparse_ty ctxt ty >>? fun (_, ctxt') ->
@@ -750,7 +757,11 @@ module Unparse_type_benchmark : Benchmark.S = struct
               (Gas_helpers.fp_to_z
                  (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
           in
-          let workload = Type_workload {nodes = depth; consumed} in
+          let nodes =
+            let x = Script_typed_ir.ty_size ty in
+            Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+          in
+          let workload = Type_workload {nodes; consumed} in
           let closure () = ignore (unparse_ty ctxt ty) in
           ok (Generator.Plain {workload; closure}) )
     |> function
@@ -770,6 +781,74 @@ module Unparse_type_benchmark : Benchmark.S = struct
 
   let create_benchmarks ~rng_state ~bench_num config =
     List.repeat bench_num (make_bench rng_state config)
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen size_model)
 end
 
 let () = Registration_helpers.register (module Unparse_type_benchmark)
+
+module Unparse_comparable_type_benchmark : Benchmark.S = struct
+  include Parse_type_shared
+
+  let name = "UNPARSE_COMPARABLE_TYPE"
+
+  let info = "Benchmarking unparse_comparable_ty"
+
+  let make_bench rng_state config () =
+    let open Error_monad in
+    let res =
+      Lwt_main.run (Execution_context.make ~rng_state) >>? fun (ctxt, _) ->
+      let ctxt = Gas_helpers.set_limit ctxt in
+      let size = Random.State.int rng_state config.max_size in
+      let ty = dummy_comparable_type_generator size in
+      let nodes =
+        let (Script_ir_translator.Ex_comparable_ty ty) = ty in
+        let x = Script_typed_ir.comparable_ty_size ty in
+        Saturation_repr.to_int @@ Script_typed_ir.Type_size.to_int x
+      in
+      match ty with
+      | Ex_comparable_ty comp_ty ->
+          Environment.wrap_tzresult
+          @@ Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty
+          >>? fun (_, ctxt') ->
+          let consumed =
+            Z.to_int
+              (Gas_helpers.fp_to_z
+                 (Alpha_context.Gas.consumed ~since:ctxt ~until:ctxt'))
+          in
+          let workload = Type_workload {nodes; consumed} in
+          let closure () =
+            ignore
+              (Script_ir_translator.unparse_comparable_ty ~loc:() ctxt comp_ty)
+          in
+          ok (Generator.Plain {workload; closure})
+    in
+    match res with
+    | Ok closure -> closure
+    | Error errs -> global_error name errs
+
+  let size_model =
+    Model.make
+      ~conv:(function Type_workload {nodes; consumed = _} -> (nodes, ()))
+      ~model:
+        (Model.affine
+           ~intercept:
+             (Free_variable.of_string (Format.asprintf "%s_const" name))
+           ~coeff:(Free_variable.of_string (Format.asprintf "%s_coeff" name)))
+
+  let () =
+    Registration_helpers.register_for_codegen
+      name
+      (Model.For_codegen size_model)
+
+  let models = [("size_translator_model", size_model)]
+
+  let create_benchmarks ~rng_state ~bench_num config =
+    List.repeat bench_num (make_bench rng_state config)
+end
+
+let () =
+  Registration_helpers.register (module Unparse_comparable_type_benchmark)

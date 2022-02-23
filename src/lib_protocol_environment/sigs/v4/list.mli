@@ -83,7 +83,7 @@
 
 (** {3 Trivial values} *)
 
-type 'a t = 'a Stdlib.List.t = [] | ( :: ) of 'a * 'a list
+type 'a t = 'a list = [] | ( :: ) of 'a * 'a list
 
 (** in-monad, preallocated nil *)
 
@@ -278,6 +278,11 @@ val fold_right2 :
   'b list ->
   'c ->
   ('c, 'trace) result
+
+(** [fold_left_map f a xs] is a combination of [fold_left] and [map] that maps
+    over all elements of [xs] and threads an accumulator with initial value [a]
+    through calls to [f]. *)
+val fold_left_map : ('a -> 'b -> 'a * 'c) -> 'a -> 'b list -> 'a * 'c list
 
 val for_all2 :
   when_different_lengths:'trace ->
@@ -524,6 +529,20 @@ val filter_map_es :
 
 val filter_map_p : ('a -> 'b option Lwt.t) -> 'a list -> 'b list Lwt.t
 
+val concat_map : ('a -> 'b list) -> 'a list -> 'b list
+
+val concat_map_s : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
+val concat_map_e :
+  ('a -> ('b list, 'error) result) -> 'a list -> ('b list, 'error) result
+
+val concat_map_es :
+  ('a -> ('b list, 'error) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error) result Lwt.t
+
+val concat_map_p : ('a -> 'b list Lwt.t) -> 'a list -> 'b list Lwt.t
+
 val fold_left : ('a -> 'b -> 'a) -> 'a -> 'b list -> 'a
 
 val fold_left_e :
@@ -533,6 +552,48 @@ val fold_left_s : ('a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> 'a Lwt.t
 
 val fold_left_es :
   ('a -> 'b -> ('a, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  ('a, 'trace) result Lwt.t
+
+(** [fold_left_map_e f a xs] is a combination of [fold_left_e] and [map_e] that
+    maps over all elements of [xs] and threads an accumulator with initial
+    value [a] through calls to [f]. The list is traversed from left to right
+    and the first encountered error is returned. *)
+val fold_left_map_e :
+  ('a -> 'b -> ('a * 'c, 'trace) result) ->
+  'a ->
+  'b list ->
+  ('a * 'c list, 'trace) result
+
+(** [fold_left_map_s f a xs] is a combination of [fold_left_s] and [map_s] that
+    maps over all elements of [xs] and threads an accumulator with initial
+    value [a] through calls to [f]. *)
+val fold_left_map_s :
+  ('a -> 'b -> ('a * 'c) Lwt.t) -> 'a -> 'b list -> ('a * 'c list) Lwt.t
+
+(** [fold_left_map_es f a xs] is a combination of [fold_left_es] and [map_es] that
+    maps over all elements of [xs] and threads an accumulator with initial
+    value [a] through calls to [f]. The list is traversed from left to right
+    and the first encountered error is returned. *)
+val fold_left_map_es :
+  ('a -> 'b -> ('a * 'c, 'trace) result Lwt.t) ->
+  'a ->
+  'b list ->
+  ('a * 'c list, 'trace) result Lwt.t
+
+val fold_left_i : (int -> 'a -> 'b -> 'a) -> 'a -> 'b list -> 'a
+
+val fold_left_i_e :
+  (int -> 'a -> 'b -> ('a, 'trace) result) ->
+  'a ->
+  'b list ->
+  ('a, 'trace) result
+
+val fold_left_i_s : (int -> 'a -> 'b -> 'a Lwt.t) -> 'a -> 'b list -> 'a Lwt.t
+
+val fold_left_i_es :
+  (int -> 'a -> 'b -> ('a, 'trace) result Lwt.t) ->
   'a ->
   'b list ->
   ('a, 'trace) result Lwt.t
@@ -788,7 +849,7 @@ val combine_with_leftovers :
 
 val compare : ('a -> 'a -> int) -> 'a list -> 'a list -> int
 
-val compare_lengths : 'a list -> 'a list -> int
+val compare_lengths : 'a list -> 'b list -> int
 
 val compare_length_with : 'a list -> int -> int
 
@@ -806,7 +867,7 @@ val sort_uniq : ('a -> 'a -> int) -> 'a list -> 'a list
 
 (** {3 conversion} *)
 
-val to_seq : 'a t -> 'a Seq.t
+val to_seq : 'a list -> 'a Seq.t
 
 val of_seq : 'a Seq.t -> 'a list
 
@@ -860,6 +921,11 @@ val filter_map_ep :
   ('a -> ('b option, 'error Error_monad.trace) result Lwt.t) ->
   'a list ->
   ('b list, 'error Error_monad.trace) result Lwt.t
+
+val concat_map_ep :
+  ('a -> ('b list, 'error trace) result Lwt.t) ->
+  'a list ->
+  ('b list, 'error trace) result Lwt.t
 
 val for_all_ep :
   ('a -> (bool, 'error Error_monad.trace) result Lwt.t) ->

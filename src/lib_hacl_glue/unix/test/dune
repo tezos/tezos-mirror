@@ -1,0 +1,24 @@
+(tests
+ (names
+   test_hacl
+   test_prop_hacl_hash
+   test_prop_signature_pk)
+ (package tezos-hacl-glue-unix)
+ (libraries
+  tezos-stdlib
+  tezos-error-monad
+  zarith
+  zarith_stubs_js
+  tezos-hacl-glue
+  tezos-hacl-glue-unix
+  data-encoding
+  qcheck-alcotest
+  tezos-test-helpers)
+ (modes native)
+ (js_of_ocaml)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad.TzLwtreslib
+   -open Data_encoding
+   -open Tezos_hacl_glue)))

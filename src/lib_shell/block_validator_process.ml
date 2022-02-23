@@ -85,6 +85,9 @@ module type S = sig
 
   (** [init_test_chain] must only be called on a forking block. *)
   val init_test_chain : t -> Store.Block.t -> Block_header.t tzresult Lwt.t
+
+  val reconfigure_event_logging :
+    t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
 end
 
 (* We hide the validator (of type [S.t]) and the according module in a GADT.
@@ -244,15 +247,8 @@ module Internal_validator_process = struct
     let user_activated_protocol_overrides =
       validator.user_activated_protocol_overrides
     in
-    let cache =
-      match validator.cache with
-      | None -> `Load
-      | Some block_cache ->
-          `Inherited (block_cache, predecessor_shell_header.context)
-    in
     Block_validation.preapply
       ~chain_id
-      ~cache
       ~user_activated_upgrades
       ~user_activated_protocol_overrides
       ~timestamp
@@ -312,6 +308,8 @@ module Internal_validator_process = struct
     let forked_header = Store.Block.header forking_block in
     Store.Block.context validator.chain_store forking_block >>=? fun context ->
     Block_validation.init_test_chain context forked_header
+
+  let reconfigure_event_logging _ _ = return_unit
 end
 
 (** Block validation using an external process *)
@@ -743,6 +741,12 @@ module External_validator_process = struct
     in
     send_request validator request Block_header.encoding
 
+  let reconfigure_event_logging validator config =
+    send_request
+      validator
+      (External_validation.Reconfigure_event_logging config)
+      Data_encoding.unit
+
   let close vp =
     Events.(emit close ()) >>= fun () ->
     match vp.validator_process with
@@ -819,6 +823,10 @@ let init validator_environment validator_kind =
       return (E {validator_process; validator})
 
 let close (E {validator_process = (module VP); validator}) = VP.close validator
+
+let reconfigure_event_logging (E {validator_process = (module VP); validator})
+    config =
+  VP.reconfigure_event_logging validator config
 
 let apply_block (E {validator_process = (module VP); validator}) chain_store
     ~predecessor header operations =

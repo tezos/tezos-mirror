@@ -24,9 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-val get_block :
-  Store.chain_store -> Block_services.block -> Store.Block.t option Lwt.t
-
 val build_raw_rpc_directory :
   (module Block_services.PROTO) ->
   (module Registered_protocol.T) ->

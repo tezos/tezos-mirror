@@ -12,6 +12,7 @@ from tools.utils import (
 )
 from tools.constants import IDENTITIES
 from .contract_paths import OPCODES_CONTRACT_PATH, MINI_SCENARIOS_CONTRACT_PATH
+from . import protocol
 
 KEY1 = 'foo'
 KEY2 = 'bar'
@@ -113,7 +114,9 @@ class TestContractOnchainOpcodes:
         )
         bake(client)
 
-        assert_storage_contains(client, 'store_now', f'"{client.get_now()}"')
+        assert_storage_contains(
+            client, 'store_now', f'"{protocol.get_now(client)}"'
+        )
 
     def test_transfer_tokens(self, client_regtest_scrubbed: ClientRegression):
         """Tests TRANSFER_TOKENS."""
@@ -1279,7 +1282,7 @@ class TestContractOnchainLevel:
     # This test needs to be in a separate class to not depend on the number
     # of operations happening before
 
-    def test_level(self, client_regtest_scrubbed):
+    def test_level(self, client_regtest_scrubbed: ClientRegression):
         client = client_regtest_scrubbed
 
         init_with_transfer(

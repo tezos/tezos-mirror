@@ -21,7 +21,7 @@
  (action
   (write-file %{targets}
               "module Name = struct let name = \"demo-noops\" end
-include Tezos_protocol_environment.MakeV3(Name)()
+include Tezos_protocol_environment.MakeV4(Name)()
 module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
 ")))
 
@@ -99,7 +99,9 @@ include Tezos_raw_protocol_demo_noops.Main
 
 (library
  (name tezos_protocol_demo_noops_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-demo-noops)
  (libraries
       tezos-protocol-environment

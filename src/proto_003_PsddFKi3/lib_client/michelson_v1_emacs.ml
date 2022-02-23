@@ -209,7 +209,7 @@ let report_errors ppf (parsed, errs) =
            | Unterminated_string loc
            | Unterminated_integer loc
            | Unterminated_comment loc
-           | Odd_lengthed_bytes loc
+           | Invalid_hex_bytes loc
            | Unclosed {loc; _}
            | Unexpected {loc; _}
            | Extra {loc; _} ->

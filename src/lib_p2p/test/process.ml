@@ -446,7 +446,7 @@ let wait_all_results (processes : ('a, 'b, 'c) t list) =
   loop terminations >>= function
   | None ->
       lwt_log_info "All done!" >>= fun () ->
-      Error_monad.all_p terminations >>= fun terminated ->
+      Error_monad.Lwt_syntax.all terminations >>= fun terminated ->
       return
       @@ List.map (function Ok a -> a | Error _ -> assert false) terminated
   | Some (_err, remaining) ->

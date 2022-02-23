@@ -758,7 +758,9 @@ let parse_arg :
       match TzString.Map.find_opt long args_dict with
       | None | Some [] -> return_none
       | Some [s] ->
-          trace (Bad_option_argument ("--" ^ long, command)) (converter ctx s)
+          converter ctx s
+          >|= record_trace_eval (fun () ->
+                  Bad_option_argument ("--" ^ long, command))
           >|=? fun x -> Some x
       | Some (_ :: _) -> fail (Multiple_occurrences ("--" ^ long, command)))
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
@@ -1794,7 +1796,7 @@ let complete_tree cctxt tree index args =
                     ind
                     (matched_args @ [a])
                     (s_rest, a_rest)
-                else if List.length matched_args = 0 then
+                else if matched_args = [] then
                   (* Suffix not found on args head, check the rest of the args *)
                   args_starting_from_suffix
                     (ind - 1)
@@ -1806,7 +1808,7 @@ let complete_tree cctxt tree index args =
                   None
             | (unmatched_suffix, args)
             (* Partial or full suffix match found *)
-              when List.length unmatched_suffix < List.length suffix ->
+              when Compare.List_lengths.(unmatched_suffix < suffix) ->
                 Some (matched_args @ args, ind)
             | _ -> None
           in
@@ -1953,7 +1955,7 @@ let add_manual ~executable_name ~global_options format ppf commands =
               let verbosity =
                 match verbosity with
                 | Some verbosity -> verbosity
-                | None when List.length commands <= 3 -> Full
+                | None when Compare.List_length_with.(commands <= 3) -> Full
                 | None -> Short
               in
               match commands with

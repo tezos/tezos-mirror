@@ -30,42 +30,13 @@
     See {!Lwtreslib} and {!Seq} for general description of traversors and the
     meaning of [_s], [_e], and [_es] suffixes. *)
 
-module type MONAD_S = sig
+module type S = sig
   type ('a, 'e) t = ('a, 'e) result = Ok of 'a | Error of 'e (***)
 
-  val return : 'a -> ('a, 'e) result
-
-  val return_unit : (unit, 'e) result
-
-  val return_none : ('a option, 'e) result
-
-  val return_some : 'a -> ('a option, 'e) result
-
-  val return_nil : ('a list, 'e) result
-
-  val return_true : (bool, 'e) result
-
-  val return_false : (bool, 'e) result
-
-  val fail : 'e -> ('a, 'e) result
-
-  val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
-
-  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
-
-  val map : ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
-
-  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
-end
-
-module type S = sig
-  include MONAD_S
-
   (* We do not provide all of the [_e] and [_es] functions that you might expect
-     based on other modules such as [Option]. This is because the returned
-     values are results within results ([(('a, 'e) result, 'ee) result]) which
-     are often impractical. It is possible to achieve manually in the rare
-     occasions where it might be appropriate. *)
+     based on other modules such as [Option]. This is because the double
+     layering of result is rarely necessary and generally discouraged. It is
+     possible to achieve manually. *)
 
   val ok : 'a -> ('a, 'e) result
 
@@ -78,6 +49,14 @@ module type S = sig
   val value : ('a, 'e) result -> default:'a -> 'a
 
   val value_f : ('a, 'e) result -> default:(unit -> 'a) -> 'a
+
+  val bind : ('a, 'e) result -> ('a -> ('b, 'e) result) -> ('b, 'e) result
+
+  val bind_error : ('a, 'e) result -> ('e -> ('a, 'f) result) -> ('a, 'f) result
+
+  val map : ('a -> 'b) -> ('a, 'e) result -> ('b, 'e) result
+
+  val map_error : ('e -> 'f) -> ('a, 'e) result -> ('a, 'f) result
 
   val bind_s :
     ('a, 'e) result -> ('a -> ('b, 'e) result Lwt.t) -> ('b, 'e) result Lwt.t
@@ -199,4 +178,20 @@ module type S = sig
       within Lwt (gives more flexibility) or not (gives more guarantee about the
       timeliness of learning about rejections). We will revisit this if a needs
       for it arises. *)
+
+  (**/**) (* for backwards compatibility *)
+
+  val return : 'a -> ('a, 'e) result
+
+  val return_unit : (unit, 'e) result
+
+  val return_none : ('a option, 'e) result
+
+  val return_some : 'a -> ('a option, 'e) result
+
+  val return_nil : ('a list, 'e) result
+
+  val return_true : (bool, 'e) result
+
+  val return_false : (bool, 'e) result
 end

@@ -1,4 +1,3 @@
-from typing import Dict, List
 import time
 
 import pytest
@@ -11,43 +10,9 @@ from . import protocol
 MIGRATION_LEVEL = 8
 BAKER = 'bootstrap1'
 BAKER_PKH = constants.IDENTITIES[BAKER]['identity']
-PREV_DEPOSIT = protocol.PREV_PARAMETERS["block_security_deposit"]
-DEPOSIT = protocol.PARAMETERS["block_security_deposit"]
-
-PREV_DEPOSIT_RECEIPTS = [
-    {
-        "kind": "contract",
-        "contract": BAKER_PKH,
-        "change": "-" + PREV_DEPOSIT,
-        "origin": "block",
-    },
-    {
-        "kind": "freezer",
-        "category": "deposits",
-        "delegate": BAKER_PKH,
-        "cycle": 0,
-        "change": PREV_DEPOSIT,
-        "origin": "block",
-    },
-]
-DEPOSIT_RECEIPTS = [
-    {
-        "kind": "contract",
-        "contract": BAKER_PKH,
-        "change": "-" + DEPOSIT,
-        "origin": "block",
-    },
-    {
-        "kind": "freezer",
-        "category": "deposits",
-        "delegate": BAKER_PKH,
-        "cycle": 1,
-        "change": DEPOSIT,
-        "origin": "block",
-    },
-]
-MIGRATION_RECEIPTS: List[Dict[str, str]] = []
-
+BAKER_BALANCE = next(
+    bal for [BAKER_PKH, bal] in protocol.PARAMETERS["bootstrap_accounts"]
+)
 
 # configure user-activate-upgrade at MIGRATION_LEVEL to test migration
 NODE_CONFIG = {
@@ -71,7 +36,7 @@ NODE_CONFIG = {
 
 @pytest.fixture(scope="class")
 def client(sandbox):
-    sandbox.add_node(0, node_config=NODE_CONFIG)
+    sandbox.add_node(0, params=constants.NODE_PARAMS, node_config=NODE_CONFIG)
     protocol.activate(
         sandbox.client(0),
         proto=protocol.PREV_HASH,
@@ -79,6 +44,27 @@ def client(sandbox):
         activate_in_the_past=True,
     )
     yield sandbox.client(0)
+
+
+all_bootstrap_accounts = [f"bootstrap{i}" for i in range(1, 6)]
+
+
+def endorse_all(client, endorse="endorse"):
+    cmd = [endorse, "for"] + all_bootstrap_accounts + ["--force"]
+    client.run(cmd)
+
+
+def manual_bake(client, baker):
+    """Tenderbake baking using propose/preendorse/endorse
+
+    Using the 3 lower level steps instead of `bake for` allows to control who
+    bakes while (pre)endorsing with all known accounts. Such fine-grained
+    control cannot be achieved through `bake for`.
+
+    """
+    client.propose([baker], ["--minimal-timestamp"])
+    endorse_all(client, endorse="preendorse")
+    endorse_all(client)
 
 
 @pytest.mark.incremental
@@ -105,11 +91,6 @@ class TestMigration:
         utils.bake(client, BAKER)
         assert client.get_protocol() == protocol.PREV_HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 1
-        metadata = client.get_metadata()
-        assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
-        # PROTO_A is using env. V1+, metadata hashes should be present
-        _ops_metadata_hash = client.get_operations_metadata_hash()
-        _block_metadata_hash = client.get_block_metadata_hash()
 
     def test_migration(self, client, sandbox):
         # 3: last block of PROTO_A, runs migration code (MIGRATION_LEVEL)
@@ -117,38 +98,24 @@ class TestMigration:
             utils.bake(client, BAKER)
         metadata = client.get_metadata()
         assert metadata['next_protocol'] == protocol.HASH
-        assert metadata['balance_updates'] == PREV_DEPOSIT_RECEIPTS
-        # PROTO_B is using env. V1+, metadata hashes should be present
-        _ops_metadata_hash = client.get_operations_metadata_hash()
-        _block_metadata_hash = client.get_block_metadata_hash()
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
     def test_new_proto(self, client, sandbox):
         # 4: first block of PROTO_B
-        utils.bake(client, BAKER)
+        manual_bake(client, BAKER)
         assert client.get_protocol() == protocol.HASH
         assert sandbox.client(0).get_head()['header']['proto'] == 2
 
-        # check that migration balance update appears in receipts
-        metadata = client.get_metadata()
-        assert metadata['balance_updates'] == (
-            MIGRATION_RECEIPTS + DEPOSIT_RECEIPTS
-        )
-        _ops_metadata_hash = client.get_operations_metadata_hash()
-        _block_metadata_hash = client.get_block_metadata_hash()
-
     def test_new_proto_second(self, client):
         # 5: second block of PROTO_B
-        utils.bake(client, BAKER)
-        metadata = client.get_metadata()
-        assert metadata['balance_updates'] == DEPOSIT_RECEIPTS
+        manual_bake(client, BAKER)
 
     def test_terminate_node0(self, client, sandbox: Sandbox, session: dict):
         # to export rolling snapshot, we need to be at level > 60
         # (see `max_operations_ttl`)
         level = client.get_head()['header']['level']
         for _ in range(60 - level + 1):
-            utils.bake(client, BAKER)
+            manual_bake(client, BAKER)
         assert client.get_head()['header']['level'] == 61
 
         # terminate node0
@@ -173,19 +140,25 @@ class TestMigration:
             1, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
         )
         client = sandbox.client(1)
-        utils.bake(client, BAKER)
+        client.multibake(args=["--minimal-timestamp"])
 
     def test_import_rolling_snapshot_node2(self, sandbox, session):
         sandbox.add_node(
-            2, snapshot=session['snapshot_rolling'], node_config=NODE_CONFIG
+            2,
+            snapshot=session['snapshot_rolling'],
+            params=constants.NODE_PARAMS,
+            node_config=NODE_CONFIG,
         )
         client = sandbox.client(2)
         utils.synchronize([sandbox.client(1), client], max_diff=0)
-        utils.bake(client, BAKER)
+        client.multibake(args=["--minimal-timestamp"])
 
     def test_reconstruct_full_node3(self, sandbox, session):
         sandbox.add_node(
-            3, snapshot=session['snapshot_full'], node_config=NODE_CONFIG
+            3,
+            snapshot=session['snapshot_full'],
+            node_config=NODE_CONFIG,
+            params=constants.NODE_PARAMS,
         )
         sandbox.node(3).terminate()
         time.sleep(3)
@@ -196,7 +169,7 @@ class TestMigration:
         utils.synchronize(
             [sandbox.client(1), sandbox.client(2), client], max_diff=0
         )
-        utils.bake(client, BAKER)
+        client.multibake(args=["--minimal-timestamp"])
 
     def test_rerun_node0(self, sandbox):
         sandbox.node(0).run()

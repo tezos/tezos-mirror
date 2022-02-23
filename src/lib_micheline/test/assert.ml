@@ -32,14 +32,13 @@
 
 (* Mini compatibility layer to avoid circular dependency *)
 module Compat = struct
-  let failwith fmt = Format.kasprintf (fun s -> Lwt.return_error s) fmt
+  let failwith fmt = Format.kasprintf (fun s -> Error s) fmt
 
-  let return_unit = Lwt.return_ok ()
+  let return_unit = Ok ()
 
-  let ( >>= ) = Lwt.bind
+  let ( >>= ) x f = f x
 
-  let ( >>=? ) v f =
-    v >>= function Error _ as err -> Lwt.return err | Ok v -> f v
+  let ( >>=? ) v f = v >>= function Error _ as err -> err | Ok v -> f v
 
   let rec iter2_p f l1 l2 =
     match (l1, l2) with
@@ -50,9 +49,9 @@ module Compat = struct
         tx >>= fun tx_res ->
         tl >>= fun tl_res ->
         match (tx_res, tl_res) with
-        | (Ok (), Ok ()) -> Lwt.return_ok ()
+        | (Ok (), Ok ()) -> Ok ()
         | (Error exn1, Error exn2) -> failwith "%s -- %s" exn1 exn2
-        | (Ok (), Error exn) | (Error exn, Ok ()) -> Lwt.return_error exn)
+        | (Ok (), Error exn) | (Error exn, Ok ()) -> Error exn)
 end
 
 open Compat

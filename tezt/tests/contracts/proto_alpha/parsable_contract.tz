@@ -1,0 +1,41 @@
+/*
+(*
+  Original Camligo code. The entrypoint
+  - returns (and update storage to 0) if parameter is 0
+  - fails with 'NEGATIVE_INT' is parameter is negative
+  - loops forever if parameter is positive
+*)
+type storage = (int, address) map
+type parameter = int
+let rec loop_forever () : storage = loop_forever ()
+
+let main (action, store : parameter * storage) : operation list * storage =
+ let s =
+   if action > 0 then Map.add action Tezos.sender store
+   else if action < 0 then (failwith "NEGATIVE_INT" : storage)
+   else loop_forever () (*loops if action = 0*)
+ in
+ ([] : operation list),  s
+*/
+{ parameter int ;
+  storage (map int address) ;
+  code { UNPAIR ;
+         PUSH int 0 ;
+         SWAP ;
+         DUP ;
+         DUG 2 ;
+         COMPARE ;
+         GT ;
+         IF { SWAP ; SENDER ; DIG 2 ; SWAP ; SOME ; SWAP ; UPDATE }
+            { SWAP ;
+              DROP ;
+              PUSH int 0 ;
+              SWAP ;
+              COMPARE ;
+              LT ;
+              IF { PUSH string "NEGATIVE_INT" ; FAILWITH }
+                 { PUSH unit Unit ;
+                   LEFT (map int address) ;
+                   LOOP_LEFT { DROP ; PUSH unit Unit ; LEFT (map int address) } } } ;
+         NIL operation ;
+         PAIR } }

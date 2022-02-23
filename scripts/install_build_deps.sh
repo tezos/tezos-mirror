@@ -87,7 +87,7 @@ case $(opam --version) in
         opam install --yes opam-depext ;;
 esac
 
-"$script_dir"/install_build_deps.raw.sh
+"$script_dir"/install_build_deps.raw.sh "$1"
 
 # add back the default repo if asked to or it was present in the first
 # place.  we add the rank here even if it wasn't there just to be on

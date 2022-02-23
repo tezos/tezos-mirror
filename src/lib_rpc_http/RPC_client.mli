@@ -54,7 +54,11 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {endpoint : Uri.t; logger : logger}
+  type config = {
+    media_type : Media_type.t list;
+    endpoint : Uri.t;
+    logger : logger;
+  }
 
   val config_encoding : config Data_encoding.t
 
@@ -95,6 +99,14 @@ module type S = sig
     Uri.t ->
     (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
     Lwt.t
+
+  val generic_media_type_call :
+    ?headers:(string * string) list ->
+    accept:Media_type.t list ->
+    ?body:Data_encoding.json ->
+    [< Resto.meth] ->
+    Uri.t ->
+    RPC_context.generic_call_result tzresult Lwt.t
 
   type content_type = string * string
 

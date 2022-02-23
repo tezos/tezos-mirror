@@ -1,13 +1,16 @@
-(tests
- (names test_encrypted)
- (libraries tezos-base
-            tezos-base.unix
-            tezos-signer-backends
-            alcotest-lwt)
+(test
+ (name test_encrypted)
  (package tezos-signer-backends)
- (flags (:standard -open Tezos_error_monad
-                   -open Tezos_stdlib
-                   -open Tezos_error_monad.TzLwtreslib
-                   -open Tezos_crypto
-                   -open Tezos_client_base
-                   -open Tezos_signer_backends)))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-signer-backends
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_error_monad
+   -open Tezos_stdlib
+   -open Tezos_error_monad.TzLwtreslib
+   -open Tezos_crypto
+   -open Tezos_client_base
+   -open Tezos_signer_backends)))

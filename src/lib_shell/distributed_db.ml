@@ -175,7 +175,7 @@ let activate
               P2p.send p2p conn (Get_current_branch chain_id) :: acc)
         in
         Error_monad.dont_wait
-          (fun () -> join_ep sends)
+          (fun () -> Error_monad.Lwt_tzresult_syntax.join sends)
           (fun trace ->
             Format.eprintf
               "Uncaught error: %a\n%!"
@@ -251,7 +251,8 @@ let clear_block chain_db hash n =
 
 let commit_block chain_db hash block_header operations result =
   assert (Block_hash.equal hash (Block_header.hash block_header)) ;
-  assert (List.length operations = block_header.shell.validation_passes) ;
+  assert (
+    Compare.List_length_with.(operations = block_header.shell.validation_passes)) ;
   Store.Block.store_block
     chain_db.reader_chain_db.chain_store
     ~block_header

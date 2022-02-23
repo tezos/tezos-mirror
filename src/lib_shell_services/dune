@@ -1,12 +1,17 @@
 (library
  (name tezos_shell_services)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-shell-services)
- (libraries tezos-base
-	    tezos-p2p-services
-	    tezos-version)
- (flags (:standard -linkall
-       -open Tezos_base__TzPervasives
-       -open Tezos_base
-		   -open Tezos_p2p_services
-		   -open Tezos_version)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-workers
+  tezos-stdlib-unix ;; for Tezos_stdlib_unix.Internal_event_unix
+  tezos-p2p-services
+  tezos-version)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_base
+   -open Tezos_p2p_services
+   -open Tezos_version)))

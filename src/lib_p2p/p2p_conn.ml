@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -29,7 +29,7 @@ module Events = P2p_events.P2p_conn
 type ('msg, 'peer, 'conn) t = {
   canceler : Lwt_canceler.t;
   greylister : unit -> unit;
-  messages : (int * 'msg) Lwt_pipe.t;
+  messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
   conn : ('msg P2p_message.t, 'conn) P2p_socket.t;
   peer_info : (('msg, 'peer, 'conn) t, 'peer, 'conn) P2p_peer_state.Info.t;
   point_info : ('msg, 'peer, 'conn) t P2p_point_state.Info.t option;
@@ -47,7 +47,7 @@ let rec worker_loop (t : ('msg, 'peer, 'conn) t) callback =
   let request_info =
     P2p_answerer.{last_sent_swap_request = t.last_sent_swap_request}
   in
-  Lwt_unix.yield () >>= fun () ->
+  Lwt.pause () >>= fun () ->
   protect ~canceler:t.canceler (fun () -> P2p_socket.read t.conn) >>= function
   | Ok (_, Bootstrap) -> (
       callback.bootstrap request_info >>= function
@@ -133,19 +133,19 @@ let pipe_exn_handler = function
   | Lwt_pipe.Closed -> fail P2p_errors.Connection_closed
   | exc -> Lwt.fail exc
 
-(* see [Lwt_pipe.pop] *)
+(* see [Lwt_pipe.Maybe_bounded.pop] *)
 
 let read t =
   Lwt.catch
     (fun () ->
-      Lwt_pipe.pop t.messages >>= fun (s, msg) ->
+      Lwt_pipe.Maybe_bounded.pop t.messages >>= fun (s, msg) ->
       Events.(emit bytes_popped_from_queue) (s, (P2p_socket.info t.conn).peer_id)
       >>= fun () -> return msg)
     pipe_exn_handler
 
 let is_readable t =
   Lwt.catch
-    (fun () -> Lwt_pipe.peek t.messages >>= fun _ -> return_unit)
+    (fun () -> Lwt_pipe.Maybe_bounded.peek t.messages >>= fun _ -> return_unit)
     pipe_exn_handler
 
 let write t msg = P2p_socket.write t.conn (Message msg)

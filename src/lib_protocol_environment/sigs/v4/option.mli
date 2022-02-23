@@ -105,7 +105,7 @@ val of_result : ('a, 'e) result -> 'a option
 
 val to_list : 'a option -> 'a list
 
-val to_seq : 'a option -> 'a Stdlib.Seq.t
+val to_seq : 'a option -> 'a Seq.t
 
 (** [catch f] is [Some (f ())] if [f] does not raise an exception, it is
     [None] otherwise.

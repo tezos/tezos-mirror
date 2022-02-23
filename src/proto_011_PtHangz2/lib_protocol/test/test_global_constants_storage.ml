@@ -29,7 +29,7 @@ open Test_transfer
 (** Testing
     -------
     Component:  Protocol (global table of constants)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe \
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe \
                 -- test "^global table of constants$"
     Subject:  This module tests that the global table of constants
               can be written to and read from across blocks.

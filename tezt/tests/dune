@@ -5,5 +5,7 @@
             data-encoding
             tezos-base
             tezos-base.unix
-            tezos-stdlib-unix)
+            tezos-stdlib-unix
+            tezos-protocol-alpha
+            tezos-protocol-010-PtGRANAD)
  (flags (:standard -open Tezt -open Tezt_tezos -open Tezt.Base)))

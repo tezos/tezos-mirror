@@ -1,10 +1,11 @@
-(tests
- (names test_rewriting)
- (libraries tezos-micheline
-            tezos-micheline-rewriting
-            tezos-protocol-alpha
-            tezos-error-monad
-            tezos-client-alpha
-            alcotest-lwt)
+(test
+ (name test_rewriting)
  (package tezos-micheline-rewriting)
+ (libraries
+  tezos-micheline
+  tezos-micheline-rewriting
+  tezos-protocol-alpha
+  tezos-error-monad
+  tezos-client-alpha
+  alcotest-lwt)
  (flags (:standard -open Tezos_micheline)))

@@ -23,6 +23,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+open Tezos_benchmark
+
 (* Input parameter parsing *)
 
 let verbose =
@@ -37,46 +39,42 @@ let verbose =
 (* ------------------------------------------------------------------------- *)
 (* Base sampler parameters *)
 
-let sampling_parameters =
-  let open Michelson_samplers_parameters in
-  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32} in
-  {
-    int_size = size;
-    string_size = size;
-    bytes_size = size;
-    stack_size = size;
-    type_size = size;
-    list_size = size;
-    set_size = size;
-    map_size = size;
-  }
-
 let state = Random.State.make [|42; 987897; 54120|]
 
-module Full = Michelson_samplers_base.Make_full (struct
-  let parameters = sampling_parameters
-
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
   let algo = `Default
 
   let size = 16
 end)
 
+module Michelson_base_samplers = Michelson_samplers_base.Make (struct
+  let parameters =
+    let size = {Base_samplers.min = 4; max = 32} in
+    {
+      Michelson_samplers_base.int_size = size;
+      string_size = size;
+      bytes_size = size;
+    }
+end)
+
 (* ------------------------------------------------------------------------- *)
 (* MCMC instantiation *)
 
-module Gen = Generators.Code (struct
-  module Samplers = Full
+module Code =
+  Michelson_mcmc_samplers.Make_code_sampler
+    (Michelson_base_samplers)
+    (Crypto_samplers)
+    (struct
+      let rng_state = state
 
-  let rng_state = state
+      let target_size = 500
 
-  let target_size = 500
-
-  let verbosity = if verbose then `Trace else `Silent
-end)
+      let verbosity = if verbose then `Trace else `Silent
+    end)
 
 let start = Unix.gettimeofday ()
 
-let generator = Gen.generator ~burn_in:(500 * 7)
+let generator = Code.generator ~burn_in:(500 * 7) state
 
 let stop = Unix.gettimeofday ()
 
@@ -84,15 +82,17 @@ let () = Format.printf "Burn in time: %f seconds@." (stop -. start)
 
 let _ =
   for i = 1 to 1000 do
-    let (michelson, (bef, aft)) = StaTz.Stats.sample_gen generator in
-    Test_helpers.typecheck_by_tezos bef michelson ;
-    let printable =
-      Micheline_printer.printable
-        Protocol.Michelson_v1_primitives.string_of_prim
-        michelson
+    let Michelson_mcmc_samplers.{term = michelson; bef; aft} =
+      generator state
     in
+    Test_helpers.typecheck_by_tezos bef michelson ;
     if verbose then (
       Format.eprintf "result %d/1000:@." i ;
-      Format.eprintf "type: %a => %a@." Type.Stack.pp bef Type.Stack.pp aft ;
-      Format.eprintf "%a@." Micheline_printer.print_expr printable)
+      Format.eprintf
+        "type: %a => %a@."
+        Test_helpers.print_script_expr_list
+        bef
+        Test_helpers.print_script_expr_list
+        aft ;
+      Format.eprintf "%a@." Test_helpers.print_script_expr michelson)
   done

@@ -39,15 +39,9 @@ open Error_monad
 
 (** {3 Events Definitions and Registration } *)
 
-type level =
-  | Debug
-  | Info
-  | Notice
-  | Warning
-  | Error
-  | Fatal
-      (** The relative importance of a particular event (compatible with
+(** The relative importance of a particular event (compatible with
     traditional logging systems, cf. {!Lwt_log_core.level}). *)
+type level = Debug | Info | Notice | Warning | Error | Fatal
 
 (** Module to manipulate values of type {!level}.  *)
 module Level : sig
@@ -81,6 +75,9 @@ module Section : sig
 
   (** Make the equivalent {!Lwt_log} section.  *)
   val to_lwt_log : t -> Lwt_log_core.section
+
+  (** [is_prefix ~prefix p] checks that [p] starts with [~prefix].  *)
+  val is_prefix : prefix:t -> t -> bool
 
   val encoding : t Data_encoding.t
 
@@ -450,8 +447,9 @@ module All_sinks : sig
       scheme and calls {!configure}. *)
   val activate : Uri.t -> unit tzresult Lwt.t
 
-  (** Call [close] on all the active sinks. *)
-  val close : unit -> unit tzresult Lwt.t
+  (** Call [close] on all the sinks, except the ones matching the
+      predicate [?except] (default: all of them). *)
+  val close : ?except:(Uri.t -> bool) -> unit -> unit tzresult Lwt.t
 
   (** Display the state of registered/active sinks. *)
   val pp_state : Format.formatter -> unit -> unit

@@ -55,17 +55,17 @@ be updated.
 You can work on your feature, using the types and values provided by
 your new dependency.
 
-Creating a work-in-progress MR (optional)
------------------------------------------
+Creating a draft MR (optional)
+------------------------------
 
 If you need to share your work in the early stages of development to
-gather feedback, you can start by creating a work-in-progress (WIP) MR.
+gather feedback, you can start by creating a work-in-progress (Draft) MR.
 This MR will include a hack (described below) to bypass the normal CI
 process. Because of this, it will not be mergeable as is but it will
 pass the CI and allow you to work collaboratively with other
 developers.
 
-To give the CI access to your new dependency, **insert the WIP opam commands to
+To give the CI access to your new dependency, **insert temporary opam commands to
 the CI yaml files.** The opam commands have the following form:
 
 ::
@@ -84,10 +84,10 @@ dependencies, you need to pin all of them and upgrade all of them. E.g., if
        - opam upgrade --yes foo bar
 
 In the case where your new dependency brings many transitive dependencies, this
-hack might not be worth it. You can skip this WIP MR and go directly for the
+hack might not be worth it. You can skip this Draft MR and go directly for the
 finalised MR as per the section below.
 
-If you do decide to open the WIP MR anyway, you must insert the yaml chunk into
+If you do decide to open the Draft MR anyway, you must insert the yaml chunk into
 multiple places in the CI yaml files. The list of places that you need to insert
 this chunk into may change with the CI. At the time of writing, you must insert it
 into the following places:
@@ -110,13 +110,13 @@ into the following places:
 With this ``opam pin`` hack, it can be tested but it cannot be merged
 onto master. You can push you branch to Gitlab and open an MR.
 
-- Do not forget to mark your MR as WIP on Gitlab.
+- Do not forget to mark your MR as Draft on Gitlab.
 - You should also use one dedicated commit to introduce the ``opam pin`` hack. Use an easily identifiable title for the commit. It will be easy to remove afterwards.
 
 Finalising the MR
 -----------------
 
-The ``opam pin`` CI yaml hack is satisfactory for a WIP MR. But it is
+The ``opam pin`` CI yaml hack is satisfactory for a Draft MR. But it is
 not mergeable. In order to get to a mergeable MR, you must perform the
 following steps.
 
@@ -153,14 +153,14 @@ In order to create the opam repository MR:
 - Create the opam repository MR from this branch.
 
 Fourth, back in your local copy of Tezos, **update the variables in the**
-``.gitlab-ci.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
+:src:`.gitlab/ci/templates.yml` **and** :src:`scripts/version.sh` **files**. Specifically, set
 the ``build_deps_image_version`` and the ``opam_repository_tag`` variables
 to the hash of the ``HEAD`` commit of the opam repository MR. Commit
 this change with a title along the lines of “CI: use dependency
 ``foo``”.
 
-Fifth, still in your local copy of Tezos, **update the variables in the**
-``.gitlab-ci.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
+Fifth, still in your local copy of Tezos, **temporarily patch some variables in the**
+``.gitlab/ci/templates.yml`` **and** ``scripts/version.sh`` **files**. Specifically, set
 the variables ``build_deps_image_name`` to
 ``registry.gitlab.com/<your-organisation>/opam-repository`` and
 ``opam_repository_url`` to
@@ -193,12 +193,12 @@ That’s it. You now have two MRs:
 Merging the MR
 --------------
 
-This section is for the merge team. It is the last step in the lifetime
+This section is for the :doc:`Octez merge team <merge_team>`. It is the last step in the lifetime
 of the MRs you have opened. Understanding the basics of this process may
 help you when communicating with the reviewers and the mergers of your
 MR. Understanding all the minutiae and details is not necessary. For
 this reason, this final section is addressed to whichever member of the
-merge team takes care of this MR (you).
+Octez merge team takes care of this MR (you).
 
 After the iterative review-comment-edit process has reached a satisfying
 fixpoint, you can merge the two MRs opened by the developer. To avoid
@@ -212,7 +212,10 @@ organisation’s registry.
 Second, **fix the tezos MR**. Specifically you need to:
 
 - Remove the temporary commit that points the CI to the developer’s organisation registry.
-- Amend the commit that sets the commit hash in ``.gitlab-ci.yml`` and ``scripts/version.sh``. Specifically, amend the commit to set the variables to the commit hash of the ``HEAD`` commit on the ``master`` branch of the ``tezos/opam-repository`` repository. This ``HEAD`` commit is the one obtained from merging the MR in the previous step.
+- Amend the commit that sets the commit hash in ``.gitlab/ci/templates.yml`` and ``scripts/version.sh``.
+  Specifically, amend the commit to set the variables to the commit hash of the ``HEAD`` commit on the
+  ``master`` branch of the ``tezos/opam-repository`` repository. This ``HEAD`` commit is the one obtained from
+  merging the MR in the previous step.
 
 Third, wait for the ``opam-repository`` CI to finish, and **run the CI
 on the tezos MR**. Make sure that you also run the opam stage of the

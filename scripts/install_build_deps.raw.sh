@@ -6,7 +6,14 @@ src_dir="$(dirname "$script_dir")"
 #shellcheck source=scripts/version.sh
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
+if [ "$1" = "--tps" ]; then
+    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
+else
+    # The TPS evaluation tool requires some extra dependencies that we want to hide from the end user that
+    # builds Octez. As such we're not building it by default.
+    opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -not -path "$src_dir/src/bin_tps_evaluation/*" -print)
+fi
+
 
 export OPAMYES=${OPAMYES:=true}
 
@@ -18,7 +25,7 @@ export OPAMYES=${OPAMYES:=true}
 # Note that install_build_deps.sh calls install_build_deps.rust.sh
 # which checks whether Rust is installed with the right version and explains how
 # to install it if needed, so using opam depext is redundant anyway.
-conf_packages="conf-gmp conf-libev conf-pkg-config conf-hidapi ctypes-foreign conf-autoconf conf-libffi conf-zlib" #conf-rust
+conf_packages="conf-gmp conf-libev conf-pkg-config conf-hidapi conf-autoconf conf-libffi conf-zlib" #conf-rust
 
 # Opam < 2.1 uses opam-depext as a plugin, later versions provide the option
 # `--depext-only`:

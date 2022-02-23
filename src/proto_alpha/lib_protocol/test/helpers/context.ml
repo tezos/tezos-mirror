@@ -116,21 +116,44 @@ let rpc_ctxt =
         | I bl -> Incremental.rpc_ctxt#call_proto_service3 s bl a b c q i
   end
 
-let get_endorsers ctxt = Plugin.RPC.Endorsing_rights.get rpc_ctxt ctxt
+let get_endorsers ctxt = Plugin.RPC.Validators.get rpc_ctxt ctxt
 
 let get_endorser ctxt =
-  Plugin.RPC.Endorsing_rights.get rpc_ctxt ctxt >|=? fun endorsers ->
+  get_endorsers ctxt >|=? fun endorsers ->
   let endorser = WithExceptions.Option.get ~loc:__LOC__ @@ List.hd endorsers in
   (endorser.delegate, endorser.slots)
 
-let get_voting_power = Alpha_services.Delegate.voting_power rpc_ctxt
+let get_endorser_n ctxt n =
+  Plugin.RPC.Validators.get rpc_ctxt ctxt >|=? fun endorsers ->
+  let endorser =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth endorsers n
+  in
+  (endorser.delegate, endorser.slots)
+
+let get_endorsing_power_for_delegate ctxt ?levels pkh =
+  Plugin.RPC.Validators.get rpc_ctxt ?levels ctxt >>=? fun endorsers ->
+  let rec find_slots_for_delegate = function
+    | [] -> return 0
+    | {Plugin.RPC.Validators.delegate; slots; _} :: t ->
+        if Signature.Public_key_hash.equal delegate pkh then
+          return (List.length slots)
+        else find_slots_for_delegate t
+  in
+  find_slots_for_delegate endorsers
+
+let get_voting_power = Delegate_services.voting_power rpc_ctxt
 
 let get_total_voting_power = Alpha_services.Voting.total_voting_power rpc_ctxt
 
-let get_bakers ctxt =
-  Plugin.RPC.Baking_rights.get ~max_priority:256 rpc_ctxt ctxt
-  >|=? fun bakers ->
-  List.map (fun p -> p.Plugin.RPC.Baking_rights.delegate) bakers
+let get_bakers ?(filter = fun _x -> true) ctxt =
+  Plugin.RPC.Baking_rights.get rpc_ctxt ctxt >|=? fun bakers ->
+  List.filter filter bakers
+  |> List.map (fun p -> p.Plugin.RPC.Baking_rights.delegate)
+
+let get_baker ctxt ~round =
+  get_bakers ~filter:(fun x -> x.round = round) ctxt >>=? fun bakers ->
+  (* there is only one baker for a given round *)
+  match bakers with [baker] -> return baker | _ -> assert false
 
 let get_seed_nonce_hash ctxt =
   let header =
@@ -144,42 +167,27 @@ let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
 let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 
-let get_minimal_valid_time ctxt ~priority ~endorsing_power =
-  Alpha_services.Delegate.Minimal_valid_time.get
-    rpc_ctxt
-    ctxt
-    priority
-    endorsing_power
-
-let rec reward_for_priority reward_per_prio prio =
-  match reward_per_prio with
-  | [] ->
-      (* Empty reward list in parameters means no rewards *)
-      Tez.zero
-  | [last] -> last
-  | first :: rest ->
-      if Compare.Int.(prio <= 0) then first
-      else reward_for_priority rest (pred prio)
-
-let get_baking_reward ctxt ~priority ~endorsing_power =
+let get_baking_reward_fixed_portion ctxt =
   get_constants ctxt
-  >>=? fun {Constants.parametric = {baking_reward_per_endorsement; _}; _} ->
-  let reward_per_endorsement =
-    reward_for_priority baking_reward_per_endorsement priority
-  in
+  >>=? fun {Constants.parametric = {baking_reward_fixed_portion; _}; _} ->
+  return baking_reward_fixed_portion
+
+let get_bonus_reward ctxt ~endorsing_power =
+  get_constants ctxt
+  >>=? fun {
+             Constants.parametric =
+               {baking_reward_bonus_per_slot; consensus_threshold; _};
+             _;
+           } ->
+  let multiplier = max 0 (endorsing_power - consensus_threshold) in
+  return Test_tez.(baking_reward_bonus_per_slot *! Int64.of_int multiplier)
+
+let get_endorsing_reward ctxt ~expected_endorsing_power =
+  get_constants ctxt
+  >>=? fun {Constants.parametric = {endorsing_reward_per_slot; _}; _} ->
   Lwt.return
     (Environment.wrap_tzresult
-       Tez.(reward_per_endorsement *? Int64.of_int endorsing_power))
-
-let get_endorsing_reward ctxt ~priority ~endorsing_power =
-  get_constants ctxt
-  >>=? fun {Constants.parametric = {endorsement_reward; _}; _} ->
-  let reward_per_endorsement =
-    reward_for_priority endorsement_reward priority
-  in
-  Lwt.return
-    (Environment.wrap_tzresult
-       Tez.(reward_per_endorsement *? Int64.of_int endorsing_power))
+       Tez.(endorsing_reward_per_slot *? Int64.of_int expected_endorsing_power))
 
 let get_liquidity_baking_subsidy ctxt =
   get_constants ctxt
@@ -235,29 +243,8 @@ module Contract = struct
     | Some p -> return p
     | None -> failwith "pkh: only for implicit contracts"
 
-  type balance_kind = Main | Deposit | Fees | Rewards
-
-  let balance ?(kind = Main) ctxt contract =
-    match kind with
-    | Main -> Alpha_services.Contract.balance rpc_ctxt ctxt contract
-    | _ -> (
-        match Alpha_context.Contract.is_implicit contract with
-        | None ->
-            invalid_arg
-              "get_balance: no frozen accounts for an originated contract."
-        | Some pkh ->
-            Alpha_services.Delegate.frozen_balance_by_cycle rpc_ctxt ctxt pkh
-            >>=? fun map ->
-            Lwt.return
-            @@ Cycle.Map.fold_e
-                 (fun _cycle {Delegate.deposit; fees; rewards} acc ->
-                   match kind with
-                   | Deposit -> Test_tez.Tez.(acc +? deposit)
-                   | Fees -> Test_tez.Tez.(acc +? fees)
-                   | Rewards -> Test_tez.Tez.(acc +? rewards)
-                   | _ -> assert false)
-                 map
-                 Tez.zero)
+  let balance ctxt contract =
+    Alpha_services.Contract.balance rpc_ctxt ctxt contract
 
   let counter ctxt contract =
     match Contract.is_implicit contract with
@@ -300,10 +287,11 @@ end
 
 module Delegate = struct
   type info = Delegate_services.info = {
-    balance : Tez.t;
-    frozen_balance : Tez.t;
-    frozen_balance_by_cycle : Delegate.frozen_balance Cycle.Map.t;
+    full_balance : Tez.t;
+    current_frozen_deposits : Tez.t;
+    frozen_deposits : Tez.t;
     staking_balance : Tez.t;
+    frozen_deposits_limit : Tez.t option;
     delegated_contracts : Alpha_context.Contract.t list;
     delegated_balance : Tez.t;
     deactivated : bool;
@@ -311,13 +299,36 @@ module Delegate = struct
     voting_power : int32;
   }
 
-  let info ctxt pkh = Alpha_services.Delegate.info rpc_ctxt ctxt pkh
+  let info ctxt pkh = Delegate_services.info rpc_ctxt ctxt pkh
+
+  let full_balance ctxt pkh = Delegate_services.full_balance rpc_ctxt ctxt pkh
+
+  let current_frozen_deposits ctxt pkh =
+    Delegate_services.current_frozen_deposits rpc_ctxt ctxt pkh
+
+  let initial_frozen_deposits ctxt pkh =
+    Delegate_services.frozen_deposits rpc_ctxt ctxt pkh
+
+  let staking_balance ctxt pkh =
+    Delegate_services.staking_balance rpc_ctxt ctxt pkh
+
+  let frozen_deposits_limit ctxt pkh =
+    Delegate_services.frozen_deposits_limit rpc_ctxt ctxt pkh
+
+  let deactivated ctxt pkh = Delegate_services.deactivated rpc_ctxt ctxt pkh
+
+  let participation ctxt pkh = Delegate_services.participation rpc_ctxt ctxt pkh
 end
 
-let init ?rng_state ?endorsers_per_block ?with_commitments
-    ?(initial_balances = []) ?initial_endorsers ?min_proposal_quorum
-    ?time_between_blocks ?minimal_block_delay ?delay_per_missing_endorsement
-    ?bootstrap_contracts ?level ?cost_per_byte ?liquidity_baking_subsidy n =
+module Tx_rollup = struct
+  let state ctxt tx_rollup = Tx_rollup_services.state rpc_ctxt ctxt tx_rollup
+end
+
+let init ?rng_state ?commitments ?(initial_balances = []) ?consensus_threshold
+    ?min_proposal_quorum ?bootstrap_contracts ?level ?cost_per_byte
+    ?liquidity_baking_subsidy ?endorsing_reward_per_slot
+    ?baking_reward_bonus_per_slot ?baking_reward_fixed_portion ?origination_size
+    ?blocks_per_cycle ?tx_rollup_enable n =
   let accounts = Account.generate_accounts ?rng_state ~initial_balances n in
   let contracts =
     List.map
@@ -325,16 +336,38 @@ let init ?rng_state ?endorsers_per_block ?with_commitments
       accounts
   in
   Block.genesis
-    ?endorsers_per_block
-    ?with_commitments
-    ?initial_endorsers
+    ?commitments
+    ?consensus_threshold
     ?min_proposal_quorum
-    ?time_between_blocks
-    ?minimal_block_delay
-    ?delay_per_missing_endorsement
     ?bootstrap_contracts
     ?level
     ?cost_per_byte
     ?liquidity_baking_subsidy
+    ?endorsing_reward_per_slot
+    ?baking_reward_bonus_per_slot
+    ?baking_reward_fixed_portion
+    ?origination_size
+    ?blocks_per_cycle
+    ?tx_rollup_enable
     accounts
   >|=? fun blk -> (blk, contracts)
+
+let init_with_constants constants n =
+  let accounts = Account.generate_accounts n in
+  let contracts =
+    List.map
+      (fun (a, _) -> Alpha_context.Contract.implicit_contract Account.(a.pkh))
+      accounts
+  in
+  let open Tezos_protocol_alpha_parameters in
+  let bootstrap_accounts =
+    List.map
+      (fun (acc, tez) ->
+        Default_parameters.make_bootstrap_account
+          (acc.Account.pkh, acc.Account.pk, tez))
+      accounts
+  in
+  let parameters =
+    Default_parameters.parameters_of_constants ~bootstrap_accounts constants
+  in
+  Block.genesis_with_parameters parameters >|=? fun blk -> (blk, contracts)

@@ -51,7 +51,6 @@ module Prevalidators = struct
         ~output:
           (Worker_types.full_status_encoding
              Prevalidator_worker_state.Request.encoding
-             Prevalidator_worker_state.Event.encoding
              RPC_error.encoding)
         RPC_path.(
           root / "workers" / "prevalidators" /: Chain_services.chain_arg)
@@ -73,7 +72,6 @@ module Block_validator = struct
         ~output:
           (Worker_types.full_status_encoding
              Block_validator_worker_state.Request.encoding
-             Block_validator_worker_state.Event.encoding
              RPC_error.encoding)
         RPC_path.(root / "workers" / "block_validator")
   end
@@ -113,7 +111,6 @@ module Peer_validators = struct
         ~output:
           (Worker_types.full_status_encoding
              Peer_validator_worker_state.Request.encoding
-             Peer_validator_worker_state.Event.encoding
              RPC_error.encoding)
         RPC_path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg
@@ -153,7 +150,6 @@ module Chain_validators = struct
         ~output:
           (Worker_types.full_status_encoding
              Chain_validator_worker_state.Request.encoding
-             Chain_validator_worker_state.Event.encoding
              RPC_error.encoding)
         RPC_path.(
           root / "workers" / "chain_validators" /: Chain_services.chain_arg)

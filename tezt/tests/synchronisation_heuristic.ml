@@ -32,19 +32,37 @@
 
 open Base
 
+let wait_for ~statuses node =
+  let filter json =
+    match JSON.(json |=> 1 |-> "event" |> as_string_opt) with
+    | None ->
+        Log.info "%s: none" (Node.name node) ;
+        None
+    | Some status ->
+        Log.info "%s: %s" (Node.name node) status ;
+        if List.exists (fun st -> String.equal st status) statuses then Some ()
+        else None
+  in
+  Node.wait_for node "node_chain_validator.v0" filter
+
 let wait_for_sync node =
   let filter json =
     match JSON.(json |=> 1 |-> "event" |> as_string_opt) with
-    | None -> None
-    | Some status -> if status = "synced" then Some () else None
+    | None ->
+        Log.info "%s: none" (Node.name node) ;
+        None
+    | Some status ->
+        Log.info "%s: %s" (Node.name node) status ;
+        if String.equal status "synced" then Some () else None
   in
   let event = Node.wait_for node "node_chain_validator.v0" filter in
-  (* If a node is synchronised before the node to be ready, we check
-     if the nde is not already synchronised via an RPC. *)
+  (* A node may be synchronised before it is considered "ready". We check
+     whether the node is (already) synchronized via an RPC. *)
   let is_synchronised =
     let* client = Client.init ~endpoint:(Node node) () in
     let* json = RPC.is_bootstrapped client in
-    if JSON.(json |-> "sync_state" |> as_string = "synced") then Lwt.return_unit
+    if String.equal JSON.(json |-> "sync_state" |> as_string) "synced" then
+      Lwt.return_unit
     else fst @@ Lwt.task ()
   in
   Lwt.pick [event; is_synchronised]
@@ -70,14 +88,12 @@ let check_node_synchronization_state =
   in
   Log.info "%d nodes initialized." (n + 1) ;
   let* client = Client.init ~endpoint:(Node main_node) () in
-  let* () =
-    Client.activate_protocol
-      ~protocol
-      ~timestamp_delay:(float_of_int blocks_to_bake)
-      client
-  in
+  let* () = Client.activate_protocol ~protocol client in
   Log.info "Activated protocol." ;
-  let* () = repeat blocks_to_bake (fun () -> Client.bake_for client) in
+  let* () =
+    repeat blocks_to_bake (fun () ->
+        Client.bake_for ~minimal_timestamp:true client)
+  in
   Log.info "Baked %d blocks." blocks_to_bake ;
   let* () =
     Lwt_list.iter_p
@@ -93,26 +109,17 @@ let check_node_synchronization_state =
         unit)
       nodes
   in
-  Log.info "Terminating the nodes..." ;
-  let* () =
-    Lwt_list.iter_p (fun node -> Node.terminate node) (main_node :: nodes)
-  in
-  (* We register the event before the node is restarted. Otherwise,
-     the test may be flaky since the event could be registered after
-     the event happend. *)
-  let event =
-    Lwt_list.iter_p (fun node -> wait_for_sync node) (main_node :: nodes)
-  in
   Log.info "Restarting the nodes..." ;
+  let* _ =
+    Lwt_list.iter_p (fun node -> Node.restart node []) (main_node :: nodes)
+  in
+  Log.info "Waiting for nodes to be synchronized." ;
   let* () =
     Lwt_list.iter_p
-      (fun node ->
-        let* () = Node.run node [] in
-        Node.wait_for_ready node)
+      (fun node -> wait_for ~statuses:["synced"; "stuck"] node)
       (main_node :: nodes)
   in
-  Log.info "Waiting for nodes to be synchronized..." ;
-  event
+  unit
 
 (* In order to check that the prevalidator is not alive, we cannot
    rely on events because it's indecidable, thus we query a RPC that
@@ -163,7 +170,7 @@ let check_prevalidator_start =
     Lwt_list.iter_p (fun node -> wait_for_sync node) [node1; node2]
   in
   let* client = Client.init ~endpoint:(Node node1) () in
-  let* () = Client.activate_protocol ~protocol client ~timestamp_delay:3600. in
+  let* () = Client.activate_protocol ~protocol client ~timestamp_delay:0. in
   Log.info "Activated protocol." ;
   let* () = Client.bake_for ~minimal_timestamp:false client in
   let connect node node' =

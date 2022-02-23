@@ -102,9 +102,12 @@ module SingletonR : EXTENDED = struct
   let salvage f e = match f e with None -> Error e | Some x -> Ok x
 
   let salvage_s f e =
+    let open Lwt_syntax in
     match f e with
-    | None -> Lwt.return (Error e)
-    | Some x -> x >>= Lwt.return_ok
+    | None -> return_error e
+    | Some x ->
+        let* o = x in
+        return_ok o
 
   let salvage_e f e = match f e with None -> Error e | Some x -> x
 
@@ -146,9 +149,12 @@ module SingletonL : EXTENDED = struct
   let salvage f e = match f e with None -> Error e | Some x -> Ok x
 
   let salvage_s f e =
+    let open Lwt_syntax in
     match f e with
-    | None -> Lwt.return (Error e)
-    | Some x -> x >>= Lwt.return_ok
+    | None -> return_error e
+    | Some x ->
+        let* o = x in
+        return_ok o
 
   let salvage_e f e = match f e with None -> Error e | Some x -> x
 
@@ -198,9 +204,12 @@ module SingletonND : EXTENDED = struct
   let salvage f e = match f e with None -> Error e | Some x -> Ok x
 
   let salvage_s f e =
+    let open Lwt_syntax in
     match f e with
-    | None -> Lwt.return (Error e)
-    | Some x -> x >>= Lwt.return_ok
+    | None -> return_error e
+    | Some x ->
+        let* o = x in
+        return_ok o
 
   let salvage_e f e = match f e with None -> Error e | Some x -> x
 
@@ -247,10 +256,13 @@ module Flat : EXTENDED = struct
     match f e with None -> Error t | Some x -> Ok x
 
   let salvage_s f t =
+    let open Lwt_syntax in
     let e = Stdlib.List.hd t in
     match f e with
-    | None -> Lwt.return (Error t)
-    | Some x -> x >>= Lwt.return_ok
+    | Some x ->
+        let* o = x in
+        return_ok o
+    | None -> return_error t
 
   let salvage_e f t =
     let e = Stdlib.List.hd t in
@@ -339,16 +351,18 @@ module Full : EXTENDED = struct
     match pre_salvage f t with Some x -> Ok x | None -> Error t
 
   let salvage_s f t =
+    let open Lwt_syntax in
     match pre_salvage f t with
-    | Some x -> x >>= fun x -> Lwt.return (Ok x)
-    | None -> Lwt.return (Error t)
+    | None -> return_error t
+    | Some x ->
+        let* o = x in
+        return_ok o
 
   let salvage_e f t = match pre_salvage f t with Some x -> x | None -> Error t
 
   let salvage_es f t =
-    match pre_salvage f t with
-    | Some x -> x >>= fun x -> Lwt.return x
-    | None -> Lwt.return (Error t)
+    let open Lwt_syntax in
+    match pre_salvage f t with None -> return_error t | Some x -> x
 
   let recover f g t = match pre_salvage f t with Some x -> x | None -> g t
 

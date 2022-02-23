@@ -377,9 +377,10 @@ class Sandbox:
     def add_baker(
         self,
         node_id: int,
-        account: str,
+        accounts: List[str],
         proto: str,
         params: List[str] = None,
+        log_levels: Dict[str, str] = None,
         branch: str = "",
         run_params: List[str] = None,
     ) -> None:
@@ -392,6 +393,7 @@ class Sandbox:
             proto (str): name of protocol, used to determine the binary to
                          use. E.g. 'alpha` for `tezos-baker-alpha`.
             params (list): additional parameters
+            log_levels (dict): log levels. e.g. {"p2p.connection-pool":"debug"}
             branch (str): see branch parameter for `add_node()`
         """
         assert node_id in self.nodes, f'No node running with id={node_id}'
@@ -418,8 +420,9 @@ class Sandbox:
             rpc_node,
             client.base_dir,
             node.node_dir,
-            account,
+            accounts,
             params=params,
+            log_levels=log_levels,
             log_file=log_file,
             run_params=run_params,
         )
@@ -622,3 +625,112 @@ class Sandbox:
                     print(f'# endorser {endo_id} for proto {proto} has failed')
                     daemons_alive = False
         return daemons_alive
+
+
+class SandboxMultiBranch(Sandbox):
+    """Specialized version of `Sandbox` using binaries with different versions.
+
+    Binaries are looked up according to a map from node_id to branch
+
+    For instance,  if we define `branch_map` as:
+
+    branch_map = {i: 'zeronet' if i % 2 == 0 else 'alphanet'
+                  for i in range(20)}
+
+    Nodes/client for even ids will be looked up in `binaries_path/zeronet`
+    Nodes/client for odd ids will be looked up in `binaries_path/alphanet`
+
+    One advantage of using `SandboxMultibranch` rather than `Sandbox` is that
+    we can sometimes run the same tests with different binaries revision by
+    simply changing the sandbox.
+    """
+
+    def __init__(
+        self,
+        binaries_path: str,
+        identities: Dict[str, Dict[str, str]],
+        branch_map: Dict[int, str],
+        rpc: int = 18730,
+        p2p: int = 19730,
+        num_peers: int = 45,
+        log_dir: str = None,
+        singleprocess: bool = False,
+    ):
+        """Same semantics as Sandbox class, plus a `branch_map` parameter"""
+        super().__init__(
+            binaries_path,
+            identities,
+            rpc,
+            p2p,
+            num_peers,
+            log_dir,
+            singleprocess,
+        )
+        self._branch_map = branch_map
+        for branch in list(branch_map.values()):
+            error_msg = f'{binaries_path}/{branch} not a dir'
+            assert os.path.isdir(f'{binaries_path}/{branch}'), error_msg
+
+    def add_baker(
+        self,
+        node_id: int,
+        accounts: List[str],
+        proto: str,
+        params: List[str] = None,
+        log_levels: Dict[str, str] = None,
+        branch: str = "",
+        run_params: List[str] = None,
+    ) -> None:
+        """branch is overridden by branch_map"""
+        branch = self._branch_map[node_id]
+        super().add_baker(
+            node_id, accounts, proto, params, log_levels, branch, run_params
+        )
+
+    def add_endorser(
+        self,
+        node_id: int,
+        account: str,
+        proto: str,
+        endorsement_delay: int = 0,
+        branch: str = "",
+    ) -> None:
+        """branchs is overridden by branch_map"""
+        branch = self._branch_map[node_id]
+        super().add_endorser(node_id, account, proto, endorsement_delay, branch)
+
+    def add_node(
+        self,
+        node_id: int,
+        node_dir: str = None,
+        peers: List[int] = None,
+        params: List[str] = None,
+        log_levels: Dict[str, str] = None,
+        private: bool = True,
+        config_client: bool = True,
+        use_tls: Tuple[str, str] = None,
+        snapshot: str = None,
+        reconstruct: bool = False,
+        branch: str = "",
+        node_config: dict = None,
+        mode: str = None,
+        client_factory: Callable = Client,
+    ) -> None:
+        assert not branch
+        branch = self._branch_map[node_id]
+        super().add_node(
+            node_id,
+            node_dir,
+            peers,
+            params,
+            log_levels,
+            private,
+            config_client,
+            use_tls,
+            snapshot,
+            reconstruct,
+            branch,
+            node_config,
+            mode,
+            client_factory,
+        )

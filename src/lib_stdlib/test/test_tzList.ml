@@ -41,7 +41,7 @@ let rec permut = function
         in
         loop [] [] xs
       in
-      List.concat (List.map insert (permut xs))
+      List.concat_map insert (permut xs)
 
 let test_take_n _ =
   ListLabels.iter
@@ -77,6 +77,20 @@ let test_take_n _ =
     ~f:(fun xs ->
       Assert.equal ~msg:__LOC__ (TzList.take_n ~compare 5 xs) [4; 5; 5; 5; 6])
 
+let test_drop_n _ =
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 3 [1; 2; 3; 4; 5]) [4; 5] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 3 [1; 2]) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 3 []) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n (-1) [1; 2]) [1; 2] ;
+  Assert.equal ~msg:__LOC__ (TzList.drop_n 0 [1; 2]) [1; 2]
+
+let test_filter_some _ =
+  Assert.equal ~msg:__LOC__ (TzList.filter_some []) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [None]) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [None; None]) [] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [Some 0; None; Some 1]) [0; 1] ;
+  Assert.equal ~msg:__LOC__ (TzList.filter_some [Some 1]) [1]
+
 let list_size = QCheck.Gen.int_range 2 1000
 
 let pp_int_list =
@@ -84,10 +98,12 @@ let pp_int_list =
     ~pp_sep:(fun ppf () -> Format.fprintf ppf "; ")
     Format.pp_print_int
 
+let count = 1000
+
 let test_shuffle_preserves_values =
   QCheck.Test.make
     ~name:"shuffle preserves value sets"
-    ~count:1000
+    ~count
     QCheck.(list_of_size list_size int)
     (fun l ->
       let l1 = List.sort Int.compare l in
@@ -99,6 +115,32 @@ let test_shuffle_preserves_values =
         ~expected:l1
         ())
 
+let test_take_drop =
+  QCheck.Test.make
+    ~name:"(take_n n l @@ drop_n n l) = l"
+    ~count
+    QCheck.(pair (list_of_size list_size int) small_int)
+    (fun (l, n) ->
+      Lib_test.Qcheck_helpers.qcheck_eq'
+        ~pp:pp_int_list
+        ~eq:( = )
+        ~actual:TzList.(take_n n l @ TzList.drop_n n l)
+        ~expected:l
+        ())
+
+let test_filter_some_length =
+  QCheck.Test.make
+    ~name:"(length (filter_some l)) = (length (filter (Option.is_some) l))"
+    ~count
+    QCheck.(list_of_size list_size (option int))
+    (fun l ->
+      Lib_test.Qcheck_helpers.qcheck_eq'
+        ~pp:Format.pp_print_int
+        ~eq:( = )
+        ~actual:(List.length (TzList.filter_some l))
+        ~expected:(List.length (List.filter Option.is_some l))
+        ())
+
 let () =
   Alcotest.run
     "stdlib"
@@ -106,6 +148,10 @@ let () =
       ( "tzList",
         [
           ("take_n", `Quick, test_take_n);
+          ("drop_n", `Quick, test_drop_n);
+          ("filter_some", `Quick, test_filter_some);
           QCheck_alcotest.to_alcotest test_shuffle_preserves_values;
+          QCheck_alcotest.to_alcotest test_take_drop;
+          QCheck_alcotest.to_alcotest test_filter_some_length;
         ] );
     ]

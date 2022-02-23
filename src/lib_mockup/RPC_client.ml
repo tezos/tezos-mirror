@@ -25,8 +25,8 @@
 
 class mockup_ctxt (base_dir : string) (mem_only : bool)
   (mockup_env : Tezos_mockup_registration.Registration.mockup_environment)
-  (chain_id : Chain_id.t) (rpc_context : Tezos_protocol_environment.rpc_context) :
-  RPC_context.json =
+  (chain_id : Chain_id.t) (rpc_context : Tezos_protocol_environment.rpc_context)
+  protocol_data : RPC_context.json =
   let local_ctxt =
     Tezos_mockup_proxy.RPC_client.local_ctxt
       (Local_services.build_directory
@@ -34,13 +34,17 @@ class mockup_ctxt (base_dir : string) (mem_only : bool)
          mem_only
          mockup_env
          chain_id
-         rpc_context)
+         rpc_context
+         protocol_data)
   in
   object
     method base = local_ctxt#base
 
     method generic_json_call meth ?body uri =
       local_ctxt#generic_json_call meth ?body uri
+
+    method generic_media_type_call meth ?body uri =
+      local_ctxt#generic_media_type_call meth ?body uri
 
     method call_service
         : 'm 'p 'q 'i 'o.

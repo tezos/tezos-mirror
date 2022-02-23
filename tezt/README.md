@@ -31,11 +31,13 @@ The Tezt directory contains several directories:
   regression test which can be either `tests/RPC_test.ml` or
   `tests/encoding.ml`.
 
-- `test-results.json` is a record of the time taken by tests.
-  It is used by the CI to distribute tests in jobs of roughly equal duration.
-  To update it, run (from the root of the Tezos repository):
+- `records` contains records of the time taken by tests, and a script that updates them.
+  Records are used by the CI to distribute tests in jobs of roughly equal duration.
+  To update it, get a recent CI pipeline ID and run (from the root of the Tezos repository):
 
-    make && dune exec tezt/tests/main.exe -- --record tezt/test-results.json
+    PIPELINE=<PIPELINE_ID> dune exec tezt/records/update.exe -- -i
+    git add tezt/records
+    git commit -m 'Tezt: update records'
 
 ## Implementation Details
 

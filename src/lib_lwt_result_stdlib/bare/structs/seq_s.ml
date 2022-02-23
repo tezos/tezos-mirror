@@ -25,6 +25,11 @@
 
 open Monad
 
+(* This module is about sequences mixed in with Lwt, the most common monad
+   here is the Lwt monad, we open its syntax module for the whole file (and
+   shadow it when needed. *)
+open Lwt_syntax
+
 type +'a node = Nil | Cons of 'a * 'a t
 
 and 'a t = unit -> 'a node Lwt.t
@@ -35,53 +40,70 @@ let nil_s = Lwt.return Nil
 
 let empty () = nil_s
 
-let return x () = Lwt.return (Cons (x, empty))
-
+(* we define [return] at the end of the file to avoid shadowing the one from the
+   opened monad syntax *)
 let return_s p () = Lwt.map (fun x -> Cons (x, empty)) p
 
 let cons item t () = Lwt.return (Cons (item, t))
 
-let cons_s item t () = item >|= fun item -> Cons (item, t)
+let cons_s item t () =
+  let* item = item in
+  return (Cons (item, t))
 
 let rec append ta tb () =
-  ta () >>= function
+  let* n = ta () in
+  match n with
   | Nil -> tb ()
-  | Cons (item, ta) -> Lwt.return (Cons (item, append ta tb))
+  | Cons (item, ta) -> return (Cons (item, append ta tb))
 
-let first s = s () >|= function Nil -> None | Cons (x, _) -> Some x
+let first s =
+  let* n = s () in
+  match n with Nil -> return_none | Cons (x, _) -> return_some x
 
 let rec fold_left f acc seq =
-  seq () >>= function
-  | Nil -> Lwt.return acc
+  let* n = seq () in
+  match n with
+  | Nil -> return acc
   | Cons (item, seq) -> fold_left f (f acc item) seq
 
 let fold_left f acc seq = fold_left f acc @@ protect seq
 
 let rec fold_left_e f acc seq =
-  seq () >>= function
-  | Nil -> Monad.return acc
-  | Cons (item, seq) ->
-      Result.bind_s (f acc item) (fun acc -> fold_left_e f acc seq)
+  let* n = seq () in
+  match n with
+  | Nil -> return_ok acc
+  | Cons (item, seq) -> (
+      match f acc item with
+      | Error _ as e -> Lwt.return e
+      | Ok acc -> fold_left_e f acc seq)
 
 let fold_left_e f acc seq = fold_left_e f acc @@ protect seq
 
 let rec fold_left_s f acc seq =
-  seq () >>= function
-  | Nil -> Lwt.return acc
-  | Cons (item, seq) -> f acc item >>= fun acc -> fold_left_s f acc seq
+  let* n = seq () in
+  match n with
+  | Nil -> return acc
+  | Cons (item, seq) ->
+      let* acc = f acc item in
+      fold_left_s f acc seq
 
 let fold_left_s f acc seq = fold_left_s f acc @@ protect seq
 
 let rec fold_left_es f acc seq =
-  seq () >>= function
-  | Nil -> Monad.return acc
-  | Cons (item, seq) -> f acc item >>=? fun acc -> fold_left_es f acc seq
+  let* n = seq () in
+  let open Lwt_result_syntax in
+  match n with
+  | Nil -> return acc
+  | Cons (item, seq) ->
+      let* acc = f acc item in
+      fold_left_es f acc seq
 
 let fold_left_es f acc seq = fold_left_es f acc @@ protect seq
 
 let rec iter f seq =
-  seq () >>= function
-  | Nil -> Lwt.return_unit
+  let* n = seq () in
+  match n with
+  | Nil -> return_unit
   | Cons (item, seq) ->
       f item ;
       iter f seq
@@ -89,79 +111,102 @@ let rec iter f seq =
 let iter f seq = iter f @@ protect seq
 
 let rec iter_e f seq =
-  seq () >>= function
-  | Nil -> LwtResult.return_unit
-  | Cons (item, seq) -> f item >>?= fun () -> iter_e f seq
+  let* n = seq () in
+  let open Lwt_result_syntax in
+  match n with
+  | Nil -> return_unit
+  | Cons (item, seq) ->
+      let*? () = f item in
+      iter_e f seq
 
 let iter_e f seq = iter_e f @@ protect seq
 
 let rec iter_s f seq =
-  seq () >>= function
-  | Nil -> Lwt.return_unit
-  | Cons (item, seq) -> f item >>= fun () -> iter_s f seq
+  let* n = seq () in
+  match n with
+  | Nil -> return_unit
+  | Cons (item, seq) ->
+      let* () = f item in
+      iter_s f seq
 
 let iter_s f seq = iter_s f @@ protect seq
 
 let rec iter_es f seq =
-  seq () >>= function
-  | Nil -> LwtResult.return_unit
-  | Cons (item, seq) -> f item >>=? fun () -> iter_es f seq
+  let* n = seq () in
+  let open Lwt_result_syntax in
+  match n with
+  | Nil -> return_unit
+  | Cons (item, seq) ->
+      let* () = f item in
+      iter_es f seq
 
 let iter_es f seq = iter_es f @@ protect seq
 
 let iter_ep f seq =
-  fold_left (fun acc item -> Lwt.apply f item :: acc) [] seq >>= join_ep
+  let* ps = fold_left (fun acc item -> Lwt.apply f item :: acc) [] seq in
+  Lwt_result_syntax.join ps
 
 let iter_p f seq =
-  fold_left (fun acc item -> Lwt.apply f item :: acc) [] seq >>= join_p
+  let* ps = fold_left (fun acc item -> Lwt.apply f item :: acc) [] seq in
+  join ps
 
 let rec map f seq () =
-  seq () >|= function Nil -> Nil | Cons (item, seq) -> Cons (f item, map f seq)
+  let* n = seq () in
+  match n with
+  | Nil -> nil_s
+  | Cons (item, seq) -> return (Cons (f item, map f seq))
 
 let map f seq = map f @@ protect seq
 
 let rec map_s f seq () =
-  seq () >>= function
+  let* n = seq () in
+  match n with
   | Nil -> nil_s
-  | Cons (item, seq) -> f item >|= fun item -> Cons (item, map_s f seq)
+  | Cons (item, seq) ->
+      let* item = f item in
+      return (Cons (item, map_s f seq))
 
 let map_s f seq = map_s f @@ protect seq
 
 let rec filter f seq () =
-  seq () >>= function
+  let* n = seq () in
+  match n with
   | Nil -> nil_s
   | Cons (item, seq) ->
-      if f item then Lwt.return (Cons (item, seq)) else filter f seq ()
+      if f item then return (Cons (item, seq)) else filter f seq ()
 
 let filter f seq = filter f @@ protect seq
 
 let rec filter_s f seq () =
-  seq () >>= function
+  let* n = seq () in
+  match n with
   | Nil -> nil_s
-  | Cons (item, seq) -> (
-      f item >>= function
-      | true -> Lwt.return (Cons (item, filter_s f seq))
-      | false -> filter_s f seq ())
+  | Cons (item, seq) ->
+      let* b = f item in
+      if b then return (Cons (item, filter_s f seq)) else filter_s f seq ()
 
 let filter_s f seq = filter_s f @@ protect seq
 
 let rec filter_map f seq () =
-  seq () >>= function
+  let* n = seq () in
+  match n with
   | Nil -> nil_s
   | Cons (item, seq) -> (
       match f item with
       | None -> filter_map f seq ()
-      | Some item -> Lwt.return (Cons (item, filter_map f seq)))
+      | Some item -> return (Cons (item, filter_map f seq)))
 
 let filter_map f seq = filter_map f @@ protect seq
 
 let rec filter_map_s f seq () =
-  seq () >>= function
+  let* n = seq () in
+  match n with
   | Nil -> nil_s
   | Cons (item, seq) -> (
-      f item >>= function
+      let* item_o = f item in
+      match item_o with
       | None -> filter_map_s f seq ()
-      | Some item -> Lwt.return (Cons (item, filter_map_s f seq)))
+      | Some item -> return (Cons (item, filter_map_s f seq)))
 
 let filter_map_s f seq = filter_map_s f @@ protect seq
 
@@ -171,16 +216,21 @@ let rec unfold f a () =
   | Some (item, a) -> Lwt.return (Cons (item, unfold f a))
 
 let rec unfold_s f a () =
-  f a >>= function
+  let* cont = f a in
+  match cont with
   | None -> nil_s
-  | Some (item, a) -> Lwt.return (Cons (item, unfold_s f a))
+  | Some (item, a) -> return (Cons (item, unfold_s f a))
 
 let rec of_seq seq () =
   match seq () with
   | Stdlib.Seq.Nil -> nil_s
-  | Stdlib.Seq.Cons (e, seq) -> Lwt.return (Cons (e, of_seq seq))
+  | Stdlib.Seq.Cons (e, seq) -> return (Cons (e, of_seq seq))
 
 let rec of_seq_s seq () =
   match seq () with
   | Stdlib.Seq.Nil -> nil_s
-  | Stdlib.Seq.Cons (p, seq) -> p >|= fun e -> Cons (e, of_seq_s seq)
+  | Stdlib.Seq.Cons (p, seq) ->
+      let* e = p in
+      return (Cons (e, of_seq_s seq))
+
+let return x () = Lwt.return (Cons (x, empty))

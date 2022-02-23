@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -63,6 +64,28 @@ type public_key_hash = Signature.Public_key_hash.t
 
 type signature = Signature.t
 
+module Slot : sig
+  type t
+
+  include Compare.S with type t := t
+
+  val pp : Format.formatter -> t -> unit
+
+  val zero : t
+
+  val succ : t -> t
+
+  val of_int_do_not_use_except_for_parameters : int -> t
+
+  val encoding : t Data_encoding.encoding
+
+  val slot_range : min:int -> count:int -> t list tzresult
+
+  module Map : Map.S with type key = t
+
+  module Set : Set.S with type elt = t
+end
+
 module Tez : sig
   include BASIC_DATA
 
@@ -79,6 +102,8 @@ module Tez : sig
   val one : tez
 
   val ( -? ) : tez -> tez -> tez tzresult
+
+  val sub_opt : tez -> tez -> tez option
 
   val ( +? ) : tez -> tez -> tez tzresult
 
@@ -97,6 +122,8 @@ module Tez : sig
   val of_mutez_exn : int64 -> t
 
   val mul_exn : t -> int -> t
+
+  val div_exn : t -> int -> t
 end
 
 module Period : sig
@@ -136,9 +163,15 @@ module Timestamp : sig
 
   val ( -? ) : time -> time -> Period.t tzresult
 
+  val ( - ) : time -> Period.t -> time
+
   val of_notation : string -> time option
 
   val to_notation : time -> string
+
+  val of_seconds : int64 -> time
+
+  val to_seconds : time -> int64
 
   val of_seconds_string : string -> time option
 
@@ -191,6 +224,87 @@ module Cycle : sig
   module Map : Map.S with type key = cycle
 end
 
+module Round : sig
+  (* A round represents an iteration of the single-shot consensus algorithm.
+     This mostly simply re-exports [Round_repr]. See [Round_repr] for
+     additional documentation of this module *)
+
+  type t
+
+  val zero : t
+
+  val succ : t -> t
+
+  val pred : t -> t tzresult
+
+  val to_int32 : t -> int32
+
+  val of_int32 : int32 -> t tzresult
+
+  val of_int : int -> t tzresult
+
+  val to_int : t -> int tzresult
+
+  val to_slot : t -> committee_size:int -> Slot.t tzresult
+
+  val pp : Format.formatter -> t -> unit
+
+  val encoding : t Data_encoding.t
+
+  include Compare.S with type t := t
+
+  module Map : Map.S with type key = t
+
+  type round_durations
+
+  val pp_round_durations : Format.formatter -> round_durations -> unit
+
+  val round_durations_encoding : round_durations Data_encoding.t
+
+  val round_duration : round_durations -> t -> Period.t
+
+  module Durations : sig
+    val create :
+      first_round_duration:Period.t ->
+      delay_increment_per_round:Period.t ->
+      round_durations tzresult
+
+    val create_opt :
+      first_round_duration:Period.t ->
+      delay_increment_per_round:Period.t ->
+      round_durations option
+  end
+
+  val level_offset_of_round : round_durations -> round:t -> Period.t tzresult
+
+  val timestamp_of_round :
+    round_durations ->
+    predecessor_timestamp:Time.t ->
+    predecessor_round:t ->
+    round:t ->
+    Time.t tzresult
+
+  val timestamp_of_another_round_same_level :
+    round_durations ->
+    current_timestamp:Time.t ->
+    current_round:t ->
+    considered_round:t ->
+    Time.t tzresult
+
+  val round_of_timestamp :
+    round_durations ->
+    predecessor_timestamp:Time.t ->
+    predecessor_round:t ->
+    timestamp:Time.t ->
+    t tzresult
+
+  (* retrieve a round from the context *)
+  val get : context -> t tzresult Lwt.t
+
+  (* store a round in context *)
+  val update : context -> t -> context tzresult Lwt.t
+end
+
 module Gas : sig
   (** This module implements the gas subsystem of the context.
 
@@ -236,6 +350,14 @@ module Gas : sig
      [Unaccounted], an arbitrary value will be returned. *)
   val remaining_operation_gas : context -> Arith.fp
 
+  (** [reset_block_gas ctxt] returns a context where the remaining gas
+     in the block is reset to the constant [hard_gas_limit_per_block],
+     i.e., as if no operations have been included in the block.
+
+     /!\ Do not call this function unless you want to validate
+     operations on their own (like in the mempool). *)
+  val reset_block_gas : context -> context
+
   (** [level ctxt] is the current gas level in [ctxt] for the current
      operation. *)
   val level : context -> t
@@ -243,10 +365,6 @@ module Gas : sig
   (** [update_remaining_operation_gas ctxt remaining] sets the current
      gas level for operations to [remaining]. *)
   val update_remaining_operation_gas : context -> Arith.fp -> context
-
-  (** [gas_exhausted_error ctxt] raises an error indicating the gas
-      has been exhausted. *)
-  val gas_exhausted_error : context -> 'a tzresult
 
   (** [consumed since until] is the operation gas level difference
      between context [since] and context [until]. This function
@@ -361,6 +479,8 @@ module Script_timestamp : sig
   val to_zint : t -> Z.t
 
   val of_zint : Z.t -> t
+
+  val encoding : t Data_encoding.encoding
 end
 
 module Script : sig
@@ -451,6 +571,7 @@ module Script : sig
     | I_SLICE
     | I_STEPS_TO_QUOTA
     | I_SUB
+    | I_SUB_MUTEZ
     | I_SWAP
     | I_TRANSFER_TOKENS
     | I_SET_DELEGATE
@@ -523,7 +644,11 @@ module Script : sig
 
   val lazy_expr : expr -> lazy_expr
 
-  type node = (location, prim) Micheline.node
+  type 'location michelson_node = ('location, prim) Micheline.node
+
+  type unlocated_michelson_node = unit michelson_node
+
+  type node = location michelson_node
 
   type t = {code : lazy_expr; storage : lazy_expr}
 
@@ -545,33 +670,39 @@ module Script : sig
 
   val bytes_node_cost : bytes -> Gas.cost
 
+  (** Mode of deserialization gas consumption in {!force_decode}:
+
+      - {!Always}: the gas is taken independently of the internal state of the
+        [lazy_expr]
+      - {!When_needed}: the gas is consumed only if the [lazy_expr] has never
+        been deserialized before. *)
+  type consume_deserialization_gas = Always | When_needed
+
+  (** Decode an expression in the context after consuming the deserialization
+      gas cost (see {!consume_deserialization_gas}). *)
   val force_decode_in_context :
-    context -> lazy_expr -> (expr * context) tzresult
+    consume_deserialization_gas:consume_deserialization_gas ->
+    context ->
+    lazy_expr ->
+    (expr * context) tzresult
 
   val force_bytes_in_context :
     context -> lazy_expr -> (bytes * context) tzresult
 
   val unit_parameter : lazy_expr
 
-  val strip_locations_cost : node -> Gas.cost
+  val strip_locations_cost : _ michelson_node -> Gas.cost
+
+  val strip_annotations_cost : node -> Gas.cost
+
+  val strip_annotations : node -> node
 end
 
 module Constants : sig
   (** Fixed constants *)
-  type fixed = {
-    proof_of_work_nonce_size : int;
-    nonce_length : int;
-    max_anon_ops_per_block : int;
-    max_operation_data_length : int;
-    max_proposals_per_delegate : int;
-    max_micheline_node_count : int;
-    max_micheline_bytes_limit : int;
-    max_allowed_global_constant_depth : int;
-  }
+  type fixed
 
   val fixed_encoding : fixed Data_encoding.t
-
-  val fixed : fixed
 
   val proof_of_work_nonce_size : int
 
@@ -585,37 +716,61 @@ module Constants : sig
 
   val michelson_maximum_type_size : int
 
+  type ratio = {numerator : int; denominator : int}
+
+  val ratio_encoding : ratio Data_encoding.t
+
+  val pp_ratio : Format.formatter -> ratio -> unit
+
   (** Constants parameterized by context *)
   type parametric = {
     preserved_cycles : int;
     blocks_per_cycle : int32;
     blocks_per_commitment : int32;
-    blocks_per_roll_snapshot : int32;
+    blocks_per_stake_snapshot : int32;
     blocks_per_voting_period : int32;
-    time_between_blocks : Period.t list;
-    minimal_block_delay : Period.t;
-    endorsers_per_block : int;
     hard_gas_limit_per_operation : Gas.Arith.integral;
     hard_gas_limit_per_block : Gas.Arith.integral;
     proof_of_work_threshold : int64;
     tokens_per_roll : Tez.t;
     seed_nonce_revelation_tip : Tez.t;
     origination_size : int;
-    block_security_deposit : Tez.t;
-    endorsement_security_deposit : Tez.t;
-    baking_reward_per_endorsement : Tez.t list;
-    endorsement_reward : Tez.t list;
+    baking_reward_fixed_portion : Tez.t;
+    baking_reward_bonus_per_slot : Tez.t;
+    endorsing_reward_per_slot : Tez.t;
     cost_per_byte : Tez.t;
     hard_storage_limit_per_operation : Z.t;
     quorum_min : int32;
     quorum_max : int32;
     min_proposal_quorum : int32;
-    initial_endorsers : int;
-    delay_per_missing_endorsement : Period.t;
     liquidity_baking_subsidy : Tez.t;
     liquidity_baking_sunset_level : int32;
     liquidity_baking_escape_ema_threshold : int32;
+    max_operations_time_to_live : int;
+    minimal_block_delay : Period.t;
+    delay_increment_per_round : Period.t;
+    minimal_participation_ratio : ratio;
+    consensus_committee_size : int;
+    consensus_threshold : int;
+    max_slashing_period : int;
+    frozen_deposits_percentage : int;
+    double_baking_punishment : Tez.t;
+    ratio_of_frozen_deposits_slashed_per_double_endorsement : ratio;
+    initial_seed : State_hash.t option;
+    tx_rollup_enable : bool;
+    tx_rollup_origination_size : int;
   }
+
+  module Generated : sig
+    type t = {
+      consensus_threshold : int;
+      baking_reward_fixed_portion : Tez.t;
+      baking_reward_bonus_per_slot : Tez.t;
+      endorsing_reward_per_slot : Tez.t;
+    }
+
+    val generate : consensus_committee_size:int -> blocks_per_minute:ratio -> t
+  end
 
   val parametric_encoding : parametric Data_encoding.t
 
@@ -623,15 +778,13 @@ module Constants : sig
 
   val preserved_cycles : context -> int
 
-  val time_between_blocks : context -> Period.t list
+  val blocks_per_cycle : context -> int32
 
-  val minimal_block_delay : context -> Period.t
+  val blocks_per_commitment : context -> int32
 
-  val endorsers_per_block : context -> int
+  val blocks_per_stake_snapshot : context -> int32
 
-  val initial_endorsers : context -> int
-
-  val delay_per_missing_endorsement : context -> Period.t
+  val blocks_per_voting_period : context -> int32
 
   val hard_gas_limit_per_operation : context -> Gas.Arith.integral
 
@@ -645,17 +798,15 @@ module Constants : sig
 
   val tokens_per_roll : context -> Tez.t
 
-  val baking_reward_per_endorsement : context -> Tez.t list
-
-  val endorsement_reward : context -> Tez.t list
-
   val seed_nonce_revelation_tip : context -> Tez.t
 
   val origination_size : context -> int
 
-  val block_security_deposit : context -> Tez.t
+  val baking_reward_fixed_portion : context -> Tez.t
 
-  val endorsement_security_deposit : context -> Tez.t
+  val baking_reward_bonus_per_slot : context -> Tez.t
+
+  val endorsing_reward_per_slot : context -> Tez.t
 
   val quorum_min : context -> int32
 
@@ -669,8 +820,34 @@ module Constants : sig
 
   val liquidity_baking_escape_ema_threshold : context -> int32
 
+  val minimal_block_delay : context -> Period.t
+
+  val delay_increment_per_round : context -> Period.t
+
+  val round_durations : context -> Round.round_durations
+
+  val consensus_committee_size : context -> int
+
+  val consensus_threshold : context -> int
+
+  val minimal_participation_ratio : context -> ratio
+
+  val max_slashing_period : context -> int
+
+  val frozen_deposits_percentage : context -> int
+
+  val double_baking_punishment : context -> Tez.t
+
+  val ratio_of_frozen_deposits_slashed_per_double_endorsement : context -> ratio
+
+  val tx_rollup_enable : context -> bool
+
+  val tx_rollup_origination_size : context -> int
+
   (** All constants: fixed and parametric *)
-  type t = {fixed : fixed; parametric : parametric}
+  type t = private {fixed : fixed; parametric : parametric}
+
+  val all : context -> t
 
   val encoding : t Data_encoding.t
 end
@@ -754,11 +931,11 @@ module Global_constants_storage : sig
         continuation in `f`. *)
     val bottom_up_fold_cps :
       'accumulator ->
-      Script.node ->
-      ('accumulator -> Script.node -> 'return) ->
+      'loc Script.michelson_node ->
+      ('accumulator -> 'loc Script.michelson_node -> 'return) ->
       ('accumulator ->
-      Script_repr.node ->
-      ('accumulator -> Script.node -> 'return) ->
+      'loc Script.michelson_node ->
+      ('accumulator -> 'loc Script.michelson_node -> 'return) ->
       'return) ->
       'return
 
@@ -773,202 +950,67 @@ module Global_constants_storage : sig
 end
 
 module Cache : sig
-  (**
-
-     Frequently used data should be kept in memory and persist along a
-     chain of blocks. The caching mechanism allows the economic protocol
-     to declare such data and to rely on a Least Recently Used strategy
-     to keep the cache size under a fixed limit.
-
-     Take a look at {!Environment_cache} and {!Environment_context}
-     for additional implementation details about the protocol cache.
-
-     The protocol has two main kinds of interaction with the cache:
-
-     1. It is responsible for setting up the cache with appropriate
-        parameter values and callbacks. It must also compute cache nonces
-        to give the shell enough information to properly synchronize the
-        in-memory cache with the block contexts and protocol upgrades.
-        A typical place where this happens is {!Apply}.
-        This aspect must be implemented using {!Cache.Admin}.
-
-     2. It can exploit the cache to retrieve, to insert, and to update
-        cached values from the in-memory cache. The basic idea is to
-        avoid recomputing values from scratch at each block when they are
-        frequently used. {!Script_cache} is an example of such usage.
-        This aspect must be implemented using {!Cache.Interface}.
-
-  *)
-
-  (** Size for subcaches and values of the cache. *)
   type size = int
 
-  (** Index type to index caches. *)
   type index = int
 
-  (**
-
-     The following module acts on the whole cache, not on a specific
-     sub-cache, unlike {!Interface}. It is used to administrate the
-     protocol cache, e.g., to maintain the cache in a consistent state
-     with respect to the chain. This module is typically used by
-     low-level layers of the protocol and by the shell.
-
-  *)
   module Admin : sig
-    (** A key uniquely identifies a cached [value] in some subcache. *)
     type key
 
-    (** Cached values. *)
     type value
 
-    (** [pp fmt ctxt] is a pretty printter for the [cache] of [ctxt]. *)
     val pp : Format.formatter -> context -> unit
 
-    (** [set_cache_layout ctxt layout] sets the caches of [ctxt] to
-     comply with given [layout]. If there was already a cache in
-     [ctxt], it is erased by the new layout.
-
-     In that case, a fresh collection of empty caches is reconstructed
-     from the new [layout]. Notice that cache [key]s are invalidated
-     in that case, i.e., [find t k] will return [None]. *)
     val set_cache_layout : context -> size list -> context Lwt.t
 
-    (** [sync ctxt ~cache_nonce] updates the context with the domain of
-     the cache computed so far. Such function is expected to be called
-     at the end of the validation of a block, when there is no more
-     accesses to the cache.
-
-     [cache_nonce] identifies the block that introduced new cache
-     entries. The nonce should identify uniquely the block which
-     modifies this value. It cannot be the block hash for circularity
-     reasons: The value of the nonce is stored onto the context and
-     consequently influences the context hash of the very same
-     block. Such nonce cannot be determined by the shell and its
-     computation is delegated to the economic protocol. *)
     val sync : context -> cache_nonce:Bytes.t -> context Lwt.t
 
-    (** [clear ctxt] removes all cache entries. *)
     val clear : context -> context
 
-    (** {3 Cache helpers for RPCs} *)
-
-    (** [future_cache_expectation ctxt ~time_in_blocks] returns [ctxt] except
-      that the entries of the caches that are presumably too old to
-      still be in the caches in [n_blocks] are removed.
-
-      This function is based on a heuristic. The context maintains
-      the median of the number of removed entries: this number is
-      multipled by `n_blocks` to determine the entries that are
-      likely to be removed in `n_blocks`. *)
     val future_cache_expectation : context -> time_in_blocks:int -> context
 
-    (** [cache_size ctxt ~cache_index] returns an overapproximation of
-       the size of the cache. Returns [None] if [cache_index] is
-       greater than the number of subcaches declared by the cache
-       layout. *)
     val cache_size : context -> cache_index:int -> size option
 
-    (** [cache_size_limit ctxt ~cache_index] returns the maximal size of
-       the cache indexed by [cache_index]. Returns [None] if
-       [cache_index] is greater than the number of subcaches declared
-       by the cache layout. *)
     val cache_size_limit : context -> cache_index:int -> size option
 
-    (** [value_of_key ctxt k] interprets the functions introduced by
-     [register] to construct a cacheable value for a key [k]. *)
     val value_of_key :
       context -> Context.Cache.key -> Context.Cache.value tzresult Lwt.t
   end
 
-  (** A client uses a unique namespace (represented as a string
-     without '@') to avoid collision with the keys of other
-     clients. *)
-  type namespace = string
+  type namespace = private string
 
-  (** A key is fully determined by a namespace and an identifier. *)
+  val create_namespace : string -> namespace
+
   type identifier = string
 
-  (**
-
-     To use the cache, a client must implement the [CLIENT]
-     interface.
-
-  *)
   module type CLIENT = sig
-    (** The type of value to be stored in the cache. *)
     type cached_value
 
-    (** The client must declare the index of the subcache where its
-       values shall live. [cache_index] must be between [0] and
-       [List.length Constants_repr.cache_layout - 1]. *)
     val cache_index : index
 
-    (** The client must declare a namespace. This namespace must
-        be unique. Otherwise, the program stops.
-        A namespace cannot contain '@'. *)
     val namespace : namespace
 
-    (** [value_of_identifier id] builds the cached value identified by
-       [id]. This function is called when the subcache is loaded into
-       memory from the on-disk representation of its domain.
-
-       An error during the execution of this function is fatal as
-       witnessed by its type: an error embedded in a [tzresult] is not
-       supposed to be catched by the protocol. *)
     val value_of_identifier :
       context -> identifier -> cached_value tzresult Lwt.t
   end
 
-  (**
-
-     An [INTERFACE] to the subcache where keys live in a given [namespace].
-
-  *)
   module type INTERFACE = sig
-    (** The type of value to be stored in the cache. *)
     type cached_value
 
-    (** [update ctxt i (Some (e, size))] returns a context where the
-       value [e] of given [size] is associated to identifier [i] in
-       the subcache. If [i] is already in the subcache, the cache
-       entry is updated.
-
-        [update ctxt i None] removes [i] from the subcache. *)
     val update :
       context -> identifier -> (cached_value * size) option -> context tzresult
 
-    (** [find ctxt i = Some v] if [v] is the value associated to [i]
-       in the subcache. Returns [None] if there is no such value in
-       the subcache. This function is in the Lwt monad because if the
-       value may have not been constructed (see the lazy loading
-       mode in {!Environment_context}), it is constructed on the fly. *)
     val find : context -> identifier -> cached_value option tzresult Lwt.t
 
-    (** [list_identifiers ctxt] returns the list of the
-       identifiers of the cached values along with their respective
-       size. The returned list is sorted in terms of their age in the
-       cache, the oldest coming first. *)
     val list_identifiers : context -> (string * int) list
 
-    (** [identifier_rank ctxt identifier] returns the number of cached value
-       older than the one of [identifier]; or, [None] if the [identifier] has
-       no associated value in the subcache. *)
     val identifier_rank : context -> string -> int option
 
-    (** [size ctxt] returns an overapproximation of the subcache size
-        (in bytes). *)
     val size : context -> int
 
-    (** [size_limit ctxt] returns the maximal size of the subcache
-        (in bytes). *)
     val size_limit : context -> int
   end
 
-  (** [register_exn client] produces an [Interface] specific to a
-     given [client]. This function can fail if [client] does not
-     respect the invariant declared in the documentation of
-     {!CLIENT}. *)
   val register_exn :
     (module CLIENT with type cached_value = 'a) ->
     (module INTERFACE with type cached_value = 'a)
@@ -1001,6 +1043,12 @@ module Level : sig
   val from_raw_with_offset :
     context -> offset:int32 -> Raw_level.t -> level tzresult
 
+  (** [add c level i] i must be positive *)
+  val add : context -> level -> int -> level
+
+  (** [sub c level i] i must be positive *)
+  val sub : context -> level -> int -> level option
+
   val diff : level -> level -> int32
 
   val current : context -> level
@@ -1019,17 +1067,41 @@ module Level : sig
 end
 
 module Fitness : sig
-  include module type of Fitness
+  type error += Invalid_fitness | Wrong_fitness | Outdated_fitness
 
-  type fitness = t
+  type raw = Fitness.t
 
-  val increase : context -> context
+  type t
 
-  val current : context -> int64
+  val encoding : t Data_encoding.t
 
-  val to_int64 : fitness -> int64 tzresult
+  val pp : Format.formatter -> t -> unit
 
-  val from_int64 : int64 -> bytes list
+  val create :
+    level:Raw_level.t ->
+    locked_round:Round.t option ->
+    predecessor_round:Round.t ->
+    round:Round.t ->
+    t tzresult
+
+  val create_without_locked_round :
+    level:Raw_level.t -> predecessor_round:Round.t -> round:Round.t -> t
+
+  val to_raw : t -> raw
+
+  val from_raw : raw -> t tzresult
+
+  val round_from_raw : raw -> Round.t tzresult
+
+  val predecessor_round_from_raw : raw -> Round.t tzresult
+
+  val level : t -> Raw_level.t
+
+  val round : t -> Round.t
+
+  val locked_round : t -> Round.t option
+
+  val predecessor_round : t -> Round.t
 end
 
 module Nonce : sig
@@ -1039,12 +1111,7 @@ module Nonce : sig
 
   val encoding : nonce Data_encoding.t
 
-  type unrevealed = {
-    nonce_hash : Nonce_hash.t;
-    delegate : public_key_hash;
-    rewards : Tez.t;
-    fees : Tez.t;
-  }
+  type unrevealed = {nonce_hash : Nonce_hash.t; delegate : public_key_hash}
 
   val record_hash : context -> unrevealed -> context tzresult Lwt.t
 
@@ -1266,6 +1333,24 @@ module Lazy_storage : sig
   val apply : t -> diffs -> (t * Z.t) tzresult Lwt.t
 end
 
+module Origination_nonce : sig
+  (** see [Raw_context.init_origination_nonce] *)
+  val init : context -> Operation_hash.t -> context
+
+  (** see [Raw_context.unset_origination_nonce] *)
+  val unset : context -> context
+
+  (** This module disclose a type and a function that are only useful for
+      tests. See [Origination_nonce] for documentation. *)
+  module Internal_for_tests : sig
+    type t
+
+    val initial : Operation_hash.t -> t
+
+    val incr : t -> t
+  end
+end
+
 module Contract : sig
   include BASIC_DATA
 
@@ -1293,7 +1378,8 @@ module Contract : sig
 
   val list : context -> contract list Lwt.t
 
-  val get_manager_key : context -> public_key_hash -> public_key tzresult Lwt.t
+  val get_manager_key :
+    ?error:error -> context -> public_key_hash -> public_key tzresult Lwt.t
 
   val is_manager_key_revealed :
     context -> public_key_hash -> bool tzresult Lwt.t
@@ -1316,10 +1402,6 @@ module Contract : sig
 
   val get_balance_carbonated :
     context -> contract -> (context * Tez.t) tzresult Lwt.t
-
-  val init_origination_nonce : context -> Operation_hash.t -> context
-
-  val unset_origination_nonce : context -> context
 
   val fresh_contract_from_current_nonce : context -> (context * t) tzresult
 
@@ -1347,19 +1429,7 @@ module Contract : sig
     val of_lazy_storage_diff : Lazy_storage.diffs -> t
   end
 
-  val originate :
-    context ->
-    contract ->
-    balance:Tez.t ->
-    script:Script.t * Lazy_storage.diffs option ->
-    delegate:public_key_hash option ->
-    context tzresult Lwt.t
-
   type error += Balance_too_low of contract * Tez.t * Tez.t
-
-  val spend : context -> contract -> Tez.t -> context tzresult Lwt.t
-
-  val credit : context -> contract -> Tez.t -> context tzresult Lwt.t
 
   val update_script_storage :
     context ->
@@ -1375,55 +1445,137 @@ module Contract : sig
   val check_counter_increment :
     context -> public_key_hash -> Z.t -> unit tzresult Lwt.t
 
-  (**/**)
+  val raw_originate :
+    context ->
+    prepaid_bootstrap_storage:bool ->
+    t ->
+    script:Script.t * Lazy_storage.diffs option ->
+    context tzresult Lwt.t
 
-  (* Only for testing *)
-  type origination_nonce
-
-  val initial_origination_nonce : Operation_hash.t -> origination_nonce
-
-  val originated_contract : origination_nonce -> contract
+  module Internal_for_tests : sig
+    (** see [Contract_repr.originated_contract] for documentation *)
+    val originated_contract : Origination_nonce.Internal_for_tests.t -> contract
+  end
 end
 
 module Receipt : sig
   type balance =
     | Contract of Contract.t
-    | Rewards of Signature.Public_key_hash.t * Cycle.t
-    | Fees of Signature.Public_key_hash.t * Cycle.t
-    | Deposits of Signature.Public_key_hash.t * Cycle.t
+    | Legacy_rewards of Signature.Public_key_hash.t * Cycle.t
+    | Block_fees
+    | Legacy_deposits of Signature.Public_key_hash.t * Cycle.t
+    | Deposits of public_key_hash
+    | Nonce_revelation_rewards
+    | Double_signing_evidence_rewards
+    | Endorsing_rewards
+    | Baking_rewards
+    | Baking_bonuses
+    | Legacy_fees of Signature.Public_key_hash.t * Cycle.t
+    | Storage_fees
+    | Double_signing_punishments
+    | Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+    | Liquidity_baking_subsidies
+    | Burned
+    | Commitments of Blinded_public_key_hash.t
+    | Bootstrap
+    | Invoice
+    | Initial_commitments
+    | Minted
+
+  val compare_balance : balance -> balance -> int
 
   type balance_update = Debited of Tez.t | Credited of Tez.t
 
-  type update_origin = Block_application | Protocol_migration | Subsidy
+  type update_origin =
+    | Block_application
+    | Protocol_migration
+    | Subsidy
+    | Simulation
+
+  val compare_update_origin : update_origin -> update_origin -> int
 
   type balance_updates = (balance * balance_update * update_origin) list
 
   val balance_updates_encoding : balance_updates Data_encoding.t
 
-  val cleanup_balance_updates : balance_updates -> balance_updates
+  val group_balance_updates : balance_updates -> balance_updates tzresult
+end
+
+(** This simply re-exports [Tx_rollup_repr] and [tx_rollup_storage]. See
+    [tx_rollup_repr] and [tx_rollup_storage] for additional documentation of this
+    module *)
+module Tx_rollup : sig
+  include BASIC_DATA
+
+  type tx_rollup = t
+
+  val rpc_arg : tx_rollup RPC_arg.arg
+
+  val to_b58check : tx_rollup -> string
+
+  val of_b58check : string -> tx_rollup tzresult
+
+  val pp : Format.formatter -> tx_rollup -> unit
+
+  val encoding : tx_rollup Data_encoding.t
+
+  val originate : context -> (context * tx_rollup) tzresult Lwt.t
+
+  type state
+
+  val state : context -> tx_rollup -> state option tzresult Lwt.t
+
+  val state_encoding : state Data_encoding.t
+
+  val pp_state : Format.formatter -> state -> unit
+
+  module Internal_for_tests : sig
+    (** see [tx_rollup_repr.originated_tx_rollup] for documentation *)
+    val originated_tx_rollup :
+      Origination_nonce.Internal_for_tests.t -> tx_rollup
+  end
 end
 
 module Delegate : sig
-  val get : context -> Contract.t -> public_key_hash option tzresult Lwt.t
+  val init :
+    context ->
+    Contract.t ->
+    Signature.Public_key_hash.t ->
+    context tzresult Lwt.t
+
+  val find : context -> Contract.t -> public_key_hash option tzresult Lwt.t
 
   val set :
     context -> Contract.t -> public_key_hash option -> context tzresult Lwt.t
 
+  val frozen_deposits_limit :
+    context -> Signature.Public_key_hash.t -> Tez.t option tzresult Lwt.t
+
+  val set_frozen_deposits_limit :
+    context -> Signature.Public_key_hash.t -> Tez.t option -> context Lwt.t
+
   val fold :
-    context -> init:'a -> f:(public_key_hash -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+    context ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(public_key_hash -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   val list : context -> public_key_hash list Lwt.t
 
   val check_delegate : context -> public_key_hash -> unit tzresult Lwt.t
 
-  val freeze_deposit :
-    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+  type participation_info = {
+    expected_cycle_activity : int;
+    minimal_cycle_activity : int;
+    missed_slots : int;
+    missed_levels : int;
+    remaining_allowed_missed_slots : int;
+    expected_endorsing_rewards : Tez.t;
+  }
 
-  val freeze_rewards :
-    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
-
-  val freeze_fees :
-    context -> public_key_hash -> Tez.t -> context tzresult Lwt.t
+  val delegate_participation_info :
+    context -> public_key_hash -> participation_info tzresult Lwt.t
 
   val cycle_end :
     context ->
@@ -1433,28 +1585,46 @@ module Delegate : sig
     tzresult
     Lwt.t
 
-  type frozen_balance = {deposit : Tez.t; fees : Tez.t; rewards : Tez.t}
+  val already_slashed_for_double_endorsing :
+    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
 
-  val punish :
+  val already_slashed_for_double_baking :
+    context -> public_key_hash -> Level.t -> bool tzresult Lwt.t
+
+  val punish_double_endorsing :
     context ->
     public_key_hash ->
-    Cycle.t ->
-    (context * frozen_balance) tzresult Lwt.t
+    Level.t ->
+    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val punish_double_baking :
+    context ->
+    public_key_hash ->
+    Level.t ->
+    (context * Tez.t * Receipt.balance_updates) tzresult Lwt.t
 
   val full_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
 
-  val has_frozen_balance :
-    context -> public_key_hash -> Cycle.t -> bool tzresult Lwt.t
+  type level_participation = Participated | Didn't_participate
 
-  val frozen_balance : context -> public_key_hash -> Tez.t tzresult Lwt.t
+  val record_baking_activity_and_pay_rewards_and_fees :
+    context ->
+    payload_producer:Signature.Public_key_hash.t ->
+    block_producer:Signature.Public_key_hash.t ->
+    baking_reward:Tez.t ->
+    reward_bonus:Tez.t option ->
+    (context * Receipt.balance_updates) tzresult Lwt.t
 
-  val frozen_balance_encoding : frozen_balance Data_encoding.t
+  val record_endorsing_participation :
+    context ->
+    delegate:Signature.Public_key_hash.t ->
+    participation:level_participation ->
+    endorsing_power:int ->
+    context tzresult Lwt.t
 
-  val frozen_balance_by_cycle_encoding :
-    frozen_balance Cycle.Map.t Data_encoding.t
+  type deposits = {initial_amount : Tez.t; current_amount : Tez.t}
 
-  val frozen_balance_by_cycle :
-    context -> Signature.Public_key_hash.t -> frozen_balance Cycle.Map.t Lwt.t
+  val frozen_deposits : context -> public_key_hash -> deposits tzresult Lwt.t
 
   val staking_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
@@ -1465,11 +1635,17 @@ module Delegate : sig
   val delegated_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 
+  val registered : context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
+
   val deactivated :
     context -> Signature.Public_key_hash.t -> bool tzresult Lwt.t
 
   val grace_period :
     context -> Signature.Public_key_hash.t -> Cycle.t tzresult Lwt.t
+
+  val pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
+
+  val prepare_stake_distribution : context -> context tzresult Lwt.t
 end
 
 module Voting_period : sig
@@ -1584,9 +1760,18 @@ module Vote : sig
   val clear_current_proposal : context -> context tzresult Lwt.t
 end
 
+module Block_payload : sig
+  val hash :
+    predecessor:Block_hash.t ->
+    Round.t ->
+    Operation_list_hash.t ->
+    Block_payload_hash.t
+end
+
 module Block_header : sig
   type contents = {
-    priority : int;
+    payload_hash : Block_payload_hash.t;
+    payload_round : Round.t;
     seed_nonce_hash : Nonce_hash.t option;
     proof_of_work_nonce : bytes;
     liquidity_baking_escape_vote : bool;
@@ -1601,6 +1786,22 @@ module Block_header : sig
   type raw = Block_header.t
 
   type shell_header = Block_header.shell_header
+
+  type block_watermark = Block_header of Chain_id.t
+
+  val to_watermark : block_watermark -> Signature.watermark
+
+  val of_watermark : Signature.watermark -> block_watermark option
+
+  module Proof_of_work : sig
+    val check_hash : Block_hash.t -> int64 -> bool
+
+    val check_header_proof_of_work_stamp :
+      shell_header -> contents -> int64 -> bool
+
+    val check_proof_of_work_stamp :
+      proof_of_work_threshold:int64 -> block_header -> unit tzresult
+  end
 
   val raw : block_header -> raw
 
@@ -1622,20 +1823,98 @@ module Block_header : sig
 
   (** The maximum size of block headers in bytes *)
   val max_header_length : int
+
+  type error +=
+    | Invalid_block_signature of Block_hash.t * Signature.Public_key_hash.t
+    | Invalid_stamp
+    | Invalid_payload_hash of {
+        expected : Block_payload_hash.t;
+        provided : Block_payload_hash.t;
+      }
+    | Locked_round_after_block_round of {
+        locked_round : Round_repr.t;
+        round : Round_repr.t;
+      }
+    | Invalid_payload_round of {
+        payload_round : Round_repr.t;
+        round : Round_repr.t;
+      }
+    | Insufficient_locked_round_evidence of {
+        voting_power : int;
+        consensus_threshold : int;
+      }
+    | Invalid_commitment of {expected : bool}
+
+  val check_timestamp :
+    Round.round_durations ->
+    timestamp:Time.t ->
+    round:Round.t ->
+    predecessor_timestamp:Time.t ->
+    predecessor_round:Round.t ->
+    unit tzresult
+
+  val check_signature :
+    t -> Chain_id.t -> Signature.Public_key.t -> unit tzresult
+
+  val begin_validate_block_header :
+    block_header:t ->
+    chain_id:Chain_id.t ->
+    predecessor_timestamp:Time.t ->
+    predecessor_round:Round.t ->
+    fitness:Fitness.t ->
+    timestamp:Time.t ->
+    delegate_pk:Signature.public_key ->
+    round_durations:Round.round_durations ->
+    proof_of_work_threshold:int64 ->
+    expected_commitment:bool ->
+    unit tzresult
+
+  type locked_round_evidence = {
+    preendorsement_round : Round.t;
+    preendorsement_count : int;
+  }
+
+  type checkable_payload_hash =
+    | No_check
+    | Expected_payload_hash of Block_payload_hash.t
+
+  val finalize_validate_block_header :
+    block_header_contents:contents ->
+    round:Round.t ->
+    fitness:Fitness.t ->
+    checkable_payload_hash:checkable_payload_hash ->
+    locked_round_evidence:locked_round_evidence option ->
+    consensus_threshold:int ->
+    unit tzresult
 end
 
 module Kind : sig
+  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+
+  type endorsement_consensus_kind = Endorsement_consensus_kind
+
+  type 'a consensus =
+    | Preendorsement_kind : preendorsement_consensus_kind consensus
+    | Endorsement_kind : endorsement_consensus_kind consensus
+
+  type preendorsement = preendorsement_consensus_kind consensus
+
+  type endorsement = endorsement_consensus_kind consensus
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
-  type endorsement_with_slot = Endorsement_with_slot_kind
+  type 'a double_consensus_operation_evidence =
+    | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence = Double_endorsement_evidence_kind
+  type double_endorsement_evidence =
+    endorsement_consensus_kind double_consensus_operation_evidence
+
+  type double_preendorsement_evidence =
+    preendorsement_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
   type activate_account = Activate_account_kind
-
-  type endorsement = Endorsement_kind
 
   type proposals = Proposals_kind
 
@@ -1649,9 +1928,13 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type set_deposits_limit = Set_deposits_limit_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
+
+  type tx_rollup_origination = Tx_rollup_origination_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -1659,7 +1942,30 @@ module Kind : sig
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
     | Register_global_constant_manager_kind : register_global_constant manager
+    | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
 end
+
+type 'a consensus_operation_type =
+  | Endorsement : Kind.endorsement consensus_operation_type
+  | Preendorsement : Kind.preendorsement consensus_operation_type
+
+val pp_operation_kind :
+  Format.formatter -> 'kind consensus_operation_type -> unit
+
+type consensus_content = {
+  slot : Slot.t;
+  level : Raw_level.t;
+  (* The level is not required to validate an endorsement when it corresponds
+     to the current payload, but if we want to filter endorsements, we need
+     the level. *)
+  round : Round.t;
+  block_payload_hash : Block_payload_hash.t;
+}
+
+val consensus_content_encoding : consensus_content Data_encoding.t
+
+val pp_consensus_content : Format.formatter -> consensus_content -> unit
 
 type 'kind operation = {
   shell : Operation.shell_header;
@@ -1678,21 +1984,21 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Endorsement : {level : Raw_level.t} -> Kind.endorsement contents
+  | Preendorsement : consensus_content -> Kind.preendorsement contents
+  | Endorsement : consensus_content -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level : Raw_level.t;
       nonce : Nonce.t;
     }
       -> Kind.seed_nonce_revelation contents
-  | Endorsement_with_slot : {
-      endorsement : Kind.endorsement operation;
-      slot : int;
+  | Double_preendorsement_evidence : {
+      op1 : Kind.preendorsement operation;
+      op2 : Kind.preendorsement operation;
     }
-      -> Kind.endorsement_with_slot contents
+      -> Kind.double_preendorsement_evidence contents
   | Double_endorsement_evidence : {
       op1 : Kind.endorsement operation;
       op2 : Kind.endorsement operation;
-      slot : int;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -1752,6 +2058,10 @@ and _ manager_operation =
       value : Script.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  | Set_deposits_limit :
+      Tez.t option
+      -> Kind.set_deposits_limit manager_operation
+  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -1782,33 +2092,6 @@ type packed_internal_operation =
 
 val manager_kind : 'kind manager_operation -> 'kind Kind.manager
 
-module Fees : sig
-  val origination_burn : context -> (context * Tez.t) tzresult
-
-  val cost_of_bytes : context -> Z.t -> Tez.t tzresult
-
-  val record_paid_storage_space :
-    context -> Contract.t -> (context * Z.t * Z.t * Tez.t) tzresult Lwt.t
-
-  val record_paid_storage_space_subsidy :
-    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
-
-  val record_global_constant_storage_space : context -> Z.t -> context * Z.t
-
-  val start_counting_storage_fees : context -> context
-
-  val burn_storage_fees :
-    context -> storage_limit:Z.t -> payer:Contract.t -> context tzresult Lwt.t
-
-  type error += Cannot_pay_storage_fee (* `Temporary *)
-
-  type error += Operation_quota_exceeded (* `Temporary *)
-
-  type error += Storage_limit_too_high (* `Permanent *)
-
-  val check_storage_limit : context -> storage_limit:Z.t -> unit tzresult
-end
-
 module Operation : sig
   type nonrec 'kind contents = 'kind contents
 
@@ -1819,6 +2102,14 @@ module Operation : sig
   type nonrec 'kind protocol_data = 'kind protocol_data
 
   type nonrec packed_protocol_data = packed_protocol_data
+
+  type consensus_watermark =
+    | Endorsement of Chain_id.t
+    | Preendorsement of Chain_id.t
+
+  val to_watermark : consensus_watermark -> Signature.watermark
+
+  val of_watermark : Signature.watermark -> consensus_watermark option
 
   val protocol_data_encoding : packed_protocol_data Data_encoding.t
 
@@ -1879,11 +2170,14 @@ module Operation : sig
         }
           -> 'b case
 
+    val preendorsement_case : Kind.preendorsement case
+
     val endorsement_case : Kind.endorsement case
 
     val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
-    val endorsement_with_slot_case : Kind.endorsement_with_slot case
+    val double_preendorsement_evidence_case :
+      Kind.double_preendorsement_evidence case
 
     val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
 
@@ -1905,8 +2199,13 @@ module Operation : sig
 
     val delegation_case : Kind.delegation Kind.manager case
 
+    val tx_rollup_origination_case :
+      Kind.tx_rollup_origination Kind.manager case
+
     val register_global_constant_case :
       Kind.register_global_constant Kind.manager case
+
+    val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
 
     module Manager_operations : sig
       type 'b case =
@@ -1929,6 +2228,10 @@ module Operation : sig
       val delegation_case : Kind.delegation case
 
       val register_global_constant_case : Kind.register_global_constant case
+
+      val set_deposits_limit_case : Kind.set_deposits_limit case
+
+      val tx_rollup_origination_case : Kind.tx_rollup_origination case
     end
   end
 
@@ -1937,28 +2240,24 @@ module Operation : sig
   val to_list : packed_contents_list -> packed_contents list
 end
 
-module Roll : sig
-  type t = private int32
-
-  type roll = t
-
-  val encoding : roll Data_encoding.t
-
-  val snapshot_rolls : context -> context tzresult Lwt.t
-
-  val cycle_end : context -> Cycle.t -> context tzresult Lwt.t
+module Stake_distribution : sig
+  val snapshot : context -> context tzresult Lwt.t
 
   val baking_rights_owner :
-    context -> Level.t -> priority:int -> public_key tzresult Lwt.t
+    context ->
+    Level.t ->
+    round:Round.t ->
+    (context * Slot.t * (public_key * public_key_hash)) tzresult Lwt.t
 
-  val endorsement_rights_owner :
-    context -> Level.t -> slot:int -> public_key tzresult Lwt.t
+  val slot_owner :
+    context ->
+    Level.t ->
+    Slot.t ->
+    (context * (public_key * public_key_hash)) tzresult Lwt.t
 
   val delegate_pubkey : context -> public_key_hash -> public_key tzresult Lwt.t
 
-  val count_rolls : context -> Signature.Public_key_hash.t -> int tzresult Lwt.t
-
-  val get_change :
+  val get_staking_balance :
     context -> Signature.Public_key_hash.t -> Tez.t tzresult Lwt.t
 end
 
@@ -1969,24 +2268,11 @@ module Commitment : sig
   }
 
   val encoding : t Data_encoding.t
-
-  val find : context -> Blinded_public_key_hash.t -> Tez.t option tzresult Lwt.t
-
-  val remove_existing :
-    context -> Blinded_public_key_hash.t -> context tzresult Lwt.t
 end
 
 module Bootstrap : sig
   val cycle_end : context -> Cycle.t -> context tzresult Lwt.t
 end
-
-module Global : sig
-  val get_block_priority : context -> int tzresult Lwt.t
-
-  val set_block_priority : context -> int -> context tzresult Lwt.t
-end
-
-val max_operations_ttl : int
 
 module Migration : sig
   type origination_result = {
@@ -2006,7 +2292,6 @@ val prepare_first_block :
     ((Script.t * Lazy_storage.diffs option) * context) tzresult Lwt.t) ->
   level:Int32.t ->
   timestamp:Time.t ->
-  fitness:Fitness.t ->
   context tzresult Lwt.t
 
 (** Create an [Alpha_context.t] from an untyped context. *)
@@ -2015,29 +2300,11 @@ val prepare :
   level:Int32.t ->
   predecessor_timestamp:Time.t ->
   timestamp:Time.t ->
-  fitness:Fitness.t ->
   (context * Receipt.balance_updates * Migration.origination_result list)
   tzresult
   Lwt.t
 
-(** Finalize an {{!t} [Alpha_context.t]}, producing a [validation_result].
- *)
-val finalize : ?commit_message:string -> context -> Updater.validation_result
-
 val activate : context -> Protocol_hash.t -> context Lwt.t
-
-val record_endorsement : context -> Signature.Public_key_hash.t -> context
-
-val allowed_endorsements :
-  context ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t
-
-val init_endorsements :
-  context ->
-  (Signature.Public_key.t * int list * bool) Signature.Public_key_hash.Map.t ->
-  context
-
-val included_endorsements : context -> int
 
 val reset_internal_nonce : context -> context
 
@@ -2047,15 +2314,19 @@ val record_internal_nonce : context -> int -> context
 
 val internal_nonce_already_recorded : context -> int -> bool
 
-val add_fees : context -> Tez.t -> context tzresult
-
-val add_rewards : context -> Tez.t -> context tzresult
-
-val get_fees : context -> Tez.t
-
-val get_rewards : context -> Tez.t
-
 val description : context Storage_description.t
+
+(** Finalize an {{!t} [Alpha_context.t]}, producing a [validation_result].
+ *)
+val finalize :
+  ?commit_message:string -> context -> Fitness.raw -> Updater.validation_result
+
+(** Should only be used by [Main.current_context] to return a context usable for RPCs *)
+val current_context : context -> Context.t
+
+val record_non_consensus_operation_hash : context -> Operation_hash.t -> context
+
+val non_consensus_operations : context -> Operation_hash.t list
 
 module Parameters : sig
   type bootstrap_account = {
@@ -2065,7 +2336,7 @@ module Parameters : sig
   }
 
   type bootstrap_contract = {
-    delegate : public_key_hash;
+    delegate : public_key_hash option;
     amount : Tez.t;
     script : Script.t;
   }
@@ -2092,4 +2363,135 @@ module Liquidity_baking : sig
     escape_vote:bool ->
     (context -> Contract.t -> (context * 'a list) tzresult Lwt.t) ->
     (context * 'a list * escape_ema) tzresult Lwt.t
+end
+
+(** This module re-exports functions from [Ticket_storage]. See
+    documentation of the functions there.
+ *)
+module Ticket_balance : sig
+  type key_hash
+
+  val script_expr_hash_of_key_hash : key_hash -> Script_expr_hash.t
+
+  val make_key_hash :
+    context ->
+    ticketer:Script.node ->
+    typ:Script.node ->
+    contents:Script.node ->
+    owner:Script.node ->
+    (key_hash * context) tzresult
+
+  val adjust_balance :
+    context -> key_hash -> delta:Z.t -> (Z.t * context) tzresult Lwt.t
+
+  val get_balance : context -> key_hash -> (Z.t option * context) tzresult Lwt.t
+end
+
+module First_level_of_tenderbake : sig
+  val get : context -> Raw_level.t tzresult Lwt.t
+end
+
+module Consensus : sig
+  include
+    Raw_context.CONSENSUS
+      with type t := t
+       and type slot := Slot.t
+       and type 'a slot_map := 'a Slot.Map.t
+       and type slot_set := Slot.Set.t
+       and type round := Round.t
+
+  val store_endorsement_branch :
+    context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
+
+  val store_grand_parent_branch :
+    context -> Block_hash.t * Block_payload_hash.t -> context Lwt.t
+end
+
+(** See 'token.mli' for more explanation. *)
+module Token : sig
+  type container =
+    [ `Contract of Contract.t
+    | `Collected_commitments of Blinded_public_key_hash.t
+    | `Delegate_balance of Signature.Public_key_hash.t
+    | `Frozen_deposits of Signature.Public_key_hash.t
+    | `Block_fees
+    | `Legacy_deposits of Signature.Public_key_hash.t * Cycle.t
+    | `Legacy_fees of Signature.Public_key_hash.t * Cycle.t
+    | `Legacy_rewards of Signature.Public_key_hash.t * Cycle.t ]
+
+  type source =
+    [ `Invoice
+    | `Bootstrap
+    | `Initial_commitments
+    | `Revelation_rewards
+    | `Double_signing_evidence_rewards
+    | `Endorsing_rewards
+    | `Baking_rewards
+    | `Baking_bonuses
+    | `Minted
+    | `Liquidity_baking_subsidies
+    | container ]
+
+  type sink =
+    [ `Storage_fees
+    | `Double_signing_punishments
+    | `Lost_endorsing_rewards of Signature.Public_key_hash.t * bool * bool
+    | `Burned
+    | container ]
+
+  val allocated : context -> container -> bool tzresult Lwt.t
+
+  val balance : context -> container -> Tez.t tzresult Lwt.t
+
+  val transfer_n :
+    ?origin:Receipt.update_origin ->
+    context ->
+    ([< source] * Tez.t) list ->
+    [< sink] ->
+    (context * Receipt.balance_updates) tzresult Lwt.t
+
+  val transfer :
+    ?origin:Receipt.update_origin ->
+    context ->
+    [< source] ->
+    [< sink] ->
+    Tez.t ->
+    (context * Receipt.balance_updates) tzresult Lwt.t
+end
+
+module Fees : sig
+  val record_paid_storage_space :
+    context -> Contract.t -> (context * Z.t * Z.t) tzresult Lwt.t
+
+  val record_global_constant_storage_space : context -> Z.t -> context * Z.t
+
+  val burn_storage_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    Z.t ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  val burn_tx_rollup_origination_fees :
+    ?origin:Receipt.update_origin ->
+    context ->
+    storage_limit:Z.t ->
+    payer:Token.source ->
+    (context * Z.t * Receipt.balance_updates) tzresult Lwt.t
+
+  type error += Cannot_pay_storage_fee (* `Temporary *)
+
+  type error += Operation_quota_exceeded (* `Temporary *)
+
+  type error += Storage_limit_too_high (* `Permanent *)
+
+  val check_storage_limit : context -> storage_limit:Z.t -> unit tzresult
 end

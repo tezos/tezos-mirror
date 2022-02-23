@@ -42,9 +42,9 @@
 *)
 
 open Protocol
-open Test_tez
+open Alpha_context
 
-let ten_tez = Tez.of_int 10
+let ten_tez = Test_tez.of_int 10
 
 let gas_limit = Alpha_context.Gas.Arith.integral_of_int_exn 3000
 
@@ -59,23 +59,25 @@ let test_multiple_transfers () =
     (1 -- 10)
   >>=? fun ops ->
   Op.combine_operations ~source:c1 (B blk) ops >>=? fun operation ->
-  Context.Contract.balance (B blk) c1 >>=? fun c1_old_balance ->
-  Context.Contract.balance (B blk) c2 >>=? fun c2_old_balance ->
   Context.Contract.pkh c3 >>=? fun baker_pkh ->
-  Block.bake ~policy:(By_account baker_pkh) ~operation blk >>=? fun blk ->
+  Incremental.begin_construction ~policy:(By_account baker_pkh) blk
+  >>=? fun inc ->
+  Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
+  Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
+  Incremental.add_operation inc operation >>=? fun inc ->
   Assert.balance_was_debited
     ~loc:__LOC__
-    (B blk)
+    (I inc)
     c1
     c1_old_balance
-    (Tez.of_int 10)
+    (Test_tez.of_int 10)
   >>=? fun () ->
   Assert.balance_was_credited
     ~loc:__LOC__
-    (B blk)
+    (I inc)
     c2
     c2_old_balance
-    (Tez.of_int 10)
+    (Test_tez.of_int 10)
   >>=? fun () -> return_unit
 
 (** Groups ten delegated originations. *)
@@ -91,13 +93,13 @@ let test_multiple_origination_and_delegation () =
   (* Deploy n smart contracts with dummy scripts from c1 *)
   List.map_es
     (fun i ->
-      Op.origination
+      Op.contract_origination
         ~gas_limit
         ~delegate:delegate_pkh
         ~counter:(Z.of_int i)
         ~fee:Tez.zero
         ~script:Op.dummy_script
-        ~credit:(Tez.of_int 10)
+        ~credit:(Test_tez.of_int 10)
         (B blk)
         c1)
     (1 -- n)
@@ -107,8 +109,8 @@ let test_multiple_origination_and_delegation () =
   let (originations_operations, _) = List.split originations in
   Op.combine_operations ~source:c1 (B blk) originations_operations
   >>=? fun operation ->
-  Context.Contract.balance (B blk) c1 >>=? fun c1_old_balance ->
   Incremental.begin_construction blk >>=? fun inc ->
+  Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
   Incremental.add_operation inc operation >>=? fun inc ->
   (* To retrieve the originated contracts, it is easier to extract them
      from the tickets. Else, we could (could we ?) hash each combined
@@ -140,17 +142,18 @@ let test_multiple_origination_and_delegation () =
       tickets
   in
   (* Previous balance - (Credit (n * 10tz) + Origination cost (n tz)) *)
-  Tez.(cost_per_byte *? Int64.of_int origination_size)
+  Test_tez.(cost_per_byte *? Int64.of_int origination_size)
   >>?= fun origination_burn ->
-  Tez.(origination_burn *? Int64.of_int n) >>?= fun origination_total_cost ->
-  Tez.( *? ) Op.dummy_script_cost 10L
-  >>? Tez.( +? ) (Tez.of_int (10 * n))
-  >>? Tez.( +? ) origination_total_cost
+  Test_tez.(origination_burn *? Int64.of_int n)
+  >>?= fun origination_total_cost ->
+  Test_tez.( *? ) Op.dummy_script_cost 10L
+  >>? Test_tez.( +? ) (Test_tez.of_int (10 * n))
+  >>? Test_tez.( +? ) origination_total_cost
   >>?= fun total_cost ->
   Assert.balance_was_debited ~loc:__LOC__ (I inc) c1 c1_old_balance total_cost
   >>=? fun () ->
   List.iter_es
-    (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Tez.of_int 10))
+    (fun c -> Assert.balance_is ~loc:__LOC__ (I inc) c (Test_tez.of_int 10))
     new_contracts
 
 let expect_balance_too_low = function
@@ -170,14 +173,14 @@ let test_failing_operation_in_the_middle () =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
   Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one >>=? fun op1 ->
-  Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.max_tez
+  Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Test_tez.max_tez
   >>=? fun op2 ->
   Op.transaction ~gas_limit ~fee:Tez.zero (B blk) c1 c2 Tez.one >>=? fun op3 ->
   let operations = [op1; op2; op3] in
   Op.combine_operations ~source:c1 (B blk) operations >>=? fun operation ->
-  Context.Contract.balance (B blk) c1 >>=? fun c1_old_balance ->
-  Context.Contract.balance (B blk) c2 >>=? fun c2_old_balance ->
   Incremental.begin_construction blk >>=? fun inc ->
+  Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
+  Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
   Incremental.add_operation ~expect_failure:expect_balance_too_low inc operation
   >>=? fun inc ->
   let tickets = Incremental.rev_tickets inc in
@@ -220,13 +223,13 @@ let test_failing_operation_in_the_middle_with_fees () =
     match contracts with [c1; c2] -> (c1, c2) | _ -> assert false
   in
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op1 ->
-  Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.max_tez >>=? fun op2 ->
+  Op.transaction ~fee:Tez.one (B blk) c1 c2 Test_tez.max_tez >>=? fun op2 ->
   Op.transaction ~fee:Tez.one (B blk) c1 c2 Tez.one >>=? fun op3 ->
   let operations = [op1; op2; op3] in
   Op.combine_operations ~source:c1 (B blk) operations >>=? fun operation ->
-  Context.Contract.balance (B blk) c1 >>=? fun c1_old_balance ->
-  Context.Contract.balance (B blk) c2 >>=? fun c2_old_balance ->
   Incremental.begin_construction blk >>=? fun inc ->
+  Context.Contract.balance (I inc) c1 >>=? fun c1_old_balance ->
+  Context.Contract.balance (I inc) c2 >>=? fun c2_old_balance ->
   Incremental.add_operation ~expect_failure:expect_balance_too_low inc operation
   >>=? fun inc ->
   let tickets = Incremental.rev_tickets inc in
@@ -262,7 +265,7 @@ let test_failing_operation_in_the_middle_with_fees () =
     (I inc)
     c1
     c1_old_balance
-    (Tez.of_int 3)
+    (Test_tez.of_int 3)
   >>=? fun () ->
   Assert.balance_is ~loc:__LOC__ (I inc) c2 c2_old_balance >>=? fun () ->
   return_unit

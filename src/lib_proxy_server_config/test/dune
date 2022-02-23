@@ -1,5 +1,5 @@
-(tests
- (names test_proxy_server_config)
+(test
+ (name test_proxy_server_config)
  (package tezos-proxy-server-config)
  (libraries
   tezos-base
@@ -8,5 +8,4 @@
   tezos-test-helpers
   qcheck-alcotest
   alcotest-lwt)
- (flags
-  (:standard -open Tezos_base__TzPervasives)))
+ (flags (:standard -open Tezos_base__TzPervasives)))

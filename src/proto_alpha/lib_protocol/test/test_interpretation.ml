@@ -9,54 +9,12 @@
 open Protocol
 open Alpha_context
 open Script_interpreter
-
-let ( >>=?? ) x y =
-  x >>= function
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
-
-let ( >>??= ) x y =
-  match x with
-  | Ok s -> y s
-  | Error err -> Lwt.return @@ Error (Environment.wrap_tztrace err)
+open Error_monad_operators
 
 let test_context () =
   Context.init 3 >>=? fun (b, _cs) ->
   Incremental.begin_construction b >>=? fun v ->
   return (Incremental.alpha_ctxt v)
-
-let default_source = Contract.implicit_contract Signature.Public_key_hash.zero
-
-let default_step_constants =
-  {
-    source = default_source;
-    payer = default_source;
-    self = default_source;
-    amount = Tez.zero;
-    chain_id = Chain_id.zero;
-  }
-
-(** Helper function that parses and types a script, its initial storage and
-   parameters from strings. It then executes the typed script with the storage
-   and parameter and returns the result. *)
-let run_script ctx ?(step_constants = default_step_constants) contract
-    ?(entrypoint = "default") ~storage ~parameter () =
-  let contract_expr = Expr.from_string contract in
-  let storage_expr = Expr.from_string storage in
-  let parameter_expr = Expr.from_string parameter in
-  let script =
-    Script.{code = lazy_expr contract_expr; storage = lazy_expr storage_expr}
-  in
-  Script_interpreter.execute
-    ctx
-    Readable
-    step_constants
-    ~script
-    ~cached_script:None
-    ~entrypoint
-    ~parameter:parameter_expr
-    ~internal:false
-  >>=?? fun res -> return res
 
 let logger =
   Script_typed_ir.
@@ -70,6 +28,7 @@ let logger =
 
 let run_step ctxt code accu stack =
   let open Script_interpreter in
+  let open Contract_helpers in
   step None ctxt default_step_constants code accu stack
   >>=? fun ((_, _, ctxt') as r) ->
   step (Some logger) ctxt default_step_constants code accu stack
@@ -83,7 +42,7 @@ let run_step ctxt code accu stack =
 let test_bad_contract_parameter () =
   test_context () >>=? fun ctx ->
   (* Run script with a parameter of wrong type *)
-  run_script
+  Contract_helpers.run_script
     ctx
     "{parameter unit; storage unit; code { CAR; NIL operation; PAIR }}"
     ~storage:"Unit"
@@ -94,7 +53,7 @@ let test_bad_contract_parameter () =
   | Error (Environment.Ecoproto_error (Bad_contract_parameter source') :: _) ->
       Alcotest.(check Testable.contract)
         "incorrect field in Bad_contract_parameter"
-        default_source
+        Contract_helpers.default_source
         source' ;
       return_unit
   | Error errs ->
@@ -104,7 +63,7 @@ let test_multiplication_close_to_overflow_passes () =
   test_context () >>=? fun ctx ->
   (* Get sure that multiplication deals with numbers between 2^62 and
      2^63 without overflowing *)
-  run_script
+  Contract_helpers.run_script
     ctx
     "{parameter unit;storage unit;code {DROP; PUSH mutez 2944023901536524477; \
      PUSH nat 2; MUL; DROP; UNIT; NIL operation; PAIR}}"
@@ -122,10 +81,24 @@ let read_file filename =
   close_in ch ;
   s
 
-(* Confront the Michelson interpreter to deep recursions. *)
+(** The purpose of these two tests is to check that the Michelson interpreter is
+    stack-safe (because it is tail-recursive).
+
+    This requires to confront it to deep recursions, typically deeper than what
+    the gas limit allows. Unfortunately we cannot run the interpreter in
+    unaccounted gas mode because for efficiency it uses a custom gas management
+    that represents the gas counter as a mere integer. Instead we set the gas
+    counter to the highest possible value ([Saturation_repr.saturated]); with
+    the current gas costs and limits this enables more than a million recursive
+    calls which is larger than the stack size. *)
+
 let test_stack_overflow () =
   let open Script_typed_ir in
   test_context () >>=? fun ctxt ->
+  (* Set the gas counter to the maximum value *)
+  let ctxt =
+    Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
+  in
   let stack = Bot_t in
   let descr kinstr = {kloc = 0; kbef = stack; kaft = stack; kinstr} in
   let kinfo = {iloc = -1; kstack_ty = stack} in
@@ -148,9 +121,16 @@ let test_stack_overflow () =
       in
       Alcotest.failf "Unexpected error (%s) at %s" trace_string __LOC__
 
+(** The stack-safety of the interpreter relies a lot on the stack-safety of
+    Lwt.bind. This second test is similar to the previous one but uses an
+    instruction (IBig_map_mem) for which the interpreter calls Lwt.bind. *)
+
 let test_stack_overflow_in_lwt () =
   let open Script_typed_ir in
   test_context () >>=? fun ctxt ->
+  let ctxt =
+    Gas.update_remaining_operation_gas ctxt Saturation_repr.saturated
+  in
   let stack = Bot_t in
   let item ty s = Item_t (ty, s, None) in
   let unit_t = unit_t ~annot:None in
@@ -229,6 +209,76 @@ let error_encoding_tests =
       ("Cannot_serialize_storage", Cannot_serialize_storage);
     ]
 
+module Test_map_instr_on_options = struct
+  type storage = {prev : int option; total : int}
+
+  (* storage: (last input * total); param replaces the last input and
+     if some – gets added to the total. *)
+  let test_map_option_script =
+    {| { parameter (option int);
+         storage (pair (option int) int);
+         code {
+           UNPAIR ;
+           DIP { CDR } ;
+           MAP {
+             DUP ;
+             DIP { ADD } ;
+           } ;
+           PAIR ;
+           NIL operation ;
+           PAIR ;
+        }
+      } |}
+
+  let run_test_map_opt_script param {prev; total} =
+    let storage =
+      Option.fold
+        ~none:(Format.sprintf "Pair None %d" total)
+        ~some:(fun p -> Format.sprintf "Pair (Some %d) %d" p total)
+        prev
+    in
+    let parameter =
+      Option.fold ~none:"None" ~some:(Format.sprintf "Some %d") param
+    in
+    test_context () >>=? fun ctxt ->
+    Contract_helpers.run_script
+      ctxt
+      test_map_option_script
+      ~storage
+      ~parameter
+      ()
+
+  let assume_storage_shape =
+    let open Micheline in
+    let open Michelson_v1_primitives in
+    function
+    | Prim (_, D_Pair, [Prim (_, D_None, [], _); Int (_, total)], _) ->
+        {prev = None; total = Z.to_int total}
+    | Prim (_, D_Pair, [Prim (_, D_Some, [Int (_, prev)], _); Int (_, total)], _)
+      ->
+        {prev = Some (Z.to_int prev); total = Z.to_int total}
+    | _ -> QCheck.assume_fail ()
+
+  let assertions storage_before storage_after = function
+    | None ->
+        Assert.is_none ~loc:__LOC__ ~pp:Format.pp_print_int storage_after.prev
+        >>=? fun () ->
+        Assert.equal_int ~loc:__LOC__ storage_before.total storage_after.total
+    | Some input ->
+        Assert.get_some ~loc:__LOC__ storage_after.prev >>=? fun prev_aft ->
+        Assert.equal_int ~loc:__LOC__ input prev_aft >>=? fun () ->
+        Assert.equal_int
+          ~loc:__LOC__
+          (storage_before.total + input)
+          storage_after.total
+
+  let test_mapping (input, prev, total) =
+    let storage_before = {prev; total} in
+    run_test_map_opt_script input storage_before >>=? fun ({storage; _}, _) ->
+    let new_storage = assume_storage_shape (Micheline.root storage) in
+    assertions storage_before new_storage input
+end
+
 let tests =
   [
     Tztest.tztest "test bad contract error" `Quick test_bad_contract_parameter;
@@ -242,5 +292,13 @@ let tests =
       `Quick
       test_multiplication_close_to_overflow_passes;
     Tztest.tztest "test stack overflow error" `Slow test_stack_overflow;
+    Tztest.tztest_qcheck
+      ~name:"test map instr against options"
+      QCheck.(
+        triple
+          (option small_signed_int)
+          (option small_signed_int)
+          small_signed_int)
+      Test_map_instr_on_options.test_mapping;
   ]
   @ error_encoding_tests

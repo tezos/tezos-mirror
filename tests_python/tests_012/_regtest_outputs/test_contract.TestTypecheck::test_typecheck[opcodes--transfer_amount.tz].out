@@ -1,0 +1,14 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/transfer_amount.tz]
+
+Well typed
+Gas remaining: 1039996.803 units remaining
+{ parameter unit ;
+  storage mutez ;
+  code { DROP
+         /* [] */ ;
+         AMOUNT
+         /* [ @amount mutez ] */ ;
+         NIL operation
+         /* [ list operation : @amount mutez ] */ ;
+         PAIR
+         /* [ pair (list operation) (mutez @amount) ] */ } }

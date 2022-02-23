@@ -51,9 +51,13 @@ let init_light ~protocol =
   let mode_received = Client.get_mode client in
   let is_light_mode = function Client.Light _ -> true | _ -> false in
   assert (is_light_mode mode_received) ;
-  Client.set_mode (Client.Client (Some (Node node0))) client ;
-  let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap1.alias client in
-  let* () = Client.bake_for ~endpoint ~key:Constant.bootstrap2.alias client in
+  Client.set_mode (Client.Client (Some (Node node0), None)) client ;
+  let* () =
+    Client.bake_for ~endpoint ~keys:[Constant.bootstrap1.alias] client
+  in
+  let* () =
+    Client.bake_for ~endpoint ~keys:[Constant.bootstrap2.alias] client
+  in
   let* level_json = get_current_level ~endpoint client in
   let level = JSON.(level_json |-> "level" |> as_int) in
   let () =
@@ -146,7 +150,7 @@ let test_bake =
   let* (_, client) = init_light ~protocol in
   let giver = Constant.bootstrap1.alias in
   let* () = do_transfer ~giver client in
-  Client.bake_for ~key:giver client
+  Client.bake_for ~keys:[giver] client
 
 module NoUselessRpc = struct
   (** [starts_with prefix s] returns [true] iff [prefix] is a prefix of [s]. *)
@@ -205,7 +209,7 @@ module NoUselessRpc = struct
             queries_before ;
           test_no_overlap_rpc queries_before
     in
-    assert (List.length context_queries >= 2) ;
+    assert (List.compare_length_with context_queries 2 >= 0) ;
     Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
   (** Test.

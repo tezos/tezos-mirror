@@ -34,8 +34,8 @@ let all_equal (l : int list) =
 (* Horizontally concat CSVs *)
 let concat (csv1 : csv) (csv2 : csv) : csv =
   (* Check that both CSVs have the same number of lines. *)
-  let len1 = List.length csv1 and len2 = List.length csv2 in
-  if len1 <> len2 then Stdlib.failwith "Csv.concat: CSVs have different length"
+  if Compare.List_lengths.(csv1 <> csv2) then
+    Stdlib.failwith "Csv.concat: CSVs have different length"
   else
     (* Check that each CSV has the same number of *)
     let lengths1 = List.map List.length csv1 in
@@ -96,8 +96,8 @@ let import ~filename ?(separator = ',') () : csv =
   let header = String.split_on_char separator header in
   let ncols = List.length header in
   let rows = List.map (String.split_on_char separator) rows in
-  if not (List.for_all (fun l -> List.length l = ncols) rows) then
-    Stdlib.failwith "Csv.import: mismatch between header width and row width" ;
+  if not (List.for_all (fun l -> Compare.List_length_with.(l = ncols)) rows)
+  then Stdlib.failwith "Csv.import: mismatch between header width and row width" ;
   header :: rows
 
 let append_columns ~filename ?(separator = ',') ?(linebreak = '\n') (data : csv)

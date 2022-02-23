@@ -38,12 +38,33 @@ type error_category =
 
 (** {1 Assembling the different components of the error monad.} *)
 
+(** The main error type.
+
+    Whenever you add a variant to this type (with [type Error_monad.error += …])
+    you must also register the error with {!register_error_kind} (or
+    {!register_recursive_error_kind} if the error payload contains errors).
+
+    These errors are not meant to be inspected in general. Meaning that they
+    should not be matched upon. Consequently it is acceptable to register an
+    error in an implementation file and not mention it in the corresponding
+    interface file. *)
 type error = TzCore.error = ..
 
-include Sig.CORE with type error := error
+(** [CORE]: encoding and pretty-printing for errors *)
+include
+  Sig.CORE with type error := error and type error_category := error_category
 
+(** [WITH_WRAPPED]: wrapping of errors from other instantiations within this
+    one. Specifically, this is used to wrap errors of the economic protocol
+    (e.g., operation is invalid) within the errors of the shell (e.g., failed to
+    validate protocol data).
+
+    Functions from this module should only be used within the environment. *)
 include Sig.WITH_WRAPPED with type error := error
 
+(** [TzTrace]: trace module specific to the Tezos Error monad. The [trace] type
+    of this module is meant to become abstract in the medium-term (see
+    https://gitlab.com/tezos/tezos/-/issues/1577). *)
 module TzTrace : Sig.TRACE with type 'error trace = 'error list
 
 type 'error trace = 'error TzTrace.trace
@@ -52,6 +73,34 @@ include
   Tezos_lwt_result_stdlib.Lwtreslib.TRACED_MONAD
     with type 'error trace := 'error TzTrace.trace
 
+(** Syntax module (with let and returns) for the TzResult monad (i.e., the
+    TzTraced Result monad). *)
+module Tzresult_syntax : module type of TzLwtreslib.Monad.Traced_result_syntax
+
+(** Syntax module (with let and returns) for the TzResult+Lwt monad (i.e., the
+    Lwt TzTraced Result monad*)
+module Lwt_tzresult_syntax :
+    module type of TzLwtreslib.Monad.Lwt_traced_result_syntax
+
+(** Syntax module (with let and returns) for the error-agnostic Result monad is
+    available under the name [Result_syntax] from the [TRACED_MONAD].
+    Unlike {!Tzresult_syntax}, with syntax module
+    - [fail] does not wrap errors in traces,
+    - there is no [and*] (because there is no way to compose errors). *)
+
+(** Syntax module (with let and returns) for the Lwt and error-agnostic Result
+    combined monad is available under the name [Lwt_result_syntax] from the
+    [TRACED_MONAD].
+    Unlike {!Lwt_tzresult_syntax}, with syntax module
+    - [fail] does not wrap errors in traces,
+    - there is no [and*] (because there is no way to compose errors). *)
+
+(** [MONAD_EXTENSION]: the Tezos-specific extension to the monad part of
+    [Error_monad]. It includes
+
+    - consistent defaults,
+    - some tracing helpers,
+    - some other misc helpers. *)
 include
   Sig.MONAD_EXTENSION
     with type error := error
@@ -160,9 +209,7 @@ val fail_with_exn : exn -> 'a tzresult Lwt.t
 
 (** [error_of_exn e] is an error that carries the exception [e]. This function
     is intended to be used when interacting with a part of the code (most likely
-    an external library) which uses exceptions.
-
-    See also {!trace_of_exn}. *)
+    an external library) which uses exceptions. *)
 val error_of_exn : exn -> error
 
 (** [error_of_fmt …] is like [error_with …] but the error isn't wrapped in a
@@ -176,50 +223,12 @@ val error_of_exn : exn -> error
     *)
 val error_of_fmt : ('a, Format.formatter, unit, error) format4 -> 'a
 
-(** [trace_of_exn e] is a trace that carries an error that carries the exception
-    [e]. This function is intended to be used when interacting with a part of
-    the code (most likely an external library) which uses exception. E.g.,
-
-{[
-match parse data with
-| value -> Ok value
-| exception Parse_error -> error Invalid_content (* specific, expected exception *)
-| exception exn -> Error (trace_of_exn exn) (* catch-all *)
-]}
-
-    See also {!error_of_exn}. *)
-val trace_of_exn : exn -> error trace
-
-(** [tzresult_of_exn_result r] wraps the payload construction of the [Error]
-    constructor of a result into a [tzresult]. This is intended for use when
-    interacting with code that uses exceptions wrapped in a [result]. E.g.,
-
-{[
-let p : int Lwt.t = … in
-Lwt_result.catch p >|= tzresult_of_exn_result
-]} *)
-val tzresult_of_exn_result : ('a, exn) result -> 'a tzresult
-
-(** {2 Tracing with exceptions}
-
-    The following functions allow you to enrich existing traces with wrapped
-    exceptions. *)
-
-(** [generic_trace … r] is [r] where the trace (if any) is enriched with
-  [error_with …]. *)
-val generic_trace :
-  ( 'a,
-    Format.formatter,
-    unit,
-    ('b, error trace) result Lwt.t -> ('b, error trace) result Lwt.t )
-  format4 ->
-  'a
-
-(** {2 Misc helpers} *)
+(** {2 Standard errors} *)
 
 (** Wrapped OCaml/Lwt exception *)
 type error += Exn of exn
 
+(** Cancelation *)
 type error += Canceled
 
 (** {2 Catching exceptions} *)

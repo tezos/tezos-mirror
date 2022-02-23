@@ -32,6 +32,8 @@
 *)
 
 open Protocol
+open Alpha_context
+open Test_tez
 
 let ( >>??= ) x y =
   match x with
@@ -51,7 +53,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     let module H = Tezos_sapling.Core.Client.Hash in
@@ -91,7 +92,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
@@ -105,7 +105,7 @@ module Raw_context_tests = struct
     in
     let state = nullifiers_add state nf in
     let state = nullifiers_add state nf in
-    assert (List.length state.diff.nullifiers = 2) ;
+    assert (Compare.List_length_with.(state.diff.nullifiers = 2)) ;
     Sapling_storage.Nullifiers.size ctx id >>= wrap >>=? fun disk_size ->
     assert (disk_size = 0L) ;
     Sapling_storage.apply_diff ctx id state.diff |> assert_error
@@ -121,7 +121,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
@@ -183,7 +182,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
@@ -229,7 +227,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
@@ -314,7 +311,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
@@ -331,7 +327,6 @@ module Raw_context_tests = struct
           ~level:(Int32.add b.header.shell.level cnt)
           ~predecessor_timestamp:b.header.shell.timestamp
           ~timestamp:b.header.shell.timestamp
-          ~fitness:b.header.shell.fitness
           (Raw_context.recover ctx)
         >>= wrap
         >|=? fun ctx -> (ctx, Int32.succ cnt))
@@ -378,7 +373,6 @@ module Raw_context_tests = struct
       ~level:b.header.shell.level
       ~predecessor_timestamp:b.header.shell.timestamp
       ~timestamp:b.header.shell.timestamp
-      ~fitness:b.header.shell.fitness
     >>= wrap
     >>=? fun ctx ->
     Lazy_storage_diff.fresh Lazy_storage_kind.Sapling_state ~temporary:false ctx
@@ -575,7 +569,7 @@ module Interpreter_tests = struct
 
   let parameters_of_list transactions =
     let string = "{ " ^ String.concat " ; " transactions ^ " }" in
-    Alpha_context.Script.(lazy_expr (expression_from_string string))
+    Alpha_context.Script.(lazy_expr (Expr.from_string string))
 
   (* In this test we use a contract which takes a list of transactions, applies
      all of them, and assert all of them are correct. It also enforces a 1-to-1
@@ -586,10 +580,10 @@ module Interpreter_tests = struct
      transfer all of b inputs to a while adding dummy inputs and outputs.
      At last we fail we make a failing transaction. *)
   let test_shielded_tez () =
-    init () >>=? fun (b, baker, src0, src1) ->
+    init () >>=? fun (genesis, baker, src0, src1) ->
     let memo_size = 8 in
-    originate_contract "contracts/sapling_contract.tz" "{ }" src0 b baker
-    >>=? fun (dst, b, anti_replay) ->
+    originate_contract "contracts/sapling_contract.tz" "{ }" src0 genesis baker
+    >>=? fun (dst, b1, anti_replay) ->
     let wa = wallet_gen () in
     let (list_transac, total) =
       shield
@@ -602,8 +596,8 @@ module Interpreter_tests = struct
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
-    transac_and_sync ~memo_size b parameters total src0 dst baker
-    >>=? fun (b, _state) ->
+    transac_and_sync ~memo_size b1 parameters total src0 dst baker
+    >>=? fun (b2, _state) ->
     (* we shield again on another block, forging with the empty state *)
     let (list_transac, total) =
       shield
@@ -616,10 +610,11 @@ module Interpreter_tests = struct
     in
     let parameters = parameters_of_list list_transac in
     (* a does a list of shield transaction *)
-    transac_and_sync ~memo_size b parameters total src0 dst baker
-    >>=? fun (b, state) ->
+    transac_and_sync ~memo_size b2 parameters total src0 dst baker
+    >>=? fun (b3, state) ->
     (* address that will receive an unshield *)
-    Context.Contract.balance (B b) src1 >>=? fun balance_before_shield ->
+    Context.Contract.balance (B b3) src1 >>=? fun balance_before_shield ->
+    (* address that will receive an unshield *)
     let wb = wallet_gen () in
     let list_addr = gen_addr 15 wb.vk in
     let list_forge_input =
@@ -662,19 +657,22 @@ module Interpreter_tests = struct
       Format.sprintf "{Pair 0x%s (Some 0x%s) }" hex_transac hex_pkh
     in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     (* a transfers to b and unshield some money to src_2 (the pkh) *)
-    transac_and_sync ~memo_size b parameters 0 src0 dst baker
-    >>=? fun (b, state) ->
-    Context.Contract.balance (B b) src1 >>=? fun balance_after_shield ->
-    let diff =
+    transac_and_sync ~memo_size b3 parameters 0 src0 dst baker
+    >>=? fun (b4, state) ->
+    Context.Contract.balance (B b4) src1 >>=? fun balance_after_shield ->
+    let diff_due_to_shield =
       Int64.sub
-        (Test_tez.Tez.to_mutez balance_after_shield)
-        (Test_tez.Tez.to_mutez balance_before_shield)
+        (Test_tez.to_mutez balance_after_shield)
+        (Test_tez.to_mutez balance_before_shield)
     in
+    (* The balance after shield is obtained from the balance before shield by
+       the shield specific update. *)
     (* The inputs total [total] mutez and 15 of those are transfered in shielded tez *)
-    assert (Int64.equal diff (Int64.of_int (total - 15))) ;
+    Assert.equal_int ~loc:__LOC__ (Int64.to_int diff_due_to_shield) (total - 15)
+    >>=? fun () ->
     let list_forge_input =
       List.init ~when_negative_length:() 15 (fun i ->
           let pos = Int64.of_int (i + 14 + 14) in
@@ -709,15 +707,15 @@ module Interpreter_tests = struct
     in
     let string = Format.sprintf "{Pair 0x%s None }" hex_transac in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
     (* b transfers to a with dummy inputs and outputs *)
-    transac_and_sync ~memo_size b parameters 0 src0 dst baker
+    transac_and_sync ~memo_size b4 parameters 0 src0 dst baker
     >>=? fun (b, _state) ->
     (* Here we fail by doing the same transaction again*)
     Incremental.begin_construction b >>=? fun incr ->
-    let fee = Test_tez.Tez.of_int 10 in
-    Op.transaction ~fee (B b) src0 dst Test_tez.Tez.zero ~parameters
+    let fee = Test_tez.of_int 10 in
+    Op.transaction ~fee (B b) src0 dst Tez.zero ~parameters
     >>=? fun operation ->
     Incremental.add_operation (* TODO make more precise *)
       ~expect_failure:(fun _ -> return_unit)
@@ -782,7 +780,7 @@ module Interpreter_tests = struct
       WithExceptions.Option.get ~loc:__LOC__ @@ List.hd transactions
     in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string transaction))
+      Alpha_context.Script.(lazy_expr (Expr.from_string transaction))
     in
     transac_and_sync
       ~memo_size
@@ -818,7 +816,7 @@ module Interpreter_tests = struct
     let hex_transac_1 = hex_shield ~memo_size {sk; vk} anti_replay in
     let string_1 = Format.sprintf "{Pair %s None }" hex_transac_1 in
     let parameters_1 =
-      Alpha_context.Script.(lazy_expr (expression_from_string string_1))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string_1))
     in
     transac_and_sync ~memo_size block_start parameters_1 15 src dst baker
     >>=? fun (block_1, state) ->
@@ -845,7 +843,7 @@ module Interpreter_tests = struct
     in
     let string_2 = Format.sprintf "{Pair %s None }" hex_transac_2 in
     let parameters_2 =
-      Alpha_context.Script.(lazy_expr (expression_from_string string_2))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string_2))
     in
     transac_and_sync ~memo_size block_1 parameters_2 0 src dst baker
     >>=? fun (block_1, state_1) ->
@@ -858,8 +856,8 @@ module Interpreter_tests = struct
       ~offset_nullifier:0L
       ()
     >>=? fun (_root, diff_1) ->
-    let fee = Test_tez.Tez.of_int 10 in
-    Test_tez.Tez.(one_mutez *? Int64.of_int 15) >>?= fun amount_tez ->
+    let fee = Test_tez.of_int 10 in
+    Tez.one_mutez *? Int64.of_int 15 >>?= fun amount_tez ->
     Op.transaction
       ~fee
       (B block_start)
@@ -883,7 +881,7 @@ module Interpreter_tests = struct
       (B block_start)
       src
       dst
-      Test_tez.Tez.zero
+      Tez.zero
       ~parameters:parameters_2
     >>=? fun operation ->
     Incremental.add_operation incr operation >>=? fun incr ->
@@ -926,7 +924,6 @@ module Interpreter_tests = struct
         ~level:block.header.shell.level
         ~predecessor_timestamp:block.header.shell.timestamp
         ~timestamp:block.header.shell.timestamp
-        ~fitness:block.header.shell.fitness
       >>= wrap
       >>=? fun raw_ctx -> Sapling_storage.Roots.mem raw_ctx id root >>= wrap
     in
@@ -953,13 +950,7 @@ module Interpreter_tests = struct
       shield ~memo_size:8 sk 4 vk (Format.sprintf "0x%s") anti_replay
     in
     let parameters = parameters_of_list list_transac in
-    Op.transaction
-      ~fee:(Test_tez.Tez.of_int 10)
-      (B b)
-      src
-      dst
-      Test_tez.Tez.zero
-      ~parameters
+    Op.transaction ~fee:(Test_tez.of_int 10) (B b) src dst Tez.zero ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
 
@@ -991,17 +982,17 @@ module Interpreter_tests = struct
     in
     (* transac 1 is applied to state_1*)
     let parameters_1 =
-      Alpha_context.Script.(lazy_expr (expression_from_string str_1))
+      Alpha_context.Script.(lazy_expr (Expr.from_string str_1))
     in
     (* tranasc_2 is applied to state_2*)
     let parameters_2 =
-      Alpha_context.Script.(lazy_expr (expression_from_string str_2))
+      Alpha_context.Script.(lazy_expr (Expr.from_string str_2))
     in
-    let fee = Test_tez.Tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters:parameters_1
+    let fee = Test_tez.of_int 10 in
+    Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_1
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
-    Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters:parameters_2
+    Op.transaction ~fee (B b) src dst Tez.zero ~parameters:parameters_2
     >>=? fun operation ->
     next_block b operation >>=? fun b ->
     Incremental.begin_construction b >>=? fun incr ->
@@ -1061,19 +1052,18 @@ module Interpreter_tests = struct
     let hex_transac_1 = hex_shield ~memo_size:8 w anti_replay in
     let string = "Left " ^ hex_transac_1 in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
-    let fee = Test_tez.Tez.of_int 10 in
-    Op.transaction ~fee (B b) src dst Test_tez.Tez.zero ~parameters
-    >>=? fun operation ->
+    let fee = Test_tez.of_int 10 in
+    Op.transaction ~fee (B b) src dst Tez.zero ~parameters >>=? fun operation ->
     next_block b operation >>=? fun b ->
     let contract = "0x" ^ to_hex dst Alpha_context.Contract.encoding in
     let hex_transac_2 = hex_shield ~memo_size:8 w anti_replay_2 in
     let string = "(Pair " ^ contract ^ " " ^ hex_transac_2 ^ ")" in
     let parameters =
-      Alpha_context.Script.(lazy_expr (expression_from_string string))
+      Alpha_context.Script.(lazy_expr (Expr.from_string string))
     in
-    Op.transaction ~fee (B b) src dst_2 Test_tez.Tez.zero ~parameters
+    Op.transaction ~fee (B b) src dst_2 Tez.zero ~parameters
     >>=? fun operation ->
     next_block b operation >>=? fun _b -> return_unit
 end

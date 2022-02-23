@@ -1,32 +1,31 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-base"
-  "index" { >= "1.3.0" }
-  "camlzip" { = "1.10" }
-  "tar-unix" { = "1.1.0" }
-  "ringo-lwt" { = "0.5" }
-  "digestif" {>= "0.7.3"}
   "tezos-shell-services"
+  "index" { >= "1.3.0" }
+  "irmin-pack" { >= "2.8.0" }
   "tezos-stdlib-unix"
   "tezos-context"
   "tezos-validation"
-  "tezos-legacy-store"
-  "alcotest-lwt" { with-test & >= "1.1.0" }
-  "tezos-embedded-protocol-demo-noops" { with-test }
-  "tezos-embedded-protocol-000-Ps9mPmXa" { with-test }
-  "tezos-embedded-protocol-005-PsBabyM1" { with-test }
-  "tezos-embedded-protocol-006-PsCARTHA" { with-test }
-  "tezos-embedded-protocol-genesis" { with-test }
-  "tezos-embedded-protocol-alpha" { with-test }
-  "tezos-protocol-plugin-alpha" { with-test }
-  "tezos-protocol-alpha-parameters" { with-test }
+  "tezos-protocol-updater"
+  "lwt-watcher" { = "0.1" }
+  "ringo-lwt" { = "0.5" }
+  "camlzip" { = "1.10" }
+  "tar"
+  "tar-unix" { = "1.1.0" }
+  "tezos-embedded-protocol-demo-noops" {with-test}
+  "tezos-embedded-protocol-genesis" {with-test}
+  "tezos-embedded-protocol-alpha" {with-test}
+  "tezos-protocol-alpha-parameters" {with-test}
+  "tezos-protocol-plugin-alpha" {with-test}
+  "alcotest-lwt" { with-test & >= "1.5.0" }
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

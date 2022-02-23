@@ -102,6 +102,8 @@ module Section : sig
 
   val to_lwt_log : t -> Lwt_log_core.section
 
+  val is_prefix : prefix:t -> t -> bool
+
   val encoding : t Data_encoding.t
 
   val to_string_list : t -> string list
@@ -141,6 +143,20 @@ end = struct
   let to_string_list s = s.path
 
   let to_lwt_log s = s.lwt_log_section
+
+  let is_prefix ~prefix main =
+    try
+      let _ =
+        List.fold_left
+          (fun prev elt ->
+            match prev with
+            | t :: q when String.equal t elt -> q
+            | _ -> raise Not_found)
+          main.path
+          prefix.path
+      in
+      true
+    with Not_found -> false
 
   let encoding =
     let open Data_encoding in
@@ -300,16 +316,26 @@ module All_sinks = struct
         active := act :: !active ;
         return_unit
 
-  let close () =
+  let close ?(except = fun _ -> false) () =
     let close_one (type a) sink definition =
       let module S = (val definition : SINK with type t = a) in
       S.close sink
     in
-    let sinks_to_close = !active in
-    active := [] ;
-    List.iter_es
+    (* We want to filter the list in one Lwt-go (atomically), and only then
+       call close on the ones that are being deleted. *)
+    let (next_active, to_close_list) =
+      List.partition
+        (fun act ->
+          match act with Active {configuration; _} -> except configuration)
+        !active
+    in
+    active := next_active ;
+    (* We don't want one failure to prevent the attempt at closing as many
+       sinks as possible, so we record all errors and combine them: *)
+    List.map_s
       (fun (Active {sink; definition; _}) -> close_one sink definition)
-      sinks_to_close
+      to_close_list
+    >|= fun close_results -> Tzresult_syntax.join close_results
 
   let handle def section v =
     let handle (type a) sink definition =
@@ -564,7 +590,7 @@ module Simple = struct
      | RangedInt _ -> Format.pp_print_int fmt value
      | RangedFloat _ -> pp_print_compact_float fmt value
      | Float -> pp_print_compact_float fmt value
-     | Bytes _ -> pp_print_shortened_string fmt (Bytes.unsafe_to_string value)
+     | Bytes _ -> pp_print_shortened_string fmt (Bytes.to_string value)
      | String _ -> pp_print_shortened_string fmt value
      | Padded (encoding, _) -> pp_human_readable ~never_empty encoding fmt value
      | String_enum (table, _) -> (
@@ -1227,31 +1253,20 @@ module Legacy_logging = struct
     module Event = Make (Definition)
 
     let emit_async level fmt ?tags =
-      (* Prevent massive calls to kasprintf *)
-      let log_section = Section.to_lwt_log section in
-      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
-      then
-        Format.kasprintf
-          (fun message ->
-            Lwt.ignore_result
-              (Event.emit ~section (fun () ->
-                   Definition.make ?tags level message)))
-          fmt
-      else Format.ifprintf Format.std_formatter fmt
+      Format.kasprintf
+        (fun message ->
+          Lwt.ignore_result
+            (Event.emit ~section (fun () -> Definition.make ?tags level message)))
+        fmt
 
     let emit_lwt level fmt ?tags =
-      (* Prevent massive calls to kasprintf *)
-      let log_section = Section.to_lwt_log section in
-      if should_log ~level ~sink_level:(Lwt_log_core.Section.level log_section)
-      then
-        Format.kasprintf
-          (fun message ->
-            Event.emit ~section (fun () -> Definition.make ?tags level message)
-            >>= function
-            | Ok () -> Lwt.return_unit
-            | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
-          fmt
-      else Format.ikfprintf (fun _ -> Lwt.return_unit) Format.std_formatter fmt
+      Format.kasprintf
+        (fun message ->
+          Event.emit ~section (fun () -> Definition.make ?tags level message)
+          >>= function
+          | Ok () -> Lwt.return_unit
+          | Error el -> Format.kasprintf Lwt.fail_with "%a" pp_print_trace el)
+        fmt
   end
 
   module Make (P : sig

@@ -75,7 +75,13 @@ module Endorser = struct
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Endorser started." >>= fun () ->
+      cctxt#message
+        "Endorser v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       Client_baking_endorsement.create cctxt ~delay delegates block_stream
     in
     Client_confirmations.wait_for_bootstrapped
@@ -88,7 +94,8 @@ end
 module Baker = struct
   let run (cctxt : #Protocol_client_context.full) ?minimal_fees
       ?minimal_nanotez_per_gas_unit ?minimal_nanotez_per_byte ?max_priority
-      ?per_block_vote_file ~chain ~context_path ~keep_alive delegates =
+      ?per_block_vote_file ?extra_operations ~chain ~context_path ~keep_alive
+      delegates =
     let process () =
       Config_services.user_activated_upgrades cctxt
       >>=? fun user_activated_upgrades ->
@@ -97,7 +104,13 @@ module Baker = struct
         cctxt
         chain
       >>=? fun block_stream ->
-      cctxt#message "Baker started." >>= fun () ->
+      cctxt#message
+        "Baker v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       Client_baking_forge.create
         cctxt
         ~user_activated_upgrades
@@ -106,6 +119,7 @@ module Baker = struct
         ?minimal_nanotez_per_byte
         ?max_priority
         ?per_block_vote_file
+        ?extra_operations
         ~chain
         ~context_path
         delegates
@@ -128,7 +142,13 @@ module Accuser = struct
         ~chains:[chain]
         ()
       >>=? fun valid_blocks_stream ->
-      cctxt#message "Accuser started." >>= fun () ->
+      cctxt#message
+        "Accuser v%s (%s) for %a started."
+        Tezos_version.Version.current_string
+        Tezos_version.Current_git_info.abbreviated_commit_hash
+        Protocol_hash.pp_short
+        Protocol.hash
+      >>= fun () ->
       Client_baking_denunciation.create
         cctxt
         ~preserved_levels

@@ -74,6 +74,7 @@ module BlockToHashClient (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
   let hash_of_block (rpc_context : #RPC_context.simple)
       (chain : Tezos_shell_services.Shell_services.chain)
       (block : Tezos_shell_services.Block_services.block) =
+    let open Lwt_tzresult_syntax in
     match raw_hash_of_block block with
     | Some h ->
         (* Block is defined by its hash *)
@@ -104,7 +105,7 @@ module BlockToHashClient (S : Registration.Proxy_sig) : BLOCK_TO_HASH = struct
               (* Table is not empty, We need to be consistent with the previous call
                  and we dont have the data available:
                  need to do an RPC call to get the hash *)
-              S.hash rpc_context ~chain ~block () >>=? fun hash ->
+              let* hash = S.hash rpc_context ~chain ~block () in
               (* Fill cache with result *)
               Hashtbl.add table (chain, block) hash ;
               return_some hash)
@@ -163,6 +164,7 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
     (rpc_context : RPC_context.json)
     (proxy_env : Registration.proxy_environment) (mode : mode) envs_cache key
     chain block =
+  let open Lwt_syntax in
   match (mode, raw_hash_of_block block) with
   | (Light_client _, _) | (Proxy_client, _) | (_, Some _) ->
       (* - If tezos-client executes: don't clear anything, because the client
@@ -177,34 +179,39 @@ let schedule_clearing (printer : Tezos_client_base.Client_context.printer)
         Tezos_shell_services.Block_services.
           (chain_to_string chain, to_string block)
       in
-      (match sym_block_caching_time_opt with
-      | Some sym_block_caching_time ->
-          Lwt.return @@ Int.to_float sym_block_caching_time
-      | None -> (
-          let (module Proxy_environment) = proxy_env in
-          Proxy_environment.time_between_blocks rpc_context chain block
-          >>= function
-          | Error _ | Ok None ->
-              (* While this looks like hardcoding an important value, it's not.
-                 This block is entered if and only if: 1/ the RPC retrieving
-                 the constants fail (see [Proxy_environment.time_between_blocks]
-                 implementation that relies on this RPC). Or 2/ the
-                 protocol doesn't specify the constant time_between_blocks,
-                 which ought to be impossible. *)
-              printer#warning
-                "time_between_blocks for chain %s and block %s cannot be \
-                 determined. Using 60 seconds."
-                chain_string
-                block_string
-              >|= fun () -> 60.0
-          | Ok (Some x) -> Lwt.return (Int64.to_float x)))
-      >>= fun time_between_blocks ->
+      let* time_between_blocks =
+        match sym_block_caching_time_opt with
+        | Some sym_block_caching_time ->
+            Lwt.return @@ Int.to_float sym_block_caching_time
+        | None -> (
+            let (module Proxy_environment) = proxy_env in
+            let* ro =
+              Proxy_environment.time_between_blocks rpc_context chain block
+            in
+            match ro with
+            | Error _ | Ok None ->
+                (* While this looks like hardcoding an important value, it's not.
+                   This block is entered if and only if: 1/ the RPC retrieving
+                   the constants fail (see [Proxy_environment.time_between_blocks]
+                   implementation that relies on this RPC). Or 2/ the
+                   protocol doesn't specify the constant time_between_blocks,
+                   which ought to be impossible. *)
+                let* () =
+                  printer#warning
+                    "time_between_blocks for chain %s and block %s cannot be \
+                     determined. Using 60 seconds."
+                    chain_string
+                    block_string
+                in
+                Lwt.return 60.0
+            | Ok (Some x) -> Lwt.return (Int64.to_float x))
+      in
       let schedule () : _ Lwt.t =
-        Lwt_unix.sleep time_between_blocks >>= fun () ->
+        let* () = Lwt_unix.sleep time_between_blocks in
         Env_cache_lwt.remove envs_cache key ;
         Events.(emit clearing_data (chain_string, block_string))
       in
-      Lwt.async schedule ;
+      Lwt.dont_wait schedule (fun exc -> ignore exc) ;
       Lwt.return_unit
 
 (** [protocols hash] returns the implementation of the RPC
@@ -252,6 +259,7 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
   in
   let module B2H = (val b2h : BLOCK_TO_HASH) in
   let make chain block (module P_RPC : Proxy_proto.PROTO_RPC) =
+    let open Lwt_syntax in
     match mode with
     | Light_client sources ->
         let (module C) =
@@ -261,8 +269,9 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
           Tezos_shell_services.Block_services.
             (chain_to_string chain, to_string block)
         in
-        Light_logger.Logger.(emit core_created (chain_string, block_string))
-        >>= fun () ->
+        let* () =
+          Light_logger.Logger.(emit core_created (chain_string, block_string))
+        in
         let module M = Proxy_getter.Make (C) (P_RPC) in
         Lwt.return (module M : Proxy_getter.M)
     | Proxy_client | Proxy_server _ ->
@@ -282,7 +291,8 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
       | Proxy_client | Light_client _ -> 16)
   in
   let get_env_rpc_context chain block =
-    B2H.hash_of_block rpc_context chain block >>=? fun block_hash_opt ->
+    let open Lwt_tzresult_syntax in
+    let* block_hash_opt = B2H.hash_of_block rpc_context chain block in
     let (block_key, (fill_b2h : Block_hash.t -> unit)) =
       match block_hash_opt with
       | None -> (block, fun block_hash -> B2H.add chain block block_hash)
@@ -290,39 +300,43 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     in
     let key = (chain, block_key) in
     let compute_value (chain, block_key) =
-      Proxy_environment.init_env_rpc_context
-        printer
-        (make chain block_key)
-        rpc_context
-        (to_client_server_mode mode)
-        chain
-        block_key
-      >>=? fun initial_context ->
+      let* initial_context =
+        Proxy_environment.init_env_rpc_context
+          printer
+          (make chain block_key)
+          rpc_context
+          (to_client_server_mode mode)
+          chain
+          block_key
+      in
       fill_b2h @@ initial_context.block_hash ;
-      schedule_clearing
-        printer
-        rpc_context
-        proxy_env
-        mode
-        envs_cache
-        key
-        chain
-        block
-      >>= fun () -> return initial_context
+      let*! () =
+        schedule_clearing
+          printer
+          rpc_context
+          proxy_env
+          mode
+          envs_cache
+          key
+          chain
+          block
+      in
+      return initial_context
     in
     Env_cache_lwt.find_or_replace envs_cache key compute_value
   in
   let get_env_rpc_context' chain block =
-    get_env_rpc_context chain block >>= fun result ->
-    match result with
-    | Ok x -> Lwt.return x
-    | Error errs ->
+    let open Lwt_syntax in
+    let* res = get_env_rpc_context chain block in
+    match res with
+    | Error trace ->
         (* proto_directory expects a unit Directory.t Lwt.t,
            we can't give it a unit tzresult Directory.t Lwt.t, hence
            throwing an exception. It's handled in
            [Tezos_mockup_proxy.RPC_client]. This is not ideal, but
            it's better than asserting false. *)
-        raise (Tezos_mockup_proxy.RPC_client.Rpc_dir_creation_failure errs)
+        raise (Tezos_mockup_proxy.RPC_client.Rpc_dir_creation_failure trace)
+    | Ok res -> Lwt.return res
   in
   let proto_directory =
     let ( // ) = RPC_directory.prefix in

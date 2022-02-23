@@ -99,11 +99,11 @@ open Validation_errors
 let (big_step_size, big_step_size_announce) = (2000, 1000)
 
 (** The promises which fetches headers and operations communicate
-   through a [Lwt_pipe]. This pipe stores headers by batch. The size
+   through a [Lwt_pipe.Bounded]. This pipe stores headers by batch. The size
    of the batch is defined by [header_batch_size]. *)
 let header_batch_size = 20
 
-(** Size of the [Lwt_pipe] containing the fetched headers. If this
+(** Size of the [Lwt_pipe.Bounded] containing the fetched headers. If this
    size is reached, the promise which fetches headers holds and wait
    that the promise which fetches operations to dequeue some
    headers. This means that the maximum number of headers the queue
@@ -127,10 +127,10 @@ type t = {
   locator : Block_locator.t;
   block_validator : Block_validator.t;
   notify_new_block : Store.Block.t -> unit;
-  fetched_headers : (Block_hash.t * Block_header.t) list Lwt_pipe.t;
+  fetched_headers : (Block_hash.t * Block_header.t) list Lwt_pipe.Bounded.t;
   fetched_blocks :
     (Block_hash.t * Block_header.t * Operation.t list list tzresult Lwt.t)
-    Lwt_pipe.t;
+    Lwt_pipe.Bounded.t;
   (* HACK, a worker should be able
      to return the 'error'. *)
   mutable errors : Error_monad.error list;
@@ -197,7 +197,7 @@ let assert_acceptable_header pipeline hash (header : Block_header.t) =
     4. It loops on the predecessor of the current block. *)
 let fetch_step pipeline (step : Block_locator.step) =
   let rec fetch_loop acc hash cpt =
-    Lwt_unix.yield () >>= fun () ->
+    Lwt.pause () >>= fun () ->
     (if
      step.step > big_step_size && 0 <> cpt && cpt mod big_step_size_announce = 0
     then
@@ -268,10 +268,7 @@ let headers_fetch_worker_loop pipeline =
      match savepoint with
      | None -> Block_locator.to_steps seed pipeline.locator
      | Some (savepoint_hash, savepoint_level) ->
-         let (head, _) =
-           (pipeline.locator : Block_locator.t :> Block_header.t * _)
-         in
-         let head_level = head.shell.level in
+         let head_level = pipeline.locator.head_header.shell.level in
          let truncate_limit = Int32.(sub head_level savepoint_level) in
          Block_locator.to_steps_truncate
            ~limit:(Int32.to_int truncate_limit)
@@ -295,14 +292,14 @@ let headers_fetch_worker_loop pipeline =
          (Too_short_locator (sender_id, pipeline.locator))
        >>=? fun () ->
        (* We add the headers by batch to the fetched_headers queue.
-          If the queue is full, the [Lwt_pipe.push] promise is pending
+          If the queue is full, the [Lwt_pipe.Bounded.push] promise is pending
           until some headers are popped from the queue. *)
        let rec process_headers headers =
          let (batch, remaining_headers) =
            List.split_n header_batch_size headers
          in
          protect ~canceler:pipeline.canceler (fun () ->
-             Lwt_pipe.push pipeline.fetched_headers batch >>= fun () ->
+             Lwt_pipe.Bounded.push pipeline.fetched_headers batch >>= fun () ->
              return_unit)
          >>=? fun () ->
          match remaining_headers with
@@ -331,7 +328,7 @@ let headers_fetch_worker_loop pipeline =
       Bootstrap_pipeline_event.(emit fetching_all_steps_from_peer)
         pipeline.peer_id
       >>= fun () ->
-      Lwt_pipe.close pipeline.fetched_headers ;
+      Lwt_pipe.Bounded.close pipeline.fetched_headers ;
       Lwt.return_unit
   | Error (Exn Lwt.Canceled :: _)
   | Error (Canceled :: _)
@@ -362,9 +359,9 @@ let headers_fetch_worker_loop pipeline =
    successfuly in the queue. It is canceled if one operation could not
    be fetched. *)
 let rec operations_fetch_worker_loop pipeline =
-  ( Lwt_unix.yield () >>= fun () ->
+  ( Lwt.pause () >>= fun () ->
     protect ~canceler:pipeline.canceler (fun () ->
-        Lwt_pipe.pop pipeline.fetched_headers >>= return)
+        Lwt_pipe.Bounded.pop pipeline.fetched_headers >>= return)
     >>=? fun batch ->
     List.map_ep
       (fun (hash, header) ->
@@ -394,7 +391,9 @@ let rec operations_fetch_worker_loop pipeline =
     List.iter_es
       (fun (hash, header, operations) ->
         protect ~canceler:pipeline.canceler (fun () ->
-            Lwt_pipe.push pipeline.fetched_blocks (hash, header, operations)
+            Lwt_pipe.Bounded.push
+              pipeline.fetched_blocks
+              (hash, header, operations)
             >>= fun () -> return_unit))
       operationss )
   >>= function
@@ -402,7 +401,7 @@ let rec operations_fetch_worker_loop pipeline =
   | Error (Exn Lwt.Canceled :: _)
   | Error (Canceled :: _)
   | Error (Exn Lwt_pipe.Closed :: _) ->
-      Lwt_pipe.close pipeline.fetched_blocks ;
+      Lwt_pipe.Bounded.close pipeline.fetched_blocks ;
       Lwt.return_unit
   | Error (Distributed_db.Operations.Timeout (bh, n) :: _) ->
       Bootstrap_pipeline_event.(emit request_operations_timeout)
@@ -420,9 +419,9 @@ let rec operations_fetch_worker_loop pipeline =
    fulfilled if every block from the locator was validated. It is
    canceled if the validation of one block fails. *)
 let rec validation_worker_loop pipeline =
-  ( Lwt_unix.yield () >>= fun () ->
+  ( Lwt.pause () >>= fun () ->
     protect ~canceler:pipeline.canceler (fun () ->
-        Lwt_pipe.pop pipeline.fetched_blocks >>= return)
+        Lwt_pipe.Bounded.pop pipeline.fetched_blocks >>= return)
     >>=? fun (hash, header, operations) ->
     Bootstrap_pipeline_event.(emit requesting_validation)
       (hash, pipeline.peer_id)
@@ -478,10 +477,16 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
     ~block_operations_timeout block_validator peer_id chain_db locator =
   let canceler = Lwt_canceler.create () in
   let fetched_headers =
-    Lwt_pipe.create ~size:(fetched_headers_queue_size, fun _ -> 1) ()
+    Lwt_pipe.Bounded.create
+      ~max_size:fetched_headers_queue_size
+      ~compute_size:(fun _ -> 1)
+      ()
   in
   let fetched_blocks =
-    Lwt_pipe.create ~size:(fetched_blocks_queue_size, fun _ -> 1) ()
+    Lwt_pipe.Bounded.create
+      ~max_size:fetched_blocks_queue_size
+      ~compute_size:(fun _ -> 1)
+      ()
   in
   let pipeline =
     {
@@ -502,12 +507,10 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
     }
   in
   Lwt_canceler.on_cancel pipeline.canceler (fun () ->
-      Lwt_pipe.close fetched_blocks ;
-      Lwt_pipe.close fetched_headers ;
+      Lwt_pipe.Bounded.close fetched_blocks ;
+      Lwt_pipe.Bounded.close fetched_headers ;
       (* TODO proper cleanup of resources... *)
       Lwt.return_unit) ;
-  let (head, _) = (pipeline.locator : Block_locator.t :> _ * _) in
-  let hash = Block_header.hash head in
   pipeline.headers_fetch_worker <-
     Lwt_utils.worker
       (Format.asprintf
@@ -515,7 +518,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          P2p_peer.Id.pp_short
          peer_id
          Block_hash.pp_short
-         hash)
+         locator.Block_locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> headers_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
@@ -526,7 +529,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          P2p_peer.Id.pp_short
          peer_id
          Block_hash.pp_short
-         hash)
+         locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> operations_fetch_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
@@ -537,7 +540,7 @@ let create ?(notify_new_block = fun _ -> ()) ~block_header_timeout
          P2p_peer.Id.pp_short
          peer_id
          Block_hash.pp_short
-         hash)
+         locator.head_hash)
       ~on_event:Internal_event.Lwt_worker_event.on_event
       ~run:(fun () -> validation_worker_loop pipeline)
       ~cancel:(fun () -> Error_monad.cancel_with_exceptions pipeline.canceler) ;
@@ -559,8 +562,8 @@ let cancel pipeline =
 let length pipeline =
   Peer_validator_worker_state.
     {
-      fetched_header_length = Lwt_pipe.length pipeline.fetched_headers;
-      fetched_block_length = Lwt_pipe.length pipeline.fetched_blocks;
+      fetched_header_length = Lwt_pipe.Bounded.length pipeline.fetched_headers;
+      fetched_block_length = Lwt_pipe.Bounded.length pipeline.fetched_blocks;
     }
 
 let length_zero =

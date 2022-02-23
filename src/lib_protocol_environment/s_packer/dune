@@ -1,13 +1,13 @@
 (library
  (name tezos_protocol_environment_packer)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment-packer)
+ (instrumentation (backend bisect_ppx))
  (modules))
 
 (executable
  (name s_packer))
 
 (install
-  (section libexec)
-  (package tezos-protocol-environment-packer)
-  (files (s_packer.exe as s_packer)))
+ (section libexec)
+ (package tezos-protocol-environment-packer)
+ (files (s_packer.exe as s_packer)))

@@ -1,0 +1,39 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_after_nonexistent_view.tz]
+
+Well typed
+Gas remaining: 1039985.527 units remaining
+{ parameter address ;
+  storage address ;
+  code { CAR
+         /* [ @parameter address ] */ ;
+         DUP
+         /* [ @parameter address : @parameter address ] */ ;
+         PUSH nat 0
+         /* [ nat : @parameter address : @parameter address ] */ ;
+         VIEW "nonexistent"
+              string
+         /* [ @parameter.contract option string : @parameter address ] */ ;
+         ASSERT_NONE ;
+         CONTRACT nat
+         /* [ @parameter.contract option (contract nat) ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez 1500
+         /* [ mutez : @parameter.contract.some contract nat ] */ ;
+         PUSH nat 0
+         /* [ nat : mutez : @parameter.contract.some contract nat ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation ] */ ;
+         SELF
+         /* [ @self contract address : operation ] */ ;
+         ADDRESS
+         /* [ @self.address address : operation ] */ ;
+         SWAP
+         /* [ operation : @self.address address ] */ ;
+         NIL operation
+         /* [ list operation : operation : @self.address address ] */ ;
+         SWAP
+         /* [ operation : list operation : @self.address address ] */ ;
+         CONS
+         /* [ list operation : @self.address address ] */ ;
+         PAIR
+         /* [ pair (list operation) (address @self.address) ] */ } }

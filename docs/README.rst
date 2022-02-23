@@ -8,17 +8,40 @@ and always up to date with branch ``master`` on `GitLab <https://gitlab.com/tezo
 Building instructions
 =====================
 
-To build the documentation, you need to install the Python package
+You can build the documentation locally or in the CI.
+
+.. _build_doc_ci:
+
+Building the documentation in the CI
+------------------------------------
+
+When reviewing a merge request in the Gitlab interface, you may build the documentation in the CI without installing anything locally. Proceed as follows:
+
+- if you want the light version of the documentation (RST pages only):
+
+  + make sure the CI job ``documentation:build`` under the CI stage ``build`` is executed (you may have to trigger it manually)
+  + once finished, check the light built documentation in the exposed artifacts
+
+- if you want the full version of the documentation (including CLI manuals and Odoc APIs):
+
+  + trigger the CI job ``documentation:build_all`` under the CI stage ``manual``
+  + once finished, check the full built documentation in the exposed artifacts
+
+If the artifacts are not exposed on the main page of the MR, click on the CI jobs mentioned above, and in the job's page (once finished), click on ``Browse``, then visualize file ``docs/_build/index.html``.
+
+Building the documentation locally
+----------------------------------
+
+To build the documentation locally, you need to install the Python package
 manager `Poetry <https://python-poetry.org/>`_. For instructions on
 how to obtain Python and Poetry, see :doc:`the installation
 instructions for the python testing
 framework<developer/python_testing_framework>`.  Once this is done, you can
-install the needed dependencies locally:
+do:
 
 .. code-block:: bash
 
     # in the "docs" directory
-    poetry install
     make
 
 The output is generated and available in ``docs/_build``. It is built by
@@ -137,7 +160,7 @@ This better way is to write "executable documentation".
 The idea is to write such executable scripts separated from the documentation, and to automatically copy them in the documentation whenever it is (re)generated.
 Executable documentation allows one to test those scripts, e.g. in CI (continuous integration), ensuring they work and are up to date with the code and with its environment.
 
-Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distrbutions, and so on.
+Typically, Tezos installation scripts not only have to evolve with the Tezos codebase, but also with various other evolving resources, such as OPAM packages, package managers, Linux distributions, and so on.
 By continuously testing such installation scripts, executable documentation allows one to detect problems and fix obsolete instructions as early as possible, avoiding headaches and frustration, for new end users and experienced developers alike.
 
 Technically, executable documentation can be created by using the Sphinx directive `literalinclude <https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude>`_, which may include whole scripts or parts of them.

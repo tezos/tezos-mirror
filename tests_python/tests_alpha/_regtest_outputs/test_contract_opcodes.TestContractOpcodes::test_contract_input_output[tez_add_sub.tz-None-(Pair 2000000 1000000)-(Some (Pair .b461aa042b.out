@@ -7,61 +7,65 @@ emitted operations
 big_map diff
   
 trace
-  - location: 12 (remaining gas: 1039985.118 units remaining)
+  - location: 12 (remaining gas: 1039980.750 units remaining)
     [ (Pair (Pair 2000000 1000000) None)  	 ]
-  - location: 12 (remaining gas: 1039985.108 units remaining)
+  - location: 12 (remaining gas: 1039980.740 units remaining)
     [ (Pair 2000000 1000000)  	@parameter ]
-  - location: 13 (remaining gas: 1039985.098 units remaining)
+  - location: 13 (remaining gas: 1039980.730 units remaining)
     [ (Pair 2000000 1000000)  	@parameter
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 14 (remaining gas: 1039985.088 units remaining)
+  - location: 14 (remaining gas: 1039980.720 units remaining)
     [ (Pair 2000000 1000000)  	@parameter
       (Pair 2000000 1000000)  	@parameter
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 15 (remaining gas: 1039985.078 units remaining)
+  - location: 15 (remaining gas: 1039980.710 units remaining)
     [ 2000000  	
       (Pair 2000000 1000000)  	@parameter
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 16 (remaining gas: 1039985.063 units remaining)
+  - location: 16 (remaining gas: 1039980.695 units remaining)
     [ (Pair 2000000 1000000)  	@parameter
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 18 (remaining gas: 1039985.053 units remaining)
+  - location: 18 (remaining gas: 1039980.685 units remaining)
     [ 1000000  	
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 16 (remaining gas: 1039985.023 units remaining)
+  - location: 16 (remaining gas: 1039980.655 units remaining)
     [ 2000000  	
       1000000  	
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 19 (remaining gas: 1039984.998 units remaining)
+  - location: 19 (remaining gas: 1039980.635 units remaining)
     [ 3000000  	
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 20 (remaining gas: 1039984.983 units remaining)
+  - location: 20 (remaining gas: 1039980.620 units remaining)
     [ (Pair 2000000 1000000)  	@parameter ]
-  - location: 22 (remaining gas: 1039984.973 units remaining)
+  - location: 22 (remaining gas: 1039980.610 units remaining)
     [ (Pair 2000000 1000000)  	@parameter
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 23 (remaining gas: 1039984.963 units remaining)
+  - location: 23 (remaining gas: 1039980.600 units remaining)
     [ 2000000  	
       (Pair 2000000 1000000)  	@parameter ]
-  - location: 24 (remaining gas: 1039984.948 units remaining)
+  - location: 24 (remaining gas: 1039980.585 units remaining)
     [ (Pair 2000000 1000000)  	@parameter ]
-  - location: 26 (remaining gas: 1039984.938 units remaining)
+  - location: 26 (remaining gas: 1039980.575 units remaining)
     [ 1000000  	 ]
-  - location: 24 (remaining gas: 1039984.908 units remaining)
+  - location: 24 (remaining gas: 1039980.545 units remaining)
     [ 2000000  	
       1000000  	 ]
-  - location: 27 (remaining gas: 1039984.883 units remaining)
-    [ 1000000  	 ]
-  - location: 20 (remaining gas: 1039984.853 units remaining)
+  - location: 27 (remaining gas: 1039980.525 units remaining)
+    [ (Some 1000000)  	 ]
+  - location: 29 (remaining gas: 1039980.515 units remaining)
+    [ 1000000  	@some ]
+  - location: 29 (remaining gas: 1039980.500 units remaining)
+    [ 1000000  	@some ]
+  - location: 20 (remaining gas: 1039980.470 units remaining)
     [ 3000000  	
-      1000000  	 ]
-  - location: 28 (remaining gas: 1039984.838 units remaining)
+      1000000  	@some ]
+  - location: 35 (remaining gas: 1039980.455 units remaining)
     [ (Pair 3000000 1000000)  	 ]
-  - location: 29 (remaining gas: 1039984.823 units remaining)
+  - location: 36 (remaining gas: 1039980.440 units remaining)
     [ (Some (Pair 3000000 1000000))  	 ]
-  - location: 30 (remaining gas: 1039984.808 units remaining)
+  - location: 37 (remaining gas: 1039980.425 units remaining)
     [ {}  	
       (Some (Pair 3000000 1000000))  	 ]
-  - location: 32 (remaining gas: 1039984.793 units remaining)
+  - location: 39 (remaining gas: 1039980.410 units remaining)
     [ (Pair {} (Some (Pair 3000000 1000000)))  	 ]
 

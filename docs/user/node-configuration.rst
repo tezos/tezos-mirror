@@ -2,7 +2,10 @@ Node Configuration
 ==================
 
 The Tezos node can be configured in flexible ways to control various
-aspects of its behavior, such as :ref:`RPC <configure_rpc>`, :ref:`P2P <configure_p2p>`, or :ref:`shell <configure_shell>` parameters, the directory for storing data, :ref:`logging levels <configure_logging>`, and so on. These aspects can be customized in two different ways:
+aspects of its behavior, such as :ref:`RPC <configure_rpc>`, :ref:`P2P
+<configure_p2p>`, or :ref:`shell <configure_shell>` parameters, the directory
+for storing data, :doc:`logging <./logging>`, and so on. These aspects
+can be customized in two different ways:
 
 - by supplying **options** on the command line when running the node
 - by specifying **parameters** in a configuration file for the node
@@ -186,8 +189,10 @@ Examples
 In this case the RPC is only available for requests coming from ``localhost``
 (i.e. ``127.0.0.1``). There's no need configure the ACL, as an allow-all policy
 is applied to the local host by default.
+
 ::
-  $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
+
+    $ tezos-node run --rpc-addr localhost:8732 --rpc-addr 192.168.0.3:8732
 
 In this example the RPC is available to both ``localhost`` and to the local
 network (assuming the node does have address ``192.168.0.3`` in that network).
@@ -282,9 +287,38 @@ P2P parameters allow to customize aspects related to the :doc:`peer-to-peer netw
 Listening ports
 ~~~~~~~~~~~~~~~
 
-By default, the node listens to incoming connections from peers on port ``9732``, on any of the available network interfaces on the node's host.
-This behavior can be changed by passing an IP address and optionally a port number (``addr:port``), using either the ``--net-addr`` configuration option or the P2P ``listen-addr`` configuration parameter.
-Note that the IP address is only used for selecting an active network interface (technically, it is only passed to the ``bind()`` function of the socket API). Thus, it is currently not possible to advertise to peers a different port than the binding port.
+By default, the node listens to incoming connections from peers on port ``9732``,
+on any of the available network interfaces on the node's host.
+This behavior can be changed by passing an IP address and optionally a port number
+(``addr:port``), using either the ``--net-addr`` configuration option or the P2P
+``listen-addr`` configuration parameter.
+Note that the IP address is only used for selecting an active network interface
+(technically, it is only passed to the ``bind()`` function of the socket API).
+It is also possible to advertise to peers a different port than
+the binding port using ``--advertised-net-port`` configuration option or the P2P
+`advertised-net-port`` configuration parameter. Currently it is only possible to
+specify an advertised port, but not an IP address.
+
+.. note::
+
+    If the node is run on a machine ``M`` not disposing of a public IP address,
+    subject to NAT, a port forwarding rule has
+    to be added on the NAT server ``S`` on the listening port towards
+    machine ``M``: ``S:p1 -> M:p2``, where ``p1`` is ``advertised-net-port`` and
+    ``p2`` is the port specified by ``listening-addr``. Alternatively, if the
+    ``advertised-net-port`` is not configured, ``p1`` must be the same as ``p2``.
+
+    As a consequence, if a second node has to be run behind the
+    same server on a machine ``M'`` (possibly the same as ``M``),
+    it should be configured to listen on a different port ``p2'``, to
+    allow defining another forwarding rule for it: ``S:p1' -> M':p2'``, where
+    ``p1'`` is ``advertised-net-port`` configured for the second node ``M'``.
+
+    Many routers can be configured with UPnP to open ports dynamically, so the
+    port forwarding can be initiated by the internal host without any manual
+    modification on the router. This is not possible for corporate networks with
+    UPnP disabled, but is typically handy for home routers, or other networks
+    where this option is available.
 
 Private node
 ~~~~~~~~~~~~
@@ -316,52 +350,19 @@ hardware wallet.
                                   --peer <public-node-ip>
 
 
-.. _configure_logging:
-
-Logging
--------
-
-It is possible to set independent log levels for different components in the Tezos node, as well as to specify an output file for logging.
-This can be done in two different ways:
-
-- by defining log parameters in the configuration file (see :ref:`node-conf-file`)
-- by setting the environment variable ``TEZOS_LOG`` before starting the node.
-
-The list of the Tezos components that can be logged and the syntax for the logging options can be found in the DEBUG section displayed by ``tezos-node run --help``:
-
-.. literalinclude:: ../api/tezos-node-run.txt
-    :start-after: DEBUG
-    :end-before: OPTIONS
-
-Additionally, specific logs can be activated for the context part, see the :ref:`storage layer <context_component>` documentation.
-
-Event-based logging
-~~~~~~~~~~~~~~~~~~~
-
-A more advanced interface for logging, based on events generated by the different components, is available using the environment variable ``TEZOS_EVENTS_CONFIG``. Its value must be a list of URIs separated by spaces.
-Each URI defines a *sink* for log events consisting in a Unix output stream and possibly some logging options, and has one of the following forms:
-
-- ``file-descriptor-path://<path>``
-- ``file-descriptor-stdout://``
-- ``file-descriptor-stderr://``
-
-The URIs may further append options in the form of a query ``?<opt1>=<val1>&<opt2>=<val2>...``.
-
-For example, the following definition sends all the events to file ``/the/path/to/write.log``, formatted as one event per line::
-
-  export TEZOS_EVENTS_CONFIG=file-descriptor-path:///the/path/to/write.log?format=one-per-line
-
-You may find all the available options in the `file descriptor sink API <https://tezos.gitlab.io/api/odoc/_html/tezos-stdlib-unix/Tezos_stdlib_unix/File_descriptor_sink/index.html>`__.
-
-.. note::
-  Note that, as the Tezos codebase is in the process of moving from the legacy logging framework to the events-based logging framework, some interferences are observed between the two.
-  In particular, the configuration option ``level-at-least`` documented in the above API does not currently work as expected, so you should avoid using it.
-
 .. _configure_shell:
 
 Shell parameters
 ----------------
 
-Configuration options/parameters for the shell allow tuning the working of the :doc:`validation subsystem <../shell/validation>`.
+Configuration options/parameters for the shell allow tuning the
+working of the :doc:`validation subsystem <../shell/validation>`.
 
-In particular, the synchronization heuristics implemented by the chain validator can be controlled using parameters such as the synchronization threshold or the latency, described in the documentation of the  :doc:`synchronization heuristics <../shell/sync>`.
+In particular, the synchronization heuristics implemented by the chain
+validator can be controlled using parameters such as the
+synchronization threshold or the latency, described in the
+documentation of the :doc:`synchronization heuristics
+<../shell/sync>`.
+
+Configuration parameters for the context's storage can also be done
+through environment variables, see :ref:`context_component`.

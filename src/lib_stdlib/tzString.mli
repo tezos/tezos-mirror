@@ -36,8 +36,8 @@ val split_path : string -> string list
     beginning and end of string. If [limit] is passed, stops after [limit]
     split(s). [dups] defaults to [true] and [limit] defaults to [max_int].
     Examples:
-    - split ~dup:true ',' ",hello,,world,"] returns ["hello"; "world"]
-    - split ~dup:false ',' ",,hello,,,world,,"] returns [""; "hello"; ""; ""; "world"; ""]
+    - [split ~dup:true ',' ",hello,,world,"] returns ["hello"; "world"]
+    - [split ~dup:false ',' ",,hello,,,world,,"] returns [""; "hello"; ""; ""; "world"; ""]
  *)
 val split : char -> ?dup:bool -> ?limit:int -> string -> string list
 
@@ -55,9 +55,6 @@ val mem_char : string -> char -> bool
 
 (** Functional iteration over the characters of a string from first to last *)
 val fold_left : ('a -> char -> 'a) -> 'a -> string -> 'a
-
-(** Test whether a string is a valid hexadecimal value *)
-val is_hex : string -> bool
 
 (** Pretty print bytes as hexadecimal string. *)
 val pp_bytes_hex : Format.formatter -> bytes -> unit

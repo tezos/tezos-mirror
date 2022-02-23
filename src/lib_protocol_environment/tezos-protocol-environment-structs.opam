@@ -1,16 +1,17 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-stdlib"
   "tezos-crypto"
-  "tezos-protocol-environment-packer"
   "data-encoding" { >= "0.4" & < "0.5" }
+  "bls12-381-legacy"
+  "tezos-protocol-environment-packer"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

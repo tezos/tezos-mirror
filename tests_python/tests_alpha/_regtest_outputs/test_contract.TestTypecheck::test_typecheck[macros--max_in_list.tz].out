@@ -1,0 +1,29 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/max_in_list.tz]
+
+Well typed
+Gas remaining: 1039985.981 units remaining
+{ parameter (list int) ;
+  storage (option int) ;
+  code { CAR
+         /* [ @parameter list int ] */ ;
+         DIP { NONE int /* [ option int ] */ }
+         /* [ @parameter list int : option int ] */ ;
+         ITER { SWAP
+                /* [ option int : @parameter.elt int ] */ ;
+                IF_NONE
+                  { SOME /* [ option int ] */ }
+                  { DIP { DUP /* [ @parameter.elt int : @parameter.elt int ] */ }
+                    /* [ @some int : @parameter.elt int : @parameter.elt int ] */ ;
+                    DUP
+                    /* [ @some int : @some int : @parameter.elt int : @parameter.elt int ] */ ;
+                    DIP { SWAP /* [ @parameter.elt int : @some int : @parameter.elt int ] */ }
+                    /* [ @some int : @parameter.elt int : @some int : @parameter.elt int ] */ ;
+                    CMPLE ;
+                    IF { DROP /* [ @parameter.elt int ] */ } { DIP { DROP /* [] */ } /* [ @some int ] */ } ;
+                    SOME
+                    /* [ option int ] */ } }
+         /* [ option int ] */ ;
+         NIL operation
+         /* [ list operation : option int ] */ ;
+         PAIR
+         /* [ pair (list operation) (option int) ] */ } }

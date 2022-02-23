@@ -55,19 +55,21 @@ module Make (Registration : Registration.S) = struct
       protocol_hash : Protocol_hash.t;
       chain_id : Chain_id.t;
       rpc_context : Tezos_protocol_environment.rpc_context;
+      protocol_data : bytes;
     }
 
     let encoding =
       let open Data_encoding in
       conv
-        (fun {protocol_hash; chain_id; rpc_context} ->
-          (protocol_hash, chain_id, rpc_context))
-        (fun (protocol_hash, chain_id, rpc_context) ->
-          {protocol_hash; chain_id; rpc_context})
-        (obj3
+        (fun {protocol_hash; chain_id; rpc_context; protocol_data} ->
+          (protocol_hash, chain_id, rpc_context, protocol_data))
+        (fun (protocol_hash, chain_id, rpc_context, protocol_data) ->
+          {protocol_hash; chain_id; rpc_context; protocol_data})
+        (obj4
            (req "protocol_hash" Protocol_hash.encoding)
            (req "chain_id" Chain_id.encoding)
-           (req "context" rpc_context_encoding))
+           (req "context" rpc_context_encoding)
+           (req "protocol_data" Variable.bytes))
 
     let to_json = Data_encoding.Json.construct encoding
 
@@ -119,7 +121,7 @@ module Make (Registration : Registration.S) = struct
           protocol_hashes
 
   let default_mockup_context :
-      Tezos_client_base.Client_context.full ->
+      Tezos_client_base.Client_context.printer ->
       (Registration.mockup_environment * Registration.mockup_context) tzresult
       Lwt.t =
    fun cctxt ->
@@ -133,7 +135,7 @@ module Make (Registration : Registration.S) = struct
     >>=? fun rpc_context -> return (mockup, rpc_context)
 
   let init_mockup_context_by_protocol_hash :
-      cctxt:Tezos_client_base.Client_context.full ->
+      cctxt:Tezos_client_base.Client_context.printer ->
       protocol_hash:Protocol_hash.t ->
       constants_overrides_json:Data_encoding.json option ->
       bootstrap_accounts_json:Data_encoding.json option ->
@@ -150,10 +152,14 @@ module Make (Registration : Registration.S) = struct
     >>=? fun menv -> return (mockup, menv)
 
   let mockup_context_from_persisted
-      ({protocol_hash; chain_id; rpc_context} : Persistent_mockup_environment.t)
+      ({protocol_hash; chain_id; rpc_context; protocol_data} :
+        Persistent_mockup_environment.t)
       (printer : #Tezos_client_base.Client_context.printer) =
     get_registered_mockup (Some protocol_hash) printer >>=? fun mockup ->
-    return (mockup, (chain_id, rpc_context))
+    return
+      ( mockup,
+        Tezos_mockup_registration.Registration_intf.
+          {chain = chain_id; rpc_context; protocol_data} )
 
   let get_mockup_context_from_disk ~base_dir ~protocol_hash
       (printer : #Tezos_client_base.Client_context.printer) =
@@ -196,6 +202,7 @@ module Make (Registration : Registration.S) = struct
             ~timestamp
           >>=? fun value_of_key ->
           Tezos_protocol_environment.Context.load_cache
+            predecessor
             persisted_mockup.rpc_context.context
             `Lazy
             value_of_key
@@ -228,13 +235,14 @@ module Make (Registration : Registration.S) = struct
       | exception _e ->
           failwith "get_mockup_context_from_disk: could not read %s" file
 
-  let overwrite_mockup ~protocol_hash ~chain_id ~rpc_context ~base_dir =
+  let overwrite_mockup ~protocol_hash ~chain_id ~rpc_context ~protocol_data
+      ~base_dir =
     let context_file = (Files.Context.get ~dirname:base_dir :> string) in
     if not (Sys.file_exists context_file) then
       failwith "overwrite_mockup: file %s does not exist" context_file
     else
       Persistent_mockup_environment.(
-        to_json {protocol_hash; chain_id; rpc_context})
+        to_json {protocol_hash; chain_id; rpc_context; protocol_data})
       |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
 
   type base_dir_class =
@@ -291,16 +299,16 @@ module Make (Registration : Registration.S) = struct
            base_dir)
     >>=? fun () ->
     init_mockup_context_by_protocol_hash
-      ~cctxt
+      ~cctxt:(cctxt :> Tezos_client_base.Client_context.printer)
       ~protocol_hash
       ~constants_overrides_json
       ~bootstrap_accounts_json
-    >>=? fun (_mockup_env, (chain_id, rpc_context)) ->
+    >>=? fun (_mockup_env, {chain = chain_id; rpc_context; protocol_data}) ->
     let mockup_dir = (Files.get_mockup_directory ~dirname:base_dir :> string) in
     Tezos_stdlib_unix.Lwt_utils_unix.create_dir mockup_dir >>= fun () ->
     let context_file = (Files.Context.get ~dirname:base_dir :> string) in
     Persistent_mockup_environment.(
-      to_json {protocol_hash; chain_id; rpc_context})
+      to_json {protocol_hash; chain_id; rpc_context; protocol_data})
     |> Tezos_stdlib_unix.Lwt_utils_unix.Json.write_file context_file
     >>=? fun () ->
     if asynchronous then

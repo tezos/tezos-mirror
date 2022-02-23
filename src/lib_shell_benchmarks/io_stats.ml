@@ -86,7 +86,12 @@ let tree_statistics key_map =
   {total = !nodes; keys = !keys; dirs = !dirs; degrees; depths; sizes}
 
 let load_tree context key =
-  Context.fold context key ~init:Io_helpers.Key_map.empty ~f:(fun path t tree ->
+  Context.fold
+    context
+    key
+    ~order:`Sorted
+    ~init:Io_helpers.Key_map.empty
+    ~f:(fun path t tree ->
       Context.Tree.to_value t >|= function
       | Some bytes ->
           let len = Bytes.length bytes in
@@ -100,11 +105,6 @@ let context_statistics base_dir context_hash =
   load_tree context [] >>= fun tree ->
   Tezos_context.Context.close index >>= fun () ->
   Lwt.return (tree_statistics tree)
-
-open StaTz
-
-let empirical_of_list (l : int list) : int Stats.emp =
-  Stats.empirical_of_raw_data (Array.of_list l)
 
 let matrix_of_int_list (l : int list) =
   let arr = Array.map float_of_int (Array.of_list l) in

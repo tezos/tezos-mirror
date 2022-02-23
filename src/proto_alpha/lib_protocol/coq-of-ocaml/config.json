@@ -27,7 +27,10 @@
     "A variable name instead of a pattern was expected",
     "We only support extensible types in patterns at the head",
     "This kind of signature is not handled",
-    "Tezos_raw_protocol_alpha.Raw_context_intf.T"
+    "Tezos_raw_protocol_alpha.Raw_context_intf.T",
+    "No type known for the following variants:",
+    "Constructor of the variant",
+    "Polymorphic variant types are defined as standard algebraic types"
   ],
   "escape_value": [
     "a",
@@ -93,11 +96,13 @@
     "Tezos_protocol_environment_alpha.Environment.Sapling"
   ],
   "first_class_module_signature_blacklist": [
-    "Tezos_sapling__Core_sig.T_encoding",
+    "Environment_context.TREE",
     "Tezos_protocol_environment_alpha__Environment.Map.OrderedType",
     "Tezos_protocol_environment_alpha__Environment.Set.OrderedType",
     "Tezos_raw_protocol_alpha__Raw_context.T",
-    "Environment_context.TREE"
+    "Tezos_raw_protocol_alpha.Alpha_context.Cache.CLIENT",
+    "Tezos_raw_protocol_alpha.Alpha_context.Cache.INTERFACE",
+    "Tezos_sapling__Core_sig.T_encoding"
   ],
   "merge_returns": [
     ["return=", "return?", "return=?"]

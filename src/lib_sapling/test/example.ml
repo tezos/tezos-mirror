@@ -383,9 +383,9 @@ module Validator = struct
     else if
       (* To avoid overflowing the balance, the number of inputs and outputs must be
          bounded *)
-      Compare.Int.(List.length transaction.inputs >= 5208)
+      Compare.List_length_with.(transaction.inputs >= 5208)
     then fail (Too_many_inputs transaction.inputs)
-    else if Compare.Int.(List.length transaction.outputs >= 2019) then
+    else if Compare.List_length_with.(transaction.outputs >= 2019) then
       fail (Too_many_outputs transaction.outputs)
     else if
       (* Check the root is a recent state *)

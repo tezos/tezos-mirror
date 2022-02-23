@@ -1,0 +1,73 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/ticket_builder_non_fungible.tz]
+
+Well typed
+Gas remaining: 1039970.718 units remaining
+{ parameter (or (ticket %burn nat) (contract %mint_destination (ticket nat))) ;
+  storage (pair (address %manager) (nat %counter)) ;
+  code { AMOUNT
+         /* [ @amount mutez
+            : pair (or @parameter (ticket %burn nat) (contract %mint_destination (ticket nat)))
+                 (pair @storage (address %manager) (nat %counter)) ] */ ;
+         PUSH mutez
+              0
+         /* [ mutez : @amount mutez
+            : pair (or @parameter (ticket %burn nat) (contract %mint_destination (ticket nat)))
+                 (pair @storage (address %manager) (nat %counter)) ] */ ;
+         ASSERT_CMPEQ ;
+         UNPAIR
+           3
+         /* [ or (ticket %burn nat) (contract %mint_destination (ticket nat))
+            : @manager address : @counter nat ] */ ;
+         IF_LEFT
+           { READ_TICKET
+             /* [ pair address nat nat : @burn ticket nat : @manager address : @counter nat ] */ ;
+             CAR
+             /* [ address : @burn ticket nat : @manager address : @counter nat ] */ ;
+             SELF_ADDRESS
+             /* [ @self address : address : @burn ticket nat : @manager address
+                : @counter nat ] */ ;
+             ASSERT_CMPEQ ;
+             DROP
+             /* [ @manager address : @counter nat ] */ ;
+             NIL operation
+             /* [ list operation : @manager address : @counter nat ] */ }
+           { DUP @manager
+               2
+             /* [ @manager address : @mint_destination contract (ticket nat)
+                : @manager address : @counter nat ] */ ;
+             SENDER
+             /* [ @sender address : @manager address
+                : @mint_destination contract (ticket nat) : @manager address : @counter nat ] */ ;
+             ASSERT_CMPEQ ;
+             PUSH @amount
+               nat
+               1
+             /* [ @amount nat : @mint_destination contract (ticket nat) : @manager address
+                : @counter nat ] */ ;
+             DUP @counter
+               4
+             /* [ @counter nat : @amount nat : @mint_destination contract (ticket nat)
+                : @manager address : @counter nat ] */ ;
+             TICKET
+             /* [ ticket nat : @mint_destination contract (ticket nat) : @manager address
+                : @counter nat ] */ ;
+             PUSH mutez
+                  0
+             /* [ mutez : ticket nat : @mint_destination contract (ticket nat)
+                : @manager address : @counter nat ] */ ;
+             SWAP
+             /* [ ticket nat : mutez : @mint_destination contract (ticket nat)
+                : @manager address : @counter nat ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : @manager address : @counter nat ] */ ;
+             NIL operation
+             /* [ list operation : operation : @manager address : @counter nat ] */ ;
+             SWAP
+             /* [ operation : list operation : @manager address : @counter nat ] */ ;
+             CONS
+             /* [ list operation : @manager address : @counter nat ] */ ;
+             DIP 2
+                 { PUSH nat 1 /* [ nat : @counter nat ] */ ; ADD /* [ nat ] */ }
+             /* [ list operation : @manager address : nat ] */ } ;
+         PAIR 3
+         /* [ pair (list operation) address nat ] */ } }

@@ -32,15 +32,22 @@
             other files.
  *)
 
+let protocols = [Protocol.Alpha; Protocol.Ithaca; Protocol.Hangzhou]
+
+let migrate_from = Protocol.Ithaca
+
+let migrate_to = Protocol.Alpha
+
 (* This module runs the tests implemented in all other modules of this directory.
    Each module defines tests which are thematically related,
    as functions to be called here. *)
-
 let () =
+  Cli.init () ;
   (* Tests that are relatively protocol-agnostic.
      We can run them on all protocols, or only one if the CI would be too slow. *)
   Baker_test.register ~protocols:[Alpha] ;
   Basic.register ~protocols:[Alpha] ;
+  Client_config.register ~protocols:[Alpha] ;
   Global_constants.register ~protocols:[Alpha] ;
   Bootstrap.register ~protocols:[Alpha] ;
   Hash_data.register ~protocols:[Alpha] ;
@@ -48,26 +55,21 @@ let () =
   Normalize.register ~protocols:[Alpha] ;
   Double_bake.register ~protocols:[Alpha] ;
   Light.register ~protocols:[Alpha] ;
-  Mockup.register ~protocols:[Protocol.current_mainnet; Alpha] ;
-  Mockup.register_constant_migration
-    ~migrate_from:Protocol.current_mainnet
-    ~migrate_to:Alpha ;
+  Mockup.register ~protocols:[Hangzhou; Ithaca; Alpha] ;
+  Mockup.register_constant_migration ~migrate_from ~migrate_to ;
   Mockup.register_global_constants ~protocols:[Alpha] ;
   Node_event_level.register ~protocols:[Alpha] ;
-  Proxy.register ~protocols:[Protocol.current_mainnet; Alpha] ;
+  Proxy.register ~protocols ;
   Proxy_server_test.register ~protocols:[Alpha] ;
   P2p.register ~protocols:[Alpha] ;
   Protocol_limits.register ~protocols:[Alpha] ;
-  Protocol_migration.register
-    ~migrate_from:Protocol.current_mainnet
-    ~migrate_to:Alpha ;
-  User_activated_upgrade.register
-    ~migrate_from:Protocol.current_mainnet
-    ~migrate_to:Alpha ;
-  Protocol_table_update.register
-    ~migrate_from:Protocol.current_mainnet
-    ~migrate_to:Alpha ;
-  (* TODO: the "Baking" test does not have a documentation.
+  Protocol_migration.register ~migrate_from ~migrate_to ;
+  User_activated_upgrade.register ~migrate_from ~migrate_to ;
+  Rpc_config_logging.register ~protocols:[Alpha] ;
+  Protocol_table_update.register ~migrate_from ~migrate_to ;
+  Cache_cache.register ~protocols:[Hangzhou; Alpha] ;
+  (* TODO: https://gitlab.com/tezos/tezos/-/issues/1823
+     the "Baking" test does not have a documentation.
      I don't know if it is about baking accounts (and thus it is not a protocol-agnostic
      test since it requires Alpha) or about baking (which would make it possible to run
      on previous protocols, if not for a problem that was introduced in
@@ -75,7 +77,11 @@ let () =
   Baking.register ~protocols:[Alpha] ;
   Mempool.register ~protocols:[Alpha] ;
   Monitor_operations.register ~protocols:[Alpha] ;
+  Stresstest_command.register ~protocols:[Alpha] ;
+  (* Adding a new protocol would require adding samples at ./tezt/tests/encoding_samples directory*)
+  Encoding.register ~protocols ;
   Precheck.register ~protocols:[Alpha] ;
+  Tenderbake.register ~protocols:[Alpha] ;
   (* Tests that are protocol-independent.
      They do not take a protocol as a parameter and thus need to be registered only once. *)
   Light.register_protocol_independent () ;
@@ -86,10 +92,21 @@ let () =
   Cli_tezos.register_protocol_independent () ;
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
-  Encoding.register () ;
   RPC_test.register () ;
+  Voting.register
+    ~from_protocol:Hangzhou
+    ~to_protocol:(Known Ithaca)
+    ~loser_protocols:[Alpha] ;
+  Voting.register
+    ~from_protocol:Hangzhou
+    ~to_protocol:Injected_test
+    ~loser_protocols:[Alpha; Hangzhou] ;
   (* This file tests an RPC added in protocol G *)
   Big_map_all.register () ;
   Reject_malformed_micheline.register ~protocols:[Alpha] ;
+  Tx_rollup.register ~protocols:[Alpha] ;
+
+  Manager_operations.register ~protocols ;
+  Replace_by_fees.register ~protocols:[Alpha] ;
   (* Test.run () should be the last statement, don't register afterwards! *)
   Test.run ()

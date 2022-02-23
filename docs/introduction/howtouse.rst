@@ -1,4 +1,4 @@
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 .. _howtouse:
 
@@ -28,8 +28,8 @@ After a successful compilation, you should have the following binaries:
 - ``tezos-snoop``: a tool for modeling the performance of any piece of OCaml code, based on benchmarking (see :doc:`../developer/snoop`)
 
 The daemons other than the node are suffixed with the name of the protocol they are
-bound to. For instance, ``tezos-baker-010-PtGRANAD`` is the baker
-for the Granada protocol, and ``tezos-baker-alpha`` is the baker
+bound to. For instance, ``tezos-baker-011-PtHangz2`` is the baker
+for the Hangzhou protocol, and ``tezos-baker-alpha`` is the baker
 of the development protocol.
 The ``tezos-node`` daemon is not suffixed by any protocol name, because it is independent of the economic protocol. See also the `Node Protocol`_ section below.
 
@@ -52,14 +52,23 @@ To see the usage of one specific command, you may also type the command without 
 
    tezos-client transfer
 
-However, beware that the commands available on the client depend on the specific
-protocol run by the node. For instance, ``transfer`` is not available when
-the node runs the genesis protocol, which may happen for a few minutes when
-launching a node for the first time, or when the client is not connected to a
-node. In the last case, the above command generates a warning::
+.. warning::
 
-    Warning:
-      Failed to acquire the protocol version from the node
+    Beware that the commands available on the client depend on the specific
+    protocol run by the node. For instance, ``transfer`` is not available when
+    the node runs the genesis protocol, which may happen for a few minutes when
+    launching a node for the first time, **or when the client is not connected
+    to a node**. In the last case, the above command generates a warning
+    followed by an error::
+
+        Warning:
+          Failed to acquire the protocol version from the node
+          [...]
+        Error:
+          Unrecognized command.
+          Try using the man command to get more information.
+        Usage:
+          [...]
 
 .. _tezos_client_protocol:
 
@@ -193,7 +202,7 @@ Many options of the node can be configured when running the node:
 - The directory where the node stores local data (using option ``--data-dir``)
 - Network parameters (e.g. the number of connections to peers, using option ``--connections``)
 - Validator and mempool parameters
-- :ref:`Logging options <configure_logging>`.
+- :ref:`Logging options <configure_node_logging>`.
 
 The list of configurable options can be obtained using the following command::
 
@@ -262,11 +271,11 @@ command::
 
     tezos-client activate account alice with "tz1__xxxxxxxxx__.json"
 
-If you run Tezos using docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``granadanet.sh``
-to run the Granadanet test network for instance), you should prefix the file
-with ``container:`` in order to copy it into the docker image::
+If you run Tezos using Docker images (via the ``tezos-docker-manager.sh`` script, renamed as ``hangzhounet.sh``
+to run the Hangzhounet test network for instance), you should prefix the file
+with ``container:`` in order to copy it into the Docker image::
 
-    ./granadanet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
+    ./hangzhounet.sh client activate account alice with "container:tz1__xxxxxxxxx__.json"
 
 Let's check the balance of the new account with::
 
@@ -658,6 +667,10 @@ The behavior of the client can be configured using the following environment var
   If this variable is not set, or otherwise cannot be parsed as a positive integer, a default value of ``10`` seconds is used for each call.
   The two RPC calls this variable affects are queries that the client makes to the node in order to determine:
   (1) the protocol version of the node it connects to, and (2) the commands supported in that version.
+- `TEZOS_CLIENT_REMOTE_OPERATIONS_POOL_HTTP_HEADERS`: This variable specifies
+  custom HTTP headers to use with the ``--operations-pool`` option. Only the Host
+  header is supported as of now (see description in `rfc2616, section 14.23
+  <https://datatracker.ietf.org/doc/html/rfc2616#section-14.23>`_
 
 Other binaries
 --------------
@@ -691,7 +704,7 @@ This environment is limited to a restricted set of libraries in order to constra
 
 It is meant to be used:
 
-- by developers to compile the protocol under developement,
+- by developers to compile the protocol under development,
 - by the packaging process to compile protocols that are pre-linked in the binaries,
 - by the Tezos node when there is an on-chain update to a protocol that is not pre-linked with the binary.
 
@@ -701,7 +714,7 @@ Summary
 In this tutorial, you have learned:
 
 - to start a Tezos node and set up its basic configuration;
-- to use the Tezos client to create implict accounts and do transfers between them;
+- to use the Tezos client to create implicit accounts and do transfers between them;
 - to deploy and interact with a simple predefined smart contract;
 - to distinguish between the various costs associated to transactions such as burnt tez, fees, storage costs, and gas consumption;
 - some further concepts such as transaction validation and the RPC interface;

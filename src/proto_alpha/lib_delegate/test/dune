@@ -1,0 +1,25 @@
+(test
+ (name main)
+ (package tezos-baking-alpha)
+ (libraries
+   tezos-client-alpha
+   tezos_baking_alpha
+   tezos-baking-alpha.mockup-simulator
+   tezos-base-test-helpers
+   tezos-protocol-alpha-parameters
+   tezos-crypto
+   alcotest-lwt)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_micheline
+                   -open Tezos_client_alpha
+                   -open Tezos_protocol_alpha
+                   -open Tezos_protocol_environment_alpha
+                   -open Tezos_base_test_helpers
+                   -open Tezos_alpha_mockup_simulator
+                   -open Tezos_baking_alpha))
+ (action (run %{exe:main.exe} -q -e)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

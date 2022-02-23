@@ -1,26 +1,35 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-base"
   "tezos-version"
+  "tezos-stdlib-unix"
+  "tezos-shell-services"
+  "tezos-workers"
   "tezos-rpc-http-server"
   "tezos-p2p"
   "tezos-shell"
-  "tezos-workers"
-  "tezos-protocol-updater"
+  "tezos-store"
+  "tezos-context"
   "tezos-validator"
+  "tezos-shell-context"
+  "tezos-protocol-updater"
+  "cmdliner"
+  "fmt"
+  "tls" { >= "0.10" }
+  "lwt-exit"
+]
+depopts: [
   "tezos-embedded-protocol-genesis"
   "tezos-embedded-protocol-genesis-carthagenet"
   "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-demo-counter"
-  "tezos-embedded-protocol-alpha"
-  "tezos-embedded-protocol-demo-noops"
   "tezos-embedded-protocol-000-Ps9mPmXa"
   "tezos-embedded-protocol-001-PtCJ7pwo"
   "tezos-embedded-protocol-002-PsYLVpVv"
@@ -30,19 +39,20 @@ depends: [
   "tezos-embedded-protocol-005-PsBabyM1"
   "tezos-embedded-protocol-006-PsCARTHA"
   "tezos-embedded-protocol-007-PsDELPH1"
+  "tezos-embedded-protocol-008-PtEdoTez"
   "tezos-embedded-protocol-008-PtEdo2Zk"
   "tezos-embedded-protocol-009-PsFLoren"
   "tezos-embedded-protocol-010-PtGRANAD"
   "tezos-embedded-protocol-011-PtHangz2"
+  "tezos-embedded-protocol-012-Psithaca"
+  "tezos-embedded-protocol-alpha"
+  "tezos-protocol-plugin-007-PsDELPH1-registerer"
   "tezos-protocol-plugin-008-PtEdo2Zk-registerer"
   "tezos-protocol-plugin-009-PsFLoren-registerer"
   "tezos-protocol-plugin-010-PtGRANAD-registerer"
   "tezos-protocol-plugin-011-PtHangz2-registerer"
+  "tezos-protocol-plugin-012-Psithaca-registerer"
   "tezos-protocol-plugin-alpha-registerer"
-  "cmdliner"
-  "lwt-exit"
-  "tls" { >= "0.10" }
-  "cstruct"
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

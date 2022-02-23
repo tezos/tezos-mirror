@@ -586,6 +586,9 @@ module Chain : sig
   (** The abstract type for testchain. *)
   type testchain
 
+  (** A type alias of a block identifier. *)
+  type block_identifier = Block_services.block
+
   (** [global_store chain_store] returns the global store of
       [chain_store] allowing to retrieve global infos.*)
   val global_store : chain_store -> store
@@ -690,6 +693,15 @@ module Chain : sig
   (** [mempool chain_store] returns the mempool associated to the
       [chain_store]. *)
   val mempool : chain_store -> Mempool.t Lwt.t
+
+  (** [block_of_identifier chain_store identifier] tries to return the block
+      of the given [identifier] inside the given [chain_store]. *)
+  val block_of_identifier :
+    chain_store -> block_identifier -> Block.t tzresult Lwt.t
+
+  (** [block_of_identifier_opt chain_store identifier] optional version of [block_of_identifier]. *)
+  val block_of_identifier_opt :
+    chain_store -> block_identifier -> Block.t option Lwt.t
 
   (** [set_mempool chain_store ~head mempool] sets the [mempool] of
       the [chain_store]. Does nothing if [head] is not current_head
@@ -1060,28 +1072,5 @@ module Unsafe : sig
     new_head_with_metadata:Block_repr.block ->
     protocol_levels:Protocol_levels.activation_block Protocol_levels.t ->
     history_mode:History_mode.t ->
-    unit tzresult Lwt.t
-
-  (** [restore_from_snapshot_legacy ...] same as
-      [restore_from_snapshot] but slightly differs due to some
-      information missing from legacy snapshots. *)
-  val restore_from_legacy_snapshot :
-    ?notify:(unit -> unit Lwt.t) ->
-    [`Store_dir] Naming.directory ->
-    context_index:Context.index ->
-    genesis:Genesis.t ->
-    genesis_context_hash:Context_hash.t ->
-    floating_blocks_stream:Block_repr.block Lwt_stream.t ->
-    new_head_with_metadata:Block_repr.block ->
-    partial_protocol_levels:
-      (int32 * Protocol_hash.t * Protocol_levels.commit_info option) list ->
-    history_mode:History_mode.t ->
-    unit tzresult Lwt.t
-
-  val restore_from_legacy_upgrade :
-    [`Store_dir] Naming.directory ->
-    genesis:Genesis.t ->
-    invalid_blocks:invalid_block Block_hash.Map.t ->
-    forked_chains:Block_hash.t Chain_id.Map.t ->
     unit tzresult Lwt.t
 end

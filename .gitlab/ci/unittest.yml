@@ -15,6 +15,7 @@ test-script-gen-genesis:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
     - .rules_template__development
+    - .template__coverage
   stage: test
   before_script:
     - . ./scripts/version.sh
@@ -28,6 +29,9 @@ test-script-gen-genesis:
   extends: .test_template
   variables:
     ARCH: ""
+    MAKE_TARGETS: ""
+  script:
+    - make $MAKE_TARGETS
   artifacts:
     name: "$CI_JOB_NAME-$CI_COMMIT_SHA-${ARCH}"
     paths:
@@ -51,50 +55,60 @@ test-script-gen-genesis:
   tags:
     - arm64
 
-unit:010_PtGRANAD:
-  extends: .unit_test_template_x86_64
-  script:
-    - >
-      make
-      src/proto_010_PtGRANAD/lib_benchmark/lib_benchmark_type_inference.test_proto
-      src/proto_010_PtGRANAD/lib_benchmark.test_proto
-      src/proto_010_PtGRANAD/lib_client.test_proto
-      src/proto_010_PtGRANAD/lib_protocol.test_proto
-
 unit:011_PtHangz2:
-  extends: .unit_test_template
-  script:
-     - >
-       make
-       src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
-       src/proto_011_PtHangz2/lib_benchmark.test_proto
-       src/proto_011_PtHangz2/lib_client.test_proto
-       src/proto_011_PtHangz2/lib_protocol.test_proto
+  extends:
+  - .unit_test_template_x86_64
+  - .template__coverage_files
+  variables:
+    MAKE_TARGETS: >
+      src/proto_011_PtHangz2/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_011_PtHangz2/lib_benchmark.test_proto
+      src/proto_011_PtHangz2/lib_client.test_proto
+      src/proto_011_PtHangz2/lib_protocol.test_proto
+
+unit:012_Psithaca:
+  extends:
+  - .unit_test_template_x86_64
+  - .template__coverage_files
+  variables:
+    MAKE_TARGETS: >
+      src/proto_012_Psithaca/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_012_Psithaca/lib_benchmark.test_proto
+      src/proto_012_Psithaca/lib_client.test_proto
+      src/proto_012_Psithaca/lib_plugin.test_proto
+      src/proto_012_Psithaca/lib_protocol.test_proto
+      src/proto_012_Psithaca/lib_delegate.test_proto
 
 unit:alpha:
-  extends: .unit_test_template_x86_64
-  script:
-     - >
-       make
-       src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
-       src/proto_alpha/lib_benchmark.test_proto
-       src/proto_alpha/lib_client.test_proto
-       src/proto_alpha/lib_protocol.test_proto
-
+  extends:
+  - .unit_test_template_x86_64
+  - .template__coverage_files
+  variables:
+    MAKE_TARGETS: >
+      src/proto_alpha/lib_benchmark/lib_benchmark_type_inference.test_proto
+      src/proto_alpha/lib_benchmark.test_proto
+      src/proto_alpha/lib_client.test_proto
+      src/proto_alpha/lib_plugin.test_proto
+      src/proto_alpha/lib_protocol.test_proto
+      src/proto_alpha/lib_delegate.test_proto
 unit:non-proto-x86_64:
-  extends: .unit_test_template_x86_64
-  script:
-    - make test-nonproto-unit
+  extends:
+  - .unit_test_template_x86_64
+  - .template__coverage_files
+  variables:
+    MAKE_TARGETS: test-nonproto-unit
 
 unit:non-proto-arm64:
   extends: .unit_test_template_arm64
-  script:
-    - make test-nonproto-unit
+  variables:
+    MAKE_TARGETS: test-nonproto-unit
 
 unit:js_components:
   extends: .unit_test_template_x86_64
   script:
-    - dune build @runtest_js
+    # install node
+    - . ./scripts/install_build_deps.js.sh
+    - make test-js
 
 unit:protocol_compiles:
   extends: .unit_test_template_x86_64

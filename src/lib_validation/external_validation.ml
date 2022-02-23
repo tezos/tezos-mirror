@@ -73,6 +73,7 @@ type request =
       forked_header : Block_header.t;
     }
   | Terminate
+  | Reconfigure_event_logging of Internal_event_unix.Configuration.t
 
 let request_pp ppf = function
   | Init -> Format.fprintf ppf "process handshake"
@@ -107,6 +108,8 @@ let request_pp ppf = function
         Block_hash.pp_short
         (Block_header.hash forked_header)
   | Terminate -> Format.fprintf ppf "terminate validation process"
+  | Reconfigure_event_logging _ ->
+      Format.fprintf ppf "reconfigure event logging"
 
 let magic = Bytes.of_string "TEZOS_FORK_VALIDATOR_MAGIC_0"
 
@@ -357,29 +360,39 @@ let request_encoding =
         unit
         (function Terminate -> Some () | _ -> None)
         (fun () -> Terminate);
-      case_preapply (Tag 6);
       (* Tag 5 was ["restore_integrity"]. *)
+      case
+        (Tag 6)
+        ~title:"reconfigure_event_logging"
+        Internal_event_unix.Configuration.encoding
+        (function Reconfigure_event_logging c -> Some c | _ -> None)
+        (fun c -> Reconfigure_event_logging c);
+      case_preapply (Tag 7);
       case_precheck (Tag 8);
     ]
 
 let send pin encoding data =
+  let open Lwt_syntax in
   let msg = Data_encoding.Binary.to_bytes_exn encoding data in
-  Lwt_io.write_int pin (Bytes.length msg) >>= fun () ->
-  Lwt_io.write pin (Bytes.to_string msg) >>= fun () -> Lwt_io.flush pin
+  let* () = Lwt_io.write_int pin (Bytes.length msg) in
+  let* () = Lwt_io.write pin (Bytes.to_string msg) in
+  Lwt_io.flush pin
 
 let recv_result pout encoding =
-  Lwt_io.read_int pout >>= fun count ->
+  let open Lwt_syntax in
+  let* count = Lwt_io.read_int pout in
   let buf = Bytes.create count in
-  Lwt_io.read_into_exactly pout buf 0 count >>= fun () ->
-  Lwt.return
+  let* () = Lwt_io.read_into_exactly pout buf 0 count in
+  return
     (Data_encoding.Binary.of_bytes_exn
        (Error_monad.result_encoding encoding)
        buf)
 
 let recv pout encoding =
-  Lwt_io.read_int pout >>= fun count ->
+  let open Lwt_syntax in
+  let* count = Lwt_io.read_int pout in
   let buf = Bytes.create count in
-  Lwt_io.read_into_exactly pout buf 0 count >>= fun () ->
+  let* () = Lwt_io.read_into_exactly pout buf 0 count in
   Lwt.return (Data_encoding.Binary.of_bytes_exn encoding buf)
 
 let socket_path_prefix = "tezos-validation-socket-"
@@ -393,42 +406,49 @@ let socket_path ~socket_dir ~pid =
 let make_socket socket_path = Unix.ADDR_UNIX socket_path
 
 let create_socket ~canceler =
+  let open Lwt_syntax in
   let socket = Lwt_unix.socket PF_UNIX SOCK_STREAM 0o000 in
   Lwt_unix.set_close_on_exec socket ;
   Lwt_canceler.on_cancel canceler (fun () ->
-      Lwt_utils_unix.safe_close socket >>= fun _ -> Lwt.return_unit) ;
+      let* (_ : unit tzresult) = Lwt_utils_unix.safe_close socket in
+      return_unit) ;
   Lwt_unix.setsockopt socket SO_REUSEADDR true ;
   Lwt.return socket
 
 let create_socket_listen ~canceler ~max_requests ~socket_path =
-  create_socket ~canceler >>= fun socket ->
-  Lwt.catch
-    (fun () -> Lwt_unix.bind socket (make_socket socket_path) >>= return)
-    (function
-      | Unix.Unix_error (ENAMETOOLONG, _, _) ->
-          (* Unix.ENAMETOOLONG (Filename too long (POSIX.1-2001)) can
-             be thrown if the given directory has a too long path. *)
-          fail
-            Block_validator_errors.(
-              Validation_process_failed (Socket_path_too_long socket_path))
-      | Unix.Unix_error (EACCES, _, _) ->
-          (* Unix.EACCES (Permission denied (POSIX.1-2001)) can be
-             thrown when the given directory has wrong access rights.
-             Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
-             not be thrown in this case. *)
-          fail
-            Block_validator_errors.(
-              Validation_process_failed
-                (Socket_path_wrong_permission socket_path))
-      | exn ->
-          fail
-            (Block_validator_errors.Validation_process_failed
-               (Cannot_run_external_validator (Printexc.to_string exn))))
-  >>=? fun () ->
+  let open Lwt_tzresult_syntax in
+  let*! socket = create_socket ~canceler in
+  let* () =
+    Lwt.catch
+      (fun () ->
+        let*! () = Lwt_unix.bind socket (make_socket socket_path) in
+        return_unit)
+      (function
+        | Unix.Unix_error (ENAMETOOLONG, _, _) ->
+            (* Unix.ENAMETOOLONG (Filename too long (POSIX.1-2001)) can
+               be thrown if the given directory has a too long path. *)
+            fail
+              Block_validator_errors.(
+                Validation_process_failed (Socket_path_too_long socket_path))
+        | Unix.Unix_error (EACCES, _, _) ->
+            (* Unix.EACCES (Permission denied (POSIX.1-2001)) can be
+               thrown when the given directory has wrong access rights.
+               Unix.EPERM (Operation not permitted (POSIX.1-2001)) should
+               not be thrown in this case. *)
+            fail
+              Block_validator_errors.(
+                Validation_process_failed
+                  (Socket_path_wrong_permission socket_path))
+        | exn ->
+            fail
+              (Block_validator_errors.Validation_process_failed
+                 (Cannot_run_external_validator (Printexc.to_string exn))))
+  in
   Lwt_unix.listen socket max_requests ;
   return socket
 
 let create_socket_connect ~canceler ~socket_path =
-  create_socket ~canceler >>= fun socket ->
-  Lwt_unix.connect socket (make_socket socket_path) >>= fun () ->
+  let open Lwt_syntax in
+  let* socket = create_socket ~canceler in
+  let* () = Lwt_unix.connect socket (make_socket socket_path) in
   Lwt.return socket

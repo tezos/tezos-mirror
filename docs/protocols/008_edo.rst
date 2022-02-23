@@ -1,5 +1,3 @@
-.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-008
-
 Protocol 008_PtEdo2Zk Edo
 =========================
 
@@ -297,3 +295,6 @@ using the following instructions::
 
   $ ./scripts/snapshot_alpha.sh edo_008
   $ ls src/proto_008_*
+
+
+.. _proto-008: https://gitlab.com/metastatedev/tezos/-/tree/proto-008

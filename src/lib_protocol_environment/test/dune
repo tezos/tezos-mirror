@@ -1,12 +1,13 @@
 (tests
  (names test test_mem_context_array_theory)
- (libraries bls12-381-unix
-            tezos-base.unix
-            tezos-protocol-environment
-            alcotest-lwt
-            tezos-test-helpers
-            qcheck-alcotest
-            lwt.unix)
  (package tezos-protocol-environment)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_protocol_environment)))
+ (libraries
+  bls12-381-unix
+  tezos-base.unix
+  tezos-protocol-environment
+  alcotest-lwt
+  tezos-test-helpers
+  qcheck-alcotest
+  lwt.unix)
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_protocol_environment)))

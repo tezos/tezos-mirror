@@ -7,4 +7,5 @@
   tezos-lwt-result-stdlib.bare.sigs
   tezos-lwt-result-stdlib.bare.structs
   tezos-lwt-result-stdlib.traced.sigs
-  tezos-lwt-result-stdlib.traced.structs))
+  tezos-lwt-result-stdlib.traced.structs)
+ (js_of_ocaml))

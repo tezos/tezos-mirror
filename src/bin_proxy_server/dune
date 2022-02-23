@@ -2,120 +2,128 @@
 ; the alternative dependency mechanism of dune to implement optional
 ; dependencies.
 
-(executables
- (names main_proxy_server)
- (instrumentation (backend bisect_ppx))
- (public_names tezos-proxy-server)
+(env
+ (static (flags (:standard -ccopt -static))))
+
+(executable
+ (name main_proxy_server)
+ (public_name tezos-proxy-server)
  (package tezos-proxy-server)
- (libraries tezos-base
-            tezos-base.unix
-            cmdliner
-            lwt-exit
-            tezos-proxy
-            tezos-proxy-server-config
-            tezos-rpc-http-client-unix
-            tezos-rpc-http-server
-            tezos-shell-services
-            tezos-version
-
-            (select void_for_linking-genesis from
-              (tezos-client-genesis -> void_for_linking-genesis.empty)
-              (-> void_for_linking-genesis.empty))
-            (select void_for_linking-genesis-carthagenet from
-              (tezos-client-genesis-carthagenet -> void_for_linking-genesis-carthagenet.empty)
-              (-> void_for_linking-genesis-carthagenet.empty))
-
-            (select void_for_linking-000-Ps9mPmXa from
-              (tezos-client-000-Ps9mPmXa -> void_for_linking-000-Ps9mPmXa.empty)
-              (-> void_for_linking-000-Ps9mPmXa.empty))
-            (select void_for_linking-001-PtCJ7pwo from
-              (tezos-client-001-PtCJ7pwo -> void_for_linking-001-PtCJ7pwo.empty)
-              (-> void_for_linking-001-PtCJ7pwo.empty))
-            (select void_for_linking-002-PsYLVpVv from
-              (tezos-client-002-PsYLVpVv -> void_for_linking-002-PsYLVpVv.empty)
-              (-> void_for_linking-002-PsYLVpVv.empty))
-            (select void_for_linking-003-PsddFKi3 from
-              (tezos-client-003-PsddFKi3 -> void_for_linking-003-PsddFKi3.empty)
-              (-> void_for_linking-003-PsddFKi3.empty))
-            (select void_for_linking-004-Pt24m4xi from
-              (tezos-client-004-Pt24m4xi -> void_for_linking-004-Pt24m4xi.empty)
-              (-> void_for_linking-004-Pt24m4xi.empty))
-            (select void_for_linking-005-PsBabyM1 from
-              (tezos-client-005-PsBabyM1 -> void_for_linking-005-PsBabyM1.empty)
-              (-> void_for_linking-005-PsBabyM1.empty))
-            (select void_for_linking-006-PsCARTHA from
-              (tezos-client-006-PsCARTHA -> void_for_linking-006-PsCARTHA.empty)
-              (-> void_for_linking-006-PsCARTHA.empty))
-            (select void_for_linking-007-PsDELPH1 from
-              (tezos-client-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
-              (-> void_for_linking-007-PsDELPH1.empty))
-            (select void_for_linking-008-PtEdo2Zk from
-              (tezos-client-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk.empty)
-              (-> void_for_linking-008-PtEdo2Zk.empty))
-            (select void_for_linking-009-PsFLoren from
-              (tezos-client-009-PsFLoren -> void_for_linking-009-PsFLoren.empty)
-              (-> void_for_linking-009-PsFLoren.empty))
-            (select void_for_linking-010-PtGRANAD from
-              (tezos-client-010-PtGRANAD -> void_for_linking-010-PtGRANAD.empty)
-              (-> void_for_linking-010-PtGRANAD.empty))
-            (select void_for_linking-011-PtHangz2 from
-              (tezos-client-011-PtHangz2 -> void_for_linking-011-PtHangz2.empty)
-              (-> void_for_linking-011-PtHangz2.empty))
-
-            (select void_for_linking-alpha from
-              (tezos-client-alpha -> void_for_linking-alpha.empty)
-              (-> void_for_linking-alpha.empty))
-            (select void_for_linking-demo-counter from
-              (tezos-client-demo-counter -> void_for_linking-demo-counter.empty)
-              (-> void_for_linking-demo-counter.empty))
-
-            (select void_for_linking-007-PsDELPH1-protocol-plugin from
-              (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-007-PsDELPH1-protocol-plugin.empty)
-              (-> void_for_linking-007-PsDELPH1-protocol-plugin.empty))
-            (select void_for_linking-008-PtEdo2Zk-protocol-plugin from
-              (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty)
-              (-> void_for_linking-008-PtEdo2Zk-protocol-plugin.empty))
-            (select void_for_linking-009-PsFLoren-protocol-plugin from
-              (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-009-PsFLoren-protocol-plugin.empty)
-              (-> void_for_linking-009-PsFLoren-protocol-plugin.empty))
-            (select void_for_linking-010-PtGRANAD-protocol-plugin from
-              (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-010-PtGRANAD-protocol-plugin.empty)
-              (-> void_for_linking-010-PtGRANAD-protocol-plugin.empty))
-            (select void_for_linking-011-PtHangz2-protocol-plugin from
-              (tezos-protocol-plugin-011-PtHangz2 -> void_for_linking-011-PtHangz2-protocol-plugin.empty)
-              (-> void_for_linking-011-PtHangz2-protocol-plugin.empty))
-            (select void_for_linking-alpha-protocol-plugin from
-              (tezos-protocol-plugin-alpha -> void_for_linking-alpha-protocol-plugin.empty)
-              (-> void_for_linking-alpha-protocol-plugin.empty)))
-
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base
-                   -open Tezos_stdlib_unix
-                   -linkall)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  cmdliner
+  lwt-exit
+  tezos-proxy
+  tezos-proxy-server-config
+  tezos-rpc-http-client-unix
+  tezos-rpc-http-server
+  tezos-shell-services
+  tezos-version
+  (select void_for_linking-tezos-client-genesis from
+   (tezos-client-genesis -> void_for_linking-tezos-client-genesis.empty)
+   (-> void_for_linking-tezos-client-genesis.empty))
+  (select void_for_linking-tezos-client-genesis-carthagenet from
+   (tezos-client-genesis-carthagenet -> void_for_linking-tezos-client-genesis-carthagenet.empty)
+   (-> void_for_linking-tezos-client-genesis-carthagenet.empty))
+  (select void_for_linking-tezos-client-demo-counter from
+   (tezos-client-demo-counter -> void_for_linking-tezos-client-demo-counter.empty)
+   (-> void_for_linking-tezos-client-demo-counter.empty))
+  (select void_for_linking-tezos-client-000-Ps9mPmXa from
+   (tezos-client-000-Ps9mPmXa -> void_for_linking-tezos-client-000-Ps9mPmXa.empty)
+   (-> void_for_linking-tezos-client-000-Ps9mPmXa.empty))
+  (select void_for_linking-tezos-client-001-PtCJ7pwo from
+   (tezos-client-001-PtCJ7pwo -> void_for_linking-tezos-client-001-PtCJ7pwo.empty)
+   (-> void_for_linking-tezos-client-001-PtCJ7pwo.empty))
+  (select void_for_linking-tezos-client-002-PsYLVpVv from
+   (tezos-client-002-PsYLVpVv -> void_for_linking-tezos-client-002-PsYLVpVv.empty)
+   (-> void_for_linking-tezos-client-002-PsYLVpVv.empty))
+  (select void_for_linking-tezos-client-003-PsddFKi3 from
+   (tezos-client-003-PsddFKi3 -> void_for_linking-tezos-client-003-PsddFKi3.empty)
+   (-> void_for_linking-tezos-client-003-PsddFKi3.empty))
+  (select void_for_linking-tezos-client-004-Pt24m4xi from
+   (tezos-client-004-Pt24m4xi -> void_for_linking-tezos-client-004-Pt24m4xi.empty)
+   (-> void_for_linking-tezos-client-004-Pt24m4xi.empty))
+  (select void_for_linking-tezos-client-005-PsBabyM1 from
+   (tezos-client-005-PsBabyM1 -> void_for_linking-tezos-client-005-PsBabyM1.empty)
+   (-> void_for_linking-tezos-client-005-PsBabyM1.empty))
+  (select void_for_linking-tezos-client-006-PsCARTHA from
+   (tezos-client-006-PsCARTHA -> void_for_linking-tezos-client-006-PsCARTHA.empty)
+   (-> void_for_linking-tezos-client-006-PsCARTHA.empty))
+  (select void_for_linking-tezos-client-007-PsDELPH1 from
+   (tezos-client-007-PsDELPH1 -> void_for_linking-tezos-client-007-PsDELPH1.empty)
+   (-> void_for_linking-tezos-client-007-PsDELPH1.empty))
+  (select void_for_linking-tezos-client-008-PtEdo2Zk from
+   (tezos-client-008-PtEdo2Zk -> void_for_linking-tezos-client-008-PtEdo2Zk.empty)
+   (-> void_for_linking-tezos-client-008-PtEdo2Zk.empty))
+  (select void_for_linking-tezos-client-009-PsFLoren from
+   (tezos-client-009-PsFLoren -> void_for_linking-tezos-client-009-PsFLoren.empty)
+   (-> void_for_linking-tezos-client-009-PsFLoren.empty))
+  (select void_for_linking-tezos-client-010-PtGRANAD from
+   (tezos-client-010-PtGRANAD -> void_for_linking-tezos-client-010-PtGRANAD.empty)
+   (-> void_for_linking-tezos-client-010-PtGRANAD.empty))
+  (select void_for_linking-tezos-client-011-PtHangz2 from
+   (tezos-client-011-PtHangz2 -> void_for_linking-tezos-client-011-PtHangz2.empty)
+   (-> void_for_linking-tezos-client-011-PtHangz2.empty))
+  (select void_for_linking-tezos-client-012-Psithaca from
+   (tezos-client-012-Psithaca -> void_for_linking-tezos-client-012-Psithaca.empty)
+   (-> void_for_linking-tezos-client-012-Psithaca.empty))
+  (select void_for_linking-tezos-client-alpha from
+   (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
+   (-> void_for_linking-tezos-client-alpha.empty))
+  (select void_for_linking-tezos-protocol-plugin-007-PsDELPH1 from
+   (tezos-protocol-plugin-007-PsDELPH1 -> void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty)
+   (-> void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty))
+  (select void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk from
+   (tezos-protocol-plugin-008-PtEdo2Zk -> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty)
+   (-> void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty))
+  (select void_for_linking-tezos-protocol-plugin-009-PsFLoren from
+   (tezos-protocol-plugin-009-PsFLoren -> void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty)
+   (-> void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty))
+  (select void_for_linking-tezos-protocol-plugin-010-PtGRANAD from
+   (tezos-protocol-plugin-010-PtGRANAD -> void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty)
+   (-> void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty))
+  (select void_for_linking-tezos-protocol-plugin-011-PtHangz2 from
+   (tezos-protocol-plugin-011-PtHangz2 -> void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty)
+   (-> void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty))
+  (select void_for_linking-tezos-protocol-plugin-012-Psithaca from
+   (tezos-protocol-plugin-012-Psithaca -> void_for_linking-tezos-protocol-plugin-012-Psithaca.empty)
+   (-> void_for_linking-tezos-protocol-plugin-012-Psithaca.empty))
+  (select void_for_linking-tezos-protocol-plugin-alpha from
+   (tezos-protocol-plugin-alpha -> void_for_linking-tezos-protocol-plugin-alpha.empty)
+   (-> void_for_linking-tezos-protocol-plugin-alpha.empty)))
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_base
+   -open Tezos_stdlib_unix)))
 
 (rule
  (action
   (progn
-   (write-file void_for_linking-genesis.empty "")
-   (write-file void_for_linking-genesis-carthagenet.empty "")
-   (write-file void_for_linking-000-Ps9mPmXa.empty "")
-   (write-file void_for_linking-001-PtCJ7pwo.empty "")
-   (write-file void_for_linking-002-PsYLVpVv.empty "")
-   (write-file void_for_linking-003-PsddFKi3.empty "")
-   (write-file void_for_linking-004-Pt24m4xi.empty "")
-   (write-file void_for_linking-005-PsBabyM1.empty "")
-   (write-file void_for_linking-006-PsCARTHA.empty "")
-   (write-file void_for_linking-007-PsDELPH1.empty "")
-   (write-file void_for_linking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-009-PsFLoren.empty "")
-   (write-file void_for_linking-010-PtGRANAD.empty "")
-   (write-file void_for_linking-011-PtHangz2.empty "")
-   (write-file void_for_linking-alpha.empty "")
-   (write-file void_for_linking-demo-counter.empty "")
-   (write-file void_for_linking-007-PsDELPH1-protocol-plugin.empty "")
-   (write-file void_for_linking-008-PtEdo2Zk-protocol-plugin.empty "")
-   (write-file void_for_linking-009-PsFLoren-protocol-plugin.empty "")
-   (write-file void_for_linking-010-PtGRANAD-protocol-plugin.empty "")
-   (write-file void_for_linking-011-PtHangz2-protocol-plugin.empty "")
-   (write-file void_for_linking-alpha-protocol-plugin.empty "")
-)))
+   (write-file void_for_linking-tezos-client-genesis.empty "")
+   (write-file void_for_linking-tezos-client-genesis-carthagenet.empty "")
+   (write-file void_for_linking-tezos-client-demo-counter.empty "")
+   (write-file void_for_linking-tezos-client-000-Ps9mPmXa.empty "")
+   (write-file void_for_linking-tezos-client-001-PtCJ7pwo.empty "")
+   (write-file void_for_linking-tezos-client-002-PsYLVpVv.empty "")
+   (write-file void_for_linking-tezos-client-003-PsddFKi3.empty "")
+   (write-file void_for_linking-tezos-client-004-Pt24m4xi.empty "")
+   (write-file void_for_linking-tezos-client-005-PsBabyM1.empty "")
+   (write-file void_for_linking-tezos-client-006-PsCARTHA.empty "")
+   (write-file void_for_linking-tezos-client-007-PsDELPH1.empty "")
+   (write-file void_for_linking-tezos-client-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-tezos-client-009-PsFLoren.empty "")
+   (write-file void_for_linking-tezos-client-010-PtGRANAD.empty "")
+   (write-file void_for_linking-tezos-client-011-PtHangz2.empty "")
+   (write-file void_for_linking-tezos-client-012-Psithaca.empty "")
+   (write-file void_for_linking-tezos-client-alpha.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-007-PsDELPH1.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-009-PsFLoren.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-010-PtGRANAD.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-011-PtHangz2.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-012-Psithaca.empty "")
+   (write-file void_for_linking-tezos-protocol-plugin-alpha.empty ""))))

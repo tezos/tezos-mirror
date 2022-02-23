@@ -108,7 +108,8 @@ let test_cache_at_most_once ~protocols =
       (["helpers"; "baking_rights"], []);
       (["helpers"; "baking_rights"], [("all", "true")]);
       (["helpers"; "current_level"], []);
-      (["minimal_valid_time"], []);
+      (* FIXME: Same as above *)
+      (* (["minimal_valid_time"], []); *)
       (["context"; "constants"], []);
       (["context"; "constants"; "errors"], []);
       (["context"; "delegates"], []);
@@ -158,7 +159,7 @@ let starts_with ~(prefix : string) (s : string) : bool =
     alpha.proxy_rpc: Received tree of size 1
     alpha.proxy_rpc: P/cycle/0/random_seed
     alpha.proxy_rpc: Received tree of size 1
-    alpha.proxy_rpc: P/cycle/0/roll_snapshot
+    alpha.proxy_rpc: P/cycle/0/stake_snapshot
     alpha.proxy_rpc: Received tree of size 1
     alpha.proxy_rpc: P/cycle/0/last_roll/0
 
@@ -212,7 +213,7 @@ let test_context_suffix_no_rpc ?query_string path =
           queries_before ;
         test_no_overlap_rpc queries_before
   in
-  assert (List.length context_queries >= 2) ;
+  assert (List.compare_length_with context_queries 2 >= 0) ;
   Lwt.return @@ test_no_overlap_rpc (List.rev context_queries)
 
 let paths =
@@ -331,7 +332,7 @@ let test_transfer =
       client
   in
   Log.info "Transferred 10 tez." ;
-  let* () = Client.bake_for ~key:"bootstrap2" client in
+  let* () = Client.bake_for ~keys:["bootstrap2"] client in
   Log.info "Baked block for bootstrap2." ;
   return ()
 
@@ -474,22 +475,25 @@ module Location = struct
       in
       [
         (add_rpc_path_prefix ["context"; "constants"], []);
-        (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
-        (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
-        (add_rpc_path_prefix ["helpers"; "current_level"], []);
-        (add_rpc_path_prefix ["minimal_valid_time"], []);
-        (add_rpc_path_prefix ["context"; "constants"], []);
         (add_rpc_path_prefix ["context"; "constants"; "errors"], []);
         (add_rpc_path_prefix ["context"; "delegates"], []);
         (add_rpc_path_prefix ["context"; "nonces"; "3"], []);
+        (add_rpc_path_prefix ["helpers"; "baking_rights"], []);
+        (add_rpc_path_prefix ["helpers"; "baking_rights"], [("all", "true")]);
+        (add_rpc_path_prefix ["helpers"; "current_level"], []);
         (add_rpc_path_prefix ["helpers"; "endorsing_rights"], []);
         (add_rpc_path_prefix ["helpers"; "levels_in_current_cycle"], []);
+        (* The 2 following RPCs only exist on Alpha *)
+        (* (add_rpc_path_prefix ["helpers"; "validators"], []); *)
+        (* (add_rpc_path_prefix ["helpers"; "round"], []); *)
         (add_rpc_path_prefix ["votes"; "current_period"], []);
         (add_rpc_path_prefix ["votes"; "successor_period"], []);
         (add_rpc_path_prefix ["votes"; "total_voting_power"], []);
         (add_rpc_path_prefix ["votes"; "ballot_list"], []);
         (add_rpc_path_prefix ["votes"; "ballots"], []);
         (add_rpc_path_prefix ["votes"; "current_proposal"], []);
+        (add_rpc_path_prefix ["votes"; "current_period"], []);
+        (add_rpc_path_prefix ["votes"; "successor_period"], []);
         (add_rpc_path_prefix ["votes"; "current_quorum"], []);
         (add_rpc_path_prefix ["votes"; "listings"], []);
         (add_rpc_path_prefix ["votes"; "proposals"], []);

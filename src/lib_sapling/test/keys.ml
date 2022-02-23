@@ -4,7 +4,7 @@ module R = Rustzcash
 module Sk = Core.Raw.Spending_key
 module Vk = Core.Raw.Viewing_key
 
-let ba_of_hex h = Hex.to_bytes (`Hex h)
+let ba_of_hex h = Hex.to_bytes_exn (`Hex h)
 
 module Vector = struct
   type test_vector = {

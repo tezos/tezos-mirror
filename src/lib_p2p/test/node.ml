@@ -158,6 +158,7 @@ let detach_node ?(prefix = "") ?timeout ?(min_connections : int option)
         identity;
         proof_of_work_target;
         listening_port = Some port;
+        advertised_port = Some port;
         private_mode;
         reconnection_config = P2p_point_state.Info.default_reconnection_config;
         min_connections = unopt min_connections;
@@ -298,6 +299,6 @@ let detach_nodes ?timeout ?prefix ?min_connections ?max_connections
         port)
     points
   >>= fun nodes ->
-  Lwt.return @@ Error_monad.all_e nodes >>=? fun nodes ->
+  Lwt.return @@ Error_monad.Tzresult_syntax.all nodes >>=? fun nodes ->
   Lwt.ignore_result (sync_nodes nodes) ;
   Process.wait_all nodes

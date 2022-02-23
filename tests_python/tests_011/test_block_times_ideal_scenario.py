@@ -44,7 +44,7 @@ class TestBakers:
 
     def test_add_bakers(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
-            sandbox.add_baker(i, f'bootstrap{i+1}', proto=protocol.DAEMON)
+            sandbox.add_baker(i, [f'bootstrap{i+1}'], proto=protocol.DAEMON)
 
     def test_check_level_and_timestamp(self, sandbox: Sandbox):
         time.sleep(TEST_DURATION)
@@ -102,7 +102,7 @@ class TestBakersAndEndorsers:
 
     def test_add_bakers_and_endorsers(self, sandbox: Sandbox):
         for i in range(NUM_NODES):
-            sandbox.add_baker(i, f'bootstrap{i+1}', proto=protocol.DAEMON)
+            sandbox.add_baker(i, [f'bootstrap{i+1}'], proto=protocol.DAEMON)
         for i in range(NUM_NODES):
             sandbox.add_endorser(
                 i,

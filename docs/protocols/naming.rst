@@ -34,6 +34,7 @@ sequence:
 * 008 Edo
 * 009 Florence
 * 010 Granada
+* 011 Hangzhou
 * ...
 
 Due to the evolving nature of the in-use protocols, the above absolute protocol

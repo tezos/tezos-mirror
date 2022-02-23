@@ -1,8 +1,8 @@
-How to contribute
-=================
+How to contribute to Octez
+==========================
 
 The purpose of this document is to help contributors participate to
-the Tezos OCaml codebase.
+Octez.
 
 Introduction
 ------------
@@ -13,7 +13,7 @@ There are several ways to get involved with the codebase, and you may want to st
 Reporting issues
 ~~~~~~~~~~~~~~~~
 
-The simplest way to contribute to Tezos is to report issues that you may
+The simplest way to contribute to Octez is to report issues that you may
 find with the software on `GitLab <https://gitlab.com/tezos/tezos/-/issues>`__.
 If you are unsure about an issue
 consult the :doc:`technical support sources <../introduction/support>`
@@ -115,11 +115,11 @@ Dependencies on other merge requests, other relationships to MRs, to
 issues, etc, should also be mentioned.
 
 While the code is still not ready to be peer reviewed, but it is merely a
-work in progress, the developers prefixes the MR with ``WIP:``. This will tell everybody
+work in progress, the developer prefixes the MR with ``Draft:``. This will tell everybody
 they can look at the code, comment, but there is still work to be done and the
 branch can change and history be rewritten.
 
-Finally, when the code is ready for the :ref:`code review <code_review>`, the developer removes the WIP status of the
+Finally, when the code is ready for the :ref:`code review <code_review>`, the developer removes the Draft status of the
 MR and freezes the branch. From this moment on, the developer will refrain to
 rewrite history, but he/she can add new commits and rebase the branch for
 syncing it with master (this can be done regularly to make sure the branch does
@@ -148,11 +148,18 @@ While working on your branch to prepare a Merge Request, make sure you respect t
      the developer to make it clear at a glance who is working on what: e.g.
      ``john@new-feature``.
 
-   * Note that some extra CI tests are only done on demand for branches other
-     than master. You can (should) activate these tests by including keywords in
+   * Note that some extra CI jobs are only run on demand for branches other
+     than master. You can (should) activate these jobs by including keywords in
      the branch name.
 
-     +  If your MR impacts OPAM packaging, use ``opam`` in the branch name.
+     + Use ``opam`` in the branch name if you want to explicitly trigger
+       the OPAM packaging pipeline. Note that any OPAM related changes
+       will automatically trigger it.
+     + Use ``doc`` in the branch name if you change the documentation.
+     + Use ``arm64`` in the branch name if you need to build ARM64 artifacts.
+     + Use ``docker`` in the branch name if you need an automatic (instead of manual)
+       CI job for building Docker images.
+     + Suffix the branch name by ``-release`` if it is a release branch.
 
 -  Prefer small atomic commits over a large one that does many things.
 -  Don’t mix refactoring, reindentation, whitespace deletion, or other style
@@ -164,7 +171,7 @@ While working on your branch to prepare a Merge Request, make sure you respect t
 -  Follow the format of commit names, `<Component>: <message>`, with
    message in indicative or imperative present mood e.g. ``Shell: fix
    bug #13`` rather than ``Shell: fixed bug #13``.
-   Use multilines commit messages for important commits.
+   Use multiline commit messages for important commits.
 -  Adhere to the :doc:`coding guidelines <guidelines>`.
 -  Document your changes, in the MR description and commit messages.
    Imagine if somebody asked what your change was about in front of the
@@ -252,10 +259,23 @@ Therefore, when creating your MR, observe the following rules:
     Even better put them in a separate MR which can be merged easily.
   - Split your commits so that each step is convincing on its own, like
     the proof of a big theorem which is split into several lemmas.
+  - Avoid merge requests that are too large. They are harder to rebase and
+    request a longer continuous time for reviewing, making them overall slower
+    to merge. See :ref:`favoring small merge requests <favoring_small_mrs>`
+    below for more details.
 
 - *Anticipate questions*: explain anything which may look surprising, as comments in the code itself if it has value to future readers, or in the MR description.
 
 - *MR Labels*: Add GitLab labels to the MR, like ``doc`` or ``protocol``.
+
+  * The following special labels can be used to trigger different parts of the CI pipeline. To take effect, the label must
+    be added before any push action is made on the MR.
+
+    + ``ci--opam`` is for triggering the opam packaging tests pipeline.
+    + ``ci--docs`` is for testing some scripts in the documentation (e.g. Octez installation scenarios).
+    + ``ci--docker`` is for publishing the docker image of the MR.
+    + ``ci--arm64`` is for building on the ARM64 architecture.
+
 - *MR Options*: When opening an MR you should probably tick the following
   options:
 
@@ -270,16 +290,27 @@ Therefore, when creating your MR, observe the following rules:
     as described above in the :ref:`MR workflow <mr_workflow>`, in order
     to ease the reviewers' task.
   + `Allow commits from members who can merge to the target branch.`
-    This option is useful to allow members of the merge team, who are
+    This option is useful to allow members of the :doc:`Octez merge team <merge_team>`, who are
     not developers in your project, to commit to your branch.
     It helps to rebase and propose fixes.
 
-- *Find reviewers*: it is the responsibility of the author to find a
-  suitable reviewer, ideally before opening an MR. The reviewer(s)
-  should be mentioned in the description or in the comments.
+- *Find reviewers*: it is the responsibility of the author to find
+  suitable reviewers. In this context,
+  finding a reviewer means finding someone that agreed to review in the
+  next days after the MR becomes ready.
+  Opting for a reviewer that is not in the capacity to review your MR
+  in the next days when others can is unfortunate, because
+  the merge request will become unnecessarily blocked; which is bad for:
+
+  - the author, as their work gets delayed, and
+  - the health of the repository, as it gives the impression that a new contribution
+    will land soon; while it is not the case.
+
+  To find reviewers that will review promptly, we refer to the documentation
+  of the :ref:`reviewer field <reviewers_field>` below.
 
 - *Check progress*:
-  It is important to maintain to a minimum the number of your MRs that are in WIP state,
+  It is important to maintain to a minimum the number of your MRs that are in Draft state,
   and to constantly check that the discussion is progressing.
 
 Example of an MR with a good, clean history (each bullet is a commit,
@@ -295,6 +326,46 @@ any subitems represent the longer description of that commit)::
 
 **Beware**: For MRs touching
 ``src/proto_alpha/lib_protocol``, see :ref:`protocol MRs <protocol_mr>`.
+
+.. _favoring_small_mrs:
+
+Favoring Small Merge Requests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Small merge requests are encouraged for multiple reasons:
+
+- They are faster to review, which encourage reviewers to pick them.
+- They are easier to rebase, hereby saving developers time.
+- They are reviewed more thoroughly.
+- If the merge request is not accepted, less work is lost; in particular
+  less review time has been spent.
+
+However, small merge requests also come with drawbacks:
+
+- They make it more difficult for reviewers to get the global picture of the intended change.
+- They may introduce intermediate states, during which a feature
+  is not yet finished; or dead code is temporarily introduced.
+- They have to be reverted if the entire feature is ultimately cancelled.
+
+For ``tezos/tezos`` to evolve fast, however, we are convinced that the advantages
+of small merge requests outweigh the drawbacks. If possible, drawbacks
+must be mitigated as follows:
+
+- Have the entire piece of work described or done somewhere. For example in
+  an issue, or a branch containing the entire change, or a
+  large (unsplit) work as a draft merge request.
+  For complex works, an external document may be referred in the issue/MR, detailing the design/implementation rationale; if such documents are only targeted to reviewers and/or are only describing a *change*, they should not go in the online documentation. 
+- Include a link to the entire piece of work in the description of each
+  small merge requests created by splitting the large piece of work.
+  This will help reviewers get the big picture.
+- Explain why the intermediate state is harmless, if applicable.
+- To mitigate loss of work if the whole piece is not accepted,
+  we advise to split the work so that improvements that are desirable on their own
+  are the first ones to be merged in the sequence of small merge requests.
+  A desirable standalone improvement is for example a refactoring that
+  improves the quality of the code, or adds new tests, or fixes typos.
+
+.. _assignee_field:
 
 Merge Request "Assignees" Field
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -315,22 +386,49 @@ or respond to a comment) or one of the merge request authors (if they need
 to update the code or respond to a comment).
 
 If a merge request has no assignee, it is implicitly the role of the
-:ref:`merge dispatcher <merge_dispatcher>` to assign it to someone.
+:ref:`merge coordinator <merge_coordinator>` to assign it to someone.
 
 Even though merge requests could require action from several people
 to be merged, we avoid assigning more than one to avoid diluting responsibility.
 
+.. _reviewers_field:
+
 Merge Request "Reviewers" Field
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The reviewer field of GitLab can be used to suggest reviewers.
-Fill it when creating your merge requests so that the
-:ref:`merge dispatcher <merge_dispatcher>`
-knows who to contact if more reviews are needed.
-Anybody can suggest additional reviewers.
-In particular it is one of the role of the merge dispatcher to suggest reviewers.
-If you don't know who would be a good candidate to review your merge
-request, you can leave the field blank; but it may slow down the reviewing process.
+The reviewer field of GitLab is used to specify reviewers.
+Once the merge request is ready for review,
+:ref:`assign <assignee_field>` one of the reviewers that
+you specified in the reviewers field.
+As mentioned previously, it is the responsibility of authors to find reviewers.
+To find reviewers, either:
+
+  - Advertize your merge request on the ``#mr-advertizing`` channel of
+    the `tezos-dev <https://tezos-dev.slack.com/>`_ Slack. Good advertisement
+    consists of a link to the MR and a one sentence summary.
+  - Look at authors of the code you are modifying using
+    `git blame <https://git-scm.com/docs/git-blame>`_.
+  - Ask help to the :ref:`merge coordinator <merge_coordinator>`, either
+    by asking him/here on Slack or mentioning them in a comment (see next paragraph).
+
+Depending on your `GitLab role <https://docs.gitlab.com/ee/user/permissions.html>`_
+you may or may not be able to use the *Reviewers* field for specifying
+the reviewers. If you don't have the right, mention the reviewers using
+their GitLab handle (username prefixed with ``@``) in a comment.
+It causes GitLab to send a notification to them.
+
+.. _draft_mode:
+
+Merge Request "Draft" Mode
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A merge request that is not yet ready for review should be marked
+as `draft <https://docs.gitlab.com/ee/user/project/merge_requests/drafts.html>`_
+by prefixing its title with ``Draft:``.
+On ``tezos/tezos`` draft merge requests are ignored by reviewers.
+Marking merge requests as draft hence helps lower
+the number of merge requests that require attention from the
+:doc:`Octez merge team<merge_team>`.
 
 .. _adding_new_dependencies:
 
@@ -393,22 +491,24 @@ Code Review
 -----------
 
 At Tezos all the code is peer reviewed before getting committed in the
-master branch by the :doc:`merge team <merge_team>`.
+master branch by the :doc:`Octez merge team <merge_team>`.
 Briefly, a code review is a discussion between two or
 more developers about changes to the code to address an issue.
 
 Merge Request Approvals
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-Two approvals from different merge team members are required for merge
-requests to be merged. After their review, the second approver will also
-typically merge unless there is another merge in progress.
+Two approvals from different Octez :doc:`Octez merge team <merge_team>` members are required for merge
+requests to be merged. Both approvals must result from independent thorough
+reviews. After both reviews, the second approver will also typically merge.
 
-Both approvals must correspond to different thorough reviews
-but merge team members may trust the reviews of other developers and
-approve without reviewing thoroughly, especially for less critical
-parts of the code. Good comments from reviewers help the merge team to decide
-to approve a merge request without doing a full review.
+However, for less critical parts of the code, an Octez merge team member may
+choose to trust the review of a developer who is not a member of the Octez
+merge team. In that case, the Octez merge team member may choose to count that
+review as their own, effectively "converting" the other developer's passing
+review into an approval. This may be done even when the Octez merge team
+member is the author of the merge request. A second independent review from an
+Octez merge team member is still required, of course.
 
 For this reason, if you make a partial review, for instance if you only
 reviewed part of the code, or only the general design, it is good practice
@@ -463,7 +563,7 @@ pitfalls a code reviewer should avoid.
 - Discuss in person for more detailed points: Online comments are useful for
   focused technical questions. On many occasions it is more productive to
   discuss it in person rather than in the comments. Similarly, if discussion
-  about a point goes back and forth, It will be often more productive to pick
+  about a point goes back and forth, it will be often more productive to pick
   it up in person and finish out the discussion.
 
 - Explain reasoning: Sometimes it is best to both ask if there is a better
@@ -512,6 +612,8 @@ pitfalls a code reviewer should avoid.
   have a different reaction to it and impact on the quality of this work. This
   general remark is valid for any comment.
 
+When reviewing MRs involving documentation, you may check the built documentation directly within the Gitlab interface, see :ref:`build_doc_ci`.
+
 .. _merge_bot:
 
 The Merge-Request Bot
@@ -535,14 +637,14 @@ add a comment to justify it.
 In particular, the Merge-Request Bot may complain about :ref:`TODO/FIXME comments <todo_fixme>` without an issue number ensuring that the intended evolution is tracked.
 
 The code for the bot is at
-`smondet/merbocop <https://gitlab.com/smondet/merbocop>`__. It is of course
-work-in-progress and new warnings and comments will appear little by little.
-We welcome specific issues or contributions there too.
+`oxheadalpha/merbocop <https://gitlab.com/oxheadalpha/merbocop>`__. It is of
+course work-in-progress and new warnings and comments will appear little by
+little. We welcome specific issues or contributions there too.
 
 .. _dev_tools:
 
 Developer Tools
 ~~~~~~~~~~~~~~~
 
-Somme tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
+Some tools to make protocol development more convenient can be found in the :src:`src/tooling/` folder.
 In particular, it contains ``tztop``, a REPL (interactive read-eval-print loop) based on ``utop``.

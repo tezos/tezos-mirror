@@ -226,6 +226,16 @@ let tuple4 a b c d =
       Item (d, fun (_, _, _, x) -> x);
     ]
 
+let tuple5 a b c d e =
+  tuple
+    [
+      Item (a, fun (x, _, _, _, _) -> x);
+      Item (b, fun (_, x, _, _, _) -> x);
+      Item (c, fun (_, _, x, _, _) -> x);
+      Item (d, fun (_, _, _, x, _) -> x);
+      Item (e, fun (_, _, _, _, x) -> x);
+    ]
+
 let convert encode = function
   | E {pp; equal} ->
       let pp fmt x = pp fmt (encode x) in
@@ -264,7 +274,7 @@ let comparable_module (type a) (m : (module COMPARABLE with type t = a)) =
   let module M = (val m) in
   comparable M.pp M.compare
 
-let fail error_msg pp_a a pp_b b =
+let fail ?__LOC__ error_msg pp_a a pp_b b =
   let error_msg =
     let substitution group =
       match Re.Group.get group 0 with
@@ -278,7 +288,7 @@ let fail error_msg pp_a a pp_b b =
     in
     Re.replace (Re.compile (Re.Perl.re "%[LR]")) ~f:substitution error_msg
   in
-  Test.fail "%s" error_msg
+  Test.fail ?__LOC__ "%s" error_msg
 
 let eq a b typ ~error_msg =
   if not (get_equal typ a b) then
@@ -326,6 +336,20 @@ let like a b ~error_msg =
 
 let not_like a b ~error_msg =
   if a =~ b then fail error_msg pp_print_quoted_string a pp_rex b
+
+let list_mem typ ?__LOC__ a l ~error_msg =
+  let eq = get_equal typ in
+  if not @@ List.exists (eq a) l then
+    let pp = get_pp typ in
+    let pp_list = get_pp (list typ) in
+    fail ?__LOC__ error_msg pp a pp_list l
+
+let list_not_mem typ ?__LOC__ a l ~error_msg =
+  let eq = get_equal typ in
+  if List.exists (eq a) l then
+    let pp = get_pp typ in
+    let pp_list = get_pp (list typ) in
+    fail ?__LOC__ error_msg pp a pp_list l
 
 (* We define infix operators at the end to avoid using them accidentally. *)
 

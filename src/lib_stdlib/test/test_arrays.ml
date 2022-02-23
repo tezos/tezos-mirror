@@ -43,8 +43,6 @@ module Make (A : sig
 
   val fallback : 'a t -> 'a
 
-  val length : 'a t -> int
-
   val get : 'a t -> int -> 'a
 
   val set : 'a t -> int -> 'a -> 'a t
@@ -66,9 +64,6 @@ struct
     [(0, "fallback", "foo"); (1, "fallback", "baz"); (100, "fallback", "bar")]
 
   let on_samples f () = List.iter f samples
-
-  let check_make_and_length (s, d, _) =
-    if not (length (make s d) = s) then fail "length (make s d) = s"
 
   let check_make_and_fallback (s, d, _) =
     assert (s < Sys.max_array_length) ;

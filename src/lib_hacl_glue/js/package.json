@@ -1,54 +1,6 @@
 {
-  "name": "@nomadic-labs/tezos-hacl-glue",
-  "version": "0.0.1",
-  "main": "src/api.js",
-  "license": "MIT",
-  "scripts": {
-    "test": "mocha",
-    "lint-fix": "eslint test/test.js --fix",
-    "lint": "eslint test/test.js"
-  },
-  "dependencies": {
-    ""@nomadic-labs/hacl-wasm": "*"
-  },
-  "devDependencies": {
-    "eslint": "^6.8.0",
-    "eslint-plugin-import": "^2.20.1",
-    "chai": "^4.2.0",
-    "mocha": "*"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://gitlab.com/tezos/tezos.git",
-    "directory": "src/lib_glue_hacl/js"
-  },
-  "files": [
-    "src/*.js"
-  ],
-  "eslintConfig": {
-    "env": {
-      "browser": true,
-      "node": true,
-      "es6": true
-    },
-    "extends": [
-      "eslint:recommended"
-    ],
-    "globals": {
-      "Atomics": "readonly",
-      "SharedArrayBuffer": "readonly"
-    },
-    "parserOptions": {
-      "ecmaVersion": 2018
-    },
-    "rules": {
-      "camelcase": "off",
-      "no-underscore-dangle": "off",
-      "no-unused-vars": "warn",
-      "indent": [
-        "error",
-        2
-      ]
-    }
-  }
+    "private": true,
+    "type": "commonjs",
+    "description": "n/a",
+    "license": "n/a"
 }

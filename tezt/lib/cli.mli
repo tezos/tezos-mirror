@@ -61,34 +61,56 @@ type temporary_file_mode = Delete | Delete_if_successful | Keep
 (** How many times to loop. *)
 type loop_mode = Infinite | Count of int
 
-(** Command-line options. *)
+(** Command-line options.
+
+    [log_file] is [Some channel] where [channel] is open on [filename]
+    if [--log-file filename] was specified on the command line.
+    [channel] is automatically replaced by another channel if {!init}
+    is called again with [--log-file]. [channel] is automatically closed
+    either when replaced by another one or at exit. *)
 type options = {
-  color : bool;
-  log_level : log_level;
-  log_file : string option;
-  log_buffer_size : int;
-  commands : bool;
-  temporary_file_mode : temporary_file_mode;
-  keep_going : bool;
-  files_to_run : string list;
-  tests_to_run : string list;
-  tests_not_to_run : string list;
-  tags_to_run : string list;
-  tags_not_to_run : string list;
-  list : [`Ascii_art | `Tsv] option;
-  global_timeout : float option;
-  test_timeout : float option;
-  reset_regressions : bool;
-  loop_mode : loop_mode;
-  time : bool;
-  starting_port : int;
-  record : string option;
-  from_records : string list;
-  job : (int * int) option;
-  job_count : int;
-  suggest_jobs : bool;
-  junit : string option;
+  mutable color : bool;
+  mutable log_level : log_level;
+  mutable log_file : out_channel option;
+  mutable log_buffer_size : int;
+  mutable commands : bool;
+  mutable temporary_file_mode : temporary_file_mode;
+  mutable keep_going : bool;
+  mutable files_to_run : string list;
+  mutable tests_to_run : string list;
+  mutable tests_not_to_run : string list;
+  mutable tags_to_run : string list;
+  mutable tags_not_to_run : string list;
+  mutable list : [`Ascii_art | `Tsv] option;
+  mutable global_timeout : float option;
+  mutable test_timeout : float option;
+  mutable reset_regressions : bool;
+  mutable loop_mode : loop_mode;
+  mutable time : bool;
+  mutable starting_port : int;
+  mutable record : string option;
+  mutable from_records : string list;
+  mutable job : (int * int) option;
+  mutable job_count : int;
+  mutable suggest_jobs : bool;
+  mutable junit : string option;
 }
 
 (** Values for command-line options. *)
 val options : options
+
+(** Read command-line options to initialize [options].
+
+    By default arguments are read from [Sys.argv], but you can specify [args]
+    to override this behavior. Note that [args] must not contain the executable
+    name ([Sys.argv.(0)]), only actual arguments.
+
+    If you do not call [init], [options] will contain only default values.
+
+    [init] exits the program on failure to parse the arguments (with code 2) or
+    when either [-help] or [--help] is present (with code 0).
+
+    Warning: if [--log-file] is specified, the file is truncated.
+    So if you call [init] several times with the same [--log-file] argument,
+    all logs between the calls to [init] are lost in this file. *)
+val init : ?args:string list -> unit -> unit

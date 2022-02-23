@@ -1,0 +1,25 @@
+(lang dune 2.9)
+(formatting (enabled_for ocaml))
+(name tezos-time-measurement)
+
+(maintainers contact@tezos.com)
+(authors "Tezos devteam")
+(homepage https://www.tezos.com/)
+(bug_reports https://gitlab.com/tezos/tezos/issues)
+(source (uri git+https://gitlab.com/tezos/tezos.git))
+(license MIT)
+
+(generate_opam_files true)
+
+(package
+  (name tezos-time-measurement)
+  (synopsis "Tezos time measurement tooling")
+  (depends
+    (ppxlib (>= 0.22.2))
+    (data-encoding (>= 0.4))
+    (lwt (>= 5.4.2))
+    (tezos-event-logging :dev)
+    (ppx_inline_test :with-test)
+    (ocamlformat :with-test)
+  )
+)

@@ -61,6 +61,8 @@ let () =
       ("Filterp", (module TestFilterpAgainstStdlibList : F));
       ("Filtermap", (module TestFiltermapAgainstStdlibList : F));
       ("Filtermapp", (module TestFiltermappAgainstStdlibList : F));
+      ("Concatmap", (module TestConcatmapAgainstStdlibList : F));
+      ("Concatmapp", (module TestConcatmappAgainstStdlibList : F));
       ("Fold", (module TestFoldAgainstStdlibList : F));
       ("FoldRight", (module TestFoldRightAgainstStdlibList : F));
       ("FoldLeftMap", (module TestFoldLeftMapAgainstStdlibList : F));

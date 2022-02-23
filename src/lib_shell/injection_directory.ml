@@ -36,12 +36,12 @@ let inject_block validator ?force ?chain bytes operations =
   Validator.validate_block validator ?force ?chain_id bytes operations
   >>=? fun (hash, block) -> return (hash, block >>=? fun _ -> return_unit)
 
-let inject_operation validator ?chain bytes =
+let inject_operation validator ~force ?chain bytes =
   read_chain_id validator chain >>= fun chain_id ->
   let t =
     match Data_encoding.Binary.of_bytes_opt Operation.encoding bytes with
     | None -> failwith "Can't parse the operation"
-    | Some op -> Validator.inject_operation validator ?chain_id op
+    | Some op -> Validator.inject_operation validator ~force ?chain_id op
   in
   let hash = Operation_hash.hash_bytes [bytes] in
   Lwt.return (hash, t)
@@ -70,13 +70,19 @@ let build_rpc_directory validator =
   let register0 s f =
     dir := RPC_directory.register !dir s (fun () p q -> f p q)
   in
+  let inject_operation ~force q contents =
+    inject_operation validator ~force ?chain:q#chain contents
+    >>= fun (hash, wait) ->
+    (if q#async then return_unit else wait) >>=? fun () -> return hash
+  in
   register0 Injection_services.S.block (fun q (raw, operations) ->
       inject_block validator ?chain:q#chain ~force:q#force raw operations
       >>=? fun (hash, wait) ->
       (if q#async then return_unit else wait) >>=? fun () -> return hash) ;
-  register0 Injection_services.S.operation (fun q contents ->
-      inject_operation validator ?chain:q#chain contents >>= fun (hash, wait) ->
-      (if q#async then return_unit else wait) >>=? fun () -> return hash) ;
+  register0 Injection_services.S.operation (inject_operation ~force:false) ;
+  register0
+    Injection_services.S.private_operation
+    (inject_operation ~force:true) ;
   register0 Injection_services.S.protocol (fun q protocol ->
       inject_protocol state protocol >>= fun (hash, wait) ->
       (if q#async then return_unit else wait) >>=? fun () -> return hash) ;

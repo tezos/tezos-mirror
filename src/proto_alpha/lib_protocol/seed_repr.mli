@@ -52,20 +52,19 @@ val sequence : t -> int32 -> sequence
 (** Generates the next random value in the sequence *)
 val take : sequence -> bytes * sequence
 
-(** Generates the next random value as a bounded [int32] *)
+(** [take_int32 s bound] generates the next random value as a bounded [int32]
+
+    @param bound must be a positive integer
+    @raise Invalid_argument "Seed_repr.take_int32" if [bound] <= 0
+ *)
 val take_int32 : sequence -> int32 -> int32 * sequence
 
-(** {2 Predefined seeds} *)
+(** [take_int64 s bound] generates the next random value as a bounded [int64]
 
-val empty : seed
-
-(** Returns a new seed by hashing the one passed with a constant. *)
-val deterministic_seed : seed -> seed
-
-(** [initial_seeds n] generates the first [n] seeds for which there are no nonces.
-    The first seed is a constant value. The kth seed is the hash of seed (k-1)
-    concatenated with a constant. *)
-val initial_seeds : int -> seed list
+    @param bound must be a positive integer
+    @raise Invalid_argument "Seed_repr.take_int64" if [bound] <= 0
+ *)
+val take_int64 : sequence -> int64 -> int64 * sequence
 
 (** {2 Entropy} *)
 
@@ -78,7 +77,7 @@ val nonce : seed -> nonce -> seed
 (** Use a byte sequence as a nonce *)
 val make_nonce : bytes -> nonce tzresult
 
-(** Compute the has of a nonce *)
+(** Compute the hash of a nonce *)
 val hash : nonce -> Nonce_hash.t
 
 (** [check_hash nonce hash] is true if the nonce correspond to the hash *)
@@ -86,6 +85,19 @@ val check_hash : nonce -> Nonce_hash.t -> bool
 
 (** For using nonce hashes as keys in the hierarchical database *)
 val nonce_hash_key_part : Nonce_hash.t -> string list -> string list
+
+(** {2 Predefined seeds} *)
+
+val empty : seed
+
+(** Returns a new seed by hashing the one passed with a constant. *)
+val deterministic_seed : seed -> seed
+
+(** [initial_seeds n] generates the first [n] seeds for which there are no nonces.
+    The first seed is a constant value. The kth seed is the hash of seed (k-1)
+    concatenated with a constant. If an [initial_seed] is provided, the
+    {i first} seed is created using it as the first one. *)
+val initial_seeds : ?initial_seed:State_hash.t -> int -> seed list
 
 (** {2 Predefined nonce} *)
 

@@ -67,16 +67,15 @@ struct
     include Bare_structs.Hashtbl.Make_es (H)
 
     let iter_with_waiting_ep f t =
-      Monad.join_ep
+      let open Monad.Lwt_traced_result_syntax in
+      join
       @@ fold_promises
            (fun k p acc ->
              let promise =
                Lwt.try_bind
                  (fun () -> p)
-                 (function
-                   | Error _ -> Monad.LwtTracedResult.return_unit
-                   | Ok v -> f k v)
-                 (fun _ -> Monad.LwtTracedResult.return_unit)
+                 (function Error _ -> return_unit | Ok v -> f k v)
+                 (fun _ -> return_unit)
              in
              promise :: acc)
            t

@@ -374,7 +374,9 @@ include Tezos_raw_protocol_005_PsBabyM1.Main
 
 (library
  (name tezos_protocol_005_PsBabyM1_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-005-PsBabyM1)
  (libraries
       tezos-protocol-environment

@@ -1,24 +1,21 @@
 (tests
+ (names test_rustzcash test_keys test_merkle test_roots test_sapling)
  (package tezos-sapling)
- (names test_rustzcash
-        test_keys
-        test_merkle
-        test_roots
-        test_sapling)
- (deps vectors.csv vectors-zip32.csv)
- (libraries tezos-sapling
-            str
-            tezos-base
-            tezos-base.unix
-            tezos-stdlib-unix
-            tezos-base-test-helpers
-            alcotest-lwt)
- (flags (:standard -open Tezos_sapling
-                   -open Tezos_crypto
-                   -open Tezos_stdlib
-                   -open Data_encoding
-                   -open Tezos_base_test_helpers)))
+ (libraries
+  tezos-sapling
+  str
+  tezos-base
+  tezos-base.unix
+  tezos-stdlib-unix
+  tezos-base-test-helpers
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_sapling
+   -open Tezos_crypto
+   -open Tezos_stdlib
+   -open Data_encoding
+   -open Tezos_base_test_helpers))
+ (deps (file vectors.csv) (file vectors-zip32.csv)))
 
-(env
- (dev
-  (flags (:standard -warn-error -A))))
+(env (dev (flags (:standard -warn-error -A))))

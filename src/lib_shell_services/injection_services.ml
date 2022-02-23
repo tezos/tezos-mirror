@@ -80,7 +80,12 @@ module S = struct
     |+ opt_field "chain" Chain_services.chain_arg (fun t -> t#chain)
     |> seal
 
-  let operation =
+  (* If [private_] is set, the [private/injection/operation] path is used,
+   * otherwise, it is [/injection/operation].
+     This RPC does less checks than [injection/operation] and should be used for
+     test or internal use only. The [private/] prefix is used to forbid the use
+     of such RPC on a public node *)
+  let operation ~private_ =
     RPC_service.post_service
       ~description:
         "Inject an operation in node and broadcast it. Returns the ID of the \
@@ -96,7 +101,12 @@ module S = struct
       ~query:operation_query
       ~input:bytes
       ~output:Operation_hash.encoding
-      RPC_path.(path / "operation")
+      (if private_ then RPC_path.(root / "private" / "injection" / "operation")
+      else RPC_path.(path / "operation"))
+
+  let private_operation = operation ~private_:true
+
+  let operation = operation ~private_:false
 
   let protocol_query =
     let open RPC_query in
@@ -135,9 +145,9 @@ let block ctxt ?(async = false) ?(force = false) ?chain raw operations =
     end)
     (raw, operations)
 
-let operation ctxt ?(async = false) ?chain operation =
+let operation_rpc ctxt ~private_rpc ?(async = false) ?chain operation =
   make_call
-    S.operation
+    (if private_rpc then S.private_operation else S.operation)
     ctxt
     ()
     (object
@@ -146,6 +156,12 @@ let operation ctxt ?(async = false) ?chain operation =
        method chain = chain
     end)
     operation
+
+let private_operation ctxt ?async ?chain operation =
+  operation_rpc ctxt ~private_rpc:true ?async ?chain operation
+
+let operation ctxt ?async ?chain operation =
+  operation_rpc ctxt ~private_rpc:false ?async ?chain operation
 
 let protocol ctxt ?(async = false) protocol =
   make_call

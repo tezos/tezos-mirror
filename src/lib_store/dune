@@ -1,27 +1,28 @@
 (library
  (name tezos_store)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-store)
- (libraries tezos-base
-            tezos-shell-services
-            index
-            irmin-pack
-            tezos-stdlib-unix
-            tezos-context
-            tezos-legacy-store
-            tezos-validation
-            tezos-protocol-updater
-            lwt-watcher
-            ringo-lwt
-            camlzip
-            tar
-            tar-unix)
- (flags (:standard -open Tezos_shell_services
-                   -open Tezos_base
-                   -open Tezos_base__TzPervasives
-                   -open Tezos_context
-                   -open Tezos_legacy_store
-                   -open Tezos_validation
-                   -open Tezos_protocol_updater
-                   -open Tezos_stdlib_unix
-                   -open Tezos_stdlib)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-shell-services
+  index
+  irmin-pack
+  tezos-stdlib-unix
+  tezos-context
+  tezos-validation
+  tezos-protocol-updater
+  lwt-watcher
+  ringo-lwt
+  camlzip
+  tar
+  tar-unix)
+ (flags
+  (:standard
+   -open Tezos_shell_services
+   -open Tezos_base
+   -open Tezos_base__TzPervasives
+   -open Tezos_context
+   -open Tezos_validation
+   -open Tezos_protocol_updater
+   -open Tezos_stdlib_unix
+   -open Tezos_stdlib)))

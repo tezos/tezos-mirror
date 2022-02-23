@@ -302,7 +302,7 @@ module Protocol_constants_overrides = struct
     | None -> ()
     | Some value -> Format.fprintf ppf "@[<h>%s: %a@]" name pp value
 
-  let apply_overrides (cctxt : Tezos_client_base.Client_context.full) (o : t)
+  let apply_overrides (cctxt : Tezos_client_base.Client_context.printer) (o : t)
       (c : Constants.parametric) : Constants.parametric tzresult Lwt.t =
     let open Format in
     let pp_print_int32 ppf i = fprintf ppf "%li" i in
@@ -849,16 +849,19 @@ let initial_context chain_id (header : Block_header.shell_header)
       reason, the mockup mode loads the cache lazily.
       See {!Environment_context.source_of_cache}.
   *)
-  Tezos_protocol_environment.Context.load_cache context `Lazy (fun key ->
-      value_of_key key >|= Protocol.Environment.wrap_tzresult)
+  Tezos_protocol_environment.Context.load_cache
+    predecessor
+    context
+    `Lazy
+    (fun key -> value_of_key key >|= Protocol.Environment.wrap_tzresult)
   >>=? fun context -> return context
 
 let mem_init :
-    cctxt:Tezos_client_base.Client_context.full ->
+    cctxt:Tezos_client_base.Client_context.printer ->
     parameters:Protocol_parameters.t ->
     constants_overrides_json:Data_encoding.json option ->
     bootstrap_accounts_json:Data_encoding.json option ->
-    (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
+    Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
  fun ~cctxt ~parameters ~constants_overrides_json ~bootstrap_accounts_json ->
   let hash =
     Block_hash.of_b58check_exn
@@ -940,14 +943,19 @@ let mem_init :
     }
   >>=? fun context ->
   return
-    ( chain_id,
-      Tezos_protocol_environment.
-        {block_hash = hash; block_header = shell_header; context} )
+    Tezos_mockup_registration.Registration_intf.
+      {
+        chain = chain_id;
+        rpc_context =
+          Tezos_protocol_environment.
+            {block_hash = hash; block_header = shell_header; context};
+        protocol_data = Bytes.empty;
+      }
 
 let migrate :
-    Chain_id.t * Tezos_protocol_environment.rpc_context ->
-    (Chain_id.t * Tezos_protocol_environment.rpc_context) tzresult Lwt.t =
- fun (chain_id, rpc_context) ->
+    Tezos_mockup_registration.Registration.mockup_context ->
+    Tezos_mockup_registration.Registration.mockup_context tzresult Lwt.t =
+ fun {chain; rpc_context; protocol_data} ->
   let Tezos_protocol_environment.{block_hash; context; block_header} =
     rpc_context
   in
@@ -956,7 +964,9 @@ let migrate :
   let rpc_context =
     Tezos_protocol_environment.{block_hash; block_header; context}
   in
-  return (chain_id, rpc_context)
+  return
+    Tezos_mockup_registration.Registration_intf.
+      {chain; rpc_context; protocol_data}
 
 (* ------------------------------------------------------------------------- *)
 (* Register mockup *)

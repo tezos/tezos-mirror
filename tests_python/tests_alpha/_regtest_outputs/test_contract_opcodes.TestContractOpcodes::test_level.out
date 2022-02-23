@@ -1,0 +1,21 @@
+tests_alpha/test_contract_opcodes.py::TestContractOpcodes::test_level
+
+storage
+  10
+emitted operations
+  
+big_map diff
+  
+trace
+  - location: 7 (remaining gas: 1039994.948 units remaining)
+    [ (Pair Unit 9999999)  	 ]
+  - location: 7 (remaining gas: 1039994.938 units remaining)
+    [  ]
+  - location: 8 (remaining gas: 1039994.923 units remaining)
+    [ 10  	@level ]
+  - location: 9 (remaining gas: 1039994.908 units remaining)
+    [ {}  	
+      10  	@level ]
+  - location: 11 (remaining gas: 1039994.893 units remaining)
+    [ (Pair {} 10)  	 ]
+

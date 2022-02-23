@@ -1,20 +1,79 @@
-(executable
- (name test)
- (modes js)
- (libraries
-  tezos-hacl-glue-js
-  zarith_stubs_js
-  js_of_ocaml-compiler
-  js_of_ocaml)
- (preprocess (pps js_of_ocaml-ppx))
- (js_of_ocaml (javascript_files hacl_stubs.js)))
+;; We use virtual libraries, and want to compile the same test with
+;; unix and js. In order to do this, we copy tests from the unix
+;; directory and change the library providing the implementation of
+;; the virtual lib (tezos-hacl-glue-js)
 
 (rule
- (targets hacl_stubs.js)
- (action (copy %{lib:tezos-hacl-glue-js:hacl_stubs.js} hacl_stubs.js)))
+  (action (copy ../../unix/test/test_hacl.ml test_hacl.ml.from-unix)))
+
+(rule
+  (action (copy ../../unix/test/vectors_p256.ml vectors_p256.ml.from-unix)))
+
+(rule
+  (action (copy ../../unix/test/test_prop_signature_pk.ml test_prop_signature_pk.ml.from-unix)))
+
+(rule
+  (alias runtest_js)
+  (action (diff test_hacl.ml test_hacl.ml.from-unix )))
+
+(rule
+  (alias runtest_js)
+  (action (diff vectors_p256.ml vectors_p256.ml.from-unix)))
+
+(rule
+  (alias runtest_js)
+  (action (diff test_prop_signature_pk.ml test_prop_signature_pk.ml.from-unix)))
+
+(executables
+ (names
+  test_hacl
+  test_prop_signature_pk)
+ (modules (:standard \ test))
+ (libraries
+  tezos-stdlib
+  tezos-error-monad
+  zarith
+  zarith_stubs_js
+  tezos-hacl-glue
+  tezos-hacl-glue-js
+  data-encoding
+  qcheck-alcotest
+  tezos-test-helpers)
+ (modes js)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_error_monad.TzLwtreslib
+   -open Data_encoding
+   -open Tezos_hacl_glue)))
+
+(executable
+ (name test)
+ (modules test)
+ (modes js)
+ (libraries
+  tezos-hacl-glue-js))
 
 (rule
  (alias runtest_js)
  (package tezos-hacl-glue-js)
- (deps ../.yarnrc test.bc.js test.sh)
- (action (system ./test.sh)))
+ (deps ../.npmrc ../package.json ../package-lock.json)
+ (action (progn
+            (run npm install hacl-wasm)
+            (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test.bc.js}))))
+
+(rule
+  (alias runtest_js)
+  (package tezos-hacl-glue-js)
+  (deps ../.npmrc ../package.json ../package-lock.json)
+  (action (progn
+            (run npm install hacl-wasm)
+            (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test_hacl.bc.js}))))
+
+(rule
+  (alias runtest_js)
+  (package tezos-hacl-glue-js)
+  (deps ../.npmrc ../package.json ../package-lock.json)
+  (action (progn
+            (run npm install hacl-wasm)
+            (run %{dep:../../../tooling/node_wrapper.exe} --hacl %{dep:./test_prop_signature_pk.bc.js}))))

@@ -5,7 +5,9 @@ let spawn_encode ?path ?hooks ~name json =
   spawn_command ?path ?hooks ["encode"; name; "from"; JSON.encode_u json]
 
 let encode ?path ?hooks ~name json =
-  spawn_encode ?path ?hooks ~name json |> Process.check_and_read_stdout
+  let open Lwt.Infix in
+  spawn_encode ?path ?hooks ~name json
+  |> Process.check_and_read_stdout >|= String.trim
 
 let spawn_decode ?path ?hooks ~name binary =
   spawn_command ?path ?hooks ["decode"; name; "from"; binary]

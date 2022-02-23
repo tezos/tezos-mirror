@@ -26,8 +26,8 @@
 (** Testing
     -------
     Component:    Protocol
-    Invocation:   dune exec src/proto_alpha/lib_protocol/test/main.exe\
-                  -- test "^failing_noop$"
+    Invocation:   dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe \
+                  -- test "^failing_noop operation$"
     Subject:      The Failing_noop operation was added bearing in mind the
                   possibility for the end user to sign arbitrary bytes,
                   encapsulate in the operation, with the absolute garanty that

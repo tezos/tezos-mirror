@@ -35,33 +35,13 @@ let blocks_per_commitment c =
   let constants = Raw_context.constants c in
   constants.blocks_per_commitment
 
-let blocks_per_roll_snapshot c =
+let blocks_per_stake_snapshot c =
   let constants = Raw_context.constants c in
-  constants.blocks_per_roll_snapshot
+  constants.blocks_per_stake_snapshot
 
 let blocks_per_voting_period c =
   let constants = Raw_context.constants c in
   constants.blocks_per_voting_period
-
-let time_between_blocks c =
-  let constants = Raw_context.constants c in
-  constants.time_between_blocks
-
-let minimal_block_delay c =
-  let constants = Raw_context.constants c in
-  constants.minimal_block_delay
-
-let endorsers_per_block c =
-  let constants = Raw_context.constants c in
-  constants.endorsers_per_block
-
-let initial_endorsers c =
-  let constants = Raw_context.constants c in
-  constants.initial_endorsers
-
-let delay_per_missing_endorsement c =
-  let constants = Raw_context.constants c in
-  constants.delay_per_missing_endorsement
 
 let hard_gas_limit_per_operation c =
   let constants = Raw_context.constants c in
@@ -95,21 +75,17 @@ let origination_size c =
   let constants = Raw_context.constants c in
   constants.origination_size
 
-let block_security_deposit c =
+let baking_reward_fixed_portion c =
   let constants = Raw_context.constants c in
-  constants.block_security_deposit
+  constants.baking_reward_fixed_portion
 
-let endorsement_security_deposit c =
+let baking_reward_bonus_per_slot c =
   let constants = Raw_context.constants c in
-  constants.endorsement_security_deposit
+  constants.baking_reward_bonus_per_slot
 
-let baking_reward_per_endorsement c =
+let endorsing_reward_per_slot c =
   let constants = Raw_context.constants c in
-  constants.baking_reward_per_endorsement
-
-let endorsement_reward c =
-  let constants = Raw_context.constants c in
-  constants.endorsement_reward
+  constants.endorsing_reward_per_slot
 
 let quorum_min c =
   let constants = Raw_context.constants c in
@@ -136,3 +112,47 @@ let liquidity_baking_escape_ema_threshold c =
   constants.liquidity_baking_escape_ema_threshold
 
 let parametric c = Raw_context.constants c
+
+let minimal_block_delay c =
+  let constants = Raw_context.constants c in
+  constants.minimal_block_delay
+
+let delay_increment_per_round c =
+  let constants = Raw_context.constants c in
+  constants.delay_increment_per_round
+
+let consensus_committee_size c =
+  let constants = Raw_context.constants c in
+  constants.consensus_committee_size
+
+let consensus_threshold c =
+  let constants = Raw_context.constants c in
+  constants.consensus_threshold
+
+let minimal_participation_ratio c =
+  let constants = Raw_context.constants c in
+  constants.minimal_participation_ratio
+
+let max_slashing_period c =
+  let constants = Raw_context.constants c in
+  constants.max_slashing_period
+
+let frozen_deposits_percentage c =
+  let constants = Raw_context.constants c in
+  constants.frozen_deposits_percentage
+
+let double_baking_punishment c =
+  let constants = Raw_context.constants c in
+  constants.double_baking_punishment
+
+let tx_rollup_enable c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_enable
+
+let tx_rollup_origination_size c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_origination_size
+
+let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
+  let constants = Raw_context.constants c in
+  constants.ratio_of_frozen_deposits_slashed_per_double_endorsement

@@ -25,29 +25,23 @@
 
 let rng_state = Random.State.make [|42; 987897; 54120|]
 
-let sampling_parameters =
-  let open Michelson_samplers_parameters in
-  let size = {Tezos_benchmark.Base_samplers.min = 4; max = 32} in
-  {
-    int_size = size;
-    string_size = size;
-    bytes_size = size;
-    stack_size = size;
-    type_size = size;
-    list_size = size;
-    set_size = size;
-    map_size = size;
-  }
-
-module Full = Michelson_samplers_base.Make_full (struct
-  let parameters = sampling_parameters
-
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
   let algo = `Default
 
   let size = 16
 end)
 
-module Autocomp = Autocomp.Make (Full)
+module Michelson_base_samplers = Michelson_samplers_base.Make (struct
+  let parameters =
+    let size = {Base_samplers.min = 4; max = 32} in
+    {
+      Michelson_samplers_base.int_size = size;
+      string_size = size;
+      bytes_size = size;
+    }
+end)
+
+module Autocomp = Autocomp.Make (Michelson_base_samplers) (Crypto_samplers)
 
 let () = Format.eprintf "===============================@.%!"
 
@@ -106,7 +100,10 @@ let complete term =
     bef'
     Type.Stack.pp
     aft' ;
-  let node = Micheline.strip_locations @@ Michelson.of_mikhailsky term state in
+  let node =
+    Micheline.strip_locations @@ Mikhailsky_to_michelson.convert term state
+  in
+  let bef' = Type_helpers.stack_type_to_michelson_type_list bef' in
   Test_helpers.typecheck_by_tezos bef' node
 
 open Mikhailsky

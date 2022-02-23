@@ -29,6 +29,7 @@ module Events = P2p_events.P2p
 type config = {
   listening_port : P2p_addr.port option;
   listening_addr : P2p_addr.t option;
+  advertised_port : P2p_addr.port option;
   discovery_port : P2p_addr.port option;
   discovery_addr : Ipaddr.V4.t option;
   trusted_points : (P2p_point.Id.t * P2p_peer.Id.t option) list;
@@ -101,6 +102,7 @@ let create_connect_handler config limits pool msg_cfg conn_meta_cfg io_sched
       P2p_connect_handler.identity = config.identity;
       proof_of_work_target = config.proof_of_work_target;
       listening_port = config.listening_port;
+      advertised_port = config.advertised_port;
       private_mode = config.private_mode;
       reconnection_config = config.reconnection_config;
       min_connections = limits.min_connections;
@@ -333,7 +335,7 @@ module Real = struct
         | Error _ ->
             Events.(emit message_read_error) (P2p_conn.info conn).peer_id
             >>= fun () ->
-            Lwt_unix.yield () >>= fun () -> recv_any net ())
+            Lwt.pause () >>= fun () -> recv_any net ())
 
   let send _net conn m =
     P2p_conn.write conn m >>= function

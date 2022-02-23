@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 module Output = struct
   type t =
@@ -167,17 +167,18 @@ let cfg_encoding =
 
 let init ?(template = default_template) output =
   let open Output in
-  (match output with
-  | Stderr ->
-      Lwt.return
-      @@ Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
-  | Stdout ->
-      Lwt.return
-      @@ Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
-  | File file_name -> Lwt_log.file ~file_name ~template ()
-  | Null -> Lwt.return @@ Lwt_log.null
-  | Syslog facility -> Lwt.return @@ Lwt_log.syslog ~template ~facility ())
-  >>= fun logger ->
+  let* logger =
+    match output with
+    | Stderr ->
+        Lwt.return
+        @@ Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stderr ()
+    | Stdout ->
+        Lwt.return
+        @@ Lwt_log.channel ~template ~close_mode:`Keep ~channel:Lwt_io.stdout ()
+    | File file_name -> Lwt_log.file ~file_name ~template ()
+    | Null -> Lwt.return @@ Lwt_log.null
+    | Syslog facility -> Lwt.return @@ Lwt_log.syslog ~template ~facility ()
+  in
   Lwt_log.default := logger ;
   Lwt.return_unit
 
@@ -196,13 +197,17 @@ let find_log_rules default =
 let initialize ?(cfg = default_cfg) () =
   Lwt_log_core.add_rule "*" (Internal_event.Level.to_lwt_log cfg.default_level) ;
   let (origin, rules) = find_log_rules cfg.rules in
-  (match rules with
-  | None -> Lwt.return_unit
-  | Some rules -> (
-      try
-        Lwt_log_core.load_rules rules ~fail_on_error:true ;
-        Lwt.return_unit
-      with _ ->
-        Printf.ksprintf Lwt.fail_with "Incorrect log rules defined in %s" origin
-      ))
-  >>= fun () -> init ~template:cfg.template cfg.output
+  let* () =
+    match rules with
+    | None -> Lwt.return_unit
+    | Some rules -> (
+        try
+          Lwt_log_core.load_rules rules ~fail_on_error:true ;
+          Lwt.return_unit
+        with _ ->
+          Printf.ksprintf
+            Lwt.fail_with
+            "Incorrect log rules defined in %s"
+            origin)
+  in
+  init ~template:cfg.template cfg.output

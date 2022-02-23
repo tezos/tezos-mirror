@@ -1,33 +1,35 @@
 opam-version: "2.0"
 maintainer: "contact@tezos.com"
-authors: [ "Tezos devteam" ]
+authors: ["Tezos devteam"]
 homepage: "https://www.tezos.com/"
 bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
+  "lwt-watcher" { = "0.1" }
+  "lwt-canceler" { >= "0.3" & < "0.4" }
   "tezos-base"
   "tezos-version"
-  "tezos-p2p"
   "tezos-context"
   "tezos-store"
+  "tezos-shell-context"
+  "tezos-p2p"
+  "tezos-stdlib-unix"
   "tezos-shell-services"
   "tezos-p2p-services"
   "tezos-protocol-updater"
-  "tezos-validation"
-  "tezos-stdlib-unix"
   "tezos-requester"
-  "lwt-watcher" { = "0.1" }
-  "lwt-canceler" { >= "0.3" & < "0.4" }
-  "lwt-exit"
-  "alcotest-lwt" { with-test & >= "1.1.0" }
-  "qcheck-alcotest" { with-test }
-  "tezos-test-helpers" { with-test }
   "tezos-workers"
-  "tezos-embedded-protocol-demo-noops" { with-test }
-  "tezos-protocol-plugin-alpha" { with-test }
-  "tezos-base-test-helpers" { with-test }
+  "tezos-validation"
+  "lwt-exit"
+  "tezos-base-test-helpers" {with-test}
+  "tezos-embedded-protocol-demo-noops" {with-test}
+  "tezos-event-logging-test-helpers" {with-test}
+  "tezos-test-helpers" {with-test}
+  "alcotest-lwt" { with-test & >= "1.5.0" }
+  "tezos-alpha-test-helpers" {with-test}
+  "tezos-protocol-plugin-alpha" {with-test}
 ]
 build: [
   ["dune" "build" "-p" name "-j" jobs]

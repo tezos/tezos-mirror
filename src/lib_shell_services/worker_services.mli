@@ -41,7 +41,7 @@ module Prevalidators : sig
   val state :
     #simple ->
     Chain_services.chain ->
-    (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    Request.view Worker_types.full_status tzresult Lwt.t
 
   module S : sig
     val list :
@@ -63,7 +63,7 @@ module Prevalidators : sig
         unit * Chain_services.chain,
         unit,
         unit,
-        (Request.view, Event.t) Worker_types.full_status )
+        Request.view Worker_types.full_status )
       RPC_service.t
   end
 end
@@ -71,8 +71,7 @@ end
 module Block_validator : sig
   open Block_validator_worker_state
 
-  val state :
-    #simple -> (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+  val state : #simple -> Request.view Worker_types.full_status tzresult Lwt.t
 
   module S : sig
     val state :
@@ -81,7 +80,7 @@ module Block_validator : sig
         unit,
         unit,
         unit,
-        (Request.view, Event.t) Worker_types.full_status )
+        Request.view Worker_types.full_status )
       RPC_service.t
   end
 end
@@ -104,7 +103,7 @@ module Peer_validators : sig
     #simple ->
     Chain_services.chain ->
     P2p_peer.Id.t ->
-    (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    Request.view Worker_types.full_status tzresult Lwt.t
 
   module S : sig
     val list :
@@ -126,7 +125,7 @@ module Peer_validators : sig
         (unit * Chain_services.chain) * P2p_peer.Id.t,
         unit,
         unit,
-        (Request.view, Event.t) Worker_types.full_status )
+        Request.view Worker_types.full_status )
       RPC_service.t
   end
 end
@@ -147,7 +146,7 @@ module Chain_validators : sig
   val state :
     #simple ->
     Chain_services.chain ->
-    (Request.view, Event.t) Worker_types.full_status tzresult Lwt.t
+    Request.view Worker_types.full_status tzresult Lwt.t
 
   val ddb_state :
     #simple -> Chain_services.chain -> Distributed_db_state.view tzresult Lwt.t
@@ -172,7 +171,7 @@ module Chain_validators : sig
         unit * Chain_services.chain,
         unit,
         unit,
-        (Request.view, Event.t) Worker_types.full_status )
+        Request.view Worker_types.full_status )
       RPC_service.t
 
     val ddb_state :

@@ -11,7 +11,8 @@ def sandbox() -> Iterator[Sandbox]:
         sandbox.add_node(0, params=constants.NODE_PARAMS)
         utils.activate_alpha(sandbox.client(0))
         sandbox.add_node(1, params=constants.NODE_PARAMS)
-        sandbox.add_baker(0, 'bootstrap5', proto=constants.ALPHA_DAEMON)
+        # Empty list makes everyone bake
+        sandbox.add_baker(0, [], proto=constants.ALPHA_DAEMON)
         yield sandbox
         assert sandbox.are_daemons_alive()
 

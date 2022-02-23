@@ -18,6 +18,9 @@
    v0/data_encoding.ml
    v1/bls12_381.ml
    v1/error_monad_preallocated_values.ml
+   v1/hex.ml
+   v0/error_monad_trace_eval.ml
+   v0/error_monad_classification.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}

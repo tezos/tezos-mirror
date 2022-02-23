@@ -1,0 +1,14 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/cons.tz]
+
+Well typed
+Gas remaining: 1039996.280 units remaining
+{ parameter int ;
+  storage (list int) ;
+  code { UNPAIR
+         /* [ @parameter int : @storage list int ] */ ;
+         CONS
+         /* [ list int ] */ ;
+         NIL operation
+         /* [ list operation : list int ] */ ;
+         PAIR
+         /* [ pair (list operation) (list int) ] */ } }

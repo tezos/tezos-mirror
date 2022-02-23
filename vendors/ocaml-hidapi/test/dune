@@ -1,0 +1,11 @@
+(executable
+ (name enumerate)
+ (public_name ocaml-hid-enumerate)
+ (libraries hidapi))
+
+(alias
+ (name runtest-hidapi)
+ (deps
+  (:< enumerate.exe))
+ (action
+  (run %{<})))

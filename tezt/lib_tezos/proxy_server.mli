@@ -26,6 +26,16 @@
 (** A proxy server instance *)
 type t
 
+(** Command-line arguments of [tezos-proxy-server].
+
+    Not all arguments are available here, because it was not needed so far. *)
+type argument =
+  | Symbolic_block_caching_time of int
+      (** Time interval (in seconds) during which data for a symbolic block
+          identifier (like HEAD) is kept. A symbolic identifier
+          is a block identifier that it not a hash and which hence
+          cannot be safely used as a key in any form of cache. *)
+
 (** Get the RPC port of a proxy server. It's the port to
     do request to. *)
 val rpc_port : t -> int
@@ -35,17 +45,20 @@ val rpc_port : t -> int
     Return [None] if the proxy server runs on the local machine. *)
 val runner : t -> Runner.t option
 
-(** [init ?runner ?name ?rpc_port node] creates and starts a proxy server
+(** [init ?runner ?name ?rpc_port ?event_level ?args node] creates and starts a proxy server
     that serves the given port and delegates its queries to [node].
 
     [event_level] specifies the verbosity of the file descriptor sink.
-    Possible values are: ["debug"], ["info"], ["notice"], ["warning"], ["error"],
-    and ["fatal"]. *)
+
+    [event_sections_levels] specifies the verbosity for events in sections whose
+    prefix is in the list. See {!Node.run} for description. *)
 val init :
   ?runner:Runner.t ->
   ?name:string ->
   ?rpc_port:int ->
-  ?event_level:string ->
+  ?event_level:Daemon.Level.default_level ->
+  ?event_sections_levels:(string * Daemon.Level.level) list ->
+  ?args:argument list ->
   Node.t ->
   t Lwt.t
 

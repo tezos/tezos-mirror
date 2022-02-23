@@ -1,30 +1,32 @@
-; build static executable with --profile static
 (env
- (static (flags (:standard
-                  -ccopt -static
-                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
-(executables
- (names main_signer)
- (instrumentation (backend bisect_ppx))
- (public_names tezos-signer)
+ (static
+  (flags (:standard -ccopt -static))))
+
+(executable
+ (name main_signer)
+ (public_name tezos-signer)
  (package tezos-signer)
- (libraries tezos-base
-            tezos-base.unix
-            tezos-client-base
-            tezos-client-base-unix
-            tezos-client-commands
-            tezos-signer-services
-            tezos-rpc-http-server
-            tezos-rpc-http-client-unix
-            tezos-stdlib-unix
-            tezos-signer-backends.unix)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_client_base
-                   -open Tezos_client_base_unix
-                   -open Tezos_client_commands
-                   -open Tezos_signer_services
-                   -open Tezos_rpc_http
-                   -open Tezos_rpc_http_server
-                   -open Tezos_rpc_http_client_unix
-                   -open Tezos_stdlib_unix
-                   -open Tezos_stdlib)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-base.unix
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-client-commands
+  tezos-signer-services
+  tezos-rpc-http-server
+  tezos-rpc-http-client-unix
+  tezos-stdlib-unix
+  tezos-signer-backends.unix)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_client_base
+   -open Tezos_client_base_unix
+   -open Tezos_client_commands
+   -open Tezos_signer_services
+   -open Tezos_rpc_http
+   -open Tezos_rpc_http_server
+   -open Tezos_rpc_http_client_unix
+   -open Tezos_stdlib_unix
+   -open Tezos_stdlib)))

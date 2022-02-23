@@ -34,7 +34,7 @@ module Request = struct
         -> unit t
     | Notify : P2p_peer.Id.t * Mempool.t -> unit t
     | Leftover : unit t
-    | Inject : Operation.t -> unit t
+    | Inject : {op : Operation.t; force : bool} -> unit t
     | Arrived : Operation_hash.t * Operation.t -> unit t
     | Advertise : unit t
     | Ban : Operation_hash.t -> unit t
@@ -75,11 +75,13 @@ module Request = struct
         case
           (Tag 2)
           ~title:"Inject"
-          (obj2
+          (obj3
              (req "request" (constant "inject"))
-             (req "operation" Operation.encoding))
-          (function View (Inject op) -> Some ((), op) | _ -> None)
-          (fun ((), op) -> View (Inject op));
+             (req "operation" Operation.encoding)
+             (req "force" bool))
+          (function
+            | View (Inject {op; force}) -> Some ((), op, force) | _ -> None)
+          (fun ((), op, force) -> View (Inject {op; force}));
         case
           (Tag 3)
           ~title:"Arrived"
@@ -130,12 +132,13 @@ module Request = struct
           (Operation_hash.Set.elements pending) ;
         Format.fprintf ppf "@]"
     | Leftover -> Format.fprintf ppf "process next batch of operation"
-    | Inject op ->
+    | Inject {op; force} ->
         Format.fprintf
           ppf
-          "injecting operation %a"
+          "injecting operation %a (force:%b)"
           Operation_hash.pp
           (Operation.hash op)
+          force
     | Arrived (oph, _) ->
         Format.fprintf ppf "operation %a arrived" Operation_hash.pp oph
     | Advertise -> Format.fprintf ppf "advertising pending operations"

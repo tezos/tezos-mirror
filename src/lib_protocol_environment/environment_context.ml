@@ -26,7 +26,8 @@
 open Error_monad
 
 let err_implementation_mismatch ~expected ~got =
-  Fmt.invalid_arg
+  Format.kasprintf
+    invalid_arg
     "Context implementation mismatch: expecting %s, got %s"
     expected
     got
@@ -175,8 +176,8 @@ module Context = struct
   let fold ?depth
       (Context
         {ops = (module Ops) as ops; ctxt; equality_witness; impl_name; _}) key
-      ~init ~f =
-    Ops.fold ?depth ctxt key ~init ~f:(fun k v acc ->
+      ~order ~init ~f =
+    Ops.fold ?depth ctxt key ~order ~init ~f:(fun k v acc ->
         let v = Tree {ops; tree = v; equality_witness; impl_name} in
         f k v acc)
 
@@ -246,8 +247,8 @@ module Context = struct
     let fold ?depth
         (Tree
           {ops = (module Ops) as ops; tree = t; equality_witness; impl_name})
-        key ~init ~f =
-      Ops.Tree.fold ?depth t key ~init ~f:(fun k v acc ->
+        key ~order ~init ~f =
+      Ops.Tree.fold ?depth t key ~order ~init ~f:(fun k v acc ->
           let v = Tree {ops; tree = v; equality_witness; impl_name} in
           f k v acc)
 
@@ -260,7 +261,7 @@ module Context = struct
   type block_cache = {context_hash : Context_hash.t; cache : cache}
 
   type source_of_cache =
-    [`Load | `Lazy | `Inherited of block_cache * Context_hash.t]
+    [`Force_load | `Load | `Lazy | `Inherited of block_cache * Context_hash.t]
 
   type builder = Environment_cache.key -> cache_value tzresult Lwt.t
 
@@ -283,7 +284,7 @@ module Context = struct
       let start_loading_cache =
         declare_0
           ~section
-          ~level:Notice
+          ~level:Info
           ~name:"start_loading_cache"
           ~msg:"start loading cache now"
           ()
@@ -291,7 +292,7 @@ module Context = struct
       let stop_loading_cache =
         declare_0
           ~section
-          ~level:Notice
+          ~level:Info
           ~name:"stop_loading_cache"
           ~msg:"stop loading cache now"
           ()
@@ -501,7 +502,7 @@ module Context = struct
   end
 
   let load_cache (Context ctxt) mode builder =
-    (match mode with
+    match mode with
     | `Inherited ({context_hash; cache}, predecessor_context_hash) ->
         if Context_hash.equal context_hash predecessor_context_hash then
           (*
@@ -525,8 +526,49 @@ module Context = struct
     | (`Load | `Lazy) as mode ->
         Cache.get_cache_layout (Context ctxt) >>= fun layout ->
         let cache = Environment_cache.from_layout layout in
-        Cache.load_cache (Context ctxt) cache mode builder)
-    >>=? fun cache -> return (Context {ctxt with cache})
+        Cache.load_cache (Context ctxt) cache mode builder
+
+  (**
+
+     The following reference contains a cache for the cache to avoid
+     reloading the cache from the context when it has been used in the
+     last cache-related operations.
+
+     The cache is indexed by the block hash that has produced it.
+
+     Notice that there is no guarantee that, after the execution of
+     [load_cache b], [cache_cache] contains the cache of the block
+     [b]. Indeed, a concurrent evaluation of [load_cache] may assign
+     [cache_cache] before we reach the [return] instruction. This
+     cannot endanger safety since the assignment to [cache_cache] is
+     atomic and maintains the invariant that the pair [(block_hash,
+     cache)] is consistent.
+
+  *)
+  let cache_cache : (Block_hash.t * cache) option ref = ref None
+
+  let load_cache block_hash (Context ctxt) mode builder =
+    match mode with
+    | `Force_load ->
+        cache_cache := None ;
+        load_cache (Context ctxt) `Load builder >>=? fun cache ->
+        cache_cache := Some (block_hash, cache) ;
+        return (Context {ctxt with cache})
+    | (`Load | `Lazy | `Inherited _) as mode ->
+        (match !cache_cache with
+        | Some (block_hash', cached_cache)
+          when Block_hash.equal block_hash block_hash' ->
+            return cached_cache
+        | _ ->
+            cache_cache := None ;
+            load_cache (Context ctxt) mode builder >>=? fun cache ->
+            cache_cache := Some (block_hash, cache) ;
+            return cache)
+        >>=? fun cache -> return (Context {ctxt with cache})
+
+  let reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing
+      () =
+    cache_cache := None
 
   (* misc *)
 

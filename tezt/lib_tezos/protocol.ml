@@ -25,18 +25,22 @@
 (*****************************************************************************)
 
 (* Declaration order must respect the version order. *)
-type t = Granada | Alpha
+type t = Hangzhou | Ithaca | Alpha
 
 type constants = Constants_sandbox | Constants_mainnet | Constants_test
 
-let name = function Alpha -> "Alpha" | Granada -> "Granada"
+let name = function
+  | Alpha -> "Alpha"
+  | Hangzhou -> "Hangzhou"
+  | Ithaca -> "Ithaca"
 
 (* Test tags must be lowercase. *)
 let tag protocol = String.lowercase_ascii (name protocol)
 
 let hash = function
   | Alpha -> "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK"
-  | Granada -> "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV"
+  | Hangzhou -> "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+  | Ithaca -> "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A"
 
 let default_constants = Constants_sandbox
 
@@ -50,11 +54,15 @@ let parameter_file ?(constants = default_constants) protocol =
   let directory =
     match protocol with
     | Alpha -> "proto_alpha"
-    | Granada -> "proto_010_PtGRANAD"
+    | Hangzhou -> "proto_011_PtHangz2"
+    | Ithaca -> "proto_012_Psithaca"
   in
   sf "src/%s/parameters/%s-parameters.json" directory name
 
-let daemon_name = function Alpha -> "alpha" | Granada -> "010-PtGRANAD"
+let daemon_name = function
+  | Alpha -> "alpha"
+  | Hangzhou -> "011-PtHangz2"
+  | Ithaca -> "012-Psithaca"
 
 let accuser proto = "./tezos-accuser-" ^ daemon_name proto
 
@@ -64,12 +72,22 @@ let encoding_prefix = daemon_name
 
 type parameter_overrides = (string list * string option) list
 
-let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
- fun ~protocol parameter_overrides ->
+let write_parameter_file :
+    ?additional_bootstrap_accounts:(Account.key * int option) list ->
+    base:(string, t * constants option) Either.t ->
+    parameter_overrides ->
+    string Lwt.t =
+ fun ?(additional_bootstrap_accounts = []) ~base parameter_overrides ->
   (* make a copy of the parameters file and update the given constants *)
   let overriden_parameters = Temp.file "parameters.json" in
   let original_parameters =
-    JSON.parse_file @@ parameter_file protocol |> JSON.unannotate
+    let file =
+      Either.fold
+        ~left:Fun.id
+        ~right:(fun (x, constants) -> parameter_file ?constants x)
+        base
+    in
+    JSON.parse_file file |> JSON.unannotate
   in
   let parameters =
     List.fold_left
@@ -79,19 +97,48 @@ let write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t =
       original_parameters
       parameter_overrides
   in
+  let parameters =
+    let bootstrap_accounts = ["bootstrap_accounts"] in
+    let existing_accounts =
+      Ezjsonm.get_list Fun.id (Ezjsonm.find parameters bootstrap_accounts)
+    in
+    let additional_bootstrap_accounts =
+      List.map
+        (fun ((account : Account.key), default_balance) ->
+          `A
+            [
+              `String account.public_key_hash;
+              `String
+                (string_of_int
+                   (Option.fold
+                      ~none:4000000000000
+                      ~some:Fun.id
+                      default_balance));
+            ])
+        additional_bootstrap_accounts
+    in
+    Ezjsonm.update
+      parameters
+      bootstrap_accounts
+      (Some (`A (existing_accounts @ additional_bootstrap_accounts)))
+  in
   let* overriden_parameters_out =
     Lwt_io.open_file ~mode:Output overriden_parameters
   in
   let* () = Lwt_io.write overriden_parameters_out @@ JSON.encode_u parameters in
   Lwt.return overriden_parameters
 
-let next_protocol = function Granada -> Some Alpha | Alpha -> None
+let next_protocol = function
+  | Hangzhou -> Some Ithaca
+  | Ithaca -> None
+  | Alpha -> None
 
-let previous_protocol = function Alpha -> Some Granada | Granada -> None
+let previous_protocol = function
+  | Alpha -> Some Hangzhou
+  | Ithaca -> Some Hangzhou
+  | Hangzhou -> None
 
-let all = [Alpha; Granada]
-
-let current_mainnet = Granada
+let all = [Alpha; Hangzhou; Ithaca]
 
 (* Used to ensure that [register_test] and [register_regression_test]
    share the same conventions. *)

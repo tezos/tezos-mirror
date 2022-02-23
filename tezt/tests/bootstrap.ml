@@ -98,13 +98,18 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
      before we kill [node_2]. *)
   let bakes_before_kill = 9 in
 
+  let max_operations_ttl = 1 in
+
+  (* TODO-TB: update the doc strings below, written for
+     max_operations_ttl = 0. *)
+
   (* Number of calls to [tezos-client bake for] while [node_2] is not
      running. This number is high enough so that it is bigger than the
      Last-Allowed-Fork-Level or the caboose.
 
-     Since the caboose depends on [max_op_ttl] which is set to [120]
+     Since the caboose depends on [max_op_ttl] which is set to [0]
      with the consensus algorithm Emmy* we bake [1 + bakes_before_kill
-     + bakes_during_kill = 153] blocks.
+     + bakes_during_kill = 49] blocks.
 
      The rationale behind this number is the following:
 
@@ -112,18 +117,21 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
      in this case is the same as the [last allowed fork level] since
      no target is not set on the command-line) and [caboose]. The
      [checkpoint] is the block level (often we refer it as the level
-     directly) for which there is not reorganisation below this
-     point. The [caboose] is the lowest level for which the store
-     knows the [block_header] associated. These values are updated by
-     the shell using information from the economic protocol when a new
-     cycle starts.
+     directly) for which there is not reorganisation below this point.
+     The [caboose] is the lowest level for which the store knows the
+     [block_header] associated. These values are updated by the shell
+     using information from the economic protocol when a new cycle
+     starts.
 
-     - When the checkpoint is set, its level is [preserved_cycles *
-     blocks_per_cycle] behind the current level of the head
+     - When the checkpoint is set, its level is [preserved_blocks =
+     preserved_cycles * blocks_per_cycle] behind the current level of
+     the head
 
-     - When the [caboose] is set, its level is [max(0, checkpoint -
-     max_op_ttl)]. In [Full] and [Archive] mode, the [caboose] value
-     is always [0].
+     - When the [caboose] is set, its level is [max(0, (checkpoint -
+     max(preserved_blocks,max_op_ttl)))]. In [Full] and [Archive]
+     mode, the [caboose] value is always [0]. For this test, we ensure
+     that [preserved_blocks] and [max_op_ttl] are also [0] to save
+     some computational time.
 
      These values are set when the head changes with level [level = 1
      mod blocks_per_cycle] (the modulo 1 comes from the activation
@@ -132,10 +140,11 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
      In sandbox mode, we have [preserved_cycles = 2] and
      [blocks_per_cycle = 8].
 
-     Hence, when [node_1] has baked [153] blocks, the checkpoint
-     should be at level [153 - 16 = 137] and the [caboose] in rolling
-     history mode should be at level [137 - 120 = 17] (and [0] for the
-     other history modes).
+     Hence, when [node_1] has baked [49] blocks, the checkpoint should
+     be at level [49 - 16 = 33] and the [caboose] in rolling history
+     mode should be at level [33 - 0 = 33] (and [0] for the other
+     history modes). The [0] comes from as explained above that
+     [max_op_ttl] and [preserved_blocks] are both set to [0].
 
      When the [node_1] is in rolling mode, we want to ensure that it
      can't synchronise with [node_2]. Consequently, we want to ensure
@@ -147,13 +156,14 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
      for which it prevents the synchronisation with [node_2].
 
      Consequently, to have a [caboose] at level [17] we need a
-     checkpoint at level [137] and so the head should be, at least, at
-     level [153].
+     checkpoint at level [17] and so the head should be, at least, at
+     level [33].
 
      However, the [caboose] is set asynchronously and checking the
      level of the node is not enough. We have to ensure that the
      [caboose] was set too. This should be done when the [store]
-     finishes its merge.
+     finishes its merge. This is why we bake [2] more cycles and that
+     finally the number of baked blocks is [49].
 
      To ensure that, we need first to catch an event which says which
      cycle (up to which block) is being merged and then wait for the
@@ -166,16 +176,17 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
 
   (* FIXME https://gitlab.com/tezos/tezos/-/issues/1337
 
-     To avoid this particular case, we add 16 blocks.
-  *)
-  let bakes_during_kill = 143 + 16 in
+     This bug may create flakyness. We avoid it by baking [16] more
+     blocks. *)
+  let bakes_during_kill = 7 + 16 in
   let last_cycle_being_merged = ref false in
   let on_starting_merge_event node =
     Node.on_event node @@ fun Node.{name; value} ->
-    if name = "start_merging_stores.v0" then
+    if name = "start_merging_stores.v0" then (
       let level = JSON.(value |> as_int) in
-      if level = bakes_during_kill + 1 + bakes_before_kill - (2 * 8) then
-        last_cycle_being_merged := true
+      Log.info "COUCOU: %d" level ;
+      if level = bakes_during_kill + 1 + bakes_before_kill - 16 then
+        last_cycle_being_merged := true)
   in
   let wait_for_end_merge_event node last_cycle_being_merged =
     Node.wait_for node "end_merging_stores.v0" @@ fun _json ->
@@ -206,7 +217,15 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   let* client = Client.init ~endpoint:endpoint_1 () in
   (* Connect node 1 to node 2 and start baking. *)
   let* () = Client.Admin.connect_address client ~peer:node_2 in
-  let* () = Client.activate_protocol ~protocol client in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, None))
+      [
+        ( ["max_operations_time_to_live"],
+          Some (string_of_int max_operations_ttl) );
+      ]
+  in
+  let* () = Client.activate_protocol ~protocol client ~parameter_file in
   Log.info "Activated protocol." ;
   let* () = repeat bakes_before_kill (fun () -> Client.bake_for client) in
   let* _ = Node.wait_for_level node_1 (bakes_before_kill + 1)
@@ -222,32 +241,34 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
   (* Restart node 2 and let it catch up. *)
   Log.info "Baked %d times with node_2 down, restart node_2." bakes_during_kill ;
   let final_level = 1 + bakes_before_kill + bakes_during_kill in
-  let* _ = Node.wait_for_level node_1 final_level
-  and* () = wait_for_last_cycle in
+  let* _ = Node.wait_for_level node_1 final_level in
+  let* () = wait_for_last_cycle in
   let* () = Node.run node_2 [Synchronisation_threshold 1; Connections 1] in
   let* _ = Node.wait_for_ready node_2 in
   (* Register the unknown ancestor event before connecting node 2 to node 1
      to ensure that we don't miss it because of a race condition. *)
   let node_2_catched_up =
-    if hmode1 <> Rolling then
-      let* _ = Node.wait_for_level node_2 final_level in
-      unit
-    else
-      (* In rolling mode, node 2 cannot catch up. We get an unknown ancestor event instead. *)
-      Lwt.pick
-        [
-          (let* _ = Node.wait_for_level node_2 (bakes_before_kill + 2) in
-           Test.fail
-             "node_2 is not supposed to progress when node_1 is in rolling mode");
-          wait_for_unknown_ancestor node_2;
-        ]
+    match hmode1 with
+    | Full _ | Archive ->
+        let* _ = Node.wait_for_level node_2 final_level in
+        unit
+    | Rolling _ ->
+        (* In rolling mode, node 2 cannot catch up. We get an unknown ancestor event instead. *)
+        Lwt.pick
+          [
+            (let* _ = Node.wait_for_level node_2 (bakes_before_kill + 2) in
+             Test.fail
+               "node_2 is not supposed to progress when node_1 is in rolling \
+                mode");
+            wait_for_unknown_ancestor node_2;
+          ]
   in
   let* () = Client.Admin.connect_address client ~peer:node_2 in
   let* () = node_2_catched_up in
   (* Node 2 has caught up, check its checkpoint level depending on history mode. *)
   let* () =
     match hmode1 with
-    | Full ->
+    | Full _ ->
         let* savepoint = get_savepoint ~endpoint:endpoint_1 client in
         if savepoint <= bakes_before_kill then
           Test.fail
@@ -255,7 +276,7 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
             savepoint
             bakes_before_kill ;
         return ()
-    | Rolling ->
+    | Rolling _ ->
         let* caboose = get_caboose ~endpoint:endpoint_1 client in
         if caboose <= bakes_before_kill then
           Test.fail
@@ -266,12 +287,13 @@ let check_bootstrap_with_history_modes hmode1 hmode2 =
     | _ -> return ()
   in
   (* Check whether the nodes are still connected. *)
-  if hmode1 <> Rolling then
-    let* b = is_connected client ~peer_id:node2_identity in
-    if not b then Test.fail "expected the two nodes to be connected" else unit
-  else
-    let* b = is_connected client ~peer_id:node2_identity in
-    if b then Test.fail "expected the two nodes NOT to be connected" else unit
+  match hmode1 with
+  | Full _ | Archive ->
+      let* b = is_connected client ~peer_id:node2_identity in
+      if not b then Test.fail "expected the two nodes to be connected" else unit
+  | Rolling _ ->
+      let* b = is_connected client ~peer_id:node2_identity in
+      if b then Test.fail "expected the two nodes NOT to be connected" else unit
 
 let check_rpc_force_bootstrapped () =
   Test.register
@@ -291,14 +313,22 @@ let check_rpc_force_bootstrapped () =
   unit
 
 let register ~protocols =
-  check_bootstrap_with_history_modes Archive Archive ~protocols ;
-  check_bootstrap_with_history_modes Archive Full ~protocols ;
-  check_bootstrap_with_history_modes Archive Rolling ~protocols ;
-  check_bootstrap_with_history_modes Full Archive ~protocols ;
-  check_bootstrap_with_history_modes Full Full ~protocols ;
-  check_bootstrap_with_history_modes Full Rolling ~protocols ;
-  check_bootstrap_with_history_modes Rolling Archive ~protocols ;
-  check_bootstrap_with_history_modes Rolling Rolling ~protocols ;
-  check_bootstrap_with_history_modes Rolling Full ~protocols
+  let archive = Node.Archive in
+  let full = Node.Full None in
+  let rolling = Node.Rolling None in
+  (* This parameter is used in the special case we run two rolling
+     nodes. To ensure two nodes cannot reconnect, we need to bake some
+     blocks. Putting the number `0` in parameters allows to
+     save 16 blocks. *)
+  let rolling_0 = Node.Rolling (Some 0) in
+  check_bootstrap_with_history_modes archive archive ~protocols ;
+  check_bootstrap_with_history_modes archive full ~protocols ;
+  check_bootstrap_with_history_modes archive rolling ~protocols ;
+  check_bootstrap_with_history_modes full archive ~protocols ;
+  check_bootstrap_with_history_modes full full ~protocols ;
+  check_bootstrap_with_history_modes full rolling ~protocols ;
+  check_bootstrap_with_history_modes rolling_0 Archive ~protocols ;
+  check_bootstrap_with_history_modes rolling_0 rolling_0 ~protocols ;
+  check_bootstrap_with_history_modes rolling_0 full ~protocols
 
 let register_protocol_independent () = check_rpc_force_bootstrapped ()

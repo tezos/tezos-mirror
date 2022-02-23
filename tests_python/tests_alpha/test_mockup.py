@@ -443,6 +443,32 @@ def _get_state_using_config_show_mockup(
     return _parse_config_init_output(stdout)
 
 
+def write_file(filename, contents):
+    filename.write(contents)
+    filename.flush()
+
+
+def _gen_assert_msg(flag, sent, received):
+    return (
+        f"Json sent with --{flag} differs from json received"
+        f"\nJson sent is:\n{sent}"
+        f"\nwhile json received is:\n{received}"
+    )
+
+
+def rm_amounts(bootstrap_accounts):
+    for account in bootstrap_accounts:
+        account.pop('amount', None)
+
+
+def compute_expected_amounts(
+    bootstrap_accounts, frozen_deposits_percentage: int
+) -> None:
+    pct = 100 - frozen_deposits_percentage
+    for account in bootstrap_accounts:
+        account['amount'] = str(int(pct * int(account['amount']) / 100))
+
+
 def _test_create_mockup_init_show_roundtrip(
     sandbox: Sandbox,
     read_initial_state,
@@ -468,6 +494,7 @@ def _test_create_mockup_init_show_roundtrip(
 
     ba_file = None
     pc_file = None
+
     try:
         if protocol_constants_json is not None:
             pc_file = tempfile.mktemp(prefix='tezos-proto-consts')
@@ -498,7 +525,7 @@ def _test_create_mockup_init_show_roundtrip(
         if ba_file is not None:
             os.remove(ba_file)
 
-    # 2/ Check the json obtained is valid by building json objects
+    # 2a/ Check the json obtained is valid by building json objects
     ba_sent = _try_json_loads(_BA_FLAG, ba_str)
     pc_sent = _try_json_loads(_PC_FLAG, pc_str)
 
@@ -508,7 +535,12 @@ def _test_create_mockup_init_show_roundtrip(
     # https://gitlab.com/tezos/tezos/-/issues/938
     if bootstrap_json:
         ba_input = json.loads(bootstrap_json)
+        # adjust amount field on Tenderbake w.r.t. to frozen_deposits_percentage
+        compute_expected_amounts(
+            ba_input, int(pc_sent['frozen_deposits_percentage'])
+        )
         assert ba_sent == ba_input
+
     if protocol_constants_json:
         pc_input = json.loads(protocol_constants_json)
         assert pc_sent == pc_input
@@ -527,10 +559,8 @@ def _test_create_mockup_init_show_roundtrip(
         prefix='tezos-client.'
     ) as base_dir:
 
-        ba_json_file.write(ba_str)
-        ba_json_file.flush()
-        pc_json_file.write(pc_str)
-        pc_json_file.flush()
+        write_file(ba_json_file, ba_str)
+        write_file(pc_json_file, pc_str)
 
         with tempfile.TemporaryDirectory(prefix='tezos-client.') as base_dir:
             # Follow pattern of mockup_client fixture:
@@ -551,14 +581,14 @@ def _test_create_mockup_init_show_roundtrip(
     ba_received = _try_json_loads(_BA_FLAG, ba_received_str)
     pc_received = _try_json_loads(_PC_FLAG, pc_received_str)
 
-    def _gen_assert_msg(flag, sent, received):
-        result = f"Json sent with --{flag} differs from"
-        result += " json received"
-        result += f"\nJson sent is:\n{sent}"
-        result += f"\nwhile json received is:\n{received}"
-
     # and finally check that json objects received are the same
     # as the ones that were given as input
+
+    # adjust amount field on Tenderbake w.r.t. to frozen_deposits_percentage
+    compute_expected_amounts(
+        ba_sent, int(pc_sent['frozen_deposits_percentage'])
+    )
+
     assert ba_sent == ba_received, _gen_assert_msg(
         _BA_FLAG, ba_sent, ba_received
     )
@@ -579,34 +609,50 @@ def _test_create_mockup_init_show_roundtrip(
             {
                 "initial_timestamp": "2021-02-03T12:34:56Z",
                 "chain_id": "NetXaFDF7xZQCpR",
-                "delay_per_missing_endorsement": "2",
-                "initial_endorsers": 2,
                 "min_proposal_quorum": 501,
                 "quorum_max": 7001,
                 "quorum_min": 2001,
                 "hard_storage_limit_per_operation": "60001",
                 "cost_per_byte": "251",
-                "endorsement_reward": ["1250001", "833334"],
-                "baking_reward_per_endorsement": ["1250001", "187501"],
-                "endorsement_security_deposit": "64000001",
-                "block_security_deposit": "512000001",
+                "baking_reward_fixed_portion": "20000000",
+                "baking_reward_bonus_per_slot": "2500",
+                "endorsing_reward_per_slot": "2857",
                 "origination_size": 258,
                 "seed_nonce_revelation_tip": "125001",
                 "tokens_per_roll": "8000000001",
                 "proof_of_work_threshold": "-2",
                 "hard_gas_limit_per_block": "10400001",
                 "hard_gas_limit_per_operation": "1040001",
-                "endorsers_per_block": 33,
-                "time_between_blocks": ["2", "1"],
+                'consensus_committee_size': 12,
+                # DO NOT EDIT the value consensus_threshold this is actually a
+                # constant, not a parameter
+                'consensus_threshold': 0,
+                'initial_seed': None,
+                'minimal_participation_ratio': {
+                    'denominator': 5,
+                    'numerator': 1,
+                },
+                'minimal_block_delay': '1',
+                'delay_increment_per_round': '1',
+                'max_slashing_period': 12,
                 "blocks_per_voting_period": 65,
-                "blocks_per_roll_snapshot": 5,
+                "blocks_per_stake_snapshot": 5,
                 "blocks_per_commitment": 5,
                 "blocks_per_cycle": 9,
                 "preserved_cycles": 3,
-                "minimal_block_delay": "1",
                 "liquidity_baking_escape_ema_threshold": 1000000,
                 "liquidity_baking_subsidy": "2500000",
                 "liquidity_baking_sunset_level": 1024,
+                "max_operations_time_to_live": 120,
+                "frozen_deposits_percentage": 10,
+                'ratio_of_frozen_deposits_slashed_per_double_endorsement': {
+                    'numerator': 1,
+                    'denominator': 2,
+                },
+                "double_baking_punishment": "640000001",
+                "tx_rollup_enable": False,
+                # TODO: https://gitlab.com/tezos/tezos/-/issues/2152
+                "tx_rollup_origination_size": 60_000,
             }
         ),
     ],
@@ -634,7 +680,6 @@ def test_create_mockup_config_show_init_roundtrip(
     3/ Recreate a mockup using the output gathered in 2/ and call
        `read_final_state` to check that output
        received is similar to output seen in 2.
-
     This is a roundtrip test using a matrix.
     """
     _test_create_mockup_init_show_roundtrip(
@@ -656,7 +701,7 @@ def test_transfer_rpc(mockup_client: Client):
     def get_balance(tz1):
         res = mockup_client.rpc(
             'get',
-            f'chains/main/blocks/head/' f'context/contracts/{tz1}/balance',
+            f'chains/main/blocks/head/context/contracts/{tz1}/balance',
         )
         return float(res)
 

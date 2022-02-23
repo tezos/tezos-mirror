@@ -1,5 +1,7 @@
-(executables
-  (names main)
-  (libraries tezos-base
-             tezos-base.unix
-             flextesa))
+(executable
+ (name main)
+ (libraries
+  tezos-base
+  tezos-base.unix
+  fmt
+  flextesa))

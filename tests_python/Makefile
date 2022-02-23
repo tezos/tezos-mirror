@@ -4,7 +4,18 @@ TYPECHECK=poetry run mypy
 # It is configured by ./.pylint.rc
 # In pylint, we ignore the following additional errors:
 # - C0330: pylint is wrong (https://github.com/psf/black/issues/48)
-PYLINT=poetry run pylint --disable C0330
+# The warnings below are disabled due to the large number of files that would be affected.
+# - unspecified-encoding (W1514)
+# - consider-using-with (R1732)
+# - consider-using-dict-items (C0206)
+# - consider-using-f-string (C0209)
+PYLINTRC?=../.pylintrc
+PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint \
+			 --disable C0330 \
+			 --disable W1514 \
+			 --disable R1732 \
+			 --disable C0206 \
+			 --disable C0209
 
 # pycodestyle does not support pyproject.toml configuration for now
 # https://github.com/PyCQA/pydocstyle/issues/447
@@ -24,7 +35,7 @@ PYCODESTYLE_OPTIONS=\
 # black is configured in pyproject.toml
 BLACK=poetry run black
 
-SRCS?=process daemons launchers client tools scripts tests_*  examples codec conftest.py
+SRCS?=pytest_plugins process daemons launchers client tools scripts tests_*  examples codec conftest.py
 
 LOG_DIR=tmp
 
@@ -41,6 +52,10 @@ all:
 alpha:
 	mkdir -p $(LOG_DIR)
 	poetry run pytest --log-dir=tmp --tb=no tests_alpha
+
+tenderbake:
+	mkdir -p $(LOG_DIR)
+	poetry run pytest --log-dir=tmp --tb=no -m tenderbake
 
 lint: pylint pycodestyle lint_black
 

@@ -1,0 +1,17 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/shifts.tz]
+
+Well typed
+Gas remaining: 1039993.299 units remaining
+{ parameter (or (pair nat nat) (pair nat nat)) ;
+  storage (option nat) ;
+  code { CAR
+         /* [ @parameter or (pair nat nat) (pair nat nat) ] */ ;
+         IF_LEFT
+           { UNPAIR /* [ nat : nat ] */ ; LSL /* [ nat ] */ }
+           { UNPAIR /* [ nat : nat ] */ ; LSR /* [ nat ] */ } ;
+         SOME
+         /* [ option nat ] */ ;
+         NIL operation
+         /* [ list operation : option nat ] */ ;
+         PAIR
+         /* [ pair (list operation) (option nat) ] */ } }

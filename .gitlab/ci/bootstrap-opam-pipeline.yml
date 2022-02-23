@@ -2,10 +2,9 @@ opam:create_pipeline:
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__trigger_opam_child_pipeline
+    - .rules_template__trigger_opam_pipeline
   stage: bootstrap
   script:
-    - . ./scripts/detect-opam-changes.sh
     - ./scripts/generate_opam_pipeline.sh
     - cat opam-ci.yml
   artifacts:
@@ -14,7 +13,7 @@ opam:create_pipeline:
 
 opam:trigger:
   extends:
-    - .rules_template__trigger_opam_child_pipeline
+    - .rules_template__trigger_opam_pipeline
   stage: packaging
   needs:
     - "opam:create_pipeline"

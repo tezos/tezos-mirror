@@ -53,7 +53,7 @@ let mk_sources_config ~min_agreement ~uris =
           "min_agreement value must be within 0 (exclusive) and 1 (inclusive) \
            but you provided %f"
           min_agreement)
-  else if List.length uris < 2 then
+  else if Compare.List_length_with.(uris < 2) then
     Error
       Format.(
         asprintf

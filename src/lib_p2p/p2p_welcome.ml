@@ -87,7 +87,7 @@ type t = {
 
 let rec worker_loop st =
   let (Connect_handler connect_handler) = st.connect_handler in
-  Lwt_unix.yield () >>= fun () ->
+  Lwt.pause () >>= fun () ->
   protect ~canceler:st.canceler (fun () -> P2p_fd.accept st.socket >>= return)
   >>= function
   | Ok (fd, addr) ->

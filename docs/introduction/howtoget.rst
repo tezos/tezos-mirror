@@ -1,4 +1,4 @@
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 .. _howtoget:
 
@@ -33,7 +33,7 @@ There are several options for getting the binaries, depending on how you plan to
 
 These different options are described in the following sections.
 
-Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current developement version (see :doc:`../releases/releases` for more information).
+Note that some of the packaged distributions are not only available for the latest stable release. For instance, static binaries are also available for release candidates, and Docker images are also available for the current development version (see :doc:`../releases/releases` for more information).
 
 When choosing between the installation options, you may take into account the
 convenience of the installation step (and of upgrading steps), but also
@@ -44,7 +44,7 @@ repository is more secure than installing OPAM packages from a repository that
 is not under Tezos control. In particular, compiling from sources enforces a fixed set of dependencies; when compiling via OPAM, this set of dependencies may change, which may or may not be compatible with your security practices.
 
 All our installation scenarios are tested daily, including by automated means, to ensure that they are correct and up to date.
-These tests are performed by applying scenarios in several standard environements, from scratch.
+These tests are performed by applying scenarios in several standard environments, from scratch.
 However, if you encounter problems when performing one of the installation scenarios in your own environment, you may want to take a look at :doc:`get_troubleshooting`.
 
 .. _getting_static_binaries:
@@ -121,27 +121,27 @@ with architecture **x86_64**.  Although we only officially support
 Linux, the script has been tested with success in the past on
 Windows, OS X, and Linux.
 
-The same script can be used to run Tezos on Mainnet, on Granadanet, or on other network: it
+The same script can be used to run Tezos on Mainnet, on Hangzhounet, or on other network: it
 suffices to rename it as it downloads a different image based on its
 name.
-For example, to run Tezos on the Granadanet test network with the latest release:
+For example, to run Tezos on the Hangzhounet test network with the latest release:
 
-.. literalinclude:: use-docker-granadanet.sh
+.. literalinclude:: use-docker-hangzhounet.sh
    :language: shell
-   :start-after: [get granadanet]
-   :end-before: [start granadanet]
+   :start-after: [get testnet]
+   :end-before: [start testnet]
 
 Alternatively, to run on Mainnet::
 
    wget -O mainnet.sh https://gitlab.com/tezos/tezos/raw/latest-release/scripts/tezos-docker-manager.sh
    chmod +x mainnet.sh
 
-In the following we assume you are running on the Granadanet test network.
+In the following we assume you are running on the Hangzhounet test network.
 You are now one step away from a working node:
 
-.. literalinclude:: use-docker-granadanet.sh
+.. literalinclude:: use-docker-hangzhounet.sh
    :language: shell
-   :start-after: [start granadanet]
+   :start-after: [start testnet]
 
 This will download the right Docker image for your chosen network, launch 3
 Docker containers running the node, the baker and the endorser. Keep in mind
@@ -150,23 +150,23 @@ synchronize the chain. This can be *lengthy* on the first launch
 considering that the chain takes up several gigabytes of data. See
 :ref:`how to use Tezos<howtouse>` for more details.
 
-Every call to ``granadanet.sh`` will check for updates of the node and
+Every call to ``hangzhounet.sh`` will check for updates of the node and
 will fail if your node is not up-to-date. For updating the node, simply
 run::
 
-    ./granadanet.sh restart
+    ./hangzhounet.sh restart
 
 If you prefer to temporarily disable automatic updates, you just have to
 set an environment variable::
 
    export TEZOS_ALPHANET_DO_NOT_PULL=yes
 
-See ``./granadanet.sh --help`` for more information about the
-script. In particular see ``./granadanet.sh client --help`` or the
+See ``./hangzhounet.sh --help`` for more information about the
+script. In particular see ``./hangzhounet.sh client --help`` or the
 :ref:`online manual<client_manual>` for more information about
 the client. Every command to the ``tezos-client`` can be equivalently
-executed by using ``./granadanet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
-can be executed using ``./granadanet.sh admin-client``.
+executed by using ``./hangzhounet.sh client``, passing the needed arguments. Similarly, ``tezos-admin-client``
+can be executed using ``./hangzhounet.sh admin-client``.
 
 
 .. _building_with_opam:
@@ -176,6 +176,15 @@ Building from sources via OPAM
 
 The easiest way to build the binaries from the source code is to use the OPAM
 source package manager for OCaml.
+
+This is easier than :ref:`setting up a complete development environment <build_from_sources>`, like developers do.
+However, this method is recommended for expert users as it requires basic
+knowledge of the OPAM package manager and the OCaml packages
+workflow. In particular, upgrading Tezos from release to
+release might require tinkering with different options of the OPAM
+package manager to adjust the local environment for the new
+dependencies.
+
 
 .. _build_environment:
 
@@ -205,6 +214,8 @@ After the first install of OPAM, use ``opam init --bare`` to set it up
 while avoiding to compile an OCaml compiler now, as this will be done in
 the next step.
 
+.. _install_opam_packages:
+
 Install Tezos OPAM packages
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -229,6 +240,12 @@ of variable ``$ocaml_version`` in file ``scripts/version.sh``). To get an enviro
   :end-before: [get system dependencies]
 
 .. note::
+
+   The ``opam switch create`` command may fail if the switch already exists;
+   you are probably re-installing or upgrading an existing installation.
+   If the required compiler version has not changed since the last time, you
+   may simply ignore this error. Otherwise, you are upgrading to a new compiler,
+   so look at the :ref:`relevant section below <updating_with_opam>`.
 
    The command ``eval $(opam env)`` sets up required environment
    variables. OPAM will suggest to add it in your rc file. If, at any
@@ -258,7 +275,7 @@ Now, install all the binaries by:
   :start-after: [install tezos]
 
 You can be more specific and only ``opam install tezos-node``, ``opam
-install tezos-endorser-010-PtGRANAD``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
+install tezos-endorser-alpha``, ... In that case, it is enough to install the system dependencies of this package only by running ``opam depext tezos-node`` for example instead of ``opam depext tezos``.
 
 .. warning::
 
@@ -267,6 +284,8 @@ install tezos-endorser-010-PtGRANAD``, ... In that case, it is enough to install
    Ledger Nano devices. To enable it, run ``opam install
    ledgerwallet-tezos`` in addition to installing the binaries. (The
    macro meta-package ``tezos`` installs ``ledgerwallet-tezos``.)
+
+.. _updating_with_opam:
 
 Updating via OPAM
 ~~~~~~~~~~~~~~~~~
@@ -288,8 +307,18 @@ anymore. Beware not uninstall too much though.
 Identified situations where it will be more tricky are:
 
 * When the OCaml compiler version requirement changes. In this case,
-  be explicit about the "upgrade" and do ``opam upgrade --unlock-base
-  ocaml.$new_version tezos``.
+  you have several possibilities:
+
+  - Be explicit about the "upgrade" and do ``opam upgrade --unlock-base
+    ocaml.$new_version tezos``. Note that starting from OPAM version 2.1,
+    this option is replaced by ``--update-invariant`` (see the `opam-switch
+    manual <https://opam.ocaml.org/doc/man/opam-switch.html>`_).
+  - Remove the existing switch (e.g., ``opam switch remove for_tezos``, but
+    be aware that this will delete the previous installation), and replay
+    :ref:`the installation instructions <install_opam_packages>`.
+  - Replay :ref:`the installation instructions <install_opam_packages>` while
+    creating a different switch (e.g. ``ocaml_${ocaml_version}_for_tezos``), but
+    be aware that each switch consumes a significant amount of disk space.
 
 * When there are Rust dependencies involved. The way to go is still
   unclear.

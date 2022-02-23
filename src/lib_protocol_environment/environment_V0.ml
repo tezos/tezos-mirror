@@ -339,10 +339,17 @@ struct
   end
 
   module Error_core = struct
-    include Tezos_error_monad.Core_maker.Make (struct
-      let id = Format.asprintf "proto.%s." Param.name
-    end)
+    include
+      Tezos_error_monad.Core_maker.Make
+        (struct
+          let id = Format.asprintf "proto.%s." Param.name
+        end)
+        (Tezos_protocol_environment_structs.V0.M.Error_monad_classification)
+
+    let error_encoding = Data_encoding.dynamic_size error_encoding
   end
+
+  type error_category = Error_core.error_category
 
   type error += Ecoproto_error of Error_core.error
 
@@ -352,7 +359,10 @@ struct
     include (
       Error_core :
         sig
-          include Tezos_error_monad.Sig.CORE with type error := unwrapped
+          include
+            Tezos_error_monad.Sig.CORE
+              with type error := unwrapped
+               and type error_category = error_category
         end)
 
     let unwrap = function Ecoproto_error ecoerror -> Some ecoerror | _ -> None
@@ -365,8 +375,6 @@ struct
 
     type shell_error = Error_monad.error = ..
 
-    type error_category = [`Branch | `Temporary | `Permanent]
-
     include Error_core
     include Tezos_error_monad.TzLwtreslib.Monad
     include
@@ -375,10 +383,14 @@ struct
 
     (* below is for backward compatibility *)
     include Error_monad_traversors
-
-    let classify_errors = classify_trace
+    include Error_monad_trace_eval
 
     let ( >>|? ) = ( >|=? )
+
+    (* Shouldn't be used, only to keep the same environment interface *)
+    let classify_errors = function
+      | [] -> `Temporary
+      | error :: _ -> (find_info_of_error error).category
   end
 
   let () =
@@ -707,12 +719,12 @@ struct
       | Some sub_tree -> add_tree ctxt to_ sub_tree >>= Lwt.return_some
 
     let fold_keys s root ~init ~f =
-      Context.fold s root ~init ~f:(fun k v acc ->
+      Context.fold s root ~order:`Sorted ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with `Value -> f k acc | `Tree -> Lwt.return acc)
 
     let fold t root ~init ~f =
-      Context.fold ~depth:(`Eq 1) t root ~init ~f:(fun k v acc ->
+      Context.fold ~depth:(`Eq 1) t root ~order:`Sorted ~init ~f:(fun k v acc ->
           let k = root @ k in
           match Tree.kind v with
           | `Value -> f (`Key k) acc

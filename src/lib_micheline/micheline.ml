@@ -36,6 +36,8 @@ type ('l, 'p) node =
 
 type canonical_location = int
 
+let dummy_location = -1
+
 type 'p canonical = Canonical of (canonical_location, 'p) node
 
 let location = function
@@ -397,8 +399,14 @@ let%test_module "semantics_preservation" =
         else invalid_arg "sample_in_interval"
 
       let reasonable_width_function ~depth rng_state =
-        (* Entirely ad-hoc *)
-        sample_in_interval 0 (20 / (Bits.numbits depth + 1)) rng_state
+        match Sys.backend_type with
+        | Other _ ->
+            (* e.g. js_of_ocaml *)
+            (* chosen experimentally to avoid stack_overflow *)
+            sample_in_interval 0 (19 / (Bits.numbits depth + 1)) rng_state
+        | Native | Bytecode ->
+            (* Entirely ad-hoc *)
+            sample_in_interval 0 (20 / (Bits.numbits depth + 1)) rng_state
 
       let sample = sample reasonable_width_function
     end

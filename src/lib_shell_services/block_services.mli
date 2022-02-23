@@ -36,12 +36,24 @@ val chain_to_string : chain -> string
 
 val chain_arg : chain RPC_arg.t
 
+(** A representation of a block's position relatively to a known
+    block of a chain. *)
 type block =
-  [ `Genesis
+  [ `Genesis  (** The genesis block *)
   | `Head of int
+    (** The [n]th predecessor of the [current_head] block if [n > 0].
+      If [n = 0], represents the [current_head]. [n] should
+      not be negative since the [current_head] does not have
+      successors. *)
   | `Alias of [`Caboose | `Checkpoint | `Savepoint] * int
+    (** The [n]th predecessor of the [caboose], the [checkpoint]
+      or the [savepoint] if [n > 0]. If [n = 0], represents the block itself.
+      If [n < 0], represents the [n]th successor.  *)
   | `Hash of Block_hash.t * int
-  | `Level of Int32.t ]
+    (** The [n]th predecessor of the block of given [hash] if [n > 0].
+      If [n = 0], represents the block itself.
+      Otherwise, if [n < 0], represents the [n]th successor.*)
+  | `Level of Int32.t  (** The block at a given [level] *) ]
 
 val parse_block : string -> (block, string) result
 
@@ -81,8 +93,6 @@ val pp_raw_context : Format.formatter -> raw_context -> unit
 (** [raw_context_insert (k,v) c] inserts a key-value pair [(k,v)] in a raw_context [c].
     If [k] collides to a existing sub-tree in [c], the sub-tree is replaced by a new key-value pair. *)
 val raw_context_insert : string list * raw_context -> raw_context -> raw_context
-
-type error += Invalid_depth_arg of int
 
 (** The kind of a [merkle_node] *)
 type merkle_hash_kind =
@@ -389,13 +399,20 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
     type t = {
       applied : (Operation_hash.t * Next_proto.operation) list;
       refused : (Next_proto.operation * error list) Operation_hash.Map.t;
+      outdated : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_refused : (Next_proto.operation * error list) Operation_hash.Map.t;
       branch_delayed : (Next_proto.operation * error list) Operation_hash.Map.t;
       unprocessed : Next_proto.operation Operation_hash.Map.t;
     }
 
+    type t_with_version
+
+    val pending_operations_version_dispatcher :
+      version:int -> t -> t_with_version RPC_answer.t Lwt.t
+
     (** Call RPC GET /chains/[chain]/mempool/pending_operations *)
-    val pending_operations : #simple -> ?chain:chain -> unit -> t tzresult Lwt.t
+    val pending_operations :
+      #simple -> ?chain:chain -> ?version:int -> unit -> t tzresult Lwt.t
 
     (** Call RPC POST /chains/[chain]/mempool/ban_operation *)
     val ban_operation :
@@ -426,8 +443,9 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       ?branch_delayed:bool ->
       ?branch_refused:bool ->
       ?refused:bool ->
+      ?outdated:bool ->
       unit ->
-      (((Operation_hash.t * Next_proto.operation) * error list) list
+      (((Operation_hash.t * Next_proto.operation) * error trace option) list
        Lwt_stream.t
       * stopper)
       tzresult
@@ -435,7 +453,11 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
 
     (** Call RPC POST /chains/[chain]/mempool/request_operations *)
     val request_operations :
-      #simple -> ?chain:chain -> unit -> unit tzresult Lwt.t
+      #simple ->
+      ?chain:chain ->
+      ?peer_id:P2p_peer.Id.t ->
+      unit ->
+      unit tzresult Lwt.t
   end
 
   val live_blocks :
@@ -638,7 +660,13 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
       (** Define RPC GET /chains/[chain]/mempool/pending_operations *)
       val pending_operations :
         ('a, 'b) RPC_path.t ->
-        ([`GET], 'a, 'b, unit, unit, Mempool.t) RPC_service.t
+        ( [`GET],
+          'a,
+          'b,
+          < version : int >,
+          unit,
+          Mempool.t_with_version )
+        RPC_service.t
 
       (** Define RPC POST /chains/[chain]/mempool/ban_operation *)
       val ban_operation :
@@ -663,24 +691,45 @@ module Make (Proto : PROTO) (Next_proto : PROTO) : sig
           < applied : bool
           ; branch_delayed : bool
           ; branch_refused : bool
-          ; refused : bool >,
+          ; refused : bool
+          ; outdated : bool >,
           unit,
-          ((Operation_hash.t * Next_proto.operation) * error list) list )
+          ((Operation_hash.t * Next_proto.operation) * error trace option) list
+        )
         RPC_service.t
 
       (** Define RPC GET /chains/[chain]/mempool/filter *)
       val get_filter :
         ('a, 'b) RPC_path.t ->
-        ([`GET], 'a, 'b, unit, unit, Data_encoding.json) RPC_service.t
+        ( [`GET],
+          'a,
+          'b,
+          < include_default : bool >,
+          unit,
+          Data_encoding.json )
+        RPC_service.t
 
       (** Define RPC POST /chains/[chain]/mempool/filter *)
       val set_filter :
         ('a, 'b) RPC_path.t ->
-        ([`POST], 'a, 'b, unit, Data_encoding.json, unit) RPC_service.t
+        ( [`POST],
+          'a,
+          'b,
+          unit,
+          Data_encoding.json,
+          Data_encoding.json )
+        RPC_service.t
 
       (** Define RPC POST /chains/[chain]/mempool/request_operations *)
       val request_operations :
-        ('a, 'b) RPC_path.t -> ([`POST], 'a, 'b, unit, unit, unit) RPC_service.t
+        ('a, 'b) RPC_path.t ->
+        ( [`POST],
+          'a,
+          'b,
+          < peer_id : P2p_peer_id.t option >,
+          unit,
+          unit )
+        RPC_service.t
     end
 
     val live_blocks :

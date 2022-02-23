@@ -1,66 +1,49 @@
-(executables
- (names test_shell
-        test_locator
-        test_synchronisation_heuristic_fuzzy
-        test_prevalidation
-        test_prevalidator_classification)
- (libraries tezos-base
-            tezos-base-test-helpers
-            tezos-store
-            tezos-context
-            tezos-shell-context
-            tezos-p2p
-            tezos-p2p-services
-            tezos-protocol-updater
-            tezos-requester
-            tezos-shell
-            tezos-shell-services
-            tezos-embedded-protocol-demo-noops
-            tezos-stdlib-unix
-            tezos-validation
-            tezos-event-logging-test-helpers
-            tezos-test-helpers
-            alcotest-lwt)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_base_test_helpers
-                   -open Tezos_store
-                   -open Tezos_context
-                   -open Tezos_shell_context
-                   -open Tezos_protocol_updater
-                   -open Tezos_p2p
-                   -open Tezos_p2p_services
-                   -open Tezos_shell
-                   -open Tezos_shell_services
-                   -open Tezos_stdlib_unix
-                   -open Tezos_validation
-                   -open Tezos_event_logging_test_helpers)))
-
-(rule
- (alias runtest)
+(tests
+ (names
+  test_shell
+  test_locator
+  test_synchronisation_heuristic_fuzzy
+  test_prevalidation
+  test_prevalidation_t
+  test_prevalidator_classification
+  test_prevalidator_classification_operations
+  test_prevalidator_pending_operations)
  (package tezos-shell)
- (action (run %{exe:test_shell.exe})))
+ (libraries
+  tezos-base
+  tezos-base-test-helpers
+  tezos-store
+  tezos-context
+  tezos-shell-context
+  tezos-p2p
+  tezos-p2p-services
+  tezos-protocol-updater
+  tezos-requester
+  tezos-shell
+  tezos-shell-services
+  tezos-embedded-protocol-demo-noops
+  tezos-stdlib-unix
+  tezos-validation
+  tezos-event-logging-test-helpers
+  tezos-test-helpers
+  alcotest-lwt)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_base_test_helpers
+   -open Tezos_store
+   -open Tezos_context
+   -open Tezos_shell_context
+   -open Tezos_protocol_updater
+   -open Tezos_p2p
+   -open Tezos_p2p_services
+   -open Tezos_shell
+   -open Tezos_shell_services
+   -open Tezos_stdlib_unix
+   -open Tezos_validation
+   -open Tezos_event_logging_test_helpers)))
 
 (rule
- (alias runtest)
+ (alias runtest_locator_bench)
  (package tezos-shell)
- (action (run %{exe:test_prevalidation.exe})))
-
-(rule
- (alias runtest)
-(package tezos-shell)
- (action (run %{exe:test_prevalidator_classification.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{exe:test_locator.exe} --no-bench)))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{exe:test_synchronisation_heuristic_fuzzy.exe})))
-
-(rule
- (alias runtest)
- (package tezos-shell)
- (action (run %{exe:test_locator.exe})))
+ (action (run %{exe:test_locator.exe} --bench)))

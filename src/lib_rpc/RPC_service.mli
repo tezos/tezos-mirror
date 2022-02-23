@@ -107,3 +107,5 @@ val description_service :
 val error_service : ([`GET], unit, unit, unit, unit, Json_schema.schema) service
 
 val error_encoding : error Data_encoding.t
+
+val error_opt_encoding : error option Data_encoding.t

@@ -382,7 +382,9 @@ include Tezos_raw_protocol_007_PsDELPH1.Main
 
 (library
  (name tezos_protocol_007_PsDELPH1_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-007-PsDELPH1)
  (libraries
       tezos-protocol-environment

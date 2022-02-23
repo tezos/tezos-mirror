@@ -1,0 +1,16 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/hash_key.tz]
+
+Well typed
+Gas remaining: 1039996.037 units remaining
+{ parameter key ;
+  storage (option key_hash) ;
+  code { CAR
+         /* [ @parameter key ] */ ;
+         HASH_KEY
+         /* [ key_hash ] */ ;
+         SOME
+         /* [ option key_hash ] */ ;
+         NIL operation
+         /* [ list operation : option key_hash ] */ ;
+         PAIR
+         /* [ pair (list operation) (option key_hash) ] */ } }

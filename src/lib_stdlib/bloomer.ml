@@ -50,7 +50,7 @@ let sf = Printf.sprintf
 let check_peek_poke_args fname bytes ofs bits =
   if bits <= 0 then invalid_arg (sf "Bloomer.%s: non positive bits value" fname) ;
   if ofs < 0 then invalid_arg (sf "Bloomer.%s: negative offset" fname) ;
-  if bits > Sys.word_size - 2 then
+  if bits > Sys.int_size - 7 then
     invalid_arg (sf "Bloomer.%s: indexes out of bounds" fname) ;
   if bits + ofs > Bytes.length bytes * 8 then
     invalid_arg (sf "Bloomer.%s: indexes out of bounds" fname)
@@ -60,8 +60,7 @@ let check_peek_poke_args fname bytes ofs bits =
    bit interval into [v]. The superfluous bits at the beginning and at the end
    are then removed from [v], yielding the returned value.
  *)
-let peek bytes ofs bits =
-  check_peek_poke_args "peek" bytes ofs bits ;
+let peek_unsafe bytes ofs bits =
   let first = ofs / 8 in
   let last = first + (((ofs mod 8) + bits + 7) / 8) in
   let v = ref 0 in
@@ -72,10 +71,12 @@ let peek bytes ofs bits =
   v := !v land ((1 lsl bits) - 1) ;
   !v
 
+let peek bytes ofs bits =
+  check_peek_poke_args "peek" bytes ofs bits ;
+  peek_unsafe bytes ofs bits
+
 (* blits [bits] bits of [bytes] at offset [ofs] from an OCaml int in big endian order *)
-let poke bytes ofs bits v =
-  if v lsr bits <> 0 then invalid_arg "Bloomer.poke: value too large" ;
-  check_peek_poke_args "poke" bytes ofs bits ;
+let poke_unsafe bytes ofs bits v =
   let first = ofs / 8 in
   let last = first + (((ofs mod 8) + bits + 7) / 8) in
   let cur = ref 0 in
@@ -88,11 +89,17 @@ let poke bytes ofs bits v =
     Bytes.set bytes i (Char.chr ((v lsr ((i - first) * 8)) land 0xFF))
   done
 
+let poke bytes ofs bits v =
+  if v lsr bits <> 0 then invalid_arg "Bloomer.poke: value too large" ;
+  check_peek_poke_args "poke" bytes ofs bits ;
+  poke_unsafe bytes ofs bits v
+
 let%test_unit "random_read_writes" =
   let bytes_length = 45 in
   let bit_length = bytes_length * 8 in
-  (* max_data_bit_width = 29 to to stay within Random.int bounds. *)
-  let max_data_bit_width = 29 in
+  (* max_data_bit_width = 29 to to stay within Random.int bounds.
+     int_size - 7 to stay within [check_peek_poke_args] domain. *)
+  let max_data_bit_width = min 29 (Sys.int_size - 7) in
   let bytes = Bytes.make 45 '\000' in
   let poke_et_peek ofs len v =
     poke bytes ofs len v ;
@@ -113,14 +120,57 @@ let%test_unit "random_read_writes" =
     assert false
   with _ -> ()
 
+let%test_unit "peek and poke work with bits = [1 .. Sys.int_size - 7]" =
+  let fail_or_success f =
+    try
+      f () ;
+      true
+    with _ -> false
+  in
+  let bytes = Bytes.make 45 '\000' in
+  (* we ignore len = 0, the implementation would accepts it but check_peek_poke_args is more strict. *)
+  for len = 1 to Sys.int_size do
+    let ints =
+      List.init 400 (fun _ ->
+          Int64.(to_int (Random.int64 (sub (shift_left one len) one))))
+    in
+    let unsafe_result =
+      fail_or_success (fun () ->
+          (* we want to test the property regardless of the offset, we test all possible offset (mod 8) *)
+          for ofs = 8 to 16 do
+            List.iter
+              (fun v ->
+                poke_unsafe bytes ofs len v ;
+                assert (peek_unsafe bytes ofs len = v))
+              ints
+          done)
+    in
+    let check_result =
+      fail_or_success (fun () ->
+          (* we want to test the property regardless of the offset, we test all possible offset (mod 8) *)
+          for ofs = 8 to 16 do
+            List.iter
+              (fun v ->
+                if v lsr len <> 0 then
+                  invalid_arg "Bloomer.poke: value too large" ;
+                check_peek_poke_args "unti-test" bytes ofs len)
+              ints
+          done)
+    in
+    assert (unsafe_result = check_result)
+  done
+
 let%test_unit "sequential_read_writes" =
   let bytes = Bytes.make 45 '\000' in
   let bits = Bytes.length bytes * 8 in
+  (* max_data_bit_width = 29 to stay within Random.int bounds.
+     int_size - 7 to stay within [check_peek_poke_args] domain. *)
+  let max_data_bit_width = min 29 (Sys.int_size - 7) in
   for _ = 0 to 10_000 do
     let rec init ofs acc =
       if ofs >= bits then List.rev acc
       else
-        let len = min (Random.int 29 + 1) (bits - ofs) in
+        let len = min (Random.int max_data_bit_width + 1) (bits - ofs) in
         let v = Random.int (1 lsl len) in
         poke bytes ofs len v ;
         assert (peek bytes ofs len = v) ;
@@ -152,6 +202,11 @@ let%test_unit "read_over_write" =
   done
 
 let create ~hash ~hashes ~index_bits ~countdown_bits =
+  (* We constrain [index_bits] and [countdown_bits] to a maximum of 24.  This is
+     because [peek] and [poke] operate on ints with size [1 .. int_size - 7]
+     and we want to stay compatible with 32bit arch (e.g. JavaScript).
+       31 (int_size on 32bit) - 7 = 24
+  *)
   if index_bits <= 0 || index_bits > 24 then
     invalid_arg "Bloomer.create: invalid value for index_bits" ;
   if countdown_bits <= 0 || countdown_bits > 24 then

@@ -86,10 +86,11 @@ module Pk_uri_hashtbl = Hashtbl.Make (struct
   let hash = Hashtbl.hash
 end)
 
-let make_pk_uri (x : Uri.t) : pk_uri tzresult Lwt.t =
+let make_pk_uri (x : Uri.t) : pk_uri tzresult =
   match Uri.scheme x with
-  | None -> failwith "Error while parsing URI: PK_URI needs a scheme"
-  | Some _ -> return x
+  | None ->
+      error (Exn (Failure "Error while parsing URI: PK_URI needs a scheme"))
+  | Some _ -> ok x
 
 type sk_uri = Uri.t
 
@@ -99,27 +100,29 @@ module CompareUri = Compare.Make (struct
   let compare = Uri.compare
 end)
 
-let make_sk_uri (x : Uri.t) : sk_uri tzresult Lwt.t =
+let make_sk_uri (x : Uri.t) : sk_uri tzresult =
   match Uri.scheme x with
-  | None -> failwith "Error while parsing URI: SK_URI needs a scheme"
-  | Some _ -> return x
+  | None ->
+      error (Exn (Failure "Error while parsing URI: SK_URI needs a scheme"))
+  | Some _ -> ok x
 
 type sapling_uri = Uri.t
 
-let make_sapling_uri (x : Uri.t) : sapling_uri =
+let make_sapling_uri (x : Uri.t) : sapling_uri tzresult =
   match Uri.scheme x with
-  | None -> Stdlib.failwith "SAPLING_URI needs a scheme"
-  | Some _ -> x
+  | None -> error (Exn (Failure "SAPLING_URI needs a scheme"))
+  | Some _ -> ok x
 
 type pvss_sk_uri = Uri.t
 
-let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult Lwt.t =
+let make_pvss_sk_uri (x : Uri.t) : pvss_sk_uri tzresult =
   match Uri.scheme x with
-  | None -> failwith "Error while parsing URI: PVSS_URI needs a scheme"
-  | Some _ -> return x
+  | None ->
+      error (Exn (Failure "Error while parsing URI: PVSS_URI needs a scheme"))
+  | Some _ -> ok x
 
 let pk_uri_parameter () =
-  Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s)
+  Clic.parameter (fun _ s -> make_pk_uri @@ Uri.of_string s >>?= return)
 
 let pk_uri_param ?name ?desc params =
   let name = Option.value ~default:"uri" name in
@@ -134,7 +137,7 @@ let pk_uri_param ?name ?desc params =
   Clic.param ~name ~desc (pk_uri_parameter ()) params
 
 let sk_uri_parameter () =
-  Clic.parameter (fun _ s -> make_sk_uri @@ Uri.of_string s)
+  Clic.parameter (fun _ s -> make_sk_uri @@ Uri.of_string s >>?= return)
 
 let sk_uri_param ?name ?desc params =
   let name = Option.value ~default:"uri" name in
@@ -155,7 +158,7 @@ module Secret_key = Client_aliases.Alias (struct
 
   include (CompareUri : Compare.S with type t := t)
 
-  let of_source s = make_sk_uri @@ Uri.of_string s
+  let of_source s = make_sk_uri @@ Uri.of_string s >>?= return
 
   let to_source t = return (Uri.to_string t)
 
@@ -176,7 +179,7 @@ module Public_key = Client_aliases.Alias (struct
   end)
 
   let of_source s =
-    make_pk_uri @@ Uri.of_string s >>=? fun pk_uri -> return (pk_uri, None)
+    make_pk_uri @@ Uri.of_string s >>?= fun pk_uri -> return (pk_uri, None)
 
   let to_source (t, _) = return (Uri.to_string t)
 
@@ -267,7 +270,7 @@ module PVSS_secret_key = Client_aliases.Alias (struct
 
   let encoding = uri_encoding
 
-  let of_source s = make_pvss_sk_uri @@ Uri.of_string s
+  let of_source s = make_pvss_sk_uri @@ Uri.of_string s >>?= return
 
   let to_source t = return (Uri.to_string t)
 end)

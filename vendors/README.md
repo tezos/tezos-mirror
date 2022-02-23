@@ -40,23 +40,8 @@ for more details.
 #### Differences with the initial library
 None
 
-### statz
-- Basic statistical functions.
-- Cloned from: [statz](https://gitlab.com/igarnier/statz)
-- Dependency to lib-benchmark.
-
-#### Differences with the initial library
-None
-
-### numerics
-- Operations on matrices on vectors
-- Cloned from: [numerics](https://gitlab.com/igarnier/numerics)
-- Dependency to statz.
-
-#### Differences with the initial library
-None
-
 ### benchmark-utils
+- Contains no tests; just stubs to system calls so unclear what we would be testing.
 - C stubs useful for benchmarking, pinning cpus, ...
 - Cloned from: nowhere
 - Dependency to lib-benchmark. Contains manually written OCaml-C bindings.
@@ -67,14 +52,14 @@ None
 ## Misc
 
 ### flextesa-lib
+- This library has no tests here; they are in the `tezos/flextesa` and not reproduced here.
 - Flextesa was initially developed to test 3rd party tools (Kiln, Dapps, etc.).
   It was then integrated into Tezos to improve the testing infrastructure and
   later, its development was re-externalized to the `tezos/flextesa` repository
-  to be more flexible.
-  It is the base for the `tezos-sandbox` executable in `src/bin_sandbox` and all
-  the test scenarios defined in that `dune` file.
+  to be more flexible. It is the base for the `tezos-sandbox` executable in
+  `src/bin_sandbox` and all the test scenarios defined in that `dune` file.
 - Cloned from: [flextesa](https://gitlab.com/tezos/flextesa), just the `src/lib`
-sub-directory.
+  sub-directory.
 - It is vendored because it
   depends on some Tezos libraries (e.g. `tezos-crypto`), and it obviously makes
   some assumptions on how Tezos works hence using `opam` would be too cumbersome
@@ -94,15 +79,6 @@ as merge-requests.
 
 #### Differences with the initial library
 Unknown
-
-### ocaml-lmdb
-
-- ocaml-lmdb are simple OCaml bindings to Lightning Memory-Mapped Database from
-  Symas.
-- Cloned from: [ocaml-lmdb](https://github.com/vbmithr/ocaml-lmdb) but evolved
-  since.
-  + The original C code is from [lmdb](https://github.com/LMDB/lmdb)
-- It was vendored for fast development.
 
 #### Differences with the initial library
 

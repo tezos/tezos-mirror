@@ -272,7 +272,7 @@ let encrypt sk password =
     | P256 _ -> Encodings.p256
   in
   let path = Base58.simple_encode encoding payload in
-  Client_keys.make_sk_uri (Uri.make ~scheme ~path ())
+  Client_keys.make_sk_uri (Uri.make ~scheme ~path ()) >>?= return
 
 let prompt_twice_and_encrypt cctxt sk =
   read_password cctxt >>=? fun password -> encrypt sk password
@@ -319,7 +319,7 @@ let encrypt_sapling_key cctxt sk =
   let path =
     Base58.simple_encode (Sapling_raw.encrypted_b58_encoding password) sk
   in
-  return (Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()))
+  Client_keys.make_sapling_uri (Uri.make ~scheme ~path ()) >>?= return
 
 let decrypt_sapling_key (cctxt : #Client_context.io) (sk_uri : sapling_uri) =
   let uri = (sk_uri :> Uri.t) in
@@ -371,7 +371,7 @@ struct
 
   let neuterize sk_uri =
     decrypt C.cctxt sk_uri >>=? fun sk ->
-    Unencrypted.make_pk (Signature.Secret_key.to_public_key sk)
+    Unencrypted.make_pk (Signature.Secret_key.to_public_key sk) >>?= return
 
   let sign ?watermark sk_uri buf =
     decrypt C.cctxt sk_uri >>=? fun sk ->
@@ -393,4 +393,4 @@ let encrypt_pvss_key cctxt sk =
   let payload = Raw.encrypt_pvss ~password sk in
   let encoding = Encodings.secp256k1_scalar in
   let path = Base58.simple_encode encoding payload in
-  Client_keys.make_pvss_sk_uri (Uri.make ~scheme ~path ())
+  Client_keys.make_pvss_sk_uri (Uri.make ~scheme ~path ()) >>?= return

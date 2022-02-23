@@ -1,0 +1,21 @@
+(env (static (flags (:standard -ccopt -static))))
+
+(executable
+ (name main_validator)
+ (public_name tezos-validator)
+ (package tezos-validator)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-validator)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_base__TzPervasives
+   -open Tezos_context
+   -open Tezos_stdlib_unix
+   -open Tezos_shell
+   -open Tezos_shell_services
+   -open Tezos_validation
+   -open Tezos_protocol_updater
+   -open Tezos_validator))
+)

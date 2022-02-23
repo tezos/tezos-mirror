@@ -1,0 +1,5 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/fail.tz]
+
+Well typed
+Gas remaining: 1039998.449 units remaining
+{ parameter unit ; storage unit ; code { FAIL } }

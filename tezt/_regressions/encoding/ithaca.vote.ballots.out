@@ -1,0 +1,11 @@
+tezt/_regressions/encoding/ithaca.vote.ballots.out
+
+./tezos-codec encode 012-Psithaca.vote.ballots from '{
+  "yay": 2147483647,
+  "nay": 0,
+  "pass": 455
+}'
+7fffffff00000000000001c7
+
+./tezos-codec decode 012-Psithaca.vote.ballots from 7fffffff00000000000001c7
+{ "yay": 2147483647, "nay": 0, "pass": 455 }

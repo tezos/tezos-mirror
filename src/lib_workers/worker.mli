@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -124,7 +124,6 @@ module type T = sig
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
-    Worker_types.limits ->
     Name.t ->
     Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
@@ -158,21 +157,12 @@ module type T = sig
     val pending_requests_length : 'a t -> int
   end
 
-  module type BOUNDED_QUEUE = sig
-    (** With [BOUNDED_QUEUE]s, you can push requests in the queue tentatively *)
-    type t
-
-    val try_push_request_now : t -> 'a Request.t -> bool
-  end
-
   module Dropbox : sig
     include BOX with type t := dropbox t
   end
 
   module Queue : sig
     include QUEUE with type 'a t := 'a queue t
-
-    include BOUNDED_QUEUE with type t := bounded queue t
 
     (** Adds a message to the queue immediately. *)
     val push_request_now : infinite queue t -> 'a Request.t -> unit
@@ -201,9 +191,6 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
-
-  (** Access the event backlog. *)
-  val last_events : _ t -> (Internal_event.level * Event.t list) list
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list

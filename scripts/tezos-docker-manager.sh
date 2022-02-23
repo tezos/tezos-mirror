@@ -95,7 +95,7 @@ for proto in $(cat "$active_protocol_versions") ; do
     hostname: baker-$proto
     environment:
       - PROTOCOL=$proto
-    command: tezos-baker --max-priority 128
+    command: tezos-baker
     links:
       - node
     volumes:
@@ -132,7 +132,7 @@ for proto in $(cat "$active_protocol_versions") ; do
     hostname: baker-$proto-test
     environment:
       - PROTOCOL=$proto
-    command: tezos-baker-test --max-priority 128
+    command: tezos-baker-test
     links:
       - node
     volumes:
@@ -702,23 +702,23 @@ command="$1"
 if [ "$#" -eq 0 ] ; then usage ; exit 1;  else shift ; fi
 
 case $(basename "$0") in
-    granadanet.sh)
-        docker_base_dir="$HOME/.tezos-granadanet"
-        docker_image=tezos/tezos:v11.1
-        docker_compose_base_name=granadanet
-        default_port=9732
-        network=granadanet
-        ;;
     hangzhounet.sh)
         docker_base_dir="$HOME/.tezos-hangzhounet"
-        docker_image=tezos/tezos:v11.1
+        docker_image=tezos/tezos:v12.0
         docker_compose_base_name=hangzhounet
         default_port=9732
         network=hangzhounet
         ;;
+    ithacanet.sh)
+        docker_base_dir="$HOME/.tezos-ithacanet"
+        docker_image=tezos/tezos:v12.0
+        docker_compose_base_name=ithacanet
+        default_port=9732
+        network=ithacanet
+        ;;
     *)
         docker_base_dir="$HOME/.tezos-mainnet"
-        docker_image=tezos/tezos:v11.1
+        docker_image=tezos/tezos:v12.0
         docker_compose_base_name="mainnet"
         default_port=9732
         network=mainnet

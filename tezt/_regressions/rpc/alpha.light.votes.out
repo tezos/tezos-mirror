@@ -23,15 +23,15 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/listings
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/proposals
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 500 ] ]
+[ [ "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp", 666 ] ]
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/successor_period
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -40,7 +40,7 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/total_voting_power
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-2500
+3330
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballot_list
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -50,7 +50,7 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/ballots
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-{ "yay": 500, "nay": 500, "pass": 500 }
+{ "yay": 666, "nay": 666, "pass": 666 }
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/current_period
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -67,11 +67,11 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/listings
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 },
-  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 500 } ]
+[ { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 },
+  { "pkh": "[PUBLIC_KEY_HASH]", "rolls": 666 } ]
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/proposals
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
@@ -84,4 +84,4 @@ protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaAL
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/votes/total_voting_power
 protocol of light mode unspecified, using the node's protocol: ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
-2500
+3330

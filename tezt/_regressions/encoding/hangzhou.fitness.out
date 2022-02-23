@@ -1,0 +1,10 @@
+tezt/_regressions/encoding/hangzhou.fitness.out
+
+./tezos-codec encode 011-PtHangz2.fitness from '[
+  "01",
+  "000000000000000a"
+]'
+00000011000000010100000008000000000000000a
+
+./tezos-codec decode 011-PtHangz2.fitness from 00000011000000010100000008000000000000000a
+[ "01", "000000000000000a" ]

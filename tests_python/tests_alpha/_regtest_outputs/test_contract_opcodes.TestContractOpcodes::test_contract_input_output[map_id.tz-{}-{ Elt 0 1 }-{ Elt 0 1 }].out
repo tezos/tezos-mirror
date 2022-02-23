@@ -7,13 +7,13 @@ emitted operations
 big_map diff
   
 trace
-  - location: 11 (remaining gas: 1039995.234 units remaining)
+  - location: 11 (remaining gas: 1039994.154 units remaining)
     [ (Pair { Elt 0 1 } {})  	 ]
-  - location: 11 (remaining gas: 1039995.224 units remaining)
+  - location: 11 (remaining gas: 1039994.144 units remaining)
     [ { Elt 0 1 }  	@parameter ]
-  - location: 12 (remaining gas: 1039995.209 units remaining)
+  - location: 12 (remaining gas: 1039994.129 units remaining)
     [ {}  	
       { Elt 0 1 }  	@parameter ]
-  - location: 14 (remaining gas: 1039995.194 units remaining)
+  - location: 14 (remaining gas: 1039994.114 units remaining)
     [ (Pair {} { Elt 0 1 })  	 ]
 

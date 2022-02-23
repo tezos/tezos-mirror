@@ -18,11 +18,11 @@ tezt/_regressions/rpc/alpha.client.contracts.out
   "[PUBLIC_KEY_HASH]" ]
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]'
-{ "balance": "4000000000000",
+{ "balance": "3800000000000",
   "delegate": "[PUBLIC_KEY_HASH]", "counter": "0" }
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/balance'
-"4000000000000"
+"3800000000000"
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/contracts/[PUBLIC_KEY_HASH]/counter'
 "0"

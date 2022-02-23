@@ -1,7 +1,7 @@
 (rule
  (targets v4.ml)
  (deps
-   v1/error_monad_preallocated_values.ml
+   v4/hex.ml
  )
 
 (action (with-stdout-to %{targets} (chdir %{workspace_root}}

@@ -163,4 +163,4 @@ val make :
   Endpoint.t list ->
   t
 
-val to_json : t -> Json.t
+val to_json : t -> Json.u

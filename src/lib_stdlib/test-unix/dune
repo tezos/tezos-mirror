@@ -1,0 +1,13 @@
+(tests
+ (names test_lwt_pipe test_circular_buffer test_circular_buffer_fuzzy)
+ (package tezos-stdlib)
+ (libraries
+  tezos-stdlib
+  alcotest
+  alcotest-lwt
+  lwt_log
+  bigstring
+  lwt.unix
+  tezos-test-helpers
+  qcheck-alcotest)
+ (flags (:standard -open Tezos_stdlib)))

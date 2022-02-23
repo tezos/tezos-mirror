@@ -1,13 +1,7 @@
-open StaTz
 open Tezos_benchmark
 open Michelson_samplers
 open Protocol
-
-module Comparable_type_name = struct
-  type t = type_name
-
-  let compare (x : t) (y : t) = Stdlib.compare x y
-end
+open Internal_for_tests
 
 let pp_type_name fmtr (t : type_name) =
   Format.pp_print_string fmtr
@@ -42,6 +36,21 @@ let pp_type_name fmtr (t : type_name) =
   | `TSignature -> "signature"
   | `TUnit -> "unit"
   | `TInt -> "int"
+
+module Type_name = struct
+  type t = type_name
+
+  let compare (x : t) (y : t) = Stdlib.compare x y
+
+  let equal (x : t) (y : t) = x = y
+
+  let pp = pp_type_name
+
+  let hash = Stdlib.Hashtbl.hash
+end
+
+module Type_name_multiset =
+  Basic_structures.Basic_impl.Free_module.Float_valued.Make_with_map (Type_name)
 
 let rec tnames_of_type :
     type a. a Script_typed_ir.ty -> type_name list -> type_name list =
@@ -116,34 +125,37 @@ and tnames_of_comparable_type :
   | Script_typed_ir.Option_key (ty, _) ->
       tnames_of_comparable_type ty (`TOption :: acc)
 
-module Config = struct
-  open Michelson_samplers_parameters
-
-  let parameters =
-    {
-      int_size = {min = 8; max = 32};
-      string_size = {min = 8; max = 128};
-      bytes_size = {min = 8; max = 128};
-      stack_size = {min = 3; max = 8};
-      type_size = {min = 1; max = 15};
-      list_size = {min = 0; max = 1000};
-      set_size = {min = 0; max = 1000};
-      map_size = {min = 0; max = 1000};
-    }
+module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (struct
+  let algo = `Default
 
   let size = 16
+end)
 
-  let algo = `Default
-end
+module Sampler =
+  Michelson_samplers.Make
+    (struct
+      let parameters =
+        {
+          base_parameters =
+            {
+              Michelson_samplers_base.int_size = {min = 8; max = 32};
+              string_size = {min = 8; max = 128};
+              bytes_size = {min = 8; max = 128};
+            };
+          list_size = {min = 10; max = 1000};
+          set_size = {min = 10; max = 1000};
+          map_size = {min = 10; max = 1000};
+        }
+    end)
+    (Crypto_samplers)
 
-module Sampler = Michelson_samplers.Make (Config)
+open Stats
 
-let pp_stats = Stats.pp_fin_fun pp_type_name
-
-let tnames_dist : type_name list -> type_name Stats.fin_prb =
+let tnames_dist : type_name list -> type_name Fin.Float.prb =
  fun tnames ->
-  Stats.empirical_of_raw_data (Array.of_list tnames)
-  |> Stats.fin_prb_of_empirical (module Comparable_type_name)
+  Emp.of_raw_data (Array.of_list tnames)
+  |> Fin.Float.counts_of_empirical (module Type_name_multiset)
+  |> Fin.Float.normalize
 
 let rec sample nsamples acc =
   let open Sampling_helpers.M in
@@ -166,5 +178,5 @@ let dist nsamples =
 let () =
   Format.printf
     "stats:@.%a@."
-    pp_stats
-    (Obj.magic (dist 500 (Random.State.make [|0x1337; 0x533D|])))
+    Fin.Float.pp_fin_mes
+    (Fin.as_measure (dist 500 (Random.State.make [|0x1337; 0x533D|])))

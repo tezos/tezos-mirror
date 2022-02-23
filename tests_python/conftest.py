@@ -5,12 +5,13 @@ E.g. start and stop a server. The fixture is simply specified as a parameter
 in the test function, and the yielded values is then accessible with this
 parameter.
 """
-import subprocess
-import shutil
 import os
-import tempfile
 from typing import Optional, Iterator
 import pytest
+
+# Should only be used for type hints
+import _pytest
+
 from pytest_regtest import (
     register_converter_pre,
     deregister_converter_pre,
@@ -21,6 +22,8 @@ from tools import constants, paths, utils
 from tools.client_regression import ClientRegression
 from tools.utils import bake
 from client.client import Client
+
+pytest_plugins = ("pytest_plugins.job_selection",)
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -187,7 +190,7 @@ def encrypted_account_with_tez(client: Client):
     bake(client, bake_for="bootstrap1")
 
 
-def pytest_addoption(parser) -> None:
+def pytest_addoption(parser: _pytest.config.argparsing.Parser) -> None:
     parser.addoption("--log-dir", action="store", help="specify log directory")
     parser.addoption(
         "--singleprocess",
@@ -196,80 +199,3 @@ def pytest_addoption(parser) -> None:
         help="the node validates blocks using only one process,\
             useful for debugging",
     )
-
-
-@pytest.fixture(scope="class")
-def legacy_stores(request):
-    """Aims to generate legacy stores.
-
-    The number of blocks to bake (batch), the home path and the
-    export_snapshots variables are pecified as a class annotation.
-    @pytest.mark.parametrize('legacy_stores', […], indirect=True)
-    """
-    assert request.param is not None
-    home = request.param['home']
-    batch = request.param['batch']
-    export_snapshots = request.param['snapshot']
-    session = {}
-    data_dir = tempfile.mkdtemp(prefix='tezos-legacy-stores.')
-    build_dir = '_build/'
-    builder_target = 'legacy_store_builder'
-    builder_path = f'src/lib_store/legacy_store/{builder_target}.exe'
-    builder_bin = f'{build_dir}default/{builder_path}'
-    maker_target = 'legacy_store_maker'
-    maker_path = f'src/lib_store/test/{maker_target}.exe'
-    maker_bin = f'{build_dir}default/{maker_path}'
-    subprocess.run(
-        [
-            'dune',
-            'build',
-            '--build-dir',
-            f'{home}{build_dir}',
-            f'{builder_path}',
-        ],
-        check=True,
-        cwd=home,
-    )
-    subprocess.run(
-        ['dune', 'build', '--build-dir', f'{home}{build_dir}', f'{maker_path}'],
-        check=True,
-        cwd=home,
-    )
-    # Call the magic binary which generates legacy stores such as:
-    # data_dir/archive_store_to_upgrade
-    #         /full_store_to_upgrade
-    #         /rolling_store_to_upgrade
-    # where every store contains the "same chain"
-    subprocess.run(
-        [
-            maker_bin,
-            data_dir,
-            builder_bin,
-            str(batch),
-            str(export_snapshots).lower(),
-        ],
-        check=True,
-        cwd=home,
-    )
-
-    # Store data paths in session
-    for history_mode in ['archive', 'full', 'rolling']:
-        path = f'{data_dir}/{history_mode}_store_to_upgrade'
-        session[f'{history_mode}_path'] = path
-
-    # Store snapshot paths in legacy_stores
-    if export_snapshots:
-        for history_mode in ['archive', 'full']:
-            full_path = f'{data_dir}/snapshot_from_{history_mode}_storage.full'
-            session[f'from_{history_mode}.full'] = full_path
-            rolling_path = (
-                f'{data_dir}' + f'/snapshot_from_{history_mode}_storage.rolling'
-            )
-            session[f'from_{history_mode}.rolling'] = rolling_path
-            # Store the rolling path
-        session['from_rolling.rolling'] = (
-            f'{data_dir}/snapshot_from' + '_rolling_storage.rolling'
-        )
-
-    yield session
-    shutil.rmtree(data_dir)

@@ -1,18 +1,15 @@
 (library
  (name tezos_benchmark)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-benchmark)
- (libraries tezos-base
-            tezos-stdlib-unix
-            tezos-micheline
-            tezos-clic
-            data-encoding
-            staTz
-            benchmark-utils
-            pyml-plot ;; because of Matrix module... pyml-plot should be split further
-            ocaml-migrate-parsetree
-            )
- (flags (:standard
-                 -open Tezos_base__TzPervasives
-                 -open StaTz
-                 -open Tezos_stdlib_unix)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  tezos-micheline
+  tezos-clic
+  data-encoding
+  prbnmcn-stats
+  benchmark-utils
+  pyml-plot ;; because of Matrix module... pyml-plot should be split further
+  ocaml-migrate-parsetree)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_stdlib_unix)))

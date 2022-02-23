@@ -67,23 +67,24 @@ module Block_info = struct
     Bytes.unsafe_to_string bytes
 
   let decode str i =
-    let bytes = Bytes.unsafe_of_string str in
     let current_offset = ref i in
     (* The Int64.to_int conversion is not likely to fail as it was
        written based on Int64.of_int and the encoded offset won't
        reach the int64 max value. *)
-    let offset = Bytes.get_int64_be bytes !current_offset |> Int64.to_int in
+    let offset =
+      TzEndian.get_int64_string str !current_offset |> Int64.to_int
+    in
     (* Setting current_offset right after the <file_offset>(8)*)
     current_offset := !current_offset + 8 ;
-    let list_size = Bytes.get_int8 bytes !current_offset in
+    let list_size = TzEndian.get_int8_string str !current_offset in
     current_offset := !current_offset + 1 ;
     let predecessors = ref [] in
     let limit = !current_offset in
     current_offset := limit + ((list_size - 1) * Block_hash.size) ;
     while !current_offset >= limit do
       predecessors :=
-        (Bytes.sub bytes !current_offset Block_hash.size
-        |> Block_hash.of_bytes_exn)
+        (String.sub str !current_offset Block_hash.size
+        |> Block_hash.of_string_exn)
         :: !predecessors ;
       current_offset := !current_offset - Block_hash.size
     done ;

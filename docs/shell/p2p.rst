@@ -49,17 +49,17 @@ are used to store incoming (resp. outgoing) messages for each
 peer. This further restricts the speed at which communication is
 possible with a peer; when a queue is full, it is not possible to read
 (resp. write) an additional message. The high-level
-`P2p_socket.connection
-<../api/odoc/tezos-p2p/Tezos_p2p/P2p_socket/index.html#type-connection>`__
-type by the P2P layer is basically a UNIX socket upgraded with I/O
-scheduling, peer metadata, cryptographic keys, and two messages queues
+`P2p_socket.t
+<../api/odoc/_html/tezos-p2p/Tezos_p2p/P2p_socket/index.html#type-t>`__
+type defined by the P2P layer is basically a UNIX socket upgraded with I/O
+scheduling, peer metadata, cryptographic keys, and two message queues
 operated by dedicated workers which operate on those queues.
 
 Pool of connections
 ~~~~~~~~~~~~~~~~~~~
 
 All the above modules are used in `P2p_pool
-<../api/odoc/tezos-p2p/Tezos_p2p/P2p_pool/index.html>`__, which
+<../api/api-inline.html#tezos-p2p/Tezos_p2p/P2p_pool/index.html>`__, which
 constitutes the core of the P2P layer, together with the worker
 processes described below. It comprises various tables of connections
 as well as methods to query them, also connections are extended with
@@ -67,19 +67,17 @@ another message queue where lower-level messages (like responses to
 ping) are filtered out and only application-level messages are kept.
 
 The main entry point of the P2P layer is in module `P2p
-<../api/odoc/tezos-p2p/Tezos_p2p/P2p/index.html>`__. See below
+<../api/api-inline.html#tezos-p2p/Tezos_p2p/P2p/index.html>`__. See below
 for a description of workers acting onto the P2P layer.
 
-Welcome worker
---------------
+Welcome worker & connect handler
+--------------------------------
 
-The welcome worker is responsible for accepting incoming connections
-and register them into the pool of connections managed by the P2P
-layer. It basically runs the ``accept(2)`` syscall and call
-`P2p_pool.accept
-<../api/odoc/tezos-p2p/Tezos_p2p/P2p_pool/index.html#val-accept>`__ so
-that it is made aware of an incoming connection. From there, the pool
-will decide how this new connection must be handled.
+The welcome worker & the connect handler are responsible for accepting incoming
+connections and register them into the pool of connections managed by the P2P
+layer. It basically runs the ``accept(2)`` syscall and build the stack of types
+that composed a connection. They decide how this new connection must be
+handled.
 
 {Black, White, Grey}lists
 ~~~~~~~~~~~~~~~~~~~~~~~~~

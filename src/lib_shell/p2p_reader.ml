@@ -34,7 +34,8 @@ type connection =
 
 type callback = {
   notify_branch : P2p_peer.Id.t -> Block_locator.t -> unit;
-  notify_head : P2p_peer.Id.t -> Block_header.t -> Mempool.t -> unit;
+  notify_head :
+    P2p_peer.Id.t -> Block_hash.t -> Block_header.t -> Mempool.t -> unit;
   disconnection : P2p_peer.Id.t -> unit;
 }
 
@@ -183,21 +184,21 @@ let handle_msg state msg =
       Lwt.return_unit
   | Current_branch (chain_id, locator) ->
       may_handle state chain_id @@ fun chain_db ->
-      let (head, hist) = (locator :> Block_header.t * Block_hash.t list) in
+      let {Block_locator.head_hash; head_header; history} = locator in
       List.exists_p
         (Store.Block.is_known_invalid chain_db.chain_store)
-        (Block_header.hash head :: hist)
+        (head_hash :: history)
       >>= fun known_invalid ->
       if known_invalid then (
         P2p.disconnect state.p2p state.conn >>= fun () ->
         P2p.greylist_peer state.p2p state.gid ;
         Lwt.return_unit)
       else if
-        not (Clock_drift.is_not_too_far_in_the_future head.shell.timestamp)
+        not
+          (Clock_drift.is_not_too_far_in_the_future head_header.shell.timestamp)
       then (
         Peer_metadata.incr meta Future_block ;
-        P2p_reader_event.(emit received_future_block)
-          (Block_header.hash head, state.gid))
+        P2p_reader_event.(emit received_future_block) (head_hash, state.gid))
       else (
         chain_db.callback.notify_branch state.gid locator ;
         (* TODO discriminate between received advertisements
@@ -227,8 +228,8 @@ let handle_msg state msg =
       Lwt.return_unit
   | Current_head (chain_id, header, mempool) ->
       may_handle state chain_id @@ fun chain_db ->
-      let head = Block_header.hash header in
-      Store.Block.is_known_invalid chain_db.chain_store head
+      let header_hash = Block_header.hash header in
+      Store.Block.is_known_invalid chain_db.chain_store header_hash
       >>= fun known_invalid ->
       let {Connection_metadata.disable_mempool; _} =
         P2p.connection_local_metadata state.p2p state.conn
@@ -247,9 +248,9 @@ let handle_msg state msg =
         not (Clock_drift.is_not_too_far_in_the_future header.shell.timestamp)
       then (
         Peer_metadata.incr meta Future_block ;
-        P2p_reader_event.(emit received_future_block) (head, state.gid))
+        P2p_reader_event.(emit received_future_block) (header_hash, state.gid))
       else (
-        chain_db.callback.notify_head state.gid header mempool ;
+        chain_db.callback.notify_head state.gid header_hash header mempool ;
         (* TODO discriminate between received advertisements
            and responses? *)
         Peer_metadata.incr meta @@ Received_advertisement Head ;

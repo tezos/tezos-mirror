@@ -1,19 +1,23 @@
 (library
  (name tezos_context)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-context)
- (libraries tezos-base
-            bigstringaf
-            tezos-shell-services
-            logs.fmt
-            digestif.c
-            irmin
-            irmin-pack
-            tezos-stdlib-unix
-            tezos-context.sigs
-            tezos-context.helpers
-            tezos-context.encoding)
- (flags (:standard -open Tezos_shell_services
-                   -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_stdlib)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  bigstringaf
+  tezos-shell-services
+  fmt
+  logs.fmt
+  digestif.c
+  irmin
+  irmin-pack
+  tezos-stdlib-unix
+  tezos-context.sigs
+  tezos-context.helpers
+  tezos-context.encoding)
+ (flags
+  (:standard
+   -open Tezos_shell_services
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_stdlib)))

@@ -23,7 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Support.Lib.Monad
+(* This test suite relies heavily on Lwt. It also deals with error a lot, but it
+   checks most errors directly. So we don't need the syntactic support to
+   alleviate the error handling. *)
+open Support.Lib.Monad.Lwt_syntax
 
 module IntESHashtbl = Support.Lib.Hashtbl.Make_es (struct
   type t = int
@@ -35,7 +38,8 @@ end)
 
 let test_add_remove _ _ =
   let t = IntESHashtbl.create 2 in
-  IntESHashtbl.find_or_make t 0 (fun () -> return 0) >>= function
+  let* r = IntESHashtbl.find_or_make t 0 (fun () -> return_ok 0) in
+  match r with
   | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make"
   | Ok n -> (
       if not (n = 0) then
@@ -44,7 +48,8 @@ let test_add_remove _ _ =
         match IntESHashtbl.find t 0 with
         | None -> Assert.fail "Some (Ok 0)" "None" "find"
         | Some p -> (
-            p >>= function
+            let* r = p in
+            match r with
             | Error _ -> Assert.fail "Some (Ok 0)" "Some (Error _)" "find"
             | Ok n ->
                 if not (n = 0) then
@@ -60,12 +65,13 @@ let test_add_remove _ _ =
 
 let test_add_add _ _ =
   let t = IntESHashtbl.create 2 in
-  IntESHashtbl.find_or_make t 0 (fun () -> return 0) >>= fun _ ->
-  IntESHashtbl.find_or_make t 0 (fun () -> return 1) >>= fun _ ->
+  let* _ = IntESHashtbl.find_or_make t 0 (fun () -> return_ok 0) in
+  let* _ = IntESHashtbl.find_or_make t 0 (fun () -> return_ok 1) in
   match IntESHashtbl.find t 0 with
   | None -> Assert.fail "Some (Ok 0)" "None" "find"
   | Some p -> (
-      p >>= function
+      let* r = p in
+      match r with
       | Error _ -> Assert.fail "Some (Ok 0)" "Some (Error _)" "find"
       | Ok n ->
           if not (n = 0) then
@@ -74,28 +80,29 @@ let test_add_add _ _ =
 
 let test_length _ _ =
   let t = IntESHashtbl.create 2 in
-  IntESHashtbl.find_or_make t 0 (fun () -> return 0) >>= fun _ ->
-  IntESHashtbl.find_or_make t 1 (fun () -> return 1) >>= fun _ ->
-  IntESHashtbl.find_or_make t 2 (fun () -> return 2) >>= fun _ ->
-  IntESHashtbl.find_or_make t 3 (fun () -> return 3) >>= fun _ ->
+  let* _ = IntESHashtbl.find_or_make t 0 (fun () -> Lwt.return_ok 0) in
+  let* _ = IntESHashtbl.find_or_make t 1 (fun () -> Lwt.return_ok 1) in
+  let* _ = IntESHashtbl.find_or_make t 2 (fun () -> Lwt.return_ok 2) in
+  let* _ = IntESHashtbl.find_or_make t 3 (fun () -> Lwt.return_ok 3) in
   let l = IntESHashtbl.length t in
   if not (l = 4) then Assert.fail "4" (Format.asprintf "%d" l) "length"
   else Lwt.return_unit
 
 let test_self_clean _ _ =
   let t = IntESHashtbl.create 2 in
-  IntESHashtbl.find_or_make t 0 (fun () -> Lwt.return (Ok 0)) >>= fun _ ->
-  IntESHashtbl.find_or_make t 1 (fun () -> Lwt.return (Error [])) >>= fun _ ->
-  IntESHashtbl.find_or_make t 2 (fun () -> Lwt.return (Error [])) >>= fun _ ->
-  IntESHashtbl.find_or_make t 3 (fun () -> Lwt.return (Ok 3)) >>= fun _ ->
-  IntESHashtbl.find_or_make t 4 (fun () -> Lwt.return (Ok 4)) >>= fun _ ->
-  IntESHashtbl.find_or_make t 5 (fun () -> Lwt.return (Error [])) >>= fun _ ->
-  Lwt.catch
-    (fun () ->
-      IntESHashtbl.find_or_make t 6 (fun () -> Lwt.fail Not_found) >>= fun _ ->
-      Assert.fail_msg "Not_found exception should propagate")
-    (function Not_found -> Lwt.return_unit | exn -> Lwt.fail exn)
-  >>= fun () ->
+  let* _ = IntESHashtbl.find_or_make t 0 (fun () -> Lwt.return (Ok 0)) in
+  let* _ = IntESHashtbl.find_or_make t 1 (fun () -> Lwt.return (Error [])) in
+  let* _ = IntESHashtbl.find_or_make t 2 (fun () -> Lwt.return (Error [])) in
+  let* _ = IntESHashtbl.find_or_make t 3 (fun () -> Lwt.return (Ok 3)) in
+  let* _ = IntESHashtbl.find_or_make t 4 (fun () -> Lwt.return (Ok 4)) in
+  let* _ = IntESHashtbl.find_or_make t 5 (fun () -> Lwt.return (Error [])) in
+  let* () =
+    Lwt.catch
+      (fun () ->
+        let* _ = IntESHashtbl.find_or_make t 6 (fun () -> Lwt.fail Not_found) in
+        Assert.fail_msg "Not_found exception should propagate")
+      (function Not_found -> Lwt.return_unit | exn -> Lwt.fail exn)
+  in
   let l = IntESHashtbl.length t in
   if not (l = 3) then Assert.fail "3" (Format.asprintf "%d" l) "length"
   else Lwt.return_unit
@@ -106,42 +113,48 @@ let test_order _ _ =
   let world = ref [] in
   (* PROMISE A *)
   let p_a =
-    IntESHashtbl.find_or_make t 0 (fun () ->
-        wter >>= fun r ->
-        world := "a_inner" :: !world ;
-        Lwt.return r)
-    >>= fun r_a ->
+    let* r_a =
+      IntESHashtbl.find_or_make t 0 (fun () ->
+          let* r = wter in
+          world := "a_inner" :: !world ;
+          Lwt.return r)
+    in
     world := "a_outer" :: !world ;
     Lwt.return r_a
   in
-  Lwt_main.yield () >>= fun () ->
+  let* () = Lwt.pause () in
   (* PROMISE B *)
   let p_b =
-    IntESHashtbl.find_or_make t 0 (fun () ->
-        world := "b_inner" :: !world ;
-        Lwt.return (Ok 1024))
-    >>= fun r_b ->
+    let* r_b =
+      IntESHashtbl.find_or_make t 0 (fun () ->
+          world := "b_inner" :: !world ;
+          Lwt.return (Ok 1024))
+    in
     world := "b_outer" :: !world ;
     Lwt.return r_b
   in
-  Lwt_main.yield () >>= fun () ->
+  let* () = Lwt.pause () in
   (* Wake up A *)
   Lwt.wakeup wker (Ok 0) ;
   (* Check that both A and B get expected results *)
-  (p_a >>= function
-   | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make(a)"
-   | Ok n ->
-       if not (n = 0) then
-         Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make(a)"
-       else Lwt.return_unit)
-  >>= fun () ->
-  (p_b >>= function
-   | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make(b)"
-   | Ok n ->
-       if not (n = 0) then
-         Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make(b)"
-       else Lwt.return_unit)
-  >>= fun () ->
+  let* () =
+    let* r = p_a in
+    match r with
+    | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make(a)"
+    | Ok n ->
+        if not (n = 0) then
+          Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make(a)"
+        else Lwt.return_unit
+  in
+  let* () =
+    let* r = p_b in
+    match r with
+    | Error _ -> Assert.fail "Ok 0" "Error _" "find_or_make(b)"
+    | Ok n ->
+        if not (n = 0) then
+          Assert.fail "Ok 0" (Format.asprintf "Ok %d" n) "find_or_make(b)"
+        else Lwt.return_unit
+  in
   (* Check that the `world` record is as expected *)
   match !world with
   | ["b_outer"; "a_outer"; "a_inner"] | ["a_outer"; "b_outer"; "a_inner"] ->

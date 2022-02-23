@@ -153,7 +153,8 @@ module Context : sig
      which are necessary. *)
 
   type source_of_cache =
-    [ `Load
+    [ `Force_load  (** Force the cache domain to be reloaded from the context. *)
+    | `Load
       (** Load a cache by iterating over the keys of its domain and by
           building a cached value for each key. *)
     | `Lazy
@@ -178,18 +179,24 @@ module Context : sig
      associated value. *)
   type builder = cache_key -> cache_value tzresult Lwt.t
 
-  (** [load_cache ctxt source builder] populates the in-memory cache
-     with values cached in the current context. To achieve that, the
-     function uses the strategy described by [source_of_cache],
-     exploiting the [builder] to create cached values that are not
-     already available in memory.
+  (** [load_cache predecessor ctxt source builder] populates the
+     in-memory cache values cached in the current context during the
+     validation of [predecessor] block. To achieve that, the function
+     uses the strategy described by [source], exploiting the [builder]
+     to create cached values that are not already available in memory.
 
      The [builder] is assumed to never fail when evaluated on the keys
      of the cache domain. Indeed, if a key had an associated value in
      the cache at some point in the past, it should have been a valid
      key. In other words, the construction of cache should be
      reproducible. For this reason, an error in [builder] is fatal. *)
-  val load_cache : t -> source_of_cache -> builder -> t tzresult Lwt.t
+  val load_cache :
+    Block_hash.t -> t -> source_of_cache -> builder -> t tzresult Lwt.t
+
+  (** This function is not documented on purpose. It can be removed if
+     a successor of Hangzhou contains a fix. *)
+  val reset_cache_cache_hangzhou_issue_do_not_use_except_if_you_know_what_you_are_doing :
+    unit -> unit
 end
 
 module Register (C : CONTEXT) : sig

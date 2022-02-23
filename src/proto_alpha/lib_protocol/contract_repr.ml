@@ -135,31 +135,18 @@ let is_implicit = function Implicit m -> Some m | Originated _ -> None
 
 let is_originated = function Implicit _ -> None | Originated h -> Some h
 
-type origination_nonce = {
-  operation_hash : Operation_hash.t;
-  origination_index : int32;
-}
-
-let origination_nonce_encoding =
-  let open Data_encoding in
-  conv
-    (fun {operation_hash; origination_index} ->
-      (operation_hash, origination_index))
-    (fun (operation_hash, origination_index) ->
-      {operation_hash; origination_index})
-  @@ obj2 (req "operation" Operation_hash.encoding) (dft "index" int32 0l)
-
 let originated_contract nonce =
   let data =
-    Data_encoding.Binary.to_bytes_exn origination_nonce_encoding nonce
+    Data_encoding.Binary.to_bytes_exn Origination_nonce.encoding nonce
   in
   Originated (Contract_hash.hash_bytes [data])
 
 let originated_contracts
-    ~since:{origination_index = first; operation_hash = first_hash}
+    ~since:
+      Origination_nonce.{origination_index = first; operation_hash = first_hash}
     ~until:
-      ({origination_index = last; operation_hash = last_hash} as
-      origination_nonce) =
+      (Origination_nonce.{origination_index = last; operation_hash = last_hash}
+      as origination_nonce) =
   assert (Operation_hash.equal first_hash last_hash) ;
   let[@coq_struct "origination_index"] rec contracts acc origination_index =
     if Compare.Int32.(origination_index < first) then acc
@@ -169,13 +156,6 @@ let originated_contracts
       contracts acc (Int32.pred origination_index)
   in
   contracts [] (Int32.pred last)
-
-let initial_origination_nonce operation_hash =
-  {operation_hash; origination_index = 0l}
-
-let incr_origination_nonce nonce =
-  let origination_index = Int32.succ nonce.origination_index in
-  {nonce with origination_index}
 
 let rpc_arg =
   let construct = to_b58check in
@@ -201,8 +181,9 @@ module Index = struct
 
   let of_path = function
     | [key] ->
-        let raw_key = Hex.to_bytes (`Hex key) in
-        Data_encoding.Binary.of_bytes_opt encoding raw_key
+        Option.bind
+          (Hex.to_bytes (`Hex key))
+          (Data_encoding.Binary.of_bytes_opt encoding)
     | _ -> None
 
   let rpc_arg = rpc_arg

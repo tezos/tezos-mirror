@@ -1,0 +1,97 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[macros/compare_bytes.tz]
+
+Well typed
+Gas remaining: 1039968.322 units remaining
+{ parameter (pair bytes bytes) ;
+  storage (list bool) ;
+  code { CAR
+         /* [ @parameter pair bytes bytes ] */ ;
+         DUP
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes ] */ ;
+         DUP
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes ] */ ;
+         DUP
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes : @parameter pair bytes bytes ] */ ;
+         DUP
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes ] */ ;
+         DIIIIIP
+           { NIL bool /* [ list bool ] */ }
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes : list bool ] */ ;
+         DIIIIP
+           { DUP
+             /* [ @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+             CAR
+             /* [ bytes : @parameter pair bytes bytes : list bool ] */ ;
+             DIP { CDR /* [ bytes : list bool ] */ }
+             /* [ bytes : bytes : list bool ] */ ;
+             COMPARE
+             /* [ int : list bool ] */ ;
+             LE
+             /* [ bool : list bool ] */ ;
+             CONS
+             /* [ list bool ] */ }
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+         DIIIP
+           { DUP
+             /* [ @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+             CAR
+             /* [ bytes : @parameter pair bytes bytes : list bool ] */ ;
+             DIP { CDR /* [ bytes : list bool ] */ }
+             /* [ bytes : bytes : list bool ] */ ;
+             COMPARE
+             /* [ int : list bool ] */ ;
+             GE
+             /* [ bool : list bool ] */ ;
+             CONS
+             /* [ list bool ] */ }
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes
+            : @parameter pair bytes bytes : list bool ] */ ;
+         DIIP { DUP
+                /* [ @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+                CAR
+                /* [ bytes : @parameter pair bytes bytes : list bool ] */ ;
+                DIP { CDR /* [ bytes : list bool ] */ }
+                /* [ bytes : bytes : list bool ] */ ;
+                COMPARE
+                /* [ int : list bool ] */ ;
+                LT
+                /* [ bool : list bool ] */ ;
+                CONS
+                /* [ list bool ] */ }
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+         DIP { DUP
+               /* [ @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+               CAR
+               /* [ bytes : @parameter pair bytes bytes : list bool ] */ ;
+               DIP { CDR /* [ bytes : list bool ] */ }
+               /* [ bytes : bytes : list bool ] */ ;
+               COMPARE
+               /* [ int : list bool ] */ ;
+               GT
+               /* [ bool : list bool ] */ ;
+               CONS
+               /* [ list bool ] */ }
+         /* [ @parameter pair bytes bytes : list bool ] */ ;
+         DUP
+         /* [ @parameter pair bytes bytes : @parameter pair bytes bytes : list bool ] */ ;
+         CAR
+         /* [ bytes : @parameter pair bytes bytes : list bool ] */ ;
+         DIP { CDR /* [ bytes : list bool ] */ }
+         /* [ bytes : bytes : list bool ] */ ;
+         COMPARE
+         /* [ int : list bool ] */ ;
+         EQ
+         /* [ bool : list bool ] */ ;
+         CONS
+         /* [ list bool ] */ ;
+         NIL operation
+         /* [ list operation : list bool ] */ ;
+         PAIR
+         /* [ pair (list operation) (list bool) ] */ } }

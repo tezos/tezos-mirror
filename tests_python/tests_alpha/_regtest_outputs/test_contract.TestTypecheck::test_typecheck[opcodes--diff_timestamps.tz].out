@@ -1,0 +1,20 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/diff_timestamps.tz]
+
+Well typed
+Gas remaining: 1039994.373 units remaining
+{ parameter (pair timestamp timestamp) ;
+  storage int ;
+  code { CAR
+         /* [ @parameter pair timestamp timestamp ] */ ;
+         DUP
+         /* [ @parameter pair timestamp timestamp : @parameter pair timestamp timestamp ] */ ;
+         CAR
+         /* [ timestamp : @parameter pair timestamp timestamp ] */ ;
+         DIP { CDR /* [ timestamp ] */ }
+         /* [ timestamp : timestamp ] */ ;
+         SUB
+         /* [ int ] */ ;
+         NIL operation
+         /* [ list operation : int ] */ ;
+         PAIR
+         /* [ pair (list operation) int ] */ } }

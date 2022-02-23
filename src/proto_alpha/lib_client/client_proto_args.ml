@@ -129,12 +129,16 @@ let int_parameter =
   parameter (fun _ p ->
       try return (int_of_string p) with _ -> failwith "Cannot read int")
 
+let uri_parameter = parameter (fun _ x -> return (Uri.of_string x))
+
 let bytes_of_prefixed_string s =
-  try
-    if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then raise Exit
-    else return (Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2))))
-  with _ ->
-    failwith "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
+  match
+    if String.length s < 2 || s.[0] <> '0' || s.[1] <> 'x' then None
+    else Hex.to_bytes (`Hex (String.sub s 2 (String.length s - 2)))
+  with
+  | Some s -> return s
+  | None ->
+      failwith "Invalid bytes, expecting hexadecimal notation (e.g. 0x1234abcd)"
 
 let bytes_parameter = parameter (fun _ s -> bytes_of_prefixed_string s)
 
@@ -206,6 +210,12 @@ let force_switch =
        of block without a fitness greater than the  current head."
     ()
 
+let no_endorse_switch =
+  switch
+    ~long:"no-endorse"
+    ~doc:"Do not let the client automatically endorse a block that it baked."
+    ()
+
 let minimal_timestamp_switch =
   switch
     ~long:"minimal-timestamp"
@@ -253,6 +263,37 @@ let default_fee_arg =
     ~placeholder:"amount"
     ~doc:"default fee in \xEA\x9C\xA9 to pay to the baker for each transaction"
     (tez_parameter "--default-fee")
+
+let level_kind =
+  parameter (fun _ s ->
+      match Option.bind (Script_int.of_string s) Script_int.is_nat with
+      | Some n -> return n
+      | None -> failwith "invalid level (must be a positive number)")
+
+let level_arg =
+  arg
+    ~long:"level"
+    ~placeholder:"level"
+    ~doc:"Set the level to be returned by the LEVEL instruction"
+    level_kind
+
+let timestamp_parameter =
+  parameter (fun _ s ->
+      match Script_timestamp.of_string s with
+      | Some time -> return time
+      | None ->
+          failwith
+            "invalid timestamp, must be either a RFC 3339 string or a number \
+             of seconds since epoch.")
+
+let now_arg =
+  arg
+    ~long:"now"
+    ~placeholder:"timestamp"
+    ~doc:
+      "Set the timestamp to be returned by the NOW instruction. Allowed format \
+       are RFC 3339 (YYYY-MM-DDTHH:MM:SSZ) or number of seconds since epoch."
+    timestamp_parameter
 
 let gas_limit_kind =
   parameter (fun _ s ->
@@ -408,6 +449,17 @@ let burn_cap_arg =
          | Some t -> return t
          | None -> failwith "Bad burn cap"))
 
+let replace_by_fees_arg =
+  switch
+    ~long:"replace"
+    ~doc:
+      "Replace an existing pending transaction from the same source, if any, \
+       with another one with higher fees. There are no guarantees that the \
+       first operation will not be included or that the second one will be. \
+       But, only one of the operations at most will end in a block (in \
+       precheck mode)."
+    ()
+
 let no_waiting_for_endorsements_arg =
   switch
     ~long:"no-waiting-for-late-endorsements"
@@ -437,11 +489,10 @@ let endorsement_delay_arg =
          with _ -> fail (Bad_endorsement_delay s)))
 
 let preserved_levels_arg =
-  default_arg
+  arg
     ~long:"preserved-levels"
     ~placeholder:"threshold"
     ~doc:"Number of effective levels kept in the accuser's memory"
-    ~default:"4096"
     (parameter (fun _ s ->
          try
            let preserved_cycles = int_of_string s in

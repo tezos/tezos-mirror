@@ -29,9 +29,12 @@ val of_char: char -> char * char
 (** [of_char c] is the the hexadecimal encoding of the character
     [c]. *)
 
-val to_char: char -> char -> char
-(** [to_char x y] is the character correspondong to the [xy]
-    hexadecimal encoding. *)
+val to_char: char -> char -> char option
+(** [to_char x y] is the character corresponding to the [xy]
+    hexadecimal encoding.
+
+    Returns [None] if [x] or [y] are not in the ranges ['0'..'9'],
+    ['a'..'f'], or ['A'..'F']. *)
 
 (** {1:string Strings} *)
 
@@ -41,9 +44,12 @@ val of_string: ?ignore:char list -> string -> t
     when converting. Eg [of_string ~ignore:[' '] "a f"]. The default
     value of [ignore] is [[]]). *)
 
-val to_string: t -> string
+val to_string: t -> string option
 (** [to_string t] is the binary string [s] such that [of_string s] is
-    [t]. *)
+    [t].
+
+    Returns [None] if [t] contains a character that is not in the range ['0'..'9'],
+    ['a'..'f'], or ['A'..'F']. *)
 
 (** {1:byte Bytes} *)
 
@@ -53,9 +59,12 @@ val of_bytes: ?ignore:char list -> bytes -> t
     when converting. Eg [of_bytes ~ignore:[' '] "a f"]. The default
     value of [ignore] is [[]]). *)
 
-val to_bytes: t -> bytes
+val to_bytes: t -> bytes option
 (** [to_bytes t] is the binary string [s] such that [of_bytes s] is
-    [t]. *)
+    [t].
+
+    Returns [None] if [t] contains a character that is not in the range ['0'..'9'],
+    ['a'..'f'], or ['A'..'F']. *)
 
 (** {1 Debugging} *)
 

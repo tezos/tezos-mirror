@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Baking
+   Invocation:   dune exec tezt/tests/main.exe -- --file baking.ml
+   Subject:      Test the baker
+*)
+
 (* ------------------------------------------------------------------------- *)
 (* Typedefs *)
 
@@ -34,7 +41,7 @@ and branch = {branch : Block_hash.t}
 
 and protocol_data = {
   contents : operation_content list;
-  signature : signature option;
+  signature : string option;
 }
 
 and operation_content = {
@@ -47,8 +54,6 @@ and operation_content = {
   amount : string;
   destination : string;
 }
-
-and signature = string
 
 type mempool_operation =
   | Mempool_operation of {
@@ -69,7 +74,7 @@ let branch_encoding : branch Data_encoding.t =
     (fun branch -> {branch})
     (obj1 (req "branch" Block_hash.encoding))
 
-let signature_encoding : signature Data_encoding.t = Data_encoding.string
+let signature_encoding : string Data_encoding.t = Data_encoding.string
 
 let operation_content_encoding : operation_content Data_encoding.t =
   let open Data_encoding in
@@ -164,20 +169,28 @@ let mempool_encoding : mempool Data_encoding.t =
     (fun operations ->
       let applied = [] in
       let refused = [] in
+      let outdated = [] in
       let branch_refused = [] in
       let branch_delayed = [] in
       let unprocessed = operations in
-      (applied, refused, branch_refused, branch_delayed, unprocessed))
-    (fun (applied, refused, branch_refused, branch_delayed, unprocessed) ->
+      (applied, refused, outdated, branch_refused, branch_delayed, unprocessed))
+    (fun ( applied,
+           refused,
+           outdated,
+           branch_refused,
+           branch_delayed,
+           unprocessed ) ->
       assert (is_empty applied) ;
       assert (is_empty refused) ;
+      assert (is_empty outdated) ;
       assert (is_empty branch_refused) ;
       assert (is_empty branch_delayed) ;
       unprocessed)
-    (obj5
+    (obj6
        (* We put [unit] as a stub *)
        (req "applied" (list (dynamic_size unit)))
        (req "refused" (list (dynamic_size unit)))
+       (req "outdated" (list (dynamic_size unit)))
        (req "branch_refused" (list (dynamic_size unit)))
        (req "branch_delayed" (list (dynamic_size unit)))
        (req
@@ -199,7 +212,7 @@ type state = {
   protocol : Tezos_crypto.Protocol_hash.t;
   sandbox_client : Tezt_tezos.Client.t;
   sandbox_node : Tezt_tezos.Node.t;
-  counters : (Constant.key, int) Hashtbl.t;
+  counters : (Account.key, int) Hashtbl.t;
 }
 
 let bootstraps =
@@ -247,20 +260,10 @@ let encode_unsigned_operation_to_binary state op =
   in
   return Hex.(to_bytes (`Hex (JSON.as_string json_hex)))
 
-let sign_operation_bytes (signer : Constant.key) (msg : Bytes.t) =
-  let open Tezos_crypto in
-  let b58_secret_key =
-    match String.split_on_char ':' signer.secret with
-    | ["unencrypted"; rest] -> rest
-    | _ -> Test.fail "Could not parse secret key"
-  in
-  let sk = Signature.Secret_key.of_b58check_exn b58_secret_key in
-  Signature.(sign ~watermark:Generic_operation sk msg)
-
 let mempool_operation_from_op state signer op :
     (mempool_operation * bytes) Lwt.t =
   let* bin = encode_unsigned_operation_to_binary state op in
-  let signature = sign_operation_bytes signer bin in
+  let signature = Operation.sign_manager_op_bytes ~signer bin in
   let signature = Tezos_crypto.Signature.to_b58check signature in
   return
     ( Mempool_operation
@@ -313,13 +316,13 @@ let sample_next_transfer_for state ~fee ~branch ~account =
             [
               {
                 kind = "transaction";
-                source = account.Constant.identity;
+                source = account.Account.public_key_hash;
                 fee = string_of_int fee;
                 counter = string_of_int (get_next_counter state account);
                 gas_limit = string_of_int 2000;
                 storage_limit = string_of_int 0;
                 amount = string_of_int amount;
-                destination = receiver.Constant.identity;
+                destination = receiver.Account.public_key_hash;
               };
             ];
           signature = None;
@@ -328,7 +331,7 @@ let sample_next_transfer_for state ~fee ~branch ~account =
   in
   return operation
 
-let bake_with_mempool state mempool =
+let bake_with_mempool ?protocol state mempool =
   let mempool_json = Data_encoding.Json.construct mempool_encoding mempool in
   let mempool_str = Ezjsonm.value_to_string mempool_json in
   let mempool = Temp.file "mempool.json" in
@@ -339,6 +342,7 @@ let bake_with_mempool state mempool =
   (* Use --context's client argument to prevent the node from sorting
      the operations. *)
   Client.bake_for
+    ?protocol
     ~mempool
     ~force:true
     ~context_path:(Node.data_dir state.sandbox_node // "context")
@@ -386,8 +390,14 @@ let check_ordering ops =
 
 let assert_block_is_well_baked block =
   match JSON.(as_list (block |-> "operations")) with
-  | [empty1; empty2; empty3; manager_ops] ->
-      List.iter (fun l -> assert (JSON.as_list l = [])) [empty1; empty2; empty3] ;
+  | [endorsement_ops; vote_ops; anonymous_ops; manager_ops] ->
+      (* There very well might be endorsement operations *)
+      Log.debug
+        "%d endorsement operations"
+        (List.length (JSON.as_list endorsement_ops)) ;
+      List.iter
+        (fun l -> assert (JSON.as_list l = []))
+        [vote_ops; anonymous_ops] ;
       let fees_managers_and_counters =
         List.map
           (fun json -> get_fees_manager_and_counter json)
@@ -447,8 +457,8 @@ let distinct_bakers_increasing_fees state : mempool Lwt.t =
 (* ------------------------------------------------------------------------- *)
 (* Test entrypoints *)
 
-let bake_and_check state ~mempool =
-  let* () = bake_with_mempool state mempool in
+let bake_and_check state ~protocol ~mempool =
+  let* () = bake_with_mempool ~protocol state mempool in
   let* block =
     Client.(rpc GET ["chains"; "main"; "blocks"; "head"] state.sandbox_client)
   in
@@ -456,7 +466,7 @@ let bake_and_check state ~mempool =
   return ()
 
 let init ~protocol =
-  let* sandbox_node = Node.init [Bootstrap_threshold 0; Private_mode] in
+  let* sandbox_node = Node.init [Synchronisation_threshold 0; Private_mode] in
   let* sandbox_client = Client.init ~endpoint:(Node sandbox_node) () in
   let* () = Client.activate_protocol ~protocol sandbox_client in
   Log.info "Activated protocol." ;
@@ -479,9 +489,80 @@ let test_ordering =
   let* mempool =
     single_baker_increasing_fees state ~account:Constant.bootstrap1
   in
-  let* () = bake_and_check state ~mempool in
+  let* () = bake_and_check state ~protocol ~mempool in
   Log.info "Testing ordering by fees" ;
   let* mempool = distinct_bakers_increasing_fees state in
-  bake_and_check state ~mempool
+  bake_and_check state ~protocol ~mempool
 
-let register ~protocols = test_ordering ~protocols
+let check_op_not_in_baked_block client op =
+  let* ops = RPC.get_operations client in
+  let open JSON in
+  let ops_list = ops |=> 3 |> as_list in
+  let res = List.exists (fun e -> e |-> "hash" |> as_string = op) ops_list in
+  if res then Test.fail "%s found in Baked block" op ;
+  unit
+
+let wrong_branch_operation_dismissal =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"wrong branch operation dismissal"
+    ~tags:["baking"; "branch"]
+  @@ fun protocol ->
+  let* node = Node.init [Synchronisation_threshold 0; Private_mode] in
+  let* client = Client.init ~endpoint:(Node node) () in
+  let minimal_block_delay = 1 in
+  let* parameter_file =
+    Protocol.write_parameter_file
+      ~base:(Either.Right (protocol, None))
+      [
+        (["consensus_threshold"], Some "1");
+        ( ["minimal_block_delay"],
+          Some (Printf.sprintf "\"%d\"" minimal_block_delay) );
+        (["delay_increment_per_round"], Some "\"1\"");
+      ]
+  in
+  let* () =
+    Client.activate_protocol
+      ~timestamp_delay:0.
+      ~protocol
+      ~parameter_file
+      client
+  in
+  Log.info "Activated protocol." ;
+  Log.info "Baking a first proposal." ;
+  let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
+  (* Retrieve head's hash *)
+  let* head_hash =
+    let* json = RPC.get_block_hash client in
+    return (JSON.as_string json)
+  in
+  Log.info "Injecting a transfer branched on the current head." ;
+  let* (`OpHash oph) =
+    Operation.inject_transfer
+      ~branch:head_hash
+      ~amount:1
+      ~source:Constant.bootstrap1
+      ~dest:Constant.bootstrap2
+      client
+  in
+  let* current_mempool = RPC.get_mempool client in
+  Check.(
+    (current_mempool <> Tezt_tezos.Mempool.empty)
+      Tezt_tezos.Mempool.typ
+      ~error_msg:"unexpected empty mempool") ;
+  Log.info "Wait a bit in order to propose on a different round." ;
+  let* () = Lwt_unix.sleep (float minimal_block_delay) in
+  Log.info "Bake a second proposal at a different round." ;
+  let* () = Client.propose_for ~minimal_timestamp:false ~key:[] client in
+  Log.info "Checking that the transfer is dismissed from the current mempool." ;
+  let* current_mempool = RPC.get_mempool client in
+  Check.(
+    (current_mempool = Tezt_tezos.Mempool.empty)
+      Tezt_tezos.Mempool.typ
+      ~error_msg:"unexpected non-empty mempool") ;
+  Log.info "Checking that the transfer is not included in the current head." ;
+  check_op_not_in_baked_block client oph
+
+let register ~protocols =
+  test_ordering ~protocols ;
+  wrong_branch_operation_dismissal ~protocols

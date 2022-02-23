@@ -6,7 +6,7 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "data-encoding" { >= "0.4" & < "0.5" }
   "tezos-lwt-result-stdlib"
   "lwt" { >= "5.4.0" }
@@ -17,8 +17,9 @@ depends: [
   "tezos-stdlib"
   "ringo" { = "0.5" }
   "zarith" { >= "1.12" & < "1.13" }
+  "zarith_stubs_js"
   "tezos-hacl-glue-unix" {with-test}
-  "alcotest" {with-test  & >= "1.5.0" }
+  "alcotest" { with-test & >= "1.5.0" }
   "alcotest-lwt" { with-test & >= "1.5.0" }
   "qcheck-alcotest" {with-test}
   "tezos-test-helpers" {with-test}

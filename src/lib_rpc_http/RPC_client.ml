@@ -54,7 +54,11 @@ module type S = sig
 
   val full_logger : Format.formatter -> logger
 
-  type config = {endpoint : Uri.t; logger : logger}
+  type config = {
+    media_type : Media_type.t list;
+    endpoint : Uri.t;
+    logger : logger;
+  }
 
   val config_encoding : config Data_encoding.t
 
@@ -96,9 +100,17 @@ module type S = sig
     (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
     Lwt.t
 
-  type content_type = string * string
+  type content_type = Media_type.Content_type.t
 
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
+
+  val generic_media_type_call :
+    ?headers:(string * string) list ->
+    accept:Media_type.t list ->
+    ?body:Data_encoding.json ->
+    [< RPC_service.meth] ->
+    Uri.t ->
+    RPC_context.generic_call_result tzresult Lwt.t
 
   val generic_call :
     ?headers:(string * string) list ->
@@ -123,7 +135,7 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
 
   let full_logger = Client.full_logger
 
-  type content_type = string * string
+  type content_type = Media_type.Content_type.t
 
   type content = Cohttp_lwt.Body.t * content_type option * Media_type.t option
 
@@ -163,106 +175,177 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     | `Unauthorized_host host ->
         request_failed meth uri (Unauthorized_host host)
 
-  let handle_error meth uri (body, media, _) f =
+  let handle_error (body, content_type, _) f =
     Cohttp_lwt.Body.is_empty body >>= fun empty ->
-    if empty then return (f None)
+    if empty then return (content_type, f None)
     else
-      match media with
+      Cohttp_lwt.Body.to_string body >>= fun body ->
+      return (content_type, f (Some body))
+
+  let jsonify_other meth uri content_type error :
+      (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
+      Lwt.t =
+    let jsonify_body string_body =
+      match content_type with
       | Some ("application", "json") | None -> (
-          Cohttp_lwt.Body.to_string body >>= fun body ->
-          match Data_encoding.Json.from_string body with
-          | Ok body -> return (f (Some body))
+          match Data_encoding.Json.from_string string_body with
+          | Ok json_body -> return json_body
           | Error msg ->
               request_failed
                 meth
                 uri
                 (Unexpected_content
                    {
-                     content = body;
+                     content = string_body;
                      media_type = Media_type.(name json);
                      error = msg;
                    }))
-      | Some (l, r) ->
-          Cohttp_lwt.Body.to_string body >>= fun body ->
+      | Some content_type ->
           request_failed
             meth
             uri
             (Unexpected_content_type
                {
-                 received = l ^ "/" ^ r;
+                 received =
+                   Format.asprintf "%a" Media_type.Content_type.pp content_type;
                  acceptable = [Media_type.(name json)];
-                 body;
+                 body = string_body;
                })
-
-  let generic_json_call ?headers ?body meth uri :
-      (Data_encoding.json, Data_encoding.json option) RPC_context.rest_result
-      Lwt.t =
-    let body =
-      Option.map
-        (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
-        body
     in
-    let media = Media_type.json in
-    generic_call meth ?headers ~accept:Media_type.[bson; json] ?body ~media uri
-    >>=? function
-    | `Ok (body, (Some ("application", "json") | None), _) -> (
-        Cohttp_lwt.Body.to_string body >>= fun body ->
-        match Data_encoding.Json.from_string body with
-        | Ok json -> return (`Ok json)
-        | Error msg ->
-            request_failed
-              meth
-              uri
-              (Unexpected_content
-                 {
-                   content = body;
-                   media_type = Media_type.(name json);
-                   error = msg;
-                 }))
-    | `Ok (body, Some ("application", "bson"), _) -> (
-        Cohttp_lwt.Body.to_string body >>= fun body ->
-        match
-          Json_repr_bson.bytes_to_bson
-            ~laziness:false
-            ~copy:false
-            (Bytes.unsafe_of_string body)
-        with
-        | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
-            let error = Format.asprintf "(at offset: %d) %s" pos msg in
-            request_failed
-              meth
-              uri
-              (Unexpected_content
-                 {content = body; media_type = Media_type.(name bson); error})
-        | bson ->
-            return
-              (`Ok
-                (Json_repr.convert
-                   (module Json_repr_bson.Repr)
-                   (module Json_repr.Ezjsonm)
-                   bson)))
-    | `Ok (body, Some (l, r), _) ->
+    let jsonify_body_opt = function
+      | None -> return_none
+      | Some string_body ->
+          jsonify_body string_body >>=? fun json_body -> return_some json_body
+    in
+    match error with
+    | `Conflict s -> jsonify_body_opt s >|=? fun s -> `Conflict s
+    | `Error s -> jsonify_body_opt s >|=? fun s -> `Error s
+    | `Forbidden s -> jsonify_body_opt s >|=? fun s -> `Forbidden s
+    | `Not_found s -> jsonify_body_opt s >|=? fun s -> `Not_found s
+    | `Gone s -> jsonify_body_opt s >|=? fun s -> `Gone s
+    | `Unauthorized s -> jsonify_body_opt s >|=? fun s -> `Unauthorized s
+    | `Ok s -> jsonify_body s >|=? fun s -> `Ok s
+
+  let post_process_error_responses response meth uri accept =
+    match response with
+    | `Conflict body -> handle_error body (fun v -> `Conflict v)
+    | `Error body -> handle_error body (fun v -> `Error v)
+    | `Forbidden body -> handle_error body (fun v -> `Forbidden v)
+    | `Not_found body ->
+        (* The client's proxy mode matches on the `Not_found returned here,
+           to detect that a local RPC is unavailable at generic_json_call,
+           and hence that delegation to the endpoint must be done. *)
+        handle_error body (fun v -> `Not_found v)
+    | `Gone body -> handle_error body (fun v -> `Gone v)
+    | `Unauthorized body -> handle_error body (fun v -> `Unauthorized v)
+    | `Ok (body, (Some _ as content_type), _) ->
         Cohttp_lwt.Body.to_string body >>= fun body ->
         request_failed
           meth
           uri
           (Unexpected_content_type
              {
-               received = l ^ "/" ^ r;
-               acceptable = [Media_type.(name json)];
+               received =
+                 Format.asprintf
+                   "%a"
+                   (Format.pp_print_option Media_type.Content_type.pp)
+                   content_type;
+               acceptable = List.map Media_type.name accept;
                body;
              })
-    | `Conflict body -> handle_error meth uri body (fun v -> `Conflict v)
-    | `Error body -> handle_error meth uri body (fun v -> `Error v)
-    | `Forbidden body -> handle_error meth uri body (fun v -> `Forbidden v)
-    | `Not_found body ->
-        (* The client's proxy mode matches on the `Not_found returned here,
-           to detect that a local RPC is unavailable at generic_json_call,
-           and hence that delegation to the endpoint must be done. *)
-        handle_error meth uri body (fun v -> `Not_found v)
-    | `Gone body -> handle_error meth uri body (fun v -> `Gone v)
-    | `Unauthorized body ->
-        handle_error meth uri body (fun v -> `Unauthorized v)
+    | `Ok (body, None, _) ->
+        Cohttp_lwt.Body.to_string body >>= fun body -> return (None, `Ok body)
+
+  let post_process_json_response ~body meth uri =
+    match Data_encoding.Json.from_string body with
+    | Ok json -> return json
+    | Error msg ->
+        request_failed
+          meth
+          uri
+          (Unexpected_content
+             {content = body; media_type = Media_type.(name json); error = msg})
+
+  let post_process_bson_response ~body meth uri =
+    match
+      Json_repr_bson.bytes_to_bson
+        ~laziness:false
+        ~copy:false
+        (Bytes.of_string body)
+    with
+    | exception Json_repr_bson.Bson_decoding_error (msg, _, pos) ->
+        let error = Format.asprintf "(at offset: %d) %s" pos msg in
+        request_failed
+          meth
+          uri
+          (Unexpected_content
+             {content = body; media_type = Media_type.(name bson); error})
+    | bson ->
+        return
+          (Json_repr.convert
+             (module Json_repr_bson.Repr)
+             (module Json_repr.Ezjsonm)
+             bson)
+
+  let generic_json_call ?headers ?body meth uri =
+    let body =
+      Option.map
+        (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+        body
+    in
+    let media = Media_type.json in
+    generic_call ?headers ?body meth ~accept:Media_type.[json; bson] ~media uri
+    >>=? fun response ->
+    match response with
+    | `Ok (body, Some ("application", "json"), _) ->
+        Cohttp_lwt.Body.to_string body >>= fun body ->
+        post_process_json_response ~body meth uri >>=? fun body ->
+        return (`Ok body)
+    | `Ok (body, Some ("application", "bson"), _) ->
+        Cohttp_lwt.Body.to_string body >>= fun body ->
+        post_process_bson_response ~body meth uri >>=? fun body ->
+        return (`Ok body)
+    | _ ->
+        post_process_error_responses response meth uri Media_type.[json; bson]
+        >>=? fun (content_type, other) ->
+        jsonify_other meth uri content_type other
+
+  (* This function checks that the content type of the answer belongs to accepted ones in [accept]. If not, it is processed as an error. If the answer lacks content-type, the response is decoded as JSON if possible. *)
+  let generic_media_type_call ?headers ~accept ?body meth uri :
+      RPC_context.generic_call_result tzresult Lwt.t =
+    let body =
+      Option.map
+        (fun b -> Cohttp_lwt.Body.of_string (Data_encoding.Json.to_string b))
+        body
+    in
+    let media = Media_type.json in
+    generic_call meth ?headers ~accept ?body ~media uri >>=? fun response ->
+    match response with
+    | `Ok (body, Some ("application", "octet-stream"), _)
+      when List.mem ~equal:( == ) Media_type.octet_stream accept -> (
+        Cohttp_lwt.Body.to_string body >>= fun body ->
+        (* The binary RPCs are prefixed with a size header, we remove it here. *)
+        match Data_encoding.Binary.of_string_opt Data_encoding.string body with
+        | Some response -> return (`Binary (`Ok response))
+        | None -> return (`Binary (`Error (Some body))))
+    | `Ok (body, Some ("application", "json"), _)
+      when List.mem ~equal:( == ) Media_type.json accept ->
+        Cohttp_lwt.Body.to_string body >>= fun body ->
+        post_process_json_response ~body meth uri >>=? fun body ->
+        return (`Json (`Ok body))
+    | `Ok (body, Some ("application", "bson"), _)
+      when List.mem ~equal:( == ) Media_type.bson accept ->
+        Cohttp_lwt.Body.to_string body >>= fun body ->
+        post_process_bson_response ~body meth uri >>=? fun body ->
+        return (`Json (`Ok body))
+    | _ -> (
+        post_process_error_responses response meth uri accept
+        >>=? fun (content_type, other_resp) ->
+        (* We attempt to decode in JSON. It might
+           work. *)
+        jsonify_other meth uri content_type other_resp >>= function
+        | Ok jsonified -> return (`Json jsonified)
+        | Error _ -> return (`Other (content_type, other_resp)))
 
   let handle accept (meth, uri, ans) =
     match ans with
@@ -352,29 +435,46 @@ module Make (Client : Resto_cohttp_client.Client.CALL) = struct
     Client.call_service ?logger ?headers ~base accept service params query body
     >>= fun ans -> handle accept ans
 
-  type config = {endpoint : Uri.t; logger : logger}
+  type config = {
+    media_type : Media_type.t list;
+    endpoint : Uri.t;
+    logger : logger;
+  }
 
   let config_encoding =
     let open Data_encoding in
     conv
-      (fun {endpoint; logger = _} -> endpoint)
-      (fun endpoint -> {endpoint; logger = null_logger})
-      (obj1 (req "endpoint" RPC_encoding.uri_encoding))
+      (fun {media_type; endpoint; logger = _} -> (media_type, endpoint))
+      (fun (media_type, endpoint) ->
+        {media_type; endpoint; logger = null_logger})
+      (obj2
+         (req "media-type" (list Media_type.encoding))
+         (req "endpoint" RPC_encoding.uri_encoding))
 
   let default_config =
-    {endpoint = Uri.of_string "http://localhost:8732"; logger = null_logger}
+    {
+      media_type = Media_type.all_media_types;
+      endpoint = Uri.of_string "http://localhost:8732";
+      logger = null_logger;
+    }
 
   class http_ctxt config media_types : RPC_context.json =
     let base = config.endpoint in
     let logger = config.logger in
+    let call meth uri f =
+      let path = Uri.path uri and query = Uri.query uri in
+      let prefix = Uri.path base in
+      let prefixed_path = if prefix = "" then path else prefix ^ "/" ^ path in
+      let uri = Uri.with_path base prefixed_path in
+      let uri = Uri.with_query uri query in
+      f meth uri
+    in
     object
       method generic_json_call meth ?body uri =
-        let path = Uri.path uri and query = Uri.query uri in
-        let prefix = Uri.path base in
-        let prefixed_path = if prefix = "" then path else prefix ^ "/" ^ path in
-        let uri = Uri.with_path base prefixed_path in
-        let uri = Uri.with_query uri query in
-        generic_json_call meth ?body uri
+        call meth uri (generic_json_call ?body)
+
+      method generic_media_type_call meth ?body uri =
+        call meth uri (generic_media_type_call ?body ~accept:config.media_type)
 
       method call_service
           : 'm 'p 'q 'i 'o.

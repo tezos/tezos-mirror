@@ -12,8 +12,9 @@
   hashcons
   benchmark-utils
   tezos-011-PtHangz2-test-helpers
-  staTz)
+  prbnmcn-stats)
  (library_flags (:standard -linkall))
+ (private_modules kernel rules state_space)
  (flags (:standard -open Tezos_stdlib
                    -open Tezos_base
                    -open Tezos_error_monad

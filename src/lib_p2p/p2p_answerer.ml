@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2019 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2019-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -47,7 +47,7 @@ type 'msg conn_info = {
           to the internal [peer_id]. It must return [Ok true] if the message
           has been successfully sent, [Ok false] if the message has been
           dropped, or fails with a corresponding error otherwise. *)
-  messages : (int * 'msg) Lwt_pipe.t;
+  messages : (int * 'msg) Lwt_pipe.Maybe_bounded.t;
 }
 
 type request_info = {

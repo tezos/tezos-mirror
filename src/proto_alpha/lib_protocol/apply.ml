@@ -27,111 +27,131 @@
 
 open Alpha_context
 
-type error += Wrong_voting_period of int32 * int32
-
-(* `Temporary *)
-
-type error += Wrong_endorsement_predecessor of Block_hash.t * Block_hash.t
-
-(* `Temporary *)
-
-type error += Duplicate_endorsement of Signature.Public_key_hash.t
-
-(* `Branch *)
-
-type error += Invalid_endorsement_level
-
-type error += Invalid_endorsement_wrapper
-
-type error += Invalid_commitment of {expected : bool}
-
-type error += Internal_operation_replay of packed_internal_operation
-
-type error += Invalid_double_endorsement_evidence (* `Permanent *)
-
 type error +=
-  | Inconsistent_double_endorsement_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
+  | (* `Permanent *)
+      Not_enough_endorsements of {
+      required : int;
+      endorsements : int;
     }
-
-(* `Permanent *)
-
-type error += Unwrapped_endorsement (* `Permanent *)
-
-type error += Unrequired_double_endorsement_evidence (* `Branch*)
-
-type error +=
-  | Too_early_double_endorsement_evidence of {
-      level : Raw_level.t;
-      current : Raw_level.t;
-    }
-
-(* `Temporary *)
-
-type error +=
-  | Outdated_double_endorsement_evidence of {
-      level : Raw_level.t;
-      last : Raw_level.t;
-    }
-
-(* `Permanent *)
-
-type error +=
-  | Invalid_double_baking_evidence of {
+  | (* `Temporary *)
+      Wrong_consensus_operation_branch of
+      Block_hash.t * Block_hash.t
+  | (* `Permanent *)
+      Invalid_double_baking_evidence of {
       hash1 : Block_hash.t;
-      level1 : Int32.t;
+      level1 : Raw_level.t;
+      round1 : Round.t;
       hash2 : Block_hash.t;
-      level2 : Int32.t;
+      level2 : Raw_level.t;
+      round2 : Round.t;
     }
-
-(* `Permanent *)
-
-type error +=
-  | Inconsistent_double_baking_evidence of {
-      delegate1 : Signature.Public_key_hash.t;
-      delegate2 : Signature.Public_key_hash.t;
+  | (* `Permanent *)
+      Wrong_level_for_consensus_operation of {
+      expected : Raw_level.t;
+      provided : Raw_level.t;
     }
-
-(* `Permanent *)
-
-type error += Unrequired_double_baking_evidence (* `Branch*)
-
-type error +=
-  | Too_early_double_baking_evidence of {
-      level : Raw_level.t;
-      current : Raw_level.t;
+  | (* `Permanent *)
+      Wrong_round_for_consensus_operation of {
+      expected : Round.t;
+      provided : Round.t;
     }
-
-(* `Temporary *)
-
-type error +=
-  | Outdated_double_baking_evidence of {level : Raw_level.t; last : Raw_level.t}
-
-(* `Permanent *)
-
-type error += Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
-
-type error += Multiple_revelation
-
-type error += Gas_quota_exceeded_init_deserialize (* Permanent *)
-
-type error += (* `Permanent *) Inconsistent_sources
-
-type error += (* `Permanent *) Failing_noop_error
+  | (* `Permanent *)
+      Preendorsement_round_too_high of {
+      block_round : Round.t;
+      provided : Round.t;
+    }
+  | (* `Permanent *)
+      Unexpected_endorsement_in_block
+  | (* `Permanent *)
+      Unexpected_preendorsement_in_block
+  | (* `Permanent *)
+      Wrong_payload_hash_for_consensus_operation of {
+      expected : Block_payload_hash.t;
+      provided : Block_payload_hash.t;
+    }
+  | (* `Permanent *) Wrong_slot_used_for_consensus_operation
+  | (* `Temporary *)
+      Consensus_operation_for_future_level of {
+      expected : Raw_level.t;
+      provided : Raw_level.t;
+    }
+  | (* `Temporary *)
+      Consensus_operation_for_future_round of {
+      expected : Round.t;
+      provided : Round.t;
+    }
+  | (* `Outdated *)
+      Consensus_operation_for_old_level of {
+      expected : Raw_level.t;
+      provided : Raw_level.t;
+    }
+  | (* `Branch *)
+      Consensus_operation_for_old_round of {
+      expected : Round.t;
+      provided : Round.t;
+    }
+  | (* `Branch *)
+      Consensus_operation_on_competing_proposal of {
+      expected : Block_payload_hash.t;
+      provided : Block_payload_hash.t;
+    }
+  | (* `Permanent *)
+      Set_deposits_limit_on_originated_contract
+  | (* `Temporary *)
+      Set_deposits_limit_on_unregistered_delegate of
+      Signature.Public_key_hash.t
+  | (* `Permanent *)
+      Set_deposits_limit_too_high of {
+      limit : Tez.t;
+      max_limit : Tez.t;
+    }
+  | (* `Branch *) Empty_transaction of Contract.t
+  | (* `Permanent *)
+      Tx_rollup_disabled
 
 let () =
   register_error_kind
-    `Temporary
-    ~id:"operation.wrong_endorsement_predecessor"
-    ~title:"Wrong endorsement predecessor"
+    `Permanent
+    ~id:"operations.wrong_slot"
+    ~title:"wrong slot"
+    ~description:"wrong slot"
+    ~pp:(fun ppf () -> Format.fprintf ppf "wrong slot")
+    Data_encoding.empty
+    (function Wrong_slot_used_for_consensus_operation -> Some () | _ -> None)
+    (fun () -> Wrong_slot_used_for_consensus_operation) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.not_enough_endorsements"
+    ~title:"Not enough endorsements"
     ~description:
-      "Trying to include an endorsement in a block that is not the successor \
-       of the endorsed one"
+      "The block being validated does not include the required minimum number \
+       of endorsements."
+    ~pp:(fun ppf (required, endorsements) ->
+      Format.fprintf
+        ppf
+        "Wrong number of endorsements (%i), at least %i are expected"
+        endorsements
+        required)
+    Data_encoding.(obj2 (req "required" int31) (req "endorsements" int31))
+    (function
+      | Not_enough_endorsements {required; endorsements} ->
+          Some (required, endorsements)
+      | _ -> None)
+    (fun (required, endorsements) ->
+      Not_enough_endorsements {required; endorsements}) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.wrong_consensus_operation_branch"
+    ~title:"Wrong consensus operation branch"
+    ~description:
+      "Trying to include an endorsement or preendorsement which points to the \
+       wrong block.\n\
+      \       It should be the predecessor for preendorsements and the \
+       grandfather for endorsements."
     ~pp:(fun ppf (e, p) ->
       Format.fprintf
         ppf
-        "Wrong predecessor %a, expected %a"
+        "Wrong branch %a, expected %a"
         Block_hash.pp
         p
         Block_hash.pp
@@ -140,8 +160,406 @@ let () =
       obj2
         (req "expected" Block_hash.encoding)
         (req "provided" Block_hash.encoding))
-    (function Wrong_endorsement_predecessor (e, p) -> Some (e, p) | _ -> None)
-    (fun (e, p) -> Wrong_endorsement_predecessor (e, p)) ;
+    (function
+      | Wrong_consensus_operation_branch (e, p) -> Some (e, p) | _ -> None)
+    (fun (e, p) -> Wrong_consensus_operation_branch (e, p)) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.invalid_double_baking_evidence"
+    ~title:"Invalid double baking evidence"
+    ~description:
+      "A double-baking evidence is inconsistent  (two distinct level)"
+    ~pp:(fun ppf (hash1, level1, round1, hash2, level2, round2) ->
+      Format.fprintf
+        ppf
+        "Invalid double-baking evidence (hash: %a and %a, levels/rounds: \
+         (%ld,%ld) and (%ld,%ld))"
+        Block_hash.pp
+        hash1
+        Block_hash.pp
+        hash2
+        (Raw_level.to_int32 level1)
+        (Round.to_int32 round1)
+        (Raw_level.to_int32 level2)
+        (Round.to_int32 round2))
+    Data_encoding.(
+      obj6
+        (req "hash1" Block_hash.encoding)
+        (req "level1" Raw_level.encoding)
+        (req "round1" Round.encoding)
+        (req "hash2" Block_hash.encoding)
+        (req "level2" Raw_level.encoding)
+        (req "round2" Round.encoding))
+    (function
+      | Invalid_double_baking_evidence
+          {hash1; level1; round1; hash2; level2; round2} ->
+          Some (hash1, level1, round1, hash2, level2, round2)
+      | _ -> None)
+    (fun (hash1, level1, round1, hash2, level2, round2) ->
+      Invalid_double_baking_evidence
+        {hash1; level1; round1; hash2; level2; round2}) ;
+  register_error_kind
+    `Permanent
+    ~id:"wrong_level_for_consensus_operation"
+    ~title:"wrong level for consensus operation"
+    ~description:"Wrong level for consensus operation."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Wrong level for consensus operation (expected: %a, provided: %a)."
+        Raw_level.pp
+        expected
+        Raw_level.pp
+        provided)
+    Data_encoding.(
+      obj2
+        (req "expected" Raw_level.encoding)
+        (req "provided" Raw_level.encoding))
+    (function
+      | Wrong_level_for_consensus_operation {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Wrong_level_for_consensus_operation {expected; provided}) ;
+  register_error_kind
+    `Permanent
+    ~id:"wrong_round_for_consensus_operation"
+    ~title:"wrong round for consensus operation"
+    ~description:"Wrong round for consensus operation."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Wrong round for consensus operation (expected: %a, provided: %a)."
+        Round.pp
+        expected
+        Round.pp
+        provided)
+    Data_encoding.(
+      obj2 (req "expected" Round.encoding) (req "provided" Round.encoding))
+    (function
+      | Wrong_round_for_consensus_operation {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Wrong_round_for_consensus_operation {expected; provided}) ;
+  register_error_kind
+    `Permanent
+    ~id:"preendorsement_round_too_high"
+    ~title:"preendorsement round too high"
+    ~description:"Preendorsement round too high."
+    ~pp:(fun ppf (block_round, provided) ->
+      Format.fprintf
+        ppf
+        "Preendorsement round too high (block_round: %a, provided: %a)."
+        Round.pp
+        block_round
+        Round.pp
+        provided)
+    Data_encoding.(
+      obj2 (req "block_round" Round.encoding) (req "provided" Round.encoding))
+    (function
+      | Preendorsement_round_too_high {block_round; provided} ->
+          Some (block_round, provided)
+      | _ -> None)
+    (fun (block_round, provided) ->
+      Preendorsement_round_too_high {block_round; provided}) ;
+  register_error_kind
+    `Permanent
+    ~id:"wrong_payload_hash_for_consensus_operation"
+    ~title:"wrong payload hash for consensus operation"
+    ~description:"Wrong payload hash for consensus operation."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Wrong payload hash for consensus operation (expected: %a, provided: \
+         %a)."
+        Block_payload_hash.pp_short
+        expected
+        Block_payload_hash.pp_short
+        provided)
+    Data_encoding.(
+      obj2
+        (req "expected" Block_payload_hash.encoding)
+        (req "provided" Block_payload_hash.encoding))
+    (function
+      | Wrong_payload_hash_for_consensus_operation {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Wrong_payload_hash_for_consensus_operation {expected; provided}) ;
+  register_error_kind
+    `Permanent
+    ~id:"unexpected_endorsement_in_block"
+    ~title:"unexpected endorsement in block"
+    ~description:"Unexpected endorsement in block."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected endorsement in block.")
+    Data_encoding.empty
+    (function Unexpected_endorsement_in_block -> Some () | _ -> None)
+    (fun () -> Unexpected_endorsement_in_block) ;
+  register_error_kind
+    `Permanent
+    ~id:"unexpected_preendorsement_in_block"
+    ~title:"unexpected preendorsement in block"
+    ~description:"Unexpected preendorsement in block."
+    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected preendorsement in block.")
+    Data_encoding.empty
+    (function Unexpected_preendorsement_in_block -> Some () | _ -> None)
+    (fun () -> Unexpected_preendorsement_in_block) ;
+  register_error_kind
+    `Temporary
+    ~id:"consensus_operation_for_future_level"
+    ~title:"Consensus operation for future level"
+    ~description:"Consensus operation for future level."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Consensus operation for future level\n\
+        \                            (expected: %a, provided: %a)."
+        Raw_level.pp
+        expected
+        Raw_level.pp
+        provided)
+    Data_encoding.(
+      obj2
+        (req "expected" Raw_level.encoding)
+        (req "provided" Raw_level.encoding))
+    (function
+      | Consensus_operation_for_future_level {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Consensus_operation_for_future_level {expected; provided}) ;
+  register_error_kind
+    `Temporary
+    ~id:"consensus_operation_for_future_round"
+    ~title:"Consensus operation for future round"
+    ~description:"Consensus operation for future round."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Consensus operation for future round (expected: %a, provided: %a)."
+        Round.pp
+        expected
+        Round.pp
+        provided)
+    Data_encoding.(
+      obj2 (req "expected_max" Round.encoding) (req "provided" Round.encoding))
+    (function
+      | Consensus_operation_for_future_round {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Consensus_operation_for_future_round {expected; provided}) ;
+  register_error_kind
+    `Outdated
+    ~id:"consensus_operation_for_old_level"
+    ~title:"Consensus operation for old level"
+    ~description:"Consensus operation for old level."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Consensus operation for old level (expected: %a, provided: %a)."
+        Raw_level.pp
+        expected
+        Raw_level.pp
+        provided)
+    Data_encoding.(
+      obj2
+        (req "expected" Raw_level.encoding)
+        (req "provided" Raw_level.encoding))
+    (function
+      | Consensus_operation_for_old_level {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Consensus_operation_for_old_level {expected; provided}) ;
+  register_error_kind
+    `Branch
+    ~id:"consensus_operation_for_old_round"
+    ~title:"Consensus operation for old round"
+    ~description:"Consensus operation for old round."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Consensus operation for old round (expected_min: %a, provided: %a)."
+        Round.pp
+        expected
+        Round.pp
+        provided)
+    Data_encoding.(
+      obj2 (req "expected_min" Round.encoding) (req "provided" Round.encoding))
+    (function
+      | Consensus_operation_for_old_round {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Consensus_operation_for_old_round {expected; provided}) ;
+  register_error_kind
+    `Branch
+    ~id:"consensus_operation_on_competing_proposal"
+    ~title:"Consensus operation on competing proposal"
+    ~description:"Consensus operation on competing proposal."
+    ~pp:(fun ppf (expected, provided) ->
+      Format.fprintf
+        ppf
+        "Consensus operation on competing proposal (expected: %a, provided: \
+         %a)."
+        Block_payload_hash.pp_short
+        expected
+        Block_payload_hash.pp_short
+        provided)
+    Data_encoding.(
+      obj2
+        (req "expected" Block_payload_hash.encoding)
+        (req "provided" Block_payload_hash.encoding))
+    (function
+      | Consensus_operation_on_competing_proposal {expected; provided} ->
+          Some (expected, provided)
+      | _ -> None)
+    (fun (expected, provided) ->
+      Consensus_operation_on_competing_proposal {expected; provided}) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.set_deposits_limit_on_originated_contract"
+    ~title:"Set deposits limit on an originated contract"
+    ~description:"Cannot set deposits limit on an originated contract."
+    ~pp:(fun ppf () ->
+      Format.fprintf ppf "Cannot set deposits limit on an originated contract.")
+    Data_encoding.empty
+    (function
+      | Set_deposits_limit_on_originated_contract -> Some () | _ -> None)
+    (fun () -> Set_deposits_limit_on_originated_contract) ;
+  register_error_kind
+    `Temporary
+    ~id:"operation.set_deposits_limit_on_unregistered_delegate"
+    ~title:"Set deposits limit on an unregistered delegate"
+    ~description:"Cannot set deposits limit on an unregistered delegate."
+    ~pp:(fun ppf c ->
+      Format.fprintf
+        ppf
+        "Cannot set a deposits limit on the unregistered delegate %a."
+        Signature.Public_key_hash.pp
+        c)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    (function
+      | Set_deposits_limit_on_unregistered_delegate c -> Some c | _ -> None)
+    (fun c -> Set_deposits_limit_on_unregistered_delegate c) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.set_deposits_limit_too_high"
+    ~title:"Set deposits limit to a too high value"
+    ~description:
+      "Cannot set deposits limit such that the active stake overflows."
+    ~pp:(fun ppf (limit, max_limit) ->
+      Format.fprintf
+        ppf
+        "Cannot set deposits limit to %a as it is higher the allowed maximum \
+         %a."
+        Tez.pp
+        limit
+        Tez.pp
+        max_limit)
+    Data_encoding.(
+      obj2 (req "limit" Tez.encoding) (req "max_limit" Tez.encoding))
+    (function
+      | Set_deposits_limit_too_high {limit; max_limit} -> Some (limit, max_limit)
+      | _ -> None)
+    (fun (limit, max_limit) -> Set_deposits_limit_too_high {limit; max_limit}) ;
+  register_error_kind
+    `Branch
+    ~id:"contract.empty_transaction"
+    ~title:"Empty transaction"
+    ~description:"Forbidden to credit 0ꜩ to a contract without code."
+    ~pp:(fun ppf contract ->
+      Format.fprintf
+        ppf
+        "Transactions of 0ꜩ towards a contract without code are forbidden \
+         (%a)."
+        Contract.pp
+        contract)
+    Data_encoding.(obj1 (req "contract" Contract.encoding))
+    (function Empty_transaction c -> Some c | _ -> None)
+    (fun c -> Empty_transaction c) ;
+  register_error_kind
+    `Permanent
+    ~id:"operation.tx_rollup_is_disabled"
+    ~title:"Tx rollup is disabled"
+    ~description:"Cannot originate a tx rollup as it is disabled."
+    ~pp:(fun ppf () ->
+      Format.fprintf
+        ppf
+        "Cannot apply a tx rollup operation as it is disabled. This feature \
+         will be enabled in a future proposal")
+    Data_encoding.unit
+    (function Tx_rollup_disabled -> Some () | _ -> None)
+    (fun () -> Tx_rollup_disabled)
+
+type error += (* `Temporary *) Wrong_voting_period of int32 * int32
+
+type error +=
+  | (* `Permanent *) Internal_operation_replay of packed_internal_operation
+
+type denunciation_kind = Preendorsement | Endorsement | Block
+
+let denunciation_kind_encoding =
+  let open Data_encoding in
+  string_enum
+    [
+      ("preendorsement", Preendorsement);
+      ("endorsement", Endorsement);
+      ("block", Block);
+    ]
+
+let pp_denunciation_kind fmt : denunciation_kind -> unit = function
+  | Preendorsement -> Format.fprintf fmt "preendorsement"
+  | Endorsement -> Format.fprintf fmt "endorsement"
+  | Block -> Format.fprintf fmt "baking"
+
+type error += (* `Permanent *)
+              Invalid_denunciation of denunciation_kind
+
+type error +=
+  | (* `Permanent *)
+      Inconsistent_denunciation of {
+      kind : denunciation_kind;
+      delegate1 : Signature.Public_key_hash.t;
+      delegate2 : Signature.Public_key_hash.t;
+    }
+
+type error += (* `Branch *) Unrequired_denunciation
+
+type error +=
+  | (* `Temporary *)
+      Too_early_denunciation of {
+      kind : denunciation_kind;
+      level : Raw_level.t;
+      current : Raw_level.t;
+    }
+
+type error +=
+  | (* `Permanent *)
+      Outdated_denunciation of {
+      kind : denunciation_kind;
+      level : Raw_level.t;
+      last_cycle : Cycle.t;
+    }
+
+type error +=
+  | (* Permanent *) Invalid_activation of {pkh : Ed25519.Public_key_hash.t}
+
+type error += (* Permanent *) Multiple_revelation
+
+type error += (* Permanent *) Gas_quota_exceeded_init_deserialize
+
+type error += (* `Permanent *) Inconsistent_sources
+
+type error += (* `Permanent *) Failing_noop_error
+
+type error +=
+  | (* `Permanent *)
+      Zero_frozen_deposits of Signature.Public_key_hash.t
+
+let () =
   register_error_kind
     `Temporary
     ~id:"operation.wrong_voting_period"
@@ -154,74 +572,6 @@ let () =
       obj2 (req "current_index" int32) (req "provided_index" int32))
     (function Wrong_voting_period (e, p) -> Some (e, p) | _ -> None)
     (fun (e, p) -> Wrong_voting_period (e, p)) ;
-  register_error_kind
-    `Branch
-    ~id:"operation.duplicate_endorsement"
-    ~title:"Duplicate endorsement"
-    ~description:"Two endorsements received from same delegate"
-    ~pp:(fun ppf k ->
-      Format.fprintf
-        ppf
-        "Duplicate endorsement from delegate %a (possible replay attack)."
-        Signature.Public_key_hash.pp_short
-        k)
-    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
-    (function Duplicate_endorsement k -> Some k | _ -> None)
-    (fun k -> Duplicate_endorsement k) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.invalid_endorsement_level"
-    ~title:"Unexpected level in endorsement"
-    ~description:
-      "The level of an endorsement is inconsistent with the  provided block \
-       hash."
-    ~pp:(fun ppf () -> Format.fprintf ppf "Unexpected level in endorsement.")
-    Data_encoding.unit
-    (function Invalid_endorsement_level -> Some () | _ -> None)
-    (fun () -> Invalid_endorsement_level) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.invalid_endorsement_wrapper"
-    ~title:"Unexpected wrapper in endorsement"
-    ~description:
-      "The wrapper of an endorsement is inconsistent with the endorsement it \
-       wraps."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "The endorsement wrapper announces a block hash different from its \
-         wrapped endorsement, or bears a signature.")
-    Data_encoding.unit
-    (function Invalid_endorsement_wrapper -> Some () | _ -> None)
-    (fun () -> Invalid_endorsement_wrapper) ;
-  register_error_kind
-    `Temporary
-    ~id:"operation.unwrapped_endorsement"
-    ~title:"Unwrapped endorsement"
-    ~description:
-      "A legacy endorsement has been applied without its required slot-bearing \
-       wrapper."
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "A legacy endorsement has been applied without its required \
-         slot-bearing wrapper operation.")
-    Data_encoding.unit
-    (function Unwrapped_endorsement -> Some () | _ -> None)
-    (fun () -> Unwrapped_endorsement) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.invalid_commitment"
-    ~title:"Invalid commitment in block header"
-    ~description:"The block header has invalid commitment."
-    ~pp:(fun ppf expected ->
-      if expected then
-        Format.fprintf ppf "Missing seed's nonce commitment in block header."
-      else
-        Format.fprintf ppf "Unexpected seed's nonce commitment in block header.")
-    Data_encoding.(obj1 (req "expected" bool))
-    (function Invalid_commitment {expected} -> Some expected | _ -> None)
-    (fun expected -> Invalid_commitment {expected}) ;
   register_error_kind
     `Permanent
     ~id:"internal_operation_replay"
@@ -237,200 +587,111 @@ let () =
     (fun op -> Internal_operation_replay op) ;
   register_error_kind
     `Permanent
-    ~id:"block.invalid_double_endorsement_evidence"
-    ~title:"Invalid double endorsement evidence"
-    ~description:"A double-endorsement evidence is malformed"
-    ~pp:(fun ppf () ->
-      Format.fprintf ppf "Malformed double-endorsement evidence")
-    Data_encoding.empty
-    (function Invalid_double_endorsement_evidence -> Some () | _ -> None)
-    (fun () -> Invalid_double_endorsement_evidence) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.inconsistent_double_endorsement_evidence"
-    ~title:"Inconsistent double endorsement evidence"
-    ~description:
-      "A double-endorsement evidence is inconsistent  (two distinct delegates)"
-    ~pp:(fun ppf (delegate1, delegate2) ->
+    ~id:"block.invalid_denunciation"
+    ~title:"Invalid denunciation"
+    ~description:"A denunciation is malformed"
+    ~pp:(fun ppf kind ->
       Format.fprintf
         ppf
-        "Inconsistent double-endorsement evidence  (distinct delegate: %a and \
-         %a)"
+        "Malformed double-%a evidence"
+        pp_denunciation_kind
+        kind)
+    Data_encoding.(obj1 (req "kind" denunciation_kind_encoding))
+    (function Invalid_denunciation kind -> Some kind | _ -> None)
+    (fun kind -> Invalid_denunciation kind) ;
+  register_error_kind
+    `Permanent
+    ~id:"block.inconsistent_denunciation"
+    ~title:"Inconsistent denunciation"
+    ~description:
+      "A denunciation operation is inconsistent (two distinct delegates)"
+    ~pp:(fun ppf (kind, delegate1, delegate2) ->
+      Format.fprintf
+        ppf
+        "Inconsistent double-%a evidence (distinct delegate: %a and %a)"
+        pp_denunciation_kind
+        kind
         Signature.Public_key_hash.pp_short
         delegate1
         Signature.Public_key_hash.pp_short
         delegate2)
     Data_encoding.(
-      obj2
+      obj3
+        (req "kind" denunciation_kind_encoding)
         (req "delegate1" Signature.Public_key_hash.encoding)
         (req "delegate2" Signature.Public_key_hash.encoding))
     (function
-      | Inconsistent_double_endorsement_evidence {delegate1; delegate2} ->
-          Some (delegate1, delegate2)
+      | Inconsistent_denunciation {kind; delegate1; delegate2} ->
+          Some (kind, delegate1, delegate2)
       | _ -> None)
-    (fun (delegate1, delegate2) ->
-      Inconsistent_double_endorsement_evidence {delegate1; delegate2}) ;
+    (fun (kind, delegate1, delegate2) ->
+      Inconsistent_denunciation {kind; delegate1; delegate2}) ;
   register_error_kind
     `Branch
-    ~id:"block.unrequired_double_endorsement_evidence"
-    ~title:"Unrequired double endorsement evidence"
-    ~description:"A double-endorsement evidence is unrequired"
-    ~pp:(fun ppf () ->
+    ~id:"block.unrequired_denunciation"
+    ~title:"Unrequired denunciation"
+    ~description:"A denunciation is unrequired"
+    ~pp:(fun ppf _ ->
       Format.fprintf
         ppf
-        "A valid double-endorsement operation cannot  be applied: the \
-         associated delegate  has previously been denounced in this cycle.")
-    Data_encoding.empty
-    (function Unrequired_double_endorsement_evidence -> Some () | _ -> None)
-    (fun () -> Unrequired_double_endorsement_evidence) ;
+        "A valid denunciation cannot be applied: the associated delegate has \
+         already been denounced for this level.")
+    Data_encoding.unit
+    (function Unrequired_denunciation -> Some () | _ -> None)
+    (fun () -> Unrequired_denunciation) ;
   register_error_kind
     `Temporary
-    ~id:"block.too_early_double_endorsement_evidence"
-    ~title:"Too early double endorsement evidence"
-    ~description:"A double-endorsement evidence is in the future"
-    ~pp:(fun ppf (level, current) ->
+    ~id:"block.too_early_denunciation"
+    ~title:"Too early denunciation"
+    ~description:"A denunciation is too far in the future"
+    ~pp:(fun ppf (kind, level, current) ->
       Format.fprintf
         ppf
-        "A double-endorsement evidence is in the future  (current level: %a, \
-         endorsement level: %a)"
+        "A double-%a denunciation is too far in the future (current level: %a, \
+         given level: %a)"
+        pp_denunciation_kind
+        kind
         Raw_level.pp
         current
         Raw_level.pp
         level)
     Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "current" Raw_level.encoding))
+      obj3
+        (req "kind" denunciation_kind_encoding)
+        (req "level" Raw_level.encoding)
+        (req "current" Raw_level.encoding))
     (function
-      | Too_early_double_endorsement_evidence {level; current} ->
-          Some (level, current)
+      | Too_early_denunciation {kind; level; current} ->
+          Some (kind, level, current)
       | _ -> None)
-    (fun (level, current) ->
-      Too_early_double_endorsement_evidence {level; current}) ;
+    (fun (kind, level, current) ->
+      Too_early_denunciation {kind; level; current}) ;
   register_error_kind
     `Permanent
-    ~id:"block.outdated_double_endorsement_evidence"
-    ~title:"Outdated double endorsement evidence"
-    ~description:"A double-endorsement evidence is outdated."
-    ~pp:(fun ppf (level, last) ->
+    ~id:"block.outdated_denunciation"
+    ~title:"Outdated denunciation"
+    ~description:"A denunciation is outdated."
+    ~pp:(fun ppf (kind, level, last_cycle) ->
       Format.fprintf
         ppf
-        "A double-endorsement evidence is outdated  (last acceptable level: \
-         %a, endorsement level: %a)"
-        Raw_level.pp
-        last
+        "A double-%a is outdated (last acceptable cycle: %a, given level: %a)"
+        pp_denunciation_kind
+        kind
+        Cycle.pp
+        last_cycle
         Raw_level.pp
         level)
     Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "last" Raw_level.encoding))
+      obj3
+        (req "kind" denunciation_kind_encoding)
+        (req "level" Raw_level.encoding)
+        (req "last" Cycle.encoding))
     (function
-      | Outdated_double_endorsement_evidence {level; last} -> Some (level, last)
+      | Outdated_denunciation {kind; level; last_cycle} ->
+          Some (kind, level, last_cycle)
       | _ -> None)
-    (fun (level, last) -> Outdated_double_endorsement_evidence {level; last}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.invalid_double_baking_evidence"
-    ~title:"Invalid double baking evidence"
-    ~description:
-      "A double-baking evidence is inconsistent  (two distinct level)"
-    ~pp:(fun ppf (hash1, level1, hash2, level2) ->
-      Format.fprintf
-        ppf
-        "Invalid double-baking evidence (hash: %a and %a, levels: %ld and %ld)"
-        Block_hash.pp
-        hash1
-        Block_hash.pp
-        hash2
-        level1
-        level2)
-    Data_encoding.(
-      obj4
-        (req "hash1" Block_hash.encoding)
-        (req "level1" int32)
-        (req "hash2" Block_hash.encoding)
-        (req "level2" int32))
-    (function
-      | Invalid_double_baking_evidence {hash1; level1; hash2; level2} ->
-          Some (hash1, level1, hash2, level2)
-      | _ -> None)
-    (fun (hash1, level1, hash2, level2) ->
-      Invalid_double_baking_evidence {hash1; level1; hash2; level2}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.inconsistent_double_baking_evidence"
-    ~title:"Inconsistent double baking evidence"
-    ~description:
-      "A double-baking evidence is inconsistent  (two distinct delegates)"
-    ~pp:(fun ppf (delegate1, delegate2) ->
-      Format.fprintf
-        ppf
-        "Inconsistent double-baking evidence  (distinct delegate: %a and %a)"
-        Signature.Public_key_hash.pp_short
-        delegate1
-        Signature.Public_key_hash.pp_short
-        delegate2)
-    Data_encoding.(
-      obj2
-        (req "delegate1" Signature.Public_key_hash.encoding)
-        (req "delegate2" Signature.Public_key_hash.encoding))
-    (function
-      | Inconsistent_double_baking_evidence {delegate1; delegate2} ->
-          Some (delegate1, delegate2)
-      | _ -> None)
-    (fun (delegate1, delegate2) ->
-      Inconsistent_double_baking_evidence {delegate1; delegate2}) ;
-  register_error_kind
-    `Branch
-    ~id:"block.unrequired_double_baking_evidence"
-    ~title:"Unrequired double baking evidence"
-    ~description:"A double-baking evidence is unrequired"
-    ~pp:(fun ppf () ->
-      Format.fprintf
-        ppf
-        "A valid double-baking operation cannot  be applied: the associated \
-         delegate  has previously been denounced in this cycle.")
-    Data_encoding.empty
-    (function Unrequired_double_baking_evidence -> Some () | _ -> None)
-    (fun () -> Unrequired_double_baking_evidence) ;
-  register_error_kind
-    `Temporary
-    ~id:"block.too_early_double_baking_evidence"
-    ~title:"Too early double baking evidence"
-    ~description:"A double-baking evidence is in the future"
-    ~pp:(fun ppf (level, current) ->
-      Format.fprintf
-        ppf
-        "A double-baking evidence is in the future  (current level: %a, baking \
-         level: %a)"
-        Raw_level.pp
-        current
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "current" Raw_level.encoding))
-    (function
-      | Too_early_double_baking_evidence {level; current} ->
-          Some (level, current)
-      | _ -> None)
-    (fun (level, current) -> Too_early_double_baking_evidence {level; current}) ;
-  register_error_kind
-    `Permanent
-    ~id:"block.outdated_double_baking_evidence"
-    ~title:"Outdated double baking evidence"
-    ~description:"A double-baking evidence is outdated."
-    ~pp:(fun ppf (level, last) ->
-      Format.fprintf
-        ppf
-        "A double-baking evidence is outdated  (last acceptable level: %a, \
-         baking level: %a)"
-        Raw_level.pp
-        last
-        Raw_level.pp
-        level)
-    Data_encoding.(
-      obj2 (req "level" Raw_level.encoding) (req "last" Raw_level.encoding))
-    (function
-      | Outdated_double_baking_evidence {level; last} -> Some (level, last)
-      | _ -> None)
-    (fun (level, last) -> Outdated_double_baking_evidence {level; last}) ;
+    (fun (kind, level, last_cycle) ->
+      Outdated_denunciation {kind; level; last_cycle}) ;
   register_error_kind
     `Permanent
     ~id:"operation.invalid_activation"
@@ -497,7 +758,22 @@ let () =
         "The failing_noop operation cannot be executed by the protocol")
     Data_encoding.empty
     (function Failing_noop_error -> Some () | _ -> None)
-    (fun () -> Failing_noop_error)
+    (fun () -> Failing_noop_error) ;
+  register_error_kind
+    `Permanent
+    ~id:"delegate.zero_frozen_deposits"
+    ~title:"Zero frozen deposits"
+    ~description:"The delegate has zero frozen deposits."
+    ~pp:(fun ppf delegate ->
+      Format.fprintf
+        ppf
+        "Delegate %a has zero frozen deposits; it is not allowed to \
+         bake/preendorse/endorse."
+        Signature.Public_key_hash.pp
+        delegate)
+    Data_encoding.(obj1 (req "delegate" Signature.Public_key_hash.encoding))
+    (function Zero_frozen_deposits delegate -> Some delegate | _ -> None)
+    (fun delegate -> Zero_frozen_deposits delegate)
 
 open Apply_results
 
@@ -523,13 +799,21 @@ let apply_manager_operation_content :
     source:Contract.t ->
     chain_id:Chain_id.t ->
     internal:bool ->
+    gas_consumed_in_precheck:Gas.cost option ->
     kind manager_operation ->
     (context
     * kind successful_manager_operation_result
     * packed_internal_operation list)
     tzresult
     Lwt.t =
- fun ctxt mode ~payer ~source ~chain_id ~internal operation ->
+ fun ctxt
+     mode
+     ~payer
+     ~source
+     ~chain_id
+     ~internal
+     ~gas_consumed_in_precheck
+     operation ->
   let before_operation =
     (* This context is not used for backtracking. Only to compute
          gas consumption and originations for the operation result. *)
@@ -537,6 +821,13 @@ let apply_manager_operation_content :
   in
   Contract.must_exist ctxt source >>=? fun () ->
   Gas.consume ctxt Michelson_v1_gas.Cost_of.manager_operation >>?= fun ctxt ->
+  (match gas_consumed_in_precheck with
+  | None -> Ok ctxt
+  | Some gas -> Gas.consume ctxt gas)
+  >>?= fun ctxt ->
+  let consume_deserialization_gas = Script.When_needed in
+  (* [note]: deserialization gas has already been accounted for in the gas
+     consumed by the precheck and the lazy_exprs have been forced. *)
   match operation with
   | Reveal _ ->
       return
@@ -547,38 +838,37 @@ let apply_manager_operation_content :
             : kind successful_manager_operation_result),
           [] )
   | Transaction {amount; parameters; destination; entrypoint} -> (
-      Script.force_decode_in_context ctxt parameters
-      (* [note]: for toplevel ops, cost is nil since the lazy value has
-                 already been forced at precheck. Otherwise fail early if not
-                 enough gas for complete deserialization cost *)
-      >>?=
-      fun (parameter, ctxt) ->
-      Contract.spend ctxt source amount >>=? fun ctxt ->
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        parameters
+      >>?= fun (parameter, ctxt) ->
       (match Contract.is_implicit destination with
-      | None -> return (ctxt, [], false)
-      | Some _ -> (
-          Contract.allocated ctxt destination >>=? function
-          | true -> return (ctxt, [], false)
-          | false ->
-              Lwt.return
-                ( Fees.origination_burn ctxt >|? fun (ctxt, origination_burn) ->
-                  ( ctxt,
-                    [
-                      Receipt.
-                        ( Contract payer,
-                          Debited origination_burn,
-                          Block_application );
-                    ],
-                    true ) )))
-      >>=? fun (ctxt, maybe_burn_balance_update, allocated_destination_contract)
-        ->
-      Contract.credit ctxt destination amount >>=? fun ctxt ->
+      | None ->
+          (if Tez.(amount = zero) then
+           (* Detect potential call to non existent contract. *)
+           Contract.must_exist ctxt destination
+          else return_unit)
+          >>=? fun () ->
+          (* Since the contract is originated, nothing will be allocated
+             or the next transfer of tokens will fail. *)
+          return_false
+      | Some _ ->
+          (* Transfers of zero to implicit accounts are forbidden. *)
+          error_when Tez.(amount = zero) (Empty_transaction destination)
+          >>?= fun () ->
+          (* If the implicit contract is not yet allocated at this point then
+             the next transfer of tokens will allocate it. *)
+          Contract.allocated ctxt destination >|=? not)
+      >>=? fun allocated_destination_contract ->
+      Token.transfer ctxt (`Contract source) (`Contract destination) amount
+      >>=? fun (ctxt, balance_updates) ->
       Script_cache.find ctxt destination >>=? fun (ctxt, cache_key, script) ->
       match script with
       | None ->
           Lwt.return
             ( ( (match entrypoint with
-                | "default" -> ok_unit
+                | "default" -> Result.return_unit
                 | entrypoint ->
                     error (Script_tc_errors.No_such_entrypoint entrypoint))
               >>? fun () ->
@@ -595,16 +885,7 @@ let apply_manager_operation_content :
                   {
                     storage = None;
                     lazy_storage_diff = None;
-                    balance_updates =
-                      Receipt.(
-                        cleanup_balance_updates
-                          [
-                            (Contract source, Debited amount, Block_application);
-                            ( Contract destination,
-                              Credited amount,
-                              Block_application );
-                          ]
-                        @ maybe_burn_balance_update);
+                    balance_updates;
                     originated_contracts = [];
                     consumed_gas =
                       Gas.consumed ~since:before_operation ~until:ctxt;
@@ -615,9 +896,14 @@ let apply_manager_operation_content :
               in
               (ctxt, result, []) )
       | Some (script, script_ir) ->
+          let now = Script_timestamp.now ctxt in
+          let level =
+            (Level.current ctxt).level |> Raw_level.to_int32
+            |> Script_int.of_int32 |> Script_int.abs
+          in
           let step_constants =
             let open Script_interpreter in
-            {source; payer; self = destination; amount; chain_id}
+            {source; payer; self = destination; amount; chain_id; now; level}
           in
           Script_interpreter.execute
             ctxt
@@ -637,7 +923,7 @@ let apply_manager_operation_content :
             lazy_storage_diff
           >>=? fun ctxt ->
           Fees.record_paid_storage_space ctxt destination
-          >>=? fun (ctxt, new_size, paid_storage_size_diff, fees) ->
+          >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
           Contract.originated_from_current_nonce
             ~since:before_operation
             ~until:ctxt
@@ -655,15 +941,7 @@ let apply_manager_operation_content :
                   {
                     storage = Some storage;
                     lazy_storage_diff;
-                    balance_updates =
-                      Receipt.cleanup_balance_updates
-                        [
-                          (Contract payer, Debited fees, Block_application);
-                          (Contract source, Debited amount, Block_application);
-                          ( Contract destination,
-                            Credited amount,
-                            Block_application );
-                        ];
+                    balance_updates;
                     originated_contracts;
                     consumed_gas =
                       Gas.consumed ~since:before_operation ~until:ctxt;
@@ -674,11 +952,15 @@ let apply_manager_operation_content :
               in
               (ctxt, result, operations) ))
   | Origination {delegate; script; preorigination; credit} ->
-      Script.force_decode_in_context ctxt script.storage
-      (* see [note] *)
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.storage
       >>?= fun (_unparsed_storage, ctxt) ->
-      Script.force_decode_in_context ctxt script.code
-      (* see [note] *)
+      Script.force_decode_in_context
+        ~consume_deserialization_gas
+        ctxt
+        script.code
       >>?= fun (unparsed_code, ctxt) ->
       Script_ir_translator.parse_script
         ctxt
@@ -720,7 +1002,6 @@ let apply_manager_operation_content :
       >>=? fun (storage, ctxt) ->
       let storage = Script.lazy_expr (Micheline.strip_locations storage) in
       let script = {script with storage} in
-      Contract.spend ctxt source credit >>=? fun ctxt ->
       (match preorigination with
       | Some contract ->
           assert internal ;
@@ -730,28 +1011,25 @@ let apply_manager_operation_content :
           ok (ctxt, contract)
       | None -> Contract.fresh_contract_from_current_nonce ctxt)
       >>?= fun (ctxt, contract) ->
-      Contract.originate
+      Contract.raw_originate
         ctxt
+        ~prepaid_bootstrap_storage:false
         contract
-        ~delegate
-        ~balance:credit
         ~script:(script, lazy_storage_diff)
       >>=? fun ctxt ->
-      Fees.origination_burn ctxt >>?= fun (ctxt, origination_burn) ->
+      (match delegate with
+      | None -> return ctxt
+      | Some delegate -> Delegate.init ctxt contract delegate)
+      >>=? fun ctxt ->
+      Token.transfer ctxt (`Contract source) (`Contract contract) credit
+      >>=? fun (ctxt, balance_updates) ->
       Fees.record_paid_storage_space ctxt contract
-      >|=? fun (ctxt, size, paid_storage_size_diff, fees) ->
+      >|=? fun (ctxt, size, paid_storage_size_diff) ->
       let result =
         Origination_result
           {
             lazy_storage_diff;
-            balance_updates =
-              Receipt.cleanup_balance_updates
-                [
-                  (Contract payer, Debited fees, Block_application);
-                  (Contract payer, Debited origination_burn, Block_application);
-                  (Contract source, Debited credit, Block_application);
-                  (Contract contract, Credited credit, Block_application);
-                ];
+            balance_updates;
             originated_contracts = [contract];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             storage_size = size;
@@ -767,7 +1045,8 @@ let apply_manager_operation_content :
         [] )
   | Register_global_constant {value} ->
       (* Decode the value and consume gas appropriately *)
-      Script.force_decode_in_context ctxt value >>?= fun (expr, ctxt) ->
+      Script.force_decode_in_context ~consume_deserialization_gas ctxt value
+      >>?= fun (expr, ctxt) ->
       (* Set the key to the value in storage. *)
       Global_constants_storage.register ctxt expr
       >>=? fun (ctxt, address, size) ->
@@ -780,20 +1059,64 @@ let apply_manager_operation_content :
          On the other hand, the receipt is calculated
          with the help of [Fees.cost_of_bytes], and is included in block metadata
          and the client output. The receipt is also used during simulation,
-         letting the client automatically set an appropriate storage limit. *)
+         letting the client automatically set an appropriate storage limit.
+         TODO : is this concern still honored by the token management
+         refactoring ? *)
       let (ctxt, paid_size) =
         Fees.record_global_constant_storage_space ctxt size
       in
-      Fees.cost_of_bytes ctxt paid_size >>?= fun fees ->
       let result =
         Register_global_constant_result
           {
-            balance_updates =
-              Receipt.cleanup_balance_updates
-                [(Contract payer, Debited fees, Block_application)];
+            balance_updates = [];
             consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
             size_of_constant = paid_size;
             global_address = address;
+          }
+      in
+      return (ctxt, result, [])
+  | Set_deposits_limit limit -> (
+      (match limit with
+      | None -> return_unit
+      | Some limit ->
+          let frozen_deposits_percentage =
+            Constants.frozen_deposits_percentage ctxt
+          in
+          let max_limit =
+            Tez.of_mutez_exn
+              Int64.(
+                mul (of_int frozen_deposits_percentage) Int64.(div max_int 100L))
+          in
+          fail_when
+            Tez.(limit > max_limit)
+            (Set_deposits_limit_too_high {limit; max_limit}))
+      >>=? fun () ->
+      Contract.is_implicit source |> function
+      | None -> fail Set_deposits_limit_on_originated_contract
+      | Some delegate ->
+          Delegate.registered ctxt delegate >>=? fun is_registered ->
+          fail_unless
+            is_registered
+            (Set_deposits_limit_on_unregistered_delegate delegate)
+          >>=? fun () ->
+          Delegate.set_frozen_deposits_limit ctxt delegate limit >>= fun ctxt ->
+          return
+            ( ctxt,
+              Set_deposits_limit_result
+                {
+                  consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+                },
+              [] ))
+  | Tx_rollup_origination ->
+      fail_unless (Constants.tx_rollup_enable ctxt) Tx_rollup_disabled
+      >>=? fun () ->
+      Tx_rollup.originate ctxt >>=? fun (ctxt, originated_tx_rollup) ->
+      let result =
+        Tx_rollup_origination_result
+          {
+            consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt;
+            originated_tx_rollup;
+            balance_updates = [];
           }
       in
       return (ctxt, result, [])
@@ -816,6 +1139,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
             ~payer
             ~chain_id
             ~internal:true
+            ~gas_consumed_in_precheck:None
             operation)
         >>= function
         | Error errors ->
@@ -840,7 +1164,7 @@ let apply_internal_manager_operations ctxt mode ~payer ~chain_id ops =
   apply ctxt [] ops
 
 let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
-    : context tzresult Lwt.t =
+    ~(only_batch : bool) : (context * precheck_result) tzresult Lwt.t =
   let[@coq_match_with_default] (Manager_operation
                                  {
                                    source;
@@ -852,39 +1176,162 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
                                  }) =
     op
   in
-  Gas.consume_limit_in_block ctxt gas_limit >>?= fun ctxt ->
+  (if only_batch then
+   (* Gas.consume_limit_in_block will only raise a "temporary" error, however
+      when the precheck is called on a batch in isolation (like e.g. in the
+      mempool) it must "refuse" operations whose total gas_limit (the sum of
+      the gas_limits of each operation) is already above the block limit. We
+      add the "permanent" error Gas.Gas_limit_too_high on top of the trace to
+      this effect. *)
+   record_trace Gas.Gas_limit_too_high
+  else fun errs -> errs)
+  @@ Gas.consume_limit_in_block ctxt gas_limit
+  >>?= fun ctxt ->
   let ctxt = Gas.set_limit ctxt gas_limit in
+  let ctxt_before = ctxt in
   Fees.check_storage_limit ctxt ~storage_limit >>?= fun () ->
-  Contract.must_be_allocated ctxt (Contract.implicit_contract source)
-  >>=? fun () ->
+  let source_contract = Contract.implicit_contract source in
+  Contract.must_be_allocated ctxt source_contract >>=? fun () ->
   Contract.check_counter_increment ctxt source counter >>=? fun () ->
+  let consume_deserialization_gas = Script.Always in
+  (* We want to always consume the deserialization gas here, independently of
+     the internal state of the lazy_exprs in the arguments. Otherwise we might
+     risk getting different results if the operation has already been
+     deserialized before (e.g. when retrieve in JSON format). *)
   (match operation with
   | Reveal pk -> Contract.reveal_manager_key ctxt source pk
   | Transaction {parameters; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail early if not enough gas for complete deserialization cost *)
-      ( Script.force_decode_in_context ctxt parameters >|? fun (_arg, ctxt) ->
-        ctxt )
+      @@ (* Fail early if not enough gas for complete deserialization
+             cost or if deserialization fails. The gas consumed here is
+            "replayed" in [apply_manager_contents]. *)
+      ( Script.force_decode_in_context
+          ~consume_deserialization_gas
+          ctxt
+          parameters
+      >|? fun (_arg, ctxt) -> ctxt )
   | Origination {script; _} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (* Fail early if not enough gas for complete deserialization cost *)
-      ( Script.force_decode_in_context ctxt script.code >>? fun (_code, ctxt) ->
-        Script.force_decode_in_context ctxt script.storage
+      @@ (* See comment in the Transaction branch *)
+      ( Script.force_decode_in_context
+          ~consume_deserialization_gas
+          ctxt
+          script.code
+      >>? fun (_code, ctxt) ->
+        Script.force_decode_in_context
+          ~consume_deserialization_gas
+          ctxt
+          script.storage
         >|? fun (_storage, ctxt) -> ctxt )
   | Register_global_constant {value} ->
       Lwt.return
       @@ record_trace Gas_quota_exceeded_init_deserialize
-      @@ (Script.force_decode_in_context ctxt value >|? fun (_, ctxt) -> ctxt)
+      @@ (* See comment in the Transaction branch *)
+      ( Script.force_decode_in_context ~consume_deserialization_gas ctxt value
+      >|? fun (_value, ctxt) -> ctxt )
   | _ -> return ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
-  Contract.spend ctxt (Contract.implicit_contract source) fee >>=? fun ctxt ->
-  Lwt.return (add_fees ctxt fee)
+  Token.transfer ctxt (`Contract source_contract) `Block_fees fee
+  >|=? fun (ctxt, balance_updates) ->
+  let consumed_gas = Gas.consumed ~since:ctxt_before ~until:ctxt in
+  (ctxt, {balance_updates; consumed_gas})
+
+(** [burn_storage_fees ctxt smopr storage_limit payer] burns the storage fees
+    associated to the transaction or origination result [smopr].
+    Returns an updated context, an updated storage limit with the space consumed
+    by the operation subtracted, and [smopr] with the relevant balance updates
+    included. *)
+let burn_storage_fees :
+    type kind.
+    context ->
+    kind successful_manager_operation_result ->
+    storage_limit:Z.t ->
+    payer:Contract.t ->
+    (context * Z.t * kind successful_manager_operation_result) tzresult Lwt.t =
+ fun ctxt smopr ~storage_limit ~payer ->
+  match smopr with
+  | Transaction_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      let payer = `Contract payer in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      (if payload.allocated_destination_contract then
+       Fees.burn_origination_fees ctxt ~storage_limit ~payer
+      else return (ctxt, storage_limit, []))
+      >>=? fun (ctxt, storage_limit, origination_bus) ->
+      let balance_updates =
+        storage_bus @ payload.balance_updates @ origination_bus
+      in
+      return
+        ( ctxt,
+          storage_limit,
+          Transaction_result
+            {
+              storage = payload.storage;
+              lazy_storage_diff = payload.lazy_storage_diff;
+              balance_updates;
+              originated_contracts = payload.originated_contracts;
+              consumed_gas = payload.consumed_gas;
+              storage_size = payload.storage_size;
+              paid_storage_size_diff = payload.paid_storage_size_diff;
+              allocated_destination_contract =
+                payload.allocated_destination_contract;
+            } )
+  | Origination_result payload ->
+      let consumed = payload.paid_storage_size_diff in
+      let payer = `Contract payer in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      Fees.burn_origination_fees ctxt ~storage_limit ~payer
+      >>=? fun (ctxt, storage_limit, origination_bus) ->
+      let balance_updates =
+        storage_bus @ origination_bus @ payload.balance_updates
+      in
+      return
+        ( ctxt,
+          storage_limit,
+          Origination_result
+            {
+              lazy_storage_diff = payload.lazy_storage_diff;
+              balance_updates;
+              originated_contracts = payload.originated_contracts;
+              consumed_gas = payload.consumed_gas;
+              storage_size = payload.storage_size;
+              paid_storage_size_diff = payload.paid_storage_size_diff;
+            } )
+  | Reveal_result _ | Delegation_result _ -> return (ctxt, storage_limit, smopr)
+  | Register_global_constant_result payload ->
+      let consumed = payload.size_of_constant in
+      let payer = `Contract payer in
+      Fees.burn_storage_fees ctxt ~storage_limit ~payer consumed
+      >>=? fun (ctxt, storage_limit, storage_bus) ->
+      let balance_updates = storage_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Register_global_constant_result
+            {
+              balance_updates;
+              consumed_gas = payload.consumed_gas;
+              size_of_constant = payload.size_of_constant;
+              global_address = payload.global_address;
+            } )
+  | Set_deposits_limit_result _ -> return (ctxt, storage_limit, smopr)
+  | Tx_rollup_origination_result payload ->
+      let payer = `Contract payer in
+      Fees.burn_tx_rollup_origination_fees ctxt ~storage_limit ~payer
+      >>=? fun (ctxt, storage_limit, origination_bus) ->
+      let balance_updates = origination_bus @ payload.balance_updates in
+      return
+        ( ctxt,
+          storage_limit,
+          Tx_rollup_origination_result {payload with balance_updates} )
 
 let apply_manager_contents (type kind) ctxt mode chain_id
-    (op : kind Kind.manager contents) :
+    ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
     (success_or_failure
     * kind manager_operation_result
     * packed_internal_operation_result list)
@@ -902,7 +1349,6 @@ let apply_manager_contents (type kind) ctxt mode chain_id
   (* We do not expose the internal scaling to the users. Instead, we multiply
        the specified gas limit by the internal scaling. *)
   let ctxt = Gas.set_limit ctxt gas_limit in
-  let ctxt = Fees.start_counting_storage_fees ctxt in
   let source = Contract.implicit_contract source in
   apply_manager_operation_content
     ctxt
@@ -910,6 +1356,7 @@ let apply_manager_contents (type kind) ctxt mode chain_id
     ~source
     ~payer:source
     ~internal:false
+    ~gas_consumed_in_precheck
     ~chain_id
     operation
   >>= function
@@ -922,15 +1369,37 @@ let apply_manager_contents (type kind) ctxt mode chain_id
         internal_operations
       >>= function
       | (Success ctxt, internal_operations_results) -> (
-          Fees.burn_storage_fees ctxt ~storage_limit ~payer:source >|= function
-          | Ok ctxt ->
-              ( Success ctxt,
-                Applied operation_results,
-                internal_operations_results )
+          burn_storage_fees ctxt operation_results ~storage_limit ~payer:source
+          >>= function
+          | Ok (ctxt, storage_limit, operation_results) -> (
+              List.fold_left_es
+                (fun (ctxt, storage_limit, res) iopr ->
+                  let (Internal_operation_result (op, mopr)) = iopr in
+                  match mopr with
+                  | Applied smopr ->
+                      burn_storage_fees ctxt smopr ~storage_limit ~payer:source
+                      >>=? fun (ctxt, storage_limit, smopr) ->
+                      let iopr =
+                        Internal_operation_result (op, Applied smopr)
+                      in
+                      return (ctxt, storage_limit, iopr :: res)
+                  | _ -> return (ctxt, storage_limit, iopr :: res))
+                (ctxt, storage_limit, [])
+                internal_operations_results
+              >|= function
+              | Ok (ctxt, _, internal_operations_results) ->
+                  ( Success ctxt,
+                    Applied operation_results,
+                    List.rev internal_operations_results )
+              | Error errors ->
+                  ( Failure,
+                    Backtracked (operation_results, Some errors),
+                    internal_operations_results ))
           | Error errors ->
-              ( Failure,
-                Backtracked (operation_results, Some errors),
-                internal_operations_results ))
+              Lwt.return
+                ( Failure,
+                  Backtracked (operation_results, Some errors),
+                  internal_operations_results ))
       | (Failure, internal_operations_results) ->
           Lwt.return
             (Failure, Applied operation_results, internal_operations_results))
@@ -950,51 +1419,63 @@ let skipped_operation_result :
 
 let rec mark_skipped :
     type kind.
-    baker:Signature.Public_key_hash.t ->
+    payload_producer:Signature.Public_key_hash.t ->
     Level.t ->
-    kind Kind.manager contents_list ->
+    kind Kind.manager prechecked_contents_list ->
     kind Kind.manager contents_result_list =
- fun ~baker level -> function[@coq_match_with_default]
-  | Single (Manager_operation {source; fee; operation; _}) ->
-      let source = Contract.implicit_contract source in
+ fun ~payload_producer level prechecked_contents_list ->
+  match[@coq_match_with_default] prechecked_contents_list with
+  | PrecheckedSingle
+      {
+        contents = Manager_operation {operation; _};
+        result = {balance_updates; _};
+      } ->
       Single_result
         (Manager_operation_result
            {
-             balance_updates =
-               Receipt.cleanup_balance_updates
-                 [
-                   (Contract source, Debited fee, Block_application);
-                   (Fees (baker, level.cycle), Credited fee, Block_application);
-                 ];
+             balance_updates;
              operation_result = skipped_operation_result operation;
              internal_operation_results = [];
            })
-  | Cons (Manager_operation {source; fee; operation; _}, rest) ->
-      let source = Contract.implicit_contract source in
+  | PrecheckedCons
+      ( {
+          contents = Manager_operation {operation; _};
+          result = {balance_updates; _};
+        },
+        rest ) ->
       Cons_result
         ( Manager_operation_result
             {
-              balance_updates =
-                Receipt.cleanup_balance_updates
-                  [
-                    (Contract source, Debited fee, Block_application);
-                    (Fees (baker, level.cycle), Credited fee, Block_application);
-                  ];
+              balance_updates;
               operation_result = skipped_operation_result operation;
               internal_operation_results = [];
             },
-          mark_skipped ~baker level rest )
+          mark_skipped ~payload_producer level rest )
 
-let rec precheck_manager_contents_list :
-    type kind.
-    Alpha_context.t -> kind Kind.manager contents_list -> context tzresult Lwt.t
-    =
- fun ctxt contents_list ->
-  match[@coq_match_with_default] contents_list with
-  | Single (Manager_operation _ as op) -> precheck_manager_contents ctxt op
-  | Cons ((Manager_operation _ as op), rest) ->
-      precheck_manager_contents ctxt op >>=? fun ctxt ->
-      precheck_manager_contents_list ctxt rest
+(** Returns an updated context, and a list of prechecked contents containing
+    balance updates for fees related to each manager operation in
+    [contents_list]. *)
+let precheck_manager_contents_list ctxt contents_list ~mempool_mode =
+  let rec rec_precheck_manager_contents_list :
+      type kind.
+      Alpha_context.t ->
+      kind Kind.manager contents_list ->
+      (context * kind Kind.manager prechecked_contents_list) tzresult Lwt.t =
+   fun ctxt contents_list ->
+    match[@coq_match_with_default] contents_list with
+    | Single contents ->
+        precheck_manager_contents ctxt contents ~only_batch:mempool_mode
+        >>=? fun (ctxt, result) ->
+        return (ctxt, PrecheckedSingle {contents; result})
+    | Cons (contents, rest) ->
+        precheck_manager_contents ctxt contents ~only_batch:mempool_mode
+        >>=? fun (ctxt, result) ->
+        rec_precheck_manager_contents_list ctxt rest
+        >>=? fun (ctxt, results_rest) ->
+        return (ctxt, PrecheckedCons ({contents; result}, results_rest))
+  in
+  let ctxt = if mempool_mode then Gas.reset_block_gas ctxt else ctxt in
+  rec_precheck_manager_contents_list ctxt contents_list
 
 let check_manager_signature ctxt chain_id (op : _ Kind.manager contents_list)
     raw_operation =
@@ -1042,69 +1523,62 @@ let rec apply_manager_contents_list_rec :
     type kind.
     Alpha_context.t ->
     Script_ir_translator.unparsing_mode ->
-    public_key_hash ->
+    payload_producer:public_key_hash ->
     Chain_id.t ->
-    kind Kind.manager contents_list ->
+    kind Kind.manager prechecked_contents_list ->
     (success_or_failure * kind Kind.manager contents_result_list) Lwt.t =
- fun ctxt mode baker chain_id contents_list ->
+ fun ctxt mode ~payload_producer chain_id prechecked_contents_list ->
   let level = Level.current ctxt in
-  match[@coq_match_with_default] contents_list with
-  | Single (Manager_operation {source; fee; _} as op) ->
-      let source = Contract.implicit_contract source in
-      apply_manager_contents ctxt mode chain_id op
+  match[@coq_match_with_default] prechecked_contents_list with
+  | PrecheckedSingle
+      {
+        contents = Manager_operation _ as op;
+        result = {consumed_gas; balance_updates};
+      } ->
+      apply_manager_contents
+        ctxt
+        mode
+        chain_id
+        ~gas_consumed_in_precheck:(Some consumed_gas)
+        op
       >|= fun (ctxt_result, operation_result, internal_operation_results) ->
       let result =
         Manager_operation_result
-          {
-            balance_updates =
-              Receipt.cleanup_balance_updates
-                [
-                  (Contract source, Debited fee, Block_application);
-                  (Fees (baker, level.cycle), Credited fee, Block_application);
-                ];
-            operation_result;
-            internal_operation_results;
-          }
+          {balance_updates; operation_result; internal_operation_results}
       in
       (ctxt_result, Single_result result)
-  | Cons ((Manager_operation {source; fee; _} as op), rest) -> (
-      let source = Contract.implicit_contract source in
-      apply_manager_contents ctxt mode chain_id op >>= function
+  | PrecheckedCons
+      ( {
+          contents = Manager_operation _ as op;
+          result = {consumed_gas; balance_updates};
+        },
+        rest ) -> (
+      apply_manager_contents
+        ctxt
+        mode
+        chain_id
+        ~gas_consumed_in_precheck:(Some consumed_gas)
+        op
+      >>= function
       | (Failure, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
-              {
-                balance_updates =
-                  Receipt.cleanup_balance_updates
-                    [
-                      (Contract source, Debited fee, Block_application);
-                      ( Fees (baker, level.cycle),
-                        Credited fee,
-                        Block_application );
-                    ];
-                operation_result;
-                internal_operation_results;
-              }
+              {balance_updates; operation_result; internal_operation_results}
           in
           Lwt.return
-            (Failure, Cons_result (result, mark_skipped ~baker level rest))
+            ( Failure,
+              Cons_result (result, mark_skipped ~payload_producer level rest) )
       | (Success ctxt, operation_result, internal_operation_results) ->
           let result =
             Manager_operation_result
-              {
-                balance_updates =
-                  Receipt.cleanup_balance_updates
-                    [
-                      (Contract source, Debited fee, Block_application);
-                      ( Fees (baker, level.cycle),
-                        Credited fee,
-                        Block_application );
-                    ];
-                operation_result;
-                internal_operation_results;
-              }
+              {balance_updates; operation_result; internal_operation_results}
           in
-          apply_manager_contents_list_rec ctxt mode baker chain_id rest
+          apply_manager_contents_list_rec
+            ctxt
+            mode
+            ~payload_producer
+            chain_id
+            rest
           >|= fun (ctxt_result, results) ->
           (ctxt_result, Cons_result (result, results)))
 
@@ -1151,241 +1625,551 @@ let mark_backtracked results =
   mark_contents_list results
   [@@coq_axiom_with_reason "non-top-level mutual recursion"]
 
-let apply_manager_contents_list ctxt mode baker chain_id contents_list =
-  apply_manager_contents_list_rec ctxt mode baker chain_id contents_list
+type apply_mode =
+  | Application of {
+      predecessor_block : Block_hash.t;
+      payload_hash : Block_payload_hash.t;
+      locked_round : Round.t option;
+      predecessor_level : Level.t;
+      predecessor_round : Round.t;
+      round : Round.t;
+    } (* Both partial and normal *)
+  | Full_construction of {
+      predecessor_block : Block_hash.t;
+      payload_hash : Block_payload_hash.t;
+      predecessor_level : Level.t;
+      predecessor_round : Round.t;
+      round : Round.t;
+    }
+  | Partial_construction of {
+      predecessor_level : Level.t;
+      predecessor_round : Round.t;
+      grand_parent_round : Round.t;
+    }
+
+let get_predecessor_level = function
+  | Application {predecessor_level; _}
+  | Full_construction {predecessor_level; _}
+  | Partial_construction {predecessor_level; _} ->
+      predecessor_level
+
+let record_operation (type kind) ctxt (operation : kind operation) : context =
+  match operation.protocol_data.contents with
+  | Single (Preendorsement _) -> ctxt
+  | Single (Endorsement _) -> ctxt
+  | Single
+      ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
+      | Double_endorsement_evidence _ | Double_preendorsement_evidence _
+      | Double_baking_evidence _ | Activate_account _ | Manager_operation _ )
+  | Cons (Manager_operation _, _) ->
+      let hash = Operation.hash operation in
+      record_non_consensus_operation_hash ctxt hash
+
+type 'consensus_op_kind expected_consensus_content = {
+  payload_hash : Block_payload_hash.t;
+  branch : Block_hash.t;
+  level : Level.t;
+  round : Round.t;
+}
+
+(* The [Alpha_context] is modified only in [Full_construction] mode
+   when we check a preendorsement if the [preendorsement_quorum_round]
+   was not set. *)
+let compute_expected_consensus_content (type consensus_op_kind)
+    ~(current_level : Level.t) ~(proposal_level : Level.t)
+    (ctxt : Alpha_context.t) (application_mode : apply_mode)
+    (operation_kind : consensus_op_kind consensus_operation_type)
+    (operation_round : Round.t) (operation_level : Raw_level.t) :
+    (Alpha_context.t * consensus_op_kind expected_consensus_content) tzresult
+    Lwt.t =
+  match operation_kind with
+  | Endorsement -> (
+      match Consensus.endorsement_branch ctxt with
+      | None -> (
+          match application_mode with
+          | Application _ | Full_construction _ ->
+              fail Unexpected_endorsement_in_block
+          | Partial_construction _ ->
+              fail
+                (Consensus_operation_for_future_level
+                   {expected = proposal_level.level; provided = operation_level})
+          )
+      | Some (branch, payload_hash) -> (
+          match application_mode with
+          | Application {predecessor_round; _}
+          | Full_construction {predecessor_round; _}
+          | Partial_construction {predecessor_round; _} ->
+              return
+                ( ctxt,
+                  {
+                    payload_hash;
+                    branch;
+                    level = proposal_level;
+                    round = predecessor_round;
+                  } )))
+  | Preendorsement -> (
+      match application_mode with
+      | Application {locked_round = None; _} ->
+          fail Unexpected_preendorsement_in_block
+      | Application
+          {
+            payload_hash;
+            predecessor_block = branch;
+            locked_round = Some locked_round;
+            _;
+          } ->
+          return
+            ( ctxt,
+              {
+                payload_hash;
+                branch;
+                level = current_level;
+                round = locked_round;
+              } )
+      | Partial_construction {predecessor_round; _} -> (
+          match Consensus.endorsement_branch ctxt with
+          | None ->
+              fail
+                (Consensus_operation_for_future_level
+                   {expected = proposal_level.level; provided = operation_level})
+          | Some (branch, payload_hash) ->
+              return
+                ( ctxt,
+                  {
+                    payload_hash;
+                    branch;
+                    level = proposal_level;
+                    round = predecessor_round;
+                  } ))
+      | Full_construction {payload_hash; predecessor_block = branch; _} ->
+          let (ctxt', round) =
+            match Consensus.get_preendorsements_quorum_round ctxt with
+            | None ->
+                ( Consensus.set_preendorsements_quorum_round ctxt operation_round,
+                  operation_round )
+            | Some round -> (ctxt, round)
+          in
+          return (ctxt', {payload_hash; branch; level = current_level; round}))
+
+let check_level (apply_mode : apply_mode) ~expected ~provided =
+  match apply_mode with
+  | Application _ | Full_construction _ ->
+      error_unless
+        (Raw_level.equal expected provided)
+        (Wrong_level_for_consensus_operation {expected; provided})
+  | Partial_construction _ ->
+      (* Valid grand parent's endorsements were treated by
+         [validate_grand_parent_endorsement]. *)
+      error_when
+        Raw_level.(expected > provided)
+        (Consensus_operation_for_old_level {expected; provided})
+      >>? fun () ->
+      error_when
+        Raw_level.(expected < provided)
+        (Consensus_operation_for_future_level {expected; provided})
+
+let check_payload_hash (apply_mode : apply_mode) ~expected ~provided =
+  match apply_mode with
+  | Application _ | Full_construction _ ->
+      error_unless
+        (Block_payload_hash.equal expected provided)
+        (Wrong_payload_hash_for_consensus_operation {expected; provided})
+  | Partial_construction _ ->
+      error_unless
+        (Block_payload_hash.equal expected provided)
+        (Consensus_operation_on_competing_proposal {expected; provided})
+
+let check_operation_branch ~expected ~provided =
+  error_unless
+    (Block_hash.equal expected provided)
+    (Wrong_consensus_operation_branch (expected, provided))
+
+let check_round (type kind) (operation_kind : kind consensus_operation_type)
+    (apply_mode : apply_mode) ~(expected : Round.t) ~(provided : Round.t) :
+    unit tzresult =
+  match apply_mode with
+  | Partial_construction _ ->
+      error_when
+        Round.(expected > provided)
+        (Consensus_operation_for_old_round {expected; provided})
+      >>? fun () ->
+      error_when
+        Round.(expected < provided)
+        (Consensus_operation_for_future_round {expected; provided})
+  | Full_construction {round; _} | Application {round; _} ->
+      (match operation_kind with
+      | Preendorsement ->
+          error_when
+            Round.(round <= provided)
+            (Preendorsement_round_too_high {block_round = round; provided})
+      | Endorsement -> Result.return_unit)
+      >>? fun () ->
+      error_unless
+        (Round.equal expected provided)
+        (Wrong_round_for_consensus_operation {expected; provided})
+
+let check_consensus_content (type kind) (apply_mode : apply_mode)
+    (content : consensus_content) (operation_branch : Block_hash.t)
+    (operation_kind : kind consensus_operation_type)
+    (expected_content : kind expected_consensus_content) : unit tzresult =
+  let expected_level = expected_content.level.level in
+  let provided_level = content.level in
+  let expected_round = expected_content.round in
+  let provided_round = content.round in
+  check_level apply_mode ~expected:expected_level ~provided:provided_level
+  >>? fun () ->
+  check_round
+    operation_kind
+    apply_mode
+    ~expected:expected_round
+    ~provided:provided_round
+  >>? fun () ->
+  check_operation_branch
+    ~expected:expected_content.branch
+    ~provided:operation_branch
+  >>? fun () ->
+  check_payload_hash
+    apply_mode
+    ~expected:expected_content.payload_hash
+    ~provided:content.block_payload_hash
+
+(* Validate the 'operation.shell.branch' field of the operation. It MUST point
+   to the grandfather: the block hash used in the payload_hash. Otherwise we could produce
+   a preendorsement pointing to the direct proposal. This preendorsement wouldn't be able to
+   propagate for a subsequent proposal using it as a locked_round evidence. *)
+let validate_consensus_contents (type kind) ctxt chain_id
+    (operation_kind : kind consensus_operation_type)
+    (operation : kind operation) (apply_mode : apply_mode)
+    (content : consensus_content) :
+    (context * public_key_hash * int) tzresult Lwt.t =
+  let current_level = Level.current ctxt in
+  let proposal_level = get_predecessor_level apply_mode in
+  let slot_map =
+    match operation_kind with
+    | Preendorsement -> Consensus.allowed_preendorsements ctxt
+    | Endorsement -> Consensus.allowed_endorsements ctxt
+  in
+  compute_expected_consensus_content
+    ~current_level
+    ~proposal_level
+    ctxt
+    apply_mode
+    operation_kind
+    content.round
+    content.level
+  >>=? fun (ctxt, expected_content) ->
+  check_consensus_content
+    apply_mode
+    content
+    operation.shell.branch
+    operation_kind
+    expected_content
+  >>?= fun () ->
+  match Slot.Map.find content.slot slot_map with
+  | None -> fail Wrong_slot_used_for_consensus_operation
+  | Some (delegate_pk, delegate_pkh, voting_power) ->
+      Delegate.frozen_deposits ctxt delegate_pkh >>=? fun frozen_deposits ->
+      fail_unless
+        Tez.(frozen_deposits.current_amount > zero)
+        (Zero_frozen_deposits delegate_pkh)
+      >>=? fun () ->
+      Operation.check_signature delegate_pk chain_id operation >>?= fun () ->
+      return (ctxt, delegate_pkh, voting_power)
+
+let apply_manager_contents_list ctxt mode ~payload_producer chain_id
+    prechecked_contents_list =
+  apply_manager_contents_list_rec
+    ctxt
+    mode
+    ~payload_producer
+    chain_id
+    prechecked_contents_list
   >>= fun (ctxt_result, results) ->
   match ctxt_result with
   | Failure -> Lwt.return (ctxt (* backtracked *), mark_backtracked results)
   | Success ctxt ->
       Lazy_storage.cleanup_temporaries ctxt >|= fun ctxt -> (ctxt, results)
 
-let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
-    (operation : kind operation) (contents_list : kind contents_list) :
+let check_denunciation_age ctxt kind given_level =
+  let max_slashing_period = Constants.max_slashing_period ctxt in
+  let current_cycle = (Level.current ctxt).cycle in
+  let given_cycle = (Level.from_raw ctxt given_level).cycle in
+  let last_slashable_cycle = Cycle.add given_cycle max_slashing_period in
+  fail_when
+    Cycle.(given_cycle > current_cycle)
+    (Too_early_denunciation
+       {kind; level = given_level; current = (Level.current ctxt).level})
+  >>=? fun () ->
+  fail_unless
+    Cycle.(last_slashable_cycle > current_cycle)
+    (Outdated_denunciation
+       {kind; level = given_level; last_cycle = last_slashable_cycle})
+
+let punish_delegate ctxt delegate level mistake mk_result ~payload_producer =
+  let (already_slashed, punish) =
+    match mistake with
+    | `Double_baking ->
+        ( Delegate.already_slashed_for_double_baking,
+          Delegate.punish_double_baking )
+    | `Double_endorsing ->
+        ( Delegate.already_slashed_for_double_endorsing,
+          Delegate.punish_double_endorsing )
+  in
+  already_slashed ctxt delegate level >>=? fun slashed ->
+  fail_when slashed Unrequired_denunciation >>=? fun () ->
+  punish ctxt delegate level >>=? fun (ctxt, burned, punish_balance_updates) ->
+  (match Tez.(burned /? 2L) with
+  | Ok reward ->
+      Token.transfer
+        ctxt
+        `Double_signing_evidence_rewards
+        (`Contract (Contract.implicit_contract payload_producer))
+        reward
+  | Error _ -> (* reward is Tez.zero *) return (ctxt, []))
+  >|=? fun (ctxt, reward_balance_updates) ->
+  let balance_updates = reward_balance_updates @ punish_balance_updates in
+  (ctxt, Single_result (mk_result balance_updates))
+
+let punish_double_endorsement_or_preendorsement (type kind) ctxt ~chain_id
+    ~preendorsement ~(op1 : kind Kind.consensus Operation.t)
+    ~(op2 : kind Kind.consensus Operation.t) ~payload_producer :
+    (t * kind Kind.double_consensus_operation_evidence contents_result_list)
+    tzresult
+    Lwt.t =
+  let mk_result (balance_updates : Receipt.balance_updates) :
+      kind Kind.double_consensus_operation_evidence contents_result =
+    match op1.protocol_data.contents with
+    | Single (Preendorsement _) ->
+        Double_preendorsement_evidence_result balance_updates
+    | Single (Endorsement _) ->
+        Double_endorsement_evidence_result balance_updates
+  in
+  match (op1.protocol_data.contents, op2.protocol_data.contents) with
+  | (Single (Preendorsement e1), Single (Preendorsement e2))
+  | (Single (Endorsement e1), Single (Endorsement e2)) ->
+      let kind = if preendorsement then Preendorsement else Endorsement in
+      let op1_hash = Operation.hash op1 in
+      let op2_hash = Operation.hash op2 in
+      fail_unless
+        (Raw_level.(e1.level = e2.level)
+        && Round.(e1.round = e2.round)
+        && (not
+              (Block_payload_hash.equal
+                 e1.block_payload_hash
+                 e2.block_payload_hash))
+        && (* we require an order on hashes to avoid the existence of
+              equivalent evidences *)
+        Operation_hash.(op1_hash < op2_hash))
+        (Invalid_denunciation kind)
+      >>=? fun () ->
+      (* Disambiguate: levels are equal *)
+      let level = Level.from_raw ctxt e1.level in
+      check_denunciation_age ctxt kind level.level >>=? fun () ->
+      Stake_distribution.slot_owner ctxt level e1.slot
+      >>=? fun (ctxt, (delegate1_pk, delegate1)) ->
+      Stake_distribution.slot_owner ctxt level e2.slot
+      >>=? fun (ctxt, (_delegate2_pk, delegate2)) ->
+      fail_unless
+        (Signature.Public_key_hash.equal delegate1 delegate2)
+        (Inconsistent_denunciation {kind; delegate1; delegate2})
+      >>=? fun () ->
+      let (delegate_pk, delegate) = (delegate1_pk, delegate1) in
+      Operation.check_signature delegate_pk chain_id op1 >>?= fun () ->
+      Operation.check_signature delegate_pk chain_id op2 >>?= fun () ->
+      punish_delegate
+        ctxt
+        delegate
+        level
+        `Double_endorsing
+        mk_result
+        ~payload_producer
+
+let punish_double_baking ctxt chain_id bh1 bh2 ~payload_producer =
+  let hash1 = Block_header.hash bh1 in
+  let hash2 = Block_header.hash bh2 in
+  Fitness.from_raw bh1.shell.fitness >>?= fun bh1_fitness ->
+  let round1 = Fitness.round bh1_fitness in
+  Fitness.from_raw bh2.shell.fitness >>?= fun bh2_fitness ->
+  let round2 = Fitness.round bh2_fitness in
+  ( Raw_level.of_int32 bh1.shell.level >>?= fun level1 ->
+    Raw_level.of_int32 bh2.shell.level >>?= fun level2 ->
+    fail_unless
+      (Compare.Int32.(bh1.shell.level = bh2.shell.level)
+      && Round.(round1 = round2)
+      && (* we require an order on hashes to avoid the existence of
+            equivalent evidences *)
+      Block_hash.(hash1 < hash2))
+      (Invalid_double_baking_evidence
+         {hash1; level1; round1; hash2; level2; round2}) )
+  >>=? fun () ->
+  Raw_level.of_int32 bh1.shell.level >>?= fun raw_level ->
+  check_denunciation_age ctxt Block raw_level >>=? fun () ->
+  let level = Level.from_raw ctxt raw_level in
+  let committee_size = Constants.consensus_committee_size ctxt in
+  Round.to_slot round1 ~committee_size >>?= fun slot1 ->
+  Stake_distribution.slot_owner ctxt level slot1
+  >>=? fun (ctxt, (delegate1_pk, delegate1)) ->
+  Round.to_slot round2 ~committee_size >>?= fun slot2 ->
+  Stake_distribution.slot_owner ctxt level slot2
+  >>=? fun (ctxt, (_delegate2_pk, delegate2)) ->
+  fail_unless
+    Signature.Public_key_hash.(delegate1 = delegate2)
+    (Inconsistent_denunciation {kind = Block; delegate1; delegate2})
+  >>=? fun () ->
+  let (delegate_pk, delegate) = (delegate1_pk, delegate1) in
+  Block_header.check_signature bh1 chain_id delegate_pk >>?= fun () ->
+  Block_header.check_signature bh2 chain_id delegate_pk >>?= fun () ->
+  punish_delegate
+    ctxt
+    delegate
+    level
+    `Double_baking
+    ~payload_producer
+    (fun balance_updates -> Double_baking_evidence_result balance_updates)
+
+let is_parent_endorsement ctxt ~proposal_level ~grand_parent_round
+    (operation : 'a operation) (operation_content : consensus_content) =
+  match Consensus.grand_parent_branch ctxt with
+  | None -> false
+  | Some (great_grand_parent_hash, grand_parent_payload_hash) ->
+      (* Check level *)
+      Raw_level.(proposal_level.Level.level = succ operation_content.level)
+      (* Check round *)
+      && Round.(grand_parent_round = operation_content.round)
+      (* Check payload *)
+      && Block_payload_hash.(
+           grand_parent_payload_hash = operation_content.block_payload_hash)
+      && (* Check branch *)
+      Block_hash.(great_grand_parent_hash = operation.shell.branch)
+
+let validate_grand_parent_endorsement ctxt chain_id
+    (op : Kind.endorsement operation) =
+  match op.protocol_data.contents with
+  | Single (Endorsement e) ->
+      let level = Level.from_raw ctxt e.level in
+      Stake_distribution.slot_owner ctxt level e.slot
+      >>=? fun (ctxt, (delegate_pk, pkh)) ->
+      Operation.check_signature delegate_pk chain_id op >>?= fun () ->
+      Consensus.record_grand_parent_endorsement ctxt pkh >>?= fun ctxt ->
+      return
+        ( ctxt,
+          Single_result
+            (Endorsement_result
+               {
+                 balance_updates = [];
+                 delegate = pkh;
+                 endorsement_power =
+                   0 (* dummy endorsement power: this will never be used *);
+               }) )
+
+let apply_contents_list (type kind) ctxt chain_id (apply_mode : apply_mode) mode
+    ~payload_producer (operation : kind operation)
+    (contents_list : kind contents_list) :
     (context * kind contents_result_list) tzresult Lwt.t =
+  let mempool_mode =
+    match apply_mode with
+    | Partial_construction _ -> true
+    | Full_construction _ | Application _ -> false
+  in
   match[@coq_match_with_default] contents_list with
-  | Single
-      (Endorsement_with_slot
-        {
-          endorsement =
-            {
-              shell = {branch};
-              protocol_data = {contents = Single (Endorsement {level}); _};
-            } as unslotted;
-          slot;
-        }) ->
-      if
-        (match operation.protocol_data.signature with
-        | None -> false
-        | Some _ -> true)
-        || not (Block_hash.equal operation.shell.branch branch)
-      then fail Invalid_endorsement_wrapper
-      else
-        let operation = unslotted (* shadow the slot box *) in
-        let block = operation.shell.branch in
-        Baking.check_endorsement_right ctxt chain_id operation ~slot
-        >>=? fun delegate ->
-        error_unless
-          (Block_hash.equal block pred_block)
-          (Wrong_endorsement_predecessor (pred_block, block))
-        >>?= fun () ->
-        let current_level = Level.current ctxt in
-        error_unless
-          Raw_level.(succ level = current_level.level)
-          Invalid_endorsement_level
-        >>?= fun () ->
-        Baking.check_endorsement_slots_at_current_level ctxt ~slot delegate
-        >>=? fun (slots, used) ->
-        if used then fail (Duplicate_endorsement delegate)
-        else
-          let ctxt = record_endorsement ctxt delegate in
-          let gap = List.length slots in
-          Tez.(Constants.endorsement_security_deposit ctxt *? Int64.of_int gap)
-          >>?= fun deposit ->
-          Delegate.freeze_deposit ctxt delegate deposit >>=? fun ctxt ->
-          Global.get_block_priority ctxt >>=? fun block_priority ->
-          Baking.endorsing_reward ctxt ~block_priority gap >>?= fun reward ->
-          Delegate.freeze_rewards ctxt delegate reward >|=? fun ctxt ->
-          ( ctxt,
-            Single_result
-              (Endorsement_with_slot_result
-                 (Endorsement_result
-                    {
-                      balance_updates =
-                        Receipt.cleanup_balance_updates
-                          [
-                            ( Contract (Contract.implicit_contract delegate),
-                              Debited deposit,
-                              Block_application );
-                            ( Deposits (delegate, current_level.cycle),
-                              Credited deposit,
-                              Block_application );
-                            ( Rewards (delegate, current_level.cycle),
-                              Credited reward,
-                              Block_application );
-                          ];
-                      delegate;
-                      slots;
-                    })) )
-  | Single (Endorsement _) -> fail Unwrapped_endorsement
-  | Single (Seed_nonce_revelation {level; nonce}) ->
-      let level = Level.from_raw ctxt level in
-      Nonce.reveal ctxt level nonce >>=? fun ctxt ->
-      let seed_nonce_revelation_tip =
-        Constants.seed_nonce_revelation_tip ctxt
-      in
-      Lwt.return
-        ( add_rewards ctxt seed_nonce_revelation_tip >|? fun ctxt ->
-          ( ctxt,
-            Single_result
-              (Seed_nonce_revelation_result
-                 [
-                   ( Rewards (baker, (Level.current ctxt).cycle),
-                     Credited seed_nonce_revelation_tip,
-                     Block_application );
-                 ]) ) )
-  | Single (Double_endorsement_evidence {op1; op2; slot}) -> (
-      match (op1.protocol_data.contents, op2.protocol_data.contents) with
-      | (Single (Endorsement e1), Single (Endorsement e2))
-        when Raw_level.(e1.level = e2.level)
-             && not (Block_hash.equal op1.shell.branch op2.shell.branch) ->
-          let level = Level.from_raw ctxt e1.level in
-          let oldest_level = Level.last_allowed_fork_level ctxt in
-          fail_unless
-            Level.(level < Level.current ctxt)
-            (Too_early_double_endorsement_evidence
-               {level = level.level; current = (Level.current ctxt).level})
-          >>=? fun () ->
-          fail_unless
-            Raw_level.(oldest_level <= level.level)
-            (Outdated_double_endorsement_evidence
-               {level = level.level; last = oldest_level})
-          >>=? fun () ->
-          Baking.check_endorsement_right ctxt chain_id op1 ~slot
-          >>=? fun delegate1 ->
-          Baking.check_endorsement_right ctxt chain_id op2 ~slot
-          >>=? fun delegate2 ->
-          fail_unless
-            (Signature.Public_key_hash.equal delegate1 delegate2)
-            (Inconsistent_double_endorsement_evidence {delegate1; delegate2})
-          >>=? fun () ->
-          Delegate.has_frozen_balance ctxt delegate1 level.cycle
-          >>=? fun valid ->
-          fail_unless valid Unrequired_double_endorsement_evidence
-          >>=? fun () ->
-          Delegate.punish ctxt delegate1 level.cycle >>=? fun (ctxt, balance) ->
-          Lwt.return Tez.(balance.deposit +? balance.fees) >>=? fun burned ->
-          let reward =
-            match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
-          in
-          add_rewards ctxt reward >>?= fun ctxt ->
-          let current_cycle = (Level.current ctxt).cycle in
+  | Single (Preendorsement consensus_content) ->
+      validate_consensus_contents
+        ctxt
+        chain_id
+        Preendorsement
+        operation
+        apply_mode
+        consensus_content
+      >>=? fun (ctxt, delegate, voting_power) ->
+      Consensus.record_preendorsement
+        ctxt
+        ~initial_slot:consensus_content.slot
+        ~power:voting_power
+        consensus_content.round
+      >>?= fun ctxt ->
+      return
+        ( ctxt,
+          Single_result
+            (Preendorsement_result
+               {
+                 balance_updates = [];
+                 delegate;
+                 preendorsement_power = voting_power;
+               }) )
+  | Single (Endorsement consensus_content) -> (
+      let proposal_level = get_predecessor_level apply_mode in
+      match apply_mode with
+      | Partial_construction {grand_parent_round; _}
+        when is_parent_endorsement
+               ctxt
+               ~proposal_level
+               ~grand_parent_round
+               operation
+               consensus_content ->
+          validate_grand_parent_endorsement ctxt chain_id operation
+      | _ ->
+          validate_consensus_contents
+            ctxt
+            chain_id
+            Endorsement
+            operation
+            apply_mode
+            consensus_content
+          >>=? fun (ctxt, delegate, voting_power) ->
+          Consensus.record_endorsement
+            ctxt
+            ~initial_slot:consensus_content.slot
+            ~power:voting_power
+          >>?= fun ctxt ->
           return
             ( ctxt,
               Single_result
-                (Double_endorsement_evidence_result
-                   (Receipt.cleanup_balance_updates
-                      [
-                        ( Deposits (delegate1, level.cycle),
-                          Debited balance.deposit,
-                          Block_application );
-                        ( Fees (delegate1, level.cycle),
-                          Debited balance.fees,
-                          Block_application );
-                        ( Rewards (delegate1, level.cycle),
-                          Debited balance.rewards,
-                          Block_application );
-                        ( Rewards (baker, current_cycle),
-                          Credited reward,
-                          Block_application );
-                      ])) )
-      | (_, _) -> fail Invalid_double_endorsement_evidence)
+                (Endorsement_result
+                   {
+                     balance_updates = [];
+                     delegate;
+                     endorsement_power = voting_power;
+                   }) ))
+  | Single (Seed_nonce_revelation {level; nonce}) ->
+      let level = Level.from_raw ctxt level in
+      Nonce.reveal ctxt level nonce >>=? fun ctxt ->
+      let tip = Constants.seed_nonce_revelation_tip ctxt in
+      let contract = Contract.implicit_contract payload_producer in
+      Token.transfer ctxt `Revelation_rewards (`Contract contract) tip
+      >|=? fun (ctxt, balance_updates) ->
+      (ctxt, Single_result (Seed_nonce_revelation_result balance_updates))
+  | Single (Double_preendorsement_evidence {op1; op2}) ->
+      punish_double_endorsement_or_preendorsement
+        ctxt
+        ~preendorsement:true
+        ~chain_id
+        ~op1
+        ~op2
+        ~payload_producer
+  | Single (Double_endorsement_evidence {op1; op2}) ->
+      punish_double_endorsement_or_preendorsement
+        ctxt
+        ~preendorsement:false
+        ~chain_id
+        ~op1
+        ~op2
+        ~payload_producer
   | Single (Double_baking_evidence {bh1; bh2}) ->
-      let hash1 = Block_header.hash bh1 in
-      let hash2 = Block_header.hash bh2 in
-      fail_unless
-        (Compare.Int32.(bh1.shell.level = bh2.shell.level)
-        && not (Block_hash.equal hash1 hash2))
-        (Invalid_double_baking_evidence
-           {hash1; level1 = bh1.shell.level; hash2; level2 = bh2.shell.level})
-      >>=? fun () ->
-      Lwt.return (Raw_level.of_int32 bh1.shell.level) >>=? fun raw_level ->
-      let oldest_level = Level.last_allowed_fork_level ctxt in
-      fail_unless
-        Raw_level.(raw_level < (Level.current ctxt).level)
-        (Too_early_double_baking_evidence
-           {level = raw_level; current = (Level.current ctxt).level})
-      >>=? fun () ->
-      fail_unless
-        Raw_level.(oldest_level <= raw_level)
-        (Outdated_double_baking_evidence
-           {level = raw_level; last = oldest_level})
-      >>=? fun () ->
-      let level = Level.from_raw ctxt raw_level in
-      Roll.baking_rights_owner
-        ctxt
-        level
-        ~priority:bh1.protocol_data.contents.priority
-      >>=? fun delegate1 ->
-      Baking.check_signature bh1 chain_id delegate1 >>=? fun () ->
-      Roll.baking_rights_owner
-        ctxt
-        level
-        ~priority:bh2.protocol_data.contents.priority
-      >>=? fun delegate2 ->
-      Baking.check_signature bh2 chain_id delegate2 >>=? fun () ->
-      fail_unless
-        (Signature.Public_key.equal delegate1 delegate2)
-        (Inconsistent_double_baking_evidence
-           {
-             delegate1 = Signature.Public_key.hash delegate1;
-             delegate2 = Signature.Public_key.hash delegate2;
-           })
-      >>=? fun () ->
-      let delegate = Signature.Public_key.hash delegate1 in
-      Delegate.has_frozen_balance ctxt delegate level.cycle >>=? fun valid ->
-      fail_unless valid Unrequired_double_baking_evidence >>=? fun () ->
-      Delegate.punish ctxt delegate level.cycle >>=? fun (ctxt, balance) ->
-      Tez.(balance.deposit +? balance.fees) >>?= fun burned ->
-      let reward =
-        match Tez.(burned /? 2L) with Ok v -> v | Error _ -> Tez.zero
-      in
-      Lwt.return
-        ( add_rewards ctxt reward >|? fun ctxt ->
-          let current_cycle = (Level.current ctxt).cycle in
-          ( ctxt,
-            Single_result
-              (Double_baking_evidence_result
-                 (Receipt.cleanup_balance_updates
-                    [
-                      ( Deposits (delegate, level.cycle),
-                        Debited balance.deposit,
-                        Block_application );
-                      ( Fees (delegate, level.cycle),
-                        Debited balance.fees,
-                        Block_application );
-                      ( Rewards (delegate, level.cycle),
-                        Debited balance.rewards,
-                        Block_application );
-                      ( Rewards (baker, current_cycle),
-                        Credited reward,
-                        Block_application );
-                    ])) ) )
-  | Single (Activate_account {id = pkh; activation_code}) -> (
+      punish_double_baking ctxt chain_id bh1 bh2 ~payload_producer
+  | Single (Activate_account {id = pkh; activation_code}) ->
       let blinded_pkh =
         Blinded_public_key_hash.of_ed25519_pkh activation_code pkh
       in
-      Commitment.find ctxt blinded_pkh >>=? function
-      | None -> fail (Invalid_activation {pkh})
-      | Some amount ->
-          Commitment.remove_existing ctxt blinded_pkh >>=? fun ctxt ->
-          let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
-          Contract.(credit ctxt contract amount) >|=? fun ctxt ->
-          ( ctxt,
-            Single_result
-              (Activate_account_result
-                 [(Contract contract, Credited amount, Block_application)]) ))
+      let src = `Collected_commitments blinded_pkh in
+      Token.allocated ctxt src >>=? fun src_exists ->
+      fail_unless src_exists (Invalid_activation {pkh}) >>=? fun _ ->
+      let contract = Contract.implicit_contract (Signature.Ed25519 pkh) in
+      Token.balance ctxt src >>=? fun amount ->
+      Token.transfer ctxt src (`Contract contract) amount
+      >>=? fun (ctxt, bupds) ->
+      return (ctxt, Single_result (Activate_account_result bupds))
   | Single (Proposals {source; period; proposals}) ->
-      Roll.delegate_pubkey ctxt source >>=? fun delegate ->
+      Delegate.pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate chain_id operation >>?= fun () ->
       Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
       error_unless
@@ -1395,7 +2179,7 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       Amendment.record_proposals ctxt source proposals >|=? fun ctxt ->
       (ctxt, Single_result Proposals_result)
   | Single (Ballot {source; period; proposal; ballot}) ->
-      Roll.delegate_pubkey ctxt source >>=? fun delegate ->
+      Delegate.pubkey ctxt source >>=? fun delegate ->
       Operation.check_signature delegate chain_id operation >>?= fun () ->
       Voting_period.get_current ctxt >>=? fun {index = current_period; _} ->
       error_unless
@@ -1408,27 +2192,43 @@ let apply_contents_list (type kind) ctxt chain_id mode pred_block baker
       (* Failing_noop _ always fails *)
       fail Failing_noop_error
   | Single (Manager_operation _) as op ->
-      precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+      precheck_manager_contents_list ctxt op ~mempool_mode
+      >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
-      apply_manager_contents_list ctxt mode baker chain_id op >|= ok
+      apply_manager_contents_list
+        ctxt
+        mode
+        ~payload_producer
+        chain_id
+        prechecked_contents_list
+      >|= ok
   | Cons (Manager_operation _, _) as op ->
-      precheck_manager_contents_list ctxt op >>=? fun ctxt ->
+      precheck_manager_contents_list ctxt op ~mempool_mode
+      >>=? fun (ctxt, prechecked_contents_list) ->
       check_manager_signature ctxt chain_id op operation >>=? fun () ->
-      apply_manager_contents_list ctxt mode baker chain_id op >|= ok
+      apply_manager_contents_list
+        ctxt
+        mode
+        ~payload_producer
+        chain_id
+        prechecked_contents_list
+      >|= ok
 
-let apply_operation ctxt chain_id mode pred_block baker hash operation =
-  let ctxt = Contract.init_origination_nonce ctxt hash in
+let apply_operation ctxt chain_id (apply_mode : apply_mode) mode
+    ~payload_producer hash operation =
+  let ctxt = Origination_nonce.init ctxt hash in
+  let ctxt = record_operation ctxt operation in
   apply_contents_list
     ctxt
     chain_id
+    apply_mode
     mode
-    pred_block
-    baker
+    ~payload_producer
     operation
     operation.protocol_data.contents
   >|=? fun (ctxt, result) ->
   let ctxt = Gas.set_unlimited ctxt in
-  let ctxt = Contract.unset_origination_nonce ctxt in
+  let ctxt = Origination_nonce.unset ctxt in
   (ctxt, {contents = result})
 
 let may_start_new_cycle ctxt =
@@ -1436,16 +2236,33 @@ let may_start_new_cycle ctxt =
   | None -> return (ctxt, [], [])
   | Some last_cycle ->
       Seed.cycle_end ctxt last_cycle >>=? fun (ctxt, unrevealed) ->
-      Roll.cycle_end ctxt last_cycle >>=? fun ctxt ->
       Delegate.cycle_end ctxt last_cycle unrevealed
-      >>=? fun (ctxt, update_balances, deactivated) ->
+      >>=? fun (ctxt, balance_updates, deactivated) ->
       Bootstrap.cycle_end ctxt last_cycle >|=? fun ctxt ->
-      (ctxt, update_balances, deactivated)
+      (ctxt, balance_updates, deactivated)
 
-let endorsement_rights_of_pred_level ctxt =
-  match Level.pred ctxt (Level.current ctxt) with
-  | None -> assert false (* genesis *)
-  | Some pred_level -> Baking.endorsement_rights ctxt pred_level
+let init_allowed_consensus_operations ctxt ~endorsement_level
+    ~preendorsement_level =
+  Delegate.prepare_stake_distribution ctxt >>=? fun ctxt ->
+  (if Level.(endorsement_level = preendorsement_level) then
+   Baking.endorsing_rights_by_first_slot ctxt endorsement_level
+   >>=? fun (ctxt, slots) ->
+   let consensus_operations = slots in
+   return (ctxt, consensus_operations, consensus_operations)
+  else
+    Baking.endorsing_rights_by_first_slot ctxt endorsement_level
+    >>=? fun (ctxt, endorsements_slots) ->
+    let endorsements = endorsements_slots in
+    Baking.endorsing_rights_by_first_slot ctxt preendorsement_level
+    >>=? fun (ctxt, preendorsements_slots) ->
+    let preendorsements = preendorsements_slots in
+    return (ctxt, endorsements, preendorsements))
+  >>=? fun (ctxt, allowed_endorsements, allowed_preendorsements) ->
+  return
+    (Consensus.initialize_consensus_operation
+       ctxt
+       ~allowed_endorsements
+       ~allowed_preendorsements)
 
 let apply_liquidity_baking_subsidy ctxt ~escape_vote =
   Liquidity_baking.on_subsidy_allowed
@@ -1453,7 +2270,11 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
     ~escape_vote
     (fun ctxt liquidity_baking_cpmm_contract ->
       let ctxt =
-        (* We set a gas limit of 1/20th the block limit, which is ~10x actual usage here in Granada. Gas consumed is reported in the Transaction receipt, but not counted towards the block limit. The gas limit is reset to unlimited at the end of this function.*)
+        (* We set a gas limit of 1/20th the block limit, which is ~10x
+           actual usage here in Granada. Gas consumed is reported in
+           the Transaction receipt, but not counted towards the block
+           limit. The gas limit is reset to unlimited at the end of
+           this function.*)
         Gas.set_limit
           ctxt
           (Gas.Arith.integral_exn
@@ -1465,16 +2286,23 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
       let backtracking_ctxt = ctxt in
       (let liquidity_baking_subsidy = Constants.liquidity_baking_subsidy ctxt in
        (* credit liquidity baking subsidy to CPMM contract *)
-       Contract.credit
+       Token.transfer
+         ~origin:Subsidy
          ctxt
-         liquidity_baking_cpmm_contract
+         `Liquidity_baking_subsidies
+         (`Contract liquidity_baking_cpmm_contract)
          liquidity_baking_subsidy
-       >>=? fun ctxt ->
+       >>=? fun (ctxt, balance_updates) ->
        Script_cache.find ctxt liquidity_baking_cpmm_contract
        >>=? fun (ctxt, cache_key, script) ->
        match script with
        | None -> fail (Script_tc_errors.No_such_entrypoint "default")
        | Some (script, script_ir) -> (
+           let now = Script_timestamp.now ctxt in
+           let level =
+             (Level.current ctxt).level |> Raw_level.to_int32
+             |> Script_int.of_int32 |> Script_int.abs
+           in
            let step_constants =
              let open Script_interpreter in
              (* Using dummy values for source, payer, and chain_id
@@ -1486,6 +2314,8 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                self = liquidity_baking_cpmm_contract;
                amount = liquidity_baking_subsidy;
                chain_id = Chain_id.zero;
+               now;
+               level;
              }
            in
            let parameter =
@@ -1526,18 +2356,10 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
                  storage
                  lazy_storage_diff
                >>=? fun ctxt ->
-               Fees.record_paid_storage_space_subsidy
+               Fees.record_paid_storage_space
                  ctxt
                  liquidity_baking_cpmm_contract
                >>=? fun (ctxt, new_size, paid_storage_size_diff) ->
-               let balance_updates =
-                 [
-                   Receipt.
-                     ( Contract liquidity_baking_cpmm_contract,
-                       Credited liquidity_baking_subsidy,
-                       Subsidy );
-                 ]
-               in
                let consumed_gas =
                  Gas.consumed ~since:backtracking_ctxt ~until:ctxt
                in
@@ -1571,51 +2393,106 @@ let apply_liquidity_baking_subsidy ctxt ~escape_vote =
           let ctxt = Gas.set_unlimited backtracking_ctxt in
           Ok (ctxt, []))
 
-let begin_full_construction ctxt pred_timestamp protocol_data =
-  let priority = protocol_data.Block_header.priority in
-  Global.set_block_priority ctxt priority >>=? fun ctxt ->
-  Baking.check_timestamp ctxt ~priority pred_timestamp >>?= fun () ->
-  let level = Level.current ctxt in
-  Roll.baking_rights_owner ctxt level ~priority >>=? fun delegate_pk ->
-  let ctxt = Fitness.increase ctxt in
-  endorsement_rights_of_pred_level ctxt >>=? fun rights ->
-  let ctxt = init_endorsements ctxt rights in
+type 'a full_construction = {
+  ctxt : t;
+  protocol_data : 'a;
+  payload_producer : Signature.public_key_hash;
+  block_producer : Signature.public_key_hash;
+  round : Round.t;
+  implicit_operations_results : packed_successful_manager_operation_result list;
+  liquidity_baking_escape_ema : Liquidity_baking.escape_ema;
+}
+
+let begin_full_construction ctxt ~predecessor_timestamp ~predecessor_level
+    ~predecessor_round ~round protocol_data =
+  let round_durations = Constants.round_durations ctxt in
+  let timestamp = Timestamp.current ctxt in
+  Block_header.check_timestamp
+    round_durations
+    ~timestamp
+    ~round
+    ~predecessor_timestamp
+    ~predecessor_round
+  >>?= fun () ->
+  let current_level = Level.current ctxt in
+  Stake_distribution.baking_rights_owner ctxt current_level ~round
+  >>=? fun (ctxt, _slot, (_block_producer_pk, block_producer)) ->
+  Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
+  fail_unless
+    Tez.(frozen_deposits.current_amount > zero)
+    (Zero_frozen_deposits block_producer)
+  >>=? fun () ->
+  Stake_distribution.baking_rights_owner
+    ctxt
+    current_level
+    ~round:protocol_data.Block_header.payload_round
+  >>=? fun (ctxt, _slot, (_payload_producer_pk, payload_producer)) ->
+  init_allowed_consensus_operations
+    ctxt
+    ~endorsement_level:predecessor_level
+    ~preendorsement_level:current_level
+  >>=? fun ctxt ->
   let escape_vote = protocol_data.liquidity_baking_escape_vote in
   apply_liquidity_baking_subsidy ctxt ~escape_vote
   >|=? fun ( ctxt,
              liquidity_baking_operations_results,
              liquidity_baking_escape_ema ) ->
-  ( ctxt,
-    protocol_data,
-    delegate_pk,
-    liquidity_baking_operations_results,
-    liquidity_baking_escape_ema )
+  {
+    ctxt;
+    protocol_data;
+    payload_producer;
+    block_producer;
+    round;
+    implicit_operations_results = liquidity_baking_operations_results;
+    liquidity_baking_escape_ema;
+  }
 
-let begin_partial_construction ctxt ~escape_vote =
-  let ctxt = Fitness.increase ctxt in
-  endorsement_rights_of_pred_level ctxt >>=? fun rights ->
-  let ctxt = init_endorsements ctxt rights in
-  apply_liquidity_baking_subsidy ctxt ~escape_vote
+let begin_partial_construction ctxt ~predecessor_level ~escape_vote =
+  (* In the mempool, only consensus operations for [predecessor_level]
+     (that is, head's level) are allowed, contrary to block validation
+     where endorsements are for the previous level and
+     preendorsements, if any, for the block's level. *)
+  init_allowed_consensus_operations
+    ctxt
+    ~endorsement_level:predecessor_level
+    ~preendorsement_level:predecessor_level
+  >>=? fun ctxt -> apply_liquidity_baking_subsidy ctxt ~escape_vote
 
-let begin_application ctxt chain_id block_header pred_timestamp =
-  let priority = block_header.Block_header.protocol_data.contents.priority in
-  Global.set_block_priority ctxt priority >>=? fun ctxt ->
-  Baking.check_timestamp ctxt ~priority pred_timestamp >>?= fun () ->
-  Baking.check_proof_of_work_stamp ctxt block_header >>?= fun () ->
-  Baking.check_fitness_gap ctxt block_header >>?= fun () ->
+let begin_application ctxt chain_id (block_header : Block_header.t) fitness
+    ~predecessor_timestamp ~predecessor_level ~predecessor_round =
+  let round = Fitness.round fitness in
   let current_level = Level.current ctxt in
-  Roll.baking_rights_owner ctxt current_level ~priority >>=? fun delegate_pk ->
-  Baking.check_signature block_header chain_id delegate_pk >>=? fun () ->
-  let has_commitment =
-    Option.is_some block_header.protocol_data.contents.seed_nonce_hash
-  in
-  error_unless
-    Compare.Bool.(has_commitment = current_level.expected_commitment)
-    (Invalid_commitment {expected = current_level.expected_commitment})
+  Stake_distribution.baking_rights_owner ctxt current_level ~round
+  >>=? fun (ctxt, _slot, (block_producer_pk, block_producer)) ->
+  let round_durations = Constants.round_durations ctxt in
+  let timestamp = block_header.shell.timestamp in
+  Block_header.begin_validate_block_header
+    ~block_header
+    ~chain_id
+    ~predecessor_timestamp
+    ~predecessor_round
+    ~fitness
+    ~timestamp
+    ~delegate_pk:block_producer_pk
+    ~round_durations
+    ~proof_of_work_threshold:(Constants.proof_of_work_threshold ctxt)
+    ~expected_commitment:current_level.expected_commitment
   >>?= fun () ->
-  let ctxt = Fitness.increase ctxt in
-  endorsement_rights_of_pred_level ctxt >>=? fun rights ->
-  let ctxt = init_endorsements ctxt rights in
+  Delegate.frozen_deposits ctxt block_producer >>=? fun frozen_deposits ->
+  fail_unless
+    Tez.(frozen_deposits.current_amount > zero)
+    (Zero_frozen_deposits block_producer)
+  >>=? fun () ->
+  Stake_distribution.baking_rights_owner
+    ctxt
+    current_level
+    ~round:block_header.protocol_data.contents.payload_round
+  >>=? fun (ctxt, _slot, (payload_producer_pk, _payload_producer)) ->
+  init_allowed_consensus_operations
+    ctxt
+    ~endorsement_level:predecessor_level
+    ~preendorsement_level:current_level
+  >>=? fun ctxt ->
   let escape_vote =
     block_header.Block_header.protocol_data.contents
       .liquidity_baking_escape_vote
@@ -1625,74 +2502,172 @@ let begin_application ctxt chain_id block_header pred_timestamp =
              liquidity_baking_operations_results,
              liquidity_baking_escape_ema ) ->
   ( ctxt,
-    delegate_pk,
+    payload_producer_pk,
+    block_producer,
     liquidity_baking_operations_results,
     liquidity_baking_escape_ema )
 
-let check_minimal_valid_time ctxt ~priority ~endorsing_power =
-  let predecessor_timestamp = Timestamp.predecessor ctxt in
-  Baking.minimal_valid_time
-    (Constants.parametric ctxt)
-    ~priority
-    ~endorsing_power
-    ~predecessor_timestamp
-  >>? fun minimum ->
-  let timestamp = Timestamp.current ctxt in
-  error_unless
-    Compare.Int64.(Time.to_seconds timestamp >= Time.to_seconds minimum)
-    (Baking.Timestamp_too_early
-       {
-         minimal_time = minimum;
-         provided_time = timestamp;
-         priority;
-         endorsing_power_opt = Some endorsing_power;
-       })
+type finalize_application_mode =
+  | Finalize_full_construction of {
+      level : Raw_level.t;
+      predecessor_round : Round.t;
+    }
+  | Finalize_application of Fitness.t
 
-let finalize_application ctxt protocol_data delegate migration_balance_updates
-    liquidity_baking_escape_ema implicit_operations_results =
-  let included_endorsements = included_endorsements ctxt in
-  check_minimal_valid_time
+let compute_payload_hash (ctxt : Alpha_context.t) ~(predecessor : Block_hash.t)
+    ~(payload_round : Round.t) : Block_payload_hash.t =
+  let non_consensus_operations = non_consensus_operations ctxt in
+  let operations_hash = Operation_list_hash.compute non_consensus_operations in
+  Block_payload.hash ~predecessor payload_round operations_hash
+
+let are_endorsements_required ctxt ~level =
+  Alpha_context.First_level_of_tenderbake.get ctxt
+  >|=? fun first_Tenderbake_level ->
+  (* NB: the first level is the level of the migration block. This
+     block was proposed by an Emmy* baker. There are no
+     endorsements for this block. Therefore the block at the next
+     level cannot contain endorsements. *)
+  let tenderbake_level_position = Raw_level.diff level first_Tenderbake_level in
+  Compare.Int32.(tenderbake_level_position > 1l)
+
+let check_minimum_endorsements ~endorsing_power ~minimum =
+  fail_when
+    Compare.Int.(endorsing_power < minimum)
+    (Not_enough_endorsements
+       {required = minimum; endorsements = endorsing_power})
+
+let finalize_application_check_validity ctxt (mode : finalize_application_mode)
+    protocol_data ~round ~predecessor ~endorsing_power ~consensus_threshold
+    ~required_endorsements =
+  (if required_endorsements then
+   check_minimum_endorsements ~endorsing_power ~minimum:consensus_threshold
+  else return_unit)
+  >>=? fun () ->
+  let block_payload_hash =
+    compute_payload_hash
+      ctxt
+      ~predecessor
+      ~payload_round:protocol_data.Block_header.payload_round
+  in
+  let locked_round_evidence =
+    Option.map
+      (fun (preendorsement_round, preendorsement_count) ->
+        Block_header.{preendorsement_round; preendorsement_count})
+      (Consensus.locked_round_evidence ctxt)
+  in
+  (match mode with
+  | Finalize_application fitness -> ok fitness
+  | Finalize_full_construction {level; predecessor_round} ->
+      let locked_round =
+        match locked_round_evidence with
+        | None -> None
+        | Some {preendorsement_round; _} -> Some preendorsement_round
+      in
+      Fitness.create ~level ~round ~predecessor_round ~locked_round)
+  >>?= fun fitness ->
+  let checkable_payload_hash : Block_header.checkable_payload_hash =
+    match mode with
+    | Finalize_application _ -> Expected_payload_hash block_payload_hash
+    | Finalize_full_construction _ -> (
+        match locked_round_evidence with
+        | Some _ -> Expected_payload_hash block_payload_hash
+        | None ->
+            (* In full construction, when there is no locked round
+               evidence (and thus no preendorsements), the baker cannot
+               know the payload hash before selecting the operations. We
+               may dismiss checking the initially given
+               payload_hash. However, to be valid, the baker must patch
+               the resulting block header with the actual payload
+               hash. *)
+            No_check)
+  in
+  Block_header.finalize_validate_block_header
+    ~block_header_contents:protocol_data
+    ~round
+    ~fitness
+    ~checkable_payload_hash
+    ~locked_round_evidence
+    ~consensus_threshold
+  >>?= fun () -> return (fitness, block_payload_hash)
+
+let record_endorsing_participation ctxt =
+  let validators = Consensus.allowed_endorsements ctxt in
+  Slot.Map.fold_es
+    (fun initial_slot (_delegate_pk, delegate, power) ctxt ->
+      let participation =
+        if Slot.Set.mem initial_slot (Consensus.endorsements_seen ctxt) then
+          Delegate.Participated
+        else Delegate.Didn't_participate
+      in
+      Delegate.record_endorsing_participation
+        ctxt
+        ~delegate
+        ~participation
+        ~endorsing_power:power)
+    validators
     ctxt
-    ~priority:protocol_data.Block_header.priority
-    ~endorsing_power:included_endorsements
-  >>?= fun () ->
-  let deposit = Constants.block_security_deposit ctxt in
-  Delegate.freeze_deposit ctxt delegate deposit >>=? fun ctxt ->
-  Baking.baking_reward
+
+let finalize_application ctxt (mode : finalize_application_mode) protocol_data
+    ~payload_producer ~block_producer liquidity_baking_escape_ema
+    implicit_operations_results ~round ~predecessor ~migration_balance_updates =
+  let level = Alpha_context.Level.current ctxt in
+  let block_endorsing_power = Consensus.current_endorsement_power ctxt in
+  let consensus_threshold = Constants.consensus_threshold ctxt in
+  are_endorsements_required ctxt ~level:level.level
+  >>=? fun required_endorsements ->
+  finalize_application_check_validity
     ctxt
-    ~block_priority:protocol_data.priority
-    ~included_endorsements
-  >>?= fun reward ->
-  add_rewards ctxt reward >>?= fun ctxt ->
-  (* end of level (from this point nothing should fail) *)
-  let fees = Alpha_context.get_fees ctxt in
-  Delegate.freeze_fees ctxt delegate fees >>=? fun ctxt ->
-  let rewards = Alpha_context.get_rewards ctxt in
-  Delegate.freeze_rewards ctxt delegate rewards >>=? fun ctxt ->
+    mode
+    protocol_data
+    ~round
+    ~predecessor
+    ~endorsing_power:block_endorsing_power
+    ~consensus_threshold
+    ~required_endorsements
+  >>=? fun (fitness, block_payload_hash) ->
+  (* from this point nothing should fail *)
+  (* We mark the endorsement branch as the grand parent branch when
+     accessible. This will not be present before the first two blocks
+     of tenderbake. *)
+  (match Consensus.endorsement_branch ctxt with
+  | Some predecessor_branch ->
+      Consensus.store_grand_parent_branch ctxt predecessor_branch >>= return
+  | None -> return ctxt)
+  >>=? fun ctxt ->
+  (* We mark the current payload hash as the predecessor one => this
+     will only be accessed by the successor block now. *)
+  Consensus.store_endorsement_branch ctxt (predecessor, block_payload_hash)
+  >>= fun ctxt ->
+  Round.update ctxt round >>=? fun ctxt ->
+  (* end of level  *)
   (match protocol_data.Block_header.seed_nonce_hash with
   | None -> return ctxt
   | Some nonce_hash ->
-      Nonce.record_hash ctxt {nonce_hash; delegate; rewards; fees})
+      Nonce.record_hash ctxt {nonce_hash; delegate = block_producer})
   >>=? fun ctxt ->
+  (if required_endorsements then
+   record_endorsing_participation ctxt >>=? fun ctxt ->
+   Baking.bonus_baking_reward ctxt ~endorsing_power:block_endorsing_power
+   >>?= fun rewards_bonus -> return (ctxt, Some rewards_bonus)
+  else return (ctxt, None))
+  >>=? fun (ctxt, reward_bonus) ->
+  let baking_reward = Constants.baking_reward_fixed_portion ctxt in
+  Delegate.record_baking_activity_and_pay_rewards_and_fees
+    ctxt
+    ~payload_producer
+    ~block_producer
+    ~baking_reward
+    ~reward_bonus
+  >>=? fun (ctxt, baking_receipts) ->
   (* end of cycle *)
-  (if Level.may_snapshot_rolls ctxt then Roll.snapshot_rolls ctxt
+  (if Level.may_snapshot_rolls ctxt then Stake_distribution.snapshot ctxt
   else return ctxt)
   >>=? fun ctxt ->
-  may_start_new_cycle ctxt >>=? fun (ctxt, balance_updates, deactivated) ->
+  may_start_new_cycle ctxt
+  >>=? fun (ctxt, cycle_end_balance_updates, deactivated) ->
   Amendment.may_start_new_voting_period ctxt >>=? fun ctxt ->
-  let cycle = (Level.current ctxt).cycle in
   let balance_updates =
-    Receipt.(
-      cleanup_balance_updates
-        (migration_balance_updates
-        @ [
-            ( Contract (Contract.implicit_contract delegate),
-              Debited deposit,
-              Block_application );
-            (Deposits (delegate, cycle), Credited deposit, Block_application);
-            (Rewards (delegate, cycle), Credited reward, Block_application);
-          ]
-        @ balance_updates))
+    migration_balance_updates @ baking_receipts @ cycle_end_balance_updates
   in
   let consumed_gas =
     Gas.Arith.sub
@@ -1700,12 +2675,12 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
       (Gas.block_level ctxt)
   in
   Voting_period.get_rpc_current_info ctxt >|=? fun voting_period_info ->
-  let level_info = Level.current ctxt in
   let receipt =
     Apply_results.
       {
-        baker = delegate;
-        level_info;
+        proposer = payload_producer;
+        baker = block_producer;
+        level_info = level;
         voting_period_info;
         nonce_hash = protocol_data.seed_nonce_hash;
         consumed_gas;
@@ -1715,6 +2690,6 @@ let finalize_application ctxt protocol_data delegate migration_balance_updates
         implicit_operations_results;
       }
   in
-  (ctxt, receipt)
+  (ctxt, fitness, receipt)
 
-let value_of_key ctxt k = Alpha_context.Cache.Admin.value_of_key ctxt k
+let value_of_key ctxt k = Cache.Admin.value_of_key ctxt k

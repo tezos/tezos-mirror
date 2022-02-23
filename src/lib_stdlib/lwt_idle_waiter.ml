@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 type t = {
   mutable pending_tasks : unit Lwt.u list;
@@ -54,7 +54,7 @@ let rec may_run_idle_tasks w =
            thread? *)
         Lwt.async (fun () ->
             let pending_idle = List.rev pending_idle in
-            Lwt_list.iter_s (fun f -> f ()) pending_idle >>= fun () ->
+            let* () = Lwt_list.iter_s (fun f -> f ()) pending_idle in
             w.running_idle <- false ;
             let pending_tasks = List.rev w.pending_tasks in
             w.pending_tasks <- [] ;
@@ -63,9 +63,7 @@ let rec may_run_idle_tasks w =
             Lwt.return_unit)
 
 let wrap_error f =
-  Lwt.catch
-    (fun () -> f () >>= fun r -> Lwt.return_ok r)
-    (fun exn -> Lwt.return_error exn)
+  Lwt.catch (fun () -> Lwt_result.ok @@ f ()) (fun exn -> Lwt.return_error exn)
 
 let unwrap_error = function Ok r -> Lwt.return r | Error exn -> Lwt.fail exn
 
@@ -77,10 +75,11 @@ let rec task w f =
   if w.running_idle || w.prevent_tasks then (
     let (t, u) = Lwt.task () in
     w.pending_tasks <- u :: w.pending_tasks ;
-    t >>= fun () -> task w f)
+    let* () = t in
+    task w f)
   else (
     w.running_tasks <- w.running_tasks + 1 ;
-    wrap_error f >>= fun res ->
+    let* res = wrap_error f in
     w.running_tasks <- w.running_tasks - 1 ;
     may_run_idle_tasks w ;
     unwrap_error res)
@@ -92,7 +91,7 @@ let when_idle w f =
   let f () =
     if !canceled then Lwt.return_unit
     else
-      wrap_error f >>= fun res ->
+      let* res = wrap_error f in
       wakeup_error u res ;
       Lwt.return_unit
   in

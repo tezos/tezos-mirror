@@ -448,7 +448,7 @@ let run state ~winner_path ~demo_path ~protocol ~node_exec ~client_exec
           EF.(
             wf
               "Submitting proposal%s: %s"
-              (if List.length props = 1 then "" else "s")
+              (match props with [_] -> "" | _ -> "s")
               (String.concat ~sep:", " props)))
     >>= fun _ ->
     Tezos_client.successful_client_cmd

@@ -26,25 +26,24 @@
 open Support.Lib.Monad
 
 let assert_eq_s pa pb =
-  let open Lwt.Infix in
-  pa >>= fun a ->
-  pb >>= fun b ->
+  let open Lwt_syntax in
+  let* a = pa and* b = pb in
   assert (a = b) ;
-  Lwt.return_unit
+  return_unit
 
 let assert_err e = e = Error ()
 
 let assert_err_s e =
-  let open Lwt.Infix in
-  e >>= fun e ->
+  let open Lwt_syntax in
+  let* e = e in
   assert (e = Error ()) ;
-  Lwt.return_unit
+  return_unit
 
 let assert_err_p e =
-  let open Lwt.Infix in
-  e >>= fun e ->
+  let open Lwt_syntax in
+  let* e = e in
   assert (e = Error (Support.Test_trace.make ())) ;
-  Lwt.return_unit
+  return_unit
 
 module ListGen = struct
   include Support.Lib.List
@@ -105,9 +104,9 @@ module Init = struct
     ()
 
   let init_e () =
-    assert (assert_err @@ init_e ~when_negative_length:() (-10) ok) ;
-    assert (init_e ~when_negative_length:() 0 ok = nil_e) ;
-    assert (init_e ~when_negative_length:() 11 ok = ok @@ up 10) ;
+    assert (assert_err @@ init_e ~when_negative_length:() (-10) Result.ok) ;
+    assert (init_e ~when_negative_length:() 0 Result.ok = nil_e) ;
+    assert (init_e ~when_negative_length:() 11 Result.ok = Result.ok @@ up 10) ;
     ()
 
   let init_s _ () =
@@ -219,6 +218,126 @@ module FilterSmthg = struct
     ]
 end
 
+module ConcatMap = struct
+  let concat_map () =
+    assert (concat_map Fun.id [] = []) ;
+    assert (concat_map Fun.id [[]; []; []; []] = []) ;
+    assert (concat_map (fun _ -> assert false) [] = []) ;
+    assert (concat_map (fun _ -> []) [1] = []) ;
+    assert (concat_map (fun x -> [x]) [1] = [1]) ;
+    assert (concat_map (fun x -> [x; 0; x; x]) [1] = [1; 0; 1; 1]) ;
+    assert (concat_map (fun _ -> []) [1; 2; 3] = []) ;
+    assert (concat_map (fun x -> [x]) [1; 2; 3] = [1; 2; 3]) ;
+    assert (
+      concat_map (fun x -> [x; x; 2 * x]) [1; 2; 3]
+      = [1; 1; 2; 2; 2; 4; 3; 3; 6]) ;
+    ()
+
+  let concat_map_e () =
+    assert (concat_map_e Result.ok [] = Ok []) ;
+    assert (concat_map_e Result.ok [[]; []; []; []] = Ok []) ;
+    assert (concat_map_e (fun _ -> assert false) [] = Ok []) ;
+    assert (concat_map_e (fun _ -> Ok []) [1] = Ok []) ;
+    assert (concat_map_e (fun x -> Ok [x]) [1] = Ok [1]) ;
+    assert (concat_map_e (fun x -> Ok [x; 0; x; x]) [1] = Ok [1; 0; 1; 1]) ;
+    assert (concat_map_e (fun _ -> Ok []) [1; 2; 3] = Ok []) ;
+    assert (concat_map_e (fun x -> Ok [x]) [1; 2; 3] = Ok [1; 2; 3]) ;
+    assert (
+      concat_map_e (fun x -> Ok [x; x; 2 * x]) [1; 2; 3]
+      = Ok [1; 1; 2; 2; 2; 4; 3; 3; 6]) ;
+    assert (concat_map_e (fun _ -> Error ()) [] = Ok []) ;
+    assert (concat_map_e (fun _ -> Error ()) [[]; []; []; []] = Error ()) ;
+    assert (concat_map_e (fun _ -> Error ()) [1] = Error ()) ;
+    assert (concat_map_e (fun _ -> Error ()) [1; 2; 3] = Error ()) ;
+    assert (concat_map_e (fun x -> Error x) [1; 2; 3] = Error 1) ;
+    assert (
+      concat_map_e (fun x -> if x <= 1 then Ok [x] else Error x) [1; 2; 3]
+      = Error 2) ;
+    ()
+
+  let concat_map_s _ () =
+    let open Lwt.Infix in
+    assert_eq_s (concat_map_s Lwt.return []) nil_s >>= fun () ->
+    assert_eq_s (concat_map_s Lwt.return [[]; []; []; []]) nil_s >>= fun () ->
+    assert_eq_s (concat_map_s (fun _ -> assert false) []) nil_s >>= fun () ->
+    assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1]) nil_s >>= fun () ->
+    assert_eq_s (concat_map_s (fun x -> Lwt.return [x]) [1]) (Lwt.return [1])
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_s (fun x -> Lwt.return [x; 0; x; x]) [1])
+      (Lwt.return [1; 0; 1; 1])
+    >>= fun () ->
+    assert_eq_s (concat_map_s (fun _ -> Lwt.return []) [1; 2; 3]) nil_s
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_s (fun x -> Lwt.return [x]) [1; 2; 3])
+      (Lwt.return [1; 2; 3])
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_s (fun x -> Lwt.return [x; x; 2 * x]) [1; 2; 3])
+      (Lwt.return [1; 1; 2; 2; 2; 4; 3; 3; 6])
+    >>= fun () -> Lwt.return_unit
+
+  let concat_map_es _ () =
+    let open Lwt.Infix in
+    assert_eq_s (concat_map_es Lwt.return_ok []) nil_es >>= fun () ->
+    assert_eq_s (concat_map_es Lwt.return_ok [[]; []; []; []]) nil_es
+    >>= fun () ->
+    assert_eq_s (concat_map_es (fun _ -> assert false) []) nil_es >>= fun () ->
+    assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1]) nil_es
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun x -> Lwt.return_ok [x]) [1])
+      (Lwt.return_ok [1])
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun x -> Lwt.return_ok [x; 0; x; x]) [1])
+      (Lwt.return_ok [1; 0; 1; 1])
+    >>= fun () ->
+    assert_eq_s (concat_map_es (fun _ -> Lwt.return_ok []) [1; 2; 3]) nil_es
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun x -> Lwt.return_ok [x]) [1; 2; 3])
+      (Lwt.return_ok [1; 2; 3])
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun x -> Lwt.return_ok [x; x; 2 * x]) [1; 2; 3])
+      (Lwt.return_ok [1; 1; 2; 2; 2; 4; 3; 3; 6])
+    >>= fun () ->
+    assert_eq_s (concat_map_es (fun _ -> Lwt.return_error ()) []) nil_es
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun _ -> Lwt.return_error ()) [[]; []; []; []])
+      (Lwt.return_error ())
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun _ -> Lwt.return_error ()) [1])
+      (Lwt.return_error ())
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun _ -> Lwt.return_error ()) [1; 2; 3])
+      (Lwt.return_error ())
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es (fun x -> Lwt.return_error x) [1; 2; 3])
+      (Lwt.return_error 1)
+    >>= fun () ->
+    assert_eq_s
+      (concat_map_es
+         (fun x -> if x <= 1 then Lwt.return_ok [x] else Lwt.return_error x)
+         [1; 2; 3])
+      (Lwt.return_error 2)
+    >>= fun () -> Lwt.return_unit
+
+  let tests =
+    [
+      Alcotest_lwt.test_case_sync "concat_map" `Quick concat_map;
+      Alcotest_lwt.test_case_sync "concat_map_e" `Quick concat_map_e;
+      Alcotest_lwt.test_case "concat_map_s" `Quick concat_map_s;
+      Alcotest_lwt.test_case "concat_map_es" `Quick concat_map_es;
+    ]
+end
+
 module Combine = struct
   let combine_error () =
     assert (combine ~when_different_lengths:() [] [0] = Error ()) ;
@@ -279,8 +398,8 @@ module Partition = struct
     assert (partition_result [] = ([], [])) ;
     assert (partition_result [Ok 0] = ([0], [])) ;
     assert (partition_result [Error 0] = ([], [0])) ;
-    assert (partition_result (map ok (up 11)) = (up 11, [])) ;
-    assert (partition_result (map (fun x -> Error x) (up 11)) = ([], up 11)) ;
+    assert (partition_result (map Result.ok (up 11)) = (up 11, [])) ;
+    assert (partition_result (map Result.error (up 11)) = ([], up 11)) ;
     assert (
       let input = map (fun x -> if cond x then Ok x else Error x) (up 101) in
       partition_result input = (filter_ok input, filter_error input)) ;
@@ -309,14 +428,17 @@ module Fold = struct
     assert (x = Error 3)
 
   let test_fold_left_map_s _ () =
-    assert_eq_s
-      (fold_left_map_s (fun _ _ -> assert false) 0 [])
-      (Lwt.return (0, []))
-    >>= fun () ->
-    assert_eq_s
-      (fold_left_map_s (fun a b -> Lwt.return (a + b, b)) 0 list)
-      (Lwt.return (list_sum, list))
-    >>= fun () ->
+    let open Lwt_syntax in
+    let* () =
+      assert_eq_s
+        (fold_left_map_s (fun _ _ -> assert false) 0 [])
+        (Lwt.return (0, []))
+    in
+    let* () =
+      assert_eq_s
+        (fold_left_map_s (fun a b -> Lwt.return (a + b, b)) 0 list)
+        (Lwt.return (list_sum, list))
+    in
     let p =
       fold_left_map_s
         (fun a b -> if a < 3 then Lwt.return (a + 1, b) else Lwt.fail Exit)
@@ -327,14 +449,18 @@ module Fold = struct
     Lwt.return ()
 
   let test_fold_left_map_es _ () =
-    assert_eq_s
-      (fold_left_map_es (fun _ _ -> assert false) 0 [])
-      (return (0, []))
-    >>= fun () ->
-    assert_eq_s
-      (fold_left_map_es (fun a b -> return (a + b, b)) 0 list)
-      (return (list_sum, list))
-    >>= fun () ->
+    let open Lwt_syntax in
+    let* () =
+      assert_eq_s
+        (fold_left_map_es (fun _ _ -> assert false) 0 [])
+        (return_ok (0, []))
+    in
+    let* () =
+      assert_eq_s
+        (fold_left_map_es (fun a b -> return_ok (a + b, b)) 0 list)
+        (return_ok (list_sum, list))
+    in
+    let open Lwt_result_syntax in
     assert_eq_s
       (fold_left_map_es
          (fun s x -> if x < 3 then return (s, x) else fail x)
@@ -359,6 +485,7 @@ let () =
       ("last", Last.tests);
       ("init", Init.tests);
       ("filter_*", FilterSmthg.tests);
+      ("concat_map_*", ConcatMap.tests);
       ("combine_*", Combine.tests);
       ("partition_*", Partition.tests);
       ("fold", Fold.tests);

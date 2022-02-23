@@ -1,14 +1,17 @@
 (library
  (name tezos_event_logging)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-event-logging)
- (flags (:standard -open Tezos_stdlib
-                   -open Data_encoding
-                   -open Tezos_error_monad
-                   -open Tezos_error_monad.TzLwtreslib
-                   ))
- (libraries tezos-stdlib
-            data-encoding
-            tezos-error-monad
-            tezos-lwt-result-stdlib
-            lwt_log.core))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-stdlib
+  data-encoding
+  tezos-error-monad
+  tezos-lwt-result-stdlib
+  lwt_log.core)
+ (js_of_ocaml)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Data_encoding
+   -open Tezos_error_monad
+   -open Tezos_error_monad.TzLwtreslib)))

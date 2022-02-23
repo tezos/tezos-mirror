@@ -2,7 +2,7 @@ Tezt: Long Tests
 ================
 
 :doc:`Tezt <tezt>` can also be used for long tests.
-The differences with regular Tezt tests are:
+Here are the differences with regular Tezt tests:
 
 - long tests are not run in the CI but on dedicated machines with
   stable, predictable performance, and with no global timeout like in
@@ -110,10 +110,9 @@ One-Shot Tests
 --------------
 
 You may be interested in running some long tests using this framework
-on your own branch instead of ``master``. This is work-in-progress,
-but the goal is to make it easy to do, possibly with a manual job in
-your branch's CI pipeline that you could trigger to spawn the tests
-for your branch. Stay tuned.
+on your own branch instead of ``master``.
+
+See documentation in the README `here <https://gitlab.com/nomadic-labs/iac/terraform/tf-aws-performance-regression-oneshot-instance>`_
 
 Providing Large Data
 --------------------
@@ -121,6 +120,86 @@ Providing Large Data
 Your test may require data that is too large to commit in
 ``tezos/tezos``. For example, a benchmark in which measurement is
 dependent on some block's context would need to load the same data
-directory on each execution. This is also a work-in-progress, but a
-dedicacted AWS storage will be provided as well as a way to dowload
-files and archives from it to fullfill these needs.
+directory on each execution.
+
+There is an Amazon S3 bucket where you can
+upload your data which will be made available for your test. Data
+will be synchronized with the server your tests will be running on.
+
+For security reasons, this storage has its access limited to
+authorized people. If you want to upload data, please contact
+Jérémie Goldberg (@jgonlabs) or anyone with admin access on
+the Tezos AWS account to allow you to do so.
+
+Please note that the S3 storage root folder is mounted in ``/s3data/``.
+E.g. if your file is under ``/myfolder/myfile`` in the Amazon bucket, your
+tests will find it under ``/s3data/myfolder/myfile``.
+
+Testing Your Benchmarks Locally
+-------------------------------
+
+When developing a benchmark depending on the long test framework, it can
+be useful to test it using a development database so that your tests does
+not impact the production database.
+
+This section describes how to easily set up an InfluxDB database so that the
+framework can operate with it.
+
+The following steps assume that you already installed Docker and correctly
+configured it. For more information on this subject, please refer to:
+https://docs.docker.com/engine/install/#desktop
+
+We will first install and bootstrap an InfluxDB database. This can be done
+using the official Docker image: https://hub.docker.com/_/influxdb
+
+From a terminal, run the following commands::
+
+    mkdir $HOME/influxdb
+
+    docker run -d -p 8086:8086 \
+      -v $HOME/influxdb/data:/var/lib/influxdb2 \
+      -v $HOME/influxdb/config:/etc/influxdb2 \
+      -e DOCKER_INFLUXDB_INIT_MODE=setup \
+      -e DOCKER_INFLUXDB_INIT_USERNAME=<user> \
+      -e DOCKER_INFLUXDB_INIT_PASSWORD=<password> \
+      -e DOCKER_INFLUXDB_INIT_ORG=my-org \
+      -e DOCKER_INFLUXDB_INIT_BUCKET=my-bucket \
+      influxdb:1.8
+
+This will download an image of the version 1.8 of InfluxDB and start a
+container with it. Version 1.8 is mandatory as the framework does not
+support newer versions for now.
+
+Of course, ``<user>`` and ``<password>`` should be replaced by values of your choice.
+
+When the container is bootstrapped, you need to create the database
+that will be used by the framework.
+
+Run the following command to connect to the InfluxDB server and create
+a database named ``prt``::
+
+    curl -X POST http://localhost:8086/query\?pretty\=true \
+    --user "<user>:<password>" \
+    --data-urlencode "q=create database prt"
+
+After the database is created, you can use the following JSON
+configuration to set up the framework with your local database:
+
+``tezt_config.json``:
+
+.. code-block:: json
+
+    {
+      "influxdb": {
+        "url": "http://localhost:8086",
+        "database": "prt",
+        "username": "<user>",
+        "password": "<password>"
+      }
+    }
+
+For more information about the configuration file, please refer
+to the `Long test module API <https://gitlab.com/tezos/tezos/-/blob/master/tezt/long_tests/long_test.mli>`__.
+
+
+

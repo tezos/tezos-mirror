@@ -1,8 +1,8 @@
 ; build static executable with --profile static
 (env
- (static (flags (:standard
-                  -ccopt -static
-                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+ (static
+  (flags (:standard
+           -ccopt -static))))
 
 (executable
  (name main_accuser_011_PtHangz2)

@@ -135,12 +135,14 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
               in
               if matches hash then
                 Tezos_signer_backends.Unencrypted.make_pk public_key
-                >>=? fun pk_uri ->
+                >>?= fun pk_uri ->
                 (if encrypted then
                  Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt
                    cctxt
                    secret_key
-                else Tezos_signer_backends.Unencrypted.make_sk secret_key)
+                else
+                  Tezos_signer_backends.Unencrypted.make_sk secret_key
+                  >>?= return)
                 >>=? fun sk_uri ->
                 register_key cctxt ~force (public_key_hash, pk_uri, sk_uri) name
                 >>=? fun () -> return hash
@@ -149,7 +151,7 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                  cctxt#message "Tried %d keys without finding a match" attempts
                 else Lwt.return_unit)
                 >>= fun () ->
-                Lwt_unix.yield () >>= fun () -> loop (attempts + 1)
+                Lwt.pause () >>= fun () -> loop (attempts + 1)
             in
             loop 1 >>=? fun key_hash ->
             cctxt#message "Generated '%s' under the name '%s'." key_hash name
@@ -265,7 +267,7 @@ let commands network : Client_context.full Clic.command list =
           (fun (force, algo) name (cctxt : Client_context.full) ->
             Secret_key.of_fresh cctxt force name >>=? fun name ->
             let (pkh, pk, sk) = Signature.generate_key ~algo () in
-            Tezos_signer_backends.Unencrypted.make_pk pk >>=? fun pk_uri ->
+            Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
             Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name)
@@ -281,10 +283,10 @@ let commands network : Client_context.full Clic.command list =
           (fun (force, algo, encrypted) name (cctxt : Client_context.full) ->
             Secret_key.of_fresh cctxt force name >>=? fun name ->
             let (pkh, pk, sk) = Signature.generate_key ~algo () in
-            Tezos_signer_backends.Unencrypted.make_pk pk >>=? fun pk_uri ->
+            Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
             (if encrypted then
              Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
-            else Tezos_signer_backends.Unencrypted.make_sk sk)
+            else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return)
             >>=? fun sk_uri ->
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name));
     (match network with
@@ -604,7 +606,7 @@ let commands network : Client_context.full Clic.command list =
                      sk)
               in
               Tezos_signer_backends.Unencrypted.make_sk sk
-              >>=? fun unencrypted_sk_uri ->
+              >>?= fun unencrypted_sk_uri ->
               (match encrypt with
               | true ->
                   Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt

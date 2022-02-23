@@ -26,11 +26,12 @@
 (** Tezos Protocol Implementation - Low level Repr. of Operations
 
     Defines kinds of operations that can be performed on chain:
-    - endorsement (should now always be wrapped in endorsement_with_slot)
-    - endorsement_with_slot
-    - double endorsement evidence
-    - seed nonce revelation
+    - preendorsement
+    - endorsement
     - double baking evidence
+    - double preendorsing evidence
+    - double endorsing evidence
+    - seed nonce revelation
     - account activation
     - proposal (see: [Voting_repr])
     - ballot (see: [Voting_repr])
@@ -40,6 +41,8 @@
       - transaction
       - origination
       - delegation
+      - set deposits limitation
+    - tx rollup origination
 
     Each of them can be encoded as raw bytes. Operations are distinguished at
     type level using phantom type parameters. [packed_operation] type allows
@@ -47,17 +50,32 @@
     list. *)
 
 module Kind : sig
+  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+
+  type endorsement_consensus_kind = Endorsement_consensus_kind
+
+  type 'a consensus =
+    | Preendorsement_kind : preendorsement_consensus_kind consensus
+    | Endorsement_kind : endorsement_consensus_kind consensus
+
+  type preendorsement = preendorsement_consensus_kind consensus
+
+  type endorsement = endorsement_consensus_kind consensus
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
-  type endorsement_with_slot = Endorsement_with_slot_kind
+  type 'a double_consensus_operation_evidence =
+    | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence = Double_endorsement_evidence_kind
+  type double_endorsement_evidence =
+    endorsement_consensus_kind double_consensus_operation_evidence
+
+  type double_preendorsement_evidence =
+    preendorsement_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
   type activate_account = Activate_account_kind
-
-  type endorsement = Endorsement_kind
 
   type proposals = Proposals_kind
 
@@ -71,9 +89,13 @@ module Kind : sig
 
   type delegation = Delegation_kind
 
+  type set_deposits_limit = Set_deposits_limit_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
+
+  type tx_rollup_origination = Tx_rollup_origination_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -81,7 +103,39 @@ module Kind : sig
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
     | Register_global_constant_manager_kind : register_global_constant manager
+    | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
 end
+
+type 'a consensus_operation_type =
+  | Endorsement : Kind.endorsement consensus_operation_type
+  | Preendorsement : Kind.preendorsement consensus_operation_type
+
+val pp_operation_kind :
+  Format.formatter -> 'kind consensus_operation_type -> unit
+
+type consensus_content = {
+  slot : Slot_repr.t;
+  (* By convention, this is the validator's first slot. *)
+  level : Raw_level_repr.t;
+  (* The level of (pre)endorsed block. *)
+  round : Round_repr.t;
+  (* The round of (pre)endorsed block. *)
+  block_payload_hash : Block_payload_hash.t;
+      (* The payload hash of (pre)endorsed block. *)
+}
+
+val consensus_content_encoding : consensus_content Data_encoding.t
+
+val pp_consensus_content : Format.formatter -> consensus_content -> unit
+
+type consensus_watermark =
+  | Endorsement of Chain_id.t
+  | Preendorsement of Chain_id.t
+
+val to_watermark : consensus_watermark -> Signature.watermark
+
+val of_watermark : Signature.watermark -> consensus_watermark option
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
@@ -104,21 +158,21 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Endorsement : {level : Raw_level_repr.t} -> Kind.endorsement contents
+  | Preendorsement : consensus_content -> Kind.preendorsement contents
+  | Endorsement : consensus_content -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
-  | Endorsement_with_slot : {
-      endorsement : Kind.endorsement operation;
-      slot : int;
+  | Double_preendorsement_evidence : {
+      op1 : Kind.preendorsement operation;
+      op2 : Kind.preendorsement operation;
     }
-      -> Kind.endorsement_with_slot contents
+      -> Kind.double_preendorsement_evidence contents
   | Double_endorsement_evidence : {
       op1 : Kind.endorsement operation;
       op2 : Kind.endorsement operation;
-      slot : int;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -178,6 +232,10 @@ and _ manager_operation =
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  | Set_deposits_limit :
+      Tez_repr.t option
+      -> Kind.set_deposits_limit manager_operation
+  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -263,11 +321,14 @@ module Encoding : sig
       }
         -> 'b case
 
+  val preendorsement_case : Kind.preendorsement case
+
   val endorsement_case : Kind.endorsement case
 
   val seed_nonce_revelation_case : Kind.seed_nonce_revelation case
 
-  val endorsement_with_slot_case : Kind.endorsement_with_slot case
+  val double_preendorsement_evidence_case :
+    Kind.double_preendorsement_evidence case
 
   val double_endorsement_evidence_case : Kind.double_endorsement_evidence case
 
@@ -292,6 +353,10 @@ module Encoding : sig
   val register_global_constant_case :
     Kind.register_global_constant Kind.manager case
 
+  val set_deposits_limit_case : Kind.set_deposits_limit Kind.manager case
+
+  val tx_rollup_origination_case : Kind.tx_rollup_origination Kind.manager case
+
   module Manager_operations : sig
     type 'b case =
       | MCase : {
@@ -313,5 +378,9 @@ module Encoding : sig
     val delegation_case : Kind.delegation case
 
     val register_global_constant_case : Kind.register_global_constant case
+
+    val set_deposits_limit_case : Kind.set_deposits_limit case
+
+    val tx_rollup_origination_case : Kind.tx_rollup_origination case
   end
 end

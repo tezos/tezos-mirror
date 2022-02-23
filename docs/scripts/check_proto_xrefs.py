@@ -58,7 +58,7 @@ if not os.path.isdir(directory):
 # First pass: Scan labels: check & register
 def_lbl_pat = re.compile(r' *[.][.]  *_([a-zA-Z0-9_-]*) *:')
 for file in glob.glob(f"{directory}/*.rst"):
-    with open(file, "r") as f:
+    with open(file, mode="r", encoding="utf-8") as f:
         while line := f.readline():
             if m := re.match(def_lbl_pat, line):
                 label = m.group(1)
@@ -76,9 +76,9 @@ for file in glob.glob(f"{directory}/*.rst"):
 ref_pat = re.compile(r':ref:`([^`]+)`', flags=re.DOTALL)
 ref_lbl_desc_pat = re.compile(r'<(.+)>$')
 ref_file_pat = re.compile(r'[.](rst|html)$')
-sphinx_id_pat = re.compile(r'[\w-]+')
+sphinx_id_pat = re.compile(r'[\w.-]+')
 for file in glob.glob(f"{directory}/*.rst"):
-    with open(file, "r") as f:
+    with open(file, mode="r", encoding="utf-8") as f:
         txt = f.read()  # read all file contents
     for i in re.finditer(ref_pat, txt):
         ref = i.group(1)

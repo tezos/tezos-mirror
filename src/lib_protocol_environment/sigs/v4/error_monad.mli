@@ -24,7 +24,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error_category = [`Branch | `Temporary | `Permanent]
+type error_category = [`Branch | `Temporary | `Permanent | `Outdated]
 
 (** CORE : errors *)
 
@@ -46,8 +46,6 @@ val register_error_kind :
   (error -> 'err option) ->
   ('err -> error) ->
   unit
-
-val classify_error : error -> error_category
 
 val json_of_error : error -> Data_encoding.json
 
@@ -81,18 +79,6 @@ val pp_trace : Format.formatter -> error trace -> unit
 val result_encoding : 'a Data_encoding.t -> 'a tzresult Data_encoding.t
 
 val ok : 'a -> ('a, 'trace) result
-
-val ok_unit : (unit, 'trace) result
-
-val ok_none : ('a option, 'trace) result
-
-val ok_some : 'a -> ('a option, 'trace) result
-
-val ok_nil : ('a list, 'trace) result
-
-val ok_true : (bool, 'trace) result
-
-val ok_false : (bool, 'trace) result
 
 val return : 'a -> ('a, 'trace) result Lwt.t
 
@@ -145,12 +131,10 @@ val trace :
   'err -> ('b, 'err trace) result Lwt.t -> ('b, 'err trace) result Lwt.t
 
 val record_trace_eval :
-  (unit -> ('err, 'err trace) result) ->
-  ('a, 'err trace) result ->
-  ('a, 'err trace) result
+  (unit -> 'err) -> ('a, 'err trace) result -> ('a, 'err trace) result
 
 val trace_eval :
-  (unit -> ('err, 'err trace) result Lwt.t) ->
+  (unit -> 'err) ->
   ('b, 'err trace) result Lwt.t ->
   ('b, 'err trace) result Lwt.t
 

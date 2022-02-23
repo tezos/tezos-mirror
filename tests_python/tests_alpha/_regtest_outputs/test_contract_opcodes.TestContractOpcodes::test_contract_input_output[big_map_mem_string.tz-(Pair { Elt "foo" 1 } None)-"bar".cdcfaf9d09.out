@@ -8,36 +8,36 @@ big_map diff
   New map(4) of type (big_map string nat)
   Set map(4)["foo"] to 1
 trace
-  - location: 12 (remaining gas: 1039988.141 units remaining)
+  - location: 12 (remaining gas: 1039986.718 units remaining)
     [ (Pair "bar" { Elt "foo" 1 } None)  	 ]
-  - location: 12 (remaining gas: 1039988.131 units remaining)
+  - location: 12 (remaining gas: 1039986.708 units remaining)
     [ "bar"  	@parameter
       (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 13 (remaining gas: 1039988.116 units remaining)
+  - location: 13 (remaining gas: 1039986.693 units remaining)
     [ (Pair { Elt "foo" 1 } None)  	@storage ]
-  - location: 15 (remaining gas: 1039988.106 units remaining)
+  - location: 15 (remaining gas: 1039986.683 units remaining)
     [ { Elt "foo" 1 }  	 ]
-  - location: 16 (remaining gas: 1039988.096 units remaining)
+  - location: 16 (remaining gas: 1039986.673 units remaining)
     [ { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: 13 (remaining gas: 1039988.066 units remaining)
+  - location: 13 (remaining gas: 1039986.643 units remaining)
     [ "bar"  	@parameter
       { Elt "foo" 1 }  	
       { Elt "foo" 1 }  	 ]
-  - location: 17 (remaining gas: 1039986.711 units remaining)
+  - location: 17 (remaining gas: 1039985.665 units remaining)
     [ False  	
       { Elt "foo" 1 }  	 ]
-  - location: 18 (remaining gas: 1039986.696 units remaining)
+  - location: 18 (remaining gas: 1039985.650 units remaining)
     [ (Some False)  	
       { Elt "foo" 1 }  	 ]
-  - location: 19 (remaining gas: 1039986.686 units remaining)
+  - location: 19 (remaining gas: 1039985.640 units remaining)
     [ { Elt "foo" 1 }  	
       (Some False)  	 ]
-  - location: 20 (remaining gas: 1039986.671 units remaining)
+  - location: 20 (remaining gas: 1039985.625 units remaining)
     [ (Pair { Elt "foo" 1 } (Some False))  	 ]
-  - location: 21 (remaining gas: 1039986.656 units remaining)
+  - location: 21 (remaining gas: 1039985.610 units remaining)
     [ {}  	
       (Pair { Elt "foo" 1 } (Some False))  	 ]
-  - location: 23 (remaining gas: 1039986.641 units remaining)
+  - location: 23 (remaining gas: 1039985.595 units remaining)
     [ (Pair {} { Elt "foo" 1 } (Some False))  	 ]
 

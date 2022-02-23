@@ -25,7 +25,6 @@
 
 open Protocol
 open Alpha_context
-open Test_tez
 
 (** To implement the interface of this module, as described and
     documented in the related MLI file, we rely on the OCaml module
@@ -102,8 +101,10 @@ open Test_tez
     AddLiquidity} step. *)
 let blocks_per_add_liquidity_step = 2L
 
-(** The number of blocks baked by the [init] function. *)
-let blocks_during_init = 3L
+(** The number of blocks baked by the [init] function. Since
+    Tenderbake, we need to compensate for deposits, so the number is
+    no longer constant. It is linear wrt. the number of accounts. *)
+let blocks_during_init len = Int64.add 3L len
 
 (** The number of blocks baked by the [mint_tzbtc] functions *)
 let blocks_per_mint_tzbtc = 1L
@@ -559,13 +560,12 @@ let initial_xtz_pool balances subsidy =
 
          If the [build] function changes, this functions needs to be
          updated accordingly. *)
+  let len = Int64.of_int (List.length balances) in
   Int64.(
     add
       cpmm_initial_balance.xtz
       (mul
-         (add
-            blocks_during_init
-            (mul blocks_per_mint_tzbtc (of_int @@ List.length balances)))
+         (add (blocks_during_init len) (mul blocks_per_mint_tzbtc len))
          subsidy))
 
 (** [predict_initial_balances xtz_pool tzbtc_pool lqt_total balances]
@@ -783,7 +783,7 @@ module ConcreteBaseMachine :
       (Cpmm_repr.Parameter.TokenToXtz
          {
            to_ = dst;
-           minXtzBought = Test_tez.Tez.zero;
+           minXtzBought = Tez.zero;
            tokensSold = Z.of_int tzbtc_deposit;
            deadline = far_future;
          })
@@ -858,8 +858,14 @@ module ConcreteBaseMachine :
     let (n, initial_balances) = initial_xtz_repartition accounts_balances in
     Context.init
       n
+      ~consensus_threshold:0
       ~initial_balances
       ~cost_per_byte:Tez.zero
+      ~endorsing_reward_per_slot:Tez.zero
+      ~baking_reward_bonus_per_slot:Tez.zero
+      ~baking_reward_fixed_portion:Tez.zero
+      ~origination_size:0
+      ~blocks_per_cycle:10_000l
       ?liquidity_baking_subsidy
     >>= function
     | (blk, holder :: accounts) ->
@@ -898,6 +904,38 @@ module ConcreteBaseMachine :
         >>= fun op ->
         bake ~invariant:(fun _ _ -> pure true) ~baker:env.holder [op] env blk
         >>= fun blk ->
+        (* Since Tenderbake, we need to compensate for potential deposits
+           related to the consensus. *)
+        List.fold_left_i_es
+          (fun idx blk contract ->
+            match List.nth accounts_balances idx with
+            | Some target ->
+                get_xtz_balance contract blk >>=? fun balance ->
+                let delta = Int64.(sub target balance) in
+                if Compare.Int64.(0L = delta) then
+                  (* We need to be able to determine the number of
+                     blocks baked in the init function (to predict the
+                     CPMM balance). So even when there is no delta to
+                     compensate with, we bake an empty block. *)
+                  bake
+                    ~invariant:(fun _ _ -> pure true)
+                    ~baker:env.holder
+                    []
+                    env
+                    blk
+                else if Compare.Int64.(0L < delta) then
+                  transaction ~src:env.holder contract delta blk >>= fun op ->
+                  bake
+                    ~invariant:(fun _ _ -> pure true)
+                    ~baker:env.holder
+                    [op]
+                    env
+                    blk
+                else assert false
+            | None -> assert false)
+          blk
+          accounts
+        >>=? fun blk ->
         (* We did not check the invariant before, because the CPMM
            contract was in an inconsistent state. More precisely, it
            was supposed to hold tzbtc tokens, while in practice it was
@@ -1143,10 +1181,12 @@ module SymbolicBaseMachine :
 
   let init ~invariant:_ ?(subsidy = default_subsidy) accounts_balances =
     let (_, initial_balances) = initial_xtz_repartition accounts_balances in
+    let len = Int64.of_int (List.length accounts_balances) in
     match initial_balances with
     | holder_xtz :: accounts ->
         let xtz_cpmm =
-          Int64.(add cpmm_initial_balance.xtz (mul blocks_during_init subsidy))
+          Int64.(
+            add cpmm_initial_balance.xtz (mul (blocks_during_init len) subsidy))
         in
         ( {
             cpmm_total_liquidity = cpmm_initial_liquidity_supply;

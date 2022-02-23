@@ -46,10 +46,12 @@ type t = {
   peers : string list;
   no_bootstrap_peers : bool;
   listen_addr : string option;
+  advertised_net_port : int option;
   discovery_addr : string option;
   rpc_listen_addrs : string list;
   private_mode : bool;
   disable_mempool : bool;
+  disable_mempool_precheck : bool;
   enable_testchain : bool;
   cors_origins : string list;
   cors_headers : string list;
@@ -135,10 +137,11 @@ let load_net_config = function
 
 let wrap data_dir config_file network connections max_download_speed
     max_upload_speed binary_chunks_size peer_table_size listen_addr
-    discovery_addr peers no_bootstrap_peers bootstrap_threshold private_mode
-    disable_mempool enable_testchain expected_pow rpc_listen_addrs rpc_tls
-    cors_origins cors_headers log_output history_mode synchronisation_threshold
-    latency disable_config_validation allow_all_rpc =
+    advertised_net_port discovery_addr peers no_bootstrap_peers
+    bootstrap_threshold private_mode disable_mempool disable_mempool_precheck
+    enable_testchain expected_pow rpc_listen_addrs rpc_tls cors_origins
+    cors_headers log_output history_mode synchronisation_threshold latency
+    disable_config_validation allow_all_rpc =
   let actual_data_dir =
     Option.value ~default:Node_config_file.default_data_dir data_dir
   in
@@ -163,10 +166,12 @@ let wrap data_dir config_file network connections max_download_speed
     peers;
     no_bootstrap_peers;
     listen_addr;
+    advertised_net_port;
     discovery_addr;
     rpc_listen_addrs;
     private_mode;
     disable_mempool;
+    disable_mempool_precheck;
     enable_testchain;
     cors_origins;
     cors_headers;
@@ -415,6 +420,17 @@ module Term = struct
       & opt (some string) None
       & info ~docs ~doc ~docv:"ADDR:PORT" ["net-addr"])
 
+  let advertised_net_port =
+    let doc =
+      "The alternative TCP port at which this instance can be reached. This \
+       instance does not actually binds to it. The port may be used by a NAT \
+       server to forward connections to the instance listenning port."
+    in
+    Arg.(
+      value
+      & opt (some int) None
+      & info ~docs ~doc ~docv:"PORT" ["advertised-net-port"])
+
   let discovery_addr =
     let doc = "The UDP address and port used for local peer discovery." in
     Arg.(
@@ -470,6 +486,17 @@ module Term = struct
        to decrease the memory and computation footprints of the node."
     in
     Arg.(value & flag & info ~docs ~doc ["disable-mempool"])
+
+  let disable_mempool_precheck =
+    let doc =
+      "If set to [true], the node's prevalidator will fully execute operations \
+       before gossiping valid operations over the network. Default value is \
+       [false], in which case the node's prevalidator only performs a fast \
+       check over operations before gossiping them. If set to [true], this \
+       option can slow down your node and should be used for testing or \
+       debugging purposes."
+    in
+    Arg.(value & flag & info ~docs ~doc ["disable-mempool-precheck"])
 
   let enable_testchain =
     let doc =
@@ -558,12 +585,12 @@ module Term = struct
     let open Term in
     const wrap $ data_dir $ config_file $ network $ connections
     $ max_download_speed $ max_upload_speed $ binary_chunks_size
-    $ peer_table_size $ listen_addr $ discovery_addr $ peers
-    $ no_bootstrap_peers $ bootstrap_threshold $ private_mode $ disable_mempool
-    $ enable_testchain $ expected_pow $ rpc_listen_addrs $ rpc_tls
-    $ cors_origins $ cors_headers $ log_output $ history_mode
-    $ synchronisation_threshold $ latency $ disable_config_validation
-    $ allow_all_rpc
+    $ peer_table_size $ listen_addr $ advertised_net_port $ discovery_addr
+    $ peers $ no_bootstrap_peers $ bootstrap_threshold $ private_mode
+    $ disable_mempool $ disable_mempool_precheck $ enable_testchain
+    $ expected_pow $ rpc_listen_addrs $ rpc_tls $ cors_origins $ cors_headers
+    $ log_output $ history_mode $ synchronisation_threshold $ latency
+    $ disable_config_validation $ allow_all_rpc
 end
 
 let read_config_file args =
@@ -660,9 +687,11 @@ let read_and_patch_config_file ?(may_override_network = false)
     peers;
     no_bootstrap_peers;
     listen_addr;
+    advertised_net_port;
     private_mode;
     discovery_addr;
     disable_mempool;
+    disable_mempool_precheck;
     enable_testchain;
     rpc_listen_addrs;
     rpc_tls;
@@ -794,11 +823,13 @@ let read_and_patch_config_file ?(may_override_network = false)
     ?expected_pow
     ~bootstrap_peers:(Some bootstrap_peers)
     ?listen_addr
+    ?advertised_net_port
     ?discovery_addr
     ~rpc_listen_addrs
     ~allow_all_rpc
     ~private_mode
     ~disable_mempool
+    ~disable_mempool_precheck
     ~enable_testchain
     ~cors_origins
     ~cors_headers

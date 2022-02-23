@@ -25,6 +25,7 @@
 
 module Parameters = struct
   type persistent_state = {
+    delegates : string list;
     runner : Runner.t option;
     node : Node.t;
     client : Client.t;
@@ -53,9 +54,10 @@ let set_ready baker =
   trigger_ready baker (Some ())
 
 let handle_raw_stdout baker line =
-  match line with "Baker started." -> set_ready baker | _ -> ()
+  if line =~ rex "^Baker v.+ for .+ started.$" then set_ready baker
 
-let create ~protocol ?name ?color ?event_pipe ?runner node client =
+let create ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) node
+    client =
   let baker =
     create
       ~path:(Protocol.baker protocol)
@@ -63,7 +65,7 @@ let create ~protocol ?name ?color ?event_pipe ?runner node client =
       ?color
       ?event_pipe
       ?runner
-      {runner; node; client; pending_ready = []}
+      {delegates; runner; node; client; pending_ready = []}
   in
   on_stdout baker (handle_raw_stdout baker) ;
   baker
@@ -72,6 +74,7 @@ let run (baker : t) =
   (match baker.status with
   | Not_running -> ()
   | Running _ -> Test.fail "baker %s is already running" baker.name) ;
+  let delegates = baker.persistent_state.delegates in
   let runner = baker.persistent_state.runner in
   let node = baker.persistent_state.node in
   let client = baker.persistent_state.client in
@@ -90,6 +93,7 @@ let run (baker : t) =
       "node";
       Node.data_dir node;
     ]
+    @ delegates
   in
   let on_terminate _ =
     (* Cancel all [Ready] event listeners. *)
@@ -114,9 +118,12 @@ let wait_for_ready baker =
         resolver :: baker.persistent_state.pending_ready ;
       check_event baker "Baker started." promise
 
-let init ~protocol ?name ?color ?event_pipe ?runner node client =
+let init ~protocol ?name ?color ?event_pipe ?runner ?(delegates = []) node
+    client =
   let* () = Node.wait_for_ready node in
-  let baker = create ~protocol ?name ?color ?event_pipe ?runner node client in
+  let baker =
+    create ~protocol ?name ?color ?event_pipe ?runner ~delegates node client
+  in
   let* () = run baker in
   let* () = wait_for_ready baker in
   return baker

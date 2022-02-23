@@ -61,16 +61,19 @@ module Make_tree (Store : DB) = struct
 
   let of_value _ v = Store.Tree.add Store.Tree.empty [] v
 
-  let fold ?depth t k ~init ~f =
+  let fold ?depth t k ~(order : [`Sorted | `Undefined]) ~init ~f =
     find_tree t k >>= function
     | None -> Lwt.return init
     | Some t ->
+        let order =
+          (order :> [`Random of Random.State.t | `Sorted | `Undefined])
+        in
         Store.Tree.fold
           ?depth
           ~force:`True
           ~cache:false
           ~uniq:`False
-          ~order:`Sorted
+          ~order
           ~tree:(fun k t acc ->
             match kind t with
             | `Value -> if k = [] then Lwt.return acc else f k t acc

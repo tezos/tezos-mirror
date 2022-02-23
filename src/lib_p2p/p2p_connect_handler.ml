@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2021 Nomadic Labs, <contact@nomadic-labs.com>               *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -40,6 +41,7 @@ type config = {
   reconnection_config : P2p_point_state.Info.reconnection_config;
   proof_of_work_target : Crypto_box.pow_target;
   listening_port : P2p_addr.port option;
+  advertised_port : P2p_addr.port option;
 }
 
 type ('msg, 'peer_meta, 'conn_meta) dependencies = {
@@ -63,7 +65,7 @@ type ('msg, 'peer_meta, 'conn_meta) dependencies = {
     incoming:bool ->
     P2p_io_scheduler.connection ->
     P2p_point.Id.t ->
-    ?listening_port:int ->
+    ?advertised_port:int ->
     P2p_identity.t ->
     Network_version.t ->
     'conn_meta P2p_params.conn_meta_config ->
@@ -141,15 +143,16 @@ let create_connection t p2p_conn id_point point_info peer_info
     negotiated_version =
   let peer_id = P2p_peer_state.Info.peer_id peer_info in
   let canceler = Lwt_canceler.create () in
-  let size =
+  let bound =
     Option.map
       (fun qs ->
         ( qs,
           fun (size, _) ->
-            (Sys.word_size / 8 * 11) + size + Lwt_pipe.push_overhead ))
+            (Sys.word_size / 8 * 11)
+            + size + Lwt_pipe.Maybe_bounded.push_overhead ))
       t.config.incoming_app_message_queue_size
   in
-  let messages = Lwt_pipe.create ?size () in
+  let messages = Lwt_pipe.Maybe_bounded.create ?bound () in
   let greylister () =
     t.dependencies.pool_greylist_peer
       t.pool
@@ -195,7 +198,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       if t.config.max_connections <= P2p_pool.active_connections t.pool then (
         P2p_trigger.broadcast_too_many_connections t.triggers ;
         t.log Too_many_connections) ;
-      Lwt_pipe.close messages ;
+      Lwt_pipe.Maybe_bounded.close messages ;
       P2p_conn.close conn) ;
   List.iter (fun f -> f peer_id conn) t.new_connection_hook ;
   if P2p_pool.active_connections t.pool < t.config.min_connections then (
@@ -289,7 +292,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         ~incoming
         scheduled_conn
         point
-        ?listening_port:t.config.listening_port
+        ?advertised_port:t.config.advertised_port
         t.config.identity
         t.announced_version
         t.conn_meta_config)
@@ -628,7 +631,7 @@ module Internal_for_tests = struct
       incoming:bool ->
       P2p_io_scheduler.connection ->
       P2p_point.Id.t ->
-      ?listening_port:int ->
+      ?advertised_port:int ->
       P2p_identity.t ->
       Network_version.t ->
       'conn_meta P2p_params.conn_meta_config ->
@@ -658,7 +661,7 @@ module Internal_for_tests = struct
              ~incoming:_
              _
              _
-             ?listening_port:_
+             ?advertised_port:_
              _
              _
              _ ->
@@ -697,6 +700,7 @@ module Internal_for_tests = struct
     in
     let proof_of_work_target = Crypto_box.make_pow_target 0. in
     let listening_port = Some 9732 in
+    let advertised_port = None in
     {
       incoming_app_message_queue_size;
       private_mode;
@@ -712,6 +716,7 @@ module Internal_for_tests = struct
       reconnection_config;
       proof_of_work_target;
       listening_port;
+      advertised_port;
     }
 
   (** An encoding that typechecks for all types, but fails at runtime. This is a placeholder as most tests never go through

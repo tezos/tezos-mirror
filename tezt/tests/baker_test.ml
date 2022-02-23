@@ -30,47 +30,16 @@
    Subject:      Run the baker while performing a lot of transfers
 *)
 
-let to_account client alias =
-  Client.show_address ~show_secret:true ~alias client
-
 let test_baker =
   Protocol.register_test
     ~__FILE__
     ~title:"baker stresstest"
     ~tags:["node"; "baker"]
   @@ fun protocol ->
-  let* (node, client) = Client.init_activate_bake `Client ~protocol () in
-  let keys : Constant.key list =
-    List.filter
-      (fun {Constant.alias; _} -> alias <> "activator")
-      Constant.all_secret_keys
-  in
-  let* (accounts : Account.key list) =
-    Lwt_list.map_s
-      (fun (account : Constant.key) -> to_account client account.alias)
-      keys
-  in
-  let account_to_json (account : Account.key) =
-    let mandatory name = function
-      | None -> Test.fail "Unexpected Nothing in field %s" name
-      | Some value -> value
-    in
-    `O
-      [
-        ("pkh", `String account.public_key_hash);
-        ("pk", `String (account.public_key |> mandatory "public_key"));
-        ("sk", `String (account.secret_key |> mandatory "secret_key"));
-      ]
-  in
-  let accounts_json_obj = `A (List.map account_to_json accounts) in
-  let sources = Temp.file "sources.json" in
-  let* () =
-    Lwt_io.with_file ~mode:Lwt_io.Output sources (fun oc ->
-        Lwt_io.fprintf oc "%s" @@ Ezjsonm.value_to_string accounts_json_obj)
-  in
+  let* (node, client) = Client.init_with_protocol `Client ~protocol () in
   let* _ = Baker.init ~protocol node client in
   (* Use a large tps, to have failing operations too *)
-  let* () = Client.stresstest ~tps:25 ~sources ~transfers:100 client in
+  let* () = Client.stresstest ~tps:25 ~transfers:100 client in
   Lwt.return_unit
 
 let register ~protocols = test_baker ~protocols

@@ -120,7 +120,8 @@ let pp_cache fmt {index; map; size; limit; counter; _} =
 
 let invalid_arg_with_callstack msg =
   let cs = Printexc.get_callstack 15 in
-  Fmt.invalid_arg
+  Format.kasprintf
+    invalid_arg
     "Internal error: %s\nCall stack:\n%s\n"
     msg
     (Printexc.raw_backtrace_to_string cs)
@@ -264,7 +265,7 @@ let find t key = lookup_value (cache_of_key t key) key
 
 let compatible_layout t layout =
   with_caches t (fun caches ->
-      List.length layout = FunctionalArray.length caches
+      Compare.List_length_with.(layout = FunctionalArray.length caches)
       && List.fold_left_i
            (fun idx r len -> r && (FunctionalArray.get caches idx).limit = len)
            true
@@ -273,13 +274,11 @@ let compatible_layout t layout =
 let from_layout layout = Some (make_caches layout)
 
 let future_cache_expectation t ~time_in_blocks =
-  Some
-    (with_caches t (fun caches ->
-         FunctionalArray.map
-           (fun cache ->
-             let oldness = time_in_blocks * median_entries_removals cache in
-             Utils.fold_n_times oldness remove_dean cache)
-           caches))
+  let expected cache =
+    let oldness = time_in_blocks * median_entries_removals cache in
+    Utils.fold_n_times oldness remove_dean cache
+  in
+  Some (with_caches t (FunctionalArray.map expected))
 
 let record_entries_removals cache =
   let entries_removals =

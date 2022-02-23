@@ -10,7 +10,7 @@
 # logic.
 
 # Ensure we are running from the root directory of the Tezos repository.
-cd "$(dirname "$0")"/../..
+cd "$(dirname "$0")"/../.. || exit
 
 # Tezos binaries.
 tezos_node=./tezos-node
@@ -64,7 +64,7 @@ $tezos_client --base-dir $client_dir activate protocol $protocol_hash \
     with fitness 1 \
     and key activator \
     and parameters $protocol_parameters \
-    --timestamp $(TZ='AAA+1' date +%FT%TZ)
+    --timestamp "$(TZ='AAA+1' date +%FT%TZ)"
 
 # Wait a bit again...
 sleep 1
@@ -77,11 +77,16 @@ curl "http://localhost:$rpc_port/describe/chains/main/mempool?recurse=yes" > $me
 # Kill the node.
 kill -9 "$node_pid"
 
+# Remove RPC starting with "/private/"
+clean_private_rpc () {
+  jq 'delpaths([paths | select(.[-1] | strings | startswith("/private/"))])'
+}
+
 # Convert the RPC descriptions.
-dune exec src/bin_openapi/rpc_openapi.exe -- $version $api_json > $openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $api_json | clean_private_rpc "$@" > $openapi_json
 echo "Generated OpenAPI specification: $openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- $version $proto_api_json > $proto_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $proto_api_json | clean_private_rpc "$@" > $proto_openapi_json
 echo "Generated OpenAPI specification: $proto_openapi_json"
-dune exec src/bin_openapi/rpc_openapi.exe -- $version $mempool_api_json > $mempool_openapi_json
+dune exec src/bin_openapi/rpc_openapi.exe -- "$version" $mempool_api_json | clean_private_rpc "$@" > $mempool_openapi_json
 echo "Generated OpenAPI specification: $mempool_openapi_json"
 echo "You can now clean up with: rm -rf $tmp"

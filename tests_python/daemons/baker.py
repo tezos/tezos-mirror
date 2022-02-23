@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict
 import os
 import subprocess
 from process import process_utils
@@ -17,8 +17,9 @@ class Baker(subprocess.Popen):
         rpc_port: int,
         base_dir: str,
         node_dir: str,
-        account: str,
+        accounts: List[str],
         params: List[str] = None,
+        log_levels: Dict[str, str] = None,
         log_file: str = None,
         run_params: List[str] = None,
     ):
@@ -29,8 +30,9 @@ class Baker(subprocess.Popen):
             rpc_port (int): rpc port of the node
             base_dir (str): client directory
             node_dir (str): node directory
-            account (str): account of the delegate
+            accounts (List[str]): delegates accounts
             params (list): additional parameters to be added to the command
+            log_levels (dict): log levels. e.g. {"p2p.connection-pool":"debug"}
             log_file (str): log file name (optional)
         Returns:
             A Popen instance
@@ -45,13 +47,19 @@ class Baker(subprocess.Popen):
         endpoint = f'http://127.0.0.1:{rpc_port}'
         cmd = [baker, '-base-dir', base_dir, '-endpoint', endpoint]
         cmd.extend(params)
-        cmd.extend(['run', 'with', 'local', 'node', node_dir, account])
+        cmd.extend(['run', 'with', 'local', 'node', node_dir] + accounts)
         cmd.extend(run_params)
+        env = os.environ.copy()
+        if log_levels is not None:
+            lwt_log = ";".join(
+                f'{key} -> {values}' for key, values in log_levels.items()
+            )
+            env['TEZOS_LOG'] = lwt_log
         cmd_string = process_utils.format_command(cmd)
         print(cmd_string)
         stdout, stderr = process_utils.prepare_log(cmd, log_file)
         subprocess.Popen.__init__(
-            self, cmd, stdout=stdout, stderr=stderr
+            self, cmd, stdout=stdout, env=env, stderr=stderr
         )  # type: ignore
 
     def terminate_or_kill(self):

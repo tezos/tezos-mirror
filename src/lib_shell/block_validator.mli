@@ -28,10 +28,7 @@
 
 type t
 
-type limits = {
-  protocol_timeout : Time.System.Span.t;
-  worker_limits : Worker_types.limits;
-}
+type limits = {protocol_timeout : Time.System.Span.t}
 
 (** [create limits ddb bvp start_testchain] creates a
    [Block_validator].
@@ -149,6 +146,3 @@ val current_request :
   t ->
   (Time.System.t * Time.System.t * Block_validator_worker_state.Request.view)
   option
-
-val last_events :
-  t -> (Internal_event.level * Block_validator_worker_state.Event.t list) list

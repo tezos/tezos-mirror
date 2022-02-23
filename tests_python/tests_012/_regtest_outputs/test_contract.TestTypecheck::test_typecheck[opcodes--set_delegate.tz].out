@@ -1,0 +1,16 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/set_delegate.tz]
+
+Well typed
+Gas remaining: 1039995.476 units remaining
+{ parameter (option key_hash) ;
+  storage unit ;
+  code { UNPAIR
+         /* [ @parameter option key_hash : @storage unit ] */ ;
+         SET_DELEGATE
+         /* [ operation : @storage unit ] */ ;
+         DIP { NIL operation /* [ list operation : @storage unit ] */ }
+         /* [ operation : list operation : @storage unit ] */ ;
+         CONS
+         /* [ list operation : @storage unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @storage) ] */ } }

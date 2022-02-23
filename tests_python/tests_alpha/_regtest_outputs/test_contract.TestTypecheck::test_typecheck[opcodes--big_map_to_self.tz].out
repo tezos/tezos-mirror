@@ -1,0 +1,59 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/big_map_to_self.tz]
+
+Well typed
+Gas remaining: 1039984.417 units remaining
+{ parameter (or (pair %have_fun (big_map string nat) unit) (unit %default)) ;
+  storage (big_map string nat) ;
+  code { UNPAIR
+         /* [ @parameter or (pair %have_fun (big_map string nat) unit) (unit %default)
+            : @storage big_map string nat ] */ ;
+         DIP { NIL operation /* [ list operation : @storage big_map string nat ] */ }
+         /* [ @parameter or (pair %have_fun (big_map string nat) unit) (unit %default)
+            : list operation : @storage big_map string nat ] */ ;
+         IF_LEFT
+           { DROP /* [ list operation : @storage big_map string nat ] */ }
+           { DROP
+             /* [ list operation : @storage big_map string nat ] */ ;
+             SELF %have_fun
+             /* [ @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             PUSH mutez
+                  0
+             /* [ mutez : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             DUP 4
+             /* [ big_map string nat : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             PUSH (option nat)
+                  (Some 8)
+             /* [ option nat : big_map string nat : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             PUSH string
+                  "hahaha"
+             /* [ string : option nat : big_map string nat : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             UPDATE
+             /* [ big_map string nat : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             UNIT
+             /* [ unit : big_map string nat : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             SWAP
+             /* [ big_map string nat : unit : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             PAIR
+             /* [ pair (big_map string nat) unit : mutez
+                : @self contract (pair (big_map string nat) unit) : list operation
+                : @storage big_map string nat ] */ ;
+             TRANSFER_TOKENS
+             /* [ operation : list operation : @storage big_map string nat ] */ ;
+             CONS
+             /* [ list operation : @storage big_map string nat ] */ } ;
+         PAIR
+         /* [ pair (list operation) (big_map @storage string nat) ] */ } }

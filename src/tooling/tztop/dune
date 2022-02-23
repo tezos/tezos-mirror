@@ -1,14 +1,13 @@
 (executable
  (name tztop_main)
  (public_name tztop)
+ (package tezos-tooling)
  (modes byte)
  (libraries
   tezos-protocol-compiler
   tezos-base
   compiler-libs.toplevel
-  (select tztop.ml from
-   (utop -> tztop.utop.ml)
-   (-> tztop.vanilla.ml))))
+  (select tztop.ml from (utop -> tztop.utop.ml) (-> tztop.vanilla.ml))))
 
 ; We use Dune's select statement and keep uTop optional
 ; Keeping uTop optional lets `make build` succeed,

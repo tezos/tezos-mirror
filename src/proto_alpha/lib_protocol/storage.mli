@@ -46,15 +46,17 @@ module type Simple_single_data_storage = sig
   val init : Raw_context.t -> value -> Raw_context.t tzresult Lwt.t
 end
 
-module Block_priority : Simple_single_data_storage with type value = int
+module Legacy_block_priority : Simple_single_data_storage with type value = int
 
-module Roll : sig
+module Block_round : Simple_single_data_storage with type value = Round_repr.t
+
+module Roll_legacy : sig
   (** Storage from this submodule must only be accessed through the
-      module `Roll`. *)
+      module `Roll_legacy`. *)
 
   module Owner :
     Indexed_data_snapshotable_storage
-      with type key = Roll_repr.t
+      with type key = Roll_repr_legacy.t
        and type snapshot = Cycle_repr.t * int
        and type value = Signature.Public_key.t
        and type t := Raw_context.t
@@ -64,7 +66,7 @@ module Roll : sig
   (** The next roll to be allocated. *)
   module Next :
     Single_data_storage
-      with type value = Roll_repr.t
+      with type value = Roll_repr_legacy.t
        and type t := Raw_context.t
 
   (** Rolls linked lists represent both account owned and free rolls.
@@ -73,21 +75,21 @@ module Roll : sig
   (** Head of the linked list of rolls in limbo *)
   module Limbo :
     Single_data_storage
-      with type value = Roll_repr.t
+      with type value = Roll_repr_legacy.t
        and type t := Raw_context.t
 
   (** Rolls associated to contracts, a linked list per contract *)
   module Delegate_roll_list :
     Indexed_data_storage
       with type key = Signature.Public_key_hash.t
-       and type value = Roll_repr.t
+       and type value = Roll_repr_legacy.t
        and type t := Raw_context.t
 
   (** Use this to iter on a linked list of rolls *)
   module Successor :
     Indexed_data_storage
-      with type key = Roll_repr.t
-       and type value = Roll_repr.t
+      with type key = Roll_repr_legacy.t
+       and type value = Roll_repr_legacy.t
        and type t := Raw_context.t
 
   (** The tez of a contract that are not assigned to rolls *)
@@ -108,9 +110,13 @@ module Roll : sig
   module Last_for_snapshot :
     Indexed_data_storage
       with type key = int
-       and type value = Roll_repr.t
+       and type value = Roll_repr_legacy.t
        and type t = Raw_context.t * Cycle_repr.t
 end
+
+type deposits = {initial_amount : Tez_repr.t; current_amount : Tez_repr.t}
+
+type missed_endorsements_info = {remaining_slots : int; missed_levels : int}
 
 module Contract : sig
   (** Storage from this submodule must only be accessed through the
@@ -121,34 +127,61 @@ module Contract : sig
   (** The domain of alive contracts *)
   val fold :
     Raw_context.t ->
+    order:[`Sorted | `Undefined] ->
     init:'a ->
     f:(Contract_repr.t -> 'a -> 'a Lwt.t) ->
     'a Lwt.t
 
   val list : Raw_context.t -> Contract_repr.t list Lwt.t
 
-  (** All the tez possessed by a contract, including rolls and change *)
+  (** The tez possessed by a contract and that can be used. A contract
+     may also possess tez in frozen deposits. Empty balances (of zero
+     tez) are only allowed for originated contracts, not for implicit
+     ones. *)
   module Balance :
     Indexed_data_storage
       with type key = Contract_repr.t
        and type value = Tez_repr.t
        and type t := Raw_context.t
 
+  (** If the value is not set, the delegate didn't miss any endorsing
+     opportunity.  If it is set, this value is a record of type
+     [missed_endorsements_info], where:
+   - [remaining_slots] is the difference between the maximum number of
+     slots that can be missed and the number of missed slots;
+     therefore, when the number is positive, it represents the number
+     of slots that a delegate can still miss before forfeiting its
+     endorsing rewards for the current cycle; when the number is zero
+     it means rewards are not lost, but no further slots can be
+     missed anymore;
+   - [missed_levels] represents the number of missed levels (for
+     endorsing). *)
+  module Missed_endorsements :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = missed_endorsements_info
+       and type t := Raw_context.t
+
   (** Frozen balance, see 'delegate_storage.mli' for more explanation.
-      Always update `Delegates_with_frozen_balance` accordingly. *)
-  module Frozen_deposits :
+      Always update `Delegates_with_frozen_balance` accordingly.
+
+      Deprecated only used for migration
+  *)
+  module Legacy_frozen_deposits :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Tez_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  module Frozen_fees :
+  (** Deprecated only used for migration *)
+  module Legacy_frozen_fees :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Tez_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
-  module Frozen_rewards :
+  (** Deprecated only used for migration *)
+  module Legacy_frozen_rewards :
     Indexed_data_storage
       with type key = Cycle_repr.t
        and type value = Tez_repr.t
@@ -174,10 +207,30 @@ module Contract : sig
       with type elt = Contract_repr.t
        and type t = Raw_context.t * Contract_repr.t
 
+  (** The part of a delegate balance that can't be used. The total
+     balance is frozen_deposits.current_amount + balance. It also stores
+     the initial frozen balance in frozen_deposits.initial_amount. We
+     have current_amount <= initial_amount and current_amount <
+     initial_amount iff the delegate was slashed. *)
+  module Frozen_deposits :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = deposits
+       and type t := Raw_context.t
+
+  (** If there is a value, the frozen balance for the contract won't
+     exceed it (starting in preserved_cycles + 1). *)
+  module Frozen_deposits_limit :
+    Indexed_data_storage
+      with type key = Contract_repr.t
+       and type value = Tez_repr.t
+       and type t := Raw_context.t
+
   module Inactive_delegate :
     Data_set_storage with type elt = Contract_repr.t and type t = Raw_context.t
 
-  (** The cycle where the delegate should be deactivated. *)
+  (** The last cycle where the delegate is considered active; that is,
+     at the next cycle it will be considered inactive. *)
   module Delegate_desactivation :
     Indexed_data_storage
       with type key = Contract_repr.t
@@ -228,7 +281,12 @@ module Big_map : sig
   end
 
   (** The domain of alive big maps *)
-  val fold : Raw_context.t -> init:'a -> f:(id -> 'a -> 'a Lwt.t) -> 'a Lwt.t
+  val fold :
+    Raw_context.t ->
+    order:[`Sorted | `Undefined] ->
+    init:'a ->
+    f:(id -> 'a -> 'a Lwt.t) ->
+    'a Lwt.t
 
   val list : Raw_context.t -> id list Lwt.t
 
@@ -355,14 +413,73 @@ module Delegates :
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
+type slashed_level = {for_double_endorsing : bool; for_double_baking : bool}
+
+(** Set used to avoid slashing multiple times the same event *)
+module Slashed_deposits :
+  Indexed_data_storage
+    with type t := Raw_context.t * Cycle_repr.t
+     and type key = Raw_level_repr.t * Signature.Public_key_hash.t
+     and type value = slashed_level
+
 (** Set of all active delegates with rolls. *)
-module Active_delegates_with_rolls :
+module Legacy_active_delegates_with_rolls :
   Data_set_storage
     with type t := Raw_context.t
      and type elt = Signature.Public_key_hash.t
 
-(** Set of all the delegates with frozen rewards/bonds/fees for a given cycle. *)
-module Delegates_with_frozen_balance :
+module Stake : sig
+  (** The map of all the staking balances of all delegates, including
+     those with less than one roll. It might be large *)
+  module Staking_balance :
+    Indexed_data_snapshotable_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = Tez_repr.t
+       and type snapshot = int
+       and type t := Raw_context.t
+
+  (** This is a set, encoded in a map with value unit. This should be
+     fairly small compared to staking balance *)
+  module Active_delegate_with_one_roll :
+    Indexed_data_snapshotable_storage
+      with type key = Signature.Public_key_hash.t
+       and type value = unit
+       and type snapshot = int
+       and type t := Raw_context.t
+
+  module Last_snapshot :
+    Single_data_storage with type value = int and type t := Raw_context.t
+
+  (** List of active stake *)
+  module Selected_distribution_for_cycle :
+    Indexed_data_storage
+      with type key = Cycle_repr.t
+       and type value = (Signature.Public_key_hash.t * Tez_repr.t) list
+       and type t := Raw_context.t
+end
+
+(** Sum of the active stakes of all the delegates with rolls *)
+module Total_active_stake :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value = Tez_repr.t
+     and type t := Raw_context.t
+
+(** State of the sampler used to select delegates. Managed synchronously
+    with [Stake.Selected_distribution_for_cycle]. *)
+module Delegate_sampler_state :
+  Indexed_data_storage
+    with type key = Cycle_repr.t
+     and type value =
+          (Signature.Public_key.t * Signature.Public_key_hash.t) Sampler.t
+     and type t := Raw_context.t
+
+(** Set of all the delegates with frozen rewards/deposits/fees for a given cycle.
+    Deprecated: This is now only used for stitching while migrating from an
+    emmy protocol. This is to be removed in the next version.
+
+    This table must be cleaned after migration. *)
+module Legacy_delegates_with_frozen_balance :
   Data_set_storage
     with type t = Raw_context.t * Cycle_repr.t
      and type elt = Signature.Public_key_hash.t
@@ -428,6 +545,8 @@ module type FOR_CYCLE = sig
     Seed_repr.seed ->
     Raw_context.t tzresult Lwt.t
 
+  val mem : Raw_context.t -> Cycle_repr.t -> bool Lwt.t
+
   val get : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 
   val remove_existing :
@@ -443,8 +562,6 @@ module Seed : sig
   type unrevealed_nonce = {
     nonce_hash : Nonce_hash.t;
     delegate : Signature.Public_key_hash.t;
-    rewards : Tez_repr.t;
-    fees : Tez_repr.t;
   }
 
   type nonce_status =
@@ -452,6 +569,12 @@ module Seed : sig
     | Revealed of Seed_repr.nonce
 
   module Nonce :
+    Non_iterable_indexed_data_storage
+      with type key := Level_repr.t
+       and type value := nonce_status
+       and type t := Raw_context.t
+
+  module Nonce_legacy :
     Non_iterable_indexed_data_storage
       with type key := Level_repr.t
        and type value := nonce_status
@@ -468,21 +591,18 @@ module Commitments :
      and type value = Tez_repr.t
      and type t := Raw_context.t
 
-(** Ramp up security deposits... *)
-
+(** Ramp up rewards *)
 module Ramp_up : sig
+  type reward = {
+    baking_reward_fixed_portion : Tez_repr.t;
+    baking_reward_bonus_per_slot : Tez_repr.t;
+    endorsing_reward_per_slot : Tez_repr.t;
+  }
+
   module Rewards :
     Indexed_data_storage
       with type key = Cycle_repr.t
-       and type value := Tez_repr.t list * Tez_repr.t list
-      (* baking rewards per endorsement * endorsement rewards *)
-       and type t := Raw_context.t
-
-  module Security_deposits :
-    Indexed_data_storage
-      with type key = Cycle_repr.t
-       and type value = Tez_repr.t * Tez_repr.t
-      (* baking * endorsement *)
+       and type value := reward
        and type t := Raw_context.t
 end
 
@@ -529,4 +649,56 @@ module Global_constants : sig
       with type t := Raw_context.t
        and type key = Script_expr_hash.t
        and type value = Script_repr.expr
+end
+
+(** This module exposes a balance table for tracking ticket ownership.
+    The table is a mapping from keys to values where the keys consist of a
+    hashed representation of:
+      - A ticketer, i.e. the creator of the ticket
+      - The content of a the ticket
+      - The contract that owns some amount of the ticket
+    The values of the table are the amounts owned by each key.
+ *)
+module Ticket_balance : sig
+  module Table :
+    Non_iterable_indexed_carbonated_data_storage
+      with type t := Raw_context.t
+       and type key = Script_expr_hash.t
+       and type value = Z.t
+end
+
+(** Tenderbake *)
+
+module Tenderbake : sig
+  module First_level :
+    Single_data_storage
+      with type t := Raw_context.t
+       and type value = Raw_level_repr.t
+
+  (** [Endorsement_branch] stores a single value composed of the
+      grandparent hash and the predecessor's payload (computed with
+      the grandparent hash) used to verify the validity of
+      endorsements. *)
+  module Endorsement_branch :
+    Single_data_storage
+      with type value = Block_hash.t * Block_payload_hash.t
+       and type t := Raw_context.t
+
+  (** [Grand_parent_branch] stores a single value composed of the
+      great-grand parent hash and the grand parent's payload *)
+  module Grand_parent_branch :
+    Single_data_storage
+      with type value = Block_hash.t * Block_payload_hash.t
+       and type t := Raw_context.t
+end
+
+module Tx_rollup : sig
+  (** Storage from this submodule must only be accessed through the
+      module `Tx_rollup_storage`. *)
+
+  module State :
+    Indexed_data_storage
+      with type key = Tx_rollup_repr.t
+       and type value = Tx_rollup_repr.state
+       and type t := Raw_context.t
 end

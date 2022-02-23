@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type history_mode = Archive | Full | Rolling
+type history_mode = Archive | Full of int option | Rolling of int option
 
 type argument =
   | Network of string
@@ -36,12 +36,17 @@ type argument =
   | Private_mode
   | Peer of string
   | No_bootstrap_peers
+  | Disable_operations_precheck
 
 let make_argument = function
   | Network x -> ["--network"; x]
   | History_mode Archive -> ["--history-mode"; "archive"]
-  | History_mode Full -> ["--history-mode"; "full"]
-  | History_mode Rolling -> ["--history-mode"; "rolling"]
+  | History_mode (Full None) -> ["--history-mode"; "full"]
+  | History_mode (Full (Some i)) ->
+      ["--history-mode"; "full:" ^ string_of_int i]
+  | History_mode (Rolling None) -> ["--history-mode"; "rolling"]
+  | History_mode (Rolling (Some i)) ->
+      ["--history-mode"; "rolling:" ^ string_of_int i]
   | Expected_pow x -> ["--expected-pow"; string_of_int x]
   | Singleprocess -> ["--singleprocess"]
   | Bootstrap_threshold x -> ["--bootstrap-threshold"; string_of_int x]
@@ -51,6 +56,7 @@ let make_argument = function
   | Private_mode -> ["--private-mode"]
   | Peer x -> ["--peer"; x]
   | No_bootstrap_peers -> ["--no-bootstrap-peers"]
+  | Disable_operations_precheck -> ["--disable-mempool-precheck"]
 
 let make_arguments arguments = List.flatten (List.map make_argument arguments)
 
@@ -60,6 +66,7 @@ module Parameters = struct
   type persistent_state = {
     data_dir : string;
     mutable net_port : int;
+    advertised_net_port : int option;
     rpc_host : string;
     rpc_port : int;
     default_expected_pow : int;
@@ -101,6 +108,8 @@ let wait node =
 let name node = node.name
 
 let net_port node = node.persistent_state.net_port
+
+let advertised_net_port node = node.persistent_state.advertised_net_port
 
 let rpc_host node = node.persistent_state.rpc_host
 
@@ -147,8 +156,10 @@ let identity_generate ?expected_pow node =
 
 let show_history_mode = function
   | Archive -> "archive"
-  | Full -> "full"
-  | Rolling -> "rolling"
+  | Full None -> "full"
+  | Full (Some i) -> "full_" ^ string_of_int i
+  | Rolling None -> "rolling"
+  | Rolling (Some i) -> "rolling_" ^ string_of_int i
 
 let spawn_config_init node arguments =
   let arguments = node.persistent_state.arguments @ arguments in
@@ -182,8 +193,40 @@ module Config_file = struct
 
   let update node update = read node |> update |> write node
 
-  let set_sandbox_network_with_user_activated_upgrades node upgrade_points =
-    let network_json =
+  let set_prevalidator ?(operations_request_timeout = 10.)
+      ?(max_refused_operations = 1000) ?(operations_batch_size = 50)
+      ?(disable_operations_precheck = false) old_config =
+    let prevalidator =
+      `O
+        [
+          ("operations_request_timeout", `Float operations_request_timeout);
+          ( "max_refused_operations",
+            `Float (float_of_int max_refused_operations) );
+          ("operations_batch_size", `Float (float_of_int operations_batch_size));
+          ("disable_precheck", `Bool disable_operations_precheck);
+        ]
+      |> JSON.annotate ~origin:"set_prevalidator"
+    in
+    JSON.update
+      "shell"
+      (fun config -> JSON.put ("prevalidator", prevalidator) config)
+      old_config
+
+  let set_peer_validator ?(new_head_request_timeout = 60.) old_config =
+    let peer_validator =
+      `O
+        [
+          ( "peer_validator",
+            `O [("new_head_request_timeout", `Float new_head_request_timeout)]
+          );
+        ]
+      |> JSON.annotate ~origin:"set_peer_validator"
+    in
+    JSON.put ("shell", peer_validator) old_config
+
+  let set_sandbox_network_with_user_activated_upgrades upgrade_points old_config
+      =
+    let network =
       `O
         [
           ( "genesis",
@@ -222,15 +265,10 @@ module Config_file = struct
                      ])
                  upgrade_points) );
         ]
+      |> JSON.annotate
+           ~origin:"set_sandbox_network_with_user_activated_upgrades"
     in
-    update node @@ fun json ->
-    JSON.update
-      "network"
-      (fun _ ->
-        JSON.annotate
-          ~origin:"set_sandbox_network_with_user_activated_upgrades"
-          network_json)
-      json
+    JSON.put ("network", network) old_config
 end
 
 let trigger_ready node value =
@@ -330,6 +368,11 @@ let wait_for_level node level =
         ~where:("level >= " ^ string_of_int level)
         promise
 
+let get_level node =
+  match node.status with
+  | Running {session_state = {level = Known level; _}; _} -> level
+  | Not_running | Running _ -> 0
+
 let wait_for_identity node =
   match node.status with
   | Running {session_state = {identity = Known identity; _}; _} ->
@@ -340,8 +383,29 @@ let wait_for_identity node =
         resolver :: node.persistent_state.pending_identity ;
       check_event node "read_identity.v0" promise
 
+let wait_for_request ~request node =
+  let event_name =
+    match request with
+    | `Flush | `Inject -> "request_completed_notice.v0"
+    | `Notify | `Arrived -> "request_completed_debug.v0"
+  in
+  let request_str =
+    match request with
+    | `Flush -> "flush"
+    | `Inject -> "inject"
+    | `Notify -> "notify"
+    | `Arrived -> "arrived"
+  in
+  let filter json =
+    match JSON.(json |-> "view" |-> "request" |> as_string_opt) with
+    | Some s when String.equal s request_str -> Some ()
+    | Some _ | None -> None
+  in
+  wait_for node event_name filter
+
 let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
-    ?event_pipe ?net_port ?(rpc_host = "localhost") ?rpc_port arguments =
+    ?event_pipe ?net_port ?advertised_net_port ?(rpc_host = "localhost")
+    ?rpc_port arguments =
   let name = match name with None -> fresh_name () | Some name -> name in
   let data_dir =
     match data_dir with None -> Temp.dir ?runner name | Some dir -> dir
@@ -372,6 +436,7 @@ let create ?runner ?(path = Constant.tezos_node) ?name ?color ?data_dir
       {
         data_dir;
         net_port;
+        advertised_net_port;
         rpc_host;
         rpc_port;
         arguments;
@@ -428,6 +493,13 @@ let runlike_command_arguments node command arguments =
         ("0.0.0.0:", "0.0.0.0:")
   in
   let arguments = node.persistent_state.arguments @ arguments in
+
+  let command_args = make_arguments arguments in
+  let command_args =
+    match node.persistent_state.advertised_net_port with
+    | None -> command_args
+    | Some port -> "--advertised-net-port" :: string_of_int port :: command_args
+  in
   command
   ::
   "--data-dir"
@@ -439,28 +511,13 @@ let runlike_command_arguments node command arguments =
   (net_addr ^ string_of_int node.persistent_state.net_port)
   ::
   "--rpc-addr"
-  ::
-  (rpc_addr ^ string_of_int node.persistent_state.rpc_port)
-  :: make_arguments arguments
+  :: (rpc_addr ^ string_of_int node.persistent_state.rpc_port) :: command_args
 
-let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level node arguments
-    =
+let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level
+    ?event_sections_levels node arguments =
   (match node.status with
   | Not_running -> ()
   | Running _ -> Test.fail "node %s is already running" node.name) ;
-  let event_level =
-    match event_level with
-    | Some level -> (
-        match String.lowercase_ascii level with
-        | "debug" | "info" | "notice" -> event_level
-        | _ ->
-            Log.warn
-              "Node.run: Invalid argument event_level:%s. Possible values are: \
-               debug, info, and notice. Keeping default level (notice)."
-              level ;
-            None)
-    | None -> None
-  in
   let on_terminate status =
     on_terminate status ;
     (* Cancel all [Ready] event listeners. *)
@@ -478,21 +535,34 @@ let do_runlike_command ?(on_terminate = fun _ -> ()) ?event_level node arguments
   run
     ?runner:node.persistent_state.runner
     ?event_level
+    ?event_sections_levels
     node
     {ready = false; level = Unknown; identity = Unknown}
     arguments
     ~on_terminate
 
-let run ?on_terminate ?event_level node arguments =
+let run ?on_terminate ?event_level ?event_sections_levels node arguments =
   let arguments = runlike_command_arguments node "run" arguments in
-  do_runlike_command ?on_terminate ?event_level node arguments
+  do_runlike_command
+    ?on_terminate
+    ?event_level
+    ?event_sections_levels
+    node
+    arguments
 
-let replay ?on_terminate ?event_level ?(blocks = ["head"]) node arguments =
+let replay ?on_terminate ?event_level ?event_sections_levels
+    ?(blocks = ["head"]) node arguments =
   let arguments = runlike_command_arguments node "replay" arguments @ blocks in
-  do_runlike_command ?on_terminate ?event_level node arguments
+  do_runlike_command
+    ?on_terminate
+    ?event_level
+    ?event_sections_levels
+    node
+    arguments
 
-let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host
-    ?rpc_port ?event_level arguments =
+let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port
+    ?advertised_net_port ?rpc_host ?rpc_port ?event_level ?event_sections_levels
+    arguments =
   let node =
     create
       ?runner
@@ -502,13 +572,14 @@ let init ?runner ?path ?name ?color ?data_dir ?event_pipe ?net_port ?rpc_host
       ?data_dir
       ?event_pipe
       ?net_port
+      ?advertised_net_port
       ?rpc_host
       ?rpc_port
       arguments
   in
   let* () = identity_generate node in
   let* () = config_init node [] in
-  let* () = run ?event_level node [] in
+  let* () = run ?event_level ?event_sections_levels node [] in
   let* () = wait_for_ready node in
   return node
 

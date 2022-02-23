@@ -44,6 +44,20 @@ module type PARAMETERS = sig
   val default_colors : Log.Color.t array
 end
 
+module Level = struct
+  type default_level = [`Debug | `Info | `Notice]
+
+  type level = [default_level | `Warning | `Error | `Fatal]
+
+  let to_string = function
+    | `Debug -> "debug"
+    | `Info -> "info"
+    | `Notice -> "notice"
+    | `Warning -> "warning"
+    | `Error -> "error"
+    | `Fatal -> "fatal"
+end
+
 module Make (X : PARAMETERS) = struct
   exception
     Terminated_before_event of {
@@ -108,13 +122,13 @@ module Make (X : PARAMETERS) = struct
 
   let name daemon = daemon.name
 
-  let terminate daemon =
+  let terminate ?(kill = false) daemon =
     match daemon.status with
     | Not_running -> unit
     | Running {event_loop_promise = None; _} ->
         invalid_arg "you cannot call Daemon.terminate before Daemon.run returns"
     | Running {process; event_loop_promise = Some event_loop_promise; _} ->
-        Process.terminate process ;
+        if kill then Process.kill process else Process.terminate process ;
         event_loop_promise
 
   let next_name = ref 1
@@ -221,8 +235,9 @@ module Make (X : PARAMETERS) = struct
             in
             loop [] events)
 
-  let run ?runner ?(on_terminate = fun _ -> unit) ?event_level daemon
-      session_state arguments =
+  let run ?runner ?(on_terminate = fun _ -> unit) ?(event_level = `Info)
+      ?(event_sections_levels = []) daemon session_state arguments =
+    ignore (event_level : Level.default_level) ;
     (match daemon.status with
     | Not_running -> ()
     | Running _ -> Test.fail "daemon %s is already running" daemon.name) ;
@@ -254,14 +269,17 @@ module Make (X : PARAMETERS) = struct
       | Some process -> Lwt.return @@ Process.stdout process
     in
     let env =
-      let level_str =
-        match event_level with
-        | None -> ""
-        | Some level -> "?level-at-least=" ^ level
+      let args =
+        List.fold_right
+          (fun (prefix, level) args ->
+            sf "section-prefix=%s:%s" prefix (Level.to_string level) :: args)
+          (("", (event_level :> Level.level)) :: event_sections_levels)
+          []
       in
+      let args_str = "?" ^ String.concat "&" (List.rev args) in
       String_map.singleton
         "TEZOS_EVENTS_CONFIG"
-        ("file-descriptor-path://" ^ daemon.event_pipe ^ level_str)
+        ("file-descriptor-path://" ^ daemon.event_pipe ^ args_str)
     in
     let process =
       Process.spawn

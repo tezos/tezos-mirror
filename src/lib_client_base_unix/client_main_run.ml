@@ -58,6 +58,8 @@ module type M = sig
 
   val default_base_dir : string
 
+  val default_media_type : Media_type.t list
+
   val other_registrations :
     (Client_config.Cfg_file.t -> (module Client_config.Remote_params) -> unit)
     option
@@ -207,7 +209,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
             let rpc_builder endpoint =
               (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
                  {rpc_config with endpoint}
-                 Media_type.all_media_types
+                 rpc_config.media_type
                 :> RPC_context.simple)
             in
             let sources =
@@ -238,7 +240,7 @@ let setup_default_proxy_client_config parsed_args base_dir rpc_config mode =
            ~proxy_env
 
 let setup_mockup_rpc_client_config
-    (cctxt : Tezos_client_base.Client_context.full)
+    (cctxt : Tezos_client_base.Client_context.printer)
     (args : Client_config.cli_args) base_dir =
   let in_memory_mockup (args : Client_config.cli_args) =
     match args.protocol with
@@ -264,11 +266,18 @@ let setup_mockup_rpc_client_config
          ~protocol_hash:args.protocol
          cctxt
        >>=? fun res -> return (res, mem_only))
-  >>=? fun ((mockup_env, (chain_id, rpc_context)), mem_only) ->
+  >>=? fun ( (mockup_env, {chain = chain_id; rpc_context; protocol_data}),
+             mem_only ) ->
   return
-    (new unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context)
+    (new unix_mockup
+       ~base_dir
+       ~mem_only
+       ~mockup_env
+       ~chain_id
+       ~rpc_context
+       ~protocol_data)
 
-let setup_client_config (cctxt : Tezos_client_base.Client_context.full)
+let setup_client_config (cctxt : Tezos_client_base.Client_context.printer)
     (parsed_args : Client_config.cli_args option) base_dir rpc_config =
   let setup_non_mockup_rpc_client_config =
     setup_default_proxy_client_config parsed_args base_dir rpc_config
@@ -342,6 +351,8 @@ let main (module C : M) ~select_commands =
             | Some cfg ->
                 {
                   RPC_client_unix.default_config with
+                  media_type =
+                    Option.value cfg.media_type ~default:C.default_media_type;
                   endpoint =
                     Option.value
                       cfg.endpoint
@@ -367,7 +378,11 @@ let main (module C : M) ~select_commands =
               else rpc_config
           | None -> rpc_config
         in
-        setup_client_config full parsed_args base_dir rpc_config
+        setup_client_config
+          (full :> Client_context.printer)
+          parsed_args
+          base_dir
+          rpc_config
         >>=? fun client_config ->
         setup_remote_signer
           (module C)

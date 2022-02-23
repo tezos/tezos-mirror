@@ -1,0 +1,3 @@
+(lang dune 2.9)
+(formatting (enabled_for ocaml))
+(name tezos-tps-evaluation)

@@ -1,7 +1,6 @@
 """Protocol-specific hooks and fixtures"""
 
 import tempfile
-import shutil
 from typing import Optional, Iterator, List
 import pytest
 from launchers.sandbox import Sandbox
@@ -22,7 +21,9 @@ def client(sandbox: Sandbox) -> Iterator[Client]:
     """
     sandbox.add_node(0, params=constants.NODE_PARAMS)
     client = sandbox.client(0)
-    protocol.activate(client, activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    protocol.activate(client, parameters=parameters, activate_in_the_past=True)
     yield client
 
 
@@ -61,7 +62,9 @@ def client_regtest_bis(sandbox: Sandbox) -> Iterator[Client]:
         1, client_factory=reg_client_factory, params=constants.NODE_PARAMS
     )
     client = sandbox.client(1)
-    protocol.activate(client, activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    protocol.activate(client, activate_in_the_past=True, parameters=parameters)
     yield client
 
 
@@ -79,7 +82,14 @@ def clients(sandbox: Sandbox, request) -> Iterator[List[Client]]:
     for i in range(num_nodes):
         # Large number may increases peers connection time
         sandbox.add_node(i, params=constants.NODE_PARAMS)
-    protocol.activate(sandbox.client(0), activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    parameters['minimal_block_delay'] = '1'
+    parameters['delay_increment_per_round'] = '1'
+    protocol.activate(
+        sandbox.client(0), parameters=parameters, activate_in_the_past=True
+    )
+
     clients = sandbox.all_clients()
     for client in clients:
         proto = protocol.HASH
@@ -109,38 +119,3 @@ def mockup_client(sandbox: Sandbox) -> Iterator[Client]:
         ).create_mockup_result
         assert res == CreateMockupResult.OK
         yield sandbox.create_client(base_dir=base_dir, mode="mockup")
-
-
-@pytest.fixture(scope="class")
-def nodes_legacy_store(sandbox, legacy_stores):
-    nodes = {}
-
-    # TODO would be cleaner to return couples (node, client) in order to
-    #      avoid relying on the invariant that nodes are numbered 1, 2, 3
-    #      or just return the id?
-    i = 1
-    for history_mode in ['archive', 'full', 'rolling']:
-        node_dir = legacy_stores[f'{history_mode}_path']
-        # init config with up to date version
-        params = constants.NODE_PARAMS + ['--history-mode', history_mode]
-        node = sandbox.register_node(i, node_dir=node_dir, params=params)
-        # Workaround to allow generating an identity on an
-        # old 0.0.4 storage with a 0.0.6 node
-        version = open(node_dir + "/version.json", "w")
-        version.write('{ "version": "0.0.6" }')
-        version.close()
-        node.init_config()
-        # write version to upgrade
-        version = open(node_dir + "/version.json", "w")
-        version.write('{ "version": "0.0.4" }')
-        version.close()
-
-        nodes[history_mode] = node
-        i += 1
-
-    yield nodes
-
-    # TODO think of case of failure before `yield`
-    for history_mode in ['archive', 'full', 'rolling']:
-        node_dir = legacy_stores[f'{history_mode}_path']
-        shutil.rmtree(node_dir)

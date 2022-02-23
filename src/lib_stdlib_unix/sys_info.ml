@@ -45,7 +45,7 @@ let error_info process error =
 
 type sysname = Linux | Darwin | Unknown of string
 
-let uname =
+let uname () =
   Lwt.catch
     (fun () ->
       Lwt_process.with_process_in
@@ -59,28 +59,21 @@ let uname =
     (function
       | exn -> Lwt.return_error (error_info "uname" (Printexc.to_string exn)))
 
-let page_size () =
+let page_size sysname =
   let get_conf_process =
-    uname >>= function
-    | Ok Linux -> Lwt.return_ok ("getconf", [|"getconf"; "PAGE_SIZE"|])
-    | Ok Darwin -> Lwt.return_ok ("pagesize", [|"pagesize"|])
-    | Ok (Unknown _) ->
-        Lwt.return_error (error_info "pagesize" "Unknown unix system")
-    | Error (Unix_system_info_failure e) ->
-        Lwt.return_error (error_info "pagesize" e)
-    | Error e -> Lwt.return_error e
+    match sysname with
+    | Linux -> Ok ("getconf", [|"getconf"; "PAGE_SIZE"|])
+    | Darwin -> Ok ("pagesize", [|"pagesize"|])
+    | Unknown _ -> Error (error_info "pagesize" "Unknown unix system")
   in
-  get_conf_process >>= function
-  | Error e -> Lwt.return_error e
-  | Ok process ->
-      Lwt.catch
-        (fun () ->
-          Lwt_process.with_process_in process ~env:[|"LC_ALL=C"|] (fun pc ->
-              Lwt_io.read_line pc#stdout >>= fun ps ->
-              Lwt.return_ok (int_of_string ps)))
-        (function
-          | exn ->
-              Lwt.return_error (error_info "pagesize" (Printexc.to_string exn)))
+  get_conf_process >>?= fun process ->
+  Lwt.catch
+    (fun () ->
+      Lwt_process.with_process_in process ~env:[|"LC_ALL=C"|] (fun pc ->
+          Lwt_io.read_line pc#stdout >>= fun ps ->
+          Lwt.return_ok (int_of_string ps)))
+    (function
+      | exn -> Lwt.return_error (error_info "pagesize" (Printexc.to_string exn)))
 
 let linux_statm pid =
   Lwt.catch
@@ -93,7 +86,7 @@ let linux_statm pid =
               match List.map Int64.of_string @@ TzString.split ' ' line with
               | size :: resident :: shared :: text :: lib :: data :: dt :: _
                 -> (
-                  page_size () >>= function
+                  page_size Linux >>= function
                   | Error e -> Lwt.return_error e
                   | Ok page_size ->
                       Lwt.return_ok
@@ -141,7 +134,7 @@ let darwin_ps pid =
               | Some ps_stats -> (
                   match TzString.split ' ' ps_stats with
                   | _pid :: mem :: resident :: _ -> (
-                      page_size () >>= function
+                      page_size Darwin >>= function
                       | Error e -> Lwt.return_error e
                       | Ok page_size ->
                           Lwt.return_ok
@@ -158,7 +151,7 @@ let darwin_ps pid =
 
 let memory_stats () =
   let pid = Unix.getpid () in
-  uname >>= function
+  uname () >>= function
   | Error e -> Lwt.return_error e
   | Ok Linux -> linux_statm pid
   | Ok Darwin -> darwin_ps pid

@@ -56,7 +56,7 @@ let uniform_string ~nbytes state =
   String.init nbytes (fun _ -> uniform_byte state)
 
 let uniform_bytes ~nbytes state =
-  Bytes.unsafe_of_string (uniform_string ~nbytes state)
+  Bytes.init nbytes (fun _ -> uniform_byte state)
 
 let uniform_nat ~nbytes state = Z.of_bits (uniform_string state ~nbytes)
 
@@ -103,17 +103,24 @@ let bytes ~size state =
 module Adversarial = struct
   (* random string generator with a good probabiliy that sampling [n] times
      will yield distinct results. *)
-  let salt state (n : int) : unit -> string =
-    if n <= 0 then Stdlib.failwith "salt: n <= 0" ;
+  let salt_string state (n : int) : unit -> string =
+    if n <= 0 then Stdlib.failwith "salt_string: n <= 0" ;
     let salt_length = 2 * Z.log2 (Z.of_int n) in
     fun () -> uniform_string state ~nbytes:salt_length
+
+  (* random bytes generator with a good probabiliy that sampling [n] times
+     will yield distinct results. *)
+  let salt_bytes state (n : int) : unit -> bytes =
+    if n <= 0 then Stdlib.failwith "salt_bytes: n <= 0" ;
+    let salt_length = 2 * Z.log2 (Z.of_int n) in
+    fun () -> uniform_bytes state ~nbytes:salt_length
 
   (* Adversarial Z.t *)
   let integers ~prefix_size ~card state =
     if card <= 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
     if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.integers" ;
     let common_prefix = string state ~size:prefix_size in
-    let rand_suffix = salt state card in
+    let rand_suffix = salt_string state card in
     let elements =
       Stdlib.List.init card (fun _ ->
           Z.of_bits (rand_suffix () ^ common_prefix))
@@ -125,7 +132,7 @@ module Adversarial = struct
     if card <= 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
     if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.strings" ;
     let common_prefix = string state ~size:prefix_size in
-    let rand_suffix = salt state card in
+    let rand_suffix = salt_string state card in
     let elements =
       List.init ~when_negative_length:() card (fun _ ->
           common_prefix ^ rand_suffix ())
@@ -138,8 +145,13 @@ module Adversarial = struct
   let bytes ~prefix_size ~card state =
     if card <= 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
     if prefix_size.min < 0 then invalid_arg "Base_samplers.Adversarial.bytes" ;
-    let (prefix, strs) = strings ~prefix_size ~card state in
-    let p = Bytes.unsafe_of_string prefix in
-    let ls = List.map Bytes.unsafe_of_string strs in
-    (p, ls)
+    let common_prefix = bytes state ~size:prefix_size in
+    let rand_suffix = salt_bytes state card in
+    let elements =
+      List.init ~when_negative_length:() card (fun _ ->
+          Bytes.cat common_prefix (rand_suffix ()))
+      |> (* see [invalid_arg] above *)
+      WithExceptions.Result.get_ok ~loc:__LOC__
+    in
+    (common_prefix, elements)
 end

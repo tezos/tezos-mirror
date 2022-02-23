@@ -26,9 +26,29 @@
 open Protocol
 open Sampling_helpers
 
-(* Samplers for basic Michelson types. *)
+(** Parameters for basic samplers *)
+type parameters = {
+  int_size : Base_samplers.range;
+  string_size : Base_samplers.range;
+  bytes_size : Base_samplers.range;
+}
 
-module type Base_S = sig
+(** Encoding for basic samplers parameters *)
+let parameters_encoding =
+  let open Data_encoding in
+  let range = Base_samplers.range_encoding in
+  conv
+    (fun {int_size; string_size; bytes_size} ->
+      (int_size, string_size, bytes_size))
+    (fun (int_size, string_size, bytes_size) ->
+      {int_size; string_size; bytes_size})
+    (obj3
+       (req "int_size" range)
+       (req "string_size" range)
+       (req "bytes_size" range))
+
+(** A module of type [S] packs samplers used to construct basic Michelson values. *)
+module type S = sig
   val int : Alpha_context.Script_int.z Alpha_context.Script_int.num sampler
 
   val nat : Alpha_context.Script_int.n Alpha_context.Script_int.num sampler
@@ -42,19 +62,13 @@ module type Base_S = sig
   val tez : Alpha_context.Tez.tez sampler
 
   val timestamp : Alpha_context.Script_timestamp.t sampler
-
-  val bool : bool sampler
 end
 
-module type Full_S = sig
-  val sampling_parameters : Michelson_samplers_parameters.t
+(* Samplers for basic Michelson types. *)
 
-  module Crypto_samplers : Crypto_samplers.Finite_key_pool_S
-
-  module Michelson_base : Base_S
-end
-
-module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
+module Make (P : sig
+  val parameters : parameters
+end) : S = struct
   let int rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
     Alpha_context.Script_int.of_zint i
@@ -110,13 +124,4 @@ module Make_base (P : Michelson_samplers_parameters.S) : Base_S = struct
   let timestamp rng_state =
     let i = Base_samplers.int ~size:P.parameters.int_size rng_state in
     Protocol.Alpha_context.Script_timestamp.of_zint i
-
-  let bool rng_state = Base_samplers.uniform_bool rng_state
-end
-
-module Make_full (P : Michelson_samplers_parameters.S) : Full_S = struct
-  let sampling_parameters = P.parameters
-
-  module Crypto_samplers = Crypto_samplers.Make_finite_key_pool (P)
-  module Michelson_base = Make_base (P)
 end

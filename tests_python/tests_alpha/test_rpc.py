@@ -17,7 +17,7 @@ OPERATION_OFFSET = "0"
 
 @pytest.fixture(scope="class")
 def session():
-    session = dict()
+    session = {}
     session["implicit_accounts"] = [
         "tz1gjaF81ZRRvdzjobyfVNsAeSC6PScjfQwN",
         "tz1ddb9NMYHZi5UzPdzTZMYQQZoMub195zgv",
@@ -42,7 +42,12 @@ def sandbox(request, sandbox: Sandbox, contract_name, session: dict):
     sandbox.add_node(1, params=constants.NODE_PARAMS, mode=request.param)
     sandbox.add_node(2, params=constants.NODE_PARAMS, mode=request.param)
     client = sandbox.client(1)
-    protocol.activate(sandbox.client(1), activate_in_the_past=True)
+    parameters = protocol.get_parameters()
+    parameters['consensus_threshold'] = 0
+    protocol.activate(
+        sandbox.client(1), activate_in_the_past=True, parameters=parameters
+    )
+
     utils.bake(client)
     time.sleep(2)
     # Deploy a contract
@@ -376,19 +381,7 @@ class TestRPCsExistence:
                 'delegated_contracts',
             )
 
-    def test_chain_block_context_delegate_frozen_balance_implicit(
-        self, sandbox: Sandbox, session: dict
-    ):
-        # only implicit accounts
-        accounts = session["implicit_accounts"]
-        for pkh in accounts:
-            sandbox.client(1).rpc(
-                'get',
-                f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-                f'context/delegates/{pkh}/frozen_balance',
-            )
-
-    def test_chain_block_context_delegate_frozen_balance_by_cycle_implicit(
+    def test_chain_block_context_delegate_frozen_deposits_implicit(
         self, sandbox: Sandbox, session: dict
     ):
         # only implicit accounts
@@ -398,7 +391,7 @@ class TestRPCsExistence:
                 'get',
                 f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
                 f'context/delegates/{pkh}/'
-                'frozen_balance_by_cycle',
+                'frozen_deposits',
             )
 
     def test_chain_block_context_delegate_grace_period_implicit(
@@ -531,7 +524,10 @@ class TestRPCsExistence:
     def test_add_transactions(self, sandbox: Sandbox):
         sandbox.client(1).transfer(1.000, 'bootstrap1', 'bootstrap2')
         sandbox.client(2).transfer(1.000, 'bootstrap3', 'bootstrap4')
-        sandbox.client(1).endorse('bootstrap1')
+        # FIXME: Use client.endorse
+        # Not clear where to put it w.r.t to Tenderbake,
+        # knowing that bake for does endorse
+        sandbox.client(1).run(["endorse", "for", 'bootstrap2', '--force'])
         utils.bake(sandbox.client(1))
         time.sleep(3)
 
@@ -548,8 +544,7 @@ class TestRPCsExistence:
         sandbox.client(1).rpc(
             'get',
             f'/chains/{CHAIN_ID}/blocks/{BLOCK_ID}/'
-            f'operation_hashes/{LIST_OFFSET}/'
-            f'{OPERATION_OFFSET}',
+            f'operation_hashes/{LIST_OFFSET}/{OPERATION_OFFSET}',
         )
 
     def test_chain_block_operations(self, sandbox: Sandbox):

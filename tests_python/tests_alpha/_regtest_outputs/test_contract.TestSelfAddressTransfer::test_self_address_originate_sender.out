@@ -1,24 +1,24 @@
 tests_alpha/test_contract.py::TestSelfAddressTransfer::test_self_address_originate_sender
 
 Node is bootstrapped.
-Estimated gas: 1410.574 units (will add 100 for safety)
+Estimated gas: 1413.674 units (will add 100 for safety)
 Estimated storage: 339 bytes added (will add 20 for safety)
 Operation successfully injected in the node.
 Operation hash is '[BLOCK_HASH]'
 NOT waiting for the operation to be included.
 Use command
-  tezos-client wait for [BLOCK_HASH] to be included --confirmations 5 --branch [BLOCK_HASH]
+  tezos-client wait for [BLOCK_HASH] to be included --confirmations 1 --branch [BLOCK_HASH]
 and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [CONTRACT_HASH]
     Fee to the baker: ꜩ0.000461
     Expected counter: [EXPECTED_COUNTER]
-    Gas limit: 1511
+    Gas limit: 1514
     Storage limit: 359 bytes
     Balance updates:
-      [CONTRACT_HASH] ................ -ꜩ0.000461
-      fees(the baker who will include this operation,0) ... +ꜩ0.000461
+      [CONTRACT_HASH] ... -ꜩ0.000461
+      payload fees(the block proposer) ....... +ꜩ0.000461
     Origination:
       From: [CONTRACT_HASH]
       Credit: ꜩ0
@@ -39,12 +39,14 @@ This sequence of operations was run:
           [CONTRACT_HASH]
         Storage size: 82 bytes
         Paid storage size diff: 82 bytes
-        Consumed gas: 1410.574
+        Consumed gas: 1413.674
         Balance updates:
           [CONTRACT_HASH] ... -ꜩ0.0205
+          storage fees ........................... +ꜩ0.0205
           [CONTRACT_HASH] ... -ꜩ0.06425
+          storage fees ........................... +ꜩ0.06425
 
 New contract [CONTRACT_HASH] originated.
 Contract memorized as self_address_sender.
-Injected block [BLOCK_HASH]
+Injected block at minimal timestamp
 [ [], [], [], [ "[BLOCK_HASH]" ] ]

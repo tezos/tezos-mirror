@@ -153,7 +153,7 @@ let empirical_data (workload_data : (Sparse_vec.String.t * float) list) =
       let timings = Matrix.create ~lines:rows ~cols:1 in
       List.iteri
         (fun i {workload; qty} ->
-          assert (List.length workload = input_dims) ;
+          assert (Compare.List_length_with.(workload = input_dims)) ;
           List.iteri
             (fun input_dim (_, size) -> Matrix.set columns.(input_dim) i 0 size)
             workload ;

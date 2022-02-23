@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** An implementation of {!Tezos_base.Internal_event.SINK} which
-    writes the events as JSON into a single file-descriptor.
+    writes the events as JSON or pretty printed into a single file-descriptor.
 
     It is registered with the URI scheme ["file-descriptor-path"] to
     output to a file or
@@ -35,10 +35,16 @@
 
     - ["level-at-least"] the minimal log-level that the sink will
       output (see {!Tezos_event_logging.Internal_event.level}).
-    - ["format"] the output format used to separate JSON records:
-      acceptable values are ["one-per-line"] (the default), and
+    - ["section-prefix"] can be given many times and defines a list of pairs
+      ["<section-prefix>:<level-threshold>"] which can be used to setup more
+      precise filters. ["level-at-least=info"] is understood as
+      ["section-prefix=:info"] (the empty section prefix matches all
+      sections).
+    - ["format"] the output format used;
+      acceptable values are ["one-per-line"] (the default),
       ["netstring"] (see {{:https://en.wikipedia.org/wiki/Netstring}The
-      Netstring format}).
+      Netstring format}) (both to separate JSON records), {i or} ["pp"] to
+      output the events pretty-printed as text using the [syslog] format.
 
     Options available only for ["file-descriptor-path://"]:
 
@@ -62,7 +68,7 @@
       by a parent monitoring process (non-standard feature available
       on mainstream UNIX hosts, e.g. Linux and MacOSX).
 
-    - ["export TEZOS_NODE_HOSTNAME=hostname"]
+    - ["export TEZOS_EVENT_HOSTNAME=hostname"]
       The [hostname] will be used in the JSON representation of the event.
       By default, it is the hostname given by [Unix.gethostname ()].
 

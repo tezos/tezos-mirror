@@ -1,0 +1,14 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/loop_failwith.tz]
+
+Well typed
+Gas remaining: 1039996.317 units remaining
+{ parameter bool ;
+  storage unit ;
+  code { UNPAIR
+         /* [ @parameter bool : @storage unit ] */ ;
+         LOOP { FAILWITH /* [] */ }
+         /* [ @storage unit ] */ ;
+         NIL operation
+         /* [ list operation : @storage unit ] */ ;
+         PAIR
+         /* [ pair (list operation) (unit @storage) ] */ } }

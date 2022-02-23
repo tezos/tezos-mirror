@@ -160,7 +160,7 @@ class SubmitProposalsResult:
 
 
 class BakeForResult:
-    """Result of a 'baker for' operation."""
+    """Result of a 'bake for' operation."""
 
     def __init__(self, client_output: str):
         pattern = r"Injected block ?(\w*)"
@@ -168,6 +168,18 @@ class BakeForResult:
         if match is None:
             raise InvalidClientOutput(client_output)
         self.block_hash = match.groups()[0]
+
+
+class ProposeForResult:
+    """Result of a 'propose for' operation."""
+
+    def __init__(self, client_output: str):
+        pattern = r"Injected block ?(\w*)"
+        match = re.search(pattern, client_output)
+        if match is None:
+            return
+            # raise InvalidClientOutput(client_output)
+        # self.block_hash = match.groups()[0]
 
 
 class ShowAddressResult:

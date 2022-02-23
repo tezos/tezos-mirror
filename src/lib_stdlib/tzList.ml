@@ -71,6 +71,9 @@ let take_n ?compare n l =
   | None -> take_n_unsorted n l
   | Some compare -> take_n_sorted compare n l
 
+let rec drop_n n l =
+  if n <= 0 then l else match l with [] -> [] | _ :: xs -> drop_n (n - 1) xs
+
 let select n l =
   let rec loop n acc = function
     | [] -> invalid_arg "Utils.select"
@@ -113,6 +116,16 @@ let index_of ?(compare = Stdlib.compare) item list =
         if compare head item = 0 then Some index else find (index + 1) tail
   in
   find 0 list
+
+let filter_some l =
+  (* Written like this (building backward and with a final List.rev)
+     so that it is tail-recursive *)
+  let rec go acc = function
+    | [] -> List.rev acc
+    | None :: xs -> go acc xs
+    | Some x :: xs -> go (x :: acc) xs
+  in
+  go [] l
 
 let rec find_map f = function
   | [] -> None

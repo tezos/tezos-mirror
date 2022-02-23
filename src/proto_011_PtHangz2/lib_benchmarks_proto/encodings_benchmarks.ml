@@ -163,21 +163,20 @@ module Encoding_micheline : Benchmark.S = struct
     Generator.Plain {workload; closure}
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ = _} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ = _} -> encoding_micheline_benchmark term
-    | _ -> assert false
+    in
+    encoding_micheline_benchmark term
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.map
           (function
-            | Michelson_generation.Data {term; typ = _}
-            | Michelson_generation.Code {term; bef = _} ->
+            | Michelson_mcmc_samplers.Data {term; typ = _}
+            | Michelson_mcmc_samplers.Code {term; bef = _; aft = _} ->
                 fun () -> encoding_micheline_benchmark term)
           terms
     | None -> List.repeat bench_num (make_bench rng_state config)
@@ -234,21 +233,20 @@ module Decoding_micheline : Benchmark.S = struct
     Generator.Plain {workload; closure}
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ = _} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ = _} -> decoding_micheline_benchmark term
-    | _ -> assert false
+    in
+    decoding_micheline_benchmark term
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.map
           (function
-            | Michelson_generation.Data {term; typ = _}
-            | Michelson_generation.Code {term; bef = _} ->
+            | Michelson_mcmc_samplers.Data {term; typ = _}
+            | Michelson_mcmc_samplers.Code {term; bef = _; aft = _} ->
                 fun () -> decoding_micheline_benchmark term)
           terms
     | None -> List.repeat bench_num (make_bench rng_state config)
@@ -395,19 +393,19 @@ module Timelock = struct
 
   let () =
     Registration_helpers.register
-    @@ make_encode_variable_size_to_bytes
+    @@ make_encode_variable_size_to_string
          ~name:"ENCODING_Chest"
-         ~to_bytes:(Data_encoding.Binary.to_bytes_exn Timelock.chest_encoding)
+         ~to_string:(Data_encoding.Binary.to_string_exn Timelock.chest_encoding)
          ~generator:(fun rng_state ->
            let ((chest, _), plaintext_size) = generator rng_state in
            (chest, {bytes = plaintext_size}))
 
   let () =
     Registration_helpers.register
-    @@ make_encode_fixed_size_to_bytes
+    @@ make_encode_fixed_size_to_string
          ~name:"ENCODING_Chest_key"
-         ~to_bytes:
-           (Data_encoding.Binary.to_bytes_exn Timelock.chest_key_encoding)
+         ~to_string:
+           (Data_encoding.Binary.to_string_exn Timelock.chest_key_encoding)
          ~generator:(fun rng_state ->
            let ((_, chest_key), _w) = generator rng_state in
            chest_key)

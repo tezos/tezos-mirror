@@ -1,0 +1,39 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/self_address_after_view.tz]
+
+Well typed
+Gas remaining: 1039985.432 units remaining
+{ parameter address ;
+  storage address ;
+  code { CAR
+         /* [ @parameter address ] */ ;
+         DUP
+         /* [ @parameter address : @parameter address ] */ ;
+         PUSH nat 0
+         /* [ nat : @parameter address : @parameter address ] */ ;
+         VIEW "id"
+              (pair nat nat)
+         /* [ @parameter.contract option (pair nat nat) : @parameter address ] */ ;
+         ASSERT_SOME ;
+         DROP
+         /* [ @parameter address ] */ ;
+         CONTRACT nat
+         /* [ @parameter.contract option (contract nat) ] */ ;
+         ASSERT_SOME ;
+         PUSH mutez 1500
+         /* [ mutez : @parameter.contract.some contract nat ] */ ;
+         PUSH nat 0
+         /* [ nat : mutez : @parameter.contract.some contract nat ] */ ;
+         TRANSFER_TOKENS
+         /* [ operation ] */ ;
+         SELF_ADDRESS
+         /* [ @self address : operation ] */ ;
+         SWAP
+         /* [ operation : @self address ] */ ;
+         NIL operation
+         /* [ list operation : operation : @self address ] */ ;
+         SWAP
+         /* [ operation : list operation : @self address ] */ ;
+         CONS
+         /* [ list operation : @self address ] */ ;
+         PAIR
+         /* [ pair (list operation) (address @self) ] */ } }

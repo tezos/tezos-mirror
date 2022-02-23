@@ -21,7 +21,7 @@ _`Accuser`
 
     The accuser is awarded some funds from the baking_ deposit of the accused.
 
-    Using the tools provided by Nomadic Labs, accusation is handled by a
+    When using :ref:`Octez <octez>`, accusations are handled by a
     separate binary.
 
 _`Account`
@@ -38,14 +38,14 @@ _`Baker`
     is allowed to bake; blocks created by another node_ are invalid.
     The baker selects transactions from the mempool_ to be included in the block_ it bakes.
 
-    Using the tools provided by Nomadic Labs, baking_ is handled by a
-    separate binary.
+    When using :ref:`Octez <octez>`, baking_ is handled by a separate
+    binary.
 
 _`Baking`/_`Endorsing rights`
     A delegate_ is allowed to bake/endorse a block_ if he holds the
     baking/endorsing right for that block_. At the start of a Cycle_,
     baking and endorsing rights are computed for all the block_ heights in the
-    cycle_, based on the proportion of Rolls owned by each accounts.
+    cycle_, based on the proportion of Rolls owned by each account.
 
     For each block_ height, there are several accounts that are allowed to bake.
     These different accounts are given different Priorities.
@@ -102,7 +102,7 @@ _`Endorser`
     operation_. The accounts that emit the block_ are the endorsers of the block_.
     Endorsement operations_ are included in the next block_.
 
-    Using the tools provided by Nomadic Labs, endorsement is handled by a
+    When using :ref:`Octez <octez>`, endorsing is handled by a
     separate binary.
 
 _`Fee`
@@ -128,6 +128,7 @@ _`Implicit account`
     letters `tz` followed by `1`, `2` or `3` (depending on the
     signature scheme) and finally the hash of the public key.
 
+.. _glossary_michelson:
 .. _glossary_michelson_011:
 
 Michelson
@@ -168,11 +169,11 @@ _`Transaction`
 _`Voting period`
     Any of the ``proposal``, ``exploration``, ``cooldown``,
     ``promotion`` or ``adoption`` stages in the voting procedure when
-    ammending the `economic protocol`_.
+    amending the `economic protocol`_.
 
 _`Voting listings`
     The list calculated at the beginning of each `voting period`_ that contains
     the staking balance (in number of rolls) of each delegate_ that owns more
     than one roll_ at that moment. For each delegate_, The voting listings
-    reflects the weight of the vote emitted by the delegate_ when ammending the
+    reflects the weight of the vote emitted by the delegate_ when amending the
     `economic protocol`_.

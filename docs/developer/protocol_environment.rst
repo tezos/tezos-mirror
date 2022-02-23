@@ -1,5 +1,3 @@
-.. _protocol_environment:
-
 Economic protocol sandboxing
 ============================
 

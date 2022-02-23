@@ -3,7 +3,7 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 Welcome to the Tezos Developer Documentation!
 =============================================
@@ -17,6 +17,8 @@ like Bitcoin or Ethereum. It also attempts to come to consensus about how the
 protocol and the nodes should adapt and upgrade.
 The website https://tezos.com/ contains more information about the project.
 
+.. _octez:
+
 Octez
 -----
 
@@ -24,7 +26,7 @@ Octez is an implementation of Tezos software, including a node, a client, a bake
 This implementation is available at https://gitlab.com/tezos/tezos.
 The source code is placed under the MIT Open Source License.
 
-The current release of Octez is :doc:`../releases/version-10`.
+The current release of Octez is :doc:`../releases/version-11`.
 
 This website
 ------------
@@ -114,6 +116,7 @@ in the :ref:`introduction <howtoget>`.
 
    user/key-management
    user/node-configuration
+   user/versioning
    user/snapshots
    user/history_modes
    user/multinetwork
@@ -125,6 +128,7 @@ in the :ref:`introduction <howtoget>`.
    user/multisig
    user/fa12
    user/various
+   user/logging
 
 .. toctree::
    :maxdepth: 2
@@ -142,47 +146,37 @@ in the :ref:`introduction <howtoget>`.
 
 .. toctree::
    :maxdepth: 2
-   :caption: 010 Granada Protocol doc:
+   :caption: 011 Hangzhou Protocol doc:
 
    active/michelson
    active/proof_of_stake
    active/consensus
    active/sapling
    active/voting
+   active/liquidity_baking
+   active/timelock
+   active/plugins
    active/glossary
    active/cli-commands
    active/rpc
-   active/liquidity_baking
 
 .. toctree::
    :maxdepth: 2
-   :caption: 011 Hangzhou Protocol doc:
+   :caption: 012 Ithaca Protocol doc:
 
-   011/michelson
-   011/proof_of_stake
-   011/consensus
-   011/sapling
-   011/voting
-   011/glossary
-   011/cli-commands
-   011/rpc
-   011/liquidity_baking
-   011/timelock
+   012/protocol
+   012/glossary
+   012/cli-commands
+   012/rpc
 
 .. toctree::
    :maxdepth: 2
    :caption: Alpha Development Protocol doc:
 
-   alpha/michelson
-   alpha/proof_of_stake
-   alpha/consensus
-   alpha/sapling
-   alpha/voting
+   alpha/protocol
    alpha/glossary
    alpha/cli-commands
    alpha/rpc
-   alpha/liquidity_baking
-   alpha/timelock
 
 .. toctree::
    :maxdepth: 2
@@ -194,15 +188,19 @@ in the :ref:`introduction <howtoget>`.
    developer/gadt
    developer/error_monad
    developer/michelson_anti_patterns
+   developer/michelson_instructions
    developer/entering_alpha
+   developer/howto-freeze-protocols
    developer/protocol_environment
    developer/protocol_environment_upgrade
+   developer/event_logging_framework
    developer/testing_index
    developer/profiling
    developer/snoop
    developer/contributing
    developer/merge_team
    developer/guidelines
+   developer/time_measurement_ppx
    README
 
 .. toctree::
@@ -219,6 +217,7 @@ in the :ref:`introduction <howtoget>`.
    protocols/009_florence
    protocols/010_granada
    protocols/011_hangzhou
+   protocols/012_ithaca
    protocols/alpha
 
 .. toctree::
@@ -237,6 +236,7 @@ in the :ref:`introduction <howtoget>`.
    releases/version-9
    releases/version-10
    releases/version-11
+   releases/version-12
 
 .. toctree::
    :maxdepth: 2

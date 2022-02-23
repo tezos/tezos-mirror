@@ -77,6 +77,9 @@ let get_script_hash (rpc : #rpc_context) ~chain ~block contract =
          ok hash)
        script_opt
 
+let get_frozen_deposits_limit (rpc : #rpc_context) ~chain ~block delegate =
+  Alpha_services.Delegate.frozen_deposits_limit rpc (chain, block) delegate
+
 let parse_expression arg =
   Lwt.return
     (Micheline_parser.no_parsing_error
@@ -103,7 +106,7 @@ let build_transaction_operation ~amount ~parameters ?(entrypoint = "default")
 let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ?verbose_signing ?simulation ?branch ~source ~src_pk ~src_sk ~destination
     ?(entrypoint = "default") ?arg ~amount ?fee ?gas_limit ?storage_limit
-    ?counter ~fee_parameter () =
+    ?counter ~fee_parameter ?replace_by_fees () =
   parse_arg_transfer arg >>=? fun parameters ->
   let contents =
     build_transaction_operation
@@ -130,6 +133,7 @@ let transfer (cctxt : #full) ~chain ~block ?confirmations ?dry_run
     ~gas_limit:(Limit.of_option gas_limit)
     ~storage_limit:(Limit.of_option storage_limit)
     ?counter
+    ?replace_by_fees
     ~src_pk
     ~src_sk
     ~fee_parameter
@@ -273,6 +277,39 @@ let register_as_delegate cctxt ~chain ~block ?confirmations ?dry_run
     ?fee
     ~fee_parameter
     (Some source)
+
+let set_deposits_limit cctxt ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee contract ~src_pk ~manager_sk
+    ~fee_parameter limit_opt =
+  let operation = Set_deposits_limit limit_opt in
+  let operation =
+    Injection.prepare_manager_operation
+      ~fee:(Limit.of_option fee)
+      ~gas_limit:Limit.unknown
+      ~storage_limit:Limit.unknown
+      operation
+  in
+  let operation = Annotated_manager_operation.Single_manager operation in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ~source:contract
+    ~fee:(Limit.of_option fee)
+    ~gas_limit:Limit.unknown
+    ~storage_limit:Limit.unknown
+    ~src_pk
+    ~src_sk:manager_sk
+    ~fee_parameter
+    operation
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)
 
 let save_contract ~force cctxt alias_name contract =
   RawContractAlias.add ~force cctxt alias_name contract >>=? fun () ->
@@ -532,10 +569,10 @@ let activate_account (cctxt : #full) ~chain ~block ?confirmations ?dry_run
        Ed25519.Public_key_hash.pp
        key.pkh)
   >>=? fun () ->
-  Tezos_signer_backends.Unencrypted.make_pk pk >>=? fun pk_uri ->
+  Tezos_signer_backends.Unencrypted.make_pk pk >>?= fun pk_uri ->
   (if encrypted then
    Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt cctxt sk
-  else Tezos_signer_backends.Unencrypted.make_sk sk)
+  else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return)
   >>=? fun sk_uri ->
   Client_keys.register_key cctxt ?force (pkh, pk_uri, sk_uri) name
   >>=? fun () ->
@@ -709,3 +746,37 @@ let contract_cache_size cctxt ~chain ~block =
 let contract_cache_size_limit cctxt ~chain ~block =
   let cb = (chain, block) in
   Alpha_services.Cache.contract_cache_size_limit cctxt cb
+
+let originate_tx_rollup (cctxt : #full) ~chain ~block ?confirmations ?dry_run
+    ?verbose_signing ?simulation ?fee ?gas_limit ?storage_limit ?counter ~source
+    ~src_pk ~src_sk ~fee_parameter () =
+  let contents :
+      Kind.tx_rollup_origination Annotated_manager_operation.annotated_list =
+    Annotated_manager_operation.Single_manager
+      (Injection.prepare_manager_operation
+         ~fee:(Limit.of_option fee)
+         ~gas_limit:(Limit.of_option gas_limit)
+         ~storage_limit:(Limit.of_option storage_limit)
+         Tx_rollup_origination)
+  in
+  Injection.inject_manager_operation
+    cctxt
+    ~chain
+    ~block
+    ?confirmations
+    ?dry_run
+    ?verbose_signing
+    ?simulation
+    ?counter
+    ~source
+    ~fee:(Limit.of_option fee)
+    ~storage_limit:(Limit.of_option storage_limit)
+    ~gas_limit:(Limit.of_option gas_limit)
+    ~src_pk
+    ~src_sk
+    ~fee_parameter
+    contents
+  >>=? fun (oph, op, result) ->
+  match Apply_results.pack_contents_list op result with
+  | Apply_results.Single_and_result ((Manager_operation _ as op), result) ->
+      return (oph, op, result)

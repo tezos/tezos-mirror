@@ -78,6 +78,7 @@ type path = (string, path_input) Either.t list
 
 (* A type representation for the JSON input to an RPC. *)
 type rpc_input =
+  | Any : rpc_input
   | Boolean : rpc_input
   | Integer : {min : int option; max : int option} -> rpc_input
   | Z : rpc_input (* ["bignum"] *)
@@ -159,44 +160,73 @@ module RPC_Index = struct
     path_string |> String.split_on_char '/' |> List.tl
     |> List.map parse_path_input
 
-  let rec parse_input env schema : rpc_input =
+  (** [map_e f l] applies the [f] function (that can return [Ok _] or [Error _])
+      to all elements of [l]. If [f] succeeded on all elements, [Ok _] of
+      all transformed elements is returned, otherwise the first error is returned. *)
+  let rec map_e f = function
+    | [] -> Ok []
+    | x :: xs -> (
+        match f x with
+        | Ok y -> ( match map_e f xs with Ok ys -> Ok (y :: ys) | err -> err)
+        | Error err ->
+            (* No need to continue, in particular, no need to recurse *)
+            Error err)
+
+  let rec parse_input env schema : (rpc_input, string) result =
     let open Schema in
     match schema with
     (* These first two references are circular. *)
-    | Ref "bignum" -> Z
-    | Ref "micheline.alpha.michelson_v1.expression" -> Mich_exp
+    | Ref "bignum" -> Ok Z
+    | Ref "micheline.alpha.michelson_v1.expression" -> Ok Mich_exp
     | Ref str -> parse_input env @@ String_map.find str env
-    | Other {kind = Boolean; _} -> Boolean
+    | Other {kind = Boolean; _} -> Ok Boolean
     | Other {kind = Integer {minimum; maximum; enum = []}; _} ->
-        Integer {min = minimum; max = maximum}
-    | Other {kind = Integer {enum; _}; _} -> Int_enum enum
+        Ok (Integer {min = minimum; max = maximum})
+    | Other {kind = Integer {enum; _}; _} -> Ok (Int_enum enum)
     | Other {kind = Number {minimum; maximum}; _} ->
-        Float {min = minimum; max = maximum}
+        Ok (Float {min = minimum; max = maximum})
     | Other {kind = String {pattern = Some s; _}; _} -> (
         (* Only one regexp is used currently *)
         match s with
-        | "^([a-zA-Z0-9][a-zA-Z0-9])*$" -> Even_alphanum
-        | _ -> assert false)
-    | Other {kind = String {enum = []; _}; _} -> Rand_string
-    | Other {kind = String {enum; _}; _} -> String_enum enum
-    | Other {kind = Array schema'; _} -> Array (parse_input env schema')
+        | "^([a-zA-Z0-9][a-zA-Z0-9])*$" -> Ok Even_alphanum
+        | _ -> Error ("Unexpected regexp: " ^ s))
+    | Other {kind = String {enum = []; _}; _} -> Ok Rand_string
+    | Other {kind = String {enum; _}; _} -> Ok (String_enum enum)
+    | Other {kind = Array schema'; _} -> (
+        match parse_input env schema' with Ok x -> Ok (Array x) | err -> err)
     | Other {kind = Object {additional_properties = Some _; _}; _} ->
         (* Note: Additional properties never occur in input. *)
-        assert false
-    | Other {kind = Object {properties; _}; _} ->
+        Error "Additional properties are unsupported"
+    | Other {kind = Object {properties; _}; _} -> (
         let conv_prop Schema.{name; required; schema} =
-          {name; required; payload = parse_input env schema}
+          match parse_input env schema with
+          | Ok payload -> Ok {name; required; payload}
+          | Error err -> Error err
         in
-        Object (List.map conv_prop properties)
-    | Other {kind = One_of schemas; _} ->
-        One_of (List.map (parse_input env) schemas)
-    | Other {kind = Any; _} ->
-        (* Should not occur as input *)
-        Tezt.Test.fail "Bug: RPC parse failure"
+        match map_e conv_prop properties with
+        | Ok conv_properties -> Ok (Object conv_properties)
+        | Error err -> Error err)
+    | Other {kind = One_of schemas; _} -> (
+        match map_e (parse_input env) schemas with
+        | Ok sub -> Ok (One_of sub)
+        | Error err -> Error err)
+    | Other {kind = Any; _} -> Ok Any
 
   let parse_service path env meth service : rpc_description =
     let open Service in
-    let data = Option.map (parse_input env) service.request_body in
+    let data =
+      match service.request_body with
+      | Some schema -> (
+          match parse_input env schema with
+          | Ok rpc_input -> Some rpc_input
+          | Error err ->
+              Test.fail
+                "Error when parsing service \"%s\": %s. Can function \
+                 parse_input above be generalized?"
+                service.description
+                err)
+      | None -> None
+    in
     let description = service.description in
     {description; meth; path; data}
 
@@ -237,7 +267,7 @@ module RPC_Index = struct
     let get_url_endpoints url =
       let open Lwt_process in
       let* curl_result = pread ~stderr:`Dev_null ("curl", [|"curl"; url|]) in
-      curl_result |> Ezjsonm.value_from_string |> Api.parse_tree
+      curl_result |> JSON.parse ~origin:url |> Api.parse_tree
       |> Api.parse_services |> Api.flatten
       |> List.map Convert.convert_endpoint
       |> return
@@ -376,7 +406,7 @@ module Gen = struct
         >|= Ezjsonm.float
     | Even_alphanum -> map Ezjsonm.string even_alpha_num_gen
     | String_enum enum -> oneofl enum |> map Ezjsonm.string
-    | Rand_string -> map Ezjsonm.string string
+    | Any | Rand_string -> map Ezjsonm.string string
     | Array rpc_input ->
         list_size (0 -- 10) (known_input_gen rpc_input) |> map (fun l -> `A l)
     | One_of rpc_inputs -> oneof @@ List.map known_input_gen rpc_inputs
@@ -451,7 +481,7 @@ module Test = struct
     (* Log description of RPC *)
     let () = Log.info "%s\n\n" rpc_description.description in
     (* Start node and client *)
-    let* (node, client) = Client.init_activate_bake `Client ~protocol () in
+    let* (node, client) = Client.init_with_protocol `Client ~protocol () in
     (* Generate and test instances *)
     let* () =
       rpc_description |> Gen.instance_gen
@@ -482,11 +512,12 @@ module Test = struct
     Lwt_list.iter_s test_rpc filtered
 end
 
-let property_test_rpc_server =
+let property_test_rpc_server ~executors =
   Long_test.register
     ~__FILE__
     ~title:"property_test_rpc_server"
     ~tags:["node"; "pbt"; "fuzz"; "rpc"]
+    ~executors
     ~timeout:(Hours 1)
     Test.test_rpc_server
 

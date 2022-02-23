@@ -75,15 +75,4 @@ let fold_left f init s =
   String.iter (fun c -> acc := f !acc c) s ;
   !acc
 
-let is_hex s =
-  let len = String.length s in
-  len mod 2 = 0
-  &&
-  try
-    String.iter
-      (function '0' .. '9' | 'a' .. 'f' | 'A' .. 'F' -> () | _ -> raise Exit)
-      s ;
-    true
-  with Exit -> false
-
 let pp_bytes_hex fmt bytes = Hex.(of_bytes bytes |> pp fmt)

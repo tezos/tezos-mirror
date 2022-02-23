@@ -140,6 +140,21 @@ let () = Transport.Status.register_string_f begin function
     | _ -> None
   end
 
+let () = Transport.Status.register_help_suggestor_f begin function
+    | Transport.Status.Conditions_of_use_not_satisfied ->
+        Some "Either you rejected the operation or you waited long enough \
+              to respond that the device rejected it for you."
+    | Transport.Status.Incorrect_class ->
+        Some "A Tezos application wasn't found on the device. Is the Tezos \
+              Wallet or Tezos Baking application open on the device? Is the \
+              device busy talking to another process?"
+    | Transport.Status.Security_status_unsatisfied ->
+        Some "The operation was automatically rejected for security reasons. \
+              If baking, you may need to setup the device or reset the \
+              high-water mark."
+    | _ -> None
+  end
+
 let wrap_ins cmd =
   Apdu.create_cmd ~cmd ~cla_of_cmd:(fun _ -> 0x80) ~ins_of_cmd:int_of_ins
 
@@ -241,16 +256,37 @@ let deauthorize_baking ?pp ?buf h =
 
 let get_high_watermark ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Query_high_watermark) in
-  Transport.apdu ~msg:"get_high_watermark" ?pp ?buf h apdu >>| fun hwm ->
-  Cstruct.BE.get_uint32 hwm 0
+  Transport.apdu ~msg:"get_high_watermark" ?pp ?buf h apdu >>| fun data ->
+  let has_migrated_to_tenderbake =
+    Cstruct.length data >= 8
+  in
+  if has_migrated_to_tenderbake then
+    Cstruct.BE.get_uint32 data 0, Some (Cstruct.BE.get_uint32 data 4)
+  else
+    Cstruct.BE.get_uint32 data 0, None
 
 let get_all_high_watermarks ?pp ?buf h =
   let apdu = Apdu.create (wrap_ins Query_all_high_watermarks) in
-  Transport.apdu ~msg:"get_high_watermark" ?pp ?buf h apdu >>| fun tuple ->
-  let main_hwm = Cstruct.BE.get_uint32 tuple 0 in
-  let test_hwm = Cstruct.BE.get_uint32 tuple 4 in
-  let chain_id = Cstruct.copy tuple 8 4 in
-  (`Main_hwm main_hwm, `Test_hwm test_hwm, `Chain_id chain_id)
+  Transport.apdu ~msg:"get_high_watermark" ?pp ?buf h apdu >>| fun data ->
+  let has_migrated_to_tenderbake =
+    Cstruct.length data >= 20
+  in
+  if has_migrated_to_tenderbake then
+    let main_hwm = Cstruct.BE.get_uint32 data 0 in
+    let main_hwm_round = Cstruct.BE.get_uint32 data 4 in
+    let test_hwm = Cstruct.BE.get_uint32 data 8 in
+    let test_hwm_round = Cstruct.BE.get_uint32 data 12 in
+    let chain_id = Cstruct.copy data 16 4 in
+    (`Main_hwm (main_hwm, Some main_hwm_round),
+     `Test_hwm (test_hwm, Some test_hwm_round),
+     `Chain_id chain_id)
+  else
+    let main_hwm = Cstruct.BE.get_uint32 data 0 in
+    let test_hwm = Cstruct.BE.get_uint32 data 4 in
+    let chain_id = Cstruct.copy data 8 4 in
+    (`Main_hwm (main_hwm, None),
+     `Test_hwm (test_hwm, None),
+     `Chain_id chain_id)
 
 let set_high_watermark ?pp ?buf h hwm =
   let data = Cstruct.create 4 in

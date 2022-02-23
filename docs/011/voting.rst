@@ -179,8 +179,8 @@ fails.
 
 A protocol is *invalid* if its code cannot be compiled (e.g., if the code is not
 valid source code), if its code uses functions not present in the
-:ref:`protocol environment <protocol_environment>`, or if it downgrades the
-:ref:`protocol environment <protocol_environment>` version.
+:doc:`protocol environment <../developer/protocol_environment>`, or if it
+downgrades the protocol environment version.
 
 If an invalid protocol is voted in, then the activation fails for all the nodes,
 and then the chain becomes stuck. This is why it is important to vote for hashes
@@ -252,7 +252,7 @@ Show
 ~~~~
 
 Tezos' client provides a command to show the status of a voting period.
-It displays different informations for different kind of periods, as
+It displays different information for different kind of periods, as
 in the following samples::
 
   $ tezos-client show voting period

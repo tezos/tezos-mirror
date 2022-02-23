@@ -1,0 +1,22 @@
+tests_alpha/test_contract.py::TestTypecheck::test_typecheck[opcodes/add_timestamp_delta.tz]
+
+Well typed
+Gas remaining: 1039993.598 units remaining
+{ parameter (pair timestamp int) ;
+  storage (option timestamp) ;
+  code { CAR
+         /* [ @parameter pair timestamp int ] */ ;
+         DUP
+         /* [ @parameter pair timestamp int : @parameter pair timestamp int ] */ ;
+         CAR
+         /* [ timestamp : @parameter pair timestamp int ] */ ;
+         DIP { CDR /* [ int ] */ }
+         /* [ timestamp : int ] */ ;
+         ADD
+         /* [ timestamp ] */ ;
+         SOME
+         /* [ option timestamp ] */ ;
+         NIL operation
+         /* [ list operation : option timestamp ] */ ;
+         PAIR
+         /* [ pair (list operation) (option timestamp) ] */ } }

@@ -119,7 +119,11 @@ let to_bytes v = Data_encoding.Binary.to_bytes_exn encoding v
 
 let of_bytes b = Data_encoding.Binary.of_bytes_opt encoding b
 
+let of_string b = Data_encoding.Binary.of_string_opt encoding b
+
 let of_bytes_exn b = Data_encoding.Binary.of_bytes_exn encoding b
+
+let of_string_exn b = Data_encoding.Binary.of_string_exn encoding b
 
 let hash proto = Protocol_hash.hash_bytes [to_bytes proto]
 

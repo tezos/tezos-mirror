@@ -1,5 +1,5 @@
 {
-    "expected_env_version": 3,
+    "expected_env_version": 4,
     "hash": "ProtoDemoNoopsDemoNoopsDemoNoopsDemoNoopsDemo6XBoYp",
     "modules": ["Main"]
 }

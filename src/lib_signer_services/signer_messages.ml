@@ -46,17 +46,14 @@ module Make_authenticated_request (T : Tag) : Authenticated_request = struct
     signature : Signature.t option;
   }
 
+  let x04 = Bytes.of_string "\x04"
+
   let to_sign ~pkh ~data =
     let tag = Bytes.make 1 '0' in
     TzEndian.set_int8 tag 0 T.tag ;
     Bytes.concat
       Bytes.empty
-      [
-        Bytes.unsafe_of_string "\x04";
-        tag;
-        Signature.Public_key_hash.to_bytes pkh;
-        data;
-      ]
+      [x04; tag; Signature.Public_key_hash.to_bytes pkh; data]
 
   let encoding =
     let open Data_encoding in

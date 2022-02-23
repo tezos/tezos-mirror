@@ -1,0 +1,1841 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Tezos RPC",
+    "description": "Tezos client RPC API.",
+    "version": "11.0"
+  },
+  "paths": {
+    "/ban_operation": {
+      "post": {
+        "description": "Remove an operation from the mempool if present, reverting its effect if it was applied. Add it to the set of banned operations to prevent it from being fetched/processed/injected in the future. Note: If the baker has already received the operation, then it's necessary to restart it to flush the operation from it.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Operation_hash"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/filter": {
+      "get": {
+        "description": "Get the configuration of the mempool filter.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "description": "Set the configuration of the mempool filter.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {}
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor_operations": {
+      "get": {
+        "description": "Monitor the mempool operations.",
+        "parameters": [
+          {
+            "name": "applied",
+            "in": "query",
+            "description": "Include applied operations (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "refused",
+            "in": "query",
+            "description": "Include refused operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_refused",
+            "in": "query",
+            "description": "Include branch refused operations",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch_delayed",
+            "in": "query",
+            "description": "Include branch delayed operations (set by default)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "description": "An operation's shell header.",
+                    "type": "object",
+                    "properties": {
+                      "hash": {
+                        "$ref": "#/components/schemas/Operation_hash"
+                      },
+                      "protocol": {
+                        "type": "string",
+                        "enum": [
+                          "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+                        ]
+                      },
+                      "branch": {
+                        "$ref": "#/components/schemas/block_hash"
+                      },
+                      "contents": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
+                        }
+                      },
+                      "signature": {
+                        "$ref": "#/components/schemas/Signature"
+                      },
+                      "error": {
+                        "$ref": "#/components/schemas/error"
+                      }
+                    },
+                    "required": [
+                      "hash",
+                      "protocol",
+                      "branch",
+                      "contents",
+                      "signature"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/pending_operations": {
+      "get": {
+        "description": "List the prevalidated operations.",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "applied": {
+                      "type": "array",
+                      "items": {
+                        "description": "An operation's shell header.",
+                        "type": "object",
+                        "properties": {
+                          "hash": {
+                            "$ref": "#/components/schemas/Operation_hash"
+                          },
+                          "branch": {
+                            "$ref": "#/components/schemas/block_hash"
+                          },
+                          "contents": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
+                            }
+                          },
+                          "signature": {
+                            "$ref": "#/components/schemas/Signature"
+                          }
+                        },
+                        "required": [
+                          "hash",
+                          "branch",
+                          "contents",
+                          "signature"
+                        ]
+                      }
+                    },
+                    "refused": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/Operation_hash"
+                            },
+                            {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "protocol": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+                                  ]
+                                },
+                                "branch": {
+                                  "$ref": "#/components/schemas/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/components/schemas/Signature"
+                                },
+                                "error": {
+                                  "$ref": "#/components/schemas/error"
+                                }
+                              },
+                              "required": [
+                                "protocol",
+                                "branch",
+                                "contents",
+                                "signature",
+                                "error"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "branch_refused": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/Operation_hash"
+                            },
+                            {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "protocol": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+                                  ]
+                                },
+                                "branch": {
+                                  "$ref": "#/components/schemas/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/components/schemas/Signature"
+                                },
+                                "error": {
+                                  "$ref": "#/components/schemas/error"
+                                }
+                              },
+                              "required": [
+                                "protocol",
+                                "branch",
+                                "contents",
+                                "signature",
+                                "error"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "branch_delayed": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/Operation_hash"
+                            },
+                            {
+                              "description": "An operation's shell header.",
+                              "type": "object",
+                              "properties": {
+                                "protocol": {
+                                  "type": "string",
+                                  "enum": [
+                                    "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+                                  ]
+                                },
+                                "branch": {
+                                  "$ref": "#/components/schemas/block_hash"
+                                },
+                                "contents": {
+                                  "type": "array",
+                                  "items": {
+                                    "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
+                                  }
+                                },
+                                "signature": {
+                                  "$ref": "#/components/schemas/Signature"
+                                },
+                                "error": {
+                                  "$ref": "#/components/schemas/error"
+                                }
+                              },
+                              "required": [
+                                "protocol",
+                                "branch",
+                                "contents",
+                                "signature",
+                                "error"
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "unprocessed": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/Operation_hash"
+                            },
+                            {
+                              "$ref": "#/components/schemas/next_operation"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "applied",
+                    "refused",
+                    "branch_refused",
+                    "branch_delayed",
+                    "unprocessed"
+                  ]
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/request_operations": {
+      "post": {
+        "description": "Request the operations of your peers.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban_all_operations": {
+      "post": {
+        "description": "Clear the set of banned operations.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban_operation": {
+      "post": {
+        "description": "Remove an operation from the set of banned operations (nothing happens if it was not banned).",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Operation_hash"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "default": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "011-PtHangz2.block_header.alpha.full_header": {
+        "title": "Shell header",
+        "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
+        "type": "object",
+        "properties": {
+          "level": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          },
+          "proto": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "predecessor": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "timestamp": {
+            "$ref": "#/components/schemas/timestamp.protocol"
+          },
+          "validation_pass": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 255
+          },
+          "operations_hash": {
+            "$ref": "#/components/schemas/Operation_list_list_hash"
+          },
+          "fitness": {
+            "$ref": "#/components/schemas/fitness"
+          },
+          "context": {
+            "$ref": "#/components/schemas/Context_hash"
+          },
+          "priority": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "proof_of_work_nonce": {
+            "type": "string",
+            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+          },
+          "seed_nonce_hash": {
+            "$ref": "#/components/schemas/cycle_nonce"
+          },
+          "liquidity_baking_escape_vote": {
+            "type": "boolean"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "level",
+          "proto",
+          "predecessor",
+          "timestamp",
+          "validation_pass",
+          "operations_hash",
+          "fitness",
+          "context",
+          "priority",
+          "proof_of_work_nonce",
+          "liquidity_baking_escape_vote",
+          "signature"
+        ]
+      },
+      "011-PtHangz2.contract_id": {
+        "title": "A contract handle",
+        "description": "A contract notation as given to an RPC or inside scripts. Can be a base58 implicit contract hash or a base58 originated contract hash.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "011-PtHangz2.entrypoint": {
+        "title": "entrypoint",
+        "description": "Named entrypoint to a Michelson smart contract",
+        "oneOf": [
+          {
+            "title": "default",
+            "type": "string",
+            "enum": [
+              "default"
+            ]
+          },
+          {
+            "title": "root",
+            "type": "string",
+            "enum": [
+              "root"
+            ]
+          },
+          {
+            "title": "do",
+            "type": "string",
+            "enum": [
+              "do"
+            ]
+          },
+          {
+            "title": "set_delegate",
+            "type": "string",
+            "enum": [
+              "set_delegate"
+            ]
+          },
+          {
+            "title": "remove_delegate",
+            "type": "string",
+            "enum": [
+              "remove_delegate"
+            ]
+          },
+          {
+            "title": "named",
+            "type": "string"
+          }
+        ]
+      },
+      "011-PtHangz2.inlined.endorsement": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "operations": {
+            "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement.contents"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "branch",
+          "operations"
+        ]
+      },
+      "011-PtHangz2.inlined.endorsement.contents": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "endorsement"
+            ]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": -2147483648,
+            "maximum": 2147483647
+          }
+        },
+        "required": [
+          "kind",
+          "level"
+        ]
+      },
+      "011-PtHangz2.michelson.v1.primitives": {
+        "type": "string",
+        "enum": [
+          "ABS",
+          "IF",
+          "SENDER",
+          "VOTING_POWER",
+          "False",
+          "NEVER",
+          "DUG",
+          "chest",
+          "BLAKE2B",
+          "map",
+          "bls12_381_g2",
+          "Pair",
+          "INT",
+          "option",
+          "bls12_381_g1",
+          "storage",
+          "SIZE",
+          "view",
+          "SHA256",
+          "AND",
+          "VIEW",
+          "mutez",
+          "NIL",
+          "big_map",
+          "SUB",
+          "SAPLING_VERIFY_UPDATE",
+          "CHECK_SIGNATURE",
+          "TOTAL_VOTING_POWER",
+          "address",
+          "MAP",
+          "or",
+          "ticket",
+          "ADD",
+          "IMPLICIT_ACCOUNT",
+          "SHA512",
+          "key",
+          "LSL",
+          "bls12_381_fr",
+          "chest_key",
+          "sapling_state",
+          "COMPARE",
+          "TRANSFER_TOKENS",
+          "STEPS_TO_QUOTA",
+          "DROP",
+          "set",
+          "BALANCE",
+          "CONCAT",
+          "MUL",
+          "FAILWITH",
+          "Elt",
+          "list",
+          "OR",
+          "DIP",
+          "MEM",
+          "LOOP_LEFT",
+          "lambda",
+          "ITER",
+          "Some",
+          "parameter",
+          "sapling_transaction",
+          "EMPTY_MAP",
+          "None",
+          "SET_DELEGATE",
+          "pair",
+          "AMOUNT",
+          "string",
+          "PAIRING_CHECK",
+          "bytes",
+          "CHAIN_ID",
+          "HASH_KEY",
+          "IF_LEFT",
+          "CREATE_ACCOUNT",
+          "LT",
+          "KECCAK",
+          "UNPACK",
+          "SPLIT_TICKET",
+          "SELF_ADDRESS",
+          "unit",
+          "UNIT",
+          "LE",
+          "SOURCE",
+          "CREATE_CONTRACT",
+          "Unit",
+          "DIG",
+          "NONE",
+          "ISNAT",
+          "GE",
+          "SOME",
+          "key_hash",
+          "SELF",
+          "signature",
+          "CAR",
+          "NOT",
+          "operation",
+          "CDR",
+          "ADDRESS",
+          "TICKET",
+          "RIGHT",
+          "LEFT",
+          "RENAME",
+          "True",
+          "Right",
+          "PACK",
+          "IF_CONS",
+          "SHA3",
+          "constant",
+          "UPDATE",
+          "EMPTY_SET",
+          "NEQ",
+          "LAMBDA",
+          "timestamp",
+          "READ_TICKET",
+          "LOOP",
+          "Left",
+          "int",
+          "LSR",
+          "EMPTY_BIG_MAP",
+          "chain_id",
+          "OPEN_CHEST",
+          "LEVEL",
+          "UNPAIR",
+          "JOIN_TICKETS",
+          "PUSH",
+          "nat",
+          "GT",
+          "never",
+          "NOW",
+          "IF_NONE",
+          "PAIR",
+          "GET_AND_UPDATE",
+          "XOR",
+          "CAST",
+          "bool",
+          "SAPLING_EMPTY_STATE",
+          "EDIV",
+          "EQ",
+          "CONTRACT",
+          "contract",
+          "EXEC",
+          "GET",
+          "NEG",
+          "SLICE",
+          "DUP",
+          "CONS",
+          "SWAP",
+          "APPLY",
+          "code"
+        ]
+      },
+      "011-PtHangz2.mutez": {
+        "$ref": "#/components/schemas/positive_bignum"
+      },
+      "011-PtHangz2.operation.alpha.contents": {
+        "oneOf": [
+          {
+            "title": "Endorsement",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "endorsement"
+                ]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              }
+            },
+            "required": [
+              "kind",
+              "level"
+            ]
+          },
+          {
+            "title": "Seed_nonce_revelation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "seed_nonce_revelation"
+                ]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "nonce": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "level",
+              "nonce"
+            ]
+          },
+          {
+            "title": "Endorsement_with_slot",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "endorsement_with_slot"
+                ]
+              },
+              "endorsement": {
+                "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement"
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "kind",
+              "endorsement",
+              "slot"
+            ]
+          },
+          {
+            "title": "Double_endorsement_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_endorsement_evidence"
+                ]
+              },
+              "op1": {
+                "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement"
+              },
+              "op2": {
+                "$ref": "#/components/schemas/011-PtHangz2.inlined.endorsement"
+              },
+              "slot": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 65535
+              }
+            },
+            "required": [
+              "kind",
+              "op1",
+              "op2",
+              "slot"
+            ]
+          },
+          {
+            "title": "Double_baking_evidence",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "double_baking_evidence"
+                ]
+              },
+              "bh1": {
+                "$ref": "#/components/schemas/011-PtHangz2.block_header.alpha.full_header"
+              },
+              "bh2": {
+                "$ref": "#/components/schemas/011-PtHangz2.block_header.alpha.full_header"
+              }
+            },
+            "required": [
+              "kind",
+              "bh1",
+              "bh2"
+            ]
+          },
+          {
+            "title": "Activate_account",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "activate_account"
+                ]
+              },
+              "pkh": {
+                "$ref": "#/components/schemas/Ed25519.Public_key_hash"
+              },
+              "secret": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "kind",
+              "pkh",
+              "secret"
+            ]
+          },
+          {
+            "title": "Proposals",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "proposals"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "period": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "proposals": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Protocol_hash"
+                }
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "period",
+              "proposals"
+            ]
+          },
+          {
+            "title": "Ballot",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "ballot"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "period": {
+                "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/Protocol_hash"
+              },
+              "ballot": {
+                "type": "string",
+                "enum": [
+                  "nay",
+                  "yay",
+                  "pass"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "period",
+              "proposal",
+              "ballot"
+            ]
+          },
+          {
+            "title": "Reveal",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "reveal"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "public_key": {
+                "$ref": "#/components/schemas/Signature.Public_key"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "public_key"
+            ]
+          },
+          {
+            "title": "Transaction",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "transaction"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "amount": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "destination": {
+                "$ref": "#/components/schemas/011-PtHangz2.contract_id"
+              },
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "entrypoint": {
+                    "$ref": "#/components/schemas/011-PtHangz2.entrypoint"
+                  },
+                  "value": {
+                    "oneOf": [
+                      {
+                        "title": "Int",
+                        "type": "object",
+                        "properties": {
+                          "int": {
+                            "$ref": "#/components/schemas/bignum"
+                          }
+                        },
+                        "required": [
+                          "int"
+                        ]
+                      },
+                      {
+                        "title": "String",
+                        "type": "object",
+                        "properties": {
+                          "string": {
+                            "$ref": "#/components/schemas/unistring"
+                          }
+                        },
+                        "required": [
+                          "string"
+                        ]
+                      },
+                      {
+                        "title": "Bytes",
+                        "type": "object",
+                        "properties": {
+                          "bytes": {
+                            "type": "string",
+                            "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                          }
+                        },
+                        "required": [
+                          "bytes"
+                        ]
+                      },
+                      {
+                        "title": "Sequence",
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                        }
+                      },
+                      {
+                        "title": "Generic prim (any number of args with or without annot)",
+                        "type": "object",
+                        "properties": {
+                          "prim": {
+                            "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
+                          },
+                          "args": {
+                            "type": "array",
+                            "items": {
+                              "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                            }
+                          },
+                          "annots": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          }
+                        },
+                        "required": [
+                          "prim"
+                        ]
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "entrypoint",
+                  "value"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "amount",
+              "destination"
+            ]
+          },
+          {
+            "title": "Origination",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "origination"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "balance": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "script": {
+                "$ref": "#/components/schemas/011-PtHangz2.scripted.contracts"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "balance",
+              "script"
+            ]
+          },
+          {
+            "title": "Delegation",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "delegation"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "delegate": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit"
+            ]
+          },
+          {
+            "title": "Failing_noop",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "failing_noop"
+                ]
+              },
+              "arbitrary": {
+                "$ref": "#/components/schemas/unistring"
+              }
+            },
+            "required": [
+              "kind",
+              "arbitrary"
+            ]
+          },
+          {
+            "title": "Register_global_constant",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "register_global_constant"
+                ]
+              },
+              "source": {
+                "$ref": "#/components/schemas/Signature.Public_key_hash"
+              },
+              "fee": {
+                "$ref": "#/components/schemas/011-PtHangz2.mutez"
+              },
+              "counter": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "gas_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "storage_limit": {
+                "$ref": "#/components/schemas/positive_bignum"
+              },
+              "value": {
+                "oneOf": [
+                  {
+                    "title": "Int",
+                    "type": "object",
+                    "properties": {
+                      "int": {
+                        "$ref": "#/components/schemas/bignum"
+                      }
+                    },
+                    "required": [
+                      "int"
+                    ]
+                  },
+                  {
+                    "title": "String",
+                    "type": "object",
+                    "properties": {
+                      "string": {
+                        "$ref": "#/components/schemas/unistring"
+                      }
+                    },
+                    "required": [
+                      "string"
+                    ]
+                  },
+                  {
+                    "title": "Bytes",
+                    "type": "object",
+                    "properties": {
+                      "bytes": {
+                        "type": "string",
+                        "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                      }
+                    },
+                    "required": [
+                      "bytes"
+                    ]
+                  },
+                  {
+                    "title": "Sequence",
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                    }
+                  },
+                  {
+                    "title": "Generic prim (any number of args with or without annot)",
+                    "type": "object",
+                    "properties": {
+                      "prim": {
+                        "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
+                      },
+                      "args": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                        }
+                      },
+                      "annots": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "prim"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "source",
+              "fee",
+              "counter",
+              "gas_limit",
+              "storage_limit",
+              "value"
+            ]
+          }
+        ]
+      },
+      "011-PtHangz2.scripted.contracts": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "oneOf": [
+              {
+                "title": "Int",
+                "type": "object",
+                "properties": {
+                  "int": {
+                    "$ref": "#/components/schemas/bignum"
+                  }
+                },
+                "required": [
+                  "int"
+                ]
+              },
+              {
+                "title": "String",
+                "type": "object",
+                "properties": {
+                  "string": {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                },
+                "required": [
+                  "string"
+                ]
+              },
+              {
+                "title": "Bytes",
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "bytes"
+                ]
+              },
+              {
+                "title": "Sequence",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                }
+              },
+              {
+                "title": "Generic prim (any number of args with or without annot)",
+                "type": "object",
+                "properties": {
+                  "prim": {
+                    "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                    }
+                  },
+                  "annots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "prim"
+                ]
+              }
+            ]
+          },
+          "storage": {
+            "oneOf": [
+              {
+                "title": "Int",
+                "type": "object",
+                "properties": {
+                  "int": {
+                    "$ref": "#/components/schemas/bignum"
+                  }
+                },
+                "required": [
+                  "int"
+                ]
+              },
+              {
+                "title": "String",
+                "type": "object",
+                "properties": {
+                  "string": {
+                    "$ref": "#/components/schemas/unistring"
+                  }
+                },
+                "required": [
+                  "string"
+                ]
+              },
+              {
+                "title": "Bytes",
+                "type": "object",
+                "properties": {
+                  "bytes": {
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+                  }
+                },
+                "required": [
+                  "bytes"
+                ]
+              },
+              {
+                "title": "Sequence",
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                }
+              },
+              {
+                "title": "Generic prim (any number of args with or without annot)",
+                "type": "object",
+                "properties": {
+                  "prim": {
+                    "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
+                  },
+                  "args": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                    }
+                  },
+                  "annots": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                },
+                "required": [
+                  "prim"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "code",
+          "storage"
+        ]
+      },
+      "Context_hash": {
+        "title": "A hash of context (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Ed25519.Public_key_hash": {
+        "title": "An Ed25519 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_hash": {
+        "title": "A Tezos operation ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Operation_list_list_hash": {
+        "title": "A list of list of operations (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Protocol_hash": {
+        "title": "A Tezos protocol ID (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature": {
+        "title": "A Ed25519, Secp256k1 or P256 signature (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key": {
+        "title": "A Ed25519, Secp256k1, or P256 public key (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "Signature.Public_key_hash": {
+        "title": "A Ed25519, Secp256k1, or P256 public key hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "bignum": {
+        "title": "Big number",
+        "description": "Decimal representation of a big number",
+        "type": "string"
+      },
+      "block_hash": {
+        "title": "A block identifier (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "cycle_nonce": {
+        "title": "A nonce hash (Base58Check-encoded)",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "error": {
+        "description": "The full list of error is available with the global RPC `GET errors`"
+      },
+      "fitness": {
+        "title": "Block fitness",
+        "description": "The fitness, or score, of a block, that allow the Tezos to decide which chain is the best. A fitness value is a list of byte sequences. They are compared as follows: shortest lists are smaller; lists of the same length are compared according to the lexicographical order.",
+        "type": "array",
+        "items": {
+          "type": "string",
+          "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+        }
+      },
+      "micheline.011-PtHangz2.michelson_v1.expression": {
+        "oneOf": [
+          {
+            "title": "Int",
+            "type": "object",
+            "properties": {
+              "int": {
+                "$ref": "#/components/schemas/bignum"
+              }
+            },
+            "required": [
+              "int"
+            ]
+          },
+          {
+            "title": "String",
+            "type": "object",
+            "properties": {
+              "string": {
+                "$ref": "#/components/schemas/unistring"
+              }
+            },
+            "required": [
+              "string"
+            ]
+          },
+          {
+            "title": "Bytes",
+            "type": "object",
+            "properties": {
+              "bytes": {
+                "type": "string",
+                "pattern": "^([a-zA-Z0-9][a-zA-Z0-9])*$"
+              }
+            },
+            "required": [
+              "bytes"
+            ]
+          },
+          {
+            "title": "Sequence",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+            }
+          },
+          {
+            "title": "Generic prim (any number of args with or without annot)",
+            "type": "object",
+            "properties": {
+              "prim": {
+                "$ref": "#/components/schemas/011-PtHangz2.michelson.v1.primitives"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/micheline.011-PtHangz2.michelson_v1.expression"
+                }
+              },
+              "annots": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "prim"
+            ]
+          }
+        ]
+      },
+      "next_operation": {
+        "description": "An operation's shell header.",
+        "type": "object",
+        "properties": {
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx"
+            ]
+          },
+          "branch": {
+            "$ref": "#/components/schemas/block_hash"
+          },
+          "contents": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/011-PtHangz2.operation.alpha.contents"
+            }
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Signature"
+          }
+        },
+        "required": [
+          "protocol",
+          "branch",
+          "contents",
+          "signature"
+        ]
+      },
+      "positive_bignum": {
+        "title": "Positive big number",
+        "description": "Decimal representation of a positive big number",
+        "type": "string"
+      },
+      "timestamp.protocol": {
+        "description": "A timestamp as seen by the protocol: second-level precision, epoch based.",
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/unistring"
+          }
+        ]
+      },
+      "unistring": {
+        "title": "Universal string representation",
+        "description": "Either a plain UTF8 string, or a sequence of bytes for strings that contain invalid byte sequences.",
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "invalid_utf8_string": {
+                "type": "array",
+                "items": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255
+                }
+              }
+            },
+            "required": [
+              "invalid_utf8_string"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

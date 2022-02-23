@@ -63,6 +63,11 @@ type t = {major : int; minor : int; additional_info : additional_info}
     - [to_string { major = 7; minor = 0; additional_info = RC 1 } = "7.0~rc1"] *)
 val to_string : t -> string
 
+(** Version printer.
+
+    [pp f x] prints [to_string x] in [f] *)
+val pp : Format.formatter -> t -> unit
+
 (** Current version. *)
 val current : t
 

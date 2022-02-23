@@ -56,9 +56,9 @@ module TieredSeq : TIER with type t = int Seq.t = struct
 
   let iter f s =
     iter f s ;
-    LwtResult.return_unit
+    Lwt_result_syntax.return_unit
 
-  let iter_s f s = iter_s f s >>= fun () -> LwtResult.return_unit
+  let iter_s f s = Lwt_result.ok @@ iter_s f s
 
   let iter_e f s = Lwt.return @@ iter_e f s
 
@@ -74,53 +74,66 @@ module TestIter (Tier : TIER) = struct
       ~name:(Format.asprintf "Seq{,_%s}.iter" Tier.suffix)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           TieredSeq.iter (IterOf.fn acc fn) (List.to_seq input) >>=? fun () ->
-           Monad.return !acc)
+           let* () = TieredSeq.iter (IterOf.fn acc fn) (List.to_seq input) in
+           return !acc)
           (let acc = ref init in
-           Tier.iter (IterOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
-           >>=? fun () -> Monad.return !acc))
+           let* () =
+             Tier.iter (IterOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
+           in
+           return !acc))
 
   let test_iter_e =
     Test.make
       ~name:(Format.asprintf "Seq{,%s}.iter_e" Tier.suffix)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
-        let open Monad in
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           TieredSeq.iter_e (IterEOf.fn acc fn) (List.to_seq input)
-           >>=? fun () -> return !acc)
+           let* () = TieredSeq.iter_e (IterEOf.fn acc fn) (List.to_seq input) in
+           return !acc)
           (let acc = ref init in
-           Tier.iter_e (IterEOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
-           >>=? fun () -> return !acc))
+           let* () =
+             Tier.iter_e (IterEOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
+           in
+           return !acc))
 
   let test_iter_s =
     Test.make
       ~name:(Format.asprintf "Seq{,%s}.iter_s" Tier.suffix)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           TieredSeq.iter_s (IterSOf.fn acc fn) (List.to_seq input)
-           >>=? fun () -> Monad.return !acc)
+           let* () = TieredSeq.iter_s (IterSOf.fn acc fn) (List.to_seq input) in
+           return !acc)
           (let acc = ref init in
-           Tier.iter_s (IterSOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
-           >>=? fun () -> Monad.return !acc))
+           let* () =
+             Tier.iter_s (IterSOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
+           in
+           return !acc))
 
   let test_iter_es =
     Test.make
       ~name:(Format.asprintf "Seq{,%s}.iter_es" Tier.suffix)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           TieredSeq.iter_es (IterESOf.fn acc fn) (List.to_seq input)
-           >>=? fun () -> Monad.return !acc)
+           let* () =
+             TieredSeq.iter_es (IterESOf.fn acc fn) (List.to_seq input)
+           in
+           return !acc)
           (let acc = ref init in
-           Tier.iter_es (IterESOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
-           >>=? fun () -> Monad.return !acc))
+           let* () =
+             Tier.iter_es (IterESOf.fn acc fn) (Tier.of_seq @@ List.to_seq input)
+           in
+           return !acc))
 
   let tests = [test_iter; test_iter_e; test_iter_s; test_iter_es]
 end
@@ -132,11 +145,9 @@ module TieredSeq_s : TIER with type t = int Seq_s.t = struct
 
   type nonrec t = int t
 
-  open Monad
+  let iter f s = Lwt_result.ok @@ iter f s
 
-  let iter f s = iter f s >>= fun () -> LwtResult.return_unit
-
-  let iter_s f s = iter_s f s >>= fun () -> LwtResult.return_unit
+  let iter_s f s = Lwt_result.ok @@ iter_s f s
 end
 
 module TestedSeq_s = TestIter (TieredSeq_s)
@@ -173,16 +184,20 @@ let iter_ep =
     ~name:(Format.asprintf "Seq{,_s}.iter_ep")
     (quad Test_fuzzing_helpers.Fn.arith one one many)
     (fun (Fun (_, fn), const, init, input) ->
-      let open Monad in
+      let open Monad.Lwt_result_syntax in
       eq_es
         (let acc = ref init in
-         Seq.iter_ep (IterESOf.monotonous acc fn const) (List.to_seq input)
-         >>=? fun () -> Monad.return !acc)
+         let* () =
+           Seq.iter_ep (IterESOf.monotonous acc fn const) (List.to_seq input)
+         in
+         return !acc)
         (let acc = ref init in
-         Seq_s.iter_ep
-           (IterESOf.monotonous acc fn const)
-           (Seq_s.of_seq @@ List.to_seq input)
-         >>=? fun () -> Monad.return !acc))
+         let* () =
+           Seq_s.iter_ep
+             (IterESOf.monotonous acc fn const)
+             (Seq_s.of_seq @@ List.to_seq input)
+         in
+         return !acc))
 
 let iter_p =
   let open QCheck in
@@ -190,16 +205,20 @@ let iter_p =
     ~name:(Format.asprintf "Seq{,_s}.iter_p")
     (quad Test_fuzzing_helpers.Fn.arith one one many)
     (fun (Fun (_, fn), const, init, input) ->
-      let open Monad in
+      let open Monad.Lwt_syntax in
       eq_es
         (let acc = ref init in
-         Seq.iter_p (IterSOf.monotonous acc fn const) (List.to_seq input)
-         >>= fun () -> Monad.return !acc)
+         let* () =
+           Seq.iter_p (IterSOf.monotonous acc fn const) (List.to_seq input)
+         in
+         return_ok !acc)
         (let acc = ref init in
-         Seq_s.iter_p
-           (IterSOf.monotonous acc fn const)
-           (Seq_s.of_seq @@ List.to_seq input)
-         >>= fun () -> Monad.return !acc))
+         let* () =
+           Seq_s.iter_p
+             (IterSOf.monotonous acc fn const)
+             (Seq_s.of_seq @@ List.to_seq input)
+         in
+         return_ok !acc))
 
 let wrap (name, (module Tier : TIER)) =
   let module M = TestIter (Tier) in

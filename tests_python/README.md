@@ -44,7 +44,6 @@ sed -i '1 s@^tests_alpha/test_@tests_${SNAPSHOT_PROTO}/test_@' \
 #    snapshotted tests. remove absolute protocol references to relative ones
 #    using the constants of tests_python/tests_alpha/protocol.py
 # 5. update tests_python/README.md (this file) with a description of the new folders.
-# 6. update .gitlab-ci.yml by running ./scripts/update_integration_tests.sh
 
 # Sanity checks
 

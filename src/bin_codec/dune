@@ -1,65 +1,68 @@
-; build static executable with --profile static
 (env
- (static (flags (:standard
-                  -ccopt -static
-                  -cclib "-lusb-1.0 -lhidapi-libusb -ludev"))))
+ (static
+  (flags (:standard -ccopt -static))))
 
-(executables
- (names codec)
- (instrumentation (backend bisect_ppx))
- (public_names tezos-codec)
+(executable
+ (name codec)
+ (public_name tezos-codec)
  (package tezos-codec)
- (libraries data-encoding
-            tezos-base
-            tezos-stdlib-unix
-            tezos-event-logging
-            tezos-client-base
-            tezos-client-base-unix
-            tezos-clic
-            tezos-signer-services
-            (select void_for_linking-alpha from
-              (tezos-client-alpha -> void_for_linking-alpha.empty)
-              (-> void_for_linking-alpha.empty))
-            (select void_for_linking-005-PsBabyM1 from
-              (tezos-client-005-PsBabyM1 -> void_for_linking-005-PsBabyM1.empty)
-              (-> void_for_linking-005-PsBabyM1.empty))
-            (select void_for_linking-006-PsCARTHA from
-              (tezos-client-006-PsCARTHA -> void_for_linking-006-PsCARTHA.empty)
-              (-> void_for_linking-006-PsCARTHA.empty))
-            (select void_for_linking-007-PsDELPH1 from
-              (tezos-client-007-PsDELPH1 -> void_for_linking-007-PsDELPH1.empty)
-              (-> void_for_linking-007-PsDELPH1.empty))
-            (select void_for_linking-008-PtEdo2Zk from
-              (tezos-client-008-PtEdo2Zk -> void_for_linking-008-PtEdo2Zk.empty)
-              (-> void_for_linking-008-PtEdo2Zk.empty))
-            (select void_for_linking-009-PsFLoren from
-              (tezos-client-009-PsFLoren -> void_for_linking-009-PsFLoren.empty)
-              (-> void_for_linking-009-PsFLoren.empty))
-            (select void_for_linking-010-PtGRANAD from
-              (tezos-client-010-PtGRANAD -> void_for_linking-010-PtGRANAD.empty)
-              (-> void_for_linking-010-PtGRANAD.empty))
-            (select void_for_linking-011-PtHangz2 from
-              (tezos-client-011-PtHangz2 -> void_for_linking-011-PtHangz2.empty)
-              (-> void_for_linking-011-PtHangz2.empty))
- )
- (flags (:standard -open Data_encoding
-                   -open Tezos_base__TzPervasives
-                   -open Tezos_client_base_unix
-                   -open Tezos_client_base
-                   -open Tezos_clic
-                   -open Tezos_stdlib_unix
-                   -open Tezos_event_logging
-                   -linkall)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  data-encoding
+  tezos-base
+  tezos-stdlib-unix
+  tezos-event-logging
+  tezos-client-base
+  tezos-client-base-unix
+  tezos-clic
+  tezos-signer-services
+  (select void_for_linking-tezos-client-005-PsBabyM1 from
+   (tezos-client-005-PsBabyM1 -> void_for_linking-tezos-client-005-PsBabyM1.empty)
+   (-> void_for_linking-tezos-client-005-PsBabyM1.empty))
+  (select void_for_linking-tezos-client-006-PsCARTHA from
+   (tezos-client-006-PsCARTHA -> void_for_linking-tezos-client-006-PsCARTHA.empty)
+   (-> void_for_linking-tezos-client-006-PsCARTHA.empty))
+  (select void_for_linking-tezos-client-007-PsDELPH1 from
+   (tezos-client-007-PsDELPH1 -> void_for_linking-tezos-client-007-PsDELPH1.empty)
+   (-> void_for_linking-tezos-client-007-PsDELPH1.empty))
+  (select void_for_linking-tezos-client-008-PtEdo2Zk from
+   (tezos-client-008-PtEdo2Zk -> void_for_linking-tezos-client-008-PtEdo2Zk.empty)
+   (-> void_for_linking-tezos-client-008-PtEdo2Zk.empty))
+  (select void_for_linking-tezos-client-009-PsFLoren from
+   (tezos-client-009-PsFLoren -> void_for_linking-tezos-client-009-PsFLoren.empty)
+   (-> void_for_linking-tezos-client-009-PsFLoren.empty))
+  (select void_for_linking-tezos-client-010-PtGRANAD from
+   (tezos-client-010-PtGRANAD -> void_for_linking-tezos-client-010-PtGRANAD.empty)
+   (-> void_for_linking-tezos-client-010-PtGRANAD.empty))
+  (select void_for_linking-tezos-client-011-PtHangz2 from
+   (tezos-client-011-PtHangz2 -> void_for_linking-tezos-client-011-PtHangz2.empty)
+   (-> void_for_linking-tezos-client-011-PtHangz2.empty))
+  (select void_for_linking-tezos-client-012-Psithaca from
+   (tezos-client-012-Psithaca -> void_for_linking-tezos-client-012-Psithaca.empty)
+   (-> void_for_linking-tezos-client-012-Psithaca.empty))
+  (select void_for_linking-tezos-client-alpha from
+   (tezos-client-alpha -> void_for_linking-tezos-client-alpha.empty)
+   (-> void_for_linking-tezos-client-alpha.empty)))
+ (flags
+  (:standard
+   -linkall
+   -open Data_encoding
+   -open Tezos_base__TzPervasives
+   -open Tezos_client_base_unix
+   -open Tezos_client_base
+   -open Tezos_clic
+   -open Tezos_stdlib_unix
+   -open Tezos_event_logging)))
 
 (rule
  (action
   (progn
-   (write-file void_for_linking-alpha.empty "")
-   (write-file void_for_linking-005-PsBabyM1.empty "")
-   (write-file void_for_linking-006-PsCARTHA.empty "")
-   (write-file void_for_linking-007-PsDELPH1.empty "")
-   (write-file void_for_linking-008-PtEdo2Zk.empty "")
-   (write-file void_for_linking-009-PsFLoren.empty "")
-   (write-file void_for_linking-010-PtGRANAD.empty "")
-   (write-file void_for_linking-011-PtHangz2.empty "")
-)))
+   (write-file void_for_linking-tezos-client-005-PsBabyM1.empty "")
+   (write-file void_for_linking-tezos-client-006-PsCARTHA.empty "")
+   (write-file void_for_linking-tezos-client-007-PsDELPH1.empty "")
+   (write-file void_for_linking-tezos-client-008-PtEdo2Zk.empty "")
+   (write-file void_for_linking-tezos-client-009-PsFLoren.empty "")
+   (write-file void_for_linking-tezos-client-010-PtGRANAD.empty "")
+   (write-file void_for_linking-tezos-client-011-PtHangz2.empty "")
+   (write-file void_for_linking-tezos-client-012-Psithaca.empty "")
+   (write-file void_for_linking-tezos-client-alpha.empty ""))))

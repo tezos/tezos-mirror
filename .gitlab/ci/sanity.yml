@@ -1,0 +1,19 @@
+sanity_ci:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_test_dependencies_template
+    - .rules_template__development
+  stage: sanity
+  needs: []
+  before_script:
+    - . ./scripts/version.sh
+  script:
+    - src/tooling/lint.sh --check-gitlab-ci-yml
+
+docker-hadolint:
+  image: hadolint/hadolint:latest-debian
+  stage: sanity
+  needs: []
+  script:
+    - hadolint build.Dockerfile
+    - hadolint Dockerfile

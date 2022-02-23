@@ -243,7 +243,14 @@ let test_simple_baking_event =
   Log.info "Transferring %s from %s to %s" (Tez.to_string amount) giver receiver ;
   let* () = Client.transfer ~amount ~giver ~receiver client in
   Log.info "Baking pending operations..." ;
-  Client.bake_for ~key:giver client
+  Client.bake_for ~keys:[giver] client
+
+let transfer_expected_to_fail ~giver ~receiver ~amount client =
+  let process = Client.spawn_transfer ~amount ~giver ~receiver client in
+  let* status = Process.wait process in
+  if status = Unix.WEXITED 0 then
+    Test.fail "Last transfer was successful but was expected to fail ..." ;
+  return ()
 
 let test_same_transfer_twice =
   Protocol.register_test
@@ -260,7 +267,7 @@ let test_same_transfer_twice =
   let* () = Client.transfer ~amount ~giver ~receiver client in
   let* mempool1 = read_file mempool_file in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
-  let* () = Client.transfer ~amount ~giver ~receiver client in
+  let* () = transfer_expected_to_fail ~amount ~giver ~receiver client in
   let* mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
@@ -288,11 +295,7 @@ let test_transfer_same_participants =
   let* mempool1 = read_file mempool_file in
   let amount = Tez.(amount + one) in
   Log.info "Transfer %s from %s to %s" (Tez.to_string amount) giver receiver ;
-  (* The next process is expected to fail *)
-  let process = Client.spawn_transfer ~amount ~giver ~receiver client in
-  let* status = Process.wait process in
-  if status = Unix.WEXITED 0 then
-    Test.fail "Last transfer was successful but was expected to fail ..." ;
+  let* () = transfer_expected_to_fail ~amount ~giver ~receiver client in
   let* mempool2 = read_file mempool_file in
   Log.info "Checking that mempool is unchanged" ;
   if mempool1 <> mempool2 then
@@ -304,7 +307,7 @@ let test_transfer_same_participants =
     "Checking that last operation was discarded into a newly created trashpool" ;
   let* str = read_file thrashpool_file in
   if String.equal str "" then
-    Test.fail "Expected thrashpool to have one operation." ;
+    Test.fail "Expected thrashpool to have one operation" ;
   return ()
 
 let test_multiple_baking =
@@ -313,7 +316,12 @@ let test_multiple_baking =
     ~title:"(Mockup) Multi transfer/multi baking (asynchronous)"
     ~tags:["mockup"; "client"; "transfer"; "asynchronous"]
   @@ fun protocol ->
+  (* For the equality test below to hold, alice, bob and baker must be
+     different accounts. Here, alice is bootstrap1, bob is bootstrap2 and
+     baker is bootstrap3. *)
   let (alice, _amount, bob) = transfer_data and baker = "bootstrap3" in
+  if String.(equal alice bob || equal bob baker || equal baker alice) then
+    Test.fail "alice, bob and baker need to be different accounts" ;
   let* client =
     Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
   in
@@ -322,7 +330,7 @@ let test_multiple_baking =
       let amount = Tez.of_int amount in
       let* () = Client.transfer ~amount ~giver:alice ~receiver:bob client in
       let* () = Client.transfer ~amount ~giver:bob ~receiver:alice client in
-      let* () = Client.bake_for ~key:baker client in
+      let* () = Client.bake_for ~keys:[baker] client in
       let* alice_balance = Client.get_balance_for ~account:alice client in
       let* bob_balance = Client.get_balance_for ~account:bob client in
       Log.info
@@ -404,10 +412,33 @@ let test_migration ?(migration_spec : (Protocol.t * Protocol.t) option)
             ~post_migration)
 
 let test_migration_transfer ?migration_spec () =
-  let (giver, amount, receiver) = transfer_data in
+  let (giver, amount, receiver) = ("alice", Tez.of_int 1, "bob") in
   test_migration
     ?migration_spec
     ~pre_migration:(fun client ->
+      Log.info
+        "Creating two new accounts %s and %s and fund them sufficiently."
+        giver
+        receiver ;
+      let* _ = Client.gen_keys ~alias:giver client in
+      let* _ = Client.gen_keys ~alias:receiver client in
+      let bigger_amount = Tez.of_int 2 in
+      let* () =
+        Client.transfer
+          ~amount:bigger_amount
+          ~giver:Constant.bootstrap1.alias
+          ~receiver:giver
+          ~burn_cap:Tez.one
+          client
+      in
+      let* () =
+        Client.transfer
+          ~amount:bigger_amount
+          ~giver:Constant.bootstrap1.alias
+          ~receiver
+          ~burn_cap:Tez.one
+          client
+      in
       Log.info
         "About to transfer %s from %s to %s"
         (Tez.to_string amount)
@@ -491,10 +522,12 @@ let test_origination_from_unrevealed_fees =
     Client.import_secret_key
       client
       {
-        identity = "";
         alias = "originator";
-        secret =
-          "unencrypted:edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
+        public_key_hash = "";
+        public_key = "";
+        secret_key =
+          Unencrypted
+            "edskRiUZpqYpyBCUQmhpfCmzHfYahfiMqkKb9AaYKaEggXKaEKVUWPBz6RkwabTmLHXajbpiytRdMJb4v4f4T8zN9t6QCHLTjy";
       }
   in
   let* () =
@@ -518,15 +551,53 @@ let test_origination_from_unrevealed_fees =
   in
   return ()
 
+(** Test. Reproduce the scenario fixed by https://gitlab.com/tezos/tezos/-/merge_requests/3546 *)
+
+let test_multiple_transfers =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) multiple transfer simulation"
+    ~tags:["mockup"; "client"; "multiple"; "transfer"]
+  @@ fun protocol ->
+  let* client = Client.init_mockup ~protocol () in
+  let batch_line =
+    `O
+      [
+        ("destination", `String Constant.bootstrap1.public_key_hash);
+        ("amount", `String "0.02");
+      ]
+  in
+  let batch n = `A (List.init n (fun _ -> batch_line)) in
+  let file = Temp.file "batch.json" in
+  let oc = open_out file in
+  Ezjsonm.to_channel oc (batch 200) ;
+  close_out oc ;
+  Client.multiple_transfers ~giver:"bootstrap2" ~json_batch:file client
+
+let test_empty_block_baking =
+  Protocol.register_test
+    ~__FILE__
+    ~title:"(Mockup) Transfer (empty, asynchronous)"
+    ~tags:["mockup"; "client"; "empty"; "bake_for"; "asynchronous"]
+  @@ fun protocol ->
+  let (giver, _amount, _receiver) = transfer_data in
+  let* client =
+    Client.init_mockup ~sync_mode:Client.Asynchronous ~protocol ()
+  in
+  Log.info "Baking pending operations..." ;
+  Client.bake_for ~keys:[giver] client
+
 let register ~protocols =
   test_rpc_list ~protocols ;
   test_same_transfer_twice ~protocols ;
   test_transfer_same_participants ~protocols ;
   test_transfer ~protocols ;
+  test_empty_block_baking ~protocols ;
   test_simple_baking_event ~protocols ;
   test_multiple_baking ~protocols ;
   test_rpc_header_shell ~protocols ;
-  test_origination_from_unrevealed_fees ~protocols
+  test_origination_from_unrevealed_fees ~protocols ;
+  test_multiple_transfers ~protocols
 
 let register_global_constants ~protocols =
   test_register_global_constant_success ~protocols ;

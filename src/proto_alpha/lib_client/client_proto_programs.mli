@@ -32,35 +32,46 @@ module Program :
   Client_aliases.Alias
     with type t = Michelson_v1_parser.parsed Micheline_parser.parsing_result
 
+(* Parameters shared by both simulations (views, and contracts). *)
+type simulation_params = {
+  input : Michelson_v1_parser.parsed;
+  unparsing_mode : Script_ir_translator.unparsing_mode;
+  now : Script_timestamp.t option;
+  level : Script_int.n Script_int.num option;
+  source : Contract.t option;
+  payer : Contract.t option;
+  gas : Gas.Arith.integral option;
+}
+
+(* Parameters specific to simulations of views *)
+type run_view_params = {
+  shared_params : simulation_params;
+  contract : Contract.t;
+  entrypoint : string;
+}
+
+(* Parameters specific to simulations of contract calls *)
+type run_params = {
+  shared_params : simulation_params;
+  amount : Tez.t option;
+  balance : Tez.t;
+  program : Michelson_v1_parser.parsed;
+  storage : Michelson_v1_parser.parsed;
+  entrypoint : string option;
+}
+
 val run_view :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  contract:Contract.t ->
-  entrypoint:string ->
-  input:Michelson_v1_parser.parsed ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
-  ?source:Contract.t ->
-  ?payer:Contract.t ->
-  ?gas:Gas.Arith.integral ->
-  unit ->
+  run_view_params ->
   Script.expr tzresult Lwt.t
 
 val run :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?amount:Tez.t ->
-  balance:Tez.t ->
-  program:Michelson_v1_parser.parsed ->
-  storage:Michelson_v1_parser.parsed ->
-  input:Michelson_v1_parser.parsed ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
-  ?source:Contract.t ->
-  ?payer:Contract.t ->
-  ?gas:Gas.Arith.integral ->
-  ?entrypoint:string ->
-  unit ->
+  run_params ->
   (Script.expr * packed_internal_operation list * Lazy_storage.diffs option)
   tzresult
   Lwt.t
@@ -69,17 +80,7 @@ val trace :
   #Protocol_client_context.rpc_context ->
   chain:Shell_services.chain ->
   block:Shell_services.block ->
-  ?amount:Tez.t ->
-  balance:Tez.t ->
-  program:Michelson_v1_parser.parsed ->
-  storage:Michelson_v1_parser.parsed ->
-  input:Michelson_v1_parser.parsed ->
-  unparsing_mode:Script_ir_translator.unparsing_mode ->
-  ?source:Contract.t ->
-  ?payer:Contract.t ->
-  ?gas:Gas.Arith.integral ->
-  ?entrypoint:string ->
-  unit ->
+  run_params ->
   (Script.expr
   * packed_internal_operation list
   * Script_typed_ir.execution_trace
@@ -128,6 +129,7 @@ val typecheck_program :
   block:Shell_services.block ->
   ?gas:Gas.Arith.integral ->
   ?legacy:bool ->
+  show_types:bool ->
   Michelson_v1_parser.parsed ->
   (Script_tc_errors.type_map * Gas.t) tzresult Lwt.t
 

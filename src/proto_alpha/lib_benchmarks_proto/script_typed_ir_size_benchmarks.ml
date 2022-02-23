@@ -77,9 +77,7 @@ end = struct
     let open Translator_benchmarks in
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_ty, ctxt) =
-          Michelson_generation.michelson_type_to_ex_ty michelson_type ctxt
-        in
+        let ex_ty = Type_helpers.michelson_type_to_ex_ty michelson_type ctxt in
         match ex_ty with
         | Script_ir_translator.Ex_ty ty -> (
             match
@@ -105,20 +103,19 @@ end = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; typ} =
       Michelson_generation.make_data_sampler rng_state cfg.generator_config
-    with
-    | Data {term; typ} -> value_size_benchmark rng_state term typ
-    | _ -> assert false
+    in
+    value_size_benchmark rng_state term typ
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Data {term; typ} ->
+            | Michelson_mcmc_samplers.Data {term; typ} ->
                 Some (fun () -> value_size_benchmark rng_state term typ)
             | _ -> None)
           terms
@@ -234,15 +231,15 @@ end = struct
     let open Translator_benchmarks in
     Lwt_main.run
       ( Execution_context.make ~rng_state >>=? fun (ctxt, _) ->
-        let (ex_stack_ty, ctxt) =
-          Michelson_generation.michelson_type_list_to_ex_stack_ty stack ctxt
+        let ex_stack_ty =
+          Type_helpers.michelson_type_list_to_ex_stack_ty stack ctxt
         in
         let (Script_ir_translator.Ex_stack_ty bef) = ex_stack_ty in
         let node = Micheline.root expr in
         match
           Lwt_main.run
             (Script_ir_translator.parse_instr
-               Script_ir_translator.Lambda
+               Script_tc_context.data
                ctxt
                ~legacy:false
                node
@@ -274,20 +271,19 @@ end = struct
     | Error errs -> global_error name errs
 
   let make_bench rng_state cfg () =
-    match
+    let Michelson_mcmc_samplers.{term; bef; aft = _} =
       Michelson_generation.make_code_sampler rng_state cfg.generator_config
-    with
-    | Code {term; bef} -> kinstr_size_benchmark rng_state term bef
-    | _ -> assert false
+    in
+    kinstr_size_benchmark rng_state term bef
 
   let create_benchmarks ~rng_state ~bench_num config =
     match config.michelson_terms_file with
     | Some file ->
         Format.eprintf "Loading terms from %s@." file ;
-        let terms = Michelson_generation.load ~filename:file in
+        let terms = Michelson_mcmc_samplers.load ~filename:file in
         List.filter_map
           (function
-            | Michelson_generation.Code {term; bef} ->
+            | Michelson_mcmc_samplers.Code {term; bef; aft = _} ->
                 Some (fun () -> kinstr_size_benchmark rng_state term bef)
             | _ -> None)
           terms

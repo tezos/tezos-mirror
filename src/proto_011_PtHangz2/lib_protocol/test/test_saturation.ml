@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (saturated arithmetic)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe \
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe \
                 -- test "^saturation arithmetic$"
     Subject:    The gas is represented using saturated arithmetic.
                 These unit tests check that saturated arithmetic operations
@@ -195,7 +195,8 @@ let encoding encoder () =
                       (x' :> int)
                       x))))
   in
-  join_ep (List.map check_encode_decode [0; 7373737373; max_int - 1])
+  Error_monad.Lwt_tzresult_syntax.join
+    (List.map check_encode_decode [0; 7373737373; max_int - 1])
 
 let tests =
   [

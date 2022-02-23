@@ -1,5 +1,5 @@
 # You can set these variables from the command line.
-SPHINXOPTS    = -aE -n
+SPHINXOPTS    = -aE -n -W --keep-going
 SPHINXBUILD   = poetry run sphinx-build
 SPHINXPROJ    = Tezos
 SOURCEDIR     = .
@@ -10,14 +10,14 @@ DOCERRORDIR   = $(DOCGENDIR)/errors
 DOCRPCDIR     = $(DOCGENDIR)/rpcs
 
 ALPHA_LONG    = ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK
+ITHACA_LONG   = Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A
 HANGZHOU_LONG = PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx
-GRANADA_LONG = PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV
-ACTIVE_LONG = $(GRANADA_LONG)
+ACTIVE_LONG = $(HANGZHOU_LONG)
 
 ALPHA_SHORT    = alpha
-GRANADA_SHORT = 010-PtGRANAD
 HANGZHOU_SHORT = 011-PtHangz2
-ACTIVE_SHORT = $(GRANADA_SHORT)
+ITHACA_SHORT   = 012-Psithaca
+ACTIVE_SHORT = $(HANGZHOU_SHORT)
 
 SCRIPTSDIR		= scripts
 CHECKXREFS		= $(SCRIPTSDIR)/check_proto_xrefs.py
@@ -31,29 +31,22 @@ manuals: main
     # alpha protocol
 	@../tezos-client -protocol $(ALPHA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-client.html
 	@../tezos-baker-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-baker.html
-	@../tezos-endorser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-endorser.html
 	@../tezos-accuser-$(ALPHA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > alpha/tezos-accuser.html
+    # 012 (Ithaca) protocol
+	@../tezos-client -protocol $(ITHACA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-client.html
+	@../tezos-baker-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-baker.html
+	@../tezos-endorser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-endorser.html
+	@../tezos-accuser-$(ITHACA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 012/tezos-accuser.html
     # 011 (Hangzhou) protocol
 	@../tezos-client -protocol $(HANGZHOU_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-client.html
 	@../tezos-baker-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-baker.html
 	@../tezos-endorser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-endorser.html
 	@../tezos-accuser-$(HANGZHOU_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 011/tezos-accuser.html
-    # 010 (Granada) protocol
-	@../tezos-client -protocol $(GRANADA_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-client.html
-	@../tezos-baker-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-baker.html
-	@../tezos-endorser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-endorser.html
-	@../tezos-accuser-$(GRANADA_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > 010/tezos-accuser.html
-    # active (granada) protocol
-	@../tezos-client -protocol $(ACTIVE_LONG) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-client.html
-	@../tezos-baker-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-baker.html
-	@../tezos-endorser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-endorser.html
-	@../tezos-accuser-$(ACTIVE_SHORT) man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > active/tezos-accuser.html
     # generic
 	@../tezos-admin-client man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-admin-client.html
 	@../tezos-signer man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-signer.html
 	@../tezos-codec man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-codec.html
 	@../tezos-snoop man -verbosity 3 -format html | sed "s#${HOME}#\$$HOME#g" > api/tezos-snoop.html
-	../tezos-node run --help | sed "s#\(.\)$$(echo "\010")\1#\1#g; s#_$$(echo "\010")##g" > api/tezos-node-run.txt
 
 .PHONY: odoc
 odoc: main
@@ -78,8 +71,8 @@ redirectcheck:
 # - on the active protocol using its numeric name (not the "active" symlink)
 # - on each other protocol including alpha, also checking label defs (option -l)
 xrefscheck:
-	$(CHECKXREFS) 010
-	$(CHECKXREFS) -l 011
+	$(CHECKXREFS) 011
+	$(CHECKXREFS) -l 012
 	$(CHECKXREFS) -l alpha
 
 scriptsindoccheck:
@@ -109,7 +102,7 @@ $(DOCGENDIR)/rpc_doc.exe:
 
 rpc: $(DOCGENDIR)/rpc_doc.exe
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index "" > active/rpc.rst
-	@dune exec $(DOCGENDIR)/rpc_doc.exe index "011" > 011/rpc.rst
+	@dune exec $(DOCGENDIR)/rpc_doc.exe index "012" > 012/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index alpha > alpha/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe index shell > shell/rpc.rst
 	@dune exec $(DOCGENDIR)/rpc_doc.exe acl > user/default-acl.json
@@ -129,14 +122,16 @@ install-dependencies:
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 html: Makefile api/errors.rst rpc p2p install-dependencies
-	cp ../CHANGES.rst .
+	echo "$$(echo ':orphan:'; echo ''; cat ../CHANGES.rst)" > CHANGES.rst
 	@$(SPHINXBUILD) -b html "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS)
+	@ln -s active "$(BUILDDIR)/011" || true
 
 # pylint does not support pyproject.toml configuration for now
 # It is configured by ./.pylint.rc
 # In pylint, we ignore the following additional errors:
 # - C0330: pylint is wrong (https://github.com/psf/black/issues/48)
-PYLINT=poetry run pylint --disable C0330
+PYLINTRC?=../.pylintrc
+PYLINT=PYLINTRC=${PYLINTRC} poetry run pylint --disable C0330
 
 # pycodestyle does not support pyproject.toml configuration for now
 # https://github.com/PyCQA/pydocstyle/issues/447
@@ -172,5 +167,5 @@ lint: pylint pycodestyle lint_black
 
 clean:
 	@-rm -Rf "$(BUILDDIR)"
-	@-rm -Rf api/errors.rst active/rpc.rst 010/rpc.rst 011/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
-	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 010/tezos-*.html 011/tezos-*.html alpha/tezos-*.html
+	@-rm -Rf api/errors.rst active/rpc.rst 011/rpc.rst 012/rpc.rst alpha/rpc.rst shell/rpc.rst shell/p2p_api.rst CHANGES.rst
+	@-rm -Rf api/tezos-*.html api/tezos-*.txt active/tezos-*.html 011/tezos-*.html 012/tezos-*.html alpha/tezos-*.html

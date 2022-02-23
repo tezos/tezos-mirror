@@ -5,7 +5,7 @@ module Michelson = struct
       ?(amount = "2") state ~name ~from ~protocol_kind ~parameter ~init_storage
       =
     let id_script parameter =
-      Fmt.strf
+      Fmt.str
         "parameter %s;\n\
          storage %s;\n\
          code\n\
@@ -17,11 +17,11 @@ module Michelson = struct
         ( match push_drops with
         | 0 -> "# No push-drops"
         | n ->
-            Fmt.strf "# %d push-drop%s\n    %s" n
+            Fmt.str "# %d push-drop%s\n    %s" n
               (if n > 1 then "s" else "")
               ( List.init push_drops ~f:(fun ith ->
-                    Fmt.strf "{ PUSH string %S ; DROP } ;"
-                      (Fmt.strf
+                    Fmt.str "{ PUSH string %S ; DROP } ;"
+                      (Fmt.str
                          "push-dropping %d adds stupid bytes to the contract"
                          ith))
               |> String.concat ~sep:"\n    " ) ) in
@@ -34,7 +34,7 @@ module Michelson = struct
       ["--wait"; "none"; "originate"; "contract"; name]
       @ ( match protocol_kind with
         | `Athens -> ["for"; from]
-        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha -> [] )
+        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou | `Ithaca | `Alpha -> [] )
       @ [ "transferring"; amount; "from"; from; "running"; tmp; "--init"
         ; init_storage; "--force"; "--burn-cap"; "300000000000"
         ; (* ; "--fee-cap" ; "20000000000000" *) "--gas-limit"

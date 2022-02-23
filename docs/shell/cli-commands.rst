@@ -55,7 +55,7 @@ Codec manual
 Node manual
 ===========
 
-The comand line of the Tezos node is not currently documented as a web page, but
+The command line of the Tezos node is not currently documented as a web page, but
 you can obtain it in Unix manual format by running the node with no arguments::
 
   tezos-node

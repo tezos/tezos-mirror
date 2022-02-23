@@ -23,7 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 exception Closed
 
@@ -83,7 +83,9 @@ let rec take dropbox =
       Lwt.return elt
   | None ->
       if dropbox.closed then Lwt.fail Closed
-      else wait_put dropbox >>= fun () -> take dropbox
+      else
+        let* () = wait_put dropbox in
+        take dropbox
 
 let rec take_with_timeout timeout dropbox =
   match dropbox.data with
@@ -95,6 +97,6 @@ let rec take_with_timeout timeout dropbox =
       if Lwt.is_sleeping timeout then
         if dropbox.closed then Lwt.fail Closed
         else
-          wait_put ~timeout dropbox >>= fun () ->
+          let* () = wait_put ~timeout dropbox in
           take_with_timeout timeout dropbox
       else Lwt.return_none

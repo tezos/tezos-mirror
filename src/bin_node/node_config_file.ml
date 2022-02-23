@@ -124,41 +124,6 @@ let blockchain_network_mainnet =
       ]
     ~default_bootstrap_peers:["boot.tzbeta.net"; giganode_1; giganode_2]
 
-let blockchain_network_granadanet =
-  make_blockchain_network
-    ~alias:"granadanet"
-    {
-      time = Time.Protocol.of_notation_exn "2021-05-21T15:00:00Z";
-      block =
-        Block_hash.of_b58check_exn
-          "BLockGenesisGenesisGenesisGenesisGenesisd4299hBGVoU";
-      protocol =
-        Protocol_hash.of_b58check_exn
-          "PtYuensgYBb3G3x1hLLbCmcav8ue8Kyd2khADcL5LsT5R1hcXex";
-    }
-    ~genesis_parameters:
-      {
-        context_key = "sandbox_parameter";
-        values =
-          `O
-            [
-              ( "genesis_pubkey",
-                `String "edpkuix6Lv8vnrz6uDe1w8uaXY7YktitAxn6EHdy2jdzq5n5hZo94n"
-              );
-            ];
-      }
-    ~chain_name:"TEZOS_GRANADANET_2021-05-21T15:00:00Z"
-    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
-    ~user_activated_upgrades:
-      [(4095l, "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV")]
-    ~default_bootstrap_peers:
-      [
-        "granadanet.smartpy.io";
-        "granadanet.tezos.co.il";
-        "granadanet.kaml.fr";
-        "granadanet.tznode.net";
-      ]
-
 let blockchain_network_hangzhounet =
   make_blockchain_network
     ~alias:"hangzhounet"
@@ -193,6 +158,41 @@ let blockchain_network_hangzhounet =
         "hangzhounet.smartpy.io";
         "hangzhounet.tezos.co.il";
         "hangzhounet.boot.tez.ie";
+      ]
+
+let blockchain_network_ithacanet =
+  make_blockchain_network
+    ~alias:"ithacanet"
+    {
+      time = Time.Protocol.of_notation_exn "2022-01-25T15:00:00Z";
+      block =
+        Block_hash.of_b58check_exn
+          "BLockGenesisGenesisGenesisGenesisGenesis1db77eJNeJ9";
+      protocol =
+        Protocol_hash.of_b58check_exn
+          "Ps9mPmXaRzmzk35gbAYNCAw6UXdE2qoABTHbN2oEEc1qM7CwT9P";
+    }
+    ~genesis_parameters:
+      {
+        context_key = "sandbox_parameter";
+        values =
+          `O
+            [
+              ( "genesis_pubkey",
+                `String "edpkuYLienS3Xdt5c1vfRX1ibMxQuvfM67ByhJ9nmRYYKGAAoTq1UC"
+              );
+            ];
+      }
+    ~chain_name:"TEZOS_ITHACANET_2022-01-25T15:00:00Z"
+    ~sandboxed_chain_name:"SANDBOXED_TEZOS"
+    ~user_activated_upgrades:
+      [(8191l, "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A")]
+    ~default_bootstrap_peers:
+      [
+        "ithacanet.teztnets.xyz";
+        "ithacanet.smartpy.io";
+        "ithacanet.kaml.fr";
+        "ithacanet.boot.ecadinfra.com";
       ]
 
 let blockchain_network_sandbox =
@@ -293,8 +293,8 @@ let builtin_blockchain_networks_with_tags =
   [
     (1, blockchain_network_sandbox);
     (4, blockchain_network_mainnet);
-    (15, blockchain_network_granadanet);
     (16, blockchain_network_hangzhounet);
+    (17, blockchain_network_ithacanet);
   ]
   |> List.map (fun (tag, network) ->
          match network.alias with
@@ -353,6 +353,7 @@ and p2p = {
   expected_pow : float;
   bootstrap_peers : string list option;
   listen_addr : string option;
+  advertised_net_port : int option;
   discovery_addr : string option;
   private_mode : bool;
   limits : P2p.limits;
@@ -415,6 +416,7 @@ let default_p2p =
     expected_pow = 26.;
     bootstrap_peers = None;
     listen_addr = Some ("[::]:" ^ string_of_int default_p2p_port);
+    advertised_net_port = None;
     discovery_addr = None;
     private_mode = false;
     limits = default_p2p_limits;
@@ -675,6 +677,7 @@ let p2p =
            expected_pow;
            bootstrap_peers;
            listen_addr;
+           advertised_net_port;
            discovery_addr;
            private_mode;
            limits;
@@ -685,6 +688,7 @@ let p2p =
       ( expected_pow,
         bootstrap_peers,
         listen_addr,
+        advertised_net_port,
         discovery_addr,
         private_mode,
         limits,
@@ -694,6 +698,7 @@ let p2p =
     (fun ( expected_pow,
            bootstrap_peers,
            listen_addr,
+           advertised_net_port,
            discovery_addr,
            private_mode,
            limits,
@@ -704,6 +709,7 @@ let p2p =
         expected_pow;
         bootstrap_peers;
         listen_addr;
+        advertised_net_port;
         discovery_addr;
         private_mode;
         limits;
@@ -711,7 +717,7 @@ let p2p =
         enable_testchain;
         reconnection_config;
       })
-    (obj9
+    (obj10
        (dft
           "expected-proof-of-work"
           ~description:
@@ -732,6 +738,12 @@ let p2p =
             "Host to listen to. If the port is not specified, the default port \
              9732 will be assumed."
           string)
+       (opt
+          "advertised-net-port"
+          ~description:
+            "Alternative port advertised to other peers to connect to. If the \
+             port is not specified, the port from listen-addr will be assumed."
+          uint16)
        (dft
           "discovery-addr"
           ~description:
@@ -843,33 +855,18 @@ let rpc : rpc Data_encoding.t =
           RPC_server.Acl.policy_encoding
           RPC_server.Acl.empty_policy))
 
-let worker_limits_encoding default_size default_level =
-  let open Data_encoding in
-  conv
-    (fun {Worker_types.backlog_size; backlog_level} ->
-      (backlog_size, backlog_level))
-    (fun (backlog_size, backlog_level) -> {backlog_size; backlog_level})
-    (obj2
-       (dft "worker_backlog_size" uint16 default_size)
-       (dft "worker_backlog_level" Internal_event.Level.encoding default_level))
-
 let timeout_encoding = Time.System.Span.encoding
 
 let block_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Block_validator.protocol_timeout; worker_limits} ->
-      (protocol_timeout, worker_limits))
-    (fun (protocol_timeout, worker_limits) -> {protocol_timeout; worker_limits})
-    (merge_objs
-       (obj1
-          (dft
-             "protocol_request_timeout"
-             timeout_encoding
-             default_shell.block_validator_limits.protocol_timeout))
-       (worker_limits_encoding
-          default_shell.block_validator_limits.worker_limits.backlog_size
-          default_shell.block_validator_limits.worker_limits.backlog_level))
+    (fun {Block_validator.protocol_timeout} -> protocol_timeout)
+    (fun protocol_timeout -> {protocol_timeout})
+    (obj1
+       (dft
+          "protocol_request_timeout"
+          timeout_encoding
+          default_shell.block_validator_limits.protocol_timeout))
 
 let prevalidator_limits_encoding =
   let open Data_encoding in
@@ -878,35 +875,39 @@ let prevalidator_limits_encoding =
            Prevalidator.operation_timeout;
            max_refused_operations;
            operations_batch_size;
-           worker_limits;
+           disable_precheck;
          } ->
-      ( (operation_timeout, max_refused_operations, operations_batch_size),
-        worker_limits ))
-    (fun ( (operation_timeout, max_refused_operations, operations_batch_size),
-           worker_limits ) ->
+      ( operation_timeout,
+        max_refused_operations,
+        operations_batch_size,
+        disable_precheck ))
+    (fun ( operation_timeout,
+           max_refused_operations,
+           operations_batch_size,
+           disable_precheck ) ->
       {
         operation_timeout;
         max_refused_operations;
         operations_batch_size;
-        worker_limits;
+        disable_precheck;
       })
-    (merge_objs
-       (obj3
-          (dft
-             "operations_request_timeout"
-             timeout_encoding
-             default_shell.prevalidator_limits.operation_timeout)
-          (dft
-             "max_refused_operations"
-             uint16
-             default_shell.prevalidator_limits.max_refused_operations)
-          (dft
-             "operations_batch_size"
-             int31
-             default_shell.prevalidator_limits.operations_batch_size))
-       (worker_limits_encoding
-          default_shell.prevalidator_limits.worker_limits.backlog_size
-          default_shell.prevalidator_limits.worker_limits.backlog_level))
+    (obj4
+       (dft
+          "operations_request_timeout"
+          timeout_encoding
+          default_shell.prevalidator_limits.operation_timeout)
+       (dft
+          "max_refused_operations"
+          uint16
+          default_shell.prevalidator_limits.max_refused_operations)
+       (dft
+          "operations_batch_size"
+          int31
+          default_shell.prevalidator_limits.operations_batch_size)
+       (dft
+          "disable_precheck"
+          bool
+          default_shell.prevalidator_limits.disable_precheck))
 
 let peer_validator_limits_encoding =
   let open Data_encoding in
@@ -917,46 +918,38 @@ let peer_validator_limits_encoding =
            block_operations_timeout;
            protocol_timeout;
            new_head_request_timeout;
-           worker_limits;
          } ->
-      ( ( block_header_timeout,
-          block_operations_timeout,
-          protocol_timeout,
-          new_head_request_timeout ),
-        worker_limits ))
-    (fun ( ( block_header_timeout,
-             block_operations_timeout,
-             protocol_timeout,
-             new_head_request_timeout ),
-           worker_limits ) ->
+      ( block_header_timeout,
+        block_operations_timeout,
+        protocol_timeout,
+        new_head_request_timeout ))
+    (fun ( block_header_timeout,
+           block_operations_timeout,
+           protocol_timeout,
+           new_head_request_timeout ) ->
       {
         block_header_timeout;
         block_operations_timeout;
         protocol_timeout;
         new_head_request_timeout;
-        worker_limits;
       })
-    (merge_objs
-       (obj4
-          (dft
-             "block_header_request_timeout"
-             timeout_encoding
-             default_limits.block_header_timeout)
-          (dft
-             "block_operations_request_timeout"
-             timeout_encoding
-             default_limits.block_operations_timeout)
-          (dft
-             "protocol_request_timeout"
-             timeout_encoding
-             default_limits.protocol_timeout)
-          (dft
-             "new_head_request_timeout"
-             timeout_encoding
-             default_limits.new_head_request_timeout))
-       (worker_limits_encoding
-          default_limits.worker_limits.backlog_size
-          default_limits.worker_limits.backlog_level))
+    (obj4
+       (dft
+          "block_header_request_timeout"
+          timeout_encoding
+          default_limits.block_header_timeout)
+       (dft
+          "block_operations_request_timeout"
+          timeout_encoding
+          default_limits.block_operations_timeout)
+       (dft
+          "protocol_request_timeout"
+          timeout_encoding
+          default_limits.protocol_timeout)
+       (dft
+          "new_head_request_timeout"
+          timeout_encoding
+          default_limits.new_head_request_timeout))
 
 let synchronisation_heuristic_encoding default_latency default_threshold =
   let open Data_encoding in
@@ -985,49 +978,42 @@ let synchronisation_heuristic_encoding default_latency default_threshold =
 let chain_validator_limits_encoding =
   let open Data_encoding in
   conv
-    (fun {Chain_validator.synchronisation; worker_limits} ->
-      (synchronisation, worker_limits))
-    (fun (synchronisation, worker_limits) -> {synchronisation; worker_limits})
-    (merge_objs
-       (* Use a union to support both the deprecated
-          bootstrap_threshold and the new synchronisation_threshold
-          options when parsing.  When printing, use the new
-          synchronisation_threshold option. *)
-       (union
-          [
-            case
-              ~title:"synchronisation_heuristic_encoding"
-              Json_only
-              (synchronisation_heuristic_encoding
-                 default_shell.chain_validator_limits.synchronisation.latency
-                 default_shell.chain_validator_limits.synchronisation.threshold)
-              (fun x -> Some x)
-              (fun x -> x);
-            case
-              ~title:"legacy_bootstrap_threshold_encoding"
-              Json_only
-              (obj1
-                 (dft
-                    "bootstrap_threshold"
-                    ~description:
-                      "[DEPRECATED] Set the number of peers with whom a chain \
-                       synchronisation must be completed to bootstrap the \
-                       node."
-                    uint8
-                    4))
-              (fun _ -> None) (* This is used for legacy *)
-              (fun x ->
-                Chain_validator.
-                  {
-                    threshold = x;
-                    latency =
-                      default_shell.chain_validator_limits.synchronisation
-                        .latency;
-                  });
-          ])
-       (worker_limits_encoding
-          default_shell.chain_validator_limits.worker_limits.backlog_size
-          default_shell.chain_validator_limits.worker_limits.backlog_level))
+    (fun {Chain_validator.synchronisation} -> synchronisation)
+    (fun synchronisation -> {synchronisation})
+    (* Use a union to support both the deprecated
+       bootstrap_threshold and the new synchronisation_threshold
+       options when parsing.  When printing, use the new
+       synchronisation_threshold option. *)
+    (union
+       [
+         case
+           ~title:"synchronisation_heuristic_encoding"
+           Json_only
+           (synchronisation_heuristic_encoding
+              default_shell.chain_validator_limits.synchronisation.latency
+              default_shell.chain_validator_limits.synchronisation.threshold)
+           (fun x -> Some x)
+           (fun x -> x);
+         case
+           ~title:"legacy_bootstrap_threshold_encoding"
+           Json_only
+           (obj1
+              (dft
+                 "bootstrap_threshold"
+                 ~description:
+                   "[DEPRECATED] Set the number of peers with whom a chain \
+                    synchronisation must be completed to bootstrap the node."
+                 uint8
+                 4))
+           (fun _ -> None) (* This is used for legacy *)
+           (fun x ->
+             Chain_validator.
+               {
+                 threshold = x;
+                 latency =
+                   default_shell.chain_validator_limits.synchronisation.latency;
+               });
+       ])
 
 let shell =
   let open Data_encoding in
@@ -1242,8 +1228,10 @@ let to_string cfg =
 let update ?(disable_config_validation = false) ?data_dir ?min_connections
     ?expected_connections ?max_connections ?max_download_speed ?max_upload_speed
     ?binary_chunks_size ?peer_table_size ?expected_pow ?bootstrap_peers
-    ?listen_addr ?discovery_addr ?(rpc_listen_addrs = []) ?(allow_all_rpc = [])
-    ?(private_mode = false) ?(disable_mempool = false)
+    ?listen_addr ?advertised_net_port ?discovery_addr ?(rpc_listen_addrs = [])
+    ?(allow_all_rpc = []) ?(private_mode = false) ?(disable_mempool = false)
+    ?(disable_mempool_precheck =
+      default_shell.prevalidator_limits.disable_precheck)
     ?(enable_testchain = false) ?(cors_origins = []) ?(cors_headers = [])
     ?rpc_tls ?log_output ?synchronisation_threshold ?history_mode ?network
     ?latency cfg =
@@ -1294,6 +1282,8 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
       bootstrap_peers =
         Option.value ~default:cfg.p2p.bootstrap_peers bootstrap_peers;
       listen_addr = Option.either listen_addr cfg.p2p.listen_addr;
+      advertised_net_port =
+        Option.either advertised_net_port cfg.p2p.advertised_net_port;
       discovery_addr = Option.either discovery_addr cfg.p2p.discovery_addr;
       private_mode = cfg.p2p.private_mode || private_mode;
       limits;
@@ -1315,7 +1305,13 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
     {
       peer_validator_limits = cfg.shell.peer_validator_limits;
       block_validator_limits = cfg.shell.block_validator_limits;
-      prevalidator_limits = cfg.shell.prevalidator_limits;
+      prevalidator_limits =
+        {
+          cfg.shell.prevalidator_limits with
+          disable_precheck =
+            cfg.shell.prevalidator_limits.disable_precheck
+            || disable_mempool_precheck;
+        };
       chain_validator_limits =
         (let synchronisation : Chain_validator.synchronisation_limits =
            {
@@ -1331,7 +1327,7 @@ let update ?(disable_config_validation = false) ?data_dir ?min_connections
                  synchronisation_threshold;
            }
          in
-         {cfg.shell.chain_validator_limits with synchronisation});
+         {synchronisation});
       history_mode = Option.either history_mode cfg.shell.history_mode;
     }
   in

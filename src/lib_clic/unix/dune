@@ -1,14 +1,15 @@
 (library
  (name tezos_clic_unix)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-clic.unix)
- (flags (:standard -open Tezos_stdlib
-                   -open Tezos_clic
-                   -open Tezos_error_monad
-                   -open Tezos_error_monad.TzLwtreslib
-                   ))
- (libraries tezos-clic
-            tezos-stdlib-unix
-            tezos-error-monad
-            tezos-lwt-result-stdlib
-            ))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-clic
+  tezos-stdlib-unix
+  tezos-error-monad
+  tezos-lwt-result-stdlib)
+ (flags
+  (:standard
+   -open Tezos_stdlib
+   -open Tezos_clic
+   -open Tezos_error_monad
+   -open Tezos_error_monad.TzLwtreslib)))

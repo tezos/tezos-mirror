@@ -44,7 +44,7 @@ let tree_testable = Alcotest.testable Local.Tree.pp Local.Tree.equal
 let nb_nodes = function
   | None -> Lwt.return 0
   | Some tree ->
-      Local.Tree.fold tree tree_root ~init:0 ~f:(fun _ _ acc ->
+      Local.Tree.fold tree tree_root ~order:`Sorted ~init:0 ~f:(fun _ _ acc ->
           Lwt.return (acc + 1))
 
 module type MOCKED_PROTO_RPC = sig
@@ -149,70 +149,86 @@ let test_tree _ () =
    uses a cached value when requesting a key longer
    than a key already obtained *)
 let test_do_rpc_no_longer_key () =
+  let open Lwt_result_syntax in
   let (module MockedProtoRPC) = mock_proto_rpc () in
   let module MockedGetter = Tezos_proxy.Proxy_getter.MakeProxy (MockedProtoRPC) in
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt ->
-  nb_nodes a_b_1_tree_opt >>= fun nb_nodes_a_b_1_tree_opt ->
-  lwt_assert_true
-    "A;b;1 is mapped to tree of size 4"
-    (nb_nodes_a_b_1_tree_opt = 4)
-  >>= fun _ ->
+  let* a_b_1_tree_opt = MockedGetter.proxy_get mock_input ["A"; "b"; "1"] in
+  let*! nb_nodes_a_b_1_tree_opt = nb_nodes a_b_1_tree_opt in
+  let*! () =
+    lwt_assert_true
+      "A;b;1 is mapped to tree of size 4"
+      (nb_nodes_a_b_1_tree_opt = 4)
+  in
   let a_b_1_tree = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt in
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt' ->
+  let* a_b_1_tree_opt' = MockedGetter.proxy_get mock_input ["A"; "b"; "1"] in
   let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
-  lwt_check tree_testable "Tree is always the same" a_b_1_tree a_b_1_tree'
-  >>= fun _ ->
-  lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
-  >>= fun _ ->
-  MockedGetter.proxy_get mock_input ["A"; "b"; "2"] >>= fun _ ->
-  lwt_assert_true "Done two RPCs" (Stack.length MockedProtoRPC.calls = 2)
-  >>= fun _ ->
+  let*! _ =
+    lwt_check tree_testable "Tree is always the same" a_b_1_tree a_b_1_tree'
+  in
+  let*! _ =
+    lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
+  in
+  let*! _ = MockedGetter.proxy_get mock_input ["A"; "b"; "2"] in
+  let*! _ =
+    lwt_assert_true "Done two RPCs" (Stack.length MockedProtoRPC.calls = 2)
+  in
   (* Let's check that value mapped by A;b;1 was unaffected by getting A;b;2 *)
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt' ->
+  let* a_b_1_tree_opt' = MockedGetter.proxy_get mock_input ["A"; "b"; "1"] in
   let a_b_1_tree' = WithExceptions.Option.get ~loc:__LOC__ a_b_1_tree_opt' in
-  lwt_check
-    tree_testable
-    "Orthogonal tree stayed the same"
-    a_b_1_tree
-    a_b_1_tree'
-  >>= fun _ ->
-  MockedGetter.proxy_get mock_input ["A"] >>= fun _ ->
-  lwt_assert_true "Done three RPCs" (Stack.length MockedProtoRPC.calls = 3)
-  >>= fun _ ->
-  MockedGetter.proxy_get mock_input ["A"] >>=? fun a_opt ->
-  lwt_assert_true "Done three RPCs" (Stack.length MockedProtoRPC.calls = 3)
-  >>= fun _ ->
+  let*! _ =
+    lwt_check
+      tree_testable
+      "Orthogonal tree stayed the same"
+      a_b_1_tree
+      a_b_1_tree'
+  in
+  let*! _ = MockedGetter.proxy_get mock_input ["A"] in
+  let*! _ =
+    lwt_assert_true "Done three RPCs" (Stack.length MockedProtoRPC.calls = 3)
+  in
+  let* a_opt = MockedGetter.proxy_get mock_input ["A"] in
+  let*! _ =
+    lwt_assert_true "Done three RPCs" (Stack.length MockedProtoRPC.calls = 3)
+  in
   (* Let's check that value mapped by A;b;1 was changed by getting A.
      This is not needed for correctness but it would be weird if it wasn't
      the case, because getting a parent key erases the previous content of
      longers keys. Because of our mocked implementation of do_rpc, all
      keys are mapped to single values. This means "A" is mapped to Key.
      We can hence check that A;b;1 was affected by witnessing it's None now. *)
-  MockedGetter.proxy_get mock_input ["A"; "b"; "1"] >>=? fun a_b_1_tree_opt' ->
-  nb_nodes a_b_1_tree_opt' >>= fun nb_nodes_a_b_1_tree_opt' ->
-  lwt_assert_true "A;b;1 tree is now missing" (nb_nodes_a_b_1_tree_opt' = 0)
-  >>= fun _ ->
-  nb_nodes a_opt >>= fun nb_nodes_a_opt ->
+  let* a_b_1_tree_opt' = MockedGetter.proxy_get mock_input ["A"; "b"; "1"] in
+  let*! nb_nodes_a_b_1_tree_opt' = nb_nodes a_b_1_tree_opt' in
+  let*! _ =
+    lwt_assert_true "A;b;1 tree is now missing" (nb_nodes_a_b_1_tree_opt' = 0)
+  in
+  let*! nb_nodes_a_opt = nb_nodes a_opt in
   Stdlib.print_endline @@ string_of_int @@ nb_nodes_a_opt ;
   (* Size is 2 because mock_tree returns a tree rooted with a Dir, it's normal *)
-  lwt_assert_true "A is mapped to tree of size 2" (nb_nodes_a_opt = 2)
-  >>= fun _ -> return_unit
+  let*! _ =
+    lwt_assert_true "A is mapped to tree of size 2" (nb_nodes_a_opt = 2)
+  in
+  return_unit
 
 let test_split_key_triggers () =
+  let open Lwt_result_syntax in
   let (module MockedProtoRPC) = mock_proto_rpc () in
   let module MockedGetter = Tezos_proxy.Proxy_getter.MakeProxy (MockedProtoRPC) in
-  MockedGetter.proxy_get
-    mock_input
-    ["split"; "key"; "trigger_now!"; "whatever"; "more"]
-  >>= fun _ ->
-  lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
-  >>= fun _ ->
-  lwt_check
-    Alcotest.(list string)
-    "Done split;key;trigger_now!, not the longer key"
-    (Stack.copy MockedProtoRPC.calls |> Stack.pop)
-    ["split"; "key"; "trigger_now!"]
-  >>= fun _ -> return_unit
+  let*! _ =
+    MockedGetter.proxy_get
+      mock_input
+      ["split"; "key"; "trigger_now!"; "whatever"; "more"]
+  in
+  let*! _ =
+    lwt_assert_true "Done one RPC" (Stack.length MockedProtoRPC.calls = 1)
+  in
+  let*! _ =
+    lwt_check
+      Alcotest.(list string)
+      "Done split;key;trigger_now!, not the longer key"
+      (Stack.copy MockedProtoRPC.calls |> Stack.pop)
+      ["split"; "key"; "trigger_now!"]
+  in
+  return_unit
 
 let () =
   Alcotest_lwt.run

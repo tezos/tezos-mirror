@@ -1,17 +1,20 @@
 (library
  (name tezos_validation)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-validation)
- (libraries tezos-base
-            tezos-context
-            tezos-shell-context
-            tezos-shell-services
-            tezos-protocol-updater
-	    tezos-stdlib-unix)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_context
-                   -open Tezos_shell_context
-                   -open Tezos_shell_services
-                   -open Tezos_protocol_updater
-                   -open Tezos_stdlib_unix)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-context
+  tezos-shell-context
+  tezos-shell-services
+  tezos-protocol-updater
+  tezos-stdlib-unix)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_context
+   -open Tezos_shell_context
+   -open Tezos_shell_services
+   -open Tezos_protocol_updater
+   -open Tezos_stdlib_unix)))

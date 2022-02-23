@@ -26,7 +26,8 @@
 (** Testing
     -------
     Component:    Shell (Node)
-    Invocation:   dune exec src/lib_shell/runtest
+    Invocation:   dune exec src/lib_shell/test/test_shell.exe \
+                  -- test '^test node$'
     Dependencies: src/lib_shell/test/shell_test_helpers.ml
     Subject:      Unit tests for node. Currently only tests that
                   events are emitted.
@@ -63,6 +64,7 @@ let default_p2p : P2p.config =
   {
     listening_port = None;
     listening_addr = Some (P2p_addr.of_string_exn "[::]");
+    advertised_port = None;
     discovery_port = None;
     discovery_addr = Some Ipaddr.V4.any;
     trusted_points = [];

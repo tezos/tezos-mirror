@@ -6,10 +6,17 @@ bug-reports: "https://gitlab.com/tezos/tezos/issues"
 dev-repo: "git+https://gitlab.com/tezos/tezos.git"
 license: "MIT"
 depends: [
-  "dune" { >= "2.0" }
+  "dune" { >= "2.9" }
   "tezos-hacl-glue"
-  "hacl-star" { >= "0.4.2" & < "0.5" }
+  "hacl-star" { = "0.4.3" }
   "hacl-star-raw"
+  "tezos-stdlib" {with-test}
+  "tezos-error-monad" {with-test}
+  "zarith" {with-test}
+  "zarith_stubs_js" {with-test}
+  "data-encoding" {with-test}
+  "qcheck-alcotest" {with-test}
+  "tezos-test-helpers" {with-test}
 ]
 conflicts: [
   "hacl_x25519"

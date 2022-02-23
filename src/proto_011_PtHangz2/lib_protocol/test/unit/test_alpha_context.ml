@@ -29,7 +29,7 @@ open Alpha_context
 (** Testing
     -------
     Component:    Alpha_context 
-    Invocation:   dune exec ./src/proto_alpha/lib_protocol/test/unit/main.exe -- test Alpha_context 
+    Invocation:   dune exec ./src/proto_011_PtHangz2/lib_protocol/test/unit/main.exe -- test Alpha_context
     Dependencies: helpers/block.ml
     Subject:      To test the modules (including the top-level)
                   in alpha_context.ml as individual units, particularly
@@ -60,7 +60,7 @@ module Test_Script = struct
       "script serialised incorrectly"
       mbytes_pp
       bytes
-      (`Hex "030b" |> Hex.to_bytes)
+      (`Hex "030b" |> Hex.to_bytes_exn)
 end
 
 module Test_Big_map = struct

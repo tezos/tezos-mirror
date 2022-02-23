@@ -36,19 +36,20 @@ module Alphabet = struct
   let make alphabet =
     if String.length alphabet <> base then
       invalid_arg "Base58: invalid alphabet (length)" ;
-    let str = Bytes.make 256 '\255' in
+    let bytes = Bytes.make 256 '\255' in
     for i = 0 to String.length alphabet - 1 do
       let char = int_of_char alphabet.[i] in
-      if Bytes.get str char <> '\255' then
+      if Bytes.get bytes char <> '\255' then
         Format.kasprintf
           invalid_arg
           "Base58: invalid alphabet (dup '%c' %d %d)"
           (char_of_int char)
-          (int_of_char @@ Bytes.get str char)
+          (int_of_char @@ Bytes.get bytes char)
           i ;
-      Bytes.set str char (char_of_int i)
+      Bytes.set bytes char (char_of_int i)
     done ;
-    {encode = alphabet; decode = Bytes.unsafe_to_string str}
+    let decode = Bytes.unsafe_to_string bytes in
+    {encode = alphabet; decode}
 
   let bitcoin =
     make "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

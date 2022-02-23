@@ -1,5 +1,7 @@
 (library
-  (name tezos_openapi)
-  (instrumentation (backend bisect_ppx))
-  (public_name tezos-openapi)
-  (libraries ezjsonm json-data-encoding))
+ (name tezos_openapi)
+ (public_name tezos-openapi)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  ezjsonm
+  json-data-encoding tezt))

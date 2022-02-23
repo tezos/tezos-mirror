@@ -1,12 +1,16 @@
-(include v0.dune.inc)
-(include v1.dune.inc)
-(include v2.dune.inc)
-(include v3.dune.inc)
-(include v4.dune.inc)
-
 (library
  (name tezos_protocol_environment_sigs)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment-sigs)
- (flags (:standard -nopervasives ))
- (modules ("V0" "V1" "V2" "V3" "V4")))
+ (instrumentation (backend bisect_ppx))
+ (flags (:standard -nopervasives))
+ (modules V0 V1 V2 V3 V4))
+
+(include v0.dune.inc)
+
+(include v1.dune.inc)
+
+(include v2.dune.inc)
+
+(include v3.dune.inc)
+
+(include v4.dune.inc)

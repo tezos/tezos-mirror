@@ -32,15 +32,15 @@ let protocols =
       "Alpha",
       Some "/include/rpc_introduction.rst.inc",
       "ProtoALphaALphaALphaALphaALphaALphaALphaALphaDdp3zK" );
-    (* TODO nomadic-labs/tezos#462: adapt rest of this list *)
-    ( "011",
+    (* TODO tezos/tezos#2170: adapt rest of this list *)
+    ( "",
       "011 Hangzhou",
       Some "/include/rpc_introduction.rst.inc",
       "PtHangz2aRngywmSRGGvrcTyMbbdpWdpFKuS4uMWxg2RaH9i1qx" );
-    ( "",
-      "010 Granada",
+    ( "012",
+      "012 Ithaca",
       Some "/include/rpc_introduction.rst.inc",
-      "PtGRANADsDU8R9daYKAgWnQYAJ64omN1o3KMGVCykShA97vQbvV" );
+      "Psithaca2MLRFYargivpo7YvUr7wUDqyxrdhC5CQq78mRvimz6A" );
   ]
 
 let pp_name ppf = function
@@ -346,7 +346,7 @@ let pp_document ppf descriptions version =
   Format.pp_set_max_indent ppf 9000 ;
   let version_suffix = if version = "" then "" else "_" ^ version in
   Format.fprintf ppf "%a" Rst.pp_ref ("rpc_index" ^ version_suffix) ;
-  Rst.pp_h2 ppf "RPCs - Index" ;
+  Rst.pp_h1 ppf "RPCs - Reference" ;
   List.iter
     (fun (name, intro, prefix, rpc_dir) ->
       (* If provided, insert the introductory include *)

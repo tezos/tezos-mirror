@@ -26,7 +26,7 @@
 (** Testing
     -------
     Component:  Protocol (rolls)
-    Invocation: dune exec src/proto_alpha/lib_protocol/test/main.exe -- test "^rolls$"
+    Invocation: dune exec src/proto_011_PtHangz2/lib_protocol/test/main.exe -- test "^rolls$"
     Subject:    On rolls and baking rights.
                 A delegate has baking rights provided that it has at least
                 more than [token_per_rolls] tz of staking balance. This

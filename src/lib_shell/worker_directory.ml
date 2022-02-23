@@ -60,9 +60,8 @@ let build_rpc_directory state =
       in
       let status = Prevalidator.status t in
       let pending_requests = Prevalidator.pending_requests t in
-      let backlog = Prevalidator.last_events t in
       let current_request = Prevalidator.current_request t in
-      return {Worker_types.status; pending_requests; backlog; current_request}) ;
+      return {Worker_types.status; pending_requests; current_request}) ;
   (* Workers : Block_validator *)
   register0 Worker_services.Block_validator.S.state (fun () () ->
       let w = Block_validator.running_worker () in
@@ -70,7 +69,6 @@ let build_rpc_directory state =
         {
           Worker_types.status = Block_validator.status w;
           pending_requests = Block_validator.pending_requests w;
-          backlog = Block_validator.last_events w;
           current_request = Block_validator.current_request w;
         }) ;
   (* Workers : Peer validators *)
@@ -103,7 +101,6 @@ let build_rpc_directory state =
         {
           Worker_types.status = Peer_validator.status w;
           pending_requests = [];
-          backlog = Peer_validator.last_events w;
           current_request = Peer_validator.current_request w;
         }) ;
   (* Workers : Net validators *)
@@ -129,7 +126,6 @@ let build_rpc_directory state =
         {
           Worker_types.status = Chain_validator.status w;
           pending_requests = Chain_validator.pending_requests w;
-          backlog = Chain_validator.last_events w;
           current_request = Chain_validator.current_request w;
         }) ;
   (* DistributedDB *)

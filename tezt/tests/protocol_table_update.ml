@@ -78,13 +78,21 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   @@ fun () ->
   let node_1 = Node.create [Synchronisation_threshold 0] in
   let node_2 = Node.create [Synchronisation_threshold 0] in
+  let migration_level =
+    (* NOTE: Migration to Tenderbake is only supported after the first
+       cycle, therefore at [migration_level >= blocks_per_cycle]. *)
+    8
+  in
+  let migration_block = string_of_int migration_level in
   let* () =
     Lwt_list.iter_s
       (fun node ->
         let* () = Node.config_init node [] in
-        Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-          node
-          [(3, migrate_to)] ;
+        Node.Config_file.(
+          update
+            node
+            (set_sandbox_network_with_user_activated_upgrades
+               [(migration_level, migrate_to)])) ;
         Lwt.return_unit)
       [node_1; node_2]
   in
@@ -97,17 +105,23 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   (* Initializing the common chain history. *)
   Log.info "Activating protocol %s" (Protocol.name migrate_from) ;
   let* () = Client.activate_protocol ~protocol:migrate_from client_1 in
-  let* () = Client.bake_for client_1 in
-  let toward_activation = 2 in
+  let* () = repeat (migration_level - 2) (fun () -> Client.bake_for client_1) in
+  let toward_activation = migration_level - 1 in
   let* _ = Node.wait_for_level node_1 toward_activation
   and* _ = Node.wait_for_level node_2 toward_activation in
   Log.info "Both nodes are at level %d." toward_activation ;
   (* Shutting down node_2 to make an activation on node_1 only. *)
   let* () = Node.terminate node_2 in
   let activation_promise_node_1 = wait_for_protocol_table_update node_1 in
-  let* () = Client.bake_for ~key:Constant.bootstrap1.identity client_1 in
   let* () =
-    check_protocol_activation ~migrate_from ~migrate_to ~block:"3" client_1
+    Client.bake_for ~keys:[Constant.bootstrap1.public_key_hash] client_1
+  in
+  let* () =
+    check_protocol_activation
+      ~migrate_from
+      ~migrate_to
+      ~block:migration_block
+      client_1
   in
   let* (ph_n1_alt, bh_n1_alt) = activation_promise_node_1 in
   Log.info "Node 1 activates protocol %s on block %s" ph_n1_alt bh_n1_alt ;
@@ -117,23 +131,37 @@ let test_protocol_table_update ~migrate_from ~migrate_to =
   let* () = Node.wait_for_ready node_2 in
   let activation_promise_node_2 = wait_for_protocol_table_update node_2 in
   (* Bake the activation block with a different key to ensure divergence. *)
-  let* () = Client.bake_for ~key:Constant.bootstrap2.identity client_2 in
   let* () =
-    check_protocol_activation ~migrate_from ~migrate_to ~block:"3" client_2
+    Client.bake_for ~keys:[Constant.bootstrap2.public_key_hash] client_2
+  in
+  let* () =
+    check_protocol_activation
+      ~migrate_from
+      ~migrate_to
+      ~block:migration_block
+      client_2
   in
   let* (ph_n2, bh_n2) = activation_promise_node_2 in
   Log.info "Node 2 activates protocol %s on block %s" ph_n2 bh_n2 ;
   if String.equal bh_n1_alt bh_n2 then Test.fail "Activation block must differ." ;
-  (* Bake some block to increase the fitness of node's 2 chain. *)
-  let* () = repeat 5 (fun () -> Client.bake_for client_2) in
+  (* Bake a few blocks (eg [num_blocks]) to increase the fitness of node's 2 chain. *)
+  let num_blocks = 5 in
+  let target_level = migration_level + 5 in
+  let* () =
+    repeat num_blocks (fun () ->
+        if String.equal ph_n2 (Protocol.hash Alpha) then
+          Client.bake_for ~keys:[] client_2
+        else Client.bake_for client_2)
+  in
   let activation_promise_switch = wait_for_protocol_table_update node_1 in
   (* Restart node_1 and make it switches to node's 2 chain and update
      it's protocol table well.*)
   let* () = Node.run node_1 [] in
   let* () = Node.wait_for_ready node_1 in
   let* () = Client.Admin.connect_address ~peer:node_2 client_1 in
-  let* _ = Node.wait_for_level node_1 8 and* _ = Node.wait_for_level node_2 8 in
-  Log.info "Both nodes are at level %d." 8 ;
+  let* _ = Node.wait_for_level node_1 target_level
+  and* _ = Node.wait_for_level node_2 8 in
+  Log.info "Both nodes are at level %d." target_level ;
   let* (ph_n1, bh_n1) = activation_promise_switch in
   Log.info
     "Node 1 updated its protocol table activation block for protocol %s at \

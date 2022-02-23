@@ -37,16 +37,24 @@
 
 /* #include <sched.h> */
 
+#ifdef __MACH__
+  #include <mach/mach_time.h>
+#endif
+
 CAMLprim value stub_get_time_ns()
 {
-  struct timespec ts;
-
-  if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
-    return caml_copy_int64(0);
-  else {
-    uint64_t t = (uint64_t)ts.tv_nsec + 1000000000 * (uint64_t)ts.tv_sec;
-    return caml_copy_int64(t);
-  }
+    #ifdef __MACH__
+      uint64_t t = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+      return caml_copy_int64(t);
+    #else
+      struct timespec ts;
+      if (clock_gettime(CLOCK_REALTIME, &ts) != 0)
+        return caml_copy_int64(0);
+      else {
+        uint64_t t = (uint64_t)ts.tv_nsec + 1000000000 * (uint64_t)ts.tv_sec;
+        return caml_copy_int64(t);
+      }
+    #endif
 }
 
 int flush_cache(size_t cache_size_bytes)

@@ -38,7 +38,8 @@ let main () =
     else (Sys.argv.(1), Sys.argv.(2))
   in
   (* Parse input file and convert it. *)
-  Json.from_file filename |> Api.parse_tree |> Api.parse_services |> Api.flatten
+  Json.parse_file filename |> Api.parse_tree |> Api.parse_services
+  |> Api.flatten
   |> Convert.convert_api version
   |> Openapi.to_json |> Json.output
 

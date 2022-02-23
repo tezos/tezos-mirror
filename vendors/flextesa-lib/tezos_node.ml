@@ -107,6 +107,8 @@ module Config_file = struct
         List.map ~f:RPC_server.Acl.matcher_to_string except
         @ [ "GET /chains/*/blocks/*/helpers/baking_rights"
           ; "GET /chains/*/blocks/*/helpers/endorsing_rights"
+          ; "GET /chains/*/blocks/*/helpers/proposers"
+          ; "GET /chains/*/blocks/*/helpers/validators"
           ; "GET /chains/*/blocks/*/helpers/levels_in_current_cycle"
           ; "POST /chains/*/blocks/*/helpers/forge/operations"
           ; "POST /chains/*/blocks/*/helpers/preapply/*"
@@ -274,13 +276,13 @@ module History_modes = struct
                    with
                    | [_] -> {node with history_mode= Some (snd one)}
                    | a_bunch_maybe_zero ->
-                       Fmt.kstrf failwith
+                       Fmt.kstr failwith
                          "Prefix %S does not match exactly one node: [%s]"
                          (fst one)
                          (String.concat ~sep:", "
                             (List.map a_bunch_maybe_zero ~f:id) ) )
                  | more ->
-                     Fmt.kstrf failwith "Prefixes %s match the same node: %s"
+                     Fmt.kstr failwith "Prefixes %s match the same node: %s"
                        (String.concat ~sep:", " (List.map more ~f:fst))
                        node.id ) )
         with Failure s ->

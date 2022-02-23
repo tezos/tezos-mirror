@@ -2,4 +2,7 @@
  (name bare_sigs)
  (public_name tezos-lwt-result-stdlib.bare.sigs)
  (instrumentation (backend bisect_ppx))
- (libraries lwt tezos-lwt-result-stdlib.bare.functor-outputs))
+ (libraries
+  lwt
+  tezos-lwt-result-stdlib.bare.functor-outputs)
+ (js_of_ocaml))

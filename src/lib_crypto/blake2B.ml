@@ -76,11 +76,23 @@ module Make_minimal (K : Name) = struct
 
   let to_string (Blake2b.Hash h) = Bytes.to_string h
 
-  let of_hex s = of_string (Hex.to_string s)
+  let of_hex s =
+    match Hex.to_string s with
+    | Some s -> of_string s
+    | None -> error_with "%s.of_hex: invalid hex string (%a)" K.name Hex.pp s
 
-  let of_hex_opt s = of_string_opt (Hex.to_string s)
+  let of_hex_opt s = Option.bind (Hex.to_string s) of_string_opt
 
-  let of_hex_exn s = of_string_exn (Hex.to_string s)
+  let of_hex_exn s =
+    match Hex.to_string s with
+    | Some s -> of_string_exn s
+    | None ->
+        Format.kasprintf
+          invalid_arg
+          "%s.of_hex_exn: invalid hex string (%a)"
+          K.name
+          Hex.pp
+          s
 
   let to_hex s = Hex.of_string (to_string s)
 

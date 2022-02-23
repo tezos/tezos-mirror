@@ -70,7 +70,7 @@ let rec bake_with_foundation ?(foundation_index = [1; 2; 3; 4; 5; 6; 7; 8])
     let foundation = List.nth foundation_index index in
     let proc =
       Client.spawn_bake_for
-        ~key:("foundation" ^ string_of_int foundation)
+        ~keys:["foundation" ^ string_of_int foundation]
         client
     in
     let* res = Process.wait proc in
@@ -109,6 +109,10 @@ let migration ?yes_node_path ?yes_wallet context protocol =
     ~title:"migration test"
     ~tags:["node"; "activate"; "user_activated"; "protocol"; "migration"]
   @@ fun () ->
+  Log.info
+    "Starting migration test of protocol %s in context %s"
+    protocol
+    context ;
   Log.info "Copying context into a temporary directory" ;
   let data_dir = Temp.dir "tezos-node-test" in
   let* () = Process.run "cp" ["-R"; context ^ "/."; data_dir] in
@@ -167,10 +171,15 @@ let migration ?yes_node_path ?yes_wallet context protocol =
       after_cycle
   else unit
 
-let protocol = Protocol.(hash Alpha)
+let protocol =
+  let default = Protocol.(hash Alpha) in
+  Option.value ~default (Sys.getenv_opt "TEZT_MIGRATION_TEST_PROTOCOL")
 
 let context =
-  let home = Sys.getenv "HOME" in
-  home ^ "/tezos-node-test"
+  let default =
+    let home = Sys.getenv "HOME" in
+    home ^ "/tezos-node-test"
+  in
+  Option.value ~default (Sys.getenv_opt "TEZT_MIGRATION_TEST_CONTEXT")
 
 let register () = migration context protocol

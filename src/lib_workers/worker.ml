@@ -2,7 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2018 Nomadic Labs, <contact@nomadic-labs.com>               *)
+(* Copyright (c) 2018-2021 Nomadic Labs, <contact@nomadic-labs.com>          *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -133,7 +133,6 @@ module type T = sig
   val launch :
     'kind table ->
     ?timeout:Time.System.Span.t ->
-    Worker_types.limits ->
     Name.t ->
     Types.parameters ->
     (module HANDLERS with type self = 'kind t) ->
@@ -163,20 +162,12 @@ module type T = sig
     val pending_requests_length : 'a t -> int
   end
 
-  module type BOUNDED_QUEUE = sig
-    type t
-
-    val try_push_request_now : t -> 'a Request.t -> bool
-  end
-
   module Dropbox : sig
     include BOX with type t := dropbox t
   end
 
   module Queue : sig
     include QUEUE with type 'a t := 'a queue t
-
-    include BOUNDED_QUEUE with type t := bounded queue t
 
     (** Adds a message to the queue immediately. *)
     val push_request_now : infinite queue t -> 'a Request.t -> unit
@@ -205,9 +196,6 @@ module type T = sig
 
   (** Access the internal state, once initialized. *)
   val state : _ t -> Types.state
-
-  (** Access the event backlog. *)
-  val last_events : _ t -> (Internal_event.level * Event.t list) list
 
   (** Introspect the message queue, gives the times requests were pushed. *)
   val pending_requests : _ queue t -> (Time.System.t * Request.view) list
@@ -279,21 +267,19 @@ struct
 
   and _ buffer =
     | Queue_buffer :
-        (Time.System.t * message) Lwt_pipe.t
+        (Time.System.t * message) Lwt_pipe.Unbounded.t
         -> infinite queue buffer
     | Bounded_buffer :
-        (Time.System.t * message) Lwt_pipe.t
+        (Time.System.t * message) Lwt_pipe.Bounded.t
         -> bounded queue buffer
     | Dropbox_buffer : (Time.System.t * message) Lwt_dropbox.t -> dropbox buffer
 
   and 'kind t = {
-    limits : Worker_types.limits;
     timeout : Time.System.Span.t option;
     parameters : Types.parameters;
     mutable (* only for init *) worker : unit Lwt.t;
     mutable (* only for init *) state : Types.state option;
     buffer : 'kind buffer;
-    event_log : (Internal_event.level * Event.t Ringo.Ring.t) list;
     canceler : Lwt_canceler.t;
     name : Name.t;
     id : int;
@@ -326,17 +312,6 @@ struct
           Lwt_dropbox.put message_box (Systime_os.now (), Message (neu, None))
     with Lwt_dropbox.Closed -> ()
 
-  let push_request_and_wait w message_queue request =
-    let (t, u) = Lwt.wait () in
-    Lwt.catch
-      (fun () ->
-        Lwt_pipe.push message_queue (queue_item ~u request) >>= fun () -> t)
-      (function
-        | Lwt_pipe.Closed ->
-            let name = Format.asprintf "%a" Name.pp w.name in
-            fail (Closed {base = base_name; name})
-        | exn -> fail (Exn exn))
-
   let drop_request_and_wait w message_box request =
     let (t, u) = Lwt.wait () in
     Lwt.catch
@@ -344,10 +319,15 @@ struct
         Lwt_dropbox.put message_box (queue_item ~u request) ;
         t)
       (function
-        | Lwt_pipe.Closed ->
+        | Lwt_dropbox.Closed ->
             let name = Format.asprintf "%a" Name.pp w.name in
             fail (Closed {base = base_name; name})
-        | exn -> fail (Exn exn))
+        | exn ->
+            (* [Lwt_dropbox.put] can only raise [Closed] which is caught above.
+               We don't want to catch any other exception but we cannot use an
+               incomplete pattern like we would in a [try]-[with] construct so
+               we must explicitly match and re-raise [exn]. *)
+            raise exn)
 
   module type BOX = sig
     type t
@@ -369,12 +349,6 @@ struct
     val pending_requests_length : 'a t -> int
   end
 
-  module type BOUNDED_QUEUE = sig
-    type t
-
-    val try_push_request_now : t -> 'a Request.t -> bool
-  end
-
   module Dropbox = struct
     let put_request (w : dropbox t) request =
       let (Dropbox {merge}) = w.table.buffer_kind in
@@ -390,44 +364,59 @@ struct
     let push_request (type a) (w : a queue t) request =
       match w.buffer with
       | Queue_buffer message_queue ->
-          Lwt_pipe.push message_queue (queue_item request)
+          Lwt_pipe.Unbounded.push message_queue (queue_item request) ;
+          (* because pushing on an unbounded pipe is immediate, we return within
+             Lwt explicitly for compatibility with the other case *)
+          Lwt.return_unit
       | Bounded_buffer message_queue ->
-          Lwt_pipe.push message_queue (queue_item request)
+          Lwt_pipe.Bounded.push message_queue (queue_item request)
 
     let push_request_now (w : infinite queue t) request =
       let (Queue_buffer message_queue) = w.buffer in
-      if Lwt_pipe.is_closed message_queue then ()
-      else
-        (* Queues are infinite so the push always succeeds *)
-        assert (Lwt_pipe.push_now message_queue (queue_item request))
-
-    let try_push_request_now (w : bounded queue t) request =
-      let (Bounded_buffer message_queue) = w.buffer in
-      Lwt_pipe.push_now message_queue (queue_item request)
+      if Lwt_pipe.Unbounded.is_closed message_queue then ()
+      else Lwt_pipe.Unbounded.push message_queue (queue_item request)
 
     let push_request_and_wait (type a) (w : a queue t) request =
-      let message_queue =
-        match w.buffer with
-        | Queue_buffer message_queue -> message_queue
-        | Bounded_buffer message_queue -> message_queue
-      in
-      push_request_and_wait w message_queue request
+      match w.buffer with
+      | Queue_buffer message_queue -> (
+          try
+            let (t, u) = Lwt.wait () in
+            Lwt_pipe.Unbounded.push message_queue (queue_item ~u request) ;
+            t
+          with Lwt_pipe.Closed ->
+            let name = Format.asprintf "%a" Name.pp w.name in
+            fail (Closed {base = base_name; name}))
+      | Bounded_buffer message_queue ->
+          let (t, u) = Lwt.wait () in
+          Lwt.try_bind
+            (fun () ->
+              Lwt_pipe.Bounded.push message_queue (queue_item ~u request))
+            (fun () -> t)
+            (function
+              | Lwt_pipe.Closed ->
+                  let name = Format.asprintf "%a" Name.pp w.name in
+                  fail (Closed {base = base_name; name})
+              | exn -> raise exn)
 
     let pending_requests (type a) (w : a queue t) =
-      let message_queue =
-        match w.buffer with
-        | Queue_buffer message_queue -> message_queue
-        | Bounded_buffer message_queue -> message_queue
+      let peeked =
+        try
+          match w.buffer with
+          | Queue_buffer message_queue ->
+              Lwt_pipe.Unbounded.peek_all_now message_queue
+          | Bounded_buffer message_queue ->
+              Lwt_pipe.Bounded.peek_all_now message_queue
+        with Lwt_pipe.Closed -> []
       in
       List.map
         (function (t, Message (req, _)) -> (t, Request.view req))
-        (Lwt_pipe.peek_all message_queue)
+        peeked
 
     let pending_requests_length (type a) (w : a queue t) =
       let pipe_length (type a) (q : a buffer) =
         match q with
-        | Queue_buffer queue -> Lwt_pipe.length queue
-        | Bounded_buffer queue -> Lwt_pipe.length queue
+        | Queue_buffer queue -> Lwt_pipe.Unbounded.length queue
+        | Bounded_buffer queue -> Lwt_pipe.Bounded.length queue
         | Dropbox_buffer _ -> 1
       in
       pipe_length w.buffer
@@ -441,12 +430,17 @@ struct
       | (_, Message (_, None)) -> ()
     in
     let close_queue message_queue =
-      let messages = Lwt_pipe.pop_all_now message_queue in
+      let messages = Lwt_pipe.Bounded.pop_all_now message_queue in
       List.iter wakeup messages ;
-      Lwt_pipe.close message_queue
+      Lwt_pipe.Bounded.close message_queue
+    in
+    let close_unbounded_queue message_queue =
+      let messages = Lwt_pipe.Unbounded.pop_all_now message_queue in
+      List.iter wakeup messages ;
+      Lwt_pipe.Unbounded.close message_queue
     in
     match w.buffer with
-    | Queue_buffer message_queue -> close_queue message_queue
+    | Queue_buffer message_queue -> close_unbounded_queue message_queue
     | Bounded_buffer message_queue -> close_queue message_queue
     | Dropbox_buffer message_box ->
         (try Option.iter wakeup (Lwt_dropbox.peek message_box)
@@ -454,22 +448,38 @@ struct
         Lwt_dropbox.close message_box
 
   let pop (type a) (w : a t) =
+    let open Lwt_syntax in
     let pop_queue message_queue =
       match w.timeout with
-      | None -> Lwt_pipe.pop message_queue >>= fun m -> return_some m
+      | None ->
+          let* m = Lwt_pipe.Bounded.pop message_queue in
+          return_some m
       | Some timeout ->
-          Lwt_pipe.pop_with_timeout (Systime_os.sleep timeout) message_queue
-          >>= fun m -> return m
+          Lwt_pipe.Bounded.pop_with_timeout
+            (Systime_os.sleep timeout)
+            message_queue
+    in
+    let pop_unbounded_queue message_queue =
+      match w.timeout with
+      | None ->
+          let* m = Lwt_pipe.Unbounded.pop message_queue in
+          return_some m
+      | Some timeout ->
+          Lwt_pipe.Unbounded.pop_with_timeout
+            (Systime_os.sleep timeout)
+            message_queue
     in
     match w.buffer with
-    | Queue_buffer message_queue -> pop_queue message_queue
+    | Queue_buffer message_queue -> pop_unbounded_queue message_queue
     | Bounded_buffer message_queue -> pop_queue message_queue
     | Dropbox_buffer message_box -> (
         match w.timeout with
-        | None -> Lwt_dropbox.take message_box >>= fun m -> return_some m
+        | None ->
+            let* m = Lwt_dropbox.take message_box in
+            return_some m
         | Some timeout ->
             Lwt_dropbox.take_with_timeout (Systime_os.sleep timeout) message_box
-            >>= fun m -> return m)
+        )
 
   let trigger_shutdown w = Lwt.ignore_result (Lwt_canceler.cancel w.canceler)
 
@@ -478,20 +488,20 @@ struct
   let lwt_emit w (status : Logger.status) =
     let (module LogEvent) = w.logEvent in
     let time = Systime_os.now () in
-    LogEvent.emit
-      ~section:(Internal_event.Section.make_sanitized Name.base)
-      (fun () -> Time.System.stamp ~time status)
-    >>= function
-    | Ok () -> Lwt.return_unit
-    | Error el ->
-        Format.kasprintf Lwt.fail_with "Worker_event.emit: %a" pp_print_trace el
+    Lwt.bind
+      (LogEvent.emit
+         ~section:(Internal_event.Section.make_sanitized Name.base)
+         (fun () -> Time.System.stamp ~time status))
+      (function
+        | Ok () -> Lwt.return_unit
+        | Error el ->
+            Format.kasprintf
+              Lwt.fail_with
+              "Worker_event.emit: %a"
+              pp_print_trace
+              el)
 
-  let log_event w evt =
-    lwt_emit w (Logger.WorkerEvent (evt, Event.level evt)) >>= fun () ->
-    if Event.level evt >= w.limits.backlog_level then
-      List.assoc ~equal:Internal_event.Level.equal (Event.level evt) w.event_log
-      |> Option.iter (fun ring -> Ringo.Ring.add ring evt) ;
-    Lwt.return_unit
+  let log_event w evt = lwt_emit w (Logger.WorkerEvent (evt, Event.level evt))
 
   let record_event w evt = Lwt.ignore_result (log_event w evt)
 
@@ -524,6 +534,7 @@ struct
   let worker_loop (type kind) handlers (w : kind t) =
     let (module Handlers : HANDLERS with type self = kind t) = handlers in
     let do_close errs =
+      let open Lwt_syntax in
       let t0 =
         match w.status with
         | Running t0 -> t0
@@ -531,15 +542,12 @@ struct
       in
       w.status <- Closing (t0, Systime_os.now ()) ;
       close w ;
-      Error_monad.cancel_with_exceptions w.canceler >>= fun () ->
+      let* () = Error_monad.cancel_with_exceptions w.canceler in
       w.status <- Closed (t0, Systime_os.now (), errs) ;
-      Handlers.on_close w >>= fun () ->
+      let* () = Handlers.on_close w in
       Nametbl.remove w.table.instances w.name ;
       w.state <- None ;
-      Lwt.ignore_result
-        (List.iter (fun (_, ring) -> Ringo.Ring.clear ring) w.event_log ;
-         Lwt.return_unit) ;
-      Lwt.return_unit
+      return_unit
     in
     let rec loop () =
       (* The call to [protect] here allows the call to [pop] (responsible
@@ -554,61 +562,81 @@ struct
          processed, the processing eventually resolves, at which point a
          recursive call to this [loop] at which point this call to [protect]
          fails immediately with [Canceled]. *)
-      (protect ~canceler:w.canceler (fun () -> pop w) >>=? function
-       | None -> Handlers.on_no_request w
-       | Some (pushed, Message (request, u)) -> (
-           let current_request = Request.view request in
-           let treated_time = Systime_os.now () in
-           w.current_request <- Some (pushed, treated_time, current_request) ;
-           match u with
-           | None ->
-               Handlers.on_request w request >>=? fun res ->
-               let completed_time = Systime_os.now () in
-               let treated = Ptime.diff treated_time pushed in
-               let completed = Ptime.diff completed_time treated_time in
-               w.current_request <- None ;
-               let status = Worker_types.{pushed; treated; completed} in
-               Handlers.on_completion w request res status >>= fun () ->
-               lwt_emit w (Request (current_request, status, None))
-               >>= fun () -> return_unit
-           | Some u ->
-               Handlers.on_request w request >>= fun res ->
-               Lwt.wakeup_later u res ;
-               Lwt.return res >>=? fun res ->
-               let completed_time = Systime_os.now () in
-               let treated = Ptime.diff treated_time pushed in
-               let completed = Ptime.diff completed_time treated_time in
-               let status = Worker_types.{pushed; treated; completed} in
-               w.current_request <- None ;
-               Handlers.on_completion w request res status >>= fun () ->
-               lwt_emit w (Request (current_request, status, None))
-               >>= fun () -> return_unit))
-      >>= function
-      | Ok () -> loop ()
-      | Error (Canceled :: _)
-      | Error (Exn Lwt.Canceled :: _)
-      | Error (Exn Lwt_pipe.Closed :: _)
-      | Error (Exn Lwt_dropbox.Closed :: _) ->
-          lwt_emit w Terminated >>= fun () -> do_close None
-      | Error errs -> (
-          (match w.current_request with
-          | Some (pushed, treated_time, request) ->
-              let completed_time = Systime_os.now () in
-              let treated = Ptime.diff treated_time pushed in
-              let completed = Ptime.diff completed_time treated_time in
-              w.current_request <- None ;
-              Handlers.on_error
-                w
-                request
-                Worker_types.{pushed; treated; completed}
-                errs
-          | None -> assert false)
-          >>= function
+      Lwt.bind
+        Lwt_tzresult_syntax.(
+          let* popped =
+            protect ~canceler:w.canceler (fun () -> Lwt_result.ok @@ pop w)
+          in
+          match popped with
+          | None -> Handlers.on_no_request w
+          | Some (pushed, Message (request, u)) -> (
+              let current_request = Request.view request in
+              let treated_time = Systime_os.now () in
+              w.current_request <- Some (pushed, treated_time, current_request) ;
+              match u with
+              | None ->
+                  let* res = Handlers.on_request w request in
+                  let completed_time = Systime_os.now () in
+                  let treated = Ptime.diff treated_time pushed in
+                  let completed = Ptime.diff completed_time treated_time in
+                  w.current_request <- None ;
+                  let status = Worker_types.{pushed; treated; completed} in
+                  let*! () = Handlers.on_completion w request res status in
+                  let*! () =
+                    lwt_emit w (Request (current_request, status, None))
+                  in
+                  return_unit
+              | Some u ->
+                  (* [res] is a result. But the side effect [wakeup]
+                     needs to happen regardless of success (Ok) or failure
+                     (Error). To that end, we treat it locally like a regular
+                     promise (which happens to carry a [result]) within the Lwt
+                     monad. *)
+                  let*! res = Handlers.on_request w request in
+                  Lwt.wakeup_later u res ;
+                  let*? res = res in
+                  let completed_time = Systime_os.now () in
+                  let treated = Ptime.diff treated_time pushed in
+                  let completed = Ptime.diff completed_time treated_time in
+                  let status = Worker_types.{pushed; treated; completed} in
+                  w.current_request <- None ;
+                  let*! () = Handlers.on_completion w request res status in
+                  let*! () =
+                    lwt_emit w (Request (current_request, status, None))
+                  in
+                  return_unit))
+        Lwt_syntax.(
+          function
           | Ok () -> loop ()
-          | Error (Timeout :: _ as errs) ->
-              lwt_emit w Terminated >>= fun () -> do_close (Some errs)
-          | Error errs ->
-              lwt_emit w (Crashed errs) >>= fun () -> do_close (Some errs))
+          | Error (Canceled :: _)
+          | Error (Exn Lwt.Canceled :: _)
+          | Error (Exn Lwt_pipe.Closed :: _)
+          | Error (Exn Lwt_dropbox.Closed :: _) ->
+              let* () = lwt_emit w Terminated in
+              do_close None
+          | Error errs -> (
+              let* r =
+                match w.current_request with
+                | Some (pushed, treated_time, request) ->
+                    let completed_time = Systime_os.now () in
+                    let treated = Ptime.diff treated_time pushed in
+                    let completed = Ptime.diff completed_time treated_time in
+                    w.current_request <- None ;
+                    Handlers.on_error
+                      w
+                      request
+                      Worker_types.{pushed; treated; completed}
+                      errs
+                | None -> assert false
+              in
+              match r with
+              | Ok () -> loop ()
+              | Error (Timeout :: _ as errs) ->
+                  let* () = lwt_emit w Terminated in
+                  do_close (Some errs)
+              | Error errs ->
+                  let* () = lwt_emit w (Crashed errs) in
+                  do_close (Some errs)))
     in
     loop ()
 
@@ -616,12 +644,11 @@ struct
       type kind.
       kind table ->
       ?timeout:Time.System.Span.t ->
-      Worker_types.limits ->
       Name.t ->
       Types.parameters ->
       (module HANDLERS with type self = kind t) ->
       kind t tzresult Lwt.t =
-   fun table ?timeout limits name parameters (module Handlers) ->
+   fun table ?timeout name parameters (module Handlers) ->
     let name_s = Format.asprintf "%a" Name.pp name in
     let full_name =
       if name_s = "" then base_name
@@ -641,20 +668,17 @@ struct
       let canceler = Lwt_canceler.create () in
       let buffer : kind buffer =
         match table.buffer_kind with
-        | Queue -> Queue_buffer (Lwt_pipe.create ())
+        | Queue -> Queue_buffer (Lwt_pipe.Unbounded.create ())
         | Bounded {size} ->
-            Bounded_buffer (Lwt_pipe.create ~size:(size, fun _ -> 1) ())
+            Bounded_buffer
+              (Lwt_pipe.Bounded.create
+                 ~max_size:size
+                 ~compute_size:(fun _ -> 1)
+                 ())
         | Dropbox _ -> Dropbox_buffer (Lwt_dropbox.create ())
-      in
-      let event_log =
-        let levels =
-          Internal_event.[Debug; Info; Notice; Warning; Error; Fatal]
-        in
-        List.map (fun l -> (l, Ringo.Ring.create limits.backlog_size)) levels
       in
       let w =
         {
-          limits;
           parameters;
           name;
           canceler;
@@ -663,7 +687,6 @@ struct
           state = None;
           id;
           worker = Lwt.return_unit;
-          event_log;
           timeout;
           current_request = None;
           logEvent = (module Logger.LogEvent);
@@ -671,10 +694,10 @@ struct
         }
       in
       Nametbl.add table.instances name w ;
-      (if id_name = base_name then lwt_emit w (Started None)
-      else lwt_emit w (Started (Some name_s)))
-      >>= fun () ->
-      Handlers.on_launch w name parameters >>=? fun state ->
+      let open Lwt_tzresult_syntax in
+      let started = if id_name = base_name then None else Some name_s in
+      let*! () = lwt_emit w (Started started) in
+      let* state = Handlers.on_launch w name parameters in
       w.status <- Running (Systime_os.now ()) ;
       w.state <- Some state ;
       w.worker <-
@@ -690,8 +713,10 @@ struct
        immediately because no hooks are registered on the canceler. However, the
        worker ([w.worker]) resolves only once the ongoing request has resolved
        (if any) and some clean-up operations have completed. *)
-    lwt_emit w Triggering_shutdown >>= fun () ->
-    Error_monad.cancel_with_exceptions w.canceler >>= fun () -> w.worker
+    let open Lwt_syntax in
+    let* () = lwt_emit w Triggering_shutdown in
+    let* () = Error_monad.cancel_with_exceptions w.canceler in
+    w.worker
 
   let state w =
     match (w.state, w.status) with
@@ -714,11 +739,6 @@ struct
 
   let pending_requests q = Queue.pending_requests q
 
-  let last_events w =
-    List.map
-      (fun (level, ring) -> (level, Ringo.Ring.elements ring))
-      w.event_log
-
   let status {status; _} = status
 
   let current_request {current_request; _} = current_request
@@ -729,8 +749,8 @@ struct
       wstatus = w.status;
       queue_length =
         (match w.buffer with
-        | Queue_buffer pipe -> Lwt_pipe.length pipe
-        | Bounded_buffer pipe -> Lwt_pipe.length pipe
+        | Queue_buffer pipe -> Lwt_pipe.Unbounded.length pipe
+        | Bounded_buffer pipe -> Lwt_pipe.Bounded.length pipe
         | Dropbox_buffer _ -> 1);
     }
 

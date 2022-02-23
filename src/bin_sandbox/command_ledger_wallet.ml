@@ -209,7 +209,7 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
             match protocol_kind with
             | `Athens -> ()
             | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada
-            | `Alpha ->
+            | `Hangzhou | `Ithaca | `Alpha ->
                 wf
                   ppf
                   "From Babylon on, You will first be asked to provide the \
@@ -260,11 +260,11 @@ let voting_tests state ~client ~src ~with_rejections ~protocol_kind
                 match protocol_kind with
                 | `Athens -> ()
                 | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada
-                | `Alpha ->
+                | `Hangzhou | `Ithaca | `Alpha ->
                     wf
                       ppf
-                      "On Alpha, Babylon, Carthage, Edo, Florence and Granada, \
-                       You will first be asked to provide the public key." ;
+                      "From Babylon on, you will first be asked to provide the \
+                       public key." ;
                     cut ppf () ;
                     wf
                       ppf
@@ -350,8 +350,8 @@ let originate_manager_tz_script state ~client ~name ~from ~bake ~protocol_kind
       ["--wait"; "none"; "originate"; "contract"; name]
       @ (match protocol_kind with
         | `Athens -> ["for"; from]
-        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha
-          ->
+        | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada
+        | `Hangzhou | `Ithaca | `Alpha ->
             [])
       @ [
           "transferring";
@@ -730,7 +730,8 @@ let delegation_tests state ~client ~src ~with_rejections ~protocol_kind
   in
   match protocol_kind with
   | `Athens -> self_delegation ()
-  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha ->
+  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou
+  | `Ithaca | `Alpha ->
       tz_account_delegation () >>= fun () -> self_delegation ()
 
 let transaction_tests state ~client ~src ~with_rejections ~protocol_kind
@@ -900,7 +901,8 @@ let prepare_origination_of_id_script ?(spendable = false) ?(delegatable = false)
     ["--wait"; "none"; "originate"; "contract"; name]
     @ (match protocol_kind with
       | `Athens -> ["for"; from]
-      | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha ->
+      | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou
+      | `Ithaca | `Alpha ->
           [])
     @ [
         "transferring";
@@ -1053,7 +1055,8 @@ let basic_contract_operations_tests state ~client ~src ~with_rejections
         ~init_storage:"\"delegatable contract\""
         ~delegatable:true
         ()
-  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Alpha ->
+  | `Babylon | `Carthage | `Delphi | `Edo | `Florence | `Granada | `Hangzhou
+  | `Ithaca | `Alpha ->
       return ())
   >>= fun () ->
   let push_drops =
@@ -1360,7 +1363,7 @@ let run state ~pp_error ~protocol ~protocol_kind ~node_exec ~client_exec
     >>= fun batch_transaction_bytes ->
     let bytes_hash =
       Tezos_crypto.(
-        `Hex batch_transaction_bytes |> Hex.to_bytes
+        `Hex batch_transaction_bytes |> Tezos_stdlib.Hex.to_bytes_exn
         |> (fun x -> [x])
         |> Blake2B.hash_bytes |> Blake2B.to_string |> Base58.raw_encode)
     in

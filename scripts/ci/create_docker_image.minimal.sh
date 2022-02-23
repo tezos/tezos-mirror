@@ -40,7 +40,7 @@ docker build \
   "$src_dir"
 
 echo
-echo "### Successfully build docker image: ${image_name}debug:$image_version"
+echo "### Successfully built docker image: ${image_name}debug:$image_version"
 echo
 
 docker build \
@@ -56,7 +56,7 @@ docker build \
 
 
 echo
-echo "### Successfully build docker image: ${image_name}bare:$image_version"
+echo "### Successfully built docker image: ${image_name}bare:$image_version"
 echo
 
 docker build \
@@ -70,5 +70,5 @@ docker build \
   "$src_dir"
 
 echo
-echo "### Successfully build docker image: ${image_name%?}:$image_version"
+echo "### Successfully built docker image: ${image_name%?}:$image_version"
 echo

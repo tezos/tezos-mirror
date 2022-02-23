@@ -1,14 +1,18 @@
 (library
  (name tezos_event_logging_test_helpers)
  (public_name tezos-event-logging-test-helpers)
- (libraries tezos-stdlib
-            tezos-lwt-result-stdlib
-            data-encoding
-            tezos-error-monad
-            tezos-event-logging
-            tezos-test-helpers
-            alcotest)
- (flags (:standard -linkall
-          -open Tezos_error_monad
-          -open Tezos_error_monad.TzLwtreslib
-          -open Tezos_event_logging)))
+ (libraries
+  tezos-stdlib
+  tezos-lwt-result-stdlib
+  data-encoding
+  tezos-error-monad
+  tezos-event-logging
+  tezos-test-helpers
+  alcotest)
+ (js_of_ocaml)
+ (flags
+  (:standard
+   -linkall
+   -open Tezos_error_monad
+   -open Tezos_error_monad.TzLwtreslib
+   -open Tezos_event_logging)))

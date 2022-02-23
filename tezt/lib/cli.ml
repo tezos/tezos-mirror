@@ -33,77 +33,89 @@ type temporary_file_mode = Delete | Delete_if_successful | Keep
 type loop_mode = Infinite | Count of int
 
 type options = {
-  color : bool;
-  log_level : log_level;
-  log_file : string option;
-  log_buffer_size : int;
-  commands : bool;
-  temporary_file_mode : temporary_file_mode;
-  keep_going : bool;
-  files_to_run : string list;
-  tests_to_run : string list;
-  tests_not_to_run : string list;
-  tags_to_run : string list;
-  tags_not_to_run : string list;
-  list : [`Ascii_art | `Tsv] option;
-  global_timeout : float option;
-  test_timeout : float option;
-  reset_regressions : bool;
-  loop_mode : loop_mode;
-  time : bool;
-  starting_port : int;
-  record : string option;
-  from_records : string list;
-  job : (int * int) option;
-  job_count : int;
-  suggest_jobs : bool;
-  junit : string option;
+  mutable color : bool;
+  mutable log_level : log_level;
+  mutable log_file : out_channel option;
+  mutable log_buffer_size : int;
+  mutable commands : bool;
+  mutable temporary_file_mode : temporary_file_mode;
+  mutable keep_going : bool;
+  mutable files_to_run : string list;
+  mutable tests_to_run : string list;
+  mutable tests_not_to_run : string list;
+  mutable tags_to_run : string list;
+  mutable tags_not_to_run : string list;
+  mutable list : [`Ascii_art | `Tsv] option;
+  mutable global_timeout : float option;
+  mutable test_timeout : float option;
+  mutable reset_regressions : bool;
+  mutable loop_mode : loop_mode;
+  mutable time : bool;
+  mutable starting_port : int;
+  mutable record : string option;
+  mutable from_records : string list;
+  mutable job : (int * int) option;
+  mutable job_count : int;
+  mutable suggest_jobs : bool;
+  mutable junit : string option;
 }
 
 let options =
-  let color =
-    ref (Unix.isatty Unix.stdout && Sys.getenv_opt "TERM" <> Some "dumb")
-  in
-  let log_level = ref Report in
-  let log_file = ref None in
-  let log_buffer_size = ref 50 in
-  let commands = ref false in
-  let temporary_file_mode = ref Delete in
-  let keep_going = ref false in
-  let files_to_run = ref [] in
-  let tests_to_run = ref [] in
-  let tests_not_to_run = ref [] in
-  let tags_to_run = ref [] in
-  let tags_not_to_run = ref [] in
-  let list = ref None in
-  let global_timeout = ref None in
-  let test_timeout = ref None in
-  let reset_regressions = ref false in
-  let loop_mode = ref (Count 1) in
-  let time = ref false in
-  let starting_port = ref 16384 in
-  let record = ref None in
-  let from_records = ref [] in
-  let job = ref None in
-  let job_count = ref 3 in
-  let suggest_jobs = ref false in
-  let junit = ref None in
+  {
+    color = Unix.isatty Unix.stdout && Sys.getenv_opt "TERM" <> Some "dumb";
+    log_level = Report;
+    log_file = None;
+    log_buffer_size = 50;
+    commands = false;
+    temporary_file_mode = Delete;
+    keep_going = false;
+    files_to_run = [];
+    tests_to_run = [];
+    tests_not_to_run = [];
+    tags_to_run = [];
+    tags_not_to_run = [];
+    list = None;
+    global_timeout = None;
+    test_timeout = None;
+    reset_regressions = false;
+    loop_mode = Count 1;
+    time = false;
+    starting_port = 16384;
+    record = None;
+    from_records = [];
+    job = None;
+    job_count = 3;
+    suggest_jobs = false;
+    junit = None;
+  }
+
+let () = at_exit @@ fun () -> Option.iter close_out options.log_file
+
+let init ?args () =
   let set_log_level = function
-    | "quiet" -> log_level := Quiet
-    | "error" -> log_level := Error
-    | "warn" -> log_level := Warn
-    | "report" -> log_level := Report
-    | "info" -> log_level := Info
-    | "debug" -> log_level := Debug
+    | "quiet" -> options.log_level <- Quiet
+    | "error" -> options.log_level <- Error
+    | "warn" -> options.log_level <- Warn
+    | "report" -> options.log_level <- Report
+    | "info" -> options.log_level <- Info
+    | "debug" -> options.log_level <- Debug
     | level -> raise (Arg.Bad (Printf.sprintf "invalid log level: %S" level))
+  in
+  let set_log_file filename =
+    Option.iter close_out options.log_file ;
+    (* The channel we open here will be closed either:
+       - by the next call to [set_log_file], if there are several [--log-file]
+         arguments or if [Cli.init] is called several times;
+       - at exit. *)
+    options.log_file <- Some (open_out filename)
   in
   let set_job_count value =
     if value < 1 then raise (Arg.Bad "--job-count must be positive") ;
-    job_count := value
+    options.job_count <- value
   in
   let set_loop_count value =
     if value < 0 then raise (Arg.Bad "--loop-count must be positive or null") ;
-    loop_mode := Count value
+    options.loop_mode <- Count value
   in
   let set_job value =
     match value =~** rex "^([0-9]+)/([0-9]+)$" with
@@ -124,100 +136,133 @@ let options =
         else if count < 1 then raise (Arg.Bad "--job count must be at least 1")
         else if index > count then
           raise (Arg.Bad "--job index cannot be greater than job count")
-        else job := Some (index, count)
+        else options.job <- Some (index, count)
+  in
+  let add_from_record path =
+    if not (Sys.is_directory path) then
+      options.from_records <- path :: options.from_records
+    else
+      let records =
+        Sys.readdir path |> Array.to_list
+        |> List.filter (fun name -> Filename.extension name = ".json")
+        |> List.map (fun name -> path // name)
+      in
+      options.from_records <- records @ options.from_records
   in
   let spec =
     Arg.align
       [
-        ("--color", Arg.Set color, " Use colors in output.");
-        ("--no-color", Arg.Clear color, " Do not use colors in output.");
+        ( "--color",
+          Arg.Unit (fun () -> options.color <- true),
+          " Use colors in output." );
+        ( "--no-color",
+          Arg.Unit (fun () -> options.color <- false),
+          " Do not use colors in output." );
         ( "--log-level",
           Arg.String set_log_level,
           "<LEVEL> Set log level to LEVEL. Possible LEVELs are: quiet, error, \
            warn, report, info, debug. Default is report." );
         ( "--log-file",
-          Arg.String (fun f -> log_file := Some f),
+          Arg.String set_log_file,
           "<FILE> Also log to FILE (in verbose mode: --log-level only applies \
            to stdout)." );
         ( "--log-buffer-size",
-          Arg.Set_int log_buffer_size,
+          Arg.Int (fun x -> options.log_buffer_size <- x),
           "<COUNT> Before logging an error on stdout, also log the last COUNT \
            messages that have been ignored because of the log level since the \
            last message that was not ignored. Default is 50." );
         ( "--verbose",
-          Arg.Unit (fun () -> log_level := Debug),
+          Arg.Unit (fun () -> options.log_level <- Debug),
           " Same as --log-level debug." );
-        ("-v", Arg.Unit (fun () -> log_level := Debug), " Same as --verbose.");
+        ( "-v",
+          Arg.Unit (fun () -> options.log_level <- Debug),
+          " Same as --verbose." );
         ( "--quiet",
-          Arg.Unit (fun () -> log_level := Quiet),
+          Arg.Unit (fun () -> options.log_level <- Quiet),
           " Same as --log-level quiet." );
-        ("-q", Arg.Unit (fun () -> log_level := Quiet), " Same as --quiet.");
+        ( "-q",
+          Arg.Unit (fun () -> options.log_level <- Quiet),
+          " Same as --quiet." );
         ( "--info",
-          Arg.Unit (fun () -> log_level := Info),
+          Arg.Unit (fun () -> options.log_level <- Info),
           " Same as --log-level info." );
-        ("-i", Arg.Unit (fun () -> log_level := Info), " Same as --info.");
+        ( "-i",
+          Arg.Unit (fun () -> options.log_level <- Info),
+          " Same as --info." );
         ( "--commands",
-          Arg.Unit (fun () -> commands := true),
+          Arg.Unit (fun () -> options.commands <- true),
           " Output commands which are run, in a way that is easily copy-pasted \
            for manual reproductibility." );
-        ("-c", Arg.Unit (fun () -> commands := true), " Same as --commands.");
+        ( "-c",
+          Arg.Unit (fun () -> options.commands <- true),
+          " Same as --commands." );
         ( "--delete-temp",
-          Arg.Unit (fun () -> temporary_file_mode := Delete),
+          Arg.Unit (fun () -> options.temporary_file_mode <- Delete),
           " Delete temporary files and directories that were created (this is \
            the default)." );
         ( "--delete-temp-if-success",
-          Arg.Unit (fun () -> temporary_file_mode := Delete_if_successful),
+          Arg.Unit
+            (fun () -> options.temporary_file_mode <- Delete_if_successful),
           " Delete temporary files and directories, except if the test failed."
         );
         ( "--keep-temp",
-          Arg.Unit (fun () -> temporary_file_mode := Keep),
+          Arg.Unit (fun () -> options.temporary_file_mode <- Keep),
           " Do not delete temporary files and directories that were created." );
         ( "--keep-going",
-          Arg.Set keep_going,
+          Arg.Unit (fun () -> options.keep_going <- true),
           " If a test fails, continue with the remaining tests instead of \
            stopping. Aborting manually with Ctrl+C still stops everything." );
-        ("-k", Arg.Set keep_going, " Same as --keep-going.");
+        ( "-k",
+          Arg.Unit (fun () -> options.keep_going <- true),
+          " Same as --keep-going." );
         ( "--list",
-          Arg.Unit (fun () -> list := Some `Ascii_art),
+          Arg.Unit (fun () -> options.list <- Some `Ascii_art),
           " List tests instead of running them." );
-        ("-l", Arg.Unit (fun () -> list := Some `Ascii_art), " Same as --list.");
+        ( "-l",
+          Arg.Unit (fun () -> options.list <- Some `Ascii_art),
+          " Same as --list." );
         ( "--list-tsv",
-          Arg.Unit (fun () -> list := Some `Tsv),
+          Arg.Unit (fun () -> options.list <- Some `Tsv),
           " List tests instead of running them but one-per-line, as \
            tab-separated-values." );
         ( "--file",
-          Arg.String (fun file -> files_to_run := file :: !files_to_run),
+          Arg.String
+            (fun file -> options.files_to_run <- file :: options.files_to_run),
           "<FILE> Only run tests implemented in source file FILE (see \
            SELECTING TESTS)." );
         ( "-f",
-          Arg.String (fun file -> files_to_run := file :: !files_to_run),
+          Arg.String
+            (fun file -> options.files_to_run <- file :: options.files_to_run),
           "<FILE> Same as --file." );
         ( "--test",
-          Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
+          Arg.String
+            (fun title -> options.tests_to_run <- title :: options.tests_to_run),
           "<TITLE> Only run tests which are exactly entitled TITLE (see \
            SELECTING TESTS)." );
         ( "-t",
-          Arg.String (fun title -> tests_to_run := title :: !tests_to_run),
+          Arg.String
+            (fun title -> options.tests_to_run <- title :: options.tests_to_run),
           "<TITLE> Same as --test." );
         ( "--not-test",
           Arg.String
-            (fun title -> tests_not_to_run := title :: !tests_not_to_run),
+            (fun title ->
+              options.tests_not_to_run <- title :: options.tests_not_to_run),
           "<TITLE> Only run tests which are not exactly entitled TITLE (see \
            SELECTING TESTS)." );
         ( "--global-timeout",
-          Arg.Float (fun delay -> global_timeout := Some delay),
+          Arg.Float (fun delay -> options.global_timeout <- Some delay),
           "<SECONDS> Fail if the set of tests takes more than SECONDS to run."
         );
         ( "--test-timeout",
-          Arg.Float (fun delay -> test_timeout := Some delay),
+          Arg.Float (fun delay -> options.test_timeout <- Some delay),
           "<SECONDS> Fail if a test takes, on its own, more than SECONDS to \
            run." );
         ( "--reset-regressions",
-          Arg.Set reset_regressions,
+          Arg.Unit (fun () -> options.reset_regressions <- true),
           " Remove regression test outputs if they exist, and regenerate them."
         );
         ( "--loop",
-          Arg.Unit (fun () -> loop_mode := Infinite),
+          Arg.Unit (fun () -> options.loop_mode <- Infinite),
           " Restart from the beginning once all tests are done. All tests are \
            repeated until one of them fails or if you interrupt with Ctrl+C. \
            This is useful to reproduce non-deterministic failures. When used \
@@ -230,25 +275,27 @@ let options =
            behavior corresponds to --loop-count 1. If you specify both --loop \
            and --loop-count, only the last one is taken into account." );
         ( "--time",
-          Arg.Set time,
+          Arg.Unit (fun () -> options.time <- true),
           " Print a summary of the total time taken by each test. Ignored if a \
            test failed. Includes the time read from records: to display a \
            record, you can use --time --loop-count 0 --from-record <FILE>." );
         ( "--starting-port",
-          Arg.Set_int starting_port,
+          Arg.Int (fun x -> options.starting_port <- x),
           " If tests need to open ports, they may start from this number." );
         ( "--record",
-          Arg.String (fun file -> record := Some file),
+          Arg.String (fun file -> options.record <- Some file),
           "<FILE> Record test results to FILE. This file can then be used with \
            --from-record. If you use --loop or --loop-count, times are \
            averaged for each test." );
         ( "--from-record",
-          Arg.String (fun file -> from_records := file :: !from_records),
+          Arg.String add_from_record,
           "<FILE> Start from a file recorded with --record. Can be specified \
-           multiple times. When using --time, test durations include tests \
-           found in record files. When using --record, the new record which is \
-           output does NOT include the input records. When using --junit, \
-           reports do NOT include input records." );
+           multiple times. If <FILE> is a directory, this is equivalent to \
+           specifying --from-record for all files in this directory that have \
+           the .json extension. When using --time, test durations include \
+           tests found in record files. When using --record, the new record \
+           which is output does NOT include the input records. When using \
+           --junit, reports do NOT include input records." );
         ( "--job",
           Arg.String set_job,
           "<INDEX>/<COUNT> COUNT must be at least 1 and INDEX must be between \
@@ -271,7 +318,7 @@ let options =
            is 3)." );
         ("-j", Arg.Int set_job_count, "<COUNT> Same as --job-count.");
         ( "--suggest-jobs",
-          Set suggest_jobs,
+          Arg.Unit (fun () -> options.suggest_jobs <- true),
           " Read test results records specified with --from-records and \
            suggest a partition of the tests that would result in --job-count \
            sets of roughly the same total duration. Output each job as a list \
@@ -282,7 +329,7 @@ let options =
            not already in other jobs\", meaning that the last job acts as a \
            catch-all for unknown tests." );
         ( "--junit",
-          Arg.String (fun path -> junit := Some path),
+          Arg.String (fun path -> options.junit <- Some path),
           "<FILE> Store test results in FILE using JUnit XML format. Time \
            information for each test is the sum of all runs of this test for \
            the current session." );
@@ -318,36 +365,24 @@ let options =
        OPTIONS\n"
   in
   let add_tag tag =
-    if tag = "" || tag.[0] <> '/' then tags_to_run := tag :: !tags_to_run
+    if tag = "" || tag.[0] <> '/' then
+      options.tags_to_run <- tag :: options.tags_to_run
     else
-      tags_not_to_run :=
-        String.sub tag 1 (String.length tag - 1) :: !tags_not_to_run
+      options.tags_not_to_run <-
+        String.sub tag 1 (String.length tag - 1) :: options.tags_not_to_run
   in
-  Arg.parse spec add_tag usage ;
-  {
-    color = !color;
-    log_level = !log_level;
-    log_file = !log_file;
-    log_buffer_size = !log_buffer_size;
-    commands = !commands;
-    temporary_file_mode = !temporary_file_mode;
-    keep_going = !keep_going;
-    files_to_run = !files_to_run;
-    tests_to_run = !tests_to_run;
-    tests_not_to_run = !tests_not_to_run;
-    tags_to_run = !tags_to_run;
-    tags_not_to_run = !tags_not_to_run;
-    list = !list;
-    global_timeout = !global_timeout;
-    test_timeout = !test_timeout;
-    reset_regressions = !reset_regressions;
-    loop_mode = !loop_mode;
-    time = !time;
-    starting_port = !starting_port;
-    record = !record;
-    from_records = List.rev !from_records;
-    job = !job;
-    job_count = !job_count;
-    suggest_jobs = !suggest_jobs;
-    junit = !junit;
-  }
+  let argv =
+    let executable_name =
+      if Array.length Sys.argv > 0 then Sys.argv.(0) else Sys.executable_name
+    in
+    match args with
+    | None -> Sys.argv
+    | Some x -> Array.of_list (executable_name :: x)
+  in
+  try Arg.parse_argv argv spec add_tag usage with
+  | Arg.Bad msg ->
+      Printf.eprintf "%s" msg ;
+      exit 2
+  | Arg.Help msg ->
+      Printf.printf "%s" msg ;
+      exit 0

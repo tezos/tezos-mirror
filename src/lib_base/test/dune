@@ -1,35 +1,24 @@
 (tests
  (names test_time test_protocol)
  (package tezos-base)
- (modules test_time test_protocol)
  (libraries
-   tezos-base
-   tezos-base.unix
-   data-encoding
-   qcheck-alcotest
-   tezos-test-helpers
- )
- (flags (:standard
-          -open Tezos_base
-          -open Tezos_error_monad
-        )))
+  tezos-base
+  tezos-base.unix
+  data-encoding
+  qcheck-alcotest
+  tezos-test-helpers)
+ (flags (:standard -open Tezos_base -open Tezos_error_monad))
+ (modules test_time test_protocol))
 
-(tests
- (names test_p2p_addr)
+(test
+ (name test_p2p_addr)
  (package tezos-base)
- (deps
-   (file points.ok)
-   (file points.ko)
-   )
- (modules test_p2p_addr)
  (libraries
-   tezos-base
-   tezos-base.unix
-   data-encoding
-   qcheck-alcotest
-   tezos-test-helpers
- )
- (flags (:standard
-          -open Tezos_base
-          -open Tezos_error_monad
-        )))
+  tezos-base
+  tezos-base.unix
+  data-encoding
+  qcheck-alcotest
+  tezos-test-helpers)
+ (flags (:standard -open Tezos_base -open Tezos_error_monad))
+ (modules test_p2p_addr)
+ (deps (file points.ok) (file points.ko)))

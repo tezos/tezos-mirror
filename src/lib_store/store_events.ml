@@ -184,54 +184,81 @@ let fix_floating_stores =
     ()
 
 let fix_head =
-  declare_1
+  declare_2
     ~section
     ~level:Internal_event.Notice
     ~name:"fix_head"
-    ~msg:"updating head with the fittest block present in the store: {new}"
-    ~pp1:pp_block_descriptor
+    ~msg:
+      "updating head (previously {prev}) with the fittest block present in the \
+       store: {new}"
+    ~pp1:
+      (Format.pp_print_option
+         ~none:(fun fmt () -> Format.fprintf fmt "missing")
+         (fun fmt -> Format.fprintf fmt "%a" pp_block_descriptor))
+    ("prev", Data_encoding.option block_descriptor_encoding)
+    ~pp2:pp_block_descriptor
     ("new", block_descriptor_encoding)
 
 let fix_cementing_highwatermark =
-  let option_pp ~default pp fmt = function
-    | None -> Format.fprintf fmt "%s" default
-    | Some x -> Format.fprintf fmt "%a" pp x
+  let pp_cemented_highwatermark =
+    Format.pp_print_option
+      ~none:(fun fmt () -> Format.fprintf fmt "None")
+      (fun fmt -> Format.fprintf fmt "%ld")
   in
-  declare_1
+  declare_2
     ~section
     ~level:Internal_event.Notice
     ~name:"fix_cementing_highwatermark"
-    ~msg:"updating cementing highwatermark with: {new}"
-    ~pp1:(option_pp ~default:"None" (fun fmt -> Format.fprintf fmt "%ld"))
+    ~msg:"updating cementing highwatermark (previously {prev}) with: {new}"
+    ~pp1:pp_cemented_highwatermark
+    ("prev", Data_encoding.(option int32))
+    ~pp2:pp_cemented_highwatermark
     ("new", Data_encoding.(option int32))
 
 let fix_checkpoint =
-  declare_1
+  declare_2
     ~section
     ~level:Internal_event.Notice
     ~name:"fix_checkpoint"
-    ~msg:"updating checkpoint with: {new}"
-    ~pp1:pp_block_descriptor
+    ~msg:"updating checkpoint (previously {prev}) with: {new}"
+    ~pp1:
+      (Format.pp_print_option
+         ~none:(fun fmt () -> Format.fprintf fmt "missing")
+         (fun fmt -> Format.fprintf fmt "%a" pp_block_descriptor))
+    ("prev", Data_encoding.option block_descriptor_encoding)
+    ~pp2:pp_block_descriptor
     ("new", block_descriptor_encoding)
 
 let fix_savepoint =
-  declare_1
+  declare_2
     ~section
     ~level:Internal_event.Notice
     ~name:"fix_savepoint"
     ~msg:
-      "updating savepoint with the lowest block with metadata found in the \
-       store: {new}"
-    ~pp1:pp_block_descriptor
+      "updating savepoint (previously {prev}) with the lowest block with \
+       metadata found in the store: {new}"
+    ~pp1:
+      (Format.pp_print_option
+         ~none:(fun fmt () -> Format.fprintf fmt "missing")
+         (fun fmt -> Format.fprintf fmt "%a" pp_block_descriptor))
+    ("prev", Data_encoding.option block_descriptor_encoding)
+    ~pp2:pp_block_descriptor
     ("new", block_descriptor_encoding)
 
 let fix_caboose =
-  declare_1
+  declare_2
     ~section
     ~level:Internal_event.Notice
     ~name:"fix_caboose"
-    ~msg:"updating caboose with the lowest block found in the store: {new}"
-    ~pp1:pp_block_descriptor
+    ~msg:
+      "updating caboose (previously {prev}) with the lowest block found in the \
+       store: {new}"
+    ~pp1:
+      (Format.pp_print_option
+         ~none:(fun fmt () -> Format.fprintf fmt "missing")
+         (fun fmt -> Format.fprintf fmt "%a" pp_block_descriptor))
+    ("prev", Data_encoding.option block_descriptor_encoding)
+    ~pp2:pp_block_descriptor
     ("new", block_descriptor_encoding)
 
 let store_was_fixed =
@@ -283,20 +310,20 @@ let restore_history_mode =
     ~level:Internal_event.Notice
     ~name:"restore_history_mode"
     ~msg:
-      "history mode was sucessfully restored to {history_mode}, based on the \
+      "history mode was successfully restored to {history_mode}, based on the \
        configuration file or command line argument"
     ("history_mode", History_mode.encoding)
     ~pp1:History_mode.pp
 
-let restore_infered_history_mode =
+let restore_inferred_history_mode =
   declare_1
     ~section
     ~level:Internal_event.Notice
-    ~name:"restore_infered_history_mode"
+    ~name:"restore_inferred_history_mode"
     ~msg:
-      "history mode was sucessfully restored to {history_mode}. Warning: this \
+      "history mode was successfully restored to {history_mode}. Warning: this \
        history mode may differ from the one preceding the restore procedure \
-       and you may need to restart the node to explicitely force the history \
+       and you may need to restart the node to explicitly force the history \
        mode switch"
     ("history_mode", History_mode.encoding)
     ~pp1:History_mode.pp
@@ -312,6 +339,18 @@ let warning_incomplete_storage =
        {protocol_level} - operation receipt verification for this protocol \
        will be unavailable"
     ("protocol_level", Data_encoding.int31)
+
+let warning_missing_metadata =
+  declare_2
+    ~level:Internal_event.Warning
+    ~section
+    ~name:"missing_metadata"
+    ~msg:
+      "the storage is missing some metadata for cycle \
+       {start_level}-{end_level}. Please consider restoring a consistent \
+       storage"
+    ("start_level", Data_encoding.int32)
+    ("end_level", Data_encoding.int32)
 
 (* Error *)
 let merge_error =

@@ -1,43 +1,44 @@
 (library
  (name tezos_protocol_environment)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-environment)
- (libraries bls12-381
-            tezos-base
-            tezos-sapling
-            tezos-protocol-environment-sigs
-            tezos-protocol-environment-structs
-            tezos-micheline
-            tezos-context.memory
-            tezos-event-logging
-            )
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_micheline))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  zarith
+  zarith_stubs_js
+  bls12-381
+  tezos-base
+  tezos-sapling
+  tezos-protocol-environment-sigs
+  tezos-protocol-environment-structs
+  tezos-micheline
+  tezos-context.memory
+  tezos-event-logging)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_micheline))
  (wrapped false)
- (modules Tezos_protocol_environment
-          Environment_V0
-          Environment_V1
-          Environment_V2
-          Environment_V3
-          Environment_V4
-          Environment_cache
-          Environment_context
-          Environment_context_intf
-          Environment_protocol_T
-          Environment_protocol_T_V0
-          Environment_protocol_T_V1
-          Environment_protocol_T_V2
-          Environment_protocol_T_V3
-          Environment_protocol_T_V4
-          Dummy_context
-          Memory_context
-          Proxy_context))
+ (modules
+  Tezos_protocol_environment
+  Environment_V0
+  Environment_V1
+  Environment_V2
+  Environment_V3
+  Environment_V4
+  Environment_cache
+  Environment_context
+  Environment_context_intf
+  Environment_protocol_T
+  Environment_protocol_T_V0
+  Environment_protocol_T_V3
+  Environment_protocol_T_test
+  Dummy_context
+  Memory_context
+  Proxy_context))
 
 (library
  (name tezos_shell_context)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-shell-context)
- (libraries tezos-base
-            tezos-protocol-environment
-            tezos-context)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-protocol-environment
+  tezos-context)
  (modules Shell_context))

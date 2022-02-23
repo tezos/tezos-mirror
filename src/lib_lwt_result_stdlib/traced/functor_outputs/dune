@@ -2,4 +2,7 @@
  (name traced_functor_outputs)
  (public_name tezos-lwt-result-stdlib.traced.functor-outputs)
  (instrumentation (backend bisect_ppx))
- (libraries lwt tezos-lwt-result-stdlib.bare.sigs))
+ (libraries
+  lwt
+  tezos-lwt-result-stdlib.bare.sigs)
+ (js_of_ocaml))

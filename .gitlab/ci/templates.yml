@@ -1,8 +1,7 @@
 variables:
   ## This value MUST be the same as `opam_repository_tag` in `scripts/version.sh`
-  build_deps_image_version: efc37824b5abfccbf7deeb5d8eebd190348f5a4b
+  build_deps_image_version: 049f2433bd7f4b4fb24dc7cb7faa4b9d77589138
   build_deps_image_name: registry.gitlab.com/tezos/opam-repository
-  public_docker_image_name: docker.io/${CI_PROJECT_PATH}-
   GIT_STRATEGY: fetch
   GIT_DEPTH: "1"
   GET_SOURCES_ATTEMPTS: "2"
@@ -18,6 +17,10 @@ variables:
 # Some settings we want by default on all jobs
 .default_settings_template:
   interruptible: true
+  # `dependencies` are empty be default. Each individual job or
+  # template requiring artifacts from preceeding jobs should declare
+  # their dependencies locally.
+  dependencies: []
 
 # Image templates
 .image_template__runtime_build_test_dependencies_template:
@@ -25,6 +28,9 @@ variables:
 
 .image_template__runtime_build_dependencies_template:
   image: ${build_deps_image_name}:runtime-build-dependencies--${build_deps_image_version}
+
+.image_template__runtime_prebuild_dependencies_template:
+  image: ${build_deps_image_name}:runtime-prebuild-dependencies--${build_deps_image_version}
 
 .image_template__latest:
   image: docker:latest
@@ -39,6 +45,8 @@ variables:
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
@@ -51,6 +59,8 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
@@ -66,10 +76,20 @@ variables:
       when: never
     - if: '$CI_COMMIT_TAG && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
+      variables:
+        MASTER_OR_RELEASE: "true"
     - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
+      variables:
+        MASTER_OR_RELEASE: "true"
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
+      variables:
+        MASTER_OR_RELEASE: "true"
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+      variables:
+        MASTER_OR_RELEASE: "true"
     - when: never
 
 # Rules for all the jobs that are run only for the master branch
@@ -78,6 +98,8 @@ variables:
     - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: on_success
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: on_success
     - when: never
 
@@ -99,41 +121,32 @@ variables:
       when: never
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
       when: never
-    - if: '$CI_COMMIT_BRANCH =~ /doc/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /doc/'
+    - if: '$CI_MERGE_REQUEST_SOURCE_BRANCH_NAME == $TEZOS_DEFAULT_BRANCH && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_MERGE_REQUEST_ID'
+      changes:
+        - docs/introduction/*.sh
       when: always
     # Run when there is label on the merge request.
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--docs(?:$|[,])/'
       when: always
-    - changes:
-        - /docs
-      when: always
-    - when: never
-
-.rules_template__opam_child_pipeline_tests:
-  rules:
-    # Run on push to the default branch (i.e master).
-    - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
-      when: always
-    # Run on scheduled builds.
-    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: always
-    # Run when the branch name contains the `opam` keyword.
-    - if: '$CI_COMMIT_BRANCH =~ /opam/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /opam/'
-      when: always
-    # Run when there is label on the merge request.
-    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
-      when: always
-    # Run when opam changes are detected.
-    - if: '$TZ_OPAM_FILES_MODIFIED == "true"'
-      when: always
-    - when: never
-
-.rules_template__development_coverage:
-  rules:
-    - if: '$TZ_PIPELINE_KIND == "SCHEDULE" && $TZ_SCHEDULE_KIND == "EXTENDED_TESTS"'
-      when: always
     - when: manual
       allow_failure: true
+
+# The job `unified_coverage` runs on master and one development pipelines. It
+# runs on merge requests, unless the `ci--no-coverage` tag is set.
+.rules_template__development_unified_coverage:
+  rules:
+    - if: '$TZ_PIPELINE_KIND == "SCHEDULE"'
+      when: never
+    - if: '($CI_COMMIT_BRANCH =~ /-release$/ || $CI_MERGE_REQUEST_SOURCE_BRANCH_NAME =~ /-release$/) && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    - if: '$CI_COMMIT_TAG != null && $CI_PROJECT_NAMESPACE == $TEZOS_DEFAULT_NAMESPACE'
+      when: never
+    # Disable this job when the MR has the label `ci--no-coverage`
+    - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--no-coverage(?:$|[,])/'
+      when: never
+    - when: on_success
 
 .rules_template__development_arm64:
   rules:
@@ -165,7 +178,7 @@ variables:
       when: always
     - when: never
 
-.rules_template__trigger_opam_child_pipeline:
+.rules_template__trigger_opam_pipeline:
   rules:
     # Run on push to the default branch (i.e master).
     - if: '$CI_COMMIT_BRANCH == $TEZOS_DEFAULT_BRANCH'
@@ -179,7 +192,74 @@ variables:
     # Run when there is label on the merge request.
     - if: '$CI_MERGE_REQUEST_LABELS =~ /(?:^|[,])ci--opam(?:$|[,])/'
       when: always
-    # Run on merge requests.
-    - if: '$CI_MERGE_REQUEST_PROJECT_ID'
+    # Run on merge requests when opam changes are detected.
+    - if: '$CI_MERGE_REQUEST_ID'
+      changes:
+        - "**/dune"
+        - "**/dune.inc"
+        - "**/*.dune.inc"
+        - "**/dune-project"
+        - "**/dune_protocol.*"
+        - "**/*.opam"
+        - scripts/version.sh
+        - .gitlab-ci.yml
       when: always
     - when: never # default
+
+# Job templates
+
+# This template is used by the opam test jobs in the child pipeline
+# triggered by `bootstrap-opam-pipeline.yml`.
+.opam_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_prebuild_dependencies_template
+    # Note that the rules for jobs in the child pipeline must be the
+    # same as that of the generator job (`opam:create_pipeline`) and
+    # the child pipeline triggerer (`opam:trigger`).
+    - .rules_template__trigger_opam_pipeline
+  stage: packaging
+  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/663
+  # FIXME: https://gitlab.com/nomadic-labs/tezos/-/issues/664
+  # At the time of writing, the opam tests were quite flaky.
+  # Therefore, a retry was added. This should be removed once the
+  # underlying tests have been fixed.
+  retry: 2
+  script:
+    - ./scripts/opam-pin.sh
+    - opam depext --yes ${package}
+    - opam install --yes ${package}
+    - opam reinstall --yes --with-test ${package}
+  after_script:
+    # Stores logs in opam_logs/ for artifacts and outputs an excerpt on failure.
+    - OPAM_LOGS=opam_logs/ ./scripts/ci/opam_handle_output.sh
+  artifacts:
+    paths:
+      - opam_logs/
+    expire_in: 1 week
+    when: always
+
+# Add variables for bisect_ppx instrumentation
+.template__coverage:
+  variables:
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+    BISECT_FILE: $CI_PROJECT_DIR/_coverage_output/
+    SLACK_COVERAGE_CHANNEL: C02PHBE7W73
+
+# Merge coverage files after the execution
+.template__coverage_files:
+  extends: .template__coverage
+  after_script:
+    - COVERAGE_MERGED=$(echo $CI_JOB_NAME | sed -r 's/[\/_ ]/-/g')
+    # If the merge fails, we upload a corrupted coverage file for the test job
+    - bisect-ppx-report merge --coverage-path $BISECT_FILE $COVERAGE_MERGED.coverage
+      || { COVERAGE_MERGED=$COVERAGE_MERGED.corrupted; echo "" > $COVERAGE_MERGED.coverage; }
+    # If there is nothing to remove we still want to continue and move the corrupted file
+    - rm $BISECT_FILE*.coverage || true
+    - mv $COVERAGE_MERGED.coverage $BISECT_FILE
+  artifacts:
+    name: "coverage-files-$CI_JOB_NAME"
+    paths:
+      - $BISECT_FILE
+    expire_in: 1 day
+    when: on_success

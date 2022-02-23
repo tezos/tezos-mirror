@@ -82,7 +82,8 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
         if not (Sys.file_exists filename) then return default
         else
           Lwt_utils_unix.Json.read_file filename
-          |> generic_trace "could not read the %s alias file" alias_name
+          >|= record_trace_eval (fun () ->
+                  error_of_fmt "could not read the %s alias file" alias_name)
           >>=? fun json ->
           match Data_encoding.Json.destruct encoding json with
           | exception e ->
@@ -100,8 +101,11 @@ class unix_wallet ~base_dir ~password_filename : Client_context.wallet =
             Lwt_utils_unix.create_dir base_dir >>= fun () ->
             let filename = self#filename alias_name in
             let json = Data_encoding.Json.construct encoding list in
-            Lwt_utils_unix.Json.write_file filename json)
-        |> generic_trace "could not write the %s alias file." alias_name
+            let filename_tmp = filename ^ "_tmp" in
+            Lwt_utils_unix.Json.write_file filename_tmp json >>=? fun () ->
+            Lwt_unix.rename filename_tmp filename >>= fun () -> return_unit)
+        >|= record_trace_eval (fun () ->
+                error_of_fmt "could not write the %s alias file." alias_name)
   end
 
 class unix_prompter : Client_context.prompter =
@@ -179,7 +183,7 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     inherit
       Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
         rpc_config
-        Media_type.all_media_types
+        rpc_config.media_type
 
     inherit unix_ui
 
@@ -190,8 +194,8 @@ class unix_full ~base_dir ~chain ~block ~confirmations ~password_filename
     method confirmations = confirmations
   end
 
-class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
-  Client_context.full =
+class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context
+  ~protocol_data : Client_context.full =
   object
     inherit unix_logger ~base_dir
 
@@ -206,6 +210,7 @@ class unix_mockup ~base_dir ~mem_only ~mockup_env ~chain_id ~rpc_context :
         mockup_env
         chain_id
         rpc_context
+        protocol_data
 
     inherit unix_ui
 
@@ -230,7 +235,7 @@ class unix_proxy ~base_dir ~chain ~block ~confirmations ~password_filename
         (new unix_logger ~base_dir)
         (new Tezos_rpc_http_client_unix.RPC_client_unix.http_ctxt
            rpc_config
-           Media_type.all_media_types)
+           rpc_config.media_type)
         mode
         proxy_env
 

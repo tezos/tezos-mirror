@@ -156,6 +156,35 @@ let bytes_arb = QCheck.(map ~rev:Bytes.to_string Bytes.of_string string)
 let of_option_shrink shrink_opt x yield =
   Option.iter (fun shrink -> shrink x yield) shrink_opt
 
+let sublist : 'a list -> 'a list QCheck.Gen.t =
+  (* [take_n n l] returns the first [n] elements of [l].
+     We do not reuse the implementation from [Stdlib.TzList] to avoid a
+     dependency cycle. *)
+  let rec take_n n = function
+    | x :: xs when n > 0 -> x :: take_n (n - 1) xs
+    | _ -> []
+  in
+  fun elems ->
+    let open QCheck.Gen in
+    match elems with
+    | [] -> return []
+    | _ ->
+        let* res_len = int_range 0 (List.length elems) in
+        let+ shuffle = shuffle_l elems in
+        take_n res_len shuffle
+
+let holey (l : 'a list) : 'a list QCheck.Gen.t =
+  let open QCheck.Gen in
+  (* Generate as many Booleans as there are elements in [l] *)
+  let+ bools = list_size (return (List.length l)) bool in
+  let rev_result =
+    List.fold_left
+      (fun acc (elem, pick) -> if pick then elem :: acc else acc)
+      []
+      (List.combine l bools)
+  in
+  List.rev rev_result
+
 module MakeMapArb (Map : Stdlib.Map.S) = struct
   open QCheck
 

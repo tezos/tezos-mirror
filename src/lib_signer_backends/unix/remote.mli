@@ -35,9 +35,9 @@ module Make
       val logger : RPC_client.logger
     end) : Client_keys.SIGNER
 
-val make_pk : Signature.public_key -> Client_keys.pk_uri tzresult Lwt.t
+val make_pk : Signature.public_key -> Client_keys.pk_uri tzresult
 
-val make_sk : Signature.secret_key -> Client_keys.sk_uri tzresult Lwt.t
+val make_sk : Signature.secret_key -> Client_keys.sk_uri tzresult
 
 val read_base_uri_from_env : unit -> Uri.t option tzresult Lwt.t
 

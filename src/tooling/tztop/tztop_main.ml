@@ -58,17 +58,14 @@ let () =
   match Arg.of_sys_argv Sys.argv with
   | Some arg ->
       let directory = Arg.get_working_directory arg in
-      let directory_does_exist = try
-          Sys.is_directory directory
-        with
-        | _ -> false
+      let directory_does_exist =
+        try Sys.is_directory directory with _ -> false
       in
-      if not directory_does_exist then
-        begin
-          Printf.printf "stdout:%s is either not a directory or doesn't exist\n"
-            directory;
-          exit (-1)
-        end;
+      if not directory_does_exist then (
+        Printf.printf
+          "stdout:%s is either not a directory or doesn't exist\n"
+          directory ;
+        exit (-1)) ;
       let new_argv = Arg.to_toplevel_sys_argv arg in
       Toploop.override_sys_argv new_argv ;
       Tztop_common.patch_env_loading () ;

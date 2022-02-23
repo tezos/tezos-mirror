@@ -90,13 +90,18 @@ let wait_for_connections node connections =
   let* () = Node.wait_for_ready node in
   waiter
 
-let start ?(public = false) ?event_level ?(wait_connections = false) nodes =
+let start ?(public = false) ?event_level ?event_sections_levels
+    ?(wait_connections = false) nodes =
   let start_node node =
     let* () = Node.identity_generate node in
     let n = Node.get_peers node |> List.length in
     let* () = Node.config_init node [] in
     let* () =
-      Node.run ?event_level node (if public then [] else [Private_mode])
+      Node.run
+        ?event_level
+        ?event_sections_levels
+        node
+        (if public then [] else [Private_mode])
     in
     let waiter =
       if wait_connections then wait_for_connections node n

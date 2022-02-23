@@ -245,7 +245,7 @@ done
 # add this protocol to the immutable list
 printf \\n$long_hash >> ../../lib_protocol_compiler/final_protocol_versions
 
-dune exec ../../lib_protocol_compiler/replace.exe ../../lib_protocol_compiler/dune_protocol.template.v1 dune.inc ../../lib_protocol_compiler/final_protocol_versions ${version}_${short_hash}
+dune exec ../../lib_protocol_compiler/bin/replace.exe ../../lib_protocol_compiler/dune_protocol.template.v1 dune.inc ../../lib_protocol_compiler/final_protocol_versions ${version}_${short_hash}
 
 cd ../../..
 
@@ -256,5 +256,4 @@ if [ -z "$SILENCE_REMINDER" ]; then
   echo "Generated src/proto_${version}_${short_hash}. Don't forget to:"
   echo ""
   echo "  dune exec scripts/declare-new-protocol-unit-test/main.exe -- ${version} ${short_hash}"
-  echo "  ./scripts/update_integration_test.sh"
 fi

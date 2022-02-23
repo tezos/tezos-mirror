@@ -26,9 +26,9 @@
 #    new docker image with all the prebuilt dependencies will be
 #    created by the CI.
 #
-# 5. Update the variable `opam_repository_tag` in files
-#    `scripts/version.sh` and `.gitlab-ci.yml` with the hash of the
-#    newly created commit in `tezos/opam-repository`.
+# 5. Update the variable `opam_repository_tag` in `scripts/version.sh` 
+#    and the variable `build_deps_image_version` in `.gitlab/ci/templates.yml` 
+#    with the hash of the newly created commit in `tezos/opam-repository`.
 #
 # 6. Enjoy your new dependencies
 
@@ -49,7 +49,7 @@ src_dir="$(dirname "$script_dir")"
 
 . "$script_dir"/version.sh
 
-opams=$(find "$src_dir/vendors" "$src_dir/src" -name \*.opam -print)
+opams=$(find "$src_dir/vendors" "$src_dir/src" "$src_dir/tezt" -name \*.opam -print)
 
 ## Shallow clone of opam repository (requires git protocol version 2)
 export GIT_WORK_TREE="$tmp_dir"
@@ -85,9 +85,28 @@ for opam in $opams; do
 
 done
 
+
 ## Filtering unrequired packages
 cd $tmp_dir
 git reset --hard "$full_opam_repository_tag"
+
+## we add a dummy package that conflict with all "hidden" packages
+dummy_pkg=dummy-tezos
+dummy_path=packages/$dummy_pkg/$dummy_pkg.dev
+dummy_opam=$dummy_path/opam
+mkdir -p $dummy_path
+echo 'opam-version: "2.0"' > $dummy_opam
+echo 'conflicts:[' >> $dummy_opam
+for f in $(find ./ -name opam | xargs -n1 grep "^flags: *\[ *avoid-version *\]" -l);
+do
+    f=$(dirname $f)
+    f=$(basename $f)
+    p=$(echo $f | cut -d '.' -f '1')
+    v=$(echo $f | cut -d '.' -f '2-')
+    echo "\"$p\" {= \"$v\"}" >> $dummy_opam
+done
+echo ']' >> $dummy_opam
+
 # Opam < 2.1 requires opam-depext as a plugin, later versions include it
 # natively:
 extra_warning=""
@@ -104,7 +123,8 @@ fixing the resulting merge-request, or re-running with opam 2.0.x)."
 esac
 #shellcheck disable=SC2086
 OPAMSOLVERTIMEOUT=600 opam admin filter --yes --resolve \
-  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed
+  $packages,ocaml,ocaml-base-compiler,odoc,${opam_depext_dep}js_of_ocaml-ppx,opam-ed,$dummy_pkg
+
 
 ## Adding useful compiler variants
 for variant in afl flambda fp spacetime ; do
@@ -117,6 +137,7 @@ for opam in $opams; do
     package=${file%.opam}
     rm -r "$tmp_dir"/packages/$package
 done
+rm -r "$tmp_dir"/packages/$dummy_pkg
 
 ## Adding safer hashes
 opam admin add-hashes sha256 sha512
@@ -131,6 +152,6 @@ git diff HEAD -- packages > "$target"
 echo
 echo "Wrote proposed update in: $target."
 echo 'Please add this patch to: `https://gitlab.com/tezos/opam-repository`'
-echo 'And update accordingly the commit hash in: `.gitlab-ci.yml` and `scripts/version.sh`'
+echo 'And update accordingly the commit hash in: `.gitlab/ci/templates.yml` and `scripts/version.sh`'
 echo "$extra_warning"
 echo

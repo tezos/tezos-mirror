@@ -31,14 +31,14 @@
    This module exports the old names (available in some legacy protocol
    environments) for backwards compatibility purpose. *)
 
-let ok_unit = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_unit
+let ok_unit = Ok ()
 
-let ok_none = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_none
+let ok_none = Ok None
 
-let ok_some = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_some
+let ok_some x = Ok (Some x)
 
-let ok_nil = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_nil
+let ok_nil = Ok []
 
-let ok_true = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_true
+let ok_true = Ok true
 
-let ok_false = Tezos_lwt_result_stdlib.Lwtreslib.Bare.Monad.Result.return_false
+let ok_false = Ok false

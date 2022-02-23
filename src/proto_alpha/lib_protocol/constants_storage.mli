@@ -30,19 +30,9 @@ val blocks_per_cycle : Raw_context.t -> int32
 
 val blocks_per_commitment : Raw_context.t -> int32
 
-val blocks_per_roll_snapshot : Raw_context.t -> int32
+val blocks_per_stake_snapshot : Raw_context.t -> int32
 
 val blocks_per_voting_period : Raw_context.t -> int32
-
-val time_between_blocks : Raw_context.t -> Period_repr.t list
-
-val minimal_block_delay : Raw_context.t -> Period_repr.t
-
-val endorsers_per_block : Raw_context.t -> int
-
-val initial_endorsers : Raw_context.t -> int
-
-val delay_per_missing_endorsement : Raw_context.t -> Period_repr.t
 
 val hard_gas_limit_per_operation :
   Raw_context.t -> Gas_limit_repr.Arith.integral
@@ -61,13 +51,11 @@ val seed_nonce_revelation_tip : Raw_context.t -> Tez_repr.t
 
 val origination_size : Raw_context.t -> int
 
-val block_security_deposit : Raw_context.t -> Tez_repr.t
+val baking_reward_fixed_portion : Raw_context.t -> Tez_repr.t
 
-val endorsement_security_deposit : Raw_context.t -> Tez_repr.t
+val baking_reward_bonus_per_slot : Raw_context.t -> Tez_repr.t
 
-val baking_reward_per_endorsement : Raw_context.t -> Tez_repr.t list
-
-val endorsement_reward : Raw_context.t -> Tez_repr.t list
+val endorsing_reward_per_slot : Raw_context.t -> Tez_repr.t
 
 val quorum_min : Raw_context.t -> int32
 
@@ -82,3 +70,26 @@ val liquidity_baking_sunset_level : Raw_context.t -> int32
 val liquidity_baking_escape_ema_threshold : Raw_context.t -> int32
 
 val parametric : Raw_context.t -> Constants_repr.parametric
+
+val consensus_committee_size : Raw_context.t -> int
+
+val consensus_threshold : Raw_context.t -> int
+
+val minimal_participation_ratio : Raw_context.t -> Constants_repr.ratio
+
+val max_slashing_period : Raw_context.t -> int
+
+val frozen_deposits_percentage : Raw_context.t -> int
+
+val double_baking_punishment : Raw_context.t -> Tez_repr.t
+
+val tx_rollup_enable : Raw_context.t -> bool
+
+val tx_rollup_origination_size : Raw_context.t -> int
+
+val ratio_of_frozen_deposits_slashed_per_double_endorsement :
+  Raw_context.t -> Constants_repr.ratio
+
+val minimal_block_delay : Raw_context.t -> Period_repr.t
+
+val delay_increment_per_round : Raw_context.t -> Period_repr.t

@@ -53,10 +53,16 @@ class TestManualBaking:
     spurious fails due to slow CI."""
 
     def test_endorse(self, client: Client):
-        utils.bake(client)
+        utils.bake(
+            client,
+            bake_args=['--max-priority', f'{ENDORSING_SLOTS_PER_BLOCK+1}'],
+        )
         for account in ACCOUNTS:
             client.endorse(account)
-        utils.bake(client)
+        utils.bake(
+            client,
+            bake_args=['--max-priority', f'{ENDORSING_SLOTS_PER_BLOCK+1}'],
+        )
 
     def test_check_baking_time_from_log(self, required_log_dir, client):
         assert required_log_dir

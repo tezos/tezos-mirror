@@ -1,0 +1,36 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[macros/guestbook.tz]
+
+Well typed
+Gas remaining: 1039986.383 units remaining
+{ parameter string ;
+  storage (map address (option string)) ;
+  code { UNPAIR @message @guestbook
+         /* [ @message string : @guestbook map address (option string) ] */ ;
+         SWAP
+         /* [ @guestbook map address (option string) : @message string ] */ ;
+         DUP
+         /* [ @guestbook map address (option string)
+            : @guestbook map address (option string) : @message string ] */ ;
+         SENDER
+         /* [ @sender address : @guestbook map address (option string)
+            : @guestbook map address (option string) : @message string ] */ ;
+         GET @previous_message
+         /* [ @previous_message option (option string)
+            : @guestbook map address (option string) : @message string ] */ ;
+         ASSERT_SOME ;
+         ASSERT_NONE ;
+         SWAP
+         /* [ @message string : @guestbook map address (option string) ] */ ;
+         SOME
+         /* [ option string : @guestbook map address (option string) ] */ ;
+         SOME
+         /* [ option (option string) : @guestbook map address (option string) ] */ ;
+         SENDER
+         /* [ @sender address : option (option string)
+            : @guestbook map address (option string) ] */ ;
+         UPDATE
+         /* [ @guestbook map address (option string) ] */ ;
+         NIL operation
+         /* [ list operation : @guestbook map address (option string) ] */ ;
+         PAIR
+         /* [ pair (list operation) (map @guestbook address (option string)) ] */ } }

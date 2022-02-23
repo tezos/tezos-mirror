@@ -370,7 +370,9 @@ include Tezos_raw_protocol_004_Pt24m4xi.Main
 
 (library
  (name tezos_protocol_004_Pt24m4xi_functor)
- (instrumentation (backend bisect_ppx))
+ ; The instrumentation is removed as it can lead to a stack overflow
+ ; https://gitlab.com/tezos/tezos/-/issues/1927
+ ; (instrumentation (backend bisect_ppx))
  (public_name tezos-protocol-functor-004-Pt24m4xi)
  (libraries
       tezos-protocol-environment

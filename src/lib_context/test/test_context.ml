@@ -205,13 +205,11 @@ let test_replay {idx; genesis; _} =
       Assert.equal_string_option ~msg:__LOC__ (Some "Juillet") (c juillet) ;
       Lwt.return_unit
 
-let fold_keys s root ~init ~f =
-  fold s root ~init ~f:(fun k v acc ->
+let fold_keys s root ~order ~init ~f =
+  fold s root ~order ~init ~f:(fun k v acc ->
       match Tree.kind v with
       | `Value -> f (root @ k) acc
       | `Tree -> Lwt.return acc)
-
-let keys t = fold_keys t ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
 
 let steps =
   ["00"; "01"; "02"; "03"; "05"; "06"; "07"; "09"; "0a"; "0b"; "0c";
@@ -238,7 +236,13 @@ let bindings =
   let zero = Bytes.make 10 '0' in
   List.map (fun x -> (["root"; x], zero)) steps
 
-let test_fold_keys {idx; genesis; _} =
+let test_fold_keys ~order {idx; genesis; _} =
+  let keys t =
+    fold_keys t ~order ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+  in
+  let sort_keys l =
+    match order with `Sorted -> List.rev l | `Undefined -> List.sort compare l
+  in
   checkout idx genesis >>= function
   | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
@@ -248,15 +252,17 @@ let test_fold_keys {idx; genesis; _} =
       add ctxt ["f"] (Bytes.of_string "Avril") >>= fun ctxt ->
       add ctxt ["g"; "h"] (Bytes.of_string "Avril") >>= fun ctxt ->
       keys ctxt [] >>= fun l ->
+      let l = sort_keys l in
       Assert.equal_string_list_list
         ~msg:__LOC__
         [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]; ["f"]; ["g"; "h"]]
-        (List.sort compare l) ;
+        l ;
       keys ctxt ["a"] >>= fun l ->
+      let l = sort_keys l in
       Assert.equal_string_list_list
         ~msg:__LOC__
         [["a"; "b"]; ["a"; "c"]; ["a"; "d"; "e"]]
-        (List.sort compare l) ;
+        l ;
       keys ctxt ["f"] >>= fun l ->
       Assert.equal_string_list_list ~msg:__LOC__ [] l ;
       keys ctxt ["g"] >>= fun l ->
@@ -267,11 +273,16 @@ let test_fold_keys {idx; genesis; _} =
       >>= fun ctxt ->
       commit ctxt >>= fun h ->
       checkout_exn idx h >>= fun ctxt ->
-      fold_keys ctxt ["root"] ~init:[] ~f:(fun k acc -> Lwt.return (k :: acc))
+      fold_keys ctxt ["root"] ~order ~init:[] ~f:(fun k acc ->
+          Lwt.return (k :: acc))
       >>= fun bs ->
-      let bs = List.rev bs in
+      let bs = sort_keys bs in
       Assert.equal_string_list_list ~msg:__LOC__ (List.map fst bindings) bs ;
       Lwt.return_unit
+
+let test_fold_keys_sorted = test_fold_keys ~order:`Sorted
+
+let test_fold_keys_undefined = test_fold_keys ~order:`Undefined
 
 (** Checkout the context at [genesis] and fold upon a context a series
     of key settings. *)
@@ -284,7 +295,13 @@ let test_fold {idx; genesis; _} =
       add ctxt ["foo"; "toto"] foo1 >>= fun ctxt ->
       add ctxt ["foo"; "bar"; "toto"] foo2 >>= fun ctxt ->
       let fold depth ecs ens =
-        fold ?depth ctxt [] ~init:([], []) ~f:(fun path t (cs, ns) ->
+        fold
+          ?depth
+          ctxt
+          []
+          ~order:`Sorted
+          ~init:([], [])
+          ~f:(fun path t (cs, ns) ->
             match Tree.kind t with
             | `Tree -> Lwt.return (cs, path :: ns)
             | `Value -> Lwt.return (path :: cs, ns))
@@ -314,8 +331,14 @@ let test_trees {idx; genesis; _} =
   checkout idx genesis >>= function
   | None -> Assert.fail_msg "checkout genesis_block"
   | Some ctxt ->
-      Tree.fold ~depth:(`Eq 1) ~init:() (Tree.empty ctxt) [] ~f:(fun k _ () ->
-          assert (List.length k = 1) ;
+      Tree.fold
+        ~depth:(`Eq 1)
+        ~order:`Sorted
+        ~init:()
+        (Tree.empty ctxt)
+        []
+        ~f:(fun k _ () ->
+          assert (Compare.List_length_with.(k = 1)) ;
           Assert.fail_msg "empty")
       >>= fun () ->
       let foo1 = Bytes.of_string "foo1" in
@@ -324,7 +347,13 @@ let test_trees {idx; genesis; _} =
       Tree.add v1 ["foo"; "toto"] foo1 >>= fun v1 ->
       Tree.add v1 ["foo"; "bar"; "toto"] foo2 >>= fun v1 ->
       let fold depth ecs ens =
-        Tree.fold v1 ?depth [] ~init:([], []) ~f:(fun path t (cs, ns) ->
+        Tree.fold
+          v1
+          ?depth
+          []
+          ~order:`Sorted
+          ~init:([], [])
+          ~f:(fun path t (cs, ns) ->
             match Tree.kind t with
             | `Tree -> Lwt.return (cs, path :: ns)
             | `Value -> Lwt.return (path :: cs, ns))
@@ -519,7 +548,8 @@ let tests : (string * (t -> unit Lwt.t)) list =
     ("continuation", test_continuation);
     ("fork", test_fork);
     ("replay", test_replay);
-    ("fold_keys", test_fold_keys);
+    ("fold_keys_sorted", test_fold_keys_sorted);
+    ("fold_keys_undefined", test_fold_keys_undefined);
     ("fold", test_fold);
     ("trees", test_trees);
     ("raw", test_raw);

@@ -6,9 +6,9 @@
             tezos-shell
             tezos-rpc-http-server
             tezos-protocol-updater
-            ; TODO nomadic-labs/tezos#462: adapt next line(s)
-            tezos-embedded-protocol-010-PtGRANAD
+            ; TODO tezos/tezos#2170: adapt next line(s)
             tezos-embedded-protocol-011-PtHangz2
+            tezos-embedded-protocol-012-Psithaca
             tezos-embedded-protocol-alpha
             data-encoding
             re)

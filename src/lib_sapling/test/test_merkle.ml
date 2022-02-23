@@ -2,7 +2,7 @@ module R = Rustzcash
 module Core = Core.Client
 module Storage = Storage.Make_Storage (Core)
 
-let ba_of_hex h = Hex.to_bytes (`Hex h)
+let ba_of_hex h = Hex.to_bytes_exn (`Hex h)
 
 (* Some test vectors are in bigendian *)
 let ba_of_hex_be h =
@@ -302,10 +302,10 @@ let test_merkle3 () =
       assert (get_cm t pos = Some cm) ;
       assert (get_root t = Core.Hash.uncommitted ~height:32) ;
       let l = get_from t 0L |> Stdlib.Option.get in
-      assert (List.length l = Int64.to_int pos + 1) ;
+      assert (Compare.List_length_with.(l = Int64.to_int pos + 1)) ;
       List.iter (fun e -> assert (e = cm)) l ;
       let l = get_from t pos |> Stdlib.Option.get in
-      assert (List.length l = 1) ;
+      assert (Compare.List_length_with.(l = 1)) ;
       assert (List.hd l = cm) ;
       assert (get_from t (Int64.succ pos) = None) ;
       loop t (Int64.succ pos)

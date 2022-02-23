@@ -1,0 +1,70 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[opcodes/ediv.tz]
+
+Well typed
+Gas remaining: 1039978.198 units remaining
+{ parameter (pair int int) ;
+  storage
+    (pair (option (pair int nat))
+          (option (pair int nat))
+          (option (pair int nat))
+          (option (pair nat nat))) ;
+  code { CAR
+         /* [ @parameter pair int int ] */ ;
+         DUP
+         /* [ @parameter pair int int : @parameter pair int int ] */ ;
+         UNPAIR
+         /* [ int : int : @parameter pair int int ] */ ;
+         ABS
+         /* [ nat : int : @parameter pair int int ] */ ;
+         DIP { ABS /* [ nat : @parameter pair int int ] */ }
+         /* [ nat : nat : @parameter pair int int ] */ ;
+         EDIV
+         /* [ option (pair nat nat) : @parameter pair int int ] */ ;
+         SWAP
+         /* [ @parameter pair int int : option (pair nat nat) ] */ ;
+         DUP
+         /* [ @parameter pair int int : @parameter pair int int : option (pair nat nat) ] */ ;
+         UNPAIR
+         /* [ int : int : @parameter pair int int : option (pair nat nat) ] */ ;
+         ABS
+         /* [ nat : int : @parameter pair int int : option (pair nat nat) ] */ ;
+         EDIV
+         /* [ option (pair int nat) : @parameter pair int int : option (pair nat nat) ] */ ;
+         SWAP
+         /* [ @parameter pair int int : option (pair int nat) : option (pair nat nat) ] */ ;
+         DUP
+         /* [ @parameter pair int int : @parameter pair int int : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         UNPAIR
+         /* [ int : int : @parameter pair int int : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         DIP { ABS
+               /* [ nat : @parameter pair int int : option (pair int nat)
+                  : option (pair nat nat) ] */ }
+         /* [ int : nat : @parameter pair int int : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         EDIV
+         /* [ option (pair int nat) : @parameter pair int int : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         SWAP
+         /* [ @parameter pair int int : option (pair int nat) : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         UNPAIR
+         /* [ int : int : option (pair int nat) : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         EDIV
+         /* [ option (pair int nat) : option (pair int nat) : option (pair int nat)
+            : option (pair nat nat) ] */ ;
+         PAPAPAIR ;
+         NIL operation
+         /* [ list operation
+            : pair (option (pair int nat))
+                 (option (pair int nat))
+                 (option (pair int nat))
+                 (option (pair nat nat)) ] */ ;
+         PAIR
+         /* [ pair (list operation)
+                 (option (pair int nat))
+                 (option (pair int nat))
+                 (option (pair int nat))
+                 (option (pair nat nat)) ] */ } }

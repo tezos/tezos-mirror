@@ -23,10 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-module Make (Prefix : Sig.PREFIX) : sig
+module Make (Prefix : Sig.PREFIX) (Category : Sig.ERROR_CATEGORY) : sig
   type error = ..
 
-  include Sig.CORE with type error := error
+  type error_category = Category.t
+
+  include
+    Sig.CORE with type error := error and type error_category := error_category
 
   include Sig.WITH_WRAPPED with type error := error
 end

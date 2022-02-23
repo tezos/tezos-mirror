@@ -1,0 +1,25 @@
+(library
+ (name tezos_alpha_mockup_simulator)
+ (public_name tezos-baking-alpha.mockup-simulator)
+ (libraries tezos-client-base-unix
+            tezos-client-commands
+            tezos-protocol-alpha
+            tezos-baking-alpha
+            tezos-mockup
+            tezos-mockup-proxy
+            tezos-mockup-commands
+            tenderbrute)
+ (flags (:standard -open Tezos_base__TzPervasives
+                   -open Tezos_protocol_alpha
+                   -open Tezos_client_alpha
+                   -open Tezos_client_commands
+                   -open Tezos_baking_alpha
+                   -open Tezos_stdlib_unix
+                   -open Tezos_client_base_unix
+                   -open Tezos_protocol_alpha_parameters
+                   -open Tezos_protocol_alpha.Protocol)))
+
+(rule
+ (alias runtest_lint)
+ (deps (glob_files *.ml{,i}))
+ (action (run %{lib:tezos-tooling:lint.sh} %{deps})))

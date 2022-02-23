@@ -253,12 +253,15 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
     return t
 
   let output_json ~pp file_path event_json =
+    let open Lwt_syntax in
     Lwt.catch
       (fun () ->
-        Lwt_utils_unix.create_dir ~perm:0o700 (Filename.dirname file_path)
-        >>= fun () ->
-        Lwt_utils_unix.Json.write_file file_path event_json >>= function
-        | Ok () -> return_unit
+        let* () =
+          Lwt_utils_unix.create_dir ~perm:0o700 (Filename.dirname file_path)
+        in
+        let* ru = Lwt_utils_unix.Json.write_file file_path event_json in
+        match ru with
+        | Ok () -> Error_monad.return_unit
         | Error el ->
             failwith
               "ERROR while Handling %a,@ cannot write JSON to %s:@ %a\n%!"
@@ -277,6 +280,7 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
 
   let handle (type a) {path; lwt_bad_citizen_hack; event_filter} m
       ?(section = Internal_event.Section.empty) (v : unit -> a) =
+    let open Lwt_tzresult_syntax in
     let module M = (val m : Internal_event.EVENT_DEFINITION with type t = a) in
     let now = Micro_seconds.now () in
     let (date, time) = Micro_seconds.date_string now in
@@ -305,9 +309,10 @@ module Sink_implementation : Internal_event.SINK with type t = t = struct
             (Printf.sprintf "%s_%s_%s.json" date time tag)
         in
         lwt_bad_citizen_hack := (file_path, event_json) :: !lwt_bad_citizen_hack ;
-        output_json file_path event_json ~pp:(fun fmt () ->
-            M.pp ~short:false fmt forced)
-        >>=? fun () ->
+        let* () =
+          output_json file_path event_json ~pp:(fun fmt () ->
+              M.pp ~short:false fmt forced)
+        in
         lwt_bad_citizen_hack :=
           List.filter (fun (f, _) -> f <> file_path) !lwt_bad_citizen_hack ;
         return_unit
@@ -327,35 +332,44 @@ open Sink_implementation
 
 module Query = struct
   let with_file_kind dir p =
-    protect (fun () ->
-        Lwt_unix.stat (Filename.concat dir p) >>= fun {Lwt_unix.st_kind; _} ->
-        return st_kind)
-    >>=? function
+    let open Lwt_tzresult_syntax in
+    let* kind =
+      protect (fun () ->
+          let* {Lwt_unix.st_kind; _} =
+            Lwt_result.ok @@ Lwt_unix.stat (Filename.concat dir p)
+          in
+          return st_kind)
+    in
+    match kind with
     | Unix.S_DIR -> return (`Directory p)
     | Unix.S_REG -> return (`Regular_file p)
     | (Unix.S_CHR | Unix.S_BLK | Unix.S_LNK | Unix.S_FIFO | Unix.S_SOCK) as k ->
         return (`Special (k, p))
 
   let fold_directory path ~init ~f =
-    protect (fun () ->
-        Lwt_unix.opendir path >>= fun dirhandle -> return dirhandle)
-    >>=? fun dirhandle ->
+    let open Lwt_tzresult_syntax in
+    let* dirhandle =
+      protect (fun () -> Lwt_result.ok @@ Lwt_unix.opendir path)
+    in
     let rec iter prev =
-      protect (fun () ->
-          Lwt.catch
-            (fun () ->
-              Lwt_unix.readdir dirhandle >>= fun d ->
-              with_file_kind path d >>=? fun wk -> return_some wk)
-            (function
-              | End_of_file ->
-                  Lwt_unix.closedir dirhandle >>= fun () -> return_none
-              | (e : exn) ->
-                  failwith
-                    "ERROR while folding %s: %s"
-                    path
-                    (Printexc.to_string e)))
-      >>=? fun opt ->
-      prev >>=? fun p ->
+      let* opt =
+        protect (fun () ->
+            Lwt.catch
+              (fun () ->
+                let* d = Lwt_result.ok @@ Lwt_unix.readdir dirhandle in
+                let* wk = with_file_kind path d in
+                return_some wk)
+              (function
+                | End_of_file ->
+                    let* () = Lwt_result.ok @@ Lwt_unix.closedir dirhandle in
+                    return_none
+                | (e : exn) ->
+                    failwith
+                      "ERROR while folding %s: %s"
+                      path
+                      (Printexc.to_string e)))
+      in
+      let* p = prev in
       match opt with Some more -> iter (f p more) | None -> prev
     in
     iter init
@@ -525,6 +539,7 @@ module Query = struct
 
   let fold ?on_unknown ?only_sections ?only_names ?(time_query = `All) uri ~init
       ~f =
+    let open Lwt_tzresult_syntax in
     let name_matches =
       match only_names with
       | None -> fun _ -> true
@@ -535,7 +550,7 @@ module Query = struct
       | None -> fun _ -> true
       | Some l -> fun name -> List.mem ~equal:(Option.equal String.equal) name l
     in
-    configure uri >>=? fun {path = sink_path; _} ->
+    let* {path = sink_path; _} = configure uri in
     fold_directory
       sink_path
       ~init:(return ([], init))
@@ -575,7 +590,8 @@ module Query = struct
                                       (sink_path // dir // event_name)
                                       ~init:previous
                                       ~f:(fun prev file ->
-                                        f file >>=? fun () -> return prev)))
+                                        let* () = f file in
+                                        return prev)))
                         | `Directory _ (* filtered out *) -> return previous
                         | `Regular_file p | `Special (_, p) ->
                             return_with_warning

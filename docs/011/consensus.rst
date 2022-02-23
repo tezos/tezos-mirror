@@ -36,6 +36,7 @@ Emmy* improves Emmy+ in that it brings smaller block times and faster times to
 finality.
 
 
+.. _terminology:
 .. _terminology_011:
 
 Terminology
@@ -44,10 +45,11 @@ Terminology
 A *block* in the blockchain consists of a header and a list of operations. The
 header has a shell part (common to all protocols) and a
 protocol-specific part. In Emmy*, :ref:`the protocol-specific part of the
-header<emmyp_fitness_and_header_011>` contains, most notably, a timestamp, a
-priority (a natural number), and the endorsements for the block at the previous
-level. *Endorsements* are operations that can be seen as votes for a given
-block. Each block is signed.
+header<emmyp_fitness_and_header_011>` contains, most notably, a
+priority (a natural number). The consensus operations in a block are called *endorsements*.
+These operations can be seen as votes for a given block.
+The endorsements included a block at level ``l`` are votes for the block at the previous
+level ``l-1``. Each block is signed.
 
 Before being endorsed, blocks are baked. *Baking* is the action of producing and
 signing a block. Corresponding to these two actions of baking and endorsing, at
@@ -73,6 +75,7 @@ serves to compute the minimal time between blocks depending on the current
 block's priority `p`, and its endorsing power `e`. Namely, Emmy* defines the
 minimal block delay function as follows:
 
+.. _delaystar:
 .. _delaystar_011:
 
 .. math::
@@ -145,6 +148,7 @@ attributes).  A delegate plays two roles:
   a block by **endorsing** that block.
 
 
+.. _emmyp_slot_selection:
 .. _emmyp_slot_selection_011:
 
 To these roles correspond the two types of actions mentioned above, baking and
@@ -154,6 +158,7 @@ given by its baking, respectively endorsing slots, whose selection is described
 if the delegate whose turn is to bake is for some reason unable to bake, the
 next delegate in the list can step up and bake the block.
 
+.. _emmyp_fitness_and_header:
 .. _emmyp_fitness_and_header_011:
 
 There are two more notions which are defined abstractly at the level of the
@@ -172,6 +177,7 @@ protocol-specific header:
     ``BLOCKS_PER_COMMITMENT`` (see :ref:`Constants<ps_constants_011>`).
   - ``proof_of_work_nonce``: a nonce used to pass a low-difficulty
     proof-of-work for the block, as a spam prevention measure.
+  - ``liquidity_baking_escape_vote``: :ref:`a flag<esc_hatch_011>` that requests ending the subsidy.
 
 
 The consensus algorithm is implemented in Tezos in five components: the shell,
@@ -266,10 +272,11 @@ incident. Pragmatically, any baker who either double bakes or endorses in a
 given cycle should immediately stop both baking and endorsing for the rest of
 that cycle.
 
+.. _cs_constants:
 .. _cs_constants_011:
 
 Consensus protocol parameters
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+-----------------------------
 
 In this section we map the above notation to their corresponding parameter
 values.

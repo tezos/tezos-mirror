@@ -1,4 +1,4 @@
-.. TODO nomadic-labs/tezos#462: search shifted protocol name/number & adapt
+.. TODO tezos/tezos#2170: search shifted protocol name/number & adapt
 
 How to run Tezos
 ================
@@ -244,7 +244,7 @@ If for some reason your delegate is marked inactive you can reactivate
 it simply by re-registering again like above.
 
 To avoid your Tezos delegate being marked inactive while pausing it for maintenance work, it is advised to check the schedule of future baking and endorsing slots assigned to it, using a block explorer in the :ref:`Tezos community <tezos_community>`.
-Alternatively, you may use the :ref:`baking rights RPC <GET_..--block_id--helpers--baking_rights>`) and the :ref:`endorsing rights RPC <GET_..--block_id--helpers--endorsing_rights>`, able to return a list of baking/endorsing slots for a given delegate (see :ref:`example <DelegateRegistration>`).
+Alternatively, you may use the baking rights RPC and the endorsing rights RPC (see :doc:`../api/openapi`), which is able to return a list of baking/endorsing slots for a given delegate (see :ref:`example <DelegateRegistration>`).
 
 .. _baker_run:
 
@@ -267,20 +267,6 @@ baking for user *bob*::
     **Remember that having two bakers or endorsers running connected to the same account could lead to double baking/endorsing and the loss of all your bonds.**
     If you are worried about the availability of your node when it is its turn to bake/endorse, there are other ways than duplicating your credentials (see the discussion in section :ref:`inactive_delegates`).
     **Never** use the same account on two daemons.
-
-Endorser
-~~~~~~~~
-
-The endorser is a daemon that, once connected to an account, computes
-the endorsing rights for that account and, upon reception of a new
-block, verifies the validity of the block and emits an endorsement
-operation.
-It can endorse for a specific account or if omitted it endorses for
-all accounts.
-
-::
-
-   tezos-endorser-alpha run
 
 Accuser
 ~~~~~~~
@@ -305,12 +291,12 @@ Docker
 ~~~~~~
 
 The docker image runs the daemons by default for all your keys.
-Assuming you run on Granadanet, to know if you baked, just run::
+Assuming you run on Hangzhounet, to know if you baked, just run::
 
-    ./granadanet.sh baker log
-    ./granadanet.sh endorser log
+    ./hangzhounet.sh baker log
+    ./hangzhounet.sh endorser log
 
-(replace ``granadanet.sh`` with ``mainnet.sh`` for Mainnet).
+(replace ``hangzhounet.sh`` with ``mainnet.sh`` for Mainnet).
 You should see lines such as::
 
     Injected block BLxzbB7PBW1axq for bootstrap5 after BLSrg4dXzL2aqq  (level 1381, slot 0, fitness 00::0000000000005441, operations 21)

@@ -30,6 +30,11 @@ type error += Injection_not_possible
 
 type error += Cannot_parse_op
 
+type error += Cannot_parse_proto_data
+
+type callback_writer =
+  Tezos_protocol_environment.rpc_context -> bytes -> unit tzresult Lwt.t
+
 let () =
   register_error_kind
     `Temporary
@@ -53,7 +58,18 @@ let () =
     ~pp:(fun ppf () -> Format.pp_print_string ppf "Cannot parse operation.")
     Data_encoding.unit
     (function Cannot_parse_op -> Some () | _ -> None)
-    (fun () -> Canceled)
+    (fun () -> Cannot_parse_op)
+
+let () =
+  register_error_kind
+    `Temporary
+    ~id:"local_services.Cannot_parse_proto_data"
+    ~title:"Cannot_parse_proto_data"
+    ~description:"Cannot parse protocol data"
+    ~pp:(fun ppf () -> Format.pp_print_string ppf "Cannot parse protocol data.")
+    Data_encoding.unit
+    (function Cannot_parse_proto_data -> Some () | _ -> None)
+    (fun () -> Cannot_parse_proto_data)
 
 (* Since we bypass the node but still use the RPC mechanism for procedure
    calls, we have to register some RPCs ourselves. *)
@@ -68,6 +84,8 @@ module type MENV = sig
   val rpc_context : Tezos_protocol_environment.rpc_context
 
   val base_dir : string
+
+  val protocol_data : bytes
 end
 
 module Make (E : MENV) = struct
@@ -119,12 +137,13 @@ module Make (E : MENV) = struct
       Tezos_rpc.RPC_service.prefix path Block_services.Empty.S.protocols
     in
     Directory.register Directory.empty service (fun _prefix () () ->
+        let current_protocol =
+          if Compare.Int32.(E.rpc_context.block_header.level = 0l) then
+            Protocol_hash.zero
+          else protocol_hash
+        in
         Lwt.return
-          (`Ok
-            {
-              Block_services.current_protocol = protocol_hash;
-              next_protocol = protocol_hash;
-            }))
+          (`Ok {Block_services.current_protocol; next_protocol = protocol_hash}))
 
   let monitor () =
     let open Tezos_protocol_environment in
@@ -134,18 +153,21 @@ module Make (E : MENV) = struct
       Monitor_services.S.bootstrapped
       (fun () () () -> RPC_answer.return (block_hash, block_header.timestamp))
 
-  let check_chain (chain : Block_services.chain) =
-    let chain_chain_id =
-      match chain with
-      | `Main -> Chain_id.hash_string ["main"]
-      | `Test -> Chain_id.hash_string ["test"]
-      | `Hash cid -> cid
-    in
-    unless (Chain_id.equal E.chain_id chain_chain_id) (fun () ->
+  let chain_chain_id = function
+    | `Main -> Chain_id.hash_string ["main"]
+    | `Test -> Chain_id.hash_string ["test"]
+    | `Hash cid -> cid
+
+  let check_chain ?caller_name (chain : Block_services.chain) =
+    unless
+      (Chain_id.equal E.chain_id (chain_chain_id chain))
+      (fun () ->
         let msg =
           let open Format in
           asprintf
-            "Mismatched chain id: got %a but this mockup client expected %a."
+            "Mismatched chain id %a: got %a but this mockup client expected %a."
+            (Format.pp_print_option (fun ppf v -> Format.fprintf ppf "(%s)" v))
+            caller_name
             (fun ppf chain ->
               match chain with
               | `Main ->
@@ -167,10 +189,18 @@ module Make (E : MENV) = struct
         in
         Lwt.fail_with msg)
 
-  let begin_construction =
+  let proto_data_bytes_to_block_header_opt () =
+    Data_encoding.Binary.of_bytes_opt
+      E.Protocol.block_header_data_encoding
+      E.protocol_data
+
+  let partial_construction ~cache () =
     let predecessor = E.rpc_context.block_hash in
     let header = E.rpc_context.block_header in
     let predecessor_context = E.rpc_context.context in
+    let timestamp =
+      Time.System.to_protocol @@ Tezos_stdlib_unix.Systime_os.now ()
+    in
     E.Protocol.begin_construction
       ~chain_id:E.chain_id
       ~predecessor_context
@@ -178,7 +208,31 @@ module Make (E : MENV) = struct
       ~predecessor_level:header.level
       ~predecessor_fitness:header.fitness
       ~predecessor
-      ~timestamp:(Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ()))
+      ~timestamp
+      ~cache
+      ()
+
+  let full_construction ?timestamp ~protocol_data ~cache () =
+    let predecessor = E.rpc_context.block_hash in
+    let header = E.rpc_context.block_header in
+    let predecessor_context = E.rpc_context.context in
+    let timestamp =
+      let default =
+        Time.System.to_protocol @@ Tezos_stdlib_unix.Systime_os.now ()
+      in
+      Option.value timestamp ~default
+    in
+    E.Protocol.begin_construction
+      ~chain_id:E.chain_id
+      ~predecessor_context
+      ~predecessor_timestamp:header.timestamp
+      ~predecessor_level:header.level
+      ~predecessor_fitness:header.fitness
+      ~predecessor
+      ~protocol_data
+      ~timestamp
+      ~cache
+      ()
 
   let op_data_encoding = E.Protocol.operation_data_encoding
 
@@ -199,8 +253,8 @@ module Make (E : MENV) = struct
     let warn_trashpool_append =
       let pp1 ppf l =
         match List.length l with
-        (* This should not happend as the lone call to this function is
-           protected by a "unless"*)
+        (* This should never happen as the lone call to this function is
+           protected by a "unless" *)
         | 0 -> Format.pp_print_string ppf "nothing"
         | 1 -> Format.pp_print_string ppf "1 operation"
         | n -> Format.fprintf ppf "%d operations" n
@@ -220,6 +274,14 @@ module Make (E : MENV) = struct
         ~msg:
           "This operation already exists in the mempool and will thus be \
            ignored."
+        ~level:Internal_event.Warning
+        ()
+
+    let warn msg =
+      S.declare_0
+        ~section
+        ~name:(Printf.sprintf "local_services_warn_%s" msg)
+        ~msg:(Printf.sprintf "warning: %s" msg)
         ~level:Internal_event.Warning
         ()
   end
@@ -252,56 +314,53 @@ module Make (E : MENV) = struct
   module Mempool = Rw (Files.Mempool)
   module Trashpool = Rw (Files.Trashpool)
 
+  let to_applied (shell_header, operation_data) =
+    let op =
+      {E.Protocol.shell = shell_header; protocol_data = operation_data}
+    in
+    match Data_encoding.Binary.to_bytes op_data_encoding operation_data with
+    | Error _ -> failwith "mockup pending_operations"
+    | Ok proto ->
+        let operation_hash =
+          Operation.hash {Operation.shell = shell_header; proto}
+        in
+        return (operation_hash, op)
+
+  let with_chain ?caller_name chain k =
+    check_chain ?caller_name chain >>= function
+    | Error errs -> RPC_answer.fail errs
+    | Ok () -> k ()
+
   let pending_operations () =
     Directory.register
       Directory.empty
       (* /chains/<chain_id>/mempool/pending_operations *)
       (E.Block_services.S.Mempool.pending_operations
       @@ Block_services.mempool_path Block_services.chain_path)
-      (fun ((), chain) () () ->
+      (fun ((), chain) params () ->
         check_chain chain >>= function
         | Error errs -> RPC_answer.fail errs
         | Ok () -> (
             Mempool.read () >>= function
             | Error errs -> RPC_answer.fail errs
             | Ok pooled_operations -> (
-                List.map_es
-                  (fun (shell_header, operation_data) ->
-                    let op =
-                      {
-                        E.Protocol.shell = shell_header;
-                        protocol_data = operation_data;
-                      }
-                    in
-                    match
-                      Data_encoding.Binary.to_bytes
-                        op_data_encoding
-                        operation_data
-                    with
-                    | Error _ -> failwith "mockup pending_operations"
-                    | Ok proto ->
-                        let operation_hash =
-                          Operation.hash {Operation.shell = shell_header; proto}
-                        in
-                        return (operation_hash, op))
-                  pooled_operations
-                >>= function
+                List.map_es to_applied pooled_operations >>= function
                 | Error _ -> RPC_answer.fail [Cannot_parse_op]
                 | Ok applied ->
-                    Lwt.return
-                      (`Ok
-                        {
-                          E.Block_services.Mempool.applied;
-                          refused = Operation_hash.Map.empty;
-                          branch_refused = Operation_hash.Map.empty;
-                          branch_delayed = Operation_hash.Map.empty;
-                          unprocessed = Operation_hash.Map.empty;
-                        }))))
-
-  let with_chain chain k =
-    check_chain chain >>= function
-    | Error errs -> RPC_answer.fail errs
-    | Ok () -> k ()
+                    let pending_operations =
+                      {
+                        E.Block_services.Mempool.applied;
+                        refused = Operation_hash.Map.empty;
+                        outdated = Operation_hash.Map.empty;
+                        branch_refused = Operation_hash.Map.empty;
+                        branch_delayed = Operation_hash.Map.empty;
+                        unprocessed = Operation_hash.Map.empty;
+                      }
+                    in
+                    E.Block_services.Mempool
+                    .pending_operations_version_dispatcher
+                      ~version:params#version
+                      pending_operations)))
 
   let shell_header () =
     Directory.prefix
@@ -338,26 +397,41 @@ module Make (E : MENV) = struct
          Directory.empty
          E.Block_services.S.live_blocks
          (fun (((), chain), _block) () () ->
-           with_chain chain (fun () ->
+           with_chain ~caller_name:"live blocks" chain (fun () ->
                let set = Block_hash.Set.singleton E.rpc_context.block_hash in
                RPC_answer.return set))
 
-  let simulate_operation (validation_state, preapply_results) op =
-    E.Protocol.apply_operation validation_state op
-    >>=? fun (validation_state, _) ->
+  let simulate_operation (validation_state, preapply_result) op =
     match
       Data_encoding.Binary.to_bytes
         E.Protocol.operation_data_encoding
-        op.protocol_data
+        op.E.Protocol.protocol_data
     with
-    | Error _ -> failwith "mockup preapply_block"
-    | Ok proto ->
+    | Error _ -> failwith "mockup preapply_block: cannot deserialize operation"
+    | Ok proto -> (
         let op_t = {Operation.shell = op.shell; proto} in
         let hash = Operation.hash op_t in
-        return
-          ( validation_state,
-            Preapply_result.{empty with applied = [(hash, op_t)]}
-            :: preapply_results )
+        E.Protocol.apply_operation validation_state op >>= function
+        | Error e ->
+            let open Preapply_result in
+            return
+              ( validation_state,
+                {
+                  preapply_result with
+                  refused =
+                    Operation_hash.Map.add
+                      hash
+                      (op_t, e)
+                      preapply_result.refused;
+                } )
+        | Ok (validation_state, _) ->
+            let open Preapply_result in
+            return
+              ( validation_state,
+                {
+                  preapply_result with
+                  applied = (hash, op_t) :: preapply_result.applied;
+                } ))
 
   let preapply_block () =
     Directory.prefix
@@ -369,50 +443,71 @@ module Make (E : MENV) = struct
     @@ Directory.register
          Directory.empty
          E.Block_services.S.Helpers.Preapply.block
-         (fun (((), chain), _block) o {operations; protocol_data = _} ->
-           with_chain chain (fun () ->
-               ( begin_construction ~cache:`Lazy () >>=? fun validation_state ->
-                 List.fold_left_es
-                   (List.fold_left_es simulate_operation)
-                   (validation_state, [])
-                   operations
-                 >>=? fun (validation_state, preapply_results) ->
-                 (* The following is a "fake finalization" that must not
-                    commit into the protocol caches. Hence, [cache_nonce]
-                    is set to [None]. *)
-                 E.Protocol.finalize_block validation_state None
-                 >>=? fun (validation_result, _metadata) ->
-                 (* Similar to lib_shell.Prevalidation.preapply *)
-                 let operations_hash =
-                   let open Preapply_result in
-                   Operation_list_list_hash.compute
-                   @@ List.map
-                        (fun x ->
-                          Operation_list_hash.compute @@ List.map fst x.applied)
-                        preapply_results
-                 in
-                 let shell_header =
-                   {
-                     E.rpc_context.block_header with
-                     level = Int32.succ E.rpc_context.block_header.level;
-                     (* proto_level should be unchanged in mockup mode
-                        since we cannot switch protocols *)
-                     predecessor = E.rpc_context.block_hash;
-                     timestamp =
-                       (* The timestamp exists if --minimal-timestamp has
-                          been given on the command line *)
-                       (match o#timestamp with
-                       | None ->
-                           Time.System.to_protocol
-                             (Tezos_stdlib_unix.Systime_os.now ())
-                       | Some t -> t);
-                     operations_hash;
-                     validation_passes = List.length preapply_results;
-                     fitness = validation_result.fitness;
-                     context = Context_hash.zero (* TODO: is that correct ? *);
-                   }
-                 in
-                 return (shell_header, preapply_results) )
+         (fun (((), chain), _block) o {operations; protocol_data} ->
+           with_chain ~caller_name:"preapply_block" chain (fun () ->
+               (let timestamp = o#timestamp in
+                full_construction
+                  ~cache:`Lazy
+                  ?timestamp:o#timestamp
+                  ~protocol_data
+                  ()
+                >>=? fun validation_state ->
+                List.fold_left_es
+                  (fun (validation_passes, validation_state, validation_result)
+                       operations ->
+                    List.fold_left_es
+                      simulate_operation
+                      (validation_state, Preapply_result.empty)
+                      operations
+                    >>=? fun (state, result) ->
+                    let open Preapply_result in
+                    let p_result =
+                      {result with applied = List.rev result.applied}
+                    in
+                    return
+                      ( succ validation_passes,
+                        state,
+                        p_result :: validation_result ))
+                  (0, validation_state, [])
+                  operations
+                >>=? fun (validation_passes, validation_state, preapply_results)
+                  ->
+                let cache_nonce = Some E.rpc_context.block_header in
+                E.Protocol.finalize_block validation_state cache_nonce
+                >>=? fun (validation_result, _metadata) ->
+                (* Similar to lib_shell.Prevalidation.preapply *)
+                let operations_hash =
+                  let open Preapply_result in
+                  Operation_list_list_hash.compute
+                  @@ List.rev_map
+                       (fun x ->
+                         Operation_list_hash.compute @@ List.map fst x.applied)
+                       preapply_results
+                in
+                let timestamp =
+                  Option.value
+                    ~default:
+                      (Time.System.to_protocol
+                         (Tezos_stdlib_unix.Systime_os.now ()))
+                    timestamp
+                in
+                let shell_header =
+                  {
+                    E.rpc_context.block_header with
+                    level = Int32.succ E.rpc_context.block_header.level;
+                    (* proto_level should be unchanged in mockup mode
+                       since we cannot switch protocols *)
+                    predecessor = E.rpc_context.block_hash;
+                    timestamp
+                    (* The timestamp exists if --minimal-timestamp has
+                       been given on the command line *);
+                    operations_hash;
+                    validation_passes;
+                    fitness = validation_result.fitness;
+                    context = Context_hash.zero (* TODO: is that correct ? *);
+                  }
+                in
+                return (shell_header, List.rev preapply_results))
                >>= function
                | Error errs -> RPC_answer.fail errs
                | Ok v -> RPC_answer.return v))
@@ -429,8 +524,8 @@ module Make (E : MENV) = struct
          (* /chains/<chain_id>/blocks/<block_id>/helpers/preapply/operations *)
          E.Block_services.S.Helpers.Preapply.operations
          (fun ((_, chain), _block) () op_list ->
-           with_chain chain (fun () ->
-               ( begin_construction ~cache:`Lazy () >>=? fun state ->
+           with_chain ~caller_name:"preapply operations" chain (fun () ->
+               ( partial_construction ~cache:`Lazy () >>=? fun state ->
                  List.fold_left_es
                    (fun (state, acc) op ->
                      E.Protocol.apply_operation state op
@@ -455,27 +550,36 @@ module Make (E : MENV) = struct
     in
     Operation.hash {shell; proto}
 
-  let need_operation shell_header operation_data =
+  let equal_op (a_shell_header, a_operation_data)
+      (b_shell_header, b_operation_data) =
+    Block_hash.equal
+      a_shell_header.Operation.branch
+      b_shell_header.Operation.branch
+    && (* FIXME: the protocol should export equality/comparison functions for
+          its abstract types such as operation_data.  WARNING: the following
+          expression causes an exception to be raised, complaining about
+          functional values Stdlib.( = ) a_operation_data b_operation_data *)
+    Stdlib.compare a_operation_data b_operation_data = 0
+
+  let need_operation op =
     Mempool.read () >>=? fun mempool_operations ->
-    let op = (shell_header, operation_data) in
-    let op_hash = hash_op op in
-    if
-      List.exists
-        (fun op -> Operation_hash.equal op_hash (hash_op op))
-        mempool_operations
-    then return_false
+    if List.mem ~equal:equal_op op mempool_operations then return `Equal
     else
       let operations = op :: mempool_operations in
-      begin_construction ~cache:`Lazy () >>=? fun validation_state ->
+      partial_construction ~cache:`Lazy () >>=? fun validation_state ->
       List.fold_left_es
         (fun rstate (shell, protocol_data) ->
           simulate_operation rstate E.Protocol.{shell; protocol_data})
-        (validation_state, [])
+        (validation_state, Preapply_result.empty)
         operations
-      >>=? fun (validation_state, _) ->
-      (* A pre-application should not commit into the protocol
-         caches. For this reason, [cache_nonce] is [None]. *)
-      E.Protocol.finalize_block validation_state None >>=? fun _ -> return_true
+      >>=? fun (validation_state, preapply_result) ->
+      if Operation_hash.Map.is_empty preapply_result.refused then
+        E.Protocol.finalize_block validation_state None >>=? fun _ ->
+        return `Applicable
+      else return `Refused
+
+  let append_to_thraspool ~notification_msg op =
+    Trashpool.append [op] >>=? fun () -> failwith "%s" notification_msg
 
   let inject_operation_with_mempool operation_bytes =
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
@@ -488,22 +592,27 @@ module Make (E : MENV) = struct
         match proto_op_opt with
         | Error _ -> RPC_answer.fail [Cannot_parse_op]
         | Ok operation_data -> (
-            (need_operation shell_header operation_data >>=? function
-             | true -> Mempool.append [(shell_header, operation_data)]
-             | false ->
-                 L.(S.emit warn_mempool_mem) () >>= fun _ ->
-                 Trashpool.append [(shell_header, operation_data)])
+            let op = (shell_header, operation_data) in
+            (need_operation op >>=? function
+             | `Applicable -> Mempool.append [op]
+             | `Equal ->
+                 L.(S.emit warn_mempool_mem) () >>= fun () ->
+                 append_to_thraspool
+                   ~notification_msg:"Last operation is a duplicate"
+                   op
+             | `Refused ->
+                 append_to_thraspool
+                   ~notification_msg:"Last operation is refused"
+                   op)
             >>= function
             | Ok _ -> RPC_answer.return operation_hash
             | Error errs -> (
-                Trashpool.append [(shell_header, operation_data)] >>= function
+                Trashpool.append [op] >>= function
                 | Ok _ -> RPC_answer.fail errs
                 | Error errs2 -> RPC_answer.fail (errs @ errs2))))
 
   let inject_operation_without_mempool
-      (write_context_callback :
-        Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t)
-      operation_bytes =
+      (write_context_callback : callback_writer) operation_bytes =
     match Data_encoding.Binary.of_bytes Operation.encoding operation_bytes with
     | Error _ -> RPC_answer.fail [Cannot_parse_op]
     | Ok ({Operation.shell = shell_header; proto} as op) -> (
@@ -517,7 +626,7 @@ module Make (E : MENV) = struct
             let op =
               {E.Protocol.shell = shell_header; protocol_data = operation_data}
             in
-            ( begin_construction ~cache:`Lazy () >>=? fun state ->
+            ( partial_construction ~cache:`Lazy () >>=? fun state ->
               E.Protocol.apply_operation state op >>=? fun (state, receipt) ->
               (* The following finalization does not have to update protocol
                  caches because we are not interested in block creation here.
@@ -529,54 +638,57 @@ module Make (E : MENV) = struct
             match result with
             | Ok ({context; _}, _receipt) ->
                 let rpc_context = {E.rpc_context with context} in
-                Lwt.bind (write_context_callback rpc_context) (fun result ->
+                Lwt.bind
+                  (write_context_callback rpc_context proto)
+                  (fun result ->
                     match result with
                     | Ok () -> RPC_answer.return operation_hash
                     | Error errs -> RPC_answer.fail errs)
             | Error errs -> RPC_answer.fail errs))
 
-  (* [inject_block] is a feature that assumes that the mockup is on-disk and
-   * uses a mempool. *)
-  let inject_block
-      (write_context_callback :
-        Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+  let inject_block_generic (write_context_callback : callback_writer)
+      (update_mempool_callback : Operation.t list list -> unit tzresult Lwt.t) =
     let reconstruct (operations : Operation.t list list)
         (block_header : Block_header.t) =
-      let header = E.rpc_context.block_header in
-      let predecessor_context = E.rpc_context.context in
-      E.Protocol.begin_application
-        ~chain_id:E.chain_id
-        ~predecessor_context
-        ~predecessor_timestamp:header.timestamp
-        ~predecessor_fitness:header.fitness
-        {
-          shell = block_header.shell;
-          protocol_data =
-            Data_encoding.Binary.of_bytes_exn
-              E.Protocol.block_header_data_encoding
-              block_header.protocol_data;
-        }
-        ~cache:`Lazy
-      >>=? fun validation_state ->
-      let i = ref 0 in
-      List.fold_left_es
-        (List.fold_left_es (fun (validation_state, _results) op ->
-             incr i ;
-             match
-               Data_encoding.Binary.of_bytes op_data_encoding op.Operation.proto
-             with
-             | Error _ -> failwith "Cannot parse"
-             | Ok operation_data ->
-                 let op =
-                   {E.Protocol.shell = op.shell; protocol_data = operation_data}
-                 in
-                 E.Protocol.apply_operation validation_state op
-                 >>=? fun (validation_state, _receipt) ->
-                 return (validation_state, _receipt :: _results)))
-        (validation_state, [])
-        operations
-      >>=? fun (validation_state, _) ->
-      E.Protocol.finalize_block validation_state (Some block_header.shell)
+      match
+        Data_encoding.Binary.of_bytes_opt
+          E.Protocol.block_header_data_encoding
+          block_header.protocol_data
+      with
+      | None -> assert false
+      | Some protocol_data ->
+          let header = E.rpc_context.block_header in
+          let predecessor_context = E.rpc_context.context in
+          E.Protocol.begin_application
+            ~chain_id:E.chain_id
+            ~predecessor_context
+            ~predecessor_timestamp:header.timestamp
+            ~predecessor_fitness:header.fitness
+            {shell = block_header.shell; protocol_data}
+            ~cache:`Lazy
+          >>=? fun validation_state ->
+          List.fold_left_es
+            (List.fold_left_es (fun (validation_state, results) op ->
+                 match
+                   Data_encoding.Binary.of_bytes
+                     op_data_encoding
+                     op.Operation.proto
+                 with
+                 | Error _ -> failwith "Cannot parse"
+                 | Ok operation_data ->
+                     let op =
+                       {
+                         E.Protocol.shell = op.shell;
+                         protocol_data = operation_data;
+                       }
+                     in
+                     E.Protocol.apply_operation validation_state op
+                     >>=? fun (validation_state, receipt) ->
+                     return (validation_state, receipt :: results)))
+            (validation_state, [])
+            operations
+          >>=? fun (validation_state, _) ->
+          E.Protocol.finalize_block validation_state (Some block_header.shell)
     in
     Directory.register
       Directory.empty
@@ -601,50 +713,49 @@ module Make (E : MENV) = struct
                       block_header.shell;
                   }
               in
-              write_context_callback rpc_context >>=? fun () ->
-              Mempool.read () >>=? fun mempool_operations ->
-              List.fold_left_es
-                (fun map ((shell_header, operation_data) as v) ->
-                  match
-                    Data_encoding.Binary.to_bytes
-                      op_data_encoding
-                      operation_data
-                  with
-                  | Error _ ->
-                      failwith
-                        "mockup inject block: byte encoding operation failed"
-                  | Ok proto ->
-                      let h =
-                        Operation.hash {Operation.shell = shell_header; proto}
-                      in
-                      return @@ Operation_hash.Map.add h v map)
-                Operation_hash.Map.empty
-                mempool_operations
-              >>=? fun mempool_map ->
-              let refused_map =
-                List.fold_left
-                  (List.fold_left (fun mempool op ->
-                       Operation_hash.Map.remove (Operation.hash op) mempool))
-                  mempool_map
-                  operations
-              in
-              unless (Operation_hash.Map.is_empty refused_map) (fun () ->
-                  let refused_ops =
-                    Operation_hash.Map.fold
-                      (fun _k v l -> v :: l)
-                      refused_map
-                      []
-                  in
-                  L.(S.emit warn_trashpool_append) refused_ops >>= fun () ->
-                  Trashpool.append refused_ops)
-              >>=? fun () -> Mempool.write ~mode:Zero_truncate [] )
+              write_context_callback rpc_context block_header.protocol_data
+              >>=? fun () -> update_mempool_callback operations )
             >>= function
             | Error errs -> RPC_answer.fail errs
             | Ok () -> RPC_answer.return block_hash))
 
+  (** [inject_block] is a feature that assumes that the mockup is on-disk
+      and uses a mempool. *)
+  let inject_block (write_context_callback : callback_writer) =
+    inject_block_generic write_context_callback (fun operations ->
+        Mempool.read () >>=? fun mempool_operations ->
+        List.fold_left_es
+          (fun map ((shell_header, operation_data) as v) ->
+            match
+              Data_encoding.Binary.to_bytes op_data_encoding operation_data
+            with
+            | Error _ ->
+                failwith "mockup inject block: byte encoding operation failed"
+            | Ok proto ->
+                let h =
+                  Operation.hash {Operation.shell = shell_header; proto}
+                in
+                return @@ Operation_hash.Map.add h v map)
+          Operation_hash.Map.empty
+          mempool_operations
+        >>=? fun mempool_map ->
+        let refused_map =
+          List.fold_left
+            (List.fold_left (fun mempool op ->
+                 Operation_hash.Map.remove (Operation.hash op) mempool))
+            mempool_map
+            operations
+        in
+        unless (Operation_hash.Map.is_empty refused_map) (fun () ->
+            let refused_ops =
+              Operation_hash.Map.fold (fun _k v l -> v :: l) refused_map []
+            in
+            L.(S.emit warn_trashpool_append) refused_ops >>= fun () ->
+            Trashpool.append refused_ops)
+        >>=? fun () -> Mempool.write ~mode:Zero_truncate [])
+
   let inject_operation (mem_only : bool)
-      (write_context_callback :
-        Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+      (write_context_callback : callback_writer) =
     Directory.register
       Directory.empty
       (* /injection/operation, vanilla client implementation is in
@@ -666,9 +777,86 @@ module Make (E : MENV) = struct
                 write_context_callback
                 operation_bytes)
 
+  let monitor_heads () =
+    Directory.register
+      Directory.empty
+      Tezos_shell_services.Monitor_services.S.heads
+      (fun ((), chain) _next_protocol () ->
+        with_chain ~caller_name:"monitor heads" chain (fun () ->
+            let block_header =
+              Block_header.
+                {
+                  shell = E.rpc_context.block_header;
+                  protocol_data = E.protocol_data;
+                }
+            in
+            let block_hash = E.rpc_context.block_hash in
+            RPC_answer.return (block_hash, block_header)))
+
+  let header () =
+    Directory.prefix
+      (Tezos_rpc.RPC_path.prefix Chain_services.path Block_services.path)
+      (Directory.register
+         Directory.empty
+         E.Block_services.S.header
+         (fun (((), chain), _block) () () ->
+           with_chain ~caller_name:"header" chain (fun () ->
+               match proto_data_bytes_to_block_header_opt () with
+               | None -> assert false
+               | Some protocol_data ->
+                   let block_header =
+                     E.Block_services.
+                       {
+                         chain_id = E.chain_id;
+                         hash = E.rpc_context.block_hash;
+                         shell = E.rpc_context.block_header;
+                         protocol_data;
+                       }
+                   in
+                   RPC_answer.return block_header)))
+
+  let protocol_data_raw () =
+    Directory.prefix
+      (Tezos_rpc.RPC_path.prefix Chain_services.path Block_services.path)
+      (Directory.register
+         Directory.empty
+         E.Block_services.S.Header.raw_protocol_data
+         (fun (((), chain), _block) () () ->
+           with_chain ~caller_name:"protocol_data_raw" chain (fun () ->
+               RPC_answer.return E.protocol_data)))
+
+  let operations () =
+    Directory.prefix
+      (Tezos_rpc.RPC_path.prefix Chain_services.path Block_services.path)
+    @@ Directory.register
+         Directory.empty
+         E.Block_services.S.Operations.operations
+         (fun (((), chain), _block) () () ->
+           with_chain ~caller_name:"operations" chain (fun () ->
+               (* FIXME: Better answer here *)
+               RPC_answer.return [[]; []; []; []]))
+
+  let monitor_operations () =
+    Directory.register
+      Directory.empty
+      (E.Block_services.S.Mempool.monitor_operations
+      @@ Block_services.mempool_path Block_services.chain_path)
+      (* FIXME: Return real operations from the mempool *)
+        (fun (_, chain) o () ->
+        with_chain ~caller_name:"monitor operations" chain (fun () ->
+            let on b msg =
+              if b then L.(S.emit (warn msg)) () else Lwt.return_unit
+            in
+            on o#branch_delayed "branch_delayed ignored" >>= fun () ->
+            on o#branch_refused "branch_refused ignored" >>= fun () ->
+            on o#refused "refused ignored" >>= fun () ->
+            let _ = o#applied in
+            RPC_answer.(
+              return_stream
+                {next = (fun () -> Lwt.return_none); shutdown = (fun () -> ())})))
+
   let build_shell_directory (mem_only : bool)
-      (write_context_callback :
-        Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+      (write_context_callback : callback_writer) =
     let merge = Directory.merge in
     Directory.empty
     |> merge (p2p ())
@@ -683,13 +871,18 @@ module Make (E : MENV) = struct
     |> merge (inject_block write_context_callback)
     |> merge (live_blocks ())
     |> merge (preapply_block ())
+    |> merge (monitor_heads ())
+    |> merge (header ())
+    |> merge (operations ())
+    |> merge (protocol_data_raw ())
+    |> merge (monitor_operations ())
 end
 
 let build_shell_directory (base_dir : string)
     (mockup_env : Registration.mockup_environment) chain_id
-    (rpc_context : Tezos_protocol_environment.rpc_context) (mem_only : bool)
-    (write_context_callback :
-      Tezos_protocol_environment.rpc_context -> unit tzresult Lwt.t) =
+    (rpc_context : Tezos_protocol_environment.rpc_context)
+    (protocol_data : bytes) (mem_only : bool)
+    (write_context_callback : callback_writer) =
   let (module Mockup_environment) = mockup_env in
   let module M = Make (struct
     include Mockup_environment
@@ -699,6 +892,8 @@ let build_shell_directory (base_dir : string)
     let base_dir = base_dir
 
     let rpc_context = rpc_context
+
+    let protocol_data = protocol_data
   end) in
   M.build_shell_directory mem_only write_context_callback
 
@@ -711,13 +906,14 @@ let build_shell_directory (base_dir : string)
  *)
 let build_directory (base_dir : string) (mem_only : bool)
     (mockup_env : Registration.mockup_environment) (chain_id : Chain_id.t)
-    (rpc_context : Tezos_protocol_environment.rpc_context) :
+    (rpc_context : Tezos_protocol_environment.rpc_context) protocol_data :
     unit RPC_directory.t =
-  let write_context rpc_context =
+  let write_context rpc_context protocol_data =
     let (module Mockup_environment) = mockup_env in
     Persistence.overwrite_mockup
       ~chain_id
       ~protocol_hash:Mockup_environment.protocol_hash
+      ~protocol_data
       ~rpc_context
       ~base_dir
   in
@@ -739,6 +935,7 @@ let build_directory (base_dir : string) (mem_only : bool)
       mockup_env
       chain_id
       rpc_context
+      protocol_data
       mem_only
       write_context
   in

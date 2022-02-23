@@ -4,6 +4,7 @@
   extends:
     - .default_settings_template
     - .image_template__runtime_build_test_dependencies_template
+    - .template__coverage
   stage: build
   before_script:
     - . ./scripts/version.sh
@@ -22,16 +23,18 @@
     - . ./scripts/version.sh
     # 1. Some basic, fast sanity checks
     - if [ "${build_deps_image_version}" != "${opam_repository_tag}" ] ; then
-        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab-ci.yml'." ;
+        echo "Inconsistent dependencies hash between 'scripts/version.sh' and '.gitlab/ci/templates.yml'." ;
         echo "${build_deps_image_version} != ${opam_repository_tag}" ;
         exit 1 ;
       fi
-    - diff tests_python/poetry.lock /home/tezos/poetry.lock
-    - diff tests_python/pyproject.toml /home/tezos/pyproject.toml
+    - diff poetry.lock /home/tezos/poetry.lock
+    - diff pyproject.toml /home/tezos/pyproject.toml
     - dune build @runtest_dune_template
     # 2. Actually build
     - make all build-test
-    # 3. clean-up caches before uploading the cache
+    # 3. Also build the tps evaluation tool which is not part of the default build.
+    - dune build src/bin_tps_evaluation
+    # 4. clean-up caches before uploading the cache
     - opam clean
   cache:
     key: "$CI_COMMIT_REF_SLUG"
@@ -43,7 +46,7 @@
     paths:
       - tezos-*
       - src/proto_*/parameters/*.json
-      - _build/default/src/lib_protocol_compiler/main_native.exe
+      - _build/default/src/lib_protocol_compiler/bin/main_native.exe
     expire_in: 1 day
     when: on_success
 
@@ -62,3 +65,50 @@ build_x86_64:
     - .rules_template__development
   variables:
     ARCH: "x86_64"
+    COVERAGE_OPTIONS: --instrument-with bisect_ppx
+
+# similar to the build template above, this template
+# compiles all binaries using the static profile.
+.build_static_binaries_template:
+  extends:
+    - .default_settings_template
+    - .image_template__runtime_build_dependencies_template
+  before_script:
+    - sudo apk --no-cache --virtual add unzip wget eudev-dev autoconf automake libtool linux-headers binutils zlib-static
+    # dune build @install make ocamlopt stack overflow when compiling
+    # protocol functor with static linking (because of
+    # liquidity_baking_cpmm.ml).
+    # Let's skip protocol functors, they are not needed for the release
+    - dune build
+      @src/lib_protocol_compiler/install
+      $(for i in src/{,proto_*/}bin_* ; do echo @$i/install ; done)
+      --profile static
+    - mkdir tezos-binaries && install -t tezos-binaries _build/install/default/bin/*
+    # Strip debug symbols in binaries
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec strip --strip-debug {} \;
+  artifacts:
+    paths:
+      - tezos-binaries/*
+
+# Static binaries for x86_64 are necessary for development branches, as we want to make
+# sure the build does not break. We also need it for release tags, to as its artifacts
+# are published in the stage `publish_release`. For this reason, we build it in all pipelines.
+
+# arm64 static binaries are built in the stage `build_release` and only for master and releases.
+build:static-x86_64-linux-binaries:
+  extends: .build_static_binaries_template
+  script:
+    - sudo apk --no-cache --virtual add upx
+    # Compress resulting binaries
+    - find tezos-binaries -maxdepth 1 -type f ! -name "*.*" -exec upx {} \;
+  stage: build
+
+build:static-arm64-linux-binaries:
+  extends:
+      - .build_static_binaries_template
+      - .rules_template__master_and_releases
+  stage: build_release
+  script:
+    - echo "No compression for now"
+  tags:
+    - arm64

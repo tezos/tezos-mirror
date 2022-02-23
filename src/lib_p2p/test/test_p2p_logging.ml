@@ -190,6 +190,7 @@ module P2p_net = struct
       {
         listening_port = None;
         listening_addr = None;
+        advertised_port = None;
         discovery_port = None;
         discovery_addr = None;
         trusted_points = [];

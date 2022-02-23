@@ -42,6 +42,9 @@ let () =
 
 let default_net_timeout = ref (Ptime.Span.of_int_s 8)
 
+let end_of_file_if_zero nb_read =
+  if nb_read = 0 then Lwt.fail End_of_file else Lwt.return_unit
+
 let read_bytes_with_timeout ?(timeout = !default_net_timeout) ?file_offset
     ?(pos = 0) ?len fd buf =
   let buflen = Bytes.length buf in
@@ -50,18 +53,18 @@ let read_bytes_with_timeout ?(timeout = !default_net_timeout) ?file_offset
   let rec inner nb_read pos len =
     if len = 0 then Lwt.return_unit
     else
+      let open Lwt_syntax in
       let reader =
         match file_offset with
         | None -> Lwt_unix.read
         | Some fo -> Lwt_unix.pread ~file_offset:(fo + nb_read)
       in
-      Lwt_unix.with_timeout (Ptime.Span.to_float_s timeout) (fun () ->
-          reader fd buf pos len)
-      >>= function
-      | 0 ->
-          Lwt.fail End_of_file
-          (* other endpoint cleanly closed its connection *)
-      | nb_read' -> inner (nb_read + nb_read') (pos + nb_read') (len - nb_read')
+      let* nb_read' =
+        Lwt_unix.with_timeout (Ptime.Span.to_float_s timeout) (fun () ->
+            reader fd buf pos len)
+      in
+      let* () = end_of_file_if_zero nb_read' in
+      inner (nb_read + nb_read') (pos + nb_read') (len - nb_read')
   in
   inner 0 pos len
 
@@ -72,14 +75,15 @@ let read_bytes ?file_offset ?(pos = 0) ?len fd buf =
   let rec inner nb_read pos len =
     if len = 0 then Lwt.return_unit
     else
+      let open Lwt_syntax in
       let reader =
         match file_offset with
         | None -> Lwt_unix.read
         | Some fo -> Lwt_unix.pread ~file_offset:(fo + nb_read)
       in
-      reader fd buf pos len >>= function
-      | 0 -> Lwt.fail End_of_file
-      | nb_read' -> inner (nb_read + nb_read') (pos + nb_read') (len - nb_read')
+      let* nb_read' = reader fd buf pos len in
+      let* () = end_of_file_if_zero nb_read' in
+      inner (nb_read + nb_read') (pos + nb_read') (len - nb_read')
   in
   inner 0 pos len
 
@@ -90,20 +94,15 @@ let write_bytes ?file_offset ?(pos = 0) ?len descr buf =
   let rec inner nb_written pos len =
     if len = 0 then Lwt.return_unit
     else
+      let open Lwt_syntax in
       let writer =
         match file_offset with
         | None -> Lwt_unix.write
         | Some fo -> Lwt_unix.pwrite ~file_offset:(fo + nb_written)
       in
-      writer descr buf pos len >>= function
-      | 0 ->
-          Lwt.fail End_of_file
-          (* other endpoint cleanly closed its connection *)
-      | nb_written' ->
-          inner
-            (nb_written + nb_written')
-            (pos + nb_written')
-            (len - nb_written')
+      let* nb_written' = writer descr buf pos len in
+      let* () = end_of_file_if_zero nb_written' in
+      inner (nb_written + nb_written') (pos + nb_written') (len - nb_written')
   in
   inner 0 pos len
 
@@ -112,11 +111,10 @@ let write_string ?(pos = 0) ?len descr buf =
   let rec inner pos len =
     if len = 0 then Lwt.return_unit
     else
-      Lwt_unix.write_string descr buf pos len >>= function
-      | 0 ->
-          Lwt.fail End_of_file
-          (* other endpoint cleanly closed its connection *)
-      | nb_written -> inner (pos + nb_written) (len - nb_written)
+      let open Lwt_syntax in
+      let* nb_written = Lwt_unix.write_string descr buf pos len in
+      let* () = end_of_file_if_zero nb_written in
+      inner (pos + nb_written) (len - nb_written)
   in
   inner pos len
 
@@ -125,35 +123,40 @@ let is_directory file_name =
 
 let remove_dir dir =
   let rec remove dir =
+    let open Lwt_syntax in
     let files = Lwt_unix.files_of_directory dir in
-    Lwt_stream.iter_s
-      (fun file ->
-        if file = "." || file = ".." then Lwt.return_unit
-        else
-          let file = Filename.concat dir file in
-          if Sys.is_directory file then remove file else Lwt_unix.unlink file)
-      files
-    >>= fun () -> Lwt_unix.rmdir dir
+    let* () =
+      Lwt_stream.iter_s
+        (fun file ->
+          if file = "." || file = ".." then Lwt.return_unit
+          else
+            let file = Filename.concat dir file in
+            if Sys.is_directory file then remove file else Lwt_unix.unlink file)
+        files
+    in
+    Lwt_unix.rmdir dir
   in
   if Sys.file_exists dir && Sys.is_directory dir then remove dir
   else Lwt.return_unit
 
 let rec create_dir ?(perm = 0o755) dir =
-  Lwt_unix.file_exists dir >>= function
-  | false ->
-      create_dir (Filename.dirname dir) >>= fun () ->
-      Lwt.catch
-        (fun () -> Lwt_unix.mkdir dir perm)
-        (function
-          | Unix.Unix_error (Unix.EEXIST, _, _) ->
-              (* This is the case where the directory has been created
-                 by another Lwt.t, after the call to Lwt_unix.file_exists. *)
-              Lwt.return_unit
-          | e -> Lwt.fail e)
-  | true -> (
-      Lwt_unix.stat dir >>= function
-      | {st_kind = S_DIR; _} -> Lwt.return_unit
-      | _ -> Stdlib.failwith "Not a directory")
+  let open Lwt_syntax in
+  let* dir_exists = Lwt_unix.file_exists dir in
+  if not dir_exists then
+    let* () = create_dir (Filename.dirname dir) in
+    Lwt.catch
+      (fun () -> Lwt_unix.mkdir dir perm)
+      (function
+        | Unix.Unix_error (Unix.EEXIST, _, _) ->
+            (* This is the case where the directory has been created
+               by another Lwt.t, after the call to Lwt_unix.file_exists. *)
+            Lwt.return_unit
+        | e -> Lwt.fail e)
+  else
+    let* {st_kind; _} = Lwt_unix.stat dir in
+    match st_kind with
+    | S_DIR -> Lwt.return_unit
+    | _ -> Stdlib.failwith "Not a directory"
 
 let safe_close fd =
   Lwt.catch
@@ -161,44 +164,55 @@ let safe_close fd =
     (fun exc -> fail (Exn exc))
 
 let create_file ?(close_on_exec = true) ?(perm = 0o644) name content =
+  let open Lwt_syntax in
   let flags =
     let open Unix in
     let flags = [O_TRUNC; O_CREAT; O_WRONLY] in
     if close_on_exec then O_CLOEXEC :: flags else flags
   in
-  Lwt_unix.openfile name flags perm >>= fun fd ->
+  let* fd = Lwt_unix.openfile name flags perm in
   Lwt.try_bind
     (fun () -> write_string fd ~pos:0 ~len:(String.length content) content)
     (fun v ->
-      safe_close fd >>= function
-      | Error trace ->
-          Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-          Lwt.return v
-      | Ok () -> Lwt.return v)
+      let* ru = safe_close fd in
+      let () =
+        Result.iter_error
+          (fun trace ->
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
+          ru
+      in
+      Lwt.return v)
     (fun exc ->
-      safe_close fd >>= function
-      | Error trace ->
-          Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace ;
-          raise exc
-      | Ok () -> raise exc)
+      let* ru = safe_close fd in
+      let () =
+        Result.iter_error
+          (fun trace ->
+            Format.eprintf "Uncaught error: %a\n%!" pp_print_trace trace)
+          ru
+      in
+      raise exc)
 
 let read_file fn = Lwt_io.with_file fn ~mode:Input (fun ch -> Lwt_io.read ch)
 
 let copy_file ~src ~dst =
+  let open Lwt_syntax in
   Lwt_io.with_file ~mode:Output dst (fun dst_ch ->
       Lwt_io.with_file src ~mode:Input (fun src_ch ->
           let buff = Bytes.create 4096 in
           let rec loop () =
-            Lwt_io.read_into src_ch buff 0 4096 >>= function
+            let* n = Lwt_io.read_into src_ch buff 0 4096 in
+            match n with
             | 0 -> Lwt.return_unit
             | n ->
-                Lwt_io.write_from_exactly dst_ch buff 0 n >>= fun () -> loop ()
+                let* () = Lwt_io.write_from_exactly dst_ch buff 0 n in
+                loop ()
           in
           loop ()))
 
 let copy_dir ?(perm = 0o755) src dst =
+  let open Lwt_syntax in
   let rec copy_dir dir dst_dir =
-    create_dir ~perm dst >>= fun () ->
+    let* () = create_dir ~perm dst in
     let files = Lwt_unix.files_of_directory dir in
     Lwt_stream.iter_p
       (fun file ->
@@ -209,7 +223,8 @@ let copy_dir ?(perm = 0o755) src dst =
           let file = Filename.concat dir file in
           if Sys.is_directory file then
             let new_dir = Filename.concat dst_dir basename in
-            create_dir ~perm new_dir >>= fun () -> copy_dir file new_dir
+            let* () = create_dir ~perm new_dir in
+            copy_dir file new_dir
           else copy_file ~src:file ~dst:(Filename.concat dst_dir basename))
       files
   in
@@ -225,11 +240,13 @@ let of_sockaddr = function
 
 let getaddrinfo ~passive ~node ~service =
   let open Lwt_unix in
-  getaddrinfo
-    node
-    service
-    (AI_SOCKTYPE SOCK_STREAM :: (if passive then [AI_PASSIVE] else []))
-  >>= fun addr ->
+  let open Lwt_syntax in
+  let* addr =
+    getaddrinfo
+      node
+      service
+      (AI_SOCKTYPE SOCK_STREAM :: (if passive then [AI_PASSIVE] else []))
+  in
   let points = List.filter_map (fun {ai_addr; _} -> of_sockaddr ai_addr) addr in
   Lwt.return points
 
@@ -272,19 +289,23 @@ module Json = struct
 end
 
 let with_tempdir name f =
+  let open Lwt_syntax in
   let base_dir = Filename.temp_file name "" in
-  Lwt_unix.unlink base_dir >>= fun () ->
-  Lwt_unix.mkdir base_dir 0o700 >>= fun () ->
+  let* () = Lwt_unix.unlink base_dir in
+  let* () = Lwt_unix.mkdir base_dir 0o700 in
   Lwt.finalize (fun () -> f base_dir) (fun () -> remove_dir base_dir)
 
 let rec retry ?(log = fun _ -> Lwt.return_unit) ?(n = 5) ?(sleep = 1.) f =
-  f () >>= function
-  | Ok r -> Lwt.return_ok r
-  | Error error as x ->
+  let open Lwt_syntax in
+  let* rr = f () in
+  match rr with
+  | Ok _ as r -> Lwt.return r
+  | Error error as r ->
       if n > 0 then
-        log error >>= fun () ->
-        Lwt_unix.sleep sleep >>= fun () -> retry ~log ~n:(n - 1) ~sleep f
-      else Lwt.return x
+        let* () = log error in
+        let* () = Lwt_unix.sleep sleep in
+        retry ~log ~n:(n - 1) ~sleep f
+      else Lwt.return r
 
 type 'action io_error = {
   action : 'action;
@@ -294,19 +315,25 @@ type 'action io_error = {
 }
 
 let with_open_file ~flags ?(perm = 0o640) filename task =
-  Lwt.catch
-    (fun () ->
-      Lwt_unix.openfile filename flags perm >>= fun x -> Lwt.return (Ok x))
-    (function
-      | Unix.Unix_error (unix_code, caller, arg) ->
-          Lwt.return (Error {action = `Open; unix_code; caller; arg})
-      | exn -> raise exn)
-  >>= function
-  | Error _ as x -> Lwt.return x
+  let open Lwt_syntax in
+  let* rfd =
+    Lwt.catch
+      (fun () ->
+        let* r = Lwt_unix.openfile filename flags perm in
+        Lwt.return (Ok r))
+      (function
+        | Unix.Unix_error (unix_code, caller, arg) ->
+            Lwt.return (Error {action = `Open; unix_code; caller; arg})
+        | exn -> raise exn)
+  in
+  match rfd with
+  | Error _ as r -> Lwt.return r
   | Ok fd ->
-      task fd >>= fun res ->
+      let* res = task fd in
       Lwt.catch
-        (fun () -> Lwt_unix.close fd >>= fun () -> return res)
+        (fun () ->
+          let* () = Lwt_unix.close fd in
+          Lwt.return (Ok res))
         (function
           | Unix.Unix_error (unix_code, caller, arg) ->
               Lwt.return (Error {action = `Close; unix_code; caller; arg})
@@ -325,13 +352,15 @@ let with_open_in file task =
 
 (* This is to avoid file corruption *)
 let with_atomic_open_out ?(overwrite = true) ?temp_dir filename f =
+  let open Lwt_tzresult_syntax in
   let temp_file =
     Filename.temp_file ?temp_dir (Filename.basename filename) ".tmp"
   in
-  with_open_out ~overwrite temp_file f >>=? fun res ->
+  let* res = with_open_out ~overwrite temp_file f in
   Lwt.catch
     (fun () ->
-      Lwt_unix.rename temp_file filename >>= fun () -> Lwt.return (Ok res))
+      let*! () = Lwt_unix.rename temp_file filename in
+      return res)
     (function
       | Unix.Unix_error (unix_code, caller, arg) ->
           Lwt.return (Error {action = `Rename; unix_code; caller; arg})

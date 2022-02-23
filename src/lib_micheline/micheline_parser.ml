@@ -151,7 +151,7 @@ type error += Unterminated_string of location
 
 type error += Unterminated_integer of location
 
-type error += Odd_lengthed_bytes of location
+type error += Invalid_hex_bytes of location
 
 type error += Unterminated_comment of location
 
@@ -614,13 +614,13 @@ let rec parse ?(check = true) errors tokens stack =
   | ( (Expression None | Sequence _ | Toplevel _) :: _,
       {token = Bytes contents; loc}
       :: (([] | {token = Semi | Close_brace; _} :: _) as rest) ) ->
-      let (errors, contents) =
-        if String.length contents mod 2 <> 0 then
-          (Odd_lengthed_bytes loc :: errors, contents ^ "0")
-        else (errors, contents)
-      in
-      let bytes =
-        Hex.to_bytes (`Hex (String.sub contents 2 (String.length contents - 2)))
+      let (errors, bytes) =
+        match
+          Hex.to_bytes
+            (`Hex (String.sub contents 2 (String.length contents - 2)))
+        with
+        | None -> (Invalid_hex_bytes loc :: errors, Bytes.empty)
+        | Some bytes -> (errors, bytes)
       in
       let expr : node = Bytes (loc, bytes) in
       let errors =
@@ -842,17 +842,16 @@ let () =
     (fun loc -> Unterminated_integer loc) ;
   register_error_kind
     `Permanent
-    ~id:"micheline.parse_error.odd_lengthed_bytes"
-    ~title:"Micheline parser error: odd lengthed bytes"
+    ~id:"micheline.parse_error.invalid_hex_bytes"
+    ~title:"Micheline parser error: invalid hex bytes"
     ~description:
-      "While parsing a piece of Micheline source, the length of a byte \
-       sequence (0x...) was not a multiple of two, leaving a trailing half \
-       byte."
+      "While parsing a piece of Micheline source, a byte sequence (0x...) was \
+       not valid as a hex byte."
     ~pp:(fun ppf loc ->
-      Format.fprintf ppf "%a, odd_lengthed bytes" print_location loc)
+      Format.fprintf ppf "%a, invalid hex bytes" print_location loc)
     Data_encoding.(obj1 (req "location" location_encoding))
-    (function Odd_lengthed_bytes loc -> Some loc | _ -> None)
-    (fun loc -> Odd_lengthed_bytes loc) ;
+    (function Invalid_hex_bytes loc -> Some loc | _ -> None)
+    (fun loc -> Invalid_hex_bytes loc) ;
   register_error_kind
     `Permanent
     ~id:"micheline.parse_error.unterminated_comment"

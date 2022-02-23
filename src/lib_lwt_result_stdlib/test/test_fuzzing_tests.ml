@@ -73,9 +73,11 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.arith_e one many)
       (fun (fn, init, input) ->
         let input = M.of_list input in
+        let open Result_syntax in
         eq_e
           (let acc = ref init in
-           M.iter_e (IterEOf.fn_e acc fn) input >|? fun () -> !acc)
+           let+ () = M.iter_e (IterEOf.fn_e acc fn) input in
+           !acc)
           (M.fold_left_e (FoldEOf.fn_e fn) init input))
 
   let iter_fold_left_s =
@@ -84,9 +86,11 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.arith_s one many)
       (fun (fn, init, input) ->
         let input = M.of_list input in
+        let open Lwt_syntax in
         eq_s
           (let acc = ref init in
-           M.iter_s (IterSOf.fn_s acc fn) input >|= fun () -> !acc)
+           let+ () = M.iter_s (IterSOf.fn_s acc fn) input in
+           !acc)
           (M.fold_left_s (FoldSOf.fn_s fn) init input))
 
   let iter_fold_left_es =
@@ -95,9 +99,11 @@ end) : Test = struct
       (triple Test_fuzzing_helpers.Fn.arith_es one many)
       (fun (fn, init, input) ->
         let input = M.of_list input in
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           M.iter_es (IterESOf.fn_es acc fn) input >|=? fun () -> !acc)
+           let+ () = M.iter_es (IterESOf.fn_es acc fn) input in
+           !acc)
           (M.fold_left_es (FoldESOf.fn_es fn) init input))
 
   let tests =
@@ -129,7 +135,11 @@ end) : Test = struct
       (fun (fn, const, input) ->
         let input = M.of_list input in
         let fn = MapEOf.fn_e const fn in
-        eq_e (M.map_e fn input >|? M.rev) (M.rev_map_e fn input))
+        let open Result_syntax in
+        eq_e
+          (let+ r = M.map_e fn input in
+           M.rev r)
+          (M.rev_map_e fn input))
 
   let rev_map_s =
     Test.make
@@ -138,7 +148,11 @@ end) : Test = struct
       (fun (fn, const, input) ->
         let input = M.of_list input in
         let fn = MapSOf.fn_s const fn in
-        eq_s (M.map_s fn input >|= M.rev) (M.rev_map_s fn input))
+        let open Lwt_syntax in
+        eq_s
+          (let+ r = M.map_s fn input in
+           M.rev r)
+          (M.rev_map_s fn input))
 
   let rev_map_es =
     Test.make
@@ -147,7 +161,11 @@ end) : Test = struct
       (fun (fn, const, input) ->
         let input = M.of_list input in
         let fn = MapESOf.fn_es const fn in
-        eq_es (M.map_es fn input >|=? M.rev) (M.rev_map_es fn input))
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r = M.map_es fn input in
+           M.rev r)
+          (M.rev_map_es fn input))
 
   let rev_map_p =
     Test.make
@@ -156,7 +174,11 @@ end) : Test = struct
       (fun (fn, const, input) ->
         let input = M.of_list input in
         let fn = MapSOf.fn_s const fn in
-        eq_s (M.map_p fn input >|= M.rev) (M.rev_map_p fn input))
+        let open Lwt_syntax in
+        eq_s
+          (let+ r = M.map_p fn input in
+           M.rev r)
+          (M.rev_map_p fn input))
 
   let rev_map_ep =
     Test.make
@@ -165,9 +187,11 @@ end) : Test = struct
       (fun (fn, const, input) ->
         let input = M.of_list input in
         let fn_ep = MapEPOf.fn_ep const fn in
+        let open Lwt_result_syntax in
         eq_ep
           ~pp:M.pp
-          (M.map_ep fn_ep input >|=? M.rev)
+          (let+ r = M.map_ep fn_ep input in
+           M.rev r)
           (M.rev_map_ep fn_ep input))
 
   let tests = [rev_map; rev_map_e; rev_map_s; rev_map_es; rev_map_p; rev_map_ep]
@@ -201,9 +225,11 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_e, Stdlib.List.iter" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Result_syntax in
         eq_e
           (let acc = ref init in
-           M.iter_e (IterEOf.fn acc fn) (M.of_list input) >|? fun () -> !acc)
+           let+ () = M.iter_e (IterEOf.fn acc fn) (M.of_list input) in
+           !acc)
           (Ok (with_stdlib_iter (fn, init, input))))
 
   let iter_s =
@@ -211,9 +237,11 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_s, Stdlib.List.iter" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_syntax in
         eq_s
           (let acc = ref init in
-           M.iter_s (IterSOf.fn acc fn) (M.of_list input) >|= fun () -> !acc)
+           let+ () = M.iter_s (IterSOf.fn acc fn) (M.of_list input) in
+           !acc)
           (Lwt.return @@ with_stdlib_iter (fn, init, input)))
 
   let iter_es =
@@ -221,9 +249,11 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_es, Stdlib.List.iter" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           M.iter_es (IterESOf.fn acc fn) (M.of_list input) >|=? fun () -> !acc)
+           let+ () = M.iter_es (IterESOf.fn acc fn) (M.of_list input) in
+           !acc)
           (Lwt.return_ok @@ with_stdlib_iter (fn, init, input)))
 
   let tests = [iter; iter_e; iter_s; iter_es]
@@ -257,9 +287,11 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iteri_e, Stdlib.List.iteri" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Result_syntax in
         eq_e
           (let acc = ref init in
-           M.iteri_e (IteriEOf.fn acc fn) (M.of_list input) >|? fun () -> !acc)
+           let+ () = M.iteri_e (IteriEOf.fn acc fn) (M.of_list input) in
+           !acc)
           (Ok (with_stdlib_iteri (fn, init, input))))
 
   let iteri_s =
@@ -267,9 +299,11 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iteri_s, Stdlib.List.iteri" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_syntax in
         eq_s
           (let acc = ref init in
-           M.iteri_s (IteriSOf.fn acc fn) (M.of_list input) >|= fun () -> !acc)
+           let+ () = M.iteri_s (IteriSOf.fn acc fn) (M.of_list input) in
+           !acc)
           (Lwt.return @@ with_stdlib_iteri (fn, init, input)))
 
   let iteri_es =
@@ -277,9 +311,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iteri_es, Stdlib.List.iteri" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), init, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           M.iteri_es (IteriESOf.fn acc fn) (M.of_list input) >|=? fun () ->
+           let+ () = M.iteri_es (IteriESOf.fn acc fn) (M.of_list input) in
            !acc)
           (Lwt.return_ok @@ with_stdlib_iteri (fn, init, input)))
 
@@ -321,13 +356,17 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_s, Stdlib.List.iter" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (init, Fun (_, fn), const, input) ->
+        let open Lwt_syntax in
         eq_s
           (let acc = ref init in
-           M.iter_s
-             (fun elt ->
-               MapSOf.fn const fn elt >|= fun delta -> acc := !acc + delta)
-             (M.of_list input)
-           >|= fun () -> !acc)
+           let+ () =
+             M.iter_s
+               (fun elt ->
+                 let+ delta = MapSOf.fn const fn elt in
+                 acc := !acc + delta)
+               (M.of_list input)
+           in
+           !acc)
           (Lwt.return @@ with_stdlib_iter init (fn, const, input)))
 
   let iter_es =
@@ -335,13 +374,17 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_es, Stdlib.List.iter" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (init, Fun (_, fn), const, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           M.iter_es
-             (fun elt ->
-               MapESOf.fn const fn elt >|=? fun delta -> acc := !acc + delta)
-             (M.of_list input)
-           >|=? fun () -> !acc)
+           let+ () =
+             M.iter_es
+               (fun elt ->
+                 let+ delta = MapESOf.fn const fn elt in
+                 acc := !acc + delta)
+               (M.of_list input)
+           in
+           !acc)
           (Lwt.return_ok @@ with_stdlib_iter init (fn, const, input)))
 
   let iter_p =
@@ -349,13 +392,17 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_p, Stdlib.List.iter" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (init, Fun (_, fn), const, input) ->
+        let open Lwt_syntax in
         eq_s
           (let acc = ref init in
-           M.iter_p
-             (fun elt ->
-               MapSOf.fn const fn elt >|= fun delta -> acc := !acc + delta)
-             (M.of_list input)
-           >|= fun () -> !acc)
+           let+ () =
+             M.iter_p
+               (fun elt ->
+                 let+ delta = MapSOf.fn const fn elt in
+                 acc := !acc + delta)
+               (M.of_list input)
+           in
+           !acc)
           (Lwt.return @@ with_stdlib_iter init (fn, const, input)))
 
   let iter_ep =
@@ -363,13 +410,17 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter_ep, Stdlib.List.iter" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (init, Fun (_, fn), const, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           M.iter_ep
-             (fun elt ->
-               MapESOf.fn const fn elt >|=? fun delta -> acc := !acc + delta)
-             (M.of_list input)
-           >|=? fun () -> !acc)
+           let+ () =
+             M.iter_ep
+               (fun elt ->
+                 let+ delta = MapESOf.fn const fn elt in
+                 acc := !acc + delta)
+               (M.of_list input)
+           in
+           !acc)
           (Lwt.return_ok @@ with_stdlib_iter init (fn, const, input)))
 
   let tests = [iter; iter_s; iter_es; iter_p; iter_ep]
@@ -399,8 +450,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map_e, Stdlib.List.map" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), const, input) ->
+        let open Result_syntax in
         eq_e
-          (M.map_e (MapEOf.fn const fn) (M.of_list input) >|? M.to_list)
+          (let+ r = M.map_e (MapEOf.fn const fn) (M.of_list input) in
+           M.to_list r)
           (Ok (with_stdlib_map (fn, const, input))))
 
   let map_s =
@@ -408,8 +461,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map_s, Stdlib.List.map" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.map_s (MapSOf.fn const fn) (M.of_list input) >|= M.to_list)
+          (let+ r = M.map_s (MapSOf.fn const fn) (M.of_list input) in
+           M.to_list r)
           (Lwt.return @@ with_stdlib_map (fn, const, input)))
 
   let map_es =
@@ -417,8 +472,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map_es, Stdlib.List.map" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), const, input) ->
+        let open Lwt_result_syntax in
         eq_es
-          (M.map_es (MapESOf.fn const fn) (M.of_list input) >|=? M.to_list)
+          (let+ r = M.map_es (MapESOf.fn const fn) (M.of_list input) in
+           M.to_list r)
           (Lwt.return_ok @@ with_stdlib_map (fn, const, input)))
 
   let tests = [map; map_e; map_s; map_es]
@@ -439,8 +496,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map_p, Stdlib.List.map" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.map_p (MapSOf.fn const fn) (M.of_list input) >|= M.to_list)
+          (let+ r = M.map_p (MapSOf.fn const fn) (M.of_list input) in
+           M.to_list r)
           (Lwt.return @@ with_stdlib_map (fn, const, input)))
 
   let map_ep =
@@ -448,8 +507,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map_ep, Stdlib.List.map" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one many)
       (fun (Fun (_, fn), const, input) ->
+        let open Lwt_result_syntax in
         eq_es
-          (M.map_ep (MapESOf.fn const fn) (M.of_list input) >|=? M.to_list)
+          (let+ r = M.map_ep (MapESOf.fn const fn) (M.of_list input) in
+           M.to_list r)
           (Lwt.return_ok @@ with_stdlib_map (fn, const, input)))
 
   let tests = [map_p; map_ep]
@@ -555,7 +616,7 @@ end) : Test = struct
       (fun (Fun (_, fn), init, input) ->
         eq_es
           (M.fold_left_map_es (FoldESOf.fn fn) init (M.of_list input))
-          (return @@ with_stdlib_fold_left_map (fn, init, input)))
+          (Lwt.return_ok @@ with_stdlib_fold_left_map (fn, init, input)))
 
   let tests =
     [fold_left_map; fold_left_map_e; fold_left_map_s; fold_left_map_es]
@@ -588,9 +649,12 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.fold_e, Stdlib.List.fold_left" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (const, Fun (_, fn), init, input) ->
+        let open Result_syntax in
         eq_e
           (M.fold_e
-             (fun x acc -> FoldEOf.fn fn const x >|? fun delta -> acc + delta)
+             (fun x acc ->
+               let+ delta = FoldEOf.fn fn const x in
+               acc + delta)
              (M.of_list input)
              init)
           (Ok (with_stdlib_fold_left const (fn, init, input))))
@@ -600,9 +664,12 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.fold_s, Stdlib.List.fold_left" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (const, Fun (_, fn), init, input) ->
+        let open Lwt_syntax in
         eq_s
           (M.fold_s
-             (fun x acc -> FoldSOf.fn fn const x >|= fun delta -> acc + delta)
+             (fun x acc ->
+               let+ delta = FoldSOf.fn fn const x in
+               acc + delta)
              (M.of_list input)
              init)
           (Lwt.return @@ with_stdlib_fold_left const (fn, init, input)))
@@ -612,9 +679,12 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.fold_es, Stdlib.List.fold_left" M.name)
       (quad one Test_fuzzing_helpers.Fn.arith one many)
       (fun (const, Fun (_, fn), init, input) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.fold_es
-             (fun x acc -> FoldESOf.fn fn const x >|=? fun delta -> acc + delta)
+             (fun x acc ->
+               let+ delta = FoldESOf.fn fn const x in
+               acc + delta)
              (M.of_list input)
              init)
           (Lwt.return_ok @@ with_stdlib_fold_left const (fn, init, input)))
@@ -826,8 +896,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_e, Stdlib.List.filter" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
+        let open Result_syntax in
         eq_e
-          (M.filter_e (CondEOf.fn fn const) (M.of_list input) >|? M.to_list)
+          (let+ r = M.filter_e (CondEOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (Ok (with_stdlib_filter (fn, const, input))))
 
   let filter_s =
@@ -835,8 +907,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_s, Stdlib.List.filter" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.filter_s (CondSOf.fn fn const) (M.of_list input) >|= M.to_list)
+          (let+ r = M.filter_s (CondSOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (Lwt.return @@ with_stdlib_filter (fn, const, input)))
 
   let filter_es =
@@ -844,8 +918,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_es, Stdlib.List.filter" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
+        let open Lwt_result_syntax in
         eq_es
-          (M.filter_es (CondESOf.fn fn const) (M.of_list input) >|=? M.to_list)
+          (let+ r = M.filter_es (CondESOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (Lwt.return_ok @@ with_stdlib_filter (fn, const, input)))
 
   let tests = [filter; filter_e; filter_s; filter_es]
@@ -866,8 +942,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_p, Stdlib.List.filter" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.filter_p (CondSOf.fn fn const) (M.of_list input) >|= M.to_list)
+          (let+ r = M.filter_p (CondSOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (Lwt.return @@ with_stdlib_filter (fn, const, input)))
 
   let filter_ep =
@@ -875,8 +953,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_ep, Stdlib.List.filter" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (fn, const, input) ->
+        let open Lwt_result_syntax in
         eq_es
-          (M.filter_ep (CondESOf.fn fn const) (M.of_list input) >|=? M.to_list)
+          (let+ r = M.filter_ep (CondESOf.fn fn const) (M.of_list input) in
+           M.to_list r)
           (Lwt.return_ok @@ with_stdlib_filter (fn, const, input)))
 
   let tests = [filter_p; filter_ep]
@@ -907,9 +987,14 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_map_e, Stdlib.List.filter_map" M.name)
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
+        let open Result_syntax in
         eq_e
-          (M.filter_map_e (FilterMapEOf.fns pred arith const) (M.of_list input)
-          >|? M.to_list)
+          (let+ r =
+             M.filter_map_e
+               (FilterMapEOf.fns pred arith const)
+               (M.of_list input)
+           in
+           M.to_list r)
           (Ok (with_stdlib_filter_map (pred, arith, const, input))))
 
   let filter_map_s =
@@ -917,9 +1002,14 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_map_s, Stdlib.List.filter_map" M.name)
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.filter_map_s (FilterMapSOf.fns pred arith const) (M.of_list input)
-          >|= M.to_list)
+          (let+ r =
+             M.filter_map_s
+               (FilterMapSOf.fns pred arith const)
+               (M.of_list input)
+           in
+           M.to_list r)
           (Lwt.return @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_es =
@@ -927,11 +1017,14 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_map_es, Stdlib.List.filter_map" M.name)
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
+        let open Lwt_result_syntax in
         eq_es
-          (M.filter_map_es
-             (FilterMapESOf.fns pred arith const)
-             (M.of_list input)
-          >|=? M.to_list)
+          (let+ r =
+             M.filter_map_es
+               (FilterMapESOf.fns pred arith const)
+               (M.of_list input)
+           in
+           M.to_list r)
           (Lwt.return_ok @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let tests = [filter_map; filter_map_e; filter_map_s; filter_map_es]
@@ -952,9 +1045,14 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_map_p, Stdlib.List.filter_map" M.name)
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.filter_map_p (FilterMapSOf.fns pred arith const) (M.of_list input)
-          >|= M.to_list)
+          (let+ r =
+             M.filter_map_p
+               (FilterMapSOf.fns pred arith const)
+               (M.of_list input)
+           in
+           M.to_list r)
           (Lwt.return @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let filter_map_ep =
@@ -962,14 +1060,132 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.filter_map_ep, Stdlib.List.filter_map" M.name)
       (quad Test_fuzzing_helpers.Fn.pred Test_fuzzing_helpers.Fn.arith one many)
       (fun (pred, Fun (_, arith), const, input) ->
+        let open Lwt_result_syntax in
         eq_es
-          (M.filter_map_ep
-             (FilterMapESOf.fns pred arith const)
-             (M.of_list input)
-          >|=? M.to_list)
+          (let+ r =
+             M.filter_map_ep
+               (FilterMapESOf.fns pred arith const)
+               (M.of_list input)
+           in
+           M.to_list r)
           (Lwt.return_ok @@ with_stdlib_filter_map (pred, arith, const, input)))
 
   let tests = [filter_map_p; filter_map_ep]
+end
+
+module TestConcatmapAgainstStdlibList (M : sig
+  include BASE
+
+  include Traits.CONCATMAP_SEQUENTIAL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_concat_map (arith, consta, constb, input) =
+    Stdlib.List.concat_map (ConcatMapOf.fns Fun.id arith consta constb) input
+
+  let concat_map =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        eq
+          (M.concat_map
+             (ConcatMapOf.fns M.of_list arith consta constb)
+             (M.of_list input)
+          |> M.to_list)
+          (with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let concat_map_e =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_e, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Result_syntax in
+        eq_e
+          (let+ r =
+             M.concat_map_e
+               (ConcatMapEOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Ok (with_stdlib_concat_map (arith, consta, constb, input))))
+
+  let concat_map_s =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_s, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_syntax in
+        eq_s
+          (let+ r =
+             M.concat_map_s
+               (ConcatMapSOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let concat_map_es =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_es, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r =
+             M.concat_map_es
+               (ConcatMapESOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return_ok
+          @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let tests = [concat_map; concat_map_e; concat_map_s; concat_map_es]
+end
+
+module TestConcatmappAgainstStdlibList (M : sig
+  include BASE
+
+  include Traits.CONCATMAP_PARALLEL with type 'a t := 'a t
+end) : Test = struct
+  open QCheck
+
+  let with_stdlib_concat_map (arith, consta, constb, input) =
+    Stdlib.List.concat_map (ConcatMapOf.fns Fun.id arith consta constb) input
+
+  let concat_map_p =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_p, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_syntax in
+        eq_s
+          (let+ r =
+             M.concat_map_p
+               (ConcatMapSOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let concat_map_ep =
+    Test.make
+      ~name:(Format.asprintf "%s.concat_map_ep, Stdlib.List.concat_map" M.name)
+      (quad Test_fuzzing_helpers.Fn.arith one one many)
+      (fun (Fun (_, arith), consta, constb, input) ->
+        let open Lwt_result_syntax in
+        eq_es
+          (let+ r =
+             M.concat_map_ep
+               (ConcatMapESOf.fns M.of_list arith consta constb)
+               (M.of_list input)
+           in
+           M.to_list r)
+          (Lwt.return_ok
+          @@ with_stdlib_concat_map (arith, consta, constb, input)))
+
+  let tests = [concat_map_p; concat_map_ep]
 end
 
 module TestFindStdlibList (M : sig
@@ -1047,9 +1263,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.partition_e, Stdlib.List.partition" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
+        let open Result_syntax in
         eq
-          (M.partition_e (CondEOf.fn pred const) (M.of_list input)
-          >|? to_list_pair)
+          (let+ r = M.partition_e (CondEOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (Ok (with_stdlib_partition (pred, const, input))))
 
   let partition_s =
@@ -1057,9 +1274,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.partition_s, Stdlib.List.partition" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.partition_s (CondSOf.fn pred const) (M.of_list input)
-          >|= to_list_pair)
+          (let+ r = M.partition_s (CondSOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (Lwt.return @@ with_stdlib_partition (pred, const, input)))
 
   let partition_es =
@@ -1067,9 +1285,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.partition_es, Stdlib.List.partition" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
+        let open Lwt_result_syntax in
         eq_s
-          (M.partition_es (CondESOf.fn pred const) (M.of_list input)
-          >|=? to_list_pair)
+          (let+ r = M.partition_es (CondESOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (Lwt.return_ok @@ with_stdlib_partition (pred, const, input)))
 
   let partition_p =
@@ -1077,9 +1296,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.partition_p, Stdlib.List.partition" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
+        let open Lwt_syntax in
         eq_s
-          (M.partition_p (CondSOf.fn pred const) (M.of_list input)
-          >|= to_list_pair)
+          (let+ r = M.partition_p (CondSOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (Lwt.return @@ with_stdlib_partition (pred, const, input)))
 
   let partition_ep =
@@ -1087,9 +1307,10 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.partition_ep, Stdlib.List.partition" M.name)
       (triple Test_fuzzing_helpers.Fn.pred one many)
       (fun (pred, const, input) ->
+        let open Lwt_result_syntax in
         eq_s
-          (M.partition_ep (CondESOf.fn pred const) (M.of_list input)
-          >|=? to_list_pair)
+          (let+ r = M.partition_ep (CondESOf.fn pred const) (M.of_list input) in
+           to_list_pair r)
           (Lwt.return_ok @@ with_stdlib_partition (pred, const, input)))
 
   let tests =
@@ -1137,14 +1358,17 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter{2,}" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one manymany)
       (fun (Fun (_, fn), init, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (let acc = ref init in
-           M.iter2
-             ~when_different_lengths:101
-             (Iter2Of.fn acc fn)
-             (M.of_list left)
-             (M.of_list right)
-           >|? fun () -> !acc)
+           let+ () =
+             M.iter2
+               ~when_different_lengths:101
+               (Iter2Of.fn acc fn)
+               (M.of_list left)
+               (M.of_list right)
+           in
+           !acc)
           (let acc = ref init in
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
@@ -1157,19 +1381,22 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter{2,}_e" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_e one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (let acc = ref init in
-           M.iter2_e
-             ~when_different_lengths:101
-             (Iter2EOf.fn_e acc fn)
-             (M.of_list left)
-             (M.of_list right)
-           >|? fun () -> !acc)
+           let+ () =
+             M.iter2_e
+               ~when_different_lengths:101
+               (Iter2EOf.fn_e acc fn)
+               (M.of_list left)
+               (M.of_list right)
+           in
+           !acc)
           (let acc = ref init in
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.iter_e (uncurry @@ Iter2EOf.fn_e acc fn) leftright >>? fun () ->
+           let* () = M.iter_e (uncurry @@ Iter2EOf.fn_e acc fn) leftright in
            match leftovers with None -> Ok !acc | Some _ -> Error 101))
 
   let iter_s =
@@ -1177,44 +1404,46 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.iter{2,}_s" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_s one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_s
           (let acc = ref init in
-           M.iter2_s
-             ~when_different_lengths:101
-             (Iter2SOf.fn_s acc fn)
-             (M.of_list left)
-             (M.of_list right)
-           >|=? fun () -> !acc)
+           let+ () =
+             M.iter2_s
+               ~when_different_lengths:101
+               (Iter2SOf.fn_s acc fn)
+               (M.of_list left)
+               (M.of_list right)
+           in
+           !acc)
           (let acc = ref init in
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright >>= fun () ->
-           match leftovers with
-           | None -> Lwt.return_ok !acc
-           | Some _ -> Lwt.return_error 101))
+           let*! () = M.iter_s (uncurry @@ Iter2SOf.fn_s acc fn) leftright in
+           match leftovers with None -> return !acc | Some _ -> fail 101))
 
   let iter_es =
     Test.make
       ~name:(Format.asprintf "%s.iter{2,}_es" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_e one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (let acc = ref init in
-           M.iter2_es
-             ~when_different_lengths:101
-             (Iter2ESOf.fn_e acc fn)
-             (M.of_list left)
-             (M.of_list right)
-           >|=? fun () -> !acc)
+           let+ () =
+             M.iter2_es
+               ~when_different_lengths:101
+               (Iter2ESOf.fn_e acc fn)
+               (M.of_list left)
+               (M.of_list right)
+           in
+           !acc)
           (let acc = ref init in
            let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.iter_es (uncurry @@ Iter2ESOf.fn_e acc fn) leftright >>=? fun () ->
-           match leftovers with
-           | None -> Lwt.return_ok !acc
-           | Some _ -> Lwt.return_error 101))
+           let* () = M.iter_es (uncurry @@ Iter2ESOf.fn_e acc fn) leftright in
+           match leftovers with None -> return !acc | Some _ -> fail 101))
 
   let tests_iter = [iter; iter_e; iter_s; iter_es]
 
@@ -1240,6 +1469,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map{2,}_e" M.name)
       (pair Test_fuzzing_helpers.Fn.arith_e manymany)
       (fun (fn, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (M.map2_e
              ~when_different_lengths:101
@@ -1249,7 +1479,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.map_e (uncurry @@ Map2EOf.fn_e fn) leftright >>? fun t ->
+           let* t = M.map_e (uncurry @@ Map2EOf.fn_e fn) leftright in
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let map_s =
@@ -1257,6 +1487,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.map{2,}_s" M.name)
       (pair Test_fuzzing_helpers.Fn.arith manymany)
       (fun (Fun (_, fn), (left, right)) ->
+        let open Lwt_syntax in
         eq_s
           (M.map2_s
              ~when_different_lengths:101
@@ -1266,14 +1497,17 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.map_s (uncurry @@ Map2SOf.fn fn) leftright >|= fun t ->
-           match leftovers with None -> Ok t | Some _ -> Error 101))
+           let* t = M.map_s (uncurry @@ Map2SOf.fn fn) leftright in
+           match leftovers with
+           | None -> return_ok t
+           | Some _ -> return_error 101))
 
   let map_es =
     Test.make
       ~name:(Format.asprintf "%s.map{2,}_es" M.name)
       (pair Test_fuzzing_helpers.Fn.arith_e manymany)
       (fun (fn, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.map2_es
              ~when_different_lengths:101
@@ -1283,7 +1517,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.map_es (uncurry @@ Map2ESOf.fn_e fn) leftright >>=? fun t ->
+           let* t = M.map_es (uncurry @@ Map2ESOf.fn_e fn) leftright in
            match leftovers with
            | None -> Lwt.return_ok t
            | Some _ -> Lwt.return_error 101))
@@ -1312,6 +1546,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.rev_map{2,}_e" M.name)
       (pair Test_fuzzing_helpers.Fn.arith_e manymany)
       (fun (fn, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (M.rev_map2_e
              ~when_different_lengths:101
@@ -1321,7 +1556,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.rev_map_e (uncurry @@ Map2EOf.fn_e fn) leftright >>? fun t ->
+           let* t = M.rev_map_e (uncurry @@ Map2EOf.fn_e fn) leftright in
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let rev_map_s =
@@ -1329,6 +1564,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.rev_map{2,}_s" M.name)
       (pair Test_fuzzing_helpers.Fn.arith manymany)
       (fun (Fun (_, fn), (left, right)) ->
+        let open Lwt_syntax in
         eq_s
           (M.rev_map2_s
              ~when_different_lengths:101
@@ -1338,14 +1574,17 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.rev_map_s (uncurry @@ Map2SOf.fn fn) leftright >|= fun t ->
-           match leftovers with None -> Ok t | Some _ -> Error 101))
+           let* t = M.rev_map_s (uncurry @@ Map2SOf.fn fn) leftright in
+           match leftovers with
+           | None -> return_ok t
+           | Some _ -> return_error 101))
 
   let rev_map_es =
     Test.make
       ~name:(Format.asprintf "%s.rev_map{2,}_es" M.name)
       (pair Test_fuzzing_helpers.Fn.arith_e manymany)
       (fun (fn, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.rev_map2_es
              ~when_different_lengths:101
@@ -1355,7 +1594,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.rev_map_es (uncurry @@ Map2ESOf.fn_e fn) leftright >>=? fun t ->
+           let* t = M.rev_map_es (uncurry @@ Map2ESOf.fn_e fn) leftright in
            match leftovers with
            | None -> Lwt.return_ok t
            | Some _ -> Lwt.return_error 101))
@@ -1385,6 +1624,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.fold_left{2,}_e" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_e one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (M.fold_left2_e
              ~when_different_lengths:101
@@ -1395,8 +1635,9 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.fold_left_e (uncurry_l @@ Fold2EOf.fn_e fn) init leftright
-           >>? fun t ->
+           let* t =
+             M.fold_left_e (uncurry_l @@ Fold2EOf.fn_e fn) init leftright
+           in
            match leftovers with None -> Ok t | Some _ -> Error 101))
 
   let fold_left_s =
@@ -1404,6 +1645,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.fold_left{2,}_s" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one manymany)
       (fun (Fun (_, fn), init, (left, right)) ->
+        let open Lwt_syntax in
         eq_s
           (M.fold_left2_s
              ~when_different_lengths:101
@@ -1414,15 +1656,19 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.fold_left_s (uncurry_l @@ Fold2SOf.fn fn) init leftright
-           >|= fun t ->
-           match leftovers with None -> Ok t | Some _ -> Error 101))
+           let* t =
+             M.fold_left_s (uncurry_l @@ Fold2SOf.fn fn) init leftright
+           in
+           match leftovers with
+           | None -> return_ok t
+           | Some _ -> return_error 101))
 
   let fold_left_es =
     Test.make
       ~name:(Format.asprintf "%s.fold_left{2,}_es" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_e one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.fold_left2_es
              ~when_different_lengths:101
@@ -1433,8 +1679,9 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.fold_left_es (uncurry_l @@ Fold2ESOf.fn_e fn) init leftright
-           >>=? fun t ->
+           let* t =
+             M.fold_left_es (uncurry_l @@ Fold2ESOf.fn_e fn) init leftright
+           in
            match leftovers with
            | None -> Lwt.return_ok t
            | Some _ -> Lwt.return_error 101))
@@ -1446,6 +1693,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.fold_right{2,}" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one manymany)
       (fun (Fun (_, fn), init, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (M.fold_right2
              ~when_different_lengths:101
@@ -1453,18 +1701,20 @@ end) : Test = struct
              (M.of_list left)
              (M.of_list right)
              init)
-          ( M.combine
-              ~when_different_lengths:101
-              (M.of_list left)
-              (M.of_list right)
-          >|? fun leftright ->
-            M.fold_right (uncurry_r @@ Fold2Of.fn fn) leftright init ))
+          (let+ leftright =
+             M.combine
+               ~when_different_lengths:101
+               (M.of_list left)
+               (M.of_list right)
+           in
+           M.fold_right (uncurry_r @@ Fold2Of.fn fn) leftright init))
 
   let fold_right_e =
     Test.make
       ~name:(Format.asprintf "%s.fold_right{2,}_e" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_e one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Result_syntax in
         eq_e
           (M.fold_right2_e
              ~when_different_lengths:101
@@ -1472,18 +1722,20 @@ end) : Test = struct
              (M.of_list left)
              (M.of_list right)
              init)
-          ( M.combine
-              ~when_different_lengths:101
-              (M.of_list left)
-              (M.of_list right)
-          >>? fun leftright ->
-            M.fold_right_e (uncurry_r @@ Fold2EOf.fn_e fn) leftright init ))
+          (let* leftright =
+             M.combine
+               ~when_different_lengths:101
+               (M.of_list left)
+               (M.of_list right)
+           in
+           M.fold_right_e (uncurry_r @@ Fold2EOf.fn_e fn) leftright init))
 
   let fold_right_s =
     Test.make
       ~name:(Format.asprintf "%s.fold_right{2,}_s" M.name)
       (triple Test_fuzzing_helpers.Fn.arith one manymany)
       (fun (Fun (_, fn), init, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_s
           (M.fold_right2_s
              ~when_different_lengths:101
@@ -1491,22 +1743,22 @@ end) : Test = struct
              (M.of_list left)
              (M.of_list right)
              init)
-          (match
-             M.combine
-               ~when_different_lengths:101
-               (M.of_list left)
-               (M.of_list right)
-           with
-          | Ok leftright ->
-              M.fold_right_s (uncurry_r @@ Fold2SOf.fn fn) leftright init
-              >>= Lwt.return_ok
-          | Error _ as err -> Lwt.return err))
+          (let* leftright =
+             Lwt.return
+             @@ M.combine
+                  ~when_different_lengths:101
+                  (M.of_list left)
+                  (M.of_list right)
+           in
+           Lwt_result.ok
+           @@ M.fold_right_s (uncurry_r @@ Fold2SOf.fn fn) leftright init))
 
   let fold_right_es =
     Test.make
       ~name:(Format.asprintf "%s.fold_right{2,}_es" M.name)
       (triple Test_fuzzing_helpers.Fn.arith_es one manymany)
       (fun (fn, init, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.fold_right2_es
              ~when_different_lengths:101
@@ -1514,13 +1766,14 @@ end) : Test = struct
              (M.of_list left)
              (M.of_list right)
              init)
-          ( Lwt.return
-          @@ M.combine
-               ~when_different_lengths:101
-               (M.of_list left)
-               (M.of_list right)
-          >>=? fun leftright ->
-            M.fold_right_es (uncurry_r @@ Fold2ESOf.fn_es fn) leftright init ))
+          (let* leftright =
+             Lwt.return
+             @@ M.combine
+                  ~when_different_lengths:101
+                  (M.of_list left)
+                  (M.of_list right)
+           in
+           M.fold_right_es (uncurry_r @@ Fold2ESOf.fn_es fn) leftright init))
 
   let tests_fold_right = [fold_right; fold_right_e; fold_right_s; fold_right_es]
 
@@ -1550,6 +1803,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.for_all{2,}_e" M.name)
       (pair Test_fuzzing_helpers.Fn.pred manymany)
       (fun (pred, (left, right)) ->
+        let open Result_syntax in
         eq_e
           ~pp:PP.(res bool int)
           (M.for_all2_e
@@ -1560,7 +1814,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.for_all_e (uncurry @@ Cond2EOf.fn pred) leftright >>? fun t ->
+           let* t = M.for_all_e (uncurry @@ Cond2EOf.fn pred) leftright in
            match (t, leftovers) with
            | (false, _) -> Ok false
            | (true, None) -> Ok true
@@ -1571,6 +1825,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.for_all{2,}_s" M.name)
       (pair Test_fuzzing_helpers.Fn.pred manymany)
       (fun (pred, (left, right)) ->
+        let open Lwt_syntax in
         eq_s
           ~pp:PP.(res bool int)
           (M.for_all2_s
@@ -1581,7 +1836,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.for_all_s (uncurry @@ Cond2SOf.fn pred) leftright >|= fun t ->
+           let+ t = M.for_all_s (uncurry @@ Cond2SOf.fn pred) leftright in
            match (t, leftovers) with
            | (false, _) -> Ok false
            | (true, None) -> Ok true
@@ -1592,6 +1847,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.for_all{2,}_es" M.name)
       (pair Test_fuzzing_helpers.Fn.pred manymany)
       (fun (pred, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.for_all2_es
              ~when_different_lengths:101
@@ -1601,7 +1857,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.for_all_es (uncurry @@ Cond2ESOf.fn pred) leftright >>=? fun t ->
+           let* t = M.for_all_es (uncurry @@ Cond2ESOf.fn pred) leftright in
            match (t, leftovers) with
            | (false, _) -> Lwt.return_ok false
            | (true, None) -> Lwt.return_ok true
@@ -1635,6 +1891,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.exists{2,}_e" M.name)
       (pair Test_fuzzing_helpers.Fn.pred manymany)
       (fun (pred, (left, right)) ->
+        let open Result_syntax in
         eq_e
           ~pp:PP.(res bool int)
           (M.exists2_e
@@ -1645,7 +1902,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.exists_e (uncurry @@ Cond2EOf.fn pred) leftright >>? fun t ->
+           let* t = M.exists_e (uncurry @@ Cond2EOf.fn pred) leftright in
            match (t, leftovers) with
            | (true, _) -> Ok true
            | (false, None) -> Ok false
@@ -1656,6 +1913,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.exists{2,}_s" M.name)
       (pair Test_fuzzing_helpers.Fn.pred manymany)
       (fun (pred, (left, right)) ->
+        let open Lwt_syntax in
         eq_s
           ~pp:PP.(res bool int)
           (M.exists2_s
@@ -1666,7 +1924,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.exists_s (uncurry @@ Cond2SOf.fn pred) leftright >|= fun t ->
+           let+ t = M.exists_s (uncurry @@ Cond2SOf.fn pred) leftright in
            match (t, leftovers) with
            | (true, _) -> Ok true
            | (false, None) -> Ok false
@@ -1677,6 +1935,7 @@ end) : Test = struct
       ~name:(Format.asprintf "%s.exists{2,}_es" M.name)
       (pair Test_fuzzing_helpers.Fn.pred manymany)
       (fun (pred, (left, right)) ->
+        let open Lwt_result_syntax in
         eq_es
           (M.exists2_es
              ~when_different_lengths:101
@@ -1686,7 +1945,7 @@ end) : Test = struct
           (let (leftright, leftovers) =
              M.combine_with_leftovers (M.of_list left) (M.of_list right)
            in
-           M.exists_es (uncurry @@ Cond2ESOf.fn pred) leftright >>=? fun t ->
+           let* t = M.exists_es (uncurry @@ Cond2ESOf.fn pred) leftright in
            match (t, leftovers) with
            | (true, _) -> Lwt.return_ok true
            | (false, None) -> Lwt.return_ok false

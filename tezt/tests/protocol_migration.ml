@@ -30,17 +30,23 @@
    Subject:      Checks the migration of protocol alpha
 *)
 
-let test_protocol_migration ~migrate_from ~migrate_to =
+(* Migration to Tenderbake is only supported after the first cycle,
+   therefore at [migration_level >= blocks_per_cycle].  *)
+let test_protocol_migration ~blocks_per_cycle ~migration_level ~migrate_from
+    ~migrate_to =
   Test.register
     ~__FILE__
-    ~title:"protocol migration"
+    ~title:(Printf.sprintf "protocol migration at level %d" migration_level)
     ~tags:["protocol"; "migration"; "sandbox"]
   @@ fun () ->
+  assert (migration_level >= blocks_per_cycle) ;
   let node = Node.create [] in
   let* () = Node.config_init node [] in
-  Node.Config_file.set_sandbox_network_with_user_activated_upgrades
-    node
-    [(3, migrate_to)] ;
+  Node.Config_file.(
+    update
+      node
+      (set_sandbox_network_with_user_activated_upgrades
+         [(migration_level, migrate_to)])) ;
   Log.info "Node starting" ;
   let* () = Node.run node [] in
   let* () = Node.wait_for_ready node in
@@ -67,5 +73,17 @@ let test_protocol_migration ~migrate_from ~migrate_to =
   let* () = repeat 5 (fun () -> Client.bake_for client) in
   unit
 
+(* Test all levels for one cycle, after the first cycle. *)
+let test_migration_for_whole_cycle ~migrate_from ~migrate_to =
+  let parameters = JSON.parse_file (Protocol.parameter_file migrate_to) in
+  let blocks_per_cycle = JSON.(get "blocks_per_cycle" parameters |> as_int) in
+  for migration_level = blocks_per_cycle to 2 * blocks_per_cycle do
+    test_protocol_migration
+      ~blocks_per_cycle
+      ~migration_level
+      ~migrate_from
+      ~migrate_to
+  done
+
 let register ~migrate_from ~migrate_to =
-  test_protocol_migration ~migrate_from ~migrate_to
+  test_migration_for_whole_cycle ~migrate_from ~migrate_to

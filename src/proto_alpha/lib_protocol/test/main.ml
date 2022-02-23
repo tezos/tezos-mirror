@@ -38,14 +38,15 @@ let () =
       ("origination", Test_origination.tests);
       ("activation", Test_activation.tests);
       ("revelation", Test_reveal.tests);
-      ("baking module", Test_baking_module.tests);
       ("endorsement", Test_endorsement.tests);
+      ("preendorsement", Test_preendorsement.tests);
       ("double endorsement", Test_double_endorsement.tests);
+      ("double preendorsement", Test_double_preendorsement.tests);
       ("double baking", Test_double_baking.tests);
       ("seed", Test_seed.tests);
       ("baking", Test_baking.tests);
       ("delegation", Test_delegation.tests);
-      ("rolls", Test_rolls.tests);
+      ("deactivation", Test_deactivation.tests);
       ("combined", Test_combined_operations.tests);
       ("qty", Test_qty.tests);
       ("voting", Test_voting.tests);
@@ -68,5 +69,16 @@ let () =
       ("temp big maps", Test_temp_big_maps.tests);
       ("timelock", Test_timelock.tests);
       ("script typed ir size", Test_script_typed_ir_size.tests);
+      ("ticket storage", Test_ticket_storage.tests);
+      ("ticket scanner", Test_ticket_scanner.tests);
+      ("ticket balance key", Test_ticket_balance_key.tests);
+      ("fitness", Test_fitness.tests);
+      ("round", Test_round_repr.tests);
+      ("participation monitoring", Test_participation.tests);
+      ("frozen deposits", Test_frozen_deposits.tests);
+      ("token movements", Test_token.tests);
+      ("receipt encodings", Test_receipt.tests);
+      ("tx rollup", Test_tx_rollup.tests);
+      ("gas monad", Test_gas_monad.tests);
     ]
   |> Lwt_main.run

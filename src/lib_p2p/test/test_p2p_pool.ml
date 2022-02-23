@@ -27,7 +27,7 @@
 (** Testing
     -------
     Component:    P2P
-    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_ipv6set
+    Invocation:   dune build @src/lib_p2p/test/runtest_p2p_pool
     Dependencies: src/lib_p2p/test/process.ml
     Subject:      Testing of the Pool
                   Each test launches nodes in separate process, each node
@@ -395,7 +395,7 @@ module Overcrowded = struct
       (Advertisement_failure unknowns)
 
   let client legacy (node : Node.t) =
-    if List.length node.points > 50 then (
+    if Compare.List_length_with.(node.points > 50) then (
       log_error
         "This test only works for less clients than the advertisement list \
          length (50)@." ;

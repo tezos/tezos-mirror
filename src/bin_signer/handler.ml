@@ -40,14 +40,117 @@ module High_watermark = struct
          (List.map (fun (pkh, mark) ->
               (Signature.Public_key_hash.of_b58check_exn pkh, mark)))
     @@ assoc
-    @@ obj3
+    @@ obj4
          (req "level" int32)
+         (opt "round" int32)
          (req "hash" raw_hash)
          (opt "signature" Signature.encoding)
 
+  let get_level_and_round_for_tenderbake_block bytes =
+    (* <watermark(1)><chain_id(4)><level(4)><proto_level(1)><predecessor(32)><timestamp(8)><validation_passes(1)><oph(32)><FITNESS>... *)
+    (* FITNESS=<len(4)><version(1)><len(4)><level(4)><len(4)><locked_round(0 OR 4)><len(4)><predecessor_round(4)><len(4)><round(4)> *)
+    try
+      let level = Bytes.get_int32_be bytes (1 + 4) in
+      let fitness_offset = 1 + 4 + 4 + 1 + 32 + 8 + 1 + 32 in
+      let fitness_length =
+        Bytes.get_int32_be bytes fitness_offset |> Int32.to_int
+      in
+      let round =
+        Bytes.get_int32_be bytes (fitness_offset + fitness_length + 4 - 4)
+      in
+      return (level, Some round)
+    with exn ->
+      failwith
+        "Failed to retrieve level and round of a Tenderbake block: %s"
+        (Printexc.to_string exn)
+
+  let get_level_and_round_for_tenderbake_endorsement bytes =
+    (* <watermark(1)><chain_id(4)><branch(32)><kind(1)><slot(2)><level(4)><round(4)>... *)
+    try
+      let level_offset = 1 + 4 + 32 + 1 + 2 in
+      let level = Bytes.get_int32_be bytes level_offset in
+      let round = Bytes.get_int32_be bytes (level_offset + 4) in
+      return (level, Some round)
+    with exn ->
+      failwith
+        "Failed to retrieve level and round of an endorsement or \
+         preendorsement (%s)"
+        (Printexc.to_string exn)
+
+  let check_mark name
+      (previous_level, previous_round_opt, previous_hash, previous_signature_opt)
+      level round_opt hash =
+    let round = Option.value ~default:0l round_opt in
+    match (previous_round_opt, previous_signature_opt) with
+    | (None, None) ->
+        if previous_level >= level then
+          failwith
+            "%s level %ld not above high watermark %ld"
+            name
+            level
+            previous_level
+        else return_none
+    | (None, Some signature) ->
+        if previous_level > level then
+          failwith
+            "%s level %ld below high watermark %ld"
+            name
+            level
+            previous_level
+        else if previous_level = level then
+          if previous_hash <> hash then
+            failwith
+              "%s level %ld already signed with different data"
+              name
+              level
+          else return_some signature
+        else return_none
+    | (Some previous_round, None) ->
+        if previous_level > level then
+          failwith
+            "%s level %ld not above high watermark %ld"
+            name
+            level
+            previous_level
+        else if previous_level = level && previous_round >= round then
+          failwith
+            "%s level %ld and round %ld not above high watermark (%ld, %ld)"
+            name
+            level
+            round
+            previous_level
+            previous_round
+        else return_none
+    | (Some previous_round, Some signature) ->
+        if previous_level > level then
+          failwith
+            "%s level %ld below high watermark %ld"
+            name
+            level
+            previous_level
+        else if previous_level = level then
+          if previous_round > round then
+            failwith
+              "%s level %ld and round %ld not above high watermark (%ld,%ld)"
+              name
+              level
+              round
+              previous_level
+              previous_round
+          else if previous_round = round then
+            if previous_hash <> hash then
+              failwith
+                "%s level %ld and round %ld already signed with different data"
+                name
+                level
+                round
+            else return_some signature
+          else return_none
+        else return_none
+
   let mark_if_block_or_endorsement (cctxt : #Client_context.wallet) pkh bytes
       sign =
-    let mark art name get_level =
+    let mark art name get_level_and_round =
       let file = name ^ "_high_watermark" in
       cctxt#with_lock @@ fun () ->
       cctxt#load file ~default:[] encoding >>=? fun all ->
@@ -56,47 +159,27 @@ module High_watermark = struct
       else
         let hash = Blake2B.hash_bytes [bytes] in
         let chain_id = Chain_id.of_bytes_exn (Bytes.sub bytes 1 4) in
-        let level = get_level () in
-        (match List.assoc_opt ~equal:Chain_id.equal chain_id all with
+        get_level_and_round () >>=? fun (level, round_opt) ->
+        (match
+           Option.bind
+             (List.assoc_opt ~equal:Chain_id.equal chain_id all)
+             (List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh)
+         with
         | None -> return_none
-        | Some marks -> (
-            match
-              List.assoc_opt ~equal:Signature.Public_key_hash.equal pkh marks
-            with
-            | None -> return_none
-            | Some (previous_level, _, None) ->
-                if previous_level >= level then
-                  failwith
-                    "%s level %ld not above high watermark %ld"
-                    name
-                    level
-                    previous_level
-                else return_none
-            | Some (previous_level, previous_hash, Some signature) ->
-                if previous_level > level then
-                  failwith
-                    "%s level %ld below high watermark %ld"
-                    name
-                    level
-                    previous_level
-                else if previous_level = level then
-                  if previous_hash <> hash then
-                    failwith
-                      "%s level %ld already signed with different data"
-                      name
-                      level
-                  else return_some signature
-                else return_none))
+        | Some mark -> check_mark name mark level round_opt hash)
         >>=? function
         | Some signature -> return signature
         | None ->
             sign bytes >>=? fun signature ->
             let rec update = function
-              | [] -> [(chain_id, [(pkh, (level, hash, Some signature))])]
+              | [] ->
+                  [
+                    (chain_id, [(pkh, (level, round_opt, hash, Some signature))]);
+                  ]
               | (e_chain_id, marks) :: rest ->
                   if chain_id = e_chain_id then
                     let marks =
-                      (pkh, (level, hash, Some signature))
+                      (pkh, (level, round_opt, hash, Some signature))
                       :: List.filter (fun (pkh', _) -> pkh <> pkh') marks
                     in
                     (e_chain_id, marks) :: rest
@@ -105,12 +188,29 @@ module High_watermark = struct
             cctxt#write file (update all) encoding >>=? fun () ->
             return signature
     in
-    if Bytes.length bytes > 0 && TzEndian.get_uint8 bytes 0 = 0x01 then
-      mark "a" "block" (fun () -> TzEndian.get_int32 bytes 5)
-    else if Bytes.length bytes > 0 && TzEndian.get_uint8 bytes 0 = 0x02 then
-      mark "an" "endorsement" (fun () ->
-          TzEndian.get_int32 bytes (Bytes.length bytes - 4))
-    else sign bytes
+    if Bytes.length bytes = 0 then sign bytes
+    else
+      match TzEndian.get_uint8 bytes 0 with
+      | 0x01 ->
+          (* Emmy block *)
+          mark "a" "block" (fun () -> return (TzEndian.get_int32 bytes 5, None))
+      | 0x02 ->
+          (* Emmy endorsement *)
+          mark "an" "endorsement" (fun () ->
+              return (TzEndian.get_int32 bytes (Bytes.length bytes - 4), None))
+      | 0x11 ->
+          mark "a" "block" (fun () ->
+              (* tenderbake block *)
+              get_level_and_round_for_tenderbake_block bytes)
+      | 0x12 ->
+          (* tenderbake preendorsement *)
+          mark "a" "preendorsement" (fun () ->
+              get_level_and_round_for_tenderbake_endorsement bytes)
+      | 0x13 ->
+          (* tenderbake endorsement *)
+          mark "a" "endorsement" (fun () ->
+              get_level_and_round_for_tenderbake_endorsement bytes)
+      | _ -> sign bytes
 end
 
 module Authorized_key = Client_aliases.Alias (struct

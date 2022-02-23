@@ -24,16 +24,15 @@
 (*****************************************************************************)
 
 open Monad
-module Legacy = Stdlib.List
-include Legacy
+include Stdlib.List
 
 let nil = []
 
-let nil_e = Ok []
+let nil_e = Result_syntax.return_nil
 
-let nil_s = Lwt.return_nil
+let nil_s = Lwt_syntax.return_nil
 
-let nil_es = Lwt.return nil_e
+let nil_es = Lwt_result_syntax.return_nil
 
 let hd = function x :: _ -> Some x | [] -> None
 
@@ -69,7 +68,7 @@ let rec iter2 ~when_different_lengths f xs ys =
       The same remark applies to the other 2-list iterators.
   *)
   match (xs, ys) with
-  | ([], []) -> Result.return_unit
+  | ([], []) -> Result_syntax.return_unit
   | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
   | (x :: xs, y :: ys) ->
       f x y ;
@@ -87,7 +86,7 @@ let rev_map2 ~when_different_lengths f xs ys =
   aux [] xs ys
 
 let map2 ~when_different_lengths f xs ys =
-  rev_map2 ~when_different_lengths f xs ys >|? rev
+  rev_map2 ~when_different_lengths f xs ys |> Result.map rev
 
 let fold_left2 ~when_different_lengths f a xs ys =
   let rec aux acc xs ys =
@@ -105,7 +104,10 @@ let fold_right2 ~when_different_lengths f xs ys a =
     match (xs, ys) with
     | ([], []) -> Ok a
     | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | (x :: xs, y :: ys) -> aux xs ys >|? fun acc -> f x y acc
+    | (x :: xs, y :: ys) ->
+        let open Result_syntax in
+        let* acc = aux xs ys in
+        return (f x y acc)
   in
   aux xs ys
 
@@ -146,35 +148,38 @@ let fold_left_map_e f accu l =
   let rec aux accu rev_list_accu = function
     | [] -> Ok (accu, rev rev_list_accu)
     | x :: xs ->
-        f accu x >>? fun (accu, y) ->
+        let open Result_syntax in
+        let* (accu, y) = f accu x in
         (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
   in
   aux accu [] l
 
 let fold_left_map_s f accu l =
-  let rec aux accu rev_list_accu = function
-    | [] -> Lwt.return (accu, rev rev_list_accu)
-    | x :: xs ->
-        f accu x >>= fun (accu, y) ->
-        (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
-  in
-  match l with
-  | [] -> Lwt.return (accu, [])
-  | x :: xs ->
-      lwt_apply2 f accu x >>= fun (accu, y) ->
-      (aux [@ocaml.tailcall]) accu [y] xs
-
-let fold_left_map_es f accu l =
+  let open Lwt_syntax in
   let rec aux accu rev_list_accu = function
     | [] -> return (accu, rev rev_list_accu)
     | x :: xs ->
-        f accu x >>=? fun (accu, y) ->
+        let* (accu, y) = f accu x in
         (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
   in
   match l with
   | [] -> return (accu, [])
   | x :: xs ->
-      lwt_apply2 f accu x >>=? fun (accu, y) ->
+      let* (accu, y) = lwt_apply2 f accu x in
+      (aux [@ocaml.tailcall]) accu [y] xs
+
+let fold_left_map_es f accu l =
+  let open Lwt_result_syntax in
+  let rec aux accu rev_list_accu = function
+    | [] -> return (accu, rev rev_list_accu)
+    | x :: xs ->
+        let* (accu, y) = f accu x in
+        (aux [@ocaml.tailcall]) accu (y :: rev_list_accu) xs
+  in
+  match l with
+  | [] -> return (accu, [])
+  | x :: xs ->
+      let* (accu, y) = lwt_apply2 f accu x in
       (aux [@ocaml.tailcall]) accu [y] xs
 
 let rec mem ~equal x = function
@@ -201,98 +206,124 @@ let rec remove_assoc ~equal k = function
 let init ~when_negative_length l f =
   if l < 0 then Error when_negative_length
   else if l = 0 then nil_e
-  else Ok (Legacy.init l f)
+  else Ok (Stdlib.List.init l f)
 
 let init_e ~when_negative_length l f =
+  let open Result_syntax in
   let rec aux acc i =
-    if i >= l then Ok (rev acc)
-    else f i >>? fun v -> (aux [@ocaml.tailcall]) (v :: acc) (i + 1)
+    if i >= l then return (rev acc)
+    else
+      let* v = f i in
+      (aux [@ocaml.tailcall]) (v :: acc) (i + 1)
   in
   if l < 0 then Error when_negative_length
-  else if l = 0 then nil_e
+  else if l = 0 then return_nil
   else aux [] 0
 
 let init_s ~when_negative_length l f =
+  let open Lwt_syntax in
   let rec aux acc i =
-    if i >= l then Lwt.return (Ok (rev acc))
-    else f i >>= fun v -> (aux [@ocaml.tailcall]) (v :: acc) (i + 1)
+    if i >= l then return (rev acc)
+    else
+      let* v = f i in
+      (aux [@ocaml.tailcall]) (v :: acc) (i + 1)
   in
-  if l < 0 then Lwt.return (Error when_negative_length)
+  if l < 0 then return_error when_negative_length
   else if l = 0 then nil_es
-  else Lwt.apply f 0 >>= fun v -> aux [v] 1
+  else
+    let* v = Lwt.apply f 0 in
+    let* r = aux [v] 1 in
+    return_ok r
 
 let init_es ~when_negative_length l f =
+  let open Lwt_result_syntax in
   let rec aux acc i =
-    if i >= l then Lwt.return (Ok (rev acc))
-    else f i >>=? fun v -> (aux [@ocaml.tailcall]) (v :: acc) (i + 1)
+    if i >= l then return (rev acc)
+    else
+      let* v = f i in
+      (aux [@ocaml.tailcall]) (v :: acc) (i + 1)
   in
-  if l < 0 then Lwt.return (Error when_negative_length)
-  else if l = 0 then nil_es
-  else Lwt.apply f 0 >>=? fun v -> aux [v] 1
+  if l < 0 then fail when_negative_length
+  else if l = 0 then return_nil
+  else
+    let* v = Lwt.apply f 0 in
+    aux [v] 1
 
 let init_ep ~when_negative_length l f =
   let rec aux acc i =
-    if i >= l then all_ep (rev acc)
+    if i >= l then Lwt_result_syntax.all (rev acc)
     else (aux [@ocaml.tailcall]) (Lwt.apply f i :: acc) (i + 1)
   in
-  if l < 0 then Lwt.return (Error [when_negative_length])
-  else if l = 0 then nil_es
+  let open Lwt_result_syntax in
+  if l < 0 then fail [when_negative_length]
+  else if l = 0 then return_nil
   else aux [] 0
 
 let init_p ~when_negative_length l f =
+  let open Lwt_syntax in
   let rec aux acc i =
-    if i >= l then all_p (rev acc) >>= fun xs -> Lwt.return (Ok xs)
+    if i >= l then
+      let* xs = all (rev acc) in
+      return xs
     else (aux [@ocaml.tailcall]) (Lwt.apply f i :: acc) (i + 1)
   in
-  if l < 0 then Lwt.return (Error when_negative_length)
+  if l < 0 then return_error when_negative_length
   else if l = 0 then nil_es
-  else aux [] 0
+  else
+    let* r = aux [] 0 in
+    return_ok r
 
-let rec find_e f = function
-  | [] -> Result.return_none
-  | x :: xs -> (
-      f x >>? function
-      | true -> Ok (Some x)
-      | false -> (find_e [@ocaml.tailcall]) f xs)
+let rec find_e f =
+  let open Result_syntax in
+  function
+  | [] -> return_none
+  | x :: xs ->
+      let* found = f x in
+      if found then return_some x else (find_e [@ocaml.tailcall]) f xs
 
-let rec find_s f = function
-  | [] -> Lwt.return_none
-  | x :: xs -> (
-      f x >>= function
-      | true -> Lwt.return (Some x)
-      | false -> (find_s [@ocaml.tailcall]) f xs)
+let rec find_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_none
+  | x :: xs ->
+      let* found = f x in
+      if found then return_some x else (find_s [@ocaml.tailcall]) f xs
 
-let find_s f = function
-  | [] -> Lwt.return_none
-  | x :: xs -> (
-      Lwt.apply f x >>= function
-      | true -> Lwt.return (Some x)
-      | false -> (find_s [@ocaml.tailcall]) f xs)
+let find_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_none
+  | x :: xs ->
+      let* found = Lwt.apply f x in
+      if found then return_some x else (find_s [@ocaml.tailcall]) f xs
 
-let rec find_es f = function
-  | [] -> LwtResult.return_none
-  | x :: xs -> (
-      f x >>=? function
-      | true -> Lwt.return (Ok (Some x))
-      | false -> (find_es [@ocaml.tailcall]) f xs)
+let rec find_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_none
+  | x :: xs ->
+      let* found = f x in
+      if found then return_some x else (find_es [@ocaml.tailcall]) f xs
 
-let find_es f = function
-  | [] -> LwtResult.return_none
-  | x :: xs -> (
-      Lwt.apply f x >>=? function
-      | true -> Lwt.return (Ok (Some x))
-      | false -> (find_es [@ocaml.tailcall]) f xs)
+let find_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_none
+  | x :: xs ->
+      let* found = Lwt.apply f x in
+      if found then return_some x else (find_es [@ocaml.tailcall]) f xs
 
 let rev_filter f xs =
   fold_left (fun rev_xs x -> if f x then x :: rev_xs else rev_xs) [] xs
 
 let rev_filter_e f xs =
+  let open Result_syntax in
   let rec aux acc = function
-    | [] -> Ok acc
-    | x :: xs -> (
-        f x >>? function
-        | true -> (aux [@ocaml.tailcall]) (x :: acc) xs
-        | false -> (aux [@ocaml.tailcall]) acc xs)
+    | [] -> return acc
+    | x :: xs ->
+        let* b = f x in
+        if b then (aux [@ocaml.tailcall]) (x :: acc) xs
+        else (aux [@ocaml.tailcall]) acc xs
   in
   aux [] xs
 
@@ -326,163 +357,224 @@ let rev_filter_error rxs =
 
 let filter_error rxs = rev_filter_error rxs |> rev
 
-let filter_e f xs = rev_filter_e f xs >|? rev
+let filter_e f xs = rev_filter_e f xs |> Result.map rev
 
 let rev_filter_s f xs =
+  let open Lwt_syntax in
   let rec aux acc = function
-    | [] -> Lwt.return acc
-    | x :: xs -> (
-        f x >>= function
-        | true -> (aux [@ocaml.tailcall]) (x :: acc) xs
-        | false -> (aux [@ocaml.tailcall]) acc xs)
+    | [] -> return acc
+    | x :: xs ->
+        let* b = f x in
+        if b then (aux [@ocaml.tailcall]) (x :: acc) xs
+        else (aux [@ocaml.tailcall]) acc xs
   in
   match xs with
-  | [] -> Lwt.return []
-  | x :: xs -> (
-      Lwt.apply f x >>= function
-      | true -> (aux [@ocaml.tailcall]) [x] xs
-      | false -> (aux [@ocaml.tailcall]) [] xs)
+  | [] -> return_nil
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then (aux [@ocaml.tailcall]) [x] xs
+      else (aux [@ocaml.tailcall]) [] xs
 
-let filter_s f xs = rev_filter_s f xs >|= rev
+let filter_s f xs = rev_filter_s f xs |> Lwt.map rev
 
 let rev_filter_es f xs =
+  let open Lwt_result_syntax in
   let rec aux acc = function
-    | [] -> Lwt.return (Ok acc)
-    | x :: xs -> (
-        f x >>=? function
-        | true -> (aux [@ocaml.tailcall]) (x :: acc) xs
-        | false -> (aux [@ocaml.tailcall]) acc xs)
+    | [] -> return acc
+    | x :: xs ->
+        let* b = f x in
+        if b then (aux [@ocaml.tailcall]) (x :: acc) xs
+        else (aux [@ocaml.tailcall]) acc xs
   in
   match xs with
-  | [] -> Lwt.return (Ok [])
-  | x :: xs -> (
-      Lwt.apply f x >>=? function true -> aux [x] xs | false -> aux [] xs)
+  | [] -> return_nil
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then aux [x] xs else aux [] xs
 
-let filter_es f xs = rev_filter_es f xs >|=? rev
+let filter_es f xs = rev_filter_es f xs |> Lwt_result.map rev
 
-let rec iter_e f = function
-  | [] -> Result.return_unit
-  | h :: t -> f h >>? fun () -> (iter_e [@ocaml.tailcall]) f t
+let rec iter_e f =
+  let open Result_syntax in
+  function
+  | [] -> return_unit
+  | h :: t ->
+      let* () = f h in
+      (iter_e [@ocaml.tailcall]) f t
 
-let rec iter_s f = function
-  | [] -> Lwt.return_unit
-  | h :: t -> f h >>= fun () -> (iter_s [@ocaml.tailcall]) f t
+let rec iter_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_unit
+  | h :: t ->
+      let* () = f h in
+      (iter_s [@ocaml.tailcall]) f t
 
-let iter_s f = function
-  | [] -> Lwt.return_unit
-  | h :: t -> Lwt.apply f h >>= fun () -> (iter_s [@ocaml.tailcall]) f t
+let iter_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_unit
+  | h :: t ->
+      let* () = Lwt.apply f h in
+      (iter_s [@ocaml.tailcall]) f t
 
-let rec iter_es f = function
-  | [] -> LwtResult.return_unit
-  | h :: t -> f h >>=? fun () -> (iter_es [@ocaml.tailcall]) f t
+let rec iter_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_unit
+  | h :: t ->
+      let* () = f h in
+      (iter_es [@ocaml.tailcall]) f t
 
-let iter_es f = function
-  | [] -> LwtResult.return_unit
-  | h :: t -> Lwt.apply f h >>=? fun () -> (iter_es [@ocaml.tailcall]) f t
+let iter_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_unit
+  | h :: t ->
+      let* () = Lwt.apply f h in
+      (iter_es [@ocaml.tailcall]) f t
 
-let iter_ep f l = join_ep (rev_map (Lwt.apply f) l)
+let iter_ep f l = Lwt_result_syntax.join (rev_map (Lwt.apply f) l)
 
-let iter_p f l = join_p (rev_map (Lwt.apply f) l)
+let iter_p f l = Lwt_syntax.join (rev_map (Lwt.apply f) l)
 
 let iteri_e f l =
+  let open Result_syntax in
   let rec aux i = function
-    | [] -> Result.return_unit
-    | x :: xs -> f i x >>? fun () -> (aux [@ocaml.tailcall]) (i + 1) xs
+    | [] -> return_unit
+    | x :: xs ->
+        let* () = f i x in
+        (aux [@ocaml.tailcall]) (i + 1) xs
   in
   aux 0 l
 
 let iteri_s f l =
+  let open Lwt_syntax in
   let rec aux i = function
-    | [] -> Lwt.return_unit
-    | x :: xs -> f i x >>= fun () -> (aux [@ocaml.tailcall]) (i + 1) xs
+    | [] -> return_unit
+    | x :: xs ->
+        let* () = f i x in
+        (aux [@ocaml.tailcall]) (i + 1) xs
   in
   match l with
-  | [] -> Lwt.return_unit
-  | x :: xs -> lwt_apply2 f 0 x >>= fun () -> aux 1 xs
+  | [] -> return_unit
+  | x :: xs ->
+      let* () = lwt_apply2 f 0 x in
+      aux 1 xs
 
 let iteri_es f l =
+  let open Lwt_result_syntax in
   let rec aux i = function
-    | [] -> LwtResult.return_unit
-    | x :: xs -> f i x >>=? fun () -> (aux [@ocaml.tailcall]) (i + 1) xs
+    | [] -> return_unit
+    | x :: xs ->
+        let* () = f i x in
+        (aux [@ocaml.tailcall]) (i + 1) xs
   in
   match l with
-  | [] -> LwtResult.return_unit
-  | x :: xs -> lwt_apply2 f 0 x >>=? fun () -> aux 1 xs
+  | [] -> return_unit
+  | x :: xs ->
+      let* () = lwt_apply2 f 0 x in
+      aux 1 xs
 
-let iteri_ep f l = join_ep (mapi (lwt_apply2 f) l)
+let iteri_ep f l = Lwt_result_syntax.join (mapi (lwt_apply2 f) l)
 
-let iteri_p f l = join_p (mapi (lwt_apply2 f) l)
+let iteri_p f l = Lwt_syntax.join (mapi (lwt_apply2 f) l)
 
 let rev_map_e f l =
+  let open Result_syntax in
   let rec aux ys = function
-    | [] -> Ok ys
-    | x :: xs -> f x >>? fun y -> (aux [@ocaml.tailcall]) (y :: ys) xs
+    | [] -> return ys
+    | x :: xs ->
+        let* y = f x in
+        (aux [@ocaml.tailcall]) (y :: ys) xs
   in
   aux [] l
 
-let map_e f l = rev_map_e f l >|? rev
+let map_e f l = rev_map_e f l |> Result.map rev
 
 let rev_map_s f l =
-  let rec aux ys = function
-    | [] -> Lwt.return ys
-    | x :: xs -> f x >>= fun y -> (aux [@ocaml.tailcall]) (y :: ys) xs
-  in
-  match l with
-  | [] -> Lwt.return []
-  | x :: xs -> Lwt.apply f x >>= fun y -> aux [y] xs
-
-let map_s f l = rev_map_s f l >|= rev
-
-let rev_map_es f l =
+  let open Lwt_syntax in
   let rec aux ys = function
     | [] -> return ys
-    | x :: xs -> f x >>=? fun y -> (aux [@ocaml.tailcall]) (y :: ys) xs
+    | x :: xs ->
+        let* y = f x in
+        (aux [@ocaml.tailcall]) (y :: ys) xs
   in
   match l with
-  | [] -> return []
-  | x :: xs -> Lwt.apply f x >>=? fun y -> aux [y] xs
+  | [] -> return_nil
+  | x :: xs ->
+      let* y = Lwt.apply f x in
+      aux [y] xs
 
-let rev_map_ep f l = all_ep @@ rev_map (Lwt.apply f) l
+let map_s f l = rev_map_s f l |> Lwt.map rev
 
-let map_es f l = rev_map_es f l >|=? rev
+let rev_map_es f l =
+  let open Lwt_result_syntax in
+  let rec aux ys = function
+    | [] -> return ys
+    | x :: xs ->
+        let* y = f x in
+        (aux [@ocaml.tailcall]) (y :: ys) xs
+  in
+  match l with
+  | [] -> return_nil
+  | x :: xs ->
+      let* y = Lwt.apply f x in
+      aux [y] xs
 
-let map_ep f l = rev_map_ep f l >|=? rev
+let rev_map_ep f l = Lwt_result_syntax.all @@ rev_map (Lwt.apply f) l
 
-let rev_map_p f l = all_p @@ rev_map (Lwt.apply f) l
+let map_es f l = rev_map_es f l |> Lwt_result.map rev
 
-let map_p f l = rev_map_p f l >|= rev
+let map_ep f l = rev_map_ep f l |> Lwt_result.map rev
+
+let rev_map_p f l = Lwt_syntax.all @@ rev_map (Lwt.apply f) l
+
+let map_p f l = rev_map_p f l |> Lwt.map rev
 
 let rev_mapi_e f l =
-  let rec aux i ys = function
-    | [] -> Ok ys
-    | x :: xs -> f i x >>? fun y -> (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
-  in
-  aux 0 [] l
-
-let mapi_e f l = rev_mapi_e f l >|? rev
-
-let rev_mapi_s f l =
-  let rec aux i ys = function
-    | [] -> Lwt.return ys
-    | x :: xs -> f i x >>= fun y -> (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
-  in
-  match l with
-  | [] -> Lwt.return []
-  | x :: xs -> lwt_apply2 f 0 x >>= fun y -> aux 1 [y] xs
-
-let mapi_s f l = rev_mapi_s f l >|= rev
-
-let rev_mapi_es f l =
+  let open Result_syntax in
   let rec aux i ys = function
     | [] -> return ys
     | x :: xs ->
-        f i x >>=? fun y -> (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
+        let* y = f i x in
+        (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
+  in
+  aux 0 [] l
+
+let mapi_e f l = rev_mapi_e f l |> Result.map rev
+
+let rev_mapi_s f l =
+  let open Lwt_syntax in
+  let rec aux i ys = function
+    | [] -> return ys
+    | x :: xs ->
+        let* y = f i x in
+        (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
+  in
+  match l with
+  | [] -> return_nil
+  | x :: xs ->
+      let* y = lwt_apply2 f 0 x in
+      aux 1 [y] xs
+
+let mapi_s f l = rev_mapi_s f l |> Lwt.map rev
+
+let rev_mapi_es f l =
+  let open Lwt_result_syntax in
+  let rec aux i ys = function
+    | [] -> return ys
+    | x :: xs ->
+        let* y = f i x in
+        (aux [@ocaml.tailcall]) (i + 1) (y :: ys) xs
   in
   match l with
   | [] -> return []
-  | x :: xs -> lwt_apply2 f 0 x >>=? fun y -> aux 1 [y] xs
+  | x :: xs ->
+      let* y = lwt_apply2 f 0 x in
+      aux 1 [y] xs
 
-let mapi_es f l = rev_mapi_es f l >|=? rev
+let mapi_es f l = rev_mapi_es f l |> Lwt_result.map rev
 
 let rev_mapi f l =
   let rec aux i ys = function
@@ -491,33 +583,53 @@ let rev_mapi f l =
   in
   aux 0 [] l
 
-let rev_mapi_p f l = all_p @@ rev_mapi f l
+let rev_mapi_p f l = Lwt_syntax.all @@ rev_mapi f l
 
-let rev_mapi_ep f l = all_ep @@ rev_mapi f l
+let rev_mapi_ep f l = Lwt_result_syntax.all @@ rev_mapi f l
 
-let mapi_p f l = rev_mapi_p f l >|= rev
+let mapi_p f l = rev_mapi_p f l |> Lwt.map rev
 
-let mapi_ep f l = rev_mapi_ep f l >|=? rev
+let mapi_ep f l = rev_mapi_ep f l |> Lwt_result.map rev
 
-let rec fold_left_e f acc = function
-  | [] -> Ok acc
-  | x :: xs -> f acc x >>? fun acc -> (fold_left_e [@ocaml.tailcall]) f acc xs
-
-let rec fold_left_s f acc = function
-  | [] -> Lwt.return acc
-  | x :: xs -> f acc x >>= fun acc -> (fold_left_s [@ocaml.tailcall]) f acc xs
-
-let fold_left_s f acc = function
-  | [] -> Lwt.return acc
-  | x :: xs -> lwt_apply2 f acc x >>= fun acc -> fold_left_s f acc xs
-
-let rec fold_left_es f acc = function
+let rec fold_left_e f acc =
+  let open Result_syntax in
+  function
   | [] -> return acc
-  | x :: xs -> f acc x >>=? fun acc -> (fold_left_es [@ocaml.tailcall]) f acc xs
+  | x :: xs ->
+      let* acc = f acc x in
+      (fold_left_e [@ocaml.tailcall]) f acc xs
 
-let fold_left_es f acc = function
+let rec fold_left_s f acc =
+  let open Lwt_syntax in
+  function
   | [] -> return acc
-  | x :: xs -> lwt_apply2 f acc x >>=? fun acc -> fold_left_es f acc xs
+  | x :: xs ->
+      let* acc = f acc x in
+      (fold_left_s [@ocaml.tailcall]) f acc xs
+
+let fold_left_s f acc =
+  let open Lwt_syntax in
+  function
+  | [] -> return acc
+  | x :: xs ->
+      let* acc = lwt_apply2 f acc x in
+      fold_left_s f acc xs
+
+let rec fold_left_es f acc =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return acc
+  | x :: xs ->
+      let* acc = f acc x in
+      (fold_left_es [@ocaml.tailcall]) f acc xs
+
+let fold_left_es f acc =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return acc
+  | x :: xs ->
+      let* acc = lwt_apply2 f acc x in
+      fold_left_es f acc xs
 
 let fold_left_i f init l =
   fold_left
@@ -529,33 +641,58 @@ let fold_left_i f init l =
   |> snd
 
 let fold_left_i_e f acc l =
-  fold_left_e
-    (fun (i, acc) x -> f i acc x >>? fun acc -> Ok (i + 1, acc))
-    (0, acc)
-    l
-  >>? fun (_, acc) -> Ok acc
+  let open Result_syntax in
+  let* (_, acc) =
+    fold_left_e
+      (fun (i, acc) x ->
+        let* acc = f i acc x in
+        return (i + 1, acc))
+      (0, acc)
+      l
+  in
+  return acc
 
 let fold_left_i_s f acc l =
-  fold_left_s
-    (fun (i, acc) x -> f i acc x >>= fun acc -> Lwt.return (i + 1, acc))
-    (0, acc)
-    l
-  >>= fun (_, acc) -> Lwt.return acc
+  let open Lwt_syntax in
+  let* (_, acc) =
+    fold_left_s
+      (fun (i, acc) x ->
+        let* acc = f i acc x in
+        return (i + 1, acc))
+      (0, acc)
+      l
+  in
+  return acc
 
 let fold_left_i_es f acc l =
-  fold_left_es
-    (fun (i, acc) x -> f i acc x >>=? fun acc -> return (i + 1, acc))
-    (0, acc)
-    l
-  >>=? fun (_, acc) -> return acc
+  let open Lwt_result_syntax in
+  let* (_, acc) =
+    fold_left_es
+      (fun (i, acc) x ->
+        let* acc = f i acc x in
+        return (i + 1, acc))
+      (0, acc)
+      l
+  in
+  return acc
 
 let filter_p f l =
-  rev_map_p (fun x -> f x >|= fun b -> if b then Some x else None) l
-  >|= rev_filter_some
+  rev_map_p
+    (fun x ->
+      let open Lwt_syntax in
+      let* b = f x in
+      if b then return_some x else return_none)
+    l
+  |> Lwt.map rev_filter_some
 
 let filter_ep f l =
-  rev_map_ep (fun x -> f x >|=? fun b -> if b then Some x else None) l
-  >|=? rev_filter_some
+  rev_map_ep
+    (fun x ->
+      let open Lwt_result_syntax in
+      let* b = f x in
+      if b then return_some x else return_none)
+    l
+  |> Lwt_result.map rev_filter_some
 
 let rev_filter_map f l =
   fold_left
@@ -567,366 +704,468 @@ let filter_map f l = rev_filter_map f l |> rev
 
 let rev_filter_map_e f l =
   fold_left_e
-    (fun acc x -> f x >|? function None -> acc | Some y -> y :: acc)
+    (fun acc x ->
+      let open Result_syntax in
+      let* o = f x in
+      match o with None -> return acc | Some y -> return (y :: acc))
     []
     l
 
-let filter_map_e f l = rev_filter_map_e f l >|? rev
+let filter_map_e f l = rev_filter_map_e f l |> Result.map rev
 
 let rev_filter_map_s f l =
   fold_left_s
-    (fun acc x -> f x >|= function None -> acc | Some y -> y :: acc)
+    (fun acc x ->
+      let open Lwt_syntax in
+      let* o = f x in
+      match o with None -> return acc | Some y -> return (y :: acc))
     []
     l
 
-let filter_map_s f l = rev_filter_map_s f l >|= rev
+let filter_map_s f l = rev_filter_map_s f l |> Lwt.map rev
 
 let rev_filter_map_es f l =
   fold_left_es
-    (fun acc x -> f x >|=? function None -> acc | Some y -> y :: acc)
+    (fun acc x ->
+      let open Lwt_result_syntax in
+      let* o = f x in
+      match o with None -> return acc | Some y -> return (y :: acc))
     []
     l
 
-let filter_map_es f l = rev_filter_map_es f l >|=? rev
+let filter_map_es f l = rev_filter_map_es f l |> Lwt_result.map rev
 
-let filter_map_ep f l = rev_map_ep f l >|=? rev_filter_some
+let filter_map_ep f l = rev_map_ep f l |> Lwt_result.map rev_filter_some
 
-let filter_map_p f l = rev_map_p f l >|= rev_filter_some
+let filter_map_p f l = rev_map_p f l |> Lwt.map rev_filter_some
+
+let concat_map_s f xs =
+  let open Lwt_syntax in
+  let rec aux f acc = function
+    | [] -> return (rev acc)
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_e f xs =
+  let open Result_syntax in
+  let rec aux f acc = function
+    | [] -> return (rev acc)
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_es f xs =
+  let open Lwt_result_syntax in
+  let rec aux f acc = function
+    | [] -> return (rev acc)
+    | x :: xs ->
+        let* ys = f x in
+        (aux [@ocaml.tailcall]) f (rev_append ys acc) xs
+  in
+  aux f [] xs
+
+let concat_map_p f xs = Lwt.map flatten @@ Lwt_syntax.all (map f xs)
+
+let concat_map_ep f xs =
+  let open Lwt_result_syntax in
+  let+ r = all (map f xs) in
+  flatten r
 
 let rec fold_right_e f l acc =
-  match l with
-  | [] -> Ok acc
-  | x :: xs -> fold_right_e f xs acc >>? fun acc -> f x acc
-
-let rec fold_right_s f l acc =
-  match l with
-  | [] -> Lwt.return acc
-  | x :: xs -> fold_right_s f xs acc >>= fun acc -> f x acc
-
-let rec fold_right_es f l acc =
+  let open Result_syntax in
   match l with
   | [] -> return acc
-  | x :: xs -> fold_right_es f xs acc >>=? fun acc -> f x acc
+  | x :: xs ->
+      let* acc = fold_right_e f xs acc in
+      f x acc
+
+let rec fold_right_s f l acc =
+  let open Lwt_syntax in
+  match l with
+  | [] -> return acc
+  | x :: xs ->
+      let* acc = fold_right_s f xs acc in
+      f x acc
+
+let rec fold_right_es f l acc =
+  let open Lwt_result_syntax in
+  match l with
+  | [] -> return acc
+  | x :: xs ->
+      let* acc = fold_right_es f xs acc in
+      f x acc
 
 let rev_map2_e ~when_different_lengths f xs ys =
+  let open Result_syntax in
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok zs
+    | ([], []) -> return zs
     | (x :: xs, y :: ys) ->
-        f x y >>? fun z -> (aux [@ocaml.tailcall]) (z :: zs) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
+        let* z = f x y in
+        (aux [@ocaml.tailcall]) (z :: zs) xs ys
+    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   aux [] xs ys
 
 let rev_map2_s ~when_different_lengths f xs ys =
+  let open Lwt_syntax in
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> Lwt.return (Ok zs)
+    | ([], []) -> return_ok zs
     | (x :: xs, y :: ys) ->
-        f x y >>= fun z -> (aux [@ocaml.tailcall]) (z :: zs) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+        let* z = f x y in
+        (aux [@ocaml.tailcall]) (z :: zs) xs ys
+    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> Lwt.return (Ok [])
-  | (x :: xs, y :: ys) -> lwt_apply2 f x y >>= fun z -> aux [z] xs ys
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+  | ([], []) -> return_ok []
+  | (x :: xs, y :: ys) ->
+      let* z = lwt_apply2 f x y in
+      aux [z] xs ys
+  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
 
 let rev_map2_es ~when_different_lengths f xs ys =
+  let open Lwt_result_syntax in
   let rec aux zs xs ys =
     match (xs, ys) with
-    | ([], []) -> Lwt.return (Ok zs)
+    | ([], []) -> return zs
     | (x :: xs, y :: ys) ->
-        f x y >>=? fun z -> (aux [@ocaml.tailcall]) (z :: zs) xs ys
+        let* z = f x y in
+        (aux [@ocaml.tailcall]) (z :: zs) xs ys
     | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> Lwt.return (Ok [])
-  | (x :: xs, y :: ys) -> lwt_apply2 f x y >>=? fun z -> aux [z] xs ys
+  | ([], []) -> return []
+  | (x :: xs, y :: ys) ->
+      let* z = lwt_apply2 f x y in
+      aux [z] xs ys
   | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
 
 let map2_e ~when_different_lengths f xs ys =
-  rev_map2_e ~when_different_lengths f xs ys >|? rev
+  rev_map2_e ~when_different_lengths f xs ys |> Result.map rev
 
 let map2_s ~when_different_lengths f xs ys =
-  rev_map2_s ~when_different_lengths f xs ys >|=? rev
+  rev_map2_s ~when_different_lengths f xs ys |> Lwt_result.map rev
 
 let map2_es ~when_different_lengths f xs ys =
-  rev_map2_es ~when_different_lengths f xs ys >|=? rev
+  rev_map2_es ~when_different_lengths f xs ys |> Lwt_result.map rev
 
 let iter2_e ~when_different_lengths f xs ys =
+  let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> Result.return_unit
-    | (x :: xs, y :: ys) -> f x y >>? fun () -> (aux [@ocaml.tailcall]) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
+    | ([], []) -> return_unit
+    | (x :: xs, y :: ys) ->
+        let* () = f x y in
+        (aux [@ocaml.tailcall]) xs ys
+    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   aux xs ys
 
 let iter2_s ~when_different_lengths f xs ys =
+  let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> Lwt.return (Ok ())
-    | (x :: xs, y :: ys) -> f x y >>= fun () -> (aux [@ocaml.tailcall]) xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | ([], []) -> return_ok ()
+    | (x :: xs, y :: ys) ->
+        let* () = f x y in
+        (aux [@ocaml.tailcall]) xs ys
+    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> Lwt.return (Ok ())
-  | (x :: xs, y :: ys) -> lwt_apply2 f x y >>= fun () -> aux xs ys
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+  | ([], []) -> return_ok ()
+  | (x :: xs, y :: ys) ->
+      let* () = lwt_apply2 f x y in
+      aux xs ys
+  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
 
 let iter2_es ~when_different_lengths f xs ys =
+  let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> LwtResult.return_unit
-    | (x :: xs, y :: ys) -> f x y >>=? fun () -> (aux [@ocaml.tailcall]) xs ys
+    | ([], []) -> return_unit
+    | (x :: xs, y :: ys) ->
+        let* () = f x y in
+        (aux [@ocaml.tailcall]) xs ys
     | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> LwtResult.return_unit
-  | (x :: xs, y :: ys) -> lwt_apply2 f x y >>=? fun () -> aux xs ys
+  | ([], []) -> return_unit
+  | (x :: xs, y :: ys) ->
+      let* () = lwt_apply2 f x y in
+      aux xs ys
   | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
 
 let fold_left2_e ~when_different_lengths f init xs ys =
+  let open Result_syntax in
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok acc
+    | ([], []) -> return acc
     | (x :: xs, y :: ys) ->
-        f acc x y >>? fun acc -> (aux [@ocaml.tailcall]) acc xs ys
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
+        let* acc = f acc x y in
+        (aux [@ocaml.tailcall]) acc xs ys
+    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   aux init xs ys
 
 let fold_left2_s ~when_different_lengths f init xs ys =
+  let open Lwt_syntax in
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> Lwt.return (Ok acc)
+    | ([], []) -> return_ok acc
     | (x :: xs, y :: ys) ->
-        f acc x y >>= fun acc -> (aux [@ocaml.tailcall]) acc xs ys
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+        let* acc = f acc x y in
+        (aux [@ocaml.tailcall]) acc xs ys
+    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> Lwt.return (Ok init)
-  | (x :: xs, y :: ys) -> lwt_apply3 f init x y >>= fun acc -> aux acc xs ys
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+  | ([], []) -> return_ok init
+  | (x :: xs, y :: ys) ->
+      let* acc = lwt_apply3 f init x y in
+      aux acc xs ys
+  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
 
 let fold_left2_es ~when_different_lengths f init xs ys =
+  let open Lwt_result_syntax in
   let rec aux acc xs ys =
     match (xs, ys) with
-    | ([], []) -> Lwt.return (Ok acc)
+    | ([], []) -> return acc
     | (x :: xs, y :: ys) ->
-        f acc x y >>=? fun acc -> (aux [@ocaml.tailcall]) acc xs ys
+        let* acc = f acc x y in
+        (aux [@ocaml.tailcall]) acc xs ys
     | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   match (xs, ys) with
-  | ([], []) -> Lwt.return (Ok init)
+  | ([], []) -> return init
   | (x :: xs, y :: ys) ->
-      lwt_apply3 f init x y >>=? fun acc -> (aux [@ocaml.tailcall]) acc xs ys
+      let* acc = lwt_apply3 f init x y in
+      (aux [@ocaml.tailcall]) acc xs ys
   | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
 
 let fold_right2_e ~when_different_lengths f xs ys init =
+  let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], []) -> Ok init
-    | (x :: xs, y :: ys) -> aux xs ys >>? fun acc -> f x y acc
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
+    | ([], []) -> return init
+    | (x :: xs, y :: ys) ->
+        let* acc = aux xs ys in
+        f x y acc
+    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
   in
   aux xs ys
 
 let fold_right2_s ~when_different_lengths f xs ys init =
+  let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> Lwt.return (Ok init)
-    | (x :: xs, y :: ys) ->
-        (* We could use a specific operator for that. It'd need the following type
-           ('a, 'err) result Lwt.t -> ('a -> 'b Lwt.t) -> ('b, 'err) result Lwt.t
-        *)
-        aux xs ys >>=? fun acc -> f x y acc >|= ok
+    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+    | ([], []) -> return_ok init
+    | (x :: xs, y :: ys) -> (
+        let* acc = aux xs ys in
+        match acc with
+        | Error _ -> return acc
+        | Ok acc ->
+            let* v = f x y acc in
+            return_ok v)
   in
   aux xs ys
 
 let fold_right2_es ~when_different_lengths f xs ys init =
+  let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
     | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> Lwt.return (Ok init)
-    | (x :: xs, y :: ys) -> aux xs ys >>=? fun acc -> f x y acc
+    | ([], []) -> return init
+    | (x :: xs, y :: ys) ->
+        let* acc = aux xs ys in
+        f x y acc
   in
   aux xs ys
 
-let rec for_all_e f = function
-  | [] -> Result.return_true
-  | x :: xs -> (
-      f x >>? function
-      | true -> (for_all_e [@ocaml.tailcall]) f xs
-      | false -> Result.return_false)
+let rec for_all_e f =
+  let open Result_syntax in
+  function
+  | [] -> return_true
+  | x :: xs ->
+      let* b = f x in
+      if b then (for_all_e [@ocaml.tailcall]) f xs else return_false
 
-let rec for_all_s f = function
-  | [] -> Lwt.return_true
-  | x :: xs -> (
-      f x >>= function
-      | true -> (for_all_s [@ocaml.tailcall]) f xs
-      | false -> Lwt.return_false)
+let rec for_all_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_true
+  | x :: xs ->
+      let* b = f x in
+      if b then (for_all_s [@ocaml.tailcall]) f xs else return_false
 
-let for_all_s f = function
-  | [] -> Lwt.return_true
-  | x :: xs -> (
-      Lwt.apply f x >>= function
-      | true -> (for_all_s [@ocaml.tailcall]) f xs
-      | false -> Lwt.return_false)
+let for_all_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_true
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then (for_all_s [@ocaml.tailcall]) f xs else return_false
 
-let rec for_all_es f = function
-  | [] -> LwtResult.return_true
-  | x :: xs -> (
-      f x >>=? function
-      | true -> (for_all_es [@ocaml.tailcall]) f xs
-      | false -> LwtResult.return_false)
+let rec for_all_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_true
+  | x :: xs ->
+      let* b = f x in
+      if b then (for_all_es [@ocaml.tailcall]) f xs else return_false
 
-let for_all_es f = function
-  | [] -> LwtResult.return_true
-  | x :: xs -> (
-      Lwt.apply f x >>=? function
-      | true -> (for_all_es [@ocaml.tailcall]) f xs
-      | false -> LwtResult.return_false)
+let for_all_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_true
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then (for_all_es [@ocaml.tailcall]) f xs else return_false
 
-let for_all_ep f l = rev_map_ep f l >|=? for_all Fun.id
+let for_all_ep f l = rev_map_ep f l |> Lwt_result.map (for_all Fun.id)
 
-let for_all_p f l = rev_map_p f l >|= for_all Fun.id
+let for_all_p f l = rev_map_p f l |> Lwt.map (for_all Fun.id)
 
-let rec exists_e f = function
-  | [] -> Result.return_false
-  | x :: xs -> (
-      f x >>? function
-      | false -> (exists_e [@ocaml.tailcall]) f xs
-      | true -> Result.return_true)
+let rec exists_e f =
+  let open Result_syntax in
+  function
+  | [] -> return_false
+  | x :: xs ->
+      let* b = f x in
+      if b then return_true else (exists_e [@ocaml.tailcall]) f xs
 
-let rec exists_s f = function
-  | [] -> Lwt.return_false
-  | x :: xs -> (
-      f x >>= function
-      | false -> (exists_s [@ocaml.tailcall]) f xs
-      | true -> Lwt.return_true)
+let rec exists_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_false
+  | x :: xs ->
+      let* b = f x in
+      if b then return_true else (exists_s [@ocaml.tailcall]) f xs
 
-let exists_s f = function
-  | [] -> Lwt.return_false
-  | x :: xs -> (
-      Lwt.apply f x >>= function
-      | false -> exists_s f xs
-      | true -> Lwt.return_true)
+let exists_s f =
+  let open Lwt_syntax in
+  function
+  | [] -> return_false
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then return_true else exists_s f xs
 
-let rec exists_es f = function
-  | [] -> LwtResult.return_false
-  | x :: xs -> (
-      f x >>=? function
-      | false -> (exists_es [@ocaml.tailcall]) f xs
-      | true -> LwtResult.return_true)
+let rec exists_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_false
+  | x :: xs ->
+      let* b = f x in
+      if b then return_true else (exists_es [@ocaml.tailcall]) f xs
 
-let exists_es f = function
-  | [] -> LwtResult.return_false
-  | x :: xs -> (
-      Lwt.apply f x >>=? function
-      | false -> exists_es f xs
-      | true -> LwtResult.return_true)
+let exists_es f =
+  let open Lwt_result_syntax in
+  function
+  | [] -> return_false
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then return_true else exists_es f xs
 
-let exists_ep f l = rev_map_ep f l >|=? exists Fun.id
+let exists_ep f l = rev_map_ep f l |> Lwt_result.map (exists Fun.id)
 
-let exists_p f l = rev_map_p f l >|= exists Fun.id
+let exists_p f l = rev_map_p f l |> Lwt.map (exists Fun.id)
 
 let for_all2_e ~when_different_lengths f xs ys =
+  let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | ([], []) -> Result.return_true
-    | (x :: xs, y :: ys) -> (
-        f x y >>? function
-        | true -> (aux [@ocaml.tailcall]) xs ys
-        | false -> Result.return_false)
+    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | ([], []) -> return_true
+    | (x :: xs, y :: ys) ->
+        let* b = f x y in
+        if b then (aux [@ocaml.tailcall]) xs ys else return_false
   in
   aux xs ys
 
 let for_all2_s ~when_different_lengths f xs ys =
+  let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> LwtResult.return_true
-    | (x :: xs, y :: ys) -> (
-        f x y >>= function
-        | true -> (aux [@ocaml.tailcall]) xs ys
-        | false -> LwtResult.return_false)
+    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+    | ([], []) -> return_ok true
+    | (x :: xs, y :: ys) ->
+        let* b = f x y in
+        if b then (aux [@ocaml.tailcall]) xs ys else return_ok false
   in
   match (xs, ys) with
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-  | ([], []) -> LwtResult.return_true
-  | (x :: xs, y :: ys) -> (
-      lwt_apply2 f x y >>= function
-      | true -> aux xs ys
-      | false -> LwtResult.return_false)
+  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+  | ([], []) -> return_ok true
+  | (x :: xs, y :: ys) ->
+      let* b = lwt_apply2 f x y in
+      if b then aux xs ys else return_ok false
 
 let for_all2_es ~when_different_lengths f xs ys =
+  let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
     | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> LwtResult.return_true
-    | (x :: xs, y :: ys) -> (
-        f x y >>=? function
-        | true -> (aux [@ocaml.tailcall]) xs ys
-        | false -> LwtResult.return_false)
+    | ([], []) -> return_true
+    | (x :: xs, y :: ys) ->
+        let* b = f x y in
+        if b then (aux [@ocaml.tailcall]) xs ys else return_false
   in
   match (xs, ys) with
   | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-  | ([], []) -> LwtResult.return_true
-  | (x :: xs, y :: ys) -> (
-      lwt_apply2 f x y >>=? function
-      | true -> aux xs ys
-      | false -> LwtResult.return_false)
+  | ([], []) -> return_true
+  | (x :: xs, y :: ys) ->
+      let* b = lwt_apply2 f x y in
+      if b then aux xs ys else return_false
 
 let exists2_e ~when_different_lengths f xs ys =
+  let open Result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> Error when_different_lengths
-    | ([], []) -> Result.return_false
-    | (x :: xs, y :: ys) -> (
-        f x y >>? function
-        | false -> (aux [@ocaml.tailcall]) xs ys
-        | true -> Result.return_true)
+    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
+    | ([], []) -> return_false
+    | (x :: xs, y :: ys) ->
+        let* b = f x y in
+        if b then return_true else (aux [@ocaml.tailcall]) xs ys
   in
   aux xs ys
 
 let exists2_s ~when_different_lengths f xs ys =
+  let open Lwt_syntax in
   let rec aux xs ys =
     match (xs, ys) with
-    | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> LwtResult.return_false
-    | (x :: xs, y :: ys) -> (
-        f x y >>= function
-        | false -> (aux [@ocaml.tailcall]) xs ys
-        | true -> LwtResult.return_true)
+    | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+    | ([], []) -> return_ok false
+    | (x :: xs, y :: ys) ->
+        let* b = f x y in
+        if b then return_ok true else (aux [@ocaml.tailcall]) xs ys
   in
   match (xs, ys) with
-  | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-  | ([], []) -> LwtResult.return_false
-  | (x :: xs, y :: ys) -> (
-      lwt_apply2 f x y >>= function
-      | false -> aux xs ys
-      | true -> LwtResult.return_true)
+  | ([], _ :: _) | (_ :: _, []) -> return_error when_different_lengths
+  | ([], []) -> return_ok false
+  | (x :: xs, y :: ys) ->
+      let* b = lwt_apply2 f x y in
+      if b then return_ok true else aux xs ys
 
 let exists2_es ~when_different_lengths f xs ys =
+  let open Lwt_result_syntax in
   let rec aux xs ys =
     match (xs, ys) with
     | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-    | ([], []) -> LwtResult.return_false
-    | (x :: xs, y :: ys) -> (
-        f x y >>=? function
-        | false -> (aux [@ocaml.tailcall]) xs ys
-        | true -> LwtResult.return_true)
+    | ([], []) -> return_false
+    | (x :: xs, y :: ys) ->
+        let* b = f x y in
+        if b then return_true else (aux [@ocaml.tailcall]) xs ys
   in
   match (xs, ys) with
   | ([], _ :: _) | (_ :: _, []) -> fail when_different_lengths
-  | ([], []) -> LwtResult.return_false
-  | (x :: xs, y :: ys) -> (
-      lwt_apply2 f x y >>=? function
-      | false -> aux xs ys
-      | true -> LwtResult.return_true)
+  | ([], []) -> return_false
+  | (x :: xs, y :: ys) ->
+      let* b = lwt_apply2 f x y in
+      if b then return_true else aux xs ys
 
 let rev_partition f xs =
   let rec aux trues falses = function
@@ -953,65 +1192,93 @@ let partition_result xs =
   (rev rev_oks, rev rev_errors)
 
 let rev_partition_e f l =
+  let open Result_syntax in
   let rec aux trues falses = function
-    | [] -> Ok (trues, falses)
+    | [] -> return (trues, falses)
     | x :: xs ->
-        f x >>? fun b ->
+        let* b = f x in
         if b then (aux [@ocaml.tailcall]) (x :: trues) falses xs
         else (aux [@ocaml.tailcall]) trues (x :: falses) xs
   in
   aux [] [] l
 
 let partition_e f l =
-  rev_partition_e f l >|? fun (trues, falses) -> (rev trues, rev falses)
+  rev_partition_e f l
+  |> Result.map (fun (trues, falses) -> (rev trues, rev falses))
 
 let rev_partition_s f l =
-  let rec aux trues falses = function
-    | [] -> Lwt.return (trues, falses)
-    | x :: xs ->
-        f x >>= fun b ->
-        if b then (aux [@ocaml.tailcall]) (x :: trues) falses xs
-        else (aux [@ocaml.tailcall]) trues (x :: falses) xs
-  in
-  match l with
-  | [] -> Lwt.return ([], [])
-  | x :: xs ->
-      Lwt.apply f x >>= fun b -> if b then aux [x] [] xs else aux [] [x] xs
-
-let partition_s f l =
-  rev_partition_s f l >|= fun (trues, falses) -> (rev trues, rev falses)
-
-let rev_partition_es f l =
+  let open Lwt_syntax in
   let rec aux trues falses = function
     | [] -> return (trues, falses)
     | x :: xs ->
-        f x >>=? fun b ->
+        let* b = f x in
         if b then (aux [@ocaml.tailcall]) (x :: trues) falses xs
         else (aux [@ocaml.tailcall]) trues (x :: falses) xs
   in
   match l with
   | [] -> return ([], [])
   | x :: xs ->
-      Lwt.apply f x >>=? fun b -> if b then aux [x] [] xs else aux [] [x] xs
+      let* b = Lwt.apply f x in
+      if b then aux [x] [] xs else aux [] [x] xs
+
+let partition_s f l =
+  rev_partition_s f l
+  |> Lwt.map (fun (trues, falses) -> (rev trues, rev falses))
+
+let rev_partition_es f l =
+  let open Lwt_result_syntax in
+  let rec aux trues falses = function
+    | [] -> return (trues, falses)
+    | x :: xs ->
+        let* b = f x in
+        if b then (aux [@ocaml.tailcall]) (x :: trues) falses xs
+        else (aux [@ocaml.tailcall]) trues (x :: falses) xs
+  in
+  match l with
+  | [] -> return ([], [])
+  | x :: xs ->
+      let* b = Lwt.apply f x in
+      if b then aux [x] [] xs else aux [] [x] xs
 
 let partition_es f l =
-  rev_partition_es f l >|=? fun (trues, falses) -> (rev trues, rev falses)
+  rev_partition_es f l
+  |> Lwt_result.map (fun (trues, falses) -> (rev trues, rev falses))
 
 let partition_ep f l =
-  rev_map_ep (fun x -> f x >|=? fun b -> (b, x)) l >|=? fun bxs ->
-  fold_left
-    (fun (trues, falses) (b, x) ->
-      if b then (x :: trues, falses) else (trues, x :: falses))
-    ([], [])
-    bxs
+  let open Lwt_result_syntax in
+  let* bxs =
+    rev_map_ep
+      (fun x ->
+        let* b = f x in
+        return (b, x))
+      l
+  in
+  let r =
+    fold_left
+      (fun (trues, falses) (b, x) ->
+        if b then (x :: trues, falses) else (trues, x :: falses))
+      ([], [])
+      bxs
+  in
+  return r
 
 let partition_p f l =
-  rev_map_p (fun x -> f x >|= fun b -> (b, x)) l >|= fun bxs ->
-  fold_left
-    (fun (trues, falses) (b, x) ->
-      if b then (x :: trues, falses) else (trues, x :: falses))
-    ([], [])
-    bxs
+  let open Lwt_syntax in
+  let* bxs =
+    rev_map_p
+      (fun x ->
+        let* b = f x in
+        return (b, x))
+      l
+  in
+  let r =
+    fold_left
+      (fun (trues, falses) (b, x) ->
+        if b then (x :: trues, falses) else (trues, x :: falses))
+      ([], [])
+      bxs
+  in
+  return r
 
 let combine ~when_different_lengths xs ys =
   map2 ~when_different_lengths (fun x y -> (x, y)) xs ys

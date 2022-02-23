@@ -1,8 +1,9 @@
-Version 10.2
+Version 10.3
 ============
 
-**This version changes the storage backend and requires
-specific care when updating.**
+**This version changes the storage backend and requires specific care
+when updating. If you are upgrading from version 10.0~rc2 or earlier,
+you will need to upgrade your storage carefully.**
 
 The new storage backend uses a different file format for storing
 files, which contain the block history. This new storage layer
@@ -37,13 +38,15 @@ but forgotten CLI option ``--allow-all-rpc``.
 
 Version 10.2 fixes a criticial problem in the new storage layer.
 
+Version 10.3 prevents several corruptions of the store.
+
 Update Instructions
 -------------------
 
 To update from sources::
 
   git fetch
-  git checkout v10.2
+  git checkout v10.3
   rm -rf _opam _build
   make build-deps
   eval $(opam env)
@@ -51,12 +54,13 @@ To update from sources::
 
 Then upgrade your store by following the instructions in `Storage Upgrade`_.
 
-If you are using Docker instead, use the ``v10.2`` Docker images of Tezos.
+If you are using Docker instead, use the ``v10.3`` Docker images of Tezos.
 Then upgrade your store by following the instructions in `Guide for Docker Users`_.
 
 Changelog
 ---------
 
+- `Version 10.3 <../CHANGES.html#version-10-3>`_
 - `Version 10.2 <../CHANGES.html#version-10-2>`_
 - `Version 10.1 <../CHANGES.html#version-10-1>`_
 - `Version 10.0 <../CHANGES.html#version-10-0>`_
@@ -152,7 +156,7 @@ Docker users can run the upgrade procedure using the
 ``tezos-upgrade-storage`` command as follows (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.2 tezos-upgrade-storage
+    docker run -v docker-node:/var/run/tezos/node -it registry.gitlab.com/tezos/tezos:amd64-v10.3 tezos-upgrade-storage
 
 Users who use ``storage-docker-manager.sh`` can simply execute the built-in
 upgrade command, such as (for Mainnet): ``./mainnet.sh node upgrade``
@@ -162,7 +166,7 @@ now safely remove the backup of the previous store version.
 To do so, start a shell using (replace ``docker-node`` by
 the name of your Docker volume)::
 
-    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.2
+    docker run -v docker-node:/var/run/tezos/node -it --entrypoint /bin/sh registry.gitlab.com/tezos/tezos/debug:amd64-v10.3
 
 Once you have a shell, remove the backup using::
 

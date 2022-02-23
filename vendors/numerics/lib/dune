@@ -1,6 +1,0 @@
-(library
-  (name numerics)
-  (public_name numerics)
-  (c_names stubs)
-  (c_flags -std=c99 -pedantic)
-  (ocamlopt_flags (-warn-error -39)))

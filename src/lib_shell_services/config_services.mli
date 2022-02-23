@@ -40,5 +40,16 @@ end
 val history_mode :
   ([`GET], unit, unit, unit, unit, History_mode.t, error trace) RPC_service.raw
 
+module Logging : sig
+  val configure :
+    ( [`PUT],
+      unit,
+      unit,
+      unit,
+      Tezos_stdlib_unix.Internal_event_unix.Configuration.t,
+      unit )
+    RPC_service.service
+end
+
 val user_activated_upgrades :
   #RPC_context.simple -> User_activated.upgrades tzresult Lwt.t

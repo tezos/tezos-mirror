@@ -26,17 +26,32 @@
 (* Tezos Protocol Implementation - Low level Repr. of Operations *)
 
 module Kind = struct
+  type preendorsement_consensus_kind = Preendorsement_consensus_kind
+
+  type endorsement_consensus_kind = Endorsement_consensus_kind
+
+  type 'a consensus =
+    | Preendorsement_kind : preendorsement_consensus_kind consensus
+    | Endorsement_kind : endorsement_consensus_kind consensus
+
+  type preendorsement = preendorsement_consensus_kind consensus
+
+  type endorsement = endorsement_consensus_kind consensus
+
   type seed_nonce_revelation = Seed_nonce_revelation_kind
 
-  type endorsement_with_slot = Endorsement_with_slot_kind
+  type 'a double_consensus_operation_evidence =
+    | Double_consensus_operation_evidence
 
-  type double_endorsement_evidence = Double_endorsement_evidence_kind
+  type double_endorsement_evidence =
+    endorsement_consensus_kind double_consensus_operation_evidence
+
+  type double_preendorsement_evidence =
+    preendorsement_consensus_kind double_consensus_operation_evidence
 
   type double_baking_evidence = Double_baking_evidence_kind
 
   type activate_account = Activate_account_kind
-
-  type endorsement = Endorsement_kind
 
   type proposals = Proposals_kind
 
@@ -50,9 +65,13 @@ module Kind = struct
 
   type delegation = Delegation_kind
 
+  type set_deposits_limit = Set_deposits_limit_kind
+
   type failing_noop = Failing_noop_kind
 
   type register_global_constant = Register_global_constant_kind
+
+  type tx_rollup_origination = Tx_rollup_origination_kind
 
   type 'a manager =
     | Reveal_manager_kind : reveal manager
@@ -60,7 +79,86 @@ module Kind = struct
     | Origination_manager_kind : origination manager
     | Delegation_manager_kind : delegation manager
     | Register_global_constant_manager_kind : register_global_constant manager
+    | Set_deposits_limit_manager_kind : set_deposits_limit manager
+    | Tx_rollup_origination_manager_kind : tx_rollup_origination manager
 end
+
+type 'a consensus_operation_type =
+  | Endorsement : Kind.endorsement consensus_operation_type
+  | Preendorsement : Kind.preendorsement consensus_operation_type
+
+let pp_operation_kind (type kind) ppf
+    (operation_kind : kind consensus_operation_type) =
+  match operation_kind with
+  | Endorsement -> Format.fprintf ppf "Endorsement"
+  | Preendorsement -> Format.fprintf ppf "Preendorsement"
+
+type consensus_content = {
+  slot : Slot_repr.t;
+  level : Raw_level_repr.t;
+  (* The level is not required to validate an endorsement when it corresponds
+     to the current payload, but if we want to filter endorsements, we need
+     the level. *)
+  round : Round_repr.t;
+  block_payload_hash : Block_payload_hash.t;
+      (* NOTE: This could be just the hash of the set of operations (the
+         actual payload). The grandfather block hash should already be
+         fixed by the operation.shell.branch field.  This is not really
+         important but could make things easier for debugging *)
+}
+
+let consensus_content_encoding =
+  let open Data_encoding in
+  conv
+    (fun {slot; level; round; block_payload_hash} ->
+      (slot, level, round, block_payload_hash))
+    (fun (slot, level, round, block_payload_hash) ->
+      {slot; level; round; block_payload_hash})
+    (obj4
+       (req "slot" Slot_repr.encoding)
+       (req "level" Raw_level_repr.encoding)
+       (req "round" Round_repr.encoding)
+       (req "block_payload_hash" Block_payload_hash.encoding))
+
+let pp_consensus_content ppf content =
+  Format.fprintf
+    ppf
+    "(%ld, %a, %a, %a)"
+    (Raw_level_repr.to_int32 content.level)
+    Round_repr.pp
+    content.round
+    Slot_repr.pp
+    content.slot
+    Block_payload_hash.pp_short
+    content.block_payload_hash
+
+type consensus_watermark =
+  | Endorsement of Chain_id.t
+  | Preendorsement of Chain_id.t
+
+let bytes_of_consensus_watermark = function
+  | Preendorsement chain_id ->
+      Bytes.cat (Bytes.of_string "\x12") (Chain_id.to_bytes chain_id)
+  | Endorsement chain_id ->
+      Bytes.cat (Bytes.of_string "\x13") (Chain_id.to_bytes chain_id)
+
+let to_watermark w = Signature.Custom (bytes_of_consensus_watermark w)
+
+let of_watermark = function
+  | Signature.Custom b ->
+      if Compare.Int.(Bytes.length b > 0) then
+        match Bytes.get b 0 with
+        | '\x12' ->
+            Option.map
+              (fun chain_id -> Endorsement chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | '\x13' ->
+            Option.map
+              (fun chain_id -> Preendorsement chain_id)
+              (Chain_id.of_bytes_opt (Bytes.sub b 1 (Bytes.length b - 1)))
+        | _ -> None
+      else None
+  | _ -> None
 
 type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
@@ -83,21 +181,21 @@ and _ contents_list =
       -> ('kind * 'rest) Kind.manager contents_list
 
 and _ contents =
-  | Endorsement : {level : Raw_level_repr.t} -> Kind.endorsement contents
+  | Preendorsement : consensus_content -> Kind.preendorsement contents
+  | Endorsement : consensus_content -> Kind.endorsement contents
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
-  | Endorsement_with_slot : {
-      endorsement : Kind.endorsement operation;
-      slot : int;
+  | Double_preendorsement_evidence : {
+      op1 : Kind.preendorsement operation;
+      op2 : Kind.preendorsement operation;
     }
-      -> Kind.endorsement_with_slot contents
+      -> Kind.double_preendorsement_evidence contents
   | Double_endorsement_evidence : {
       op1 : Kind.endorsement operation;
       op2 : Kind.endorsement operation;
-      slot : int;
     }
       -> Kind.double_endorsement_evidence contents
   | Double_baking_evidence : {
@@ -157,6 +255,10 @@ and _ manager_operation =
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  | Set_deposits_limit :
+      Tez_repr.t option
+      -> Kind.set_deposits_limit manager_operation
+  | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
 
 and counter = Z.t
 
@@ -167,6 +269,8 @@ let manager_kind : type kind. kind manager_operation -> kind Kind.manager =
   | Origination _ -> Kind.Origination_manager_kind
   | Delegation _ -> Kind.Delegation_manager_kind
   | Register_global_constant _ -> Kind.Register_global_constant_manager_kind
+  | Set_deposits_limit _ -> Kind.Set_deposits_limit_manager_kind
+  | Tx_rollup_origination -> Kind.Tx_rollup_origination_manager_kind
 
 type 'kind internal_operation = {
   source : Contract_repr.contract;
@@ -223,6 +327,8 @@ let of_list l =
   match of_list_internal l with
   | Ok contents -> Ok contents
   | Error s -> error @@ Contents_list_error s
+
+let tx_rollup_operation_tag_offset = 150
 
 module Encoding = struct
   open Data_encoding
@@ -381,6 +487,32 @@ module Encoding = struct
           inj = (fun value -> Register_global_constant {value});
         }
 
+    let[@coq_axiom_with_reason "gadt"] set_deposits_limit_case =
+      MCase
+        {
+          tag = 5;
+          name = "set_deposits_limit";
+          encoding = obj1 (opt "limit" Tez_repr.encoding);
+          select =
+            (function
+            | Manager (Set_deposits_limit _ as op) -> Some op | _ -> None);
+          proj = (function Set_deposits_limit key -> key);
+          inj = (fun key -> Set_deposits_limit key);
+        }
+
+    let[@coq_axiom_with_reason "gadt"] tx_rollup_origination_case =
+      MCase
+        {
+          tag = tx_rollup_operation_tag_offset;
+          name = "tx_rollup_origination";
+          encoding = obj1 (req "tx_rollup_origination" Data_encoding.unit);
+          select =
+            (function
+            | Manager (Tx_rollup_origination as op) -> Some op | _ -> None);
+          proj = (function Tx_rollup_origination -> ());
+          inj = (fun () -> Tx_rollup_origination);
+        }
+
     let encoding =
       let make (MCase {tag; name; encoding; select; proj; inj}) =
         case
@@ -399,6 +531,8 @@ module Encoding = struct
           make origination_case;
           make delegation_case;
           make register_global_constant_case;
+          make set_deposits_limit_case;
+          make tx_rollup_origination_case;
         ]
   end
 
@@ -413,16 +547,70 @@ module Encoding = struct
       }
         -> 'b case
 
+  let preendorsement_case =
+    Case
+      {
+        tag = 20;
+        (* Preendorsement where added after *)
+        name = "preendorsement";
+        encoding = consensus_content_encoding;
+        select =
+          (function Contents (Preendorsement _ as op) -> Some op | _ -> None);
+        proj = (fun (Preendorsement preendorsement) -> preendorsement);
+        inj = (fun preendorsement -> Preendorsement preendorsement);
+      }
+
+  (* Defined before endorsement encoding because this is used there *)
+  let preendorsement_encoding =
+    let make (Case {tag; name; encoding; select = _; proj; inj}) =
+      case (Tag tag) name encoding (fun o -> Some (proj o)) (fun x -> inj x)
+    in
+    let to_list : Kind.preendorsement contents_list -> _ = function
+      | Single o -> o
+    in
+    let of_list : Kind.preendorsement contents -> _ = function
+      | o -> Single o
+    in
+    def "inlined.preendorsement"
+    @@ conv
+         (fun ({shell; protocol_data = {contents; signature}} : _ operation) ->
+           (shell, (contents, signature)))
+         (fun (shell, (contents, signature)) : _ operation ->
+           {shell; protocol_data = {contents; signature}})
+         (merge_objs
+            Operation.shell_header_encoding
+            (obj2
+               (req
+                  "operations"
+                  (conv to_list of_list
+                  @@ def "inlined.preendorsement.contents"
+                  @@ union [make preendorsement_case]))
+               (varopt "signature" Signature.encoding)))
+
+  let endorsement_encoding =
+    obj4
+      (req "slot" Slot_repr.encoding)
+      (req "level" Raw_level_repr.encoding)
+      (req "round" Round_repr.encoding)
+      (req "block_payload_hash" Block_payload_hash.encoding)
+
   let endorsement_case =
     Case
       {
-        tag = 0;
+        tag = 21;
         name = "endorsement";
-        encoding = obj1 (req "level" Raw_level_repr.encoding);
+        encoding = endorsement_encoding;
         select =
           (function Contents (Endorsement _ as op) -> Some op | _ -> None);
-        proj = (fun [@coq_match_with_default] (Endorsement {level}) -> level);
-        inj = (fun level -> Endorsement {level});
+        proj =
+          (fun [@coq_match_with_default] (Endorsement consensus_content) ->
+            ( consensus_content.slot,
+              consensus_content.level,
+              consensus_content.round,
+              consensus_content.block_payload_hash ));
+        inj =
+          (fun (slot, level, round, block_payload_hash) ->
+            Endorsement {slot; level; round; block_payload_hash});
       }
 
   let[@coq_axiom_with_reason "gadt"] endorsement_encoding =
@@ -443,7 +631,7 @@ module Encoding = struct
                (req
                   "operations"
                   (conv to_list of_list
-                  @@ def "inlined.endorsement.contents"
+                  @@ def "inlined.endorsement_mempool.contents"
                   @@ union [make endorsement_case]))
                (varopt "signature" Signature.encoding)))
 
@@ -463,24 +651,22 @@ module Encoding = struct
         inj = (fun (level, nonce) -> Seed_nonce_revelation {level; nonce});
       }
 
-  let[@coq_axiom_with_reason "gadt"] endorsement_with_slot_case :
-      Kind.endorsement_with_slot case =
+  let[@coq_axiom_with_reason "gadt"] double_preendorsement_evidence_case :
+      Kind.double_preendorsement_evidence case =
     Case
       {
-        tag = 10;
-        name = "endorsement_with_slot";
+        tag = 7;
+        name = "double_preendorsement_evidence";
         encoding =
           obj2
-            (req "endorsement" (dynamic_size endorsement_encoding))
-            (req "slot" uint16);
+            (req "op1" (dynamic_size preendorsement_encoding))
+            (req "op2" (dynamic_size preendorsement_encoding));
         select =
           (function
-          | Contents (Endorsement_with_slot _ as op) -> Some op | _ -> None);
-        proj =
-          (fun (Endorsement_with_slot {endorsement; slot}) ->
-            (endorsement, slot));
-        inj =
-          (fun (endorsement, slot) -> Endorsement_with_slot {endorsement; slot});
+          | Contents (Double_preendorsement_evidence _ as op) -> Some op
+          | _ -> None);
+        proj = (fun (Double_preendorsement_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_preendorsement_evidence {op1; op2});
       }
 
   let[@coq_axiom_with_reason "gadt"] double_endorsement_evidence_case :
@@ -490,19 +676,15 @@ module Encoding = struct
         tag = 2;
         name = "double_endorsement_evidence";
         encoding =
-          obj3
+          obj2
             (req "op1" (dynamic_size endorsement_encoding))
-            (req "op2" (dynamic_size endorsement_encoding))
-            (req "slot" uint16);
+            (req "op2" (dynamic_size endorsement_encoding));
         select =
           (function
           | Contents (Double_endorsement_evidence _ as op) -> Some op
           | _ -> None);
-        proj =
-          (fun (Double_endorsement_evidence {op1; op2; slot}) ->
-            (op1, op2, slot));
-        inj =
-          (fun (op1, op2, slot) -> Double_endorsement_evidence {op1; op2; slot});
+        proj = (fun (Double_endorsement_evidence {op1; op2}) -> (op1, op2));
+        inj = (fun (op1, op2) -> Double_endorsement_evidence {op1; op2});
       }
 
   let[@coq_axiom_with_reason "gadt"] double_baking_evidence_case =
@@ -646,6 +828,14 @@ module Encoding = struct
   let register_global_constant_case =
     make_manager_case 111 Manager_operations.register_global_constant_case
 
+  let set_deposits_limit_case =
+    make_manager_case 112 Manager_operations.set_deposits_limit_case
+
+  let tx_rollup_origination_case =
+    make_manager_case
+      tx_rollup_operation_tag_offset
+      Manager_operations.tx_rollup_origination_case
+
   let contents_encoding =
     let make (Case {tag; name; encoding; select; proj; inj}) =
       case
@@ -659,9 +849,10 @@ module Encoding = struct
     @@ union
          [
            make endorsement_case;
+           make preendorsement_case;
            make seed_nonce_revelation_case;
-           make endorsement_with_slot_case;
            make double_endorsement_evidence_case;
+           make double_preendorsement_evidence_case;
            make double_baking_evidence_case;
            make activate_account_case;
            make proposals_case;
@@ -670,8 +861,10 @@ module Encoding = struct
            make transaction_case;
            make origination_case;
            make delegation_case;
+           make set_deposits_limit_case;
            make failing_noop_case;
            make register_global_constant_case;
+           make tx_rollup_origination_case;
          ]
 
   let contents_list_encoding =
@@ -742,16 +935,17 @@ let acceptable_passes (op : packed_operation) =
   let (Operation_data protocol_data) = op.protocol_data in
   match protocol_data.contents with
   | Single (Failing_noop _) -> []
+  | Single (Preendorsement _) -> [0]
   | Single (Endorsement _) -> [0]
-  | Single (Endorsement_with_slot _) -> [0]
   | Single (Proposals _) -> [1]
   | Single (Ballot _) -> [1]
   | Single (Seed_nonce_revelation _) -> [2]
   | Single (Double_endorsement_evidence _) -> [2]
+  | Single (Double_preendorsement_evidence _) -> [2]
   | Single (Double_baking_evidence _) -> [2]
   | Single (Activate_account _) -> [2]
   | Single (Manager_operation _) -> [3]
-  | Cons _ -> [3]
+  | Cons (Manager_operation _, _ops) -> [3]
 
 type error += Invalid_signature (* `Permanent *)
 
@@ -807,15 +1001,34 @@ let check_signature (type kind) key chain_id
     if Signature.check ~watermark key signature unsigned_operation then Ok ()
     else error Invalid_signature
   in
-  match (protocol_data.contents, protocol_data.signature) with
-  | (Single _, None) -> error Missing_signature
-  | (Cons _, None) -> error Missing_signature
-  | ((Single (Endorsement _) as contents), Some signature) ->
-      check ~watermark:(Endorsement chain_id) (Contents_list contents) signature
-  | ((Single _ as contents), Some signature) ->
-      check ~watermark:Generic_operation (Contents_list contents) signature
-  | ((Cons _ as contents), Some signature) ->
-      check ~watermark:Generic_operation (Contents_list contents) signature
+  match protocol_data.signature with
+  | None -> error Missing_signature
+  | Some signature -> (
+      match protocol_data.contents with
+      | Single (Preendorsement _) as contents ->
+          check
+            ~watermark:(to_watermark (Preendorsement chain_id))
+            (Contents_list contents)
+            signature
+      | Single (Endorsement _) as contents ->
+          check
+            ~watermark:(to_watermark (Endorsement chain_id))
+            (Contents_list contents)
+            signature
+      | Single
+          ( Failing_noop _ | Proposals _ | Ballot _ | Seed_nonce_revelation _
+          | Double_endorsement_evidence _ | Double_preendorsement_evidence _
+          | Double_baking_evidence _ | Activate_account _ | Manager_operation _
+            ) ->
+          check
+            ~watermark:Generic_operation
+            (Contents_list protocol_data.contents)
+            signature
+      | Cons (Manager_operation _, _ops) ->
+          check
+            ~watermark:Generic_operation
+            (Contents_list protocol_data.contents)
+            signature)
 
 let hash_raw = Operation.hash
 
@@ -849,19 +1062,26 @@ let equal_manager_operation_kind :
   | (Delegation _, _) -> None
   | (Register_global_constant _, Register_global_constant _) -> Some Eq
   | (Register_global_constant _, _) -> None
+  | (Set_deposits_limit _, Set_deposits_limit _) -> Some Eq
+  | (Set_deposits_limit _, _) -> None
+  | (Tx_rollup_origination, Tx_rollup_origination) -> Some Eq
+  | (Tx_rollup_origination, _) -> None
 
 let equal_contents_kind : type a b. a contents -> b contents -> (a, b) eq option
     =
  fun op1 op2 ->
   match (op1, op2) with
+  | (Preendorsement _, Preendorsement _) -> Some Eq
+  | (Preendorsement _, _) -> None
   | (Endorsement _, Endorsement _) -> Some Eq
   | (Endorsement _, _) -> None
   | (Seed_nonce_revelation _, Seed_nonce_revelation _) -> Some Eq
   | (Seed_nonce_revelation _, _) -> None
-  | (Endorsement_with_slot _, Endorsement_with_slot _) -> Some Eq
-  | (Endorsement_with_slot _, _) -> None
   | (Double_endorsement_evidence _, Double_endorsement_evidence _) -> Some Eq
   | (Double_endorsement_evidence _, _) -> None
+  | (Double_preendorsement_evidence _, Double_preendorsement_evidence _) ->
+      Some Eq
+  | (Double_preendorsement_evidence _, _) -> None
   | (Double_baking_evidence _, Double_baking_evidence _) -> Some Eq
   | (Double_baking_evidence _, _) -> None
   | (Activate_account _, Activate_account _) -> Some Eq
@@ -942,6 +1162,12 @@ let internal_manager_operation_size (type a) (op : a manager_operation) =
       assert false
   | Register_global_constant _ ->
       (* Global constant registrations can't occur as internal operations *)
+      assert false
+  | Set_deposits_limit _ ->
+      (* Set_deposits_limit can't occur as internal operations *)
+      assert false
+  | Tx_rollup_origination ->
+      (* Tx_rollup_origination operation can’t occur as internal operations *)
       assert false
 
 let packed_internal_operation_in_memory_size :

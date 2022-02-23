@@ -211,7 +211,8 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
           protect
             ~on_error:(fun _ -> fail Block_not_found)
             (fun () ->
-              Block_directory.get_block main_chain_store block >>= function
+              Store.Chain.block_of_identifier_opt main_chain_store block
+              >>= function
               | None -> fail Block_not_found
               | Some block -> return block)
           >>=? fun block ->

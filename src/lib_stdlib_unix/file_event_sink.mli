@@ -33,7 +33,7 @@
     (the path should be inexistent or already a directory).
 
     The directory structure is as follows:
-    ["<section-dirname>/<event-name>/<YYYYMMDD-string>/<HHMMSS-MMMMMM>/<YYYYMMDD-HHMMSS-MMMMMM-xxxx.json>"]
+    ["<section-dirname>/<event-name>/<YYYYMMDD>/<HHMMSS-MMMMMM>/<YYYYMMDD-HHMMSS-MMMMMM-xxxx.json>"]
     where ["<section-dirname>"] is either ["no-section"] or
     ["section-<section-name>"].
 *)

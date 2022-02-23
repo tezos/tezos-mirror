@@ -153,7 +153,7 @@ let rec try_to_contact_loop t start_time ~seen_points min_to_contact
     let (candidates, seen_points) =
       connectable t start_time max_to_contact seen_points
     in
-    if candidates = [] then Lwt_unix.yield () >>= fun () -> Lwt.return_false
+    if candidates = [] then Lwt.pause () >>= fun () -> Lwt.return_false
     else
       establish t candidates >>= fun established ->
       try_to_contact_loop

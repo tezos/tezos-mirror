@@ -84,8 +84,8 @@ History modes in a nutshell
 +---------+----------------+---------------------+--------------------+
 
 (*) Suitable for delegation services if the number of additional
-preserved cycles is high enough to allow the computation of rewards.
-See :ref:`Preserving additional cycles<History_mode_additional_cycles>` for
+kept cycles is high enough to allow the computation of rewards.
+See :ref:`Keeping additional cycles<History_mode_additional_cycles>` for
 details.
 
 History modes use some markers which are used to describe the state
@@ -179,8 +179,8 @@ down to the genesis.
 
 .. _History_mode_additional_cycles:
 
-Preserving additional cycles
-----------------------------
+Keeping additional cycles
+-------------------------
 
 When running a node in ``full`` or ``rolling`` mode, you have a full
 access to the block information in a sliding window of
@@ -188,25 +188,45 @@ history. Indeed, at each new cycle, a garbage collection phase removes
 the ledger state and the block metadata (operation receipts, rewards
 updates, etc.) of blocks outside the offset of this sliding
 window. Depending on the network, a minimum number of cycles are
-preserved (e.g., 7 on mainnet). However, the node keeps a number of
-additional cycles that is configurable.
+kept. These cycles correspond to the ones above the last
+allowed fork level, that are blocks subjects to a potential chain
+reorganization (on mainnet, it corresponds to 2 cycles). However, the
+node is able to keep an additional number of cycles that is
+configurable.
 
-By default, the number of preserved additional cycles, for both
-``full`` and ``rolling`` nodes, is *5 cycles*. On mainnet, this would
-total *12 cycles* of complete history (approximately a month).  It is
+By default, the number of additional cycles kept, for both ``full``
+and ``rolling`` nodes, is *5 cycles*. On mainnet, this would total *7
+cycles* of complete history (approximately three weeks), as we keep 5
+cycles beyond the minimal number of cycles, that is 2 + 5 = 7. It is
 possible to increase this parameter to keep more history or, on the
 contrary, decrease it to reduce the storage size. For example, it is
-possible to run a baker and a delegation service on rolling mode with
-*7 additional cycles* providing two more weeks to dispatch rewards.
+possible to run a baker and a delegation service on rolling mode as
+long as we keep 7 cycles (to provide two more weeks to dispatch
+rewards), meaning that at least 5 additional cycles must be kept.
 
-When running your node for the first time on an empty storage, you may
-specify the history mode and number of additional cycles using
-``--history-mode <HISTORY_MODE>:<NB_CYCLES>`` when running it. For
-example, ``--history-mode rolling:7``.
 
-It is also possible to modify the number of additional preserved
-cycles of a previously configured node. See :ref:`Switch mode
-restrictions<Switch_mode_restrictions>`
+When initialzing your node on an empty storage, you may specify the
+history mode and number of additional cycles using ``--history-mode
+<HISTORY_MODE>:<NB_CYCLES>`` when running it. For example, running a
+node with ``--history-mode rolling:7`` would allow full RPC queries of
+the 7 previous cycles.
+
+
+It is also possible to modify the number of additional cycles kept of
+a previously configured node, see :ref:`Switch mode
+restrictions<Switch_mode_restrictions>`. When updating the number of
+additional cycles to keep on an already configured node, one must
+consider that the change may require time. If the update aims to
+shrink the number of additional cycles to keep, it is just a matter of
+deleting some data, and the operation is performed instantaneously. If
+the update aims to increase the number of additional cycles to keep,
+one must consider that the switch will be complete only after waiting
+for the end of the aforementioned number of cycles. Indeed, the
+"cycles window" will be expanded as blocks/cycles are processed by the
+node and it won't fetch blocks prior to the previous limit. For
+example, switching from ``5`` to ``7`` cycles requires to wait ``2``
+complete cycles to reach the target number of cycles to keep. On the
+contrary, switching from ``7`` to ``5`` is instantaneous.
 
 .. _Switch_mode_restrictions:
 

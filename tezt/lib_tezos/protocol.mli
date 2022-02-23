@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** Protocols we may want to test with. *)
-type t = Granada | Alpha
+type t = Hangzhou | Ithaca | Alpha
 
 (** Protocol parameters.
 
@@ -72,8 +72,22 @@ type parameter_overrides = (string list * string option) list
 
 (** Write a protocol parameter file.
 
-    Default values are used, except for values given as [parameter_overrides]. *)
-val write_parameter_file : protocol:t -> parameter_overrides -> string Lwt.t
+    This function first builds a default parameter file from the [base]
+    parameter. If [base] is a [string] {!Either.Left}, the string denotes a path
+    to a parameter file like ["src/proto_alpha/parameters/sandbox-parameters.json"],
+    which is taken as the base parameters. If [base] is a {!t * constants option} {!Either.Right},
+    the default parameters of the given protocol are the base parameters.
+
+    Then, the base parameters are tweaked with:
+    - [parameters_overrides]
+    - [additional_bootstrap_accounts] (with their optional default balance) are
+      added to the list of bootstrap accounts of the protocol.
+    *)
+val write_parameter_file :
+  ?additional_bootstrap_accounts:(Account.key * int option) list ->
+  base:(string, t * constants option) Either.t ->
+  parameter_overrides ->
+  string Lwt.t
 
 (** Get the successor of a protocol.
 
@@ -98,11 +112,6 @@ val previous_protocol : t -> t option
     - it is easier for maintainers if the list of protocols a test runs on is clearly
       defined where the test is registered. *)
 val all : t list
-
-(** The protocol that is currently active on Mainnet.
-
-    Use this when registering tests that are not expected to break in future protocols. *)
-val current_mainnet : t
 
 (** Register a test that uses the protocol.
 

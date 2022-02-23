@@ -1,15 +1,13 @@
 (library
  (name tezos_mockup_proxy)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-mockup-proxy)
- (modules RPC_client)
+ (instrumentation (backend bisect_ppx))
  (libraries
-   tezos-base
-   tezos-client-base
-   tezos-protocol-environment
-   tezos-rpc-http
-   resto-cohttp-self-serving-client
-   tezos-rpc-http-client
-   tezos-shell-services)
- (flags (:standard
-  -open Tezos_base__TzPervasives)))
+  tezos-base
+  tezos-client-base
+  tezos-protocol-environment
+  tezos-rpc-http
+  resto-cohttp-self-serving-client
+  tezos-rpc-http-client
+  tezos-shell-services)
+ (flags (:standard -open Tezos_base__TzPervasives)))

@@ -1,48 +1,53 @@
 (library
  (name tezos_rpc_http)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc-http)
- (modules RPC_client_errors media_type)
- (libraries tezos-base
-            resto-cohttp)
- (flags (:standard -open Tezos_base__TzPervasives)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  resto-cohttp)
+ (flags (:standard -open Tezos_base__TzPervasives))
+ (modules RPC_client_errors media_type))
 
 (library
  (name tezos_rpc_http_client)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc-http-client)
- (modules RPC_client)
- (libraries tezos-base
-            resto-cohttp-client
-            tezos-rpc-http)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_rpc_http)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  resto-cohttp-client
+  tezos-rpc-http)
+ (flags (:standard -open Tezos_base__TzPervasives -open Tezos_rpc_http))
+ (modules RPC_client))
 
 (library
  (name tezos_rpc_http_client_unix)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc-http-client-unix)
- (modules RPC_client_unix)
- (libraries tezos-stdlib-unix
-            tezos-base
-            cohttp-lwt-unix
-            resto-cohttp-client
-            tezos-rpc-http-client)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_rpc_http_client)))
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-stdlib-unix
+  tezos-base
+  cohttp-lwt-unix
+  resto-cohttp-client
+  tezos-rpc-http-client)
+ (flags
+  (:standard -open Tezos_base__TzPervasives -open Tezos_rpc_http_client))
+ (modules RPC_client_unix))
 
 (library
  (name tezos_rpc_http_server)
- (instrumentation (backend bisect_ppx))
  (public_name tezos-rpc-http-server)
- (libraries tezos-base
-            tezos-stdlib-unix
-            resto-cohttp-server
-            resto-acl
-            tezos-rpc-http)
+ (instrumentation (backend bisect_ppx))
+ (libraries
+  tezos-base
+  tezos-stdlib-unix
+  resto-cohttp-server
+  resto-acl
+  tezos-rpc-http)
+ (flags
+  (:standard
+   -open Tezos_base__TzPervasives
+   -open Tezos_stdlib_unix
+   -open Tezos_rpc
+   -open Tezos_rpc_http))
  (modules RPC_server RPC_logging)
- (private_modules RPC_logging)
- (flags (:standard -open Tezos_base__TzPervasives
-                   -open Tezos_stdlib_unix
-                   -open Tezos_rpc
-                   -open Tezos_rpc_http)))
+ (private_modules RPC_logging))

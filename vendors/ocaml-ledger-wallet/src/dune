@@ -5,9 +5,33 @@
  (synopsis "Ledger wallet library for OCaml: common parts")
  (libraries rresult cstruct hidapi))
 
+; (library
+;  (name ledgerwallet_btc)
+;  (public_name ledgerwallet-btc)
+;  (modules     Ledgerwallet_btc)
+;  (preprocess (pps ppx_sexp_conv))
+;  (synopsis "Ledger wallet library for OCaml: BTC app")
+;  (flags -w -37)
+;  (libraries ledgerwallet cstruct-sexp bitcoin))
+
+; (library
+;  (name        ledgerwallet_ssh_agent)
+;  (public_name ledgerwallet-ssh-agent)
+;  (modules     Ledgerwallet_ssh_agent)
+;  (synopsis "Ledger wallet library for OCaml: SSH agent app")
+;  (flags -w -37)
+;  (libraries ledgerwallet))
+
 (library
  (name        ledgerwallet_tezos)
  (public_name ledgerwallet-tezos)
  (modules     Ledgerwallet_tezos)
  (synopsis "Ledger wallet library for OCaml: Tezos app")
  (libraries ledgerwallet))
+
+; (library
+;  (name        ledgerwallet_zil)
+;  (public_name ledgerwallet-zil)
+;  (modules     Ledgerwallet_zil)
+;  (synopsis "Ledger wallet library for OCaml: Zilliqa app")
+;  (libraries hex ledgerwallet bech32))

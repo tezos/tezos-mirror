@@ -30,9 +30,16 @@
 
 type error_category = [`Branch | `Temporary | `Permanent]
 
-include TzCore
+include (
+  TzCore : module type of TzCore with type error_category := error_category)
+
 include TzMonad
 module TzTrace = TzTrace
+
+(* We offer shorter names for monads. These short names only make sense in the
+   context of Tezos' error-monads which is why it is defined here. *)
+module Tzresult_syntax = Traced_result_syntax
+module Lwt_tzresult_syntax = Lwt_traced_result_syntax
 
 type 'error trace = 'error TzTrace.trace
 
@@ -63,13 +70,6 @@ let trace_of_exn e = TzTrace.make @@ error_of_exn e
 let error_with_exn e = Error (trace_of_exn e)
 
 let fail_with_exn e = Lwt.return (error_with_exn e)
-
-let tzresult_of_exn_result r = Result.map_error trace_of_exn r
-
-let trace_exn exn f = trace (Exn exn) f
-
-let generic_trace fmt =
-  Format.kasprintf (fun str -> trace_exn (Failure str)) fmt
 
 let error_of_fmt fmt = Format.kasprintf (fun str -> Exn (Failure str)) fmt
 

@@ -12,22 +12,16 @@ misc_checks:
     # python checks
     - make -C tests_python typecheck
     # Ensure that all unit tests are restricted to their opam package
-    # (change 'tezos-test-helpers' to one the most elementary packages of
-    # the repo if you add "internal" dependencies to tezos-test-helpers)
+    - make lint-tests-pkg
     # check that the hack-module patch applies cleanly
     - git apply devtools/protocol-print/add-hack-module.patch
-    - dune runtest -p tezos-test-helpers ||
-      echo "You have probably defined some tests in dune files without specifying to which 'package' they belong."
-
-check_docs_python:
-  extends: .build_template
-  stage: test
-  needs: []
-  before_script:
-    - cd docs
-    - poetry install
-  script:
-    - make lint
+    # check that yes-wallet builds correctly
+    - dune build scripts/yes-wallet/yes_wallet.exe
+  artifacts:
+    when: always
+    paths:
+      - opam_repo.patch
+    expire_in: 1 days
 
 check_precommit_hook:
   extends: .build_template
@@ -35,10 +29,9 @@ check_precommit_hook:
   needs: []
   script:
     - ./scripts/pre_commit/pre_commit.py --test-itself
-    - cd tests_python
-    - poetry run pylint ../scripts/pre_commit/pre_commit.py
-    - poetry run pycodestyle ../scripts/pre_commit/pre_commit.py
-    - poetry run mypy ../scripts/pre_commit/pre_commit.py
+    - poetry run pylint scripts/pre_commit/pre_commit.py
+    - poetry run pycodestyle scripts/pre_commit/pre_commit.py
+    - poetry run mypy scripts/pre_commit/pre_commit.py
 
 check_scripts_b58_prefix:
   # Can be changed to a python image, but using the build docker image to keep
@@ -46,29 +39,7 @@ check_scripts_b58_prefix:
   extends: .test_template
   needs: []
   before_script:
-    - cd scripts/b58_prefix
-    - poetry install
-  script:
-    - poetry run pylint b58_prefix.py --disable=missing-docstring --disable=invalid-name
-    - poetry run pytest test_b58_prefix.py -v
-
-# fast self-checks that depends on build
-sanity_ci:
-  extends:
-    - .default_settings_template
-    - .image_template__runtime_build_test_dependencies_template
-    - .rules_template__development
-  stage: sanity_ci
-  needs: ["build_x86_64"]
-  before_script:
-    - . ./scripts/version.sh
     - . $HOME/.venv/bin/activate
   script:
-    - src/tooling/lint.sh --check-gitlab-ci-yml
-
-docker-hadolint:
-  image: hadolint/hadolint:latest-debian
-  stage: sanity_ci
-  script:
-    - hadolint build.Dockerfile
-    - hadolint Dockerfile
+    - poetry run pylint scripts/b58_prefix/b58_prefix.py --disable=missing-docstring --disable=invalid-name
+    - poetry run pytest scripts/b58_prefix/test_b58_prefix.py -v

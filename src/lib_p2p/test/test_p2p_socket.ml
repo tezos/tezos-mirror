@@ -42,13 +42,7 @@ let tzassert b pos =
   let p (file, lnum, cnum, _) = (file, lnum, cnum) in
   if b then return_unit else fail (Exn (Assert_failure (p pos)))
 
-let id0 =
-  (* Luckily, this will be an insufficient proof of work! *)
-  P2p_identity.generate (Crypto_box.make_pow_target 0.)
-
 let high_pow_target = Crypto_box.make_pow_target 100.
-
-type metadata = unit
 
 let sync ch =
   Process.Channel.push ch () >>=? fun () ->
@@ -152,7 +146,7 @@ module Crypto_test = struct
     | false -> fail Tezos_p2p_services.P2p_errors.Decipher_error
     | true -> return msg
 
-  let (sk, pk, pkh) = Crypto_box.random_keypair ()
+  let (sk, pk, _pkh) = Crypto_box.random_keypair ()
 
   let zero_nonce = Crypto_box.zero_nonce
 
@@ -184,8 +178,6 @@ end
     server check it against a unreachable pow target.
 *)
 module Pow_check = struct
-  let encoding = Data_encoding.bytes
-
   let is_failing = function
     | Error (P2p_errors.Not_enough_proof_of_work _ :: _) -> true
     | _ -> false
@@ -394,8 +386,6 @@ end
 *)
 module Close_on_read = struct
   let encoding = Data_encoding.bytes
-
-  let simple_msg = Rand.generate (1 lsl 4)
 
   let server ch sched socket =
     accept sched socket >>=? fun (_info, auth_fd) ->

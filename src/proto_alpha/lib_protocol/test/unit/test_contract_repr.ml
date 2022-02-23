@@ -50,13 +50,13 @@ module Test_contract_repr = struct
     Operation_hash.of_bytes_exn
       (Bytes.of_string "test-operation-hash-of-length-32")
 
-  let dummy_origination_nonce = initial_origination_nonce dummy_operation_hash
+  let dummy_origination_nonce = Origination_nonce.initial dummy_operation_hash
 
   let dummy_contract_hash =
     (* WARNING: Uses Contract_repr itself, which is yet to be tested. This happened because Contract_hash wasn't mocked *)
     let data =
       Data_encoding.Binary.to_bytes_exn
-        Contract_repr.origination_nonce_encoding
+        Origination_nonce.encoding
         dummy_origination_nonce
     in
     Contract_hash.hash_bytes [data]
@@ -114,7 +114,7 @@ module Test_contract_repr = struct
     let since = dummy_origination_nonce in
     let rec incr_n_times nonce = function
       | 0 -> nonce
-      | n -> incr_n_times (Contract_repr.incr_origination_nonce nonce) (n - 1)
+      | n -> incr_n_times (Origination_nonce.incr nonce) (n - 1)
     in
     let until = incr_n_times since 5 in
     let contracts = originated_contracts ~since ~until in

@@ -28,4 +28,3 @@
  * This could be worked around by using a configurator script *)
 
 let main () = failwith "tztop requires utop to be installed"
-

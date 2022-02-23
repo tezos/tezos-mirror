@@ -23,9 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Support.Lib.Monad
-
-let ( >>== ) p v = Lwt_main.run (p >|= ( = ) v)
+let ( >>== ) p v = Lwt_main.run (Lwt.map (( = ) v) p)
 
 let () =
   let open Support.Lib.Seq in

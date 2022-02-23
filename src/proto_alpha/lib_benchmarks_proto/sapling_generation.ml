@@ -394,8 +394,8 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
       in
       return transaction)
   >>=? fun transaction ->
-  assert (List.length transaction.inputs = nb_input) ;
-  assert (List.length transaction.outputs = nb_output) ;
+  assert (Compare.List_length_with.(transaction.inputs = nb_input)) ;
+  assert (Compare.List_length_with.(transaction.outputs = nb_output)) ;
   return (transaction, (ctxt, id))
 
 (* ------------------------------------------------------------------------- *)
@@ -417,8 +417,8 @@ let sapling_transition_encoding =
 let sapling_dataset_encoding = Data_encoding.list sapling_transition_encoding
 
 let save ~filename ~txs =
-  let bytes =
-    match Data_encoding.Binary.to_bytes sapling_dataset_encoding txs with
+  let str =
+    match Data_encoding.Binary.to_string sapling_dataset_encoding txs with
     | Error err ->
         Format.eprintf
           "Sapling_generation.save: encoding failed (%a); exiting"
@@ -428,17 +428,13 @@ let save ~filename ~txs =
     | Ok res -> res
   in
   ignore (* TODO handle error *)
-    (Lwt_main.run
-    @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file
-         filename
-         (Bytes.unsafe_to_string bytes))
+    (Lwt_main.run @@ Tezos_stdlib_unix.Lwt_utils_unix.create_file filename str)
 
 let load_file filename =
   Lwt_main.run
   @@ ( Tezos_stdlib_unix.Lwt_utils_unix.read_file filename >>= fun str ->
        Format.eprintf "Sapling_generation.load: loaded %s@." filename ;
-       let bytes = Bytes.unsafe_of_string str in
-       match Data_encoding.Binary.of_bytes sapling_dataset_encoding bytes with
+       match Data_encoding.Binary.of_string sapling_dataset_encoding str with
        | Ok result ->
            let result = List.map (fun tx -> (filename, tx)) result in
            Lwt.return result

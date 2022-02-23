@@ -24,51 +24,50 @@ silent () {
     rm LOG
 }
 
-requested_packages="$@"
+requested_packages="$*"
 
 export OPAMYES=yes
 
-echo -n "Cleanup state and pin packages..."
+printf "Cleanup state and pin packages..."
 silent ./scripts/opam-unpin.sh
 silent . ./scripts/opam-pin.sh
 echo " OK."
 
-if ! [ -z "$requested_packages" ]; then
+if [ -n "$requested_packages" ]; then
     packages="$requested_packages"
 fi
 
 okfile="$0.DONE"
-touch $okfile
+touch "$okfile"
 ok=$(cat "$okfile")
 
 ignore() {
     for i in $ok; do
-        if [ $i = $1 ]; then return 0; fi
+        if [ "$i" = "$1" ]; then return 0; fi
     done
     return 1
 }
 
 for package in $packages; do
 
-    if ignore $package; then
+    if ignore "$package"; then
         echo "Ignoring: $package."
         continue
     fi
 
-    echo -n "Installing: $package..."
-    silent opam install $package
+    printf "Installing: %s..." "$package"
+    silent opam install "$package"
     echo " OK."
 
-    echo -n "Removing: $package..."
-    silent opam remove -a $package
+    printf "Removing: %s..." "$package"
+    silent opam remove -a "$package"
     echo " OK."
 
-    echo $package >> "$okfile"
-
+    echo "$package" >> "$okfile"
 done
 
 echo
 echo "Successfully installed the following packages: "
 echo
-cat $okfile | sed 's/^/- /'
-rm $okfile
+sed 's/^/- /' < "$okfile"
+rm "$okfile"

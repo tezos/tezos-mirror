@@ -11,11 +11,19 @@ documentation:build:
     - .rules_template__development
   stage: build
   needs: []
+  before_script:
+    - . $HOME/.venv/bin/activate
   script:
+    # CLI manuals are not built in this job. This hack removes their inclusion to
+    # suppress the error sphinx would otherwise throw. Unfortunately, there doesn't
+    # seem to be a more elegant way to suppress this warning.
+    - "sed -i 's@:file:.*[.]html@:file: /dev/null@' ./docs/*/cli-commands.rst"
     - make -C docs html
   artifacts:
+    expose_as: 'Documentation - excluding odoc and CLI manuals'
     paths:
-      - docs
+      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
+      - docs/_build/
     expire_in: 1 week
 
 documentation:build_all:
@@ -25,11 +33,15 @@ documentation:build_all:
     - .rules_template__development_manual
   stage: manual
   needs: []
+  before_script:
+    - . $HOME/.venv/bin/activate
   script:
     - make -C docs all
   artifacts:
+    expose_as: 'Full documentation - including odoc and CLI manuals'
     paths:
-      - docs
+      # Path must be terminated with / to expose artifact (gitlab-org/gitlab#/36706)
+      - docs/_build/
     expire_in: 1 week
   allow_failure: true
 
@@ -44,6 +56,7 @@ documentation:linkcheck:
       artifacts: true
   before_script:
     - . ./scripts/version.sh
+    - . $HOME/.venv/bin/activate
   script:
     - make -C docs redirectcheck
     - make -C docs linkcheck

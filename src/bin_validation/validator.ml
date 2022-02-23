@@ -271,6 +271,13 @@ let run input output =
           >>= fun res ->
           let (res, cache) =
             match res with
+            | Error [Validation_errors.Inconsistent_hash _] as err ->
+                (* This is a special case added for Hangzhou that could
+                   be removed once the successor of Hangzhou will be
+                   activated. This behavior is here to keep the
+                   compatibility with the version Octez v11 which has a
+                   buggy behavior with Hangzhou. *)
+                (err, None)
             | Error _ as err -> (err, cache)
             | Ok {result; cache} ->
                 ( Ok result,
@@ -310,16 +317,9 @@ let run input output =
            >>=? fun predecessor_context ->
              Context.get_protocol predecessor_context >>= fun protocol_hash ->
              load_protocol protocol_hash protocol_root >>=? fun () ->
-             let cache =
-               match cache with
-               | None -> `Load
-               | Some cache ->
-                   `Inherited (cache, predecessor_shell_header.context)
-             in
              let preapply () =
                Block_validation.preapply
                  ~chain_id
-                 ~cache
                  ~user_activated_upgrades
                  ~user_activated_protocol_overrides
                  ~timestamp
@@ -431,6 +431,13 @@ let run input output =
         fork_test_chain >>= fun () -> loop cache None
     | External_validation.Terminate ->
         Lwt_io.flush_all () >>= fun () -> Events.(emit termination_request ())
+    | External_validation.Reconfigure_event_logging config ->
+        Internal_event_unix.Configuration.reapply config >>= fun res ->
+        External_validation.send
+          output
+          (Error_monad.result_encoding Data_encoding.empty)
+          res
+        >>= fun () -> loop cache None
   in
   loop None None >>= fun () -> return_unit
 

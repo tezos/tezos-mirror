@@ -34,7 +34,8 @@ type error +=
 
 (** Generates the first [preserved_cycles+2] seeds for which
     there are no nonces. *)
-val init : Raw_context.t -> Raw_context.t tzresult Lwt.t
+val init :
+  ?initial_seed:State_hash.t -> Raw_context.t -> Raw_context.t tzresult Lwt.t
 
 val for_cycle : Raw_context.t -> Cycle_repr.t -> Seed_repr.seed tzresult Lwt.t
 

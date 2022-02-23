@@ -1,0 +1,13 @@
+tezt/_regressions/encoding/hangzhou.raw_level.out
+
+./tezos-codec encode 011-PtHangz2.raw_level from 2147483647
+7fffffff
+
+./tezos-codec decode 011-PtHangz2.raw_level from 7fffffff
+2147483647
+
+./tezos-codec encode 011-PtHangz2.raw_level from 0
+00000000
+
+./tezos-codec decode 011-PtHangz2.raw_level from 00000000
+0

@@ -31,6 +31,13 @@ let compare (term1 : t) (term2 : t) =
   let tag2 = Mikhailsky.tag term2.term in
   if tag1 < tag2 then -1 else if tag1 > tag2 then 1 else 0
 
+let equal (term1 : t) (term2 : t) =
+  let tag1 = Mikhailsky.tag term1.term in
+  let tag2 = Mikhailsky.tag term2.term in
+  tag1 = tag2
+
+let hash (t : t) = Mikhailsky.hash t.term
+
 type node_statistics = {
   mutable size : int;
   mutable bytes : int;

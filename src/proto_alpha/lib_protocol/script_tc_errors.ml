@@ -32,7 +32,7 @@ type kind = Int_kind | String_kind | Bytes_kind | Prim_kind | Seq_kind
 
 type unparsed_stack_ty = (Script.expr * Script.annot) list
 
-type type_map = (int * (unparsed_stack_ty * unparsed_stack_ty)) list
+type type_map = (Script.location * (unparsed_stack_ty * unparsed_stack_ty)) list
 
 (* Structure errors *)
 type error += Invalid_arity of Script.location * prim * int * int
@@ -105,7 +105,10 @@ type error +=
 
 type error += Duplicated_view_name of Script.location
 
-type error += Self_in_lambda of Script.location
+type context_desc = Lambda | View
+
+type error +=
+  | Forbidden_instr_in_context of Script.location * context_desc * prim
 
 type error += Bad_stack_length
 
@@ -181,9 +184,6 @@ type error +=
 type error += Ill_formed_type of string option * Script.expr * Script.location
 
 type error += Ill_typed_contract : Script.expr * type_map -> error
-
-(* Gas related errors *)
-type error += Cannot_serialize_error
 
 (* Deprecation errors *)
 type error += Deprecated_instruction of prim

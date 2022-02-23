@@ -65,6 +65,9 @@ val init : validator_environment -> validator_kind -> t tzresult Lwt.t
    registered Lwt_exit.clean_up_callback). *)
 val close : t -> unit Lwt.t
 
+val reconfigure_event_logging :
+  t -> Internal_event_unix.Configuration.t -> unit tzresult Lwt.t
+
 (** [apply_block bvp predecessor header os] checks the liveness of
     the operations and then call [Block_validation.apply] *)
 val apply_block :
