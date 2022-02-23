@@ -272,8 +272,9 @@ let tickets_of_operation ctxt
   | Tx_rollup_finalize_commitment _ -> return (None, ctxt)
   | Tx_rollup_remove_commitment _ -> return (None, ctxt)
   | Tx_rollup_rejection _ -> return (None, ctxt)
-  | Sc_rollup_originate {kind = _; boot_sector = _} -> return (None, ctxt)
-  | Sc_rollup_add_messages {rollup = _; messages = _} -> return (None, ctxt)
+  | Sc_rollup_originate _ -> return (None, ctxt)
+  | Sc_rollup_add_messages _ -> return (None, ctxt)
+  | Sc_rollup_cement _ -> return (None, ctxt)
 
 let add_transfer_to_token_map ctxt token_map {destination; tickets} =
   List.fold_left_es

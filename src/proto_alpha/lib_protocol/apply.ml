@@ -1433,6 +1433,12 @@ let apply_manager_operation_content :
       let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
       let result = Sc_rollup_add_messages_result {consumed_gas; inbox_after} in
       return (ctxt, result, [])
+  | Sc_rollup_cement {rollup; commitment} ->
+      let level = (Level.current ctxt).level in
+      Sc_rollup.cement_commitment ctxt rollup level commitment >>=? fun ctxt ->
+      let consumed_gas = Gas.consumed ~since:before_operation ~until:ctxt in
+      let result = Sc_rollup_cement_result {consumed_gas} in
+      return (ctxt, result, [])
 
 type success_or_failure = Success of context | Failure
 
@@ -1573,7 +1579,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
   | Tx_rollup_return_bond _ | Tx_rollup_finalize_commitment _
   | Tx_rollup_remove_commitment _ | Tx_rollup_rejection _ ->
       assert_tx_rollup_feature_enabled ctxt >|=? fun () -> ctxt
-  | Sc_rollup_originate _ | Sc_rollup_add_messages _ ->
+  | Sc_rollup_originate _ | Sc_rollup_add_messages _ | Sc_rollup_cement _ ->
       assert_sc_rollup_feature_enabled ctxt >|=? fun () -> ctxt)
   >>=? fun ctxt ->
   Contract.increment_counter ctxt source >>=? fun ctxt ->
@@ -1696,6 +1702,7 @@ let burn_storage_fees :
       let result = Sc_rollup_originate_result {payload with balance_updates} in
       return (ctxt, storage_limit, result)
   | Sc_rollup_add_messages_result _ -> return (ctxt, storage_limit, smopr)
+  | Sc_rollup_cement_result _ -> return (ctxt, storage_limit, smopr)
 
 let apply_manager_contents (type kind) ctxt mode chain_id
     ~gas_consumed_in_precheck (op : kind Kind.manager contents) :
