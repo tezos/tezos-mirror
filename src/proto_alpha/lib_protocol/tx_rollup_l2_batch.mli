@@ -208,7 +208,20 @@ module V1 : sig
           {li [01] means an integer fitting on 2 bytes.}
           {li [10] means an integer fitting on 4 bytes.}
           {li [11] means an integer fitting on 8 bytes.}
-      } *)
+      }
+
+      If used to read, respectively write, a value where the
+      the [destination] is a layer-1 address and the ticket_hash is an
+      index, which is not allowed by the layer-2 protocol, then a
+
+       - [Data_encoding.Binary.Read_error (Exception_raised_in_user_function ...)],
+
+      respectively
+
+       - [Data_encoding.Binary.Write_error (Exception_raised_in_user_function ...)]
+
+      exception is raised.
+   *)
   val compact_operation_content :
     Indexable.unknown operation_content Data_encoding.Compact.t
 end

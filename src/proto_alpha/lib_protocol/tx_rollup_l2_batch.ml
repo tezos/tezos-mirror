@@ -39,6 +39,21 @@ let signer_encoding =
       | None -> Error "not a BLS public key")
     (Fixed.bytes Bls_signature.pk_size_in_bytes)
 
+(* A version of Data_encoding.Compact.conv that can check an invariant
+   at encoding and decoding.
+
+   It is used at runtime to enforce the invariant that transfers to L1
+   accounts should reference tickets by value.
+
+   TODO: does this makes sense? Wouldn't it be easier to have the
+   type of operation_content enforce this invariant?
+*)
+let with_coding_guard guard encoding =
+  let guard_conv x =
+    match guard x with Ok () -> x | Error s -> raise (Invalid_argument s)
+  in
+  Data_encoding.Compact.conv guard_conv guard_conv encoding
+
 module Signer_indexable = Indexable.Make (struct
   type t = Bls_signature.pk
 
@@ -105,6 +120,19 @@ module V1 = struct
            (req "destination" compact_destination)
            (req "ticket_hash" Ticket_indexable.compact)
            (req "qty" Tx_rollup_l2_qty.compact_encoding))
+
+  let compact_operation_content =
+    with_coding_guard
+      (function
+        | {destination; ticket_hash; _} -> (
+            match (destination, Indexable.destruct ticket_hash) with
+            | (Layer1 _, Left _) ->
+                (* Layer2-to-layer1 transfers must include the value of the ticket_hash *)
+                Result.error
+                  "Attempted to decode layer2 operation containing ticket \
+                   index."
+            | _ -> Result.ok ()))
+      compact_operation_content
 
   let operation_content_encoding =
     Data_encoding.Compact.make ~tag_size compact_operation_content

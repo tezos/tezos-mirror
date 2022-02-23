@@ -51,9 +51,11 @@ let bls_pk_gen =
 
 let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let open QCheck2.Gen in
-  let* choice = bool in
-  if choice then (fun pk -> from_value pk) <$> bls_pk_gen
-  else (fun x -> from_index_exn x) <$> ui32
+  frequency
+    [
+      (1, (fun pk -> from_value pk) <$> bls_pk_gen);
+      (9, (fun x -> from_index_exn x) <$> ui32);
+    ]
 
 let signer_index_gen : Signer_indexable.index QCheck2.Gen.t =
   let open QCheck2.Gen in
@@ -107,9 +109,14 @@ let qty_gen =
 
 let v1_operation_content_gen =
   let open QCheck2.Gen in
-  let+ destination = destination_gen
-  and+ ticket_hash = idx_ticket_hash_gen
-  and+ qty = qty_gen in
+  let* destination = destination_gen and+ qty = qty_gen in
+  (* in valid [operation_content]s, the ticket_hash is a value when the
+     destination is layer1 *)
+  let+ ticket_hash =
+    match destination with
+    | Layer1 _ -> idx_ticket_hash_value_gen
+    | Layer2 _ -> idx_ticket_hash_gen
+  in
   V1.{destination; ticket_hash; qty}
 
 let v1_operation_gen =
