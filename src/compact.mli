@@ -211,8 +211,9 @@ val void_case : title:string -> 'a case
 val union : ?union_tag_bits:int -> ?cases_tag_bits:int -> 'a case list -> 'a t
 
 val or_int32 :
-  int32_kind:string ->
-  alt_kind:string ->
+  int32_title:string ->
+  alt_title:string ->
+  ?alt_description:string ->
   'a Encoding.t ->
   (int32, 'a) Either.t t
 

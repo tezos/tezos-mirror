@@ -44,7 +44,7 @@ let documentation_mentions_correct_tag_bit_counts () =
   assert (tag_bit_count int64 = 2) ;
   assert (
     tag_bit_count
-      (or_int32 ~int32_kind:"i32" ~alt_kind:"alt" Data_encoding.unit)
+      (or_int32 ~int32_title:"i32" ~alt_title:"alt" Data_encoding.unit)
     = 2) ;
   assert (tag_bit_count (list ~bits:0 Data_encoding.int31) = 0) ;
   assert (tag_bit_count (list ~bits:1 Data_encoding.int31) = 1) ;

@@ -1536,95 +1536,68 @@ end
 
 let bool : bool t = (module Compact_bool)
 
-module Compact_int32 = struct
-  type input = int32
+let int32_cases =
+  [
+    case
+      ~title:"small"
+      ~description:"An int32 which fits within a uint8"
+      (payload Encoding.uint8)
+      (fun i ->
+        if 0l <= i && i <= max_uint8_l then Some (Int32.to_int i) else None)
+      (fun i -> Int32.of_int i);
+    case
+      ~title:"medium"
+      ~description:"An int32 which fits within a uint16"
+      (payload Encoding.uint16)
+      (fun i ->
+        if max_uint8_l < i && i <= max_uint16_l then Some (Int32.to_int i)
+        else None)
+      (fun i -> Int32.of_int i);
+    case
+      ~title:"big"
+      ~description:"An int32 which doesn't fit within a uint16"
+      (payload Encoding.int32)
+      (fun i -> if max_uint16_l < i || i < 0l then Some i else None)
+      (fun i -> i);
+  ]
 
-  type layout = Int8 | Int16 | Int32
+let int32 = union ~union_tag_bits:2 ~cases_tag_bits:0 int32_cases
 
-  let layouts = [Int8; Int16; Int32]
-
-  (** ---- Tag -------------------------------------------------------------- *)
-
-  let tag_len = 2
-
-  let tag = function Int8 -> 0 | Int16 -> 1 | Int32 -> 2
-
-  let unused_tag = 3
-
-  (** ---- Partial encoding ------------------------------------------------- *)
-
-  let int8_l : int32 Encoding.t =
-    Encoding.conv Int32.to_int Int32.of_int Encoding.uint8
-
-  let int16_l : int32 Encoding.t =
-    Encoding.conv Int32.to_int Int32.of_int Encoding.uint16
-
-  let int32_l : int32 Encoding.t = Encoding.int32
-
-  let partial_encoding : layout -> int32 Encoding.t = function
-    | Int8 -> int8_l
-    | Int16 -> int16_l
-    | Int32 -> int32_l
-
-  (** ---- Classifier ------------------------------------------------------- *)
-
-  let classify = function
-    | i when 0l <= i && i <= max_uint8_l -> Int8
-    | i when max_uint8_l < i && i <= max_uint16_l -> Int16
-    | _ -> Int32
-
-  let json_encoding = Encoding.int32
-end
-
-let int32 : int32 t = (module Compact_int32)
-
-module Compact_int64 = struct
-  type input = int64
-
-  type layout = Int64 | Int32 | Int16 | Int8
-
-  let layouts = [Int64; Int32; Int16; Int8]
-
-  (** ---- Tag -------------------------------------------------------------- *)
-
-  let tag_len = 2
-
-  let tag = function Int8 -> 0 | Int16 -> 1 | Int32 -> 2 | Int64 -> 3
-
-  (** ---- Partial encoding ------------------------------------------------- *)
-
-  let int8_L : int64 Encoding.t =
-    Encoding.conv Int64.to_int Int64.of_int Encoding.uint8
-
-  let int16_L : int64 Encoding.t =
-    Encoding.conv Int64.to_int Int64.of_int Encoding.uint16
-
-  let int32_L : int64 Encoding.t =
-    Encoding.conv
-      Int64.to_int32
-      (fun x -> Int64.(logand 0xFFFF_FFFFL (of_int32 x)))
-      Encoding.int32
-
-  let int64_L : int64 Encoding.t = Encoding.int64
-
-  let partial_encoding : layout -> int64 Encoding.t = function
-    | Int8 -> int8_L
-    | Int16 -> int16_L
-    | Int32 -> int32_L
-    | Int64 -> int64_L
-
-  (** ---- Classifier ------------------------------------------------------- *)
-
-  let classify = function
-    | i when 0L <= i && i <= max_uint8_L -> Int8
-    | i when max_uint8_L < i && i <= max_uint16_L -> Int16
-    | i when max_uint16_L < i && i <= max_uint32_L -> Int32
-    | _ -> Int64
-
-  let json_encoding = Encoding.int64
-end
-
-let int64 : int64 t = (module Compact_int64)
+let int64 =
+  union
+    ~union_tag_bits:2
+    ~cases_tag_bits:0
+    [
+      case
+        ~title:"small"
+        ~description:"An int64 which fits within a uint8"
+        (payload Encoding.uint8)
+        (fun i ->
+          if 0L <= i && i <= max_uint8_L then Some (Int64.to_int i) else None)
+        (fun i -> Int64.of_int i);
+      case
+        ~title:"medium"
+        ~description:"An int64 which fits within a uint16"
+        (payload Encoding.uint16)
+        (fun i ->
+          if max_uint8_L < i && i <= max_uint16_L then Some (Int64.to_int i)
+          else None)
+        (fun i -> Int64.of_int i);
+      case
+        ~title:"biggish"
+        ~description:"An int64 which fits within a uint32"
+        (payload Encoding.int32)
+        (fun i ->
+          if max_uint16_L < i && i <= max_uint32_L then Some (Int64.to_int32 i)
+          else None)
+        (fun x -> Int64.(logand 0xFFFF_FFFFL (of_int32 x)));
+      case
+        ~title:"bigger"
+        ~description:"An int64 which doesn't fit within a uint32"
+        (payload Encoding.int64)
+        (fun i -> if max_uint32_L < i || i < 0L then Some i else None)
+        (fun i -> i);
+    ]
 
 module Compact_list = struct
   type layout = Small_list of int | Big_list
@@ -1692,87 +1665,35 @@ let list : type a. bits:int -> a Encoding.t -> a list t =
     let json_encoding = json_encoding encoding
   end)
 
-module Compact_either_int32 = struct
-  open Either
-
-  type layout = Compact_int32.layout option
-
-  let layouts = None :: List.map Option.some Compact_int32.layouts
-
-  (** ---- Tag -------------------------------------------------------------- *)
-
-  let tag_len = Compact_int32.tag_len
-
-  let tag = function
-    | Some i -> Compact_int32.tag i
-    | None -> Compact_int32.unused_tag
-
-  (** ---- Partial encoding ------------------------------------------------- *)
-
-  let partial_encoding val_encoding = function
-    | Some id ->
-        conv_partial
-          (function Left i -> Some i | _ -> None)
-          (fun i -> Left i)
-          (Compact_int32.partial_encoding id)
-    | None ->
-        conv_partial
-          (function Right v -> Some v | _ -> None)
-          (fun v -> Right v)
-          val_encoding
-
-  (** ---- Classifier ------------------------------------------------------- *)
-
-  let classify : (int32, 'a) Either.t -> layout = function
-    | Left i -> Some (Compact_int32.classify i)
-    | _ -> None
-end
-
 let or_int32 :
     type a.
-    int32_kind:string ->
-    alt_kind:string ->
+    int32_title:string ->
+    alt_title:string ->
+    ?alt_description:string ->
     a Encoding.t ->
     (int32, a) Either.t t =
- fun ~int32_kind ~alt_kind encoding ->
-  (module struct
-    open Either
-
-    type input = (int32, a) Either.t
-
-    include Compact_either_int32
-
-    let partial_encoding = partial_encoding encoding
-
-    let json_encoding =
-      Encoding.conv_with_guard
-        (function
-          | Left _ as expr -> (int32_kind, expr)
-          | Right _ as expr -> (alt_kind, expr))
-        (function
-          | kind, (Left _ as x) when String.equal kind int32_kind -> Ok x
-          | kind, (Right _ as x) when String.equal kind alt_kind -> Ok x
-          | _ -> Error "not a valid kind")
-        Encoding.(
-          obj2
-            (req "kind" string)
-            (req "value"
-            @@ union
-                 [
-                   case
-                     (Tag 0)
-                     ~title:int32_kind
-                     int32
-                     (function Left x -> Some x | _ -> None)
-                     (fun x -> Left x);
-                   case
-                     (Tag 1)
-                     ~title:alt_kind
-                     encoding
-                     (function Right x -> Some x | _ -> None)
-                     (fun x -> Right x);
-                 ]))
-  end)
+ fun ~int32_title ~alt_title ?alt_description alt_encoding ->
+  let left_cases =
+    List.map
+      (fun (Case {title; description; proj; inj; compact}) ->
+        let title = Printf.sprintf "%s_%s" int32_title title in
+        let proj = function
+          | Either.Left i32 -> proj i32
+          | Either.Right _ -> None
+        in
+        let inj i = Either.Left (inj i) in
+        Case {title; description; proj; inj; compact})
+      int32_cases
+  in
+  let right_case =
+    case
+      ~title:alt_title
+      ?description:alt_description
+      (payload alt_encoding)
+      (function Either.Right a -> Some a | Either.Left _ -> None)
+      (fun a -> Either.Right a)
+  in
+  union ~union_tag_bits:2 ~cases_tag_bits:0 (left_cases @ [right_case])
 
 module Custom = struct
   module type S = S

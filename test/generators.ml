@@ -1792,8 +1792,8 @@ let compactfull_orint32 : type a. a full -> (int32, a) Either.t compactfull =
 
     let encoding =
       Data_encoding.Compact.or_int32
-        ~int32_kind:"thrity_two"
-        ~alt_kind:"alt"
+        ~int32_title:"thirty_two"
+        ~alt_title:"alt"
         Full.encoding
   end)
 
