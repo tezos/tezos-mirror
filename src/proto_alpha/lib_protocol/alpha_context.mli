@@ -2073,7 +2073,9 @@ module Tx_rollup_message : sig
 
   val pp_hash : Format.formatter -> hash -> unit
 
-  val hash : t -> hash
+  val hash_uncarbonated : t -> hash
+
+  val hash : context -> t -> (context * hash) tzresult
 end
 
 (** This module re-exports definitions from {!Tx_rollup_inbox_repr} and

@@ -85,10 +85,11 @@ let burn_per_byte state = inbox_burn state 1
 (** [check_batch_in_inbox inbox n expected] checks that the [n]th
     element of [inbox] is a batch equal to [expected]. *)
 let check_batch_in_inbox :
-    Tx_rollup_inbox.t -> int -> string -> unit tzresult Lwt.t =
- fun inbox n expected ->
+    t -> Tx_rollup_inbox.t -> int -> string -> unit tzresult Lwt.t =
+ fun ctxt inbox n expected ->
   let (expected_batch, _) = Tx_rollup_message.make_batch expected in
-  let expected_hash = Tx_rollup_message.hash expected_batch in
+  Environment.wrap_tzresult (Tx_rollup_message.hash ctxt expected_batch)
+  >>?= fun (_ctxt, expected_hash) ->
   match List.nth inbox.contents n with
   | Some content ->
       Alcotest.(
@@ -395,9 +396,11 @@ let test_add_two_batches () =
       inbox.cumulated_size) ;
 
   Context.Tx_rollup.inbox (B b) tx_rollup >>=? fun {contents; _} ->
+  Incremental.begin_construction b >>=? fun incr ->
+  let ctxt = Incremental.alpha_ctxt incr in
   Alcotest.(check int "Expect an inbox with two items" 2 (List.length contents)) ;
-  check_batch_in_inbox inbox 0 contents1 >>=? fun () ->
-  check_batch_in_inbox inbox 1 contents2 >>=? fun () ->
+  check_batch_in_inbox ctxt inbox 0 contents1 >>=? fun () ->
+  check_batch_in_inbox ctxt inbox 1 contents2 >>=? fun () ->
   inbox_burn state expected_cumulated_size >>?= fun cost ->
   Assert.balance_was_debited ~loc:__LOC__ (B b) contract balance cost
 
@@ -520,7 +523,8 @@ let test_valid_deposit () =
           ticket_hash
           (Tx_rollup_l2_qty.of_int64_exn 10L)
       in
-      let expected = Tx_rollup_message.hash message in
+      Environment.wrap_tzresult (Tx_rollup_message.hash ctxt message)
+      >>?= fun (_ctxt, expected) ->
       Alcotest.(check message_hash_testable "deposit" hash expected) ;
       return_unit
   | _ -> Alcotest.fail "The inbox has not the expected shape"

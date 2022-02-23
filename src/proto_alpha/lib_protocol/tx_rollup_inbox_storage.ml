@@ -124,12 +124,11 @@ let append_message :
     Compare.Int.(new_size < inbox_limit)
     (Tx_rollup_inbox_size_would_exceed_limit rollup)
   >>=? fun () ->
-  (* FIXME/TORU: https://gitlab.com/tezos/tezos/-/issues/2408
-     Carbonate hashing the message. *)
+  Tx_rollup_message_builder.hash ctxt message >>?= fun (ctxt, hash) ->
   Storage.Tx_rollup.Inbox_contents.add
     ((ctxt, level), rollup)
     metadata.inbox_length
-    (Tx_rollup_message_repr.hash message)
+    hash
   >>=? fun (ctxt, _, _) -> return (ctxt, new_state)
 
 let get_level :

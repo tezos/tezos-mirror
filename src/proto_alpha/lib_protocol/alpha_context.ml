@@ -259,6 +259,7 @@ end
 
 module Tx_rollup_message = struct
   include Tx_rollup_message_repr
+  include Tx_rollup_message_builder
 
   let make_message msg = (msg, size msg)
 
