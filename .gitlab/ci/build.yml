@@ -17,11 +17,13 @@
       fi
     - diff poetry.lock /home/tezos/poetry.lock
     - diff pyproject.toml /home/tezos/pyproject.toml
-    - dune build @runtest_dune_template
+    # We add $COVERAGE_OPTIONS to all dune build commands to enable reuse of
+    # build artifacts.
+    - dune build $COVERAGE_OPTIONS @runtest_dune_template
     # 2. Actually build
-    - make all build-test
+    - make all build-sandbox
     # 3. Also build the tps evaluation tool which is not part of the default build.
-    - dune build src/bin_tps_evaluation
+    - dune build $COVERAGE_OPTIONS src/bin_tps_evaluation
     # 4. clean-up caches before uploading the cache
     - opam clean
   cache:
