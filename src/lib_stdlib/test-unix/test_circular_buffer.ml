@@ -30,7 +30,7 @@
     Subject:      On circular buffer
 *)
 
-open Lwt
+open Lwt.Syntax
 module Buff = Circular_buffer
 
 let buffer_size = ref (1 lsl 14)
@@ -102,12 +102,12 @@ module Constant = struct
     Array.iteri
       (fun i data ->
         ignore
-          ( data >>= fun data ->
-            let _ = Buff.read data circular_buffer ~into:buff ~offset:0 in
-            assert (
-              Bytes.sub buff 0 (Buff.length data)
-              = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data)) ;
-            Lwt.return_unit ))
+          (let* data = data in
+           let _ = Buff.read data circular_buffer ~into:buff ~offset:0 in
+           assert (
+             Bytes.sub buff 0 (Buff.length data)
+             = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data)) ;
+           Lwt.return_unit))
       data_store
 
   (** Reads each data chunk fragement by fragment (10 fragments max,
@@ -120,29 +120,29 @@ module Constant = struct
     Array.iter
       (fun (i, data) ->
         ignore
-          ( data >>= fun data ->
-            let max_iter = 10 in
-            let rec exhaust data offset iter =
-              let length = Buff.length data in
-              let len =
-                if iter > max_iter then length
-                else try Random.int length with _ -> length
-                (* length might be 0 *)
-              in
-              let remainder =
-                Buff.read ~len data circular_buffer ~into:buff ~offset
-              in
-              let offset = offset + len in
-              match remainder with
-              | None -> offset
-              | Some remainder -> exhaust remainder offset (iter + 1)
-            in
-            let read_length = exhaust data 0 0 in
-            assert (read_length = Buff.length data) ;
-            assert (
-              Bytes.sub buff 0 (Buff.length data)
-              = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data)) ;
-            Lwt.return_unit ))
+          (let* data = data in
+           let max_iter = 10 in
+           let rec exhaust data offset iter =
+             let length = Buff.length data in
+             let len =
+               if iter > max_iter then length
+               else try Random.int length with _ -> length
+               (* length might be 0 *)
+             in
+             let remainder =
+               Buff.read ~len data circular_buffer ~into:buff ~offset
+             in
+             let offset = offset + len in
+             match remainder with
+             | None -> offset
+             | Some remainder -> exhaust remainder offset (iter + 1)
+           in
+           let read_length = exhaust data 0 0 in
+           assert (read_length = Buff.length data) ;
+           assert (
+             Bytes.sub buff 0 (Buff.length data)
+             = Bytes.sub seed_chunks.(i mod seed_count) 0 (Buff.length data)) ;
+           Lwt.return_unit))
       data_store
 
   (**{1} Tests  *)
@@ -166,7 +166,7 @@ module Constant = struct
         chunks_size
         (fill_full seed_chunks circular_buffer chunks_size chunks_count)
     done ;
-    return_unit
+    Lwt.return_unit
 
   (** [run ~buffer_size ~chunk_size ~chunks_count ~iter] fills the
      buffer with ~chunks_count. The writing function does not always
@@ -188,7 +188,7 @@ module Constant = struct
         chunks_size
         (fill_partial seed_chunks circular_buffer chunks_size chunks_count)
     done ;
-    return_unit
+    Lwt.return_unit
 
   (** [run ~buffer_size ~chunk_size ~chunks_count ~iter] fills the
      buffer with ~chunks_count. The writing function does not always
@@ -213,7 +213,7 @@ module Constant = struct
            (fun i d -> (i, d))
            (fill_partial seed_chunks circular_buffer chunks_size chunks_count))
     done ;
-    return_unit
+    Lwt.return_unit
 
   (** [run_partial_read_writes_interleaving ~buffer_size ~chunk_size
      ~chunks_count ~iter] interleaves writes of chunks_count chunks
@@ -259,7 +259,7 @@ module Constant = struct
                    chunks_count))))
     in
     loop iter data_store ;
-    return_unit
+    Lwt.return_unit
 end
 
 module Fail_Test = struct
@@ -269,26 +269,29 @@ module Fail_Test = struct
     let tmp_buff = Bytes.create (max max_data_size actual_data_size) in
     Lwt.catch
       (fun () ->
-        Buff.write
-          ~maxlen:max_data_size
-          ~fill_using:(fun buff off _maxlen ->
-            Bytes.blit tmp_buff 0 buff off actual_data_size ;
-            Lwt.return actual_data_size)
-          circular_buffer
-        >>= fun _data -> assert false)
+        let* _data =
+          Buff.write
+            ~maxlen:max_data_size
+            ~fill_using:(fun buff off _maxlen ->
+              Bytes.blit tmp_buff 0 buff off actual_data_size ;
+              Lwt.return actual_data_size)
+            circular_buffer
+        in
+        assert false)
       (function Invalid_argument _ -> Lwt.return_unit | exn -> raise exn)
 
   (** Fail read too long.  *)
   let read_invalid ~max_buffer_len ~max_data_size ~actual_data_size =
     let circular_buffer = Buff.create ~maxlength:max_buffer_len () in
     let tmp_buff = Bytes.create (max max_data_size actual_data_size) in
-    Buff.write
-      ~maxlen:max_data_size
-      ~fill_using:(fun buff off _maxlen ->
-        Bytes.blit tmp_buff 0 buff off actual_data_size ;
-        Lwt.return actual_data_size)
-      circular_buffer
-    >>= fun data ->
+    let* data =
+      Buff.write
+        ~maxlen:max_data_size
+        ~fill_using:(fun buff off _maxlen ->
+          Bytes.blit tmp_buff 0 buff off actual_data_size ;
+          Lwt.return actual_data_size)
+        circular_buffer
+    in
     try
       let _ =
         Buff.read
@@ -308,13 +311,15 @@ module Fail_Test = struct
     write_invalid ~max_buffer_len:4 ~max_data_size:5 ~actual_data_size:6
 
   let run_read_too_long_in_buffer () =
-    read_invalid ~max_buffer_len:10 ~max_data_size:10 ~actual_data_size:5
-    >>= fun () ->
+    let* () =
+      read_invalid ~max_buffer_len:10 ~max_data_size:10 ~actual_data_size:5
+    in
     read_invalid ~max_buffer_len:10 ~max_data_size:0 ~actual_data_size:0
 
   let run_read_too_long_extra_alloc () =
-    read_invalid ~max_buffer_len:4 ~max_data_size:10 ~actual_data_size:5
-    >>= fun () ->
+    let* () =
+      read_invalid ~max_buffer_len:4 ~max_data_size:10 ~actual_data_size:5
+    in
     read_invalid ~max_buffer_len:4 ~max_data_size:0 ~actual_data_size:0
 end
 
@@ -331,7 +336,9 @@ let wrap n f =
       match
         Lwt_main.run
           (Lwt.catch
-             (fun () -> f () >>= fun x -> Lwt.return @@ `Ok x)
+             (fun () ->
+               let* x = f () in
+               Lwt.return @@ `Ok x)
              (fun exn -> Lwt.return @@ `Exn exn))
       with
       | `Ok _ -> ()

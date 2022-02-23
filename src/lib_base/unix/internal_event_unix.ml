@@ -47,7 +47,8 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
       File_event_sink.Sink_implementation.uri_scheme;
     ]
   in
-  Lwt_tzresult_syntax.(
+  let open Lwt_tzresult_syntax in
+  let*! r =
     let* () =
       Lwt_result.ok @@ Lwt_log_sink_unix.initialize ?cfg:lwt_log_sink ()
     in
@@ -80,8 +81,9 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
                    (`O
                      [("variable", `String env_var_name); ("value", `String s)])))
     in
-    Configuration.apply configuration)
-  >>= function
+    Configuration.apply configuration
+  in
+  match r with
   | Ok () -> Lwt.return_unit
   | Error el ->
       Format.kasprintf
@@ -91,7 +93,9 @@ let init ?lwt_log_sink ?(configuration = Configuration.default) () =
         el
 
 let close () =
-  Internal_event.All_sinks.close () >>= function
+  let open Lwt_syntax in
+  let* r = Internal_event.All_sinks.close () in
+  match r with
   | Ok () -> Lwt.return_unit
   | Error el ->
       Format.kasprintf

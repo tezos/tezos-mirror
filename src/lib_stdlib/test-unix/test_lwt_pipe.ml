@@ -30,7 +30,7 @@
     Subject:      Lwt_pipe
 *)
 
-open Lwt.Infix
+open Lwt.Syntax
 
 (**
 
@@ -54,11 +54,15 @@ module Bounded = struct
 
   let rec producer queue = function
     | 0 -> Lwt.return_unit
-    | n -> Lwt_pipe.Bounded.push queue () >>= fun () -> producer queue (pred n)
+    | n ->
+        let* () = Lwt_pipe.Bounded.push queue () in
+        producer queue (pred n)
 
   let rec consumer queue = function
     | 0 -> Lwt.return_unit
-    | n -> Lwt_pipe.Bounded.pop queue >>= fun _ -> consumer queue (pred n)
+    | n ->
+        let* _ = Lwt_pipe.Bounded.pop queue in
+        consumer queue (pred n)
 
   let rec gen f = function 0 -> [] | n -> f () :: gen f (pred n)
 
@@ -68,8 +72,8 @@ module Bounded = struct
     in
     let producers = gen (fun () -> producer q actor_work) actors in
     let consumers = gen (fun () -> consumer q actor_work) actors in
-    Lwt.join producers >>= fun () ->
-    Lwt.join consumers >>= fun () ->
+    let* () = Lwt.join producers in
+    let* () = Lwt.join consumers in
     assert (Lwt_pipe.Bounded.is_empty q) ;
     Lwt.return_unit
 
@@ -98,14 +102,14 @@ module Bounded = struct
     in
     let producers = gen (fun () -> producer q production) prods in
     let rec consume iterations =
-      Lwt_unix.sleep 0.01 >>= fun () ->
+      let* () = Lwt_unix.sleep 0.01 in
       match Lwt_pipe.Bounded.pop_all_now q with
       | _ :: _ -> consume (iterations + 1)
       | [] -> Lwt.return iterations
     in
     let consumer = consume 0 in
-    Lwt.join producers >>= fun () ->
-    consumer >>= fun iterations ->
+    let* () = Lwt.join producers in
+    let* iterations = consumer in
     assert (Lwt_pipe.Bounded.is_empty q) ;
     assert (iterations = exp_iterations) ;
     Lwt.return_unit
@@ -128,12 +132,16 @@ module Bounded = struct
 
   let rec producer q = function
     | 0 -> Lwt_pipe.Bounded.push q 0
-    | n -> Lwt_pipe.Bounded.push q n >>= fun () -> producer q (pred n)
+    | n ->
+        let* () = Lwt_pipe.Bounded.push q n in
+        producer q (pred n)
 
   let rec consumer q = function
-    | 0 -> Lwt_pipe.Bounded.pop q >|= fun m -> assert (0 = m)
+    | 0 ->
+        let+ m = Lwt_pipe.Bounded.pop q in
+        assert (0 = m)
     | n ->
-        Lwt_pipe.Bounded.pop q >>= fun m ->
+        let* m = Lwt_pipe.Bounded.pop q in
         assert (n = m) ;
         consumer q (pred n)
 
@@ -143,8 +151,8 @@ module Bounded = struct
     in
     let producer = producer q work in
     let consumer = consumer q work in
-    producer >>= fun () ->
-    consumer >>= fun () ->
+    let* () = producer in
+    let* () = consumer in
     assert (Lwt_pipe.Bounded.is_empty q) ;
     Lwt.return_unit
 
@@ -172,7 +180,7 @@ module Bounded = struct
     let peek_0 = Lwt_pipe.Bounded.peek q in
     assert (Lwt.state peek_0 = Lwt.Sleep) ;
     let () = assert (Lwt_pipe.Bounded.push_now q 0) in
-    Lwt.pause () >>= fun () ->
+    let* () = Lwt.pause () in
     assert (Lwt.state peek_0 = Lwt.Return 0) ;
     let () = assert (Lwt_pipe.Bounded.push_now q 0) in
     let () = assert (Lwt_pipe.Bounded.push_now q 0) in
@@ -187,7 +195,7 @@ module Bounded = struct
     in
     let pop_234 = Lwt_pipe.Bounded.pop_all q in
     assert (Lwt.state pop_234 = Lwt.Return [0; 0; 0]) ;
-    Lwt.pause () >>= fun () ->
+    let* () = Lwt.pause () in
     let () = assert (Lwt_pipe.Bounded.push_now q 1) in
     let peek_0 = Lwt_pipe.Bounded.peek q in
     assert (Lwt.state peek_0 = Lwt.Return 1) ;
@@ -200,7 +208,7 @@ module Bounded = struct
     let () =
       match Lwt_pipe.Bounded.pop_now q with Some 1 -> () | _ -> assert false
     in
-    Lwt.pause () >>= fun () ->
+    let* () = Lwt.pause () in
     assert (Lwt.state push_big = Lwt.Sleep) ;
     assert (Lwt.state push_small = Lwt.Return ()) ;
     let () =
@@ -214,7 +222,7 @@ module Bounded = struct
     let () =
       match Lwt_pipe.Bounded.pop_now q with Some 1 -> () | _ -> assert false
     in
-    Lwt.pause () >>= fun () ->
+    let* () = Lwt.pause () in
     assert (Lwt.state push_big = Lwt.Return ()) ;
     let () =
       match Lwt_pipe.Bounded.pop_now q with Some 4 -> () | _ -> assert false
@@ -242,7 +250,9 @@ module Unbounded = struct
 
   let rec consumer queue = function
     | 0 -> Lwt.return_unit
-    | n -> Lwt_pipe.Unbounded.pop queue >>= fun _ -> consumer queue (pred n)
+    | n ->
+        let* _ = Lwt_pipe.Unbounded.pop queue in
+        consumer queue (pred n)
 
   let rec gen f = function 0 -> [] | n -> f () :: gen f (pred n)
 
@@ -250,8 +260,8 @@ module Unbounded = struct
     let q = Lwt_pipe.Unbounded.create () in
     let producers = gen (fun () -> producer q actor_work) actors in
     let consumers = gen (fun () -> consumer q actor_work) actors in
-    Lwt.join producers >>= fun () ->
-    Lwt.join consumers >>= fun () ->
+    let* () = Lwt.join producers in
+    let* () = Lwt.join consumers in
     assert (Lwt_pipe.Unbounded.is_empty q) ;
     Lwt.return_unit
 
@@ -269,16 +279,18 @@ module Unbounded = struct
         producer q (pred n)
 
   let rec consumer q = function
-    | 0 -> Lwt_pipe.Unbounded.pop q >|= fun m -> assert (0 = m)
+    | 0 ->
+        let+ m = Lwt_pipe.Unbounded.pop q in
+        assert (0 = m)
     | n ->
-        Lwt_pipe.Unbounded.pop q >>= fun m ->
+        let* m = Lwt_pipe.Unbounded.pop q in
         assert (n = m) ;
         consumer q (pred n)
 
   let run work =
     let q = Lwt_pipe.Unbounded.create () in
     producer q work ;
-    consumer q work >>= fun () ->
+    let* () = consumer q work in
     assert (Lwt_pipe.Unbounded.is_empty q) ;
     Lwt.return_unit
 
@@ -286,9 +298,16 @@ module Unbounded = struct
 end
 
 let with_timeout t f () =
-  let timeout = Lwt_unix.sleep t >|= fun () -> Error () in
-  let main = f () >|= fun () -> Ok () in
-  Lwt.pick [main; timeout] >|= function Ok () -> () | Error () -> assert false
+  let timeout =
+    let+ () = Lwt_unix.sleep t in
+    Error ()
+  in
+  let main =
+    let+ () = f () in
+    Ok ()
+  in
+  let+ r = Lwt.pick [main; timeout] in
+  match r with Ok () -> () | Error () -> assert false
 
 let () =
   Lwt_main.run
