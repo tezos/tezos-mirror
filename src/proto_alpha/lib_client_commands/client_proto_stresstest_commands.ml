@@ -975,7 +975,13 @@ let generate_random_transactions =
       | exception _ -> cctxt#error "Could not decode list of sources"
       | [] -> cctxt#error "It is required to provide sources"
       | sources ->
-          List.filter_map_p (normalize_source cctxt) sources >>= fun sources ->
+          (if !verbose then cctxt#message "starting to normalize sources"
+          else Lwt.return_unit)
+          >>= fun () ->
+          List.filter_map_s (normalize_source cctxt) sources >>= fun sources ->
+          (if !verbose then cctxt#message "all sources have been normalized"
+          else Lwt.return_unit)
+          >>= fun () ->
           let counters = Signature.Public_key_hash.Table.create 1023 in
           let rng_state = Random.State.make [|parameters.seed|] in
           Shell_services.Blocks.hash cctxt () >>=? fun current_head_on_start ->
