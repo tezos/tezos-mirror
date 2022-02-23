@@ -43,13 +43,9 @@ let parameter_file protocol =
     ~base:(Either.right (protocol, None))
     [(["tx_rollup_enable"], Some "true")]
 
-let submit_batch ~batch ~rollup client =
-  Client.Tx_rollup.submit_batch
-    ~hooks
-    ~content:batch
-    ~rollup
-    ~src:Constant.bootstrap1.public_key_hash
-    client
+let submit_batch ?(src = Constant.bootstrap1.public_key_hash) ~batch ~rollup
+    client =
+  Client.Tx_rollup.submit_batch ~hooks ~content:batch ~rollup ~src client
 
 (* This module only registers regressions tests. Those regressions
    tests should be used to ensure there is no regressions with the
@@ -208,6 +204,40 @@ module Regressions = struct
           (rex
              "A message submtitted to a transaction rollup inbox exceeds limit")
         process
+
+    let inbox_maximum_size ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_limit_maximum_size_inbox"
+        ~title:"Submit maximum size inbox"
+        ~tags:["tx_rollup"; "inbox"; "client"]
+        ~protocols
+      @@ fun protocol ->
+      let inbox_limit = 100_000 in
+      let batch_limit = 5000 in
+      (* The test assumes inbox_limit % batch_limit = 0 *)
+      let max_batch_number_per_inbox = inbox_limit / batch_limit in
+      let additional_bootstrap_account_count = max_batch_number_per_inbox - 5 in
+      let* {client; rollup; node} =
+        init_with_tx_rollup ~additional_bootstrap_account_count ~protocol ()
+      in
+      let batch = String.make batch_limit 'a' in
+      let* () =
+        fold max_batch_number_per_inbox () (fun i () ->
+            let src = Account.bootstrap (i + 1) in
+            let*! () = submit_batch ~src ~batch ~rollup client in
+            unit)
+      in
+      let current_level = Node.get_level node in
+      let* () = Client.bake_for client in
+      let* _ = Node.wait_for_level node (current_level + 1) in
+      let*! {cumulated_size; contents = _; hash = _} =
+        Rollup.get_inbox ~hooks ~rollup client
+      in
+      Check.(cumulated_size = inbox_limit)
+        Check.int
+        ~error_msg:"Unexpected inbox size. Expected %L. Got %R" ;
+      unit
   end
 
   module Fail = struct
@@ -244,6 +274,7 @@ module Regressions = struct
     RPC.rpc_commitment ~protocols ;
     Limits.submit_empty_batch ~protocols ;
     Limits.submit_maximum_size_batch ~protocols ;
+    Limits.inbox_maximum_size ~protocols ;
     Fail.client_submit_batch_invalid_rollup_address ~protocols
 end
 
