@@ -57,10 +57,15 @@ let submit_batch ~batch ~rollup client =
 module Regressions = struct
   type t = {node : Node.t; client : Client.t; rollup : string}
 
-  let init_with_tx_rollup ~protocol =
+  let init_with_tx_rollup ?additional_bootstrap_account_count ~protocol () =
     let* parameter_file = parameter_file protocol in
     let* (node, client) =
-      Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      Client.init_with_protocol
+        ?additional_bootstrap_account_count
+        ~parameter_file
+        `Client
+        ~protocol
+        ()
     in
     (* We originate a dumb rollup to be able to generate a paths for
        tx_rollups related RPCs. *)
@@ -105,7 +110,7 @@ module Regressions = struct
         ~tags:["tx_rollup"; "rpc"; "state"]
         ~protocols
       @@ fun protocol ->
-      let* {node = _; client; rollup} = init_with_tx_rollup ~protocol in
+      let* {node = _; client; rollup} = init_with_tx_rollup ~protocol () in
       let*! _state = Rollup.get_state ~hooks ~rollup client in
       return ()
 
@@ -118,7 +123,7 @@ module Regressions = struct
         ~protocols
       @@ fun protocol ->
       let* ({rollup; client; node = _} as state) =
-        init_with_tx_rollup ~protocol
+        init_with_tx_rollup ~protocol ()
       in
       (* The content of the batch does not matter for the regression test. *)
       let batch = "blob" in
@@ -134,7 +139,9 @@ module Regressions = struct
         ~tags:["tx_rollup"; "rpc"; "commitment"]
         ~protocols
       @@ fun protocol ->
-      let* ({rollup; client; node} as state) = init_with_tx_rollup ~protocol in
+      let* ({rollup; client; node} as state) =
+        init_with_tx_rollup ~protocol ()
+      in
       (* The content of the batch does not matter for the regression test. *)
       let batch = "blob" in
       let* () = submit_batch_and_bake ~batch state in
@@ -176,7 +183,7 @@ module Regressions = struct
         ~tags:["tx_rollup"; "batch"; "client"]
         ~protocols
       @@ fun protocol ->
-      let* state = init_with_tx_rollup ~protocol in
+      let* state = init_with_tx_rollup ~protocol () in
       let batch = "" in
       let* () = submit_batch_and_bake ~batch state in
       unit
@@ -189,7 +196,7 @@ module Regressions = struct
         ~tags:["tx_rollup"; "batch"; "client"]
         ~protocols
       @@ fun protocol ->
-      let* state = init_with_tx_rollup ~protocol in
+      let* state = init_with_tx_rollup ~protocol () in
       (* The constant comes from the default parameters of the protocol. *)
       let limit = 5000 in
       let batch = String.make limit 'b' in
