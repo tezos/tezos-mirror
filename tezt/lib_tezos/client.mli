@@ -863,7 +863,7 @@ val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
 module Tx_rollup : sig
   (** Run [tezos-client originate tx rollup from <src>]. *)
-  val originate_tx_rollup :
+  val originate :
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->

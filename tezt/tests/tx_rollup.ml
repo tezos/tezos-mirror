@@ -57,9 +57,7 @@ module Regressions = struct
     (* We originate a dumb rollup to be able to generate a paths for
        tx_rollups related RPCs. *)
     let*! rollup =
-      Client.Tx_rollup.originate_tx_rollup
-        ~src:Constant.bootstrap1.public_key_hash
-        client
+      Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
     in
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node 2 in
@@ -251,9 +249,7 @@ let test_submit_batches_in_several_blocks ~protocols =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
   let*! rollup =
-    Client.Tx_rollup.originate_tx_rollup
-      ~src:Constant.bootstrap1.public_key_hash
-      client
+    Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
   in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
@@ -331,9 +327,7 @@ let test_submit_from_originated_source ~protocols =
   let* _ = Node.wait_for_level node 2 in
   (* We originate a tx_rollup using an implicit account *)
   let*! rollup =
-    Client.Tx_rollup.originate_tx_rollup
-      ~src:Constant.bootstrap1.public_key_hash
-      client
+    Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
   in
   let* () = Client.bake_for client in
   let batch = "tezos" in

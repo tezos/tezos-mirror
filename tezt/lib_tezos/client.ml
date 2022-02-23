@@ -1123,7 +1123,7 @@ let sign_block client block_hex ~delegate =
   spawn_sign_block client block_hex ~delegate |> Process.check_and_read_stdout
 
 module Tx_rollup = struct
-  let originate_tx_rollup ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
+  let originate ?(wait = "none") ?(burn_cap = Tez.of_int 9_999_999)
       ?(storage_limit = 60_000) ~src client =
     let process =
       spawn_command
