@@ -17,9 +17,9 @@
   tezos-validation
   tezos-protocol-updater
   tezos-validator)
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_base.TzPervasives
    -open Tezos_context
    -open Tezos_stdlib_unix

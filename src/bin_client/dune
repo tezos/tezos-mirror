@@ -101,9 +101,9 @@
   (select void_for_linking-tezos-protocol-plugin-alpha from
    (tezos-protocol-plugin-alpha -> void_for_linking-tezos-protocol-plugin-alpha.empty)
    (-> void_for_linking-tezos-protocol-plugin-alpha.empty)))
+ (link_flags (:standard -linkall))
  (flags
   (:standard
-   -linkall
    -open Tezos_base.TzPervasives
    -open Tezos_rpc_http_client
    -open Tezos_stdlib_unix
