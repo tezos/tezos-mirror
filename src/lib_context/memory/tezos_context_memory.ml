@@ -23,56 +23,10 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Context comes with two variants: [Context] and [Context_binary] with
-    different tradeoffs.
+(** See [src/lib_context/tezos_context.ml] for some information. *)
 
-    Both have different Merkle tree representations (i.e. when presented the
-    same data, they don't produce the same hashes).
+(** Variant of [Tezos_context.Context_binary] purely in-memory. *)
+module Context_binary = Context.Make (Tezos_context_encoding.Context_binary)
 
-    [lib_context] represents directories as a structured tree of inodes, instead
-    of a flat list of files, to get efficient copy-on-write and optimised read
-    patterns.
-
-    The context variants differ by the branching factors used for these inode
-    trees:
-
-    - [Context] uses a branching factor of 32;
-    - [Context_binary] uses a branching factor of 2.
-
-    To represent a large directory, [Context] uses less but larger inodes than
-    [Context_binary].
-
-    As persisting inodes on disk have an overhead (i.e. the serialisation of an
-    inode is prefixed by its 32 byte hash), [Context] is thus optimised for
-    storing a large quantity of data on disk.
-
-    On the opposite, as the inodes in Merkle proofs contain the hashes of the
-    shallow siblings, [Context_binary] is thus optimised for producing smaller
-    Merkle proofs. *)
-
-module Context_binary = struct
-  type error +=
-    | Cannot_create_file = Context.Cannot_create_file
-    | Cannot_open_file = Context.Cannot_open_file
-    | Cannot_find_protocol = Context.Cannot_find_protocol
-    | Suspicious_file = Context.Suspicious_file
-
-  include Context.Make (Tezos_context_encoding.Context_binary)
-end
-
-(** The context of a tezos node. Persisted to disk. *)
-module Context = struct
-  type error +=
-    | Cannot_create_file = Context.Cannot_create_file
-    | Cannot_open_file = Context.Cannot_open_file
-    | Cannot_find_protocol = Context.Cannot_find_protocol
-    | Suspicious_file = Context.Suspicious_file
-
-  include Context.Make (Tezos_context_encoding.Context)
-end
-
-module Context_dump = Context_dump
-
-module Internal_for_tests = struct
-  module Utils = Utils
-end
+(** Variant of [Tezos_context.Context] purely in-memory. *)
+module Context = Context.Make (Tezos_context_encoding.Context)
