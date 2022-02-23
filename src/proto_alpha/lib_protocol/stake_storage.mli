@@ -26,22 +26,6 @@
 (** This library provides basic operations (accessors and setters) on
     staking tokens. *)
 
-module Delegate_sampler_state : sig
-  val init :
-    Raw_context.t ->
-    Cycle_repr.t ->
-    Storage.Delegate_sampler_state.value ->
-    Raw_context.t tzresult Lwt.t
-
-  val get :
-    Raw_context.t ->
-    Cycle_repr.t ->
-    Storage.Delegate_sampler_state.value tzresult Lwt.t
-
-  val remove_existing :
-    Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-end
-
 val remove_stake :
   Raw_context.t ->
   Signature.Public_key_hash.t ->
@@ -65,26 +49,10 @@ val get_staking_balance :
 
 val snapshot : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
-val compute_snapshot_index :
-  Raw_context.t -> Cycle_repr.t -> max_snapshot_index:int -> int tzresult Lwt.t
-
-val select_distribution_for_cycle_do_not_call_except_for_migration :
-  Raw_context.t ->
-  Cycle_repr.t ->
-  (Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t) ->
-  Raw_context.t tzresult Lwt.t
-
-val clear_cycle : Raw_context.t -> Cycle_repr.t -> Raw_context.t tzresult Lwt.t
-
-val init_first_cycles :
-  Raw_context.t ->
-  (Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t) ->
-  Raw_context.t tzresult Lwt.t
-
+(** [fold ctxt ~f ~order init] folds [f] on the list of active delegates with at
+    least one roll. The folding process starts with [init]. Each element of the
+    list is a pair [pkh, stake], where [pkh] is the public key hash of the
+    delegate and [stake] is the staking balance of the delegate. *)
 val fold :
   Raw_context.t ->
   f:(Signature.Public_key_hash.t * Tez_repr.t -> 'a -> 'a tzresult Lwt.t) ->
@@ -92,12 +60,30 @@ val fold :
   'a ->
   'a tzresult Lwt.t
 
-val select_new_distribution_at_cycle_end :
+(** [fold_snapshot ctxt ~index ~f ~init] folds [f] on the list of active
+    delegates with at least one roll for the given snapshot [index]. The folding
+    process starts with [init]. Each element of the list is a pair [pkh, stake],
+    where [pkh] is the public key hash of the delegate and [stake] is the staking
+    balance of the delegate for the given snapshot [index]. *)
+val fold_snapshot :
   Raw_context.t ->
-  new_cycle:Cycle_repr.t ->
-  (Raw_context.t ->
-  Signature.Public_key_hash.t ->
-  Signature.Public_key.t tzresult Lwt.t) ->
+  index:int ->
+  f:(Signature.Public_key_hash.t * Tez_repr.t -> 'a -> 'a tzresult Lwt.t) ->
+  init:'a ->
+  'a tzresult Lwt.t
+
+(** [max_snapshot_index ctxt] returns the index of the last snapshot taken of
+    staking balances and active delegates. *)
+val max_snapshot_index : Raw_context.t -> int tzresult Lwt.t
+
+(** [set_selected_distribution_for_cycle ctxt cycle distrib total_stake] saves
+    the selected distribution [distrib] of the [total_stake] for the given
+    [cycle]. *)
+val set_selected_distribution_for_cycle :
+  Raw_context.t ->
+  Cycle_repr.t ->
+  (Signature.public_key_hash * Tez_repr.t) list ->
+  Tez_repr.t ->
   Raw_context.t tzresult Lwt.t
 
 val clear_at_cycle_end :
@@ -132,16 +118,3 @@ val prepare_stake_distribution : Raw_context.t -> Raw_context.t tzresult Lwt.t
     active stake at [cycle] from [ctxt]. *)
 val get_total_active_stake :
   Raw_context.t -> Cycle_repr.t -> Tez_repr.t tzresult Lwt.t
-
-(** [sampler_for_cycle ctxt cycle] reads the sampler for [cycle] from
-    [ctxt] if it has been previously inited. Otherwise it initializes
-    the sampler and caches it in [ctxt] with
-    [Raw_context.set_sampler_for_cycle]. *)
-val sampler_for_cycle :
-  Raw_context.t ->
-  Cycle_repr.t ->
-  (Raw_context.t
-  * Seed_repr.seed
-  * (Signature.public_key * Signature.public_key_hash) Sampler.t)
-  tzresult
-  Lwt.t

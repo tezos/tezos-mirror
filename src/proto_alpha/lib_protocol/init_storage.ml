@@ -227,8 +227,7 @@ let prepare_first_block ctxt ~typecheck ~level ~timestamp =
         param.bootstrap_accounts
         param.bootstrap_contracts
       >>=? fun (ctxt, bootstrap_balance_updates) ->
-      Stake_storage.init_first_cycles ctxt Delegate_storage.pubkey
-      >>=? fun ctxt ->
+      Delegate_storage.init_first_cycles ctxt >>=? fun ctxt ->
       let cycle = (Raw_context.current_level ctxt).cycle in
       Delegate_storage.freeze_deposits_do_not_call_except_for_migration
         ~new_cycle:cycle
