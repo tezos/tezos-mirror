@@ -138,6 +138,9 @@ type parametric = {
      commitment from the context. *)
   tx_rollup_withdraw_period : int;
   tx_rollup_max_unfinalized_levels : int;
+  (* the maximum number of messages in an inbox.  This bounds the
+     size of a commitment. *)
+  tx_rollup_max_messages_per_inbox : int;
   sc_rollup_enable : bool;
   sc_rollup_origination_size : int;
 }

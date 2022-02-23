@@ -178,6 +178,10 @@ let tx_rollup_max_unfinalized_levels c =
   let constants = Raw_context.constants c in
   constants.tx_rollup_max_unfinalized_levels
 
+let tx_rollup_max_messages_per_inbox c =
+  let constants = Raw_context.constants c in
+  constants.tx_rollup_max_messages_per_inbox
+
 let ratio_of_frozen_deposits_slashed_per_double_endorsement c =
   let constants = Raw_context.constants c in
   constants.ratio_of_frozen_deposits_slashed_per_double_endorsement
