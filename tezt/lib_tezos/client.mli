@@ -861,61 +861,42 @@ val sign_block : t -> string -> delegate:string -> string Lwt.t
 (** Same as [sign_block], but do not wait for the process to exit. *)
 val spawn_sign_block : t -> string -> delegate:string -> Process.t
 
-(** Run [tezos-client originate tx rollup from <src>]. *)
-val originate_tx_rollup :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  ?storage_limit:int ->
-  src:string ->
-  t ->
-  string Lwt.t
+module Tx_rollup : sig
+  (** Run [tezos-client originate tx rollup from <src>]. *)
+  val originate :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    src:string ->
+    t ->
+    string Process.runnable
 
-(** Same as [originate_tx_rollup], but do not wait for the process to exit. *)
-val spawn_originate_tx_rollup :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  ?storage_limit:int ->
-  src:string ->
-  t ->
-  Process.t
+  (** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
+  val submit_batch :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    content:string ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Process.runnable
 
-(** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
-val submit_tx_rollup_batch :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  ?storage_limit:int ->
-  ?hooks:Process.hooks ->
-  content:string ->
-  rollup:string ->
-  src:string ->
-  t ->
-  unit Lwt.t
-
-(** Same as [submit_tx_rollup_batch], but do not wait for the process to exit. *)
-val spawn_submit_tx_rollup_batch :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  ?storage_limit:int ->
-  ?hooks:Process.hooks ->
-  content:string ->
-  rollup:string ->
-  src:string ->
-  t ->
-  Process.t
-
-(** Run [tezos-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
-val submit_tx_rollup_commitment :
-  ?wait:string ->
-  ?burn_cap:Tez.t ->
-  ?storage_limit:int ->
-  ?hooks:Process.hooks ->
-  level:int ->
-  roots:string list ->
-  predecessor:string option ->
-  rollup:string ->
-  src:string ->
-  t ->
-  unit Lwt.t
+  (** Run [tezos-client submit tx rollup commitment <content> to <tx_rollup> from <src>]. *)
+  val submit_commitment :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    level:int ->
+    roots:string list ->
+    predecessor:string option ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Process.runnable
+end
 
 (** Run [tezos-client show voting period] and return the period name. *)
 val show_voting_period : ?endpoint:endpoint -> t -> string Lwt.t

@@ -865,7 +865,7 @@ module Tx_rollup : sig
     ?block:string ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/tx_rollup/[tx_rollup_id]/inbox *)
   val get_inbox :
@@ -875,17 +875,7 @@ module Tx_rollup : sig
     ?block:string ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
-
-  (** Same as [get_inbox], but do not wait for the process to exit. *)
-  val spawn_get_inbox :
-    ?endpoint:Client.endpoint ->
-    ?hooks:Process.hooks ->
-    ?chain:string ->
-    ?block:string ->
-    rollup:string ->
-    Client.t ->
-    Process.t
+    JSON.t Process.runnable
 
   (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/commitment *)
   val get_commitment :
@@ -896,7 +886,7 @@ module Tx_rollup : sig
     ?offset:int ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
+    JSON.t Process.runnable
 end
 
 module Sc_rollup : sig

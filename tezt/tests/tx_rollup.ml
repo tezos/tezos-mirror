@@ -56,8 +56,8 @@ module Regressions = struct
     in
     (* We originate a dumb rollup to be able to generate a paths for
        tx_rollups related RPCs. *)
-    let* rollup =
-      Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
+    let*! rollup =
+      Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
     in
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node 2 in
@@ -72,12 +72,12 @@ module Regressions = struct
       ~protocols
     @@ fun protocol ->
     let* {node = _; client; rollup} = init_with_tx_rollup ~protocol in
-    let* _state = Rollup.get_state ~hooks ~rollup client in
+    let*! _state = Rollup.get_state ~hooks ~rollup client in
     return ()
 
   let submit_batch ~batch {rollup; client; node} =
-    let* () =
-      Client.submit_tx_rollup_batch
+    let*! () =
+      Client.Tx_rollup.submit_batch
         ~hooks
         ~content:batch
         ~rollup
@@ -103,12 +103,12 @@ module Regressions = struct
     (* The content of the batch does not matter for the regression test. *)
     let batch = "blob" in
     let* () = submit_batch ~batch state in
-    let* _state = Rollup.get_inbox ~hooks ~rollup client in
+    let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
     unit
 
   let submit_commitment ~level ~roots ~predecessor {rollup; client; node} =
-    let* () =
-      Client.submit_tx_rollup_commitment
+    let*! () =
+      Client.Tx_rollup.submit_commitment
         ~hooks
         ~level
         ~roots
@@ -155,7 +155,7 @@ module Regressions = struct
         state
     in
     let offset = Node.get_level node - batch_level in
-    let* _state =
+    let*! _commitment =
       Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
     in
     unit
@@ -175,19 +175,22 @@ module Regressions = struct
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let invalid_address = "this is an invalid tx rollup address" in
-      let* () =
-        Client.spawn_submit_tx_rollup_batch
+      let*? process =
+        Client.Tx_rollup.submit_batch
           ~hooks
           ~content:""
           ~rollup:invalid_address
           ~src:Constant.bootstrap1.public_key_hash
           client
-        |> Process.check_error
-             ~exit_code:1
-             ~msg:
-               (rex
-                  ("Parameter '" ^ invalid_address
-                 ^ "' is an invalid tx rollup address"))
+      in
+      let* () =
+        Process.check_error
+          ~exit_code:1
+          ~msg:
+            (rex
+               ("Parameter '" ^ invalid_address
+              ^ "' is an invalid tx rollup address"))
+          process
       in
       unit
   end
@@ -207,7 +210,10 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
   let* () =
     Lwt_list.iter_p
       (fun (content, src, _) ->
-        Client.submit_tx_rollup_batch ~hooks ~content ~rollup ~src client)
+        let*! () =
+          Client.Tx_rollup.submit_batch ~hooks ~content ~rollup ~src client
+        in
+        unit)
       batches
   in
   let* () = Client.bake_for client in
@@ -224,7 +230,7 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
         contents = List.map (fun (_, _, batch) -> batch) batches;
       }
   in
-  let* inbox = Rollup.get_inbox ~hooks ~rollup client in
+  let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
   Check.(
     ((inbox = expected_inbox)
        ~error_msg:"Unpexected inbox. Got: %L. Expected: %R.")
@@ -242,15 +248,15 @@ let test_submit_batches_in_several_blocks ~protocols =
   let* (node, client) =
     Client.init_with_protocol ~parameter_file `Client ~protocol ()
   in
-  let* rollup =
-    Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
+  let*! rollup =
+    Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
   in
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
   (* We check the rollup exists by trying to fetch its state. Since it
      is a regression test, we can detect changes to this default
      state. *)
-  let* state = Rollup.get_state ~hooks ~rollup client in
+  let*! state = Rollup.get_state ~hooks ~rollup client in
   let expected_state =
     Rollup.{burn_per_byte = 0; inbox_ema = 0; last_inbox_level = None}
   in
@@ -258,15 +264,14 @@ let test_submit_batches_in_several_blocks ~protocols =
     Rollup.Check.state
     ~error_msg:"Unexpected state. Got: %L. Expected: %R." ;
   let batch = "tezos" in
-  let* () =
-    Client.submit_tx_rollup_batch
+  let*! () =
+    Client.Tx_rollup.submit_batch
       ~hooks
       ~content:batch
       ~rollup
       ~src:Constant.bootstrap1.public_key_hash
       client
   in
-
   let batch1 = "tezos" in
   let batch2 = "tx_rollup" in
   let batch3 = "layer-2" in
@@ -285,17 +290,14 @@ let test_submit_batches_in_several_blocks ~protocols =
         "M21tdhc2Wn76n164oJvyKW4JVZsDSDeuDsbLgp61XZWtrXjL5WA" );
     ]
   in
-
   (* Let’s try once and see if everything goes as expected *)
   let* () =
     submit_three_batches_and_check_size ~rollup node client submission 3
   in
-
   (* Let’s try to see if we can submit three more batches in the next level *)
   let* () =
     submit_three_batches_and_check_size ~rollup node client submission 3
   in
-
   unit
 
 let test_submit_from_originated_source ~protocols =
@@ -324,23 +326,25 @@ let test_submit_from_originated_source ~protocols =
   let* () = Client.bake_for client in
   let* _ = Node.wait_for_level node 2 in
   (* We originate a tx_rollup using an implicit account *)
-  let* rollup =
-    Client.originate_tx_rollup ~src:Constant.bootstrap1.public_key_hash client
+  let*! rollup =
+    Client.Tx_rollup.originate ~src:Constant.bootstrap1.public_key_hash client
   in
   let* () = Client.bake_for client in
   let batch = "tezos" in
   (* Finally, we submit a batch to the tx_rollup from an originated contract *)
-  let* () =
-    Client.spawn_submit_tx_rollup_batch
+  let*? process =
+    Client.Tx_rollup.submit_batch
       ~hooks
       ~content:batch
       ~rollup
       ~src:originated_contract
       client
-    |> Process.check_error
-         ~exit_code:1
-         ~msg:
-           (rex "Only implicit accounts can submit transaction rollup batches")
+  in
+  let* () =
+    Process.check_error
+      ~exit_code:1
+      ~msg:(rex "Only implicit accounts can submit transaction rollup batches")
+      process
   in
   unit
 

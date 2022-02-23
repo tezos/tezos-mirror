@@ -33,10 +33,10 @@ module Tx_rollup : sig
   type inbox = {cumulated_size : int; contents : string list}
 
   val get_state :
-    ?hooks:Process.hooks -> rollup:string -> Client.t -> state Lwt.t
+    ?hooks:Process.hooks -> rollup:string -> Client.t -> state Process.runnable
 
   val get_inbox :
-    ?hooks:Process.hooks -> rollup:string -> Client.t -> inbox Lwt.t
+    ?hooks:Process.hooks -> rollup:string -> Client.t -> inbox Process.runnable
 
   val get_commitment :
     ?hooks:Process.hooks ->
@@ -44,7 +44,7 @@ module Tx_rollup : sig
     ?offset:int ->
     rollup:string ->
     Client.t ->
-    JSON.t Lwt.t
+    JSON.t Process.runnable
 
   module Check : sig
     val state : state Check.typ
