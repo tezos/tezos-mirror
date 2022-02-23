@@ -63,18 +63,6 @@ module Regressions = struct
     let* _ = Node.wait_for_level node 2 in
     return {node; client; rollup}
 
-  let rpc_state ~protocols =
-    Protocol.register_regression_test
-      ~__FILE__
-      ~output_file:"tx_rollup_rpc_state"
-      ~title:"RPC (tx_rollups, regression) - state"
-      ~tags:["tx_rollup"; "rpc"]
-      ~protocols
-    @@ fun protocol ->
-    let* {node = _; client; rollup} = init_with_tx_rollup ~protocol in
-    let*! _state = Rollup.get_state ~hooks ~rollup client in
-    return ()
-
   let submit_batch ~batch {rollup; client; node} =
     let*! () =
       Client.Tx_rollup.submit_batch
@@ -88,23 +76,6 @@ module Regressions = struct
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node (current_level + 1) in
     return ()
-
-  let rpc_inbox ~protocols =
-    Protocol.register_regression_test
-      ~__FILE__
-      ~output_file:"tx_rollup_rpc_inbox"
-      ~title:"RPC (tx_rollups, regression) - inbox"
-      ~tags:["tx_rollup"; "rpc"; "inbox"]
-      ~protocols
-    @@ fun protocol ->
-    let* ({rollup; client; node = _} as state) =
-      init_with_tx_rollup ~protocol
-    in
-    (* The content of the batch does not matter for the regression test. *)
-    let batch = "blob" in
-    let* () = submit_batch ~batch state in
-    let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
-    unit
 
   let submit_commitment ~level ~roots ~inbox_hash ~predecessor
       {rollup; client; node} =
@@ -124,43 +95,76 @@ module Regressions = struct
     let* _ = Node.wait_for_level node (current_level + 1) in
     return ()
 
-  let rpc_commitment ~protocols =
-    Protocol.register_regression_test
-      ~__FILE__
-      ~output_file:"tx_rollup_rpc_commitment"
-      ~title:"RPC (tx_rollups, regression) - commitment"
-      ~tags:["tx_rollup"; "rpc"; "commitment"]
-      ~protocols
-    @@ fun protocol ->
-    let* ({rollup; client; node} as state) = init_with_tx_rollup ~protocol in
-    (* The content of the batch does not matter for the regression test. *)
-    let batch = "blob" in
-    let* () = submit_batch ~batch state in
-    let batch_level = Node.get_level node in
+  module RPC = struct
+    let rpc_state ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_rpc_state"
+        ~title:"RPC (tx_rollup, regression) - state"
+        ~tags:["tx_rollup"; "rpc"; "state"]
+        ~protocols
+      @@ fun protocol ->
+      let* {node = _; client; rollup} = init_with_tx_rollup ~protocol in
+      let*! _state = Rollup.get_state ~hooks ~rollup client in
+      return ()
 
-    let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
+    let rpc_inbox ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_rpc_inbox"
+        ~title:"RPC (tx_rollup, regression) - inbox"
+        ~tags:["tx_rollup"; "rpc"; "inbox"]
+        ~protocols
+      @@ fun protocol ->
+      let* ({rollup; client; node = _} as state) =
+        init_with_tx_rollup ~protocol
+      in
+      (* The content of the batch does not matter for the regression test. *)
+      let batch = "blob" in
+      let* () = submit_batch ~batch state in
+      let*! _inbox = Rollup.get_inbox ~hooks ~rollup client in
+      unit
 
-    let* () = Client.bake_for client in
+    let rpc_commitment ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_rpc_commitment"
+        ~title:"RPC (tx_rollup, regression) - commitment"
+        ~tags:["tx_rollup"; "rpc"; "commitment"]
+        ~protocols
+      @@ fun protocol ->
+      let* ({rollup; client; node} as state) = init_with_tx_rollup ~protocol in
+      (* The content of the batch does not matter for the regression test. *)
+      let batch = "blob" in
+      let* () = submit_batch ~batch state in
+      let batch_level = Node.get_level node in
+      let*! inbox = Rollup.get_inbox ~rollup client in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
+         we introduce two bakes to ensure the block is finalised. This
+         should be removed once we do not rely on Tenderbake anymore. *)
+      let* () = Client.bake_for client in
+      let* () = Client.bake_for client in
+      (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
-       At the same time we add actual Irmin Merkle roots for
-       commitments, we will ensure the root is indeed the root of the
-       previous inbox. I don't know yet how we will be able to do that
-       yes, something is missing. *)
-    let* () =
-      submit_commitment
-        ~level:batch_level
-        ~roots:["root"]
-        ~inbox_hash:inbox.hash
-        ~predecessor:None
-        state
-    in
-    let offset = Node.get_level node - batch_level in
-    let*! _commitment =
-      Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
-    in
-    unit
+         At the same time we remove the dependency to Tenderbake for
+         commitment, we will ensure the root is indeed the root of the
+         previous inbox. I don't know yet how we will be able to do that
+         yes, something is missing. *)
+      let* () =
+        submit_commitment
+          ~level:batch_level
+          ~roots:["root"]
+          ~inbox_hash:inbox.hash
+          ~predecessor:None
+          state
+      in
+      let offset = Node.get_level node - batch_level in
+      let*! _commitment =
+        Rollup.get_commitment ~hooks ~block:"head" ~offset ~rollup client
+      in
+      unit
+  end
 
   module Limits = struct
     let submit_empty_batch ~protocols =
@@ -213,9 +217,9 @@ module Regressions = struct
   end
 
   let register ~protocols =
-    rpc_state ~protocols ;
-    rpc_inbox ~protocols ;
-    rpc_commitment ~protocols ;
+    RPC.rpc_state ~protocols ;
+    RPC.rpc_inbox ~protocols ;
+    RPC.rpc_commitment ~protocols ;
     Limits.submit_empty_batch ~protocols ;
     Fail.client_submit_batch_invalid_rollup_address ~protocols
 end
