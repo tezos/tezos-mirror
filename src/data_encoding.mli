@@ -233,7 +233,7 @@ module Encoding : sig
       If [max_length] is passed and the encoding of elements has fixed
       size, a {!check_size} is automatically added for earlier rejection.
 
-      @raise Invalid_argument if the inner encoding is also variable. *)
+      @raise Invalid_argument if the inner encoding is variable. *)
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
   (** Provide a transformer from one encoding to a different one.
@@ -688,6 +688,73 @@ let encoding_t =
 
         @raise Invalid_argument if [n <= 0]. *)
     val add_padding : 'a encoding -> int -> 'a encoding
+
+    (** [list n e] is an encoding for lists of exactly [n] elements. If a list
+        of more or fewer elements is provided, then the encoding fails with the
+        [write_error List_invalid_length]. For decoding, it can fail with
+        [read_error Not_enough_data] or [read_error Extra_bytes], or it may
+        cause other failures further down the line when the AST traversal
+        becomes out-of-sync with the underlying byte-stream traversal.
+
+        The difference of the errors being used when encoding and decoding is
+        because when encoding we have access to the list and we can check the
+        actual length, whereas when decoding we only see bytes, sometimes too
+        many, sometimes not enough.
+
+        This encoding has a narrow set of possible applications because it is
+        very restrictive. Still, it can to:
+        - mirror static guarantees about the length of some lists,
+        - special-case some common lengths of typical input in a union (see
+          example below),
+        - other ends.
+
+{[
+type expr =
+  | Op of string * expr list (* most commonly 1 or 2 operands *)
+  | Literal of string
+let expr_encoding =
+  mu "expr" (fun e ->
+    union [
+      case ~title:"op-nonary" (Tag 0)
+        string
+        (function Op (op, []) -> Some op | _ -> None)
+        (fun op -> Op (op, []));
+      case ~title:"op-unary" (Tag 1)
+        (tup2 string (Fixed.list 1 e))
+        (function Op (op, ([_]) as operand) -> Some (op, operand) | _ -> None)
+        (fun (op, operand) -> Op (op, operand));
+      case ~title:"op-binary" (Tag 2)
+        (tup2 string (Fixed.list 2 e))
+        (function Op (op, ([_;_]) as operand) -> Some (op, operand) | _ -> None)
+        (fun (op, operand) -> Op (op, operand));
+      case ~title:"op-moreary" (Tag 3)
+        (tup2 string (list e))
+        (function Op (op, operand) -> Some (op, operand) | _ -> None)
+        (fun (op, operand) -> Op (op, operand));
+      case ~title:"literal" (Tag 4)
+        string
+        (function Literal l -> Some l | _ -> None)
+        (fun l -> Literal l);
+        ]
+  )
+}]
+
+        Interestingly, the cases for known lengths can be generated
+        programmatically.
+
+        @raise Invalid_argument if the argument [n] is less or equal to zero.
+
+        @raise Invalid_argument if the argument [e] is a [`Variable]-size
+        encoding or a zero-byte encoding. *)
+    val list : int -> 'a encoding -> 'a list encoding
+
+    (** See [list] above.
+
+        @raise Invalid_argument if the argument [n] is less or equal to zero.
+
+        @raise Invalid_argument if the argument [e] is a [`Variable]-size
+        encoding or a zero-byte encoding. *)
+    val array : int -> 'a encoding -> 'a array encoding
   end
 
   (** Create encodings that produce data of a variable length when binary encoded.
@@ -1067,8 +1134,8 @@ module Binary : sig
     | Invalid_bytes_length of {expected : int; found : int}
     | Invalid_string_length of {expected : int; found : int}
     | Invalid_natural
-    | List_too_long
-    | Array_too_long
+    | List_invalid_length
+    | Array_invalid_length
     | Exception_raised_in_user_function of string
 
   val pp_write_error : Format.formatter -> write_error -> unit
@@ -1077,7 +1144,10 @@ module Binary : sig
 
   exception Write_error of write_error
 
-  (** Compute the expected length of the binary representation of a value *)
+  (** Compute the expected length of the binary representation of a value.
+
+      @raise Write_error in case some size/length invariants are broken.
+   *)
   val length : 'a Encoding.t -> 'a -> int
 
   (** Returns the size of the binary representation that the given

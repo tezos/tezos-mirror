@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -22,6 +23,8 @@
 (* DEALINGS IN THE SOFTWARE.                                                 *)
 (*                                                                           *)
 (*****************************************************************************)
+
+type limit = No_limit | At_most of int | Exactly of int
 
 (** This is for use *within* the data encoding library only. Instead, you should
     use the corresponding module intended for use: {!Data_encoding.Encoding}. *)
@@ -76,8 +79,8 @@ type 'a desc =
       (** The [int] indicates how many null bytes should be added on the right
           of the value. *)
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : int option * 'a t -> 'a array desc
-  | List : int option * 'a t -> 'a list desc
+  | Array : {length_limit : limit; elts : 'a t} -> 'a array desc
+  | List : {length_limit : limit; elts : 'a t} -> 'a list desc
   | Obj : 'a field -> 'a desc  (** An object with one field *)
   | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
       (** Two objects merged *)
@@ -236,6 +239,10 @@ module Fixed : sig
   val bytes : int -> Bytes.t encoding
 
   val add_padding : 'a encoding -> int -> 'a encoding
+
+  val list : int -> 'a encoding -> 'a list encoding
+
+  val array : int -> 'a encoding -> 'a array encoding
 end
 
 module Variable : sig

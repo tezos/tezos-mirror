@@ -49,7 +49,7 @@ and layout =
   | Bytes
   | String
   | Enum of Binary_size.integer * string
-  | Seq of layout * int option (* For arrays and lists *)
+  | Seq of layout * Encoding.limit (* For arrays and lists *)
   | Ref of string
   | Padding
 
@@ -140,8 +140,9 @@ module Printer_ast = struct
     | Seq (data, len) -> (
         Format.fprintf ppf "sequence of " ;
         (match len with
-        | None -> ()
-        | Some len -> Format.fprintf ppf "at most %d " len) ;
+        | No_limit -> ()
+        | At_most len -> Format.fprintf ppf "at most %d " len
+        | Exactly len -> Format.fprintf ppf "exactly %d " len) ;
         match data with
         | Ref reference -> Format.fprintf ppf "$%s" reference
         | _ -> pp_layout ppf data)
@@ -385,6 +386,29 @@ module Encoding = struct
   let integer_extended_encoding =
     string_enum (("Int64", `Int64) :: ("Int32", `Int32) :: integer_cases)
 
+  let limit_enc =
+    union
+      [
+        case
+          ~title:"No_limit"
+          (Tag 0)
+          (obj1 (req "kind" (constant "no-limit")))
+          (function No_limit -> Some () | _ -> None)
+          (fun () -> No_limit);
+        case
+          ~title:"At_most"
+          (Tag 1)
+          (obj2 (req "kind" (constant "at-most")) (req "at_most" int31))
+          (function At_most i -> Some ((), i) | _ -> None)
+          (fun ((), i) -> At_most i);
+        case
+          ~title:"Exactly"
+          (Tag 2)
+          (obj2 (req "kind" (constant "exactly")) (req "exactly" int31))
+          (function Exactly i -> Some ((), i) | _ -> None)
+          (fun ((), i) -> Exactly i);
+      ]
+
   let layout_encoding =
     mu "layout" (fun layout ->
         union
@@ -463,7 +487,7 @@ module Encoding = struct
               (obj3
                  (req "layout" layout)
                  (req "kind" (constant "Seq"))
-                 (opt "max_length" int31))
+                 (dft "length_limit" limit_enc No_limit))
               (function
                 | Seq (layout, len) -> Some (layout, (), len) | _ -> None)
               (fun (layout, (), len) -> Seq (layout, len));

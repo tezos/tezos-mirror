@@ -280,13 +280,22 @@ let rec read_rec :
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum resume state k
   | String_enum (_, arr) -> Atom.string_enum arr resume state k
-  | Array (max_length, e) ->
-      let max_length = match max_length with Some l -> l | None -> max_int in
-      read_list Array_too_long max_length e state @@ fun (l, state) ->
-      k (Array.of_list l, state)
-  | List (max_length, e) ->
-      let max_length = match max_length with Some l -> l | None -> max_int in
-      read_list List_too_long max_length e state k
+  | Array {length_limit; elts = e} -> (
+      match length_limit with
+      | No_limit ->
+          read_list Array_too_long max_int e state @@ fun (l, state) ->
+          k (Array.of_list l, state)
+      | At_most max_length ->
+          read_list Array_too_long max_length e state @@ fun (l, state) ->
+          k (Array.of_list l, state)
+      | Exactly exact_length ->
+          read_fixed_list exact_length e state @@ fun (l, state) ->
+          k (Array.of_list l, state))
+  | List {length_limit; elts = e} -> (
+      match length_limit with
+      | No_limit -> read_list Array_too_long max_int e state k
+      | At_most max_length -> read_list Array_too_long max_length e state k
+      | Exactly exact_length -> read_fixed_list exact_length e state k)
   | Obj (Req {encoding = e; _}) -> read_rec whole e state k
   | Obj (Dft {encoding = e; _}) -> read_rec whole e state k
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
@@ -409,9 +418,10 @@ and read_variable_pair :
         read_rec true e2 state @@ fun (right, state) ->
         assert (state.remaining_bytes = Some 0) ;
         k ((left, right), state)
-  | _ -> assert false
+  | _ ->
+      (* Should be rejected by [Encoding.Kind.combine] *)
+      assert false
 
-(* Should be rejected by [Encoding.Kind.combine] *)
 and read_list :
     type a ret.
     read_error ->
@@ -430,6 +440,22 @@ and read_list :
       loop state (v :: acc) (max_length - 1)
   in
   loop state [] max_length
+
+and read_fixed_list :
+    type a ret.
+    int -> a Encoding.t -> state -> (a list * state -> ret status) -> ret status
+    =
+ fun exact_length e state k ->
+  let rec loop state acc exact_length =
+    if exact_length = 0 then k (List.rev acc, state)
+    else
+      let size = remaining_bytes state in
+      if size = 0 then raise_read_error Not_enough_data
+      else
+        read_rec false e state @@ fun (v, state) ->
+        loop state (v :: acc) (exact_length - 1)
+  in
+  loop state [] exact_length
 
 let read_rec e state k =
   try read_rec false e state k with

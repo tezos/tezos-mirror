@@ -206,13 +206,19 @@ let rec read_rec : type ret. ret Encoding.t -> state -> ret =
   | RangedInt {minimum; maximum} -> Atom.ranged_int ~minimum ~maximum state
   | RangedFloat {minimum; maximum} -> Atom.ranged_float ~minimum ~maximum state
   | String_enum (_, arr) -> Atom.string_enum arr state
-  | Array (max_length, e) ->
-      let max_length = match max_length with Some l -> l | None -> max_int in
-      let l = read_list Array_too_long max_length e state in
+  | Array {length_limit; elts = e} ->
+      let l =
+        match length_limit with
+        | No_limit -> read_list Array_too_long max_int e state
+        | At_most max_length -> read_list Array_too_long max_length e state
+        | Exactly exact_length -> read_fixed_list exact_length e state
+      in
       Array.of_list l
-  | List (max_length, e) ->
-      let max_length = match max_length with Some l -> l | None -> max_int in
-      read_list List_too_long max_length e state
+  | List {length_limit; elts = e} -> (
+      match length_limit with
+      | No_limit -> read_list List_too_long max_int e state
+      | At_most max_length -> read_list List_too_long max_length e state
+      | Exactly exact_length -> read_fixed_list exact_length e state)
   | Obj (Req {encoding = e; _}) -> read_rec e state
   | Obj (Dft {encoding = e; _}) -> read_rec e state
   | Obj (Opt {kind = `Dynamic; encoding = e; _}) ->
@@ -327,6 +333,17 @@ and read_list : type a. read_error -> int -> a Encoding.t -> state -> a list =
       loop (max_length - 1) (v :: acc)
   in
   loop max_length []
+
+and read_fixed_list : type a. int -> a Encoding.t -> state -> a list =
+ fun exact_length e state ->
+  let rec loop exact_length acc =
+    if exact_length = 0 then List.rev acc
+    else if state.remaining_bytes = 0 then raise_read_error Not_enough_data
+    else
+      let v = read_rec e state in
+      loop (exact_length - 1) (v :: acc)
+  in
+  loop exact_length []
 
 (** ******************** *)
 

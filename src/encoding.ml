@@ -24,6 +24,8 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+type limit = No_limit | At_most of int | Exactly of int
+
 module Kind = struct
   type t = [`Fixed of int | `Dynamic | `Variable]
 
@@ -107,8 +109,8 @@ type 'a desc =
   | String : Kind.length -> string desc
   | Padded : 'a t * int -> 'a desc
   | String_enum : ('a, string * int) Hashtbl.t * 'a array -> 'a desc
-  | Array : int option * 'a t -> 'a array desc
-  | List : int option * 'a t -> 'a list desc
+  | Array : {length_limit : limit; elts : 'a t} -> 'a array desc
+  | List : {length_limit : limit; elts : 'a t} -> 'a list desc
   | Obj : 'a field -> 'a desc
   | Objs : {kind : Kind.t; left : 'a t; right : 'b t} -> ('a * 'b) desc
   | Tup : 'a t -> 'a desc
@@ -242,7 +244,17 @@ and classify_desc : type a. a desc -> Kind.t =
   | Mu {kind; _} -> (kind :> Kind.t)
   (* Variable *)
   | Ignore -> `Fixed 0
+  | Array {length_limit = Exactly l; elts} -> (
+      match classify_desc elts.encoding with
+      | `Fixed e -> `Fixed (l * e)
+      | `Dynamic -> `Dynamic
+      | `Variable -> assert false)
   | Array _ -> `Variable
+  | List {length_limit = Exactly l; elts} -> (
+      match classify_desc elts.encoding with
+      | `Fixed e -> `Fixed (l * e)
+      | `Dynamic -> `Dynamic
+      | `Variable -> assert false)
   | List _ -> `Variable
   (* Recursive *)
   | Obj (Req {encoding; _}) -> classify encoding
@@ -255,28 +267,15 @@ and classify_desc : type a. a desc -> Kind.t =
   | Check_size {encoding; _} -> classify encoding
   | Delayed f -> classify (f ())
 
-let make ?json_encoding encoding = {encoding; json_encoding}
-
-module Fixed = struct
-  let string n =
-    if n <= 0 then
-      invalid_arg
-        "Cannot create a string encoding of negative or null fixed length." ;
-    make @@ String (`Fixed n)
-
-  let bytes n =
-    if n <= 0 then
-      invalid_arg
-        "Cannot create a byte encoding of negative or null fixed length." ;
-    make @@ Bytes (`Fixed n)
-
-  let add_padding e n =
-    if n <= 0 then
-      invalid_arg "Cannot create a padding of negative or null fixed length." ;
-    match classify e with
-    | `Fixed _ -> make @@ Padded (e, n)
-    | _ -> invalid_arg "Cannot pad non-fixed size encoding"
-end
+let check_not_variable name e =
+  match classify e with
+  | `Variable ->
+      Printf.ksprintf
+        invalid_arg
+        "Cannot insert variable length element in %s. You should wrap the \
+         contents using Data_encoding.dynamic_size."
+        name
+  | `Dynamic | `Fixed _ -> ()
 
 (* [Mu_visited] is intended for internal use only. It is used to record visit
    to recursion nodes ([Mu]) to avoid infinite recursion. See [is_zeroable] for
@@ -331,8 +330,16 @@ let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
   | Padded _ -> false
   | String_enum _ -> false
   (* true in some cases, but in practice always protected by Dynamic *)
-  | Array _ -> true (* 0-element array *)
-  | List _ -> true (* 0-element list *)
+  | Array {length_limit = Exactly l; elts = _} ->
+      assert (l > 0) ;
+      false
+  | Array {length_limit = No_limit | At_most _; elts = _} ->
+      true (* 0-element array *)
+  | List {length_limit = Exactly l; elts = _} ->
+      assert (l > 0) ;
+      false
+  | List {length_limit = No_limit | At_most _; elts = _} ->
+      true (* 0-element list *)
   (* represented as whatever is inside: truth mostly propagates *)
   | Obj (Req {encoding = e; _}) -> is_zeroable visited e (* represented as-is *)
   | Obj (Opt {kind = `Variable; _}) -> true (* optional field omitted *)
@@ -356,38 +363,70 @@ let rec is_zeroable : type t. Mu_visited.t -> t encoding -> bool =
   (* Unscrutable: true by default *)
   | Delayed f -> is_zeroable visited (f ())
   (* Protected against zeroable *)
-  | Dynamic_size _ -> false
+  | Dynamic_size _ ->
+      (* always some data for size *)
+      false
 
 let is_zeroable e = is_zeroable Mu_visited.empty e
 
-(* always some data for size *)
+let check_not_zeroable name e =
+  if is_zeroable e then
+    Printf.ksprintf
+      invalid_arg
+      "Cannot insert potentially zero-sized element in %s."
+      name
+
+let make ?json_encoding encoding = {encoding; json_encoding}
+
+module Fixed = struct
+  let string n =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create a string encoding of negative or null fixed length." ;
+    make @@ String (`Fixed n)
+
+  let bytes n =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create a byte encoding of negative or null fixed length." ;
+    make @@ Bytes (`Fixed n)
+
+  let add_padding e n =
+    if n <= 0 then
+      invalid_arg "Cannot create a padding of negative or null fixed length." ;
+    match classify e with
+    | `Fixed _ -> make @@ Padded (e, n)
+    | _ -> invalid_arg "Cannot pad non-fixed size encoding"
+
+  let list n e =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create a list encoding of negative or null fixed length." ;
+    check_not_variable "a fixed-length list" e ;
+    check_not_zeroable "a fixed-length list" e ;
+    make @@ List {length_limit = Exactly n; elts = e}
+
+  let array n e =
+    if n <= 0 then
+      invalid_arg
+        "Cannot create an array encoding of negative or null fixed length." ;
+    check_not_variable "a fixed-length array" e ;
+    check_not_zeroable "a fixed-length array" e ;
+    make @@ Array {length_limit = Exactly n; elts = e}
+end
 
 module Variable = struct
   let string = make @@ String `Variable
 
   let bytes = make @@ Bytes `Variable
 
-  let check_not_variable name e =
-    match classify e with
-    | `Variable ->
-        Printf.ksprintf
-          invalid_arg
-          "Cannot insert variable length element in %s. You should wrap the \
-           contents using Data_encoding.dynamic_size."
-          name
-    | `Dynamic | `Fixed _ -> ()
-
-  let check_not_zeroable name e =
-    if is_zeroable e then
-      Printf.ksprintf
-        invalid_arg
-        "Cannot insert potentially zero-sized element in %s."
-        name
-
   let array ?max_length e =
     check_not_variable "an array" e ;
     check_not_zeroable "an array" e ;
-    let encoding = make @@ Array (max_length, e) in
+    let length_limit =
+      match max_length with None -> No_limit | Some l -> At_most l
+    in
+    let encoding = make @@ Array {length_limit; elts = e} in
     match (classify e, max_length) with
     | `Fixed n, Some max_length ->
         let limit = n * max_length in
@@ -397,7 +436,10 @@ module Variable = struct
   let list ?max_length e =
     check_not_variable "a list" e ;
     check_not_zeroable "a list" e ;
-    let encoding = make @@ List (max_length, e) in
+    let length_limit =
+      match max_length with None -> No_limit | Some l -> At_most l
+    in
+    let encoding = make @@ List {length_limit; elts = e} in
     match (classify e, max_length) with
     | `Fixed n, Some max_length ->
         let limit = n * max_length in

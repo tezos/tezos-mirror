@@ -174,8 +174,8 @@ let write_error_encoding =
               obj2 (req "expected" int31) (req "found" int31),
               (expected, found) )
       | Invalid_natural -> Matched (6, empty, ())
-      | List_too_long -> Matched (7, empty, ())
-      | Array_too_long -> Matched (8, empty, ())
+      | List_invalid_length -> Matched (7, empty, ())
+      | Array_invalid_length -> Matched (8, empty, ())
       | (Exception_raised_in_user_function s : write_error) ->
           Matched (9, string, s))
     [
@@ -228,16 +228,16 @@ let write_error_encoding =
         (fun () -> Invalid_natural);
       case
         (Tag 7)
-        ~title:"List too long"
+        ~title:"List too long or too short"
         empty
-        (function List_too_long -> Some () | _ -> None)
-        (fun () -> List_too_long);
+        (function List_invalid_length -> Some () | _ -> None)
+        (fun () -> List_invalid_length);
       case
         (Tag 8)
-        ~title:"Array too long"
+        ~title:"Array too long or too short"
         empty
-        (function Array_too_long -> Some () | _ -> None)
-        (fun () -> Array_too_long);
+        (function Array_invalid_length -> Some () | _ -> None)
+        (fun () -> Array_invalid_length);
       case
         (Tag 9)
         ~title:"Exception raised in user function"
@@ -268,7 +268,7 @@ let pp_write_error ppf = function
         expected
         found
   | Invalid_natural -> Format.fprintf ppf "Negative natural"
-  | List_too_long -> Format.fprintf ppf "List length limit exceeded"
-  | Array_too_long -> Format.fprintf ppf "Array length limit exceeded"
+  | List_invalid_length -> Format.fprintf ppf "List is too long or too short"
+  | Array_invalid_length -> Format.fprintf ppf "Array is too long or too short"
   | Exception_raised_in_user_function s ->
       Format.fprintf ppf "Exception raised in user function: %s" s

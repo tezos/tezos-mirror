@@ -49,8 +49,8 @@ type write_error =
   | Invalid_bytes_length of {expected : int; found : int}
   | Invalid_string_length of {expected : int; found : int}
   | Invalid_natural
-  | List_too_long
-  | Array_too_long
+  | List_invalid_length
+  | Array_invalid_length
   | Exception_raised_in_user_function of string
 
 exception Write_error of write_error

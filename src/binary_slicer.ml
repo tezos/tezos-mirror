@@ -266,13 +266,20 @@ let rec read_rec :
   | RangedFloat {minimum; maximum} ->
       Atom.ranged_float ~minimum ~maximum !!"ranged float" state
   | String_enum (_, arr) -> Atom.string_enum arr !!"enum" state
-  | Array (max_length, e) ->
-      let max_length = match max_length with Some l -> l | None -> max_int in
-      let l = read_list List_too_long max_length e ?name state in
+  | Array {length_limit; elts = e} ->
+      let l =
+        match length_limit with
+        | No_limit -> read_list Array_too_long max_int e ?name state
+        | At_most max_length ->
+            read_list Array_too_long max_length e ?name state
+        | Exactly exact_length -> read_fixed_list exact_length e ?name state
+      in
       Array.of_list l
-  | List (max_length, e) ->
-      let max_length = match max_length with Some l -> l | None -> max_int in
-      read_list Array_too_long max_length e ?name state
+  | List {length_limit; elts = e} -> (
+      match length_limit with
+      | No_limit -> read_list List_too_long max_int e ?name state
+      | At_most max_length -> read_list List_too_long max_length e ?name state
+      | Exactly exact_length -> read_fixed_list exact_length e ?name state)
   | Obj (Req {encoding = e; name; _}) -> read_rec e ~name state
   | Obj (Dft {encoding = e; name; _}) -> read_rec e ~name state
   | Obj (Opt {kind = `Dynamic; encoding = e; name; _}) ->
@@ -391,15 +398,28 @@ and read_list :
     read_error -> int -> a Encoding.t -> ?name:string -> slicer_state -> a list
     =
  fun error max_length e ?name state ->
+  let name = Option.map (fun name -> name ^ " element") name in
   let rec loop max_length acc =
     if state.remaining_bytes = 0 then List.rev acc
     else if max_length = 0 then raise error
     else
-      let name = Option.map (fun name -> name ^ " element") name in
       let v = read_rec e ?name state in
       loop (max_length - 1) (v :: acc)
   in
   loop max_length []
+
+and read_fixed_list :
+    type a. int -> a Encoding.t -> ?name:string -> slicer_state -> a list =
+ fun exact_length e ?name state ->
+  let name = Option.map (fun name -> name ^ " element") name in
+  let rec loop exact_length acc =
+    if exact_length = 0 then List.rev acc
+    else if state.remaining_bytes = 0 then raise Not_enough_data
+    else
+      let v = read_rec e ?name state in
+      loop (exact_length - 1) (v :: acc)
+  in
+  loop exact_length []
 
 (** Various entry points *)
 

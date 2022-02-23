@@ -25,6 +25,11 @@
 
 open Binary_error_types
 
+let fixed_length e =
+  match Encoding.classify e with
+  | `Fixed n -> Some n
+  | `Dynamic | `Variable -> None
+
 let n_length value =
   let bits = Z.numbits value in
   if bits = 0 then 1 else (bits + 6) / 7
@@ -75,13 +80,30 @@ let rec length : type x. x Encoding.t -> x -> int =
   | Ignore -> 0
   | Bytes `Variable -> Bytes.length value
   | String `Variable -> String.length value
-  | Array (Some max_length, _e) when Array.length value > max_length ->
-      raise (Write_error Array_too_long)
-  | Array (_, e) -> Array.fold_left (fun acc v -> length e v + acc) 0 value
-  | List (Some max_length, _e)
-    when List.compare_length_with value max_length > 0 ->
-      raise (Write_error List_too_long)
-  | List (_, e) -> List.fold_left (fun acc v -> length e v + acc) 0 value
+  | Array {length_limit; elts} -> (
+      (match length_limit with
+      | No_limit -> ()
+      | At_most max_length ->
+          if Array.length value > max_length then
+            raise (Write_error Array_invalid_length)
+      | Exactly exact_length ->
+          if Array.length value <> exact_length then
+            raise (Write_error Array_invalid_length)) ;
+      match fixed_length elts with
+      | Some s -> Array.length value * s
+      | None -> Array.fold_left (fun acc v -> length elts v + acc) 0 value)
+  | List {length_limit; elts} -> (
+      (match length_limit with
+      | No_limit -> ()
+      | At_most max_length ->
+          if List.compare_length_with value max_length > 0 then
+            raise (Write_error List_invalid_length)
+      | Exactly exact_length ->
+          if List.compare_length_with value exact_length <> 0 then
+            raise (Write_error List_invalid_length)) ;
+      match fixed_length elts with
+      | Some s -> List.length value * s
+      | None -> List.fold_left (fun acc v -> length elts v + acc) 0 value)
   | Objs {kind = `Variable; left; right} ->
       let v1, v2 = value in
       length left v1 + length right v2
@@ -111,11 +133,6 @@ let rec length : type x. x Encoding.t -> x -> int =
       if length > limit then raise (Write_error Size_limit_exceeded) ;
       length
   | Delayed f -> length (f ()) value
-
-let fixed_length e =
-  match Encoding.classify e with
-  | `Fixed n -> Some n
-  | `Dynamic | `Variable -> None
 
 let rec maximum_length : type a. a Encoding.t -> int option =
  fun e ->
@@ -158,10 +175,16 @@ let rec maximum_length : type a. a Encoding.t -> int option =
   | Ignore -> Some 0
   | Bytes `Variable -> None
   | String `Variable -> None
-  | Array (Some max_length, e) -> maximum_length e >|? fun s -> s * max_length
-  | Array (None, _) -> None
-  | List (Some max_length, e) -> maximum_length e >|? fun s -> s * max_length
-  | List (None, _) -> None
+  | Array {length_limit; elts = e} -> (
+      match length_limit with
+      | No_limit -> None
+      | At_most max_length -> maximum_length e >|? fun s -> s * max_length
+      | Exactly exact_length -> maximum_length e >|? fun s -> s * exact_length)
+  | List {length_limit; elts = e} -> (
+      match length_limit with
+      | No_limit -> None
+      | At_most max_length -> maximum_length e >|? fun s -> s * max_length
+      | Exactly exact_length -> maximum_length e >|? fun s -> s * exact_length)
   | Obj (Opt {kind = `Variable; encoding = e; _}) -> maximum_length e
   (* Variable or Dynamic we don't care for those constructors *)
   | Union {kind = `Dynamic | `Variable; tag_size; cases; _} ->
