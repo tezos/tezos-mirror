@@ -38,10 +38,6 @@ Node
   the parameters are assumed to be ``true``, making this extension
   backward-compatible (i.e. and all operations are returned).
 
-- The tezos-node configuration file parameter
-  ``shell.prevalidator.limits.max_refused_operations`` is now
-  deprecated and may be removed starting from version 13.0.
-
 - Added optional parameter ``--media-type`` and its corresponding field
   in the configuration file. It defines which format of data serialisation
   must be used for RPC requests to the node. The value can be  ``json``,
@@ -49,13 +45,6 @@ Node
 
 - Added an option ``--listen-prometheus <PORT>`` to ``tezos-node run`` to
   expose some metrics using the Prometheus format.
-
-- Fixed missing removal of replaced operation in the plugin when another better
-  one takes its place (when the mempool is full).
-
-- The output of ``tezos-client get ledger high watermark for <ledger>``
-  now also displays the high-water mark for the round, if available.
-  Rounds are introduced in Tenderbake.
 
 - Adds ``tezos-node storage head-commmit`` command to print the current
   context head commit hash to stdout.
