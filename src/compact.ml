@@ -62,14 +62,13 @@ let join_tags tags =
     @raise Write_error on any attempt to encode data in the unsupported
     subset of the input type. *)
 let conv_partial f g encoding =
-  Encoding.(
-    conv
-      (fun x ->
-        match f x with
-        | Some x -> x
-        | None -> raise Binary_error_types.(Write_error No_case_matched))
-      g
-      encoding)
+  Encoding.conv
+    (fun x ->
+      match f x with
+      | Some x -> x
+      | None -> raise Binary_error_types.(Write_error No_case_matched))
+    g
+    encoding
 
 (* ---- Compact encoding definition ----------------------------------------- *)
 
@@ -109,43 +108,47 @@ let make : type a. ?tag_size:[`Uint0 | `Uint8 | `Uint16] -> a t -> a Encoding.t
   let tag layout =
     let candidate = C.tag layout in
     if candidate >= 1 lsl C.tag_len then
-      raise @@ Invalid_argument "Compact_encoding.make: tags do not fit" ;
+      raise @@ Invalid_argument "Compact_encoding.make.tag: tags do not fit" ;
     candidate
   in
 
-  Encoding.(
-    match tag_size with
-    | `Uint0 -> (
-        (* INVARIANT: when [tag_len = 0] then either:
-           - it's void and [layouts = []], or
-           - [layouts] has a single element and [partial_encoding] is total *)
-        match C.layouts with
-        | [] -> C.json_encoding
-        | [single_layout] -> C.partial_encoding single_layout
-        | _ ->
-            invalid_arg
-              "Data_encoding.Compact.make: 0-tag encoding has more than one \
-               layout")
-    | (`Uint8 | `Uint16) as tag_size ->
-        raw_splitted
-          ~json:(Json.convert C.json_encoding)
-          ~binary:
-            (matching ~tag_size (fun x ->
-                 let layout = C.classify x in
-                 matched ~tag_size (C.tag layout) (C.partial_encoding layout) x)
-            @@ List.map
-                 (fun layout ->
-                   let tag = tag layout in
-                   (* Note: the projection function is never used. This is
-                      because [matching] uses the list of cases for decoding
-                      only, not encoding. *)
-                   case
-                     ~title:(Format.sprintf "case %d" tag)
-                     (Tag tag)
-                     (C.partial_encoding layout)
-                     (fun x -> Some x)
-                     (fun x -> x))
-                 C.layouts))
+  match tag_size with
+  | `Uint0 -> (
+      (* INVARIANT: when [tag_len = 0] then either:
+         - it's void and [layouts = []], or
+         - [layouts] has a single element and [partial_encoding] is total *)
+      match C.layouts with
+      | [] -> C.json_encoding
+      | [single_layout] -> C.partial_encoding single_layout
+      | _ ->
+          raise
+          @@ Invalid_argument
+               "Data_encoding.Compact.make: 0-tag encoding has more than one \
+                layout")
+  | (`Uint8 | `Uint16) as tag_size ->
+      Encoding.raw_splitted
+        ~json:(Json.convert C.json_encoding)
+        ~binary:
+          (Encoding.matching ~tag_size (fun x ->
+               let layout = C.classify x in
+               Encoding.matched
+                 ~tag_size
+                 (C.tag layout)
+                 (C.partial_encoding layout)
+                 x)
+          @@ List.map
+               (fun layout ->
+                 let tag = tag layout in
+                 (* Note: the projection function is never used. This is
+                    because [matching] uses the list of cases for decoding
+                    only, not encoding. *)
+                 Encoding.case
+                   ~title:(Format.sprintf "case %d" tag)
+                   (Encoding.Tag tag)
+                   (C.partial_encoding layout)
+                   (fun x -> Some x)
+                   (fun x -> x))
+               C.layouts)
 
 (* ---- Combinators --------------------------------------------------------- *)
 
@@ -176,27 +179,29 @@ let void : void t =
     let tag = refute
 
     let json_encoding =
-      Encoding.(
-        conv_with_guard refute (fun _ -> Error "void has no inhabitant") unit)
+      Encoding.conv_with_guard
+        refute
+        (fun _ -> Error "void has no inhabitant")
+        Encoding.unit
   end)
 
-type ('a, 'b, 'c) case_open = {
+type ('a, 'b, 'layout) case_open = {
   title : string;
   description : string option;
   proj : 'a -> 'b option;
   inj : 'b -> 'a;
-  compact : (module S with type input = 'b and type layout = 'c);
+  compact : (module S with type input = 'b and type layout = 'layout);
 }
 
-type ('a, 'b, 'c) case_layout_open = {
+type ('a, 'b, 'layout) case_layout_open = {
   extra_tag : int;
   proj : 'a -> 'b option;
   inj : 'b -> 'a;
-  compact : (module S with type input = 'b and type layout = 'c);
-  layout : 'c;
+  compact : (module S with type input = 'b and type layout = 'layout);
+  layout : 'layout;
 }
 
-type 'a case = Case : ('a, 'b, 'c) case_open -> 'a case [@@unboxed]
+type 'a case = Case : ('a, 'b, 'layout) case_open -> 'a case [@@unboxed]
 
 let case :
     type a b.
@@ -211,7 +216,7 @@ let case :
   Case {title; description; proj; inj; compact = (module C)}
 
 type 'a case_layout =
-  | Case_layout : ('a, 'b, 'c) case_layout_open -> 'a case_layout
+  | Case_layout : ('a, 'b, 'layout) case_layout_open -> 'a case_layout
 [@@unboxed]
 
 let case_to_layout_open :
@@ -294,19 +299,17 @@ let case_to_json_data_encoding_case_open :
     type a b layout. int -> (a, b, layout) case_open -> a Encoding.case =
  fun tag {title; description; proj; inj; compact} ->
   let (module C : S with type input = b and type layout = layout) = compact in
-  Encoding.(
-    case
-      (Tag tag)
-      ~title
-      ?description
-      (obj2 (req "kind" string) (req "value" C.json_encoding))
-      (fun x -> match proj x with Some x -> Some (title, x) | None -> None)
-      (function
-        | title', x when String.equal title title' -> inj x
-        | _ ->
-            raise
-            @@ Invalid_argument
-                 "case_to_data_encoding_case_open: Incorrect kind"))
+  Encoding.case
+    (Encoding.Tag tag)
+    ~title
+    ?description
+    Encoding.(obj2 (req "kind" string) (req "value" C.json_encoding))
+    (fun x -> match proj x with Some x -> Some (title, x) | None -> None)
+    (function
+      | title', x when String.equal title title' -> inj x
+      | _ ->
+          raise
+          @@ Invalid_argument "case_to_data_encoding_case_open: Incorrect kind")
 
 let case_to_json_data_encoding_case : type a. int -> a case -> a Encoding.case =
  fun tag (Case layout) -> case_to_json_data_encoding_case_open tag layout
@@ -324,7 +327,8 @@ let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
   if cases = [] then
-    invalid_arg "Data_encoding.Compact.union: unit list of cases." ;
+    raise
+    @@ Invalid_argument "Data_encoding.Compact.union: empty list of cases." ;
   (module struct
     type input = a
 
@@ -1157,15 +1161,13 @@ let field_to_inner_compact : type a b. (a, b) field_open -> b t = function
 type 'a field = Field : ('b, 'a) field_open -> 'a field
 
 let field_to_data_encoding_open :
-    type a b. (a, b) field_open -> b Encoding.field =
-  let open Encoding in
-  function
+    type a b. (a, b) field_open -> b Encoding.field = function
   | Req {name; compact} ->
       let (module A) = compact in
-      req name A.json_encoding
+      Encoding.req name A.json_encoding
   | Opt {name; compact} ->
       let (module A) = compact in
-      opt name A.json_encoding
+      Encoding.opt name A.json_encoding
 
 let req : string -> 'a t -> 'a field =
  fun name compact -> Field (Req {name; compact})
@@ -1180,7 +1182,7 @@ let obj1_open : type a b. (a, b) field_open -> (module S with type input = b) =
   (module struct
     include C_in
 
-    let json_encoding = Encoding.(obj1 @@ field_to_data_encoding_open f1)
+    let json_encoding = Encoding.obj1 @@ field_to_data_encoding_open f1
   end)
 
 let obj1 (Field f1) = obj1_open f1
@@ -1197,8 +1199,9 @@ let obj2_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj2 (field_to_data_encoding_open f1) (field_to_data_encoding_open f2))
+      Encoding.obj2
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
   end)
 
 let obj2 (Field f1) (Field f2) = obj2_open f1 f2
@@ -1220,11 +1223,10 @@ let obj3_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj3
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3))
+      Encoding.obj3
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
   end)
 
 let obj3 (Field f1) (Field f2) (Field f3) = obj3_open f1 f2 f3
@@ -1248,12 +1250,11 @@ let obj4_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj4
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4))
+      Encoding.obj4
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
   end)
 
 let obj4 (Field f1) (Field f2) (Field f3) (Field f4) = obj4_open f1 f2 f3 f4
@@ -1279,13 +1280,12 @@ let obj5_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj5
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4)
-          (field_to_data_encoding_open f5))
+      Encoding.obj5
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
+        (field_to_data_encoding_open f5)
   end)
 
 let obj5 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) =
@@ -1314,14 +1314,13 @@ let obj6_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj6
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4)
-          (field_to_data_encoding_open f5)
-          (field_to_data_encoding_open f6))
+      Encoding.obj6
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
+        (field_to_data_encoding_open f5)
+        (field_to_data_encoding_open f6)
   end)
 
 let obj6 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6) =
@@ -1352,15 +1351,14 @@ let obj7_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj7
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4)
-          (field_to_data_encoding_open f5)
-          (field_to_data_encoding_open f6)
-          (field_to_data_encoding_open f7))
+      Encoding.obj7
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
+        (field_to_data_encoding_open f5)
+        (field_to_data_encoding_open f6)
+        (field_to_data_encoding_open f7)
   end)
 
 let obj7 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
@@ -1394,16 +1392,15 @@ let obj8_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj8
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4)
-          (field_to_data_encoding_open f5)
-          (field_to_data_encoding_open f6)
-          (field_to_data_encoding_open f7)
-          (field_to_data_encoding_open f8))
+      Encoding.obj8
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
+        (field_to_data_encoding_open f5)
+        (field_to_data_encoding_open f6)
+        (field_to_data_encoding_open f7)
+        (field_to_data_encoding_open f8)
   end)
 
 let obj8 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
@@ -1440,17 +1437,16 @@ let obj9_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj9
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4)
-          (field_to_data_encoding_open f5)
-          (field_to_data_encoding_open f6)
-          (field_to_data_encoding_open f7)
-          (field_to_data_encoding_open f8)
-          (field_to_data_encoding_open f9))
+      Encoding.obj9
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
+        (field_to_data_encoding_open f5)
+        (field_to_data_encoding_open f6)
+        (field_to_data_encoding_open f7)
+        (field_to_data_encoding_open f8)
+        (field_to_data_encoding_open f9)
   end)
 
 let obj9 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
@@ -1498,18 +1494,17 @@ let obj10_open :
     include Tup
 
     let json_encoding =
-      Encoding.(
-        obj10
-          (field_to_data_encoding_open f1)
-          (field_to_data_encoding_open f2)
-          (field_to_data_encoding_open f3)
-          (field_to_data_encoding_open f4)
-          (field_to_data_encoding_open f5)
-          (field_to_data_encoding_open f6)
-          (field_to_data_encoding_open f7)
-          (field_to_data_encoding_open f8)
-          (field_to_data_encoding_open f9)
-          (field_to_data_encoding_open f10))
+      Encoding.obj10
+        (field_to_data_encoding_open f1)
+        (field_to_data_encoding_open f2)
+        (field_to_data_encoding_open f3)
+        (field_to_data_encoding_open f4)
+        (field_to_data_encoding_open f5)
+        (field_to_data_encoding_open f6)
+        (field_to_data_encoding_open f7)
+        (field_to_data_encoding_open f8)
+        (field_to_data_encoding_open f9)
+        (field_to_data_encoding_open f10)
   end)
 
 let obj10 (Field f1) (Field f2) (Field f3) (Field f4) (Field f5) (Field f6)
@@ -1529,11 +1524,10 @@ module Compact_bool = struct
 
   let partial_encoding : layout -> bool Encoding.t =
    fun b ->
-    Encoding.(
-      conv_partial
-        (function b' when Bool.equal b b' -> Some () | _ -> None)
-        (fun () -> b)
-        unit)
+    conv_partial
+      (function b' when Bool.equal b b' -> Some () | _ -> None)
+      (fun () -> b)
+      Encoding.unit
 
   let classify x = x
 
@@ -1560,10 +1554,10 @@ module Compact_int32 = struct
   (** ---- Partial encoding ------------------------------------------------- *)
 
   let int8_l : int32 Encoding.t =
-    Encoding.(conv Int32.to_int Int32.of_int uint8)
+    Encoding.conv Int32.to_int Int32.of_int Encoding.uint8
 
   let int16_l : int32 Encoding.t =
-    Encoding.(conv Int32.to_int Int32.of_int uint16)
+    Encoding.conv Int32.to_int Int32.of_int Encoding.uint16
 
   let int32_l : int32 Encoding.t = Encoding.int32
 
@@ -1600,17 +1594,16 @@ module Compact_int64 = struct
   (** ---- Partial encoding ------------------------------------------------- *)
 
   let int8_L : int64 Encoding.t =
-    Encoding.(conv Int64.to_int Int64.of_int uint8)
+    Encoding.conv Int64.to_int Int64.of_int Encoding.uint8
 
   let int16_L : int64 Encoding.t =
-    Encoding.(conv Int64.to_int Int64.of_int uint16)
+    Encoding.conv Int64.to_int Int64.of_int Encoding.uint16
 
   let int32_L : int64 Encoding.t =
-    Encoding.(
-      conv
-        Int64.to_int32
-        (fun x -> Int64.(logand 0xFFFF_FFFFL (of_int32 x)))
-        int32)
+    Encoding.conv
+      Int64.to_int32
+      (fun x -> Int64.(logand 0xFFFF_FFFFL (of_int32 x)))
+      Encoding.int32
 
   let int64_L : int64 Encoding.t = Encoding.int64
 
@@ -1650,11 +1643,13 @@ module Compact_list = struct
   (** ---- Partial encoding ------------------------------------------------- *)
 
   let specialised_list bits encoding =
-    let open Encoding in
     match bits with
     | 0 ->
-        conv_partial (function [] -> Some () | _ -> None) (fun () -> []) unit
-    | n -> Fixed.list n encoding
+        conv_partial
+          (function [] -> Some () | _ -> None)
+          (fun () -> [])
+          Encoding.unit
+    | n -> Encoding.Fixed.list n encoding
 
   let partial_encoding : 'a Encoding.t -> layout -> 'a list Encoding.t =
    fun encoding -> function
@@ -1750,33 +1745,33 @@ let or_int32 :
     let partial_encoding = partial_encoding encoding
 
     let json_encoding =
-      Encoding.(
-        conv_with_guard
-          (function
-            | Left _ as expr -> (int32_kind, expr)
-            | Right _ as expr -> (alt_kind, expr))
-          (function
-            | kind, (Left _ as x) when String.equal kind int32_kind -> Ok x
-            | kind, (Right _ as x) when String.equal kind alt_kind -> Ok x
-            | _ -> Error "not a valid kind")
-          (obj2
-             (req "kind" string)
-             (req "value"
-             @@ union
-                  [
-                    case
-                      (Tag 0)
-                      ~title:int32_kind
-                      int32
-                      (function Left x -> Some x | _ -> None)
-                      (fun x -> Left x);
-                    case
-                      (Tag 1)
-                      ~title:alt_kind
-                      encoding
-                      (function Right x -> Some x | _ -> None)
-                      (fun x -> Right x);
-                  ])))
+      Encoding.conv_with_guard
+        (function
+          | Left _ as expr -> (int32_kind, expr)
+          | Right _ as expr -> (alt_kind, expr))
+        (function
+          | kind, (Left _ as x) when String.equal kind int32_kind -> Ok x
+          | kind, (Right _ as x) when String.equal kind alt_kind -> Ok x
+          | _ -> Error "not a valid kind")
+        Encoding.(
+          obj2
+            (req "kind" string)
+            (req "value"
+            @@ union
+                 [
+                   case
+                     (Tag 0)
+                     ~title:int32_kind
+                     int32
+                     (function Left x -> Some x | _ -> None)
+                     (fun x -> Left x);
+                   case
+                     (Tag 1)
+                     ~title:alt_kind
+                     encoding
+                     (function Right x -> Some x | _ -> None)
+                     (fun x -> Right x);
+                 ]))
   end)
 
 module Custom = struct
