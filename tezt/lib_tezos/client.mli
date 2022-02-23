@@ -895,7 +895,7 @@ module Tx_rollup : sig
     rollup:string ->
     src:string ->
     t ->
-    unit Lwt.t
+    unit Process.runnable
 end
 
 (** Run [tezos-client show voting period] and return the period name. *)
