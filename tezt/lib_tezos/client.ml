@@ -1150,8 +1150,8 @@ module Tx_rollup = struct
     in
     {value = process; run = parse}
 
-  let submit_tx_rollup_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks
-      ~content ~rollup ~src client =
+  let submit_batch ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~content
+      ~rollup ~src client =
     let process =
       spawn_command
         ?hooks

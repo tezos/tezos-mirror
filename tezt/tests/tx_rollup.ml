@@ -79,7 +79,7 @@ module Regressions = struct
 
   let submit_batch ~batch {rollup; client; node} =
     let*! () =
-      Client.Tx_rollup.submit_tx_rollup_batch
+      Client.Tx_rollup.submit_batch
         ~hooks
         ~content:batch
         ~rollup
@@ -178,7 +178,7 @@ module Regressions = struct
       in
       let invalid_address = "this is an invalid tx rollup address" in
       let*? process =
-        Client.Tx_rollup.submit_tx_rollup_batch
+        Client.Tx_rollup.submit_batch
           ~hooks
           ~content:""
           ~rollup:invalid_address
@@ -213,12 +213,7 @@ let submit_three_batches_and_check_size ~rollup node client batches level =
     Lwt_list.iter_p
       (fun (content, src, _) ->
         let*! () =
-          Client.Tx_rollup.submit_tx_rollup_batch
-            ~hooks
-            ~content
-            ~rollup
-            ~src
-            client
+          Client.Tx_rollup.submit_batch ~hooks ~content ~rollup ~src client
         in
         unit)
       batches
@@ -274,7 +269,7 @@ let test_submit_batches_in_several_blocks ~protocols =
     ~error_msg:"Unexpected state. Got: %L. Expected: %R." ;
   let batch = "tezos" in
   let*! () =
-    Client.Tx_rollup.submit_tx_rollup_batch
+    Client.Tx_rollup.submit_batch
       ~hooks
       ~content:batch
       ~rollup
@@ -344,7 +339,7 @@ let test_submit_from_originated_source ~protocols =
   let batch = "tezos" in
   (* Finally, we submit a batch to the tx_rollup from an originated contract *)
   let*? process =
-    Client.Tx_rollup.submit_tx_rollup_batch
+    Client.Tx_rollup.submit_batch
       ~hooks
       ~content:batch
       ~rollup

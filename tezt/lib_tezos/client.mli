@@ -872,7 +872,7 @@ module Tx_rollup : sig
     string Process.runnable
 
   (** Run [tezos-client submit tx rollup batch <batch_content> to <tx_rollup> from <src>]. *)
-  val submit_tx_rollup_batch :
+  val submit_batch :
     ?wait:string ->
     ?burn_cap:Tez.t ->
     ?storage_limit:int ->

@@ -174,7 +174,7 @@ let test_tx_node_store_inbox =
       (* Submit a batch *)
       let batch = "tezos" in
       let*! () =
-        Client.Tx_rollup.submit_tx_rollup_batch
+        Client.Tx_rollup.submit_batch
           ~hooks
           ~content:batch
           ~rollup
@@ -205,7 +205,7 @@ let test_tx_node_store_inbox =
           (list string)) ;
       let snd_batch = "tezos_tezos" in
       let*! () =
-        Client.Tx_rollup.submit_tx_rollup_batch
+        Client.Tx_rollup.submit_batch
           ~hooks
           ~content:snd_batch
           ~rollup
