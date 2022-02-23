@@ -1483,7 +1483,7 @@ let precheck_manager_contents (type kind) ctxt (op : kind Kind.manager contents)
       Tx_rollup_gas.message_hash_cost message_size >>?= fun cost ->
       Alpha_context.Gas.consume ctxt cost >>?= fun ctxt ->
       fail_unless
-        Compare.Int.(message_size < size_limit)
+        Compare.Int.(message_size <= size_limit)
         Tx_rollup_inbox.Tx_rollup_message_size_exceeds_limit
       >|=? fun () -> ctxt
   | Tx_rollup_commit {commitment; _} ->
