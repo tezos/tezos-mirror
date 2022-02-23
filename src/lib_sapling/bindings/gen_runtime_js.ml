@@ -23,14 +23,33 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-let gen_fn ~cname ~stub_name fmt _fn =
+let rec compute_arity : 'a. 'a Ctypes_static.fn -> int =
+  fun (type a) (t : a Ctypes_static.fn) ->
+   match t with
+   | Ctypes_static.Returns _ -> 0
+   | Function (_, x) -> 1 + compute_arity x
+
+let max_arity = 5
+
+let gen_fn ~cname ~stub_name fmt fn =
   Format.fprintf
     fmt
     "//Provides: %s@.//Requires: caml_failwith@.function %s (_) { \
      caml_failwith('%s unimplemetned'); }@."
     stub_name
     stub_name
-    cname
+    cname ;
+  let arity = compute_arity fn in
+  if arity > max_arity then
+    Format.fprintf
+      fmt
+      "//Provides: %s_byte%d@.//Requires: caml_failwith@.function %s_byte%d \
+       (_) { caml_failwith('%s unimplemetned'); }@."
+      stub_name
+      arity
+      stub_name
+      arity
+      cname
 
 let gen_value ~cname ~stub_name fmt _typ =
   Format.fprintf
