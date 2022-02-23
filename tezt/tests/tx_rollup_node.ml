@@ -23,6 +23,13 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(* Testing
+   -------
+   Component:    Tx_rollup_node
+   Invocation:   dune exec tezt/tests/main.exe -- --file tx_rollup_node.ml
+   Subject:      Various test scenarios for the Tx rollup node
+*)
+
 module Rollup = Rollup.Tx_rollup
 module Rollup_node = Rollup_node.Tx_node
 
