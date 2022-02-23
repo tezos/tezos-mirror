@@ -43,6 +43,14 @@ let parameter_file protocol =
     ~base:(Either.right (protocol, None))
     [(["tx_rollup_enable"], Some "true")]
 
+let submit_batch ~batch ~rollup client =
+  Client.Tx_rollup.submit_batch
+    ~hooks
+    ~content:batch
+    ~rollup
+    ~src:Constant.bootstrap1.public_key_hash
+    client
+
 (* This module only registers regressions tests. Those regressions
    tests should be used to ensure there is no regressions with the
    various RPCs exported by the tx_rollups. *)
@@ -64,14 +72,7 @@ module Regressions = struct
     return {node; client; rollup}
 
   let submit_batch_and_bake ~batch {rollup; client; node} =
-    let*! () =
-      Client.Tx_rollup.submit_batch
-        ~hooks
-        ~content:batch
-        ~rollup
-        ~src:Constant.bootstrap1.public_key_hash
-        client
-    in
+    let*! () = submit_batch ~batch ~rollup client in
     let current_level = Node.get_level node in
     let* () = Client.bake_for client in
     let* _ = Node.wait_for_level node (current_level + 1) in
@@ -211,14 +212,7 @@ module Regressions = struct
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let invalid_address = "this is an invalid tx rollup address" in
-      let*? process =
-        Client.Tx_rollup.submit_batch
-          ~hooks
-          ~content:""
-          ~rollup:invalid_address
-          ~src:Constant.bootstrap1.public_key_hash
-          client
-      in
+      let*? process = submit_batch ~batch:"" ~rollup:invalid_address client in
       let* () =
         Process.check_error
           ~exit_code:1
