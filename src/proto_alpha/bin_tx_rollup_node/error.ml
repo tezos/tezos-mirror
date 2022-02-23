@@ -195,3 +195,35 @@ let () =
       | Tx_rollup_invalid_history_mode history_mode -> Some history_mode
       | _ -> None)
     (fun history_mode -> Tx_rollup_invalid_history_mode history_mode)
+
+type error +=
+  | Tx_rollup_unsupported_context_version of {
+      current : Protocol.Tx_rollup_l2_context_hash.Version.t;
+      expected : Protocol.Tx_rollup_l2_context_hash.Version.t;
+    }
+
+let () =
+  register_error_kind
+    ~id:"tx_rollup.node.invalid_context_version"
+    ~title:"The Tezos node has an invalid context version"
+    ~description:"The Tezos node has an invalid context version"
+    ~pp:(fun ppf (current, expected) ->
+      Format.fprintf
+        ppf
+        "Tx rollup node has context version %a but was expected to have \
+         version %a."
+        Protocol.Tx_rollup_l2_context_hash.Version.pp
+        current
+        Protocol.Tx_rollup_l2_context_hash.Version.pp
+        expected)
+    `Permanent
+    Data_encoding.(
+      obj2
+        (req "current" Protocol.Tx_rollup_l2_context_hash.Version.encoding)
+        (req "expected" Protocol.Tx_rollup_l2_context_hash.Version.encoding))
+    (function
+      | Tx_rollup_unsupported_context_version {current; expected} ->
+          Some (current, expected)
+      | _ -> None)
+    (fun (current, expected) ->
+      Tx_rollup_unsupported_context_version {current; expected})

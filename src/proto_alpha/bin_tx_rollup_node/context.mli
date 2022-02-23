@@ -2,8 +2,6 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2022 Nomadic Labs, <contact@nomadic-labs.com>               *)
-(* Copyright (c) 2022 Marigold, <contact@marigold.dev>                       *)
-(* Copyright (c) 2022 Oxhead Alpha <info@oxhead-alpha.com>                   *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,41 +23,53 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-(** Error issued when the rollup referenced by its hash has not been created
-    on the block referenced by its hash. The node computes a state from the
-    block that created the rollup. *)
-type error +=
-  | Tx_rollup_not_originated_in_the_given_block of
-      Protocol.Alpha_context.Tx_rollup.t
+include Protocol.Tx_rollup_l2_context_sig.CONTEXT
 
-(** Error issued when the daemon attempts to process the operations of a block
-    for which the predecessor has not yet been processed. *)
-type error += Tx_rollup_block_predecessor_not_processed of Block_hash.t
+(** A block-indexed (key x value) store directory.  *)
+type index
 
-(** Error issued when the encoding of a value, in order to be persisted in the
-    store, fails. *)
-type error +=
-  | Tx_rollup_unable_to_encode_storable_value of string * Data_encoding.Json.t
+type context = t
 
-(** Error issued when decoding a persisted value in the store fails. *)
-type error += Tx_rollup_unable_to_decode_stored_value of string * string
+val index : context -> index
 
-(** Error issued when an error occurs on Irmin side. *)
-type error += Tx_rollup_irmin_error of string
+(** Open or initialize a versioned store at a given path. *)
+val init :
+  ?patch_context:(context -> context tzresult Lwt.t) ->
+  ?readonly:bool ->
+  string ->
+  index Lwt.t
 
-(** Error issued when the configuration file does not exists. *)
-type error += Tx_rollup_configuration_file_does_not_exists of string
+(** Build an empty context from an index. The resulting context is not yet
+    commited. *)
+val empty : index -> t
 
-(** Error issued when the configuration file cannot be write. *)
-type error += Tx_rollup_unable_to_write_configuration_file of string
+(** Close the index. Does not fail when the context is already closed. *)
+val close : index -> unit Lwt.t
 
-(** Error issued when the Tezos node is not in a valid history_mode. *)
-type error +=
-  | Tx_rollup_invalid_history_mode of Tezos_shell_services.History_mode.t
+(** Sync the context with disk. Only useful for read-only instances.
+    Does not fail when the context is not in read-only mode. *)
+val sync : index -> unit Lwt.t
 
-(** Error issued when the Tx rollup node has the wrong context version. *)
-type error +=
-  | Tx_rollup_unsupported_context_version of {
-      current : Protocol.Tx_rollup_l2_context_hash.Version.t;
-      expected : Protocol.Tx_rollup_l2_context_hash.Version.t;
-    }
+(** {2 Accessing and Updating Versions} *)
+
+(** Returns true if there is a commit with this context hash *)
+val exists : index -> Protocol.Tx_rollup_l2_context_hash.t -> bool Lwt.t
+
+(** Checkout the context associated to a context hash. The context must have
+    been committed (with {!commit}). Resolves with [None] if there is no such
+    commit. *)
+val checkout :
+  index -> Protocol.Tx_rollup_l2_context_hash.t -> context option Lwt.t
+
+(** Same as {!checkout} but resolves with an exception if there is no such
+    commit. *)
+val checkout_exn :
+  index -> Protocol.Tx_rollup_l2_context_hash.t -> context Lwt.t
+
+(** Hash a context. The hash can be done with an additional [message]. *)
+val hash : ?message:string -> t -> Protocol.Tx_rollup_l2_context_hash.t
+
+(** Create a commit and return the context hash. The hash can be done with an
+    additional [message]. *)
+val commit :
+  ?message:string -> context -> Protocol.Tx_rollup_l2_context_hash.t Lwt.t
