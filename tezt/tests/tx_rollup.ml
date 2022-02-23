@@ -171,6 +171,11 @@ module Regressions = struct
   end
 
   module Limits = struct
+    (* The constant comes from the default parameters of the protocol. *)
+    let batch_limit = 5_000
+
+    let inbox_limit = 100_000
+
     let submit_empty_batch ~protocols =
       Protocol.register_regression_test
         ~__FILE__
@@ -193,11 +198,9 @@ module Regressions = struct
         ~protocols
       @@ fun protocol ->
       let* state = init_with_tx_rollup ~protocol () in
-      (* The constant comes from the default parameters of the protocol. *)
-      let limit = 5000 in
-      let batch = String.make limit 'b' in
+      let batch = String.make batch_limit 'b' in
       let* () = submit_batch_and_bake ~batch state in
-      let batch = String.make (limit + 1) 'c' in
+      let batch = String.make (batch_limit + 1) 'c' in
       let*? process = submit_batch ~batch ~rollup:state.rollup state.client in
       Process.check_error
         ~msg:
@@ -213,8 +216,6 @@ module Regressions = struct
         ~tags:["tx_rollup"; "inbox"; "client"]
         ~protocols
       @@ fun protocol ->
-      let inbox_limit = 100_000 in
-      let batch_limit = 5000 in
       (* The test assumes inbox_limit % batch_limit = 0 *)
       let max_batch_number_per_inbox = inbox_limit / batch_limit in
       let additional_bootstrap_account_count = max_batch_number_per_inbox - 5 in
