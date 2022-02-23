@@ -24,7 +24,7 @@
 (*****************************************************************************)
 
 (** The voting period kinds are ordered as follows:
-    Proposal -> Testing_vote -> Testing -> Promotion -> Adoption.
+    Proposal -> Exploration -> Cooldown -> Promotion -> Adoption.
     This order is the one used be the function [succ] below.
  *)
 type kind =

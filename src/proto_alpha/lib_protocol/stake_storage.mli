@@ -23,6 +23,9 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** This library provides basic operations (accessors and setters) on
+    staking tokens. *)
+
 module Delegate_sampler_state : sig
   val init :
     Raw_context.t ->

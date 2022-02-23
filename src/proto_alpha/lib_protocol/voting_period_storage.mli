@@ -23,6 +23,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
+(** Initializes the current context with voting period information. *)
 val init : Raw_context.t -> Voting_period_repr.t -> Raw_context.t tzresult Lwt.t
 
 (** Sets the initial period to [{voting_period = root; kind = Proposal;
@@ -36,8 +37,10 @@ val reset : Raw_context.t -> Raw_context.t tzresult Lwt.t
 (** Increment the index by one and set the kind to its successor. *)
 val succ : Raw_context.t -> Raw_context.t tzresult Lwt.t
 
+(** Returns information about the current voting period. *)
 val get_current : Raw_context.t -> Voting_period_repr.t tzresult Lwt.t
 
+(** Returns the current voting period kind. *)
 val get_current_kind : Raw_context.t -> Voting_period_repr.kind tzresult Lwt.t
 
 (** Returns true if the context level is the last of current voting period.  *)

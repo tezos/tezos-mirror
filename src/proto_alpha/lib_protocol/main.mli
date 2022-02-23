@@ -41,7 +41,11 @@
  *)
 
 (** [validation_mode] permits to differenciate [!type:validation_state]
-    values. *)
+    values.
+
+    TODO: #2536
+      Add some documentation for the different modes.
+*)
 type validation_mode =
   | Application of {
       block_header : Alpha_context.Block_header.t;

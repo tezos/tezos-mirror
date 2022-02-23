@@ -155,56 +155,90 @@ type raw = Operation.t = {shell : Operation.shell_header; proto : bytes}
 
 val raw_encoding : raw Data_encoding.t
 
+(** An [operation] contains the operation header information in [shell]
+    and all data related to the operation itself in [protocol_data]. *)
 type 'kind operation = {
   shell : Operation.shell_header;
   protocol_data : 'kind protocol_data;
 }
 
+(** A [protocol_data] wraps together a signature for the operation and
+    the contents of the operation itself. *)
 and 'kind protocol_data = {
   contents : 'kind contents_list;
   signature : Signature.t option;
 }
 
+(** A [contents_list] is a list of contents, the GADT guarantees two
+    invariants:
+    - the list is not empty, and
+    - if the list has several elements then it only contains manager
+      operations. *)
 and _ contents_list =
   | Single : 'kind contents -> 'kind contents_list
   | Cons :
       'kind Kind.manager contents * 'rest Kind.manager contents_list
       -> ('kind * 'rest) Kind.manager contents_list
 
+(** A value of type [contents] an operation related to whether
+    consensus, governance or contract management. *)
 and _ contents =
+  (* Preendorsement: About consensus, preendorsement of a block held by a
+     validator (specific to Tenderbake). *)
   | Preendorsement : consensus_content -> Kind.preendorsement contents
+  (* Endorsement: About consensus, endorsement of a block held by a
+     validator. *)
   | Endorsement : consensus_content -> Kind.endorsement contents
+  (* Seed_nonce_revelation: Nonces are created by bakers and are
+     combined to create pseudo-random seeds. Bakers are urged to reveal their
+     nonces after a given number of cycles to keep their block rewards
+     from being forfeited. *)
   | Seed_nonce_revelation : {
       level : Raw_level_repr.t;
       nonce : Seed_repr.nonce;
     }
       -> Kind.seed_nonce_revelation contents
+  (* Double_preendorsement_evidence: Double-preendorsement is a
+     kind of malicious attack where a byzantine attempts to fork
+     the chain by preendorsing blocks with different
+     contents (at the same level and same round)
+     twice. This behavior may be reported and the byzantine will have
+     its security deposit forfeited. *)
   | Double_preendorsement_evidence : {
       op1 : Kind.preendorsement operation;
       op2 : Kind.preendorsement operation;
     }
       -> Kind.double_preendorsement_evidence contents
+  (* Double_endorsement_evidence: Similar to double-preendorsement but
+     for endorsements. *)
   | Double_endorsement_evidence : {
       op1 : Kind.endorsement operation;
       op2 : Kind.endorsement operation;
     }
       -> Kind.double_endorsement_evidence contents
+  (* Double_baking_evidence: Similarly to double-endorsement but the
+     byzantine attempts to fork by signing two different blocks at the
+     same level. *)
   | Double_baking_evidence : {
       bh1 : Block_header_repr.t;
       bh2 : Block_header_repr.t;
     }
       -> Kind.double_baking_evidence contents
+  (* Activate_account: Account activation allows to register a public
+     key hash on the blockchain. *)
   | Activate_account : {
       id : Ed25519.Public_key_hash.t;
       activation_code : Blinded_public_key_hash.activation_code;
     }
       -> Kind.activate_account contents
+  (* Proposals: A candidate protocol can be proposed for voting. *)
   | Proposals : {
       source : Signature.Public_key_hash.t;
       period : int32;
       proposals : Protocol_hash.t list;
     }
       -> Kind.proposals contents
+  (* Ballot: The validators of the chain will then vote on proposals. *)
   | Ballot : {
       source : Signature.Public_key_hash.t;
       period : int32;
@@ -212,7 +246,14 @@ and _ contents =
       ballot : Vote_repr.ballot;
     }
       -> Kind.ballot contents
+  (* Failing_noop: An operation never considered by the state machine
+     and which will always fail at [apply]. This allows end-users to
+     sign arbitrary messages which have no computational semantics. *)
   | Failing_noop : string -> Kind.failing_noop contents
+  (* Manager_operation: Operations, emitted and signed by
+     a (revealed) implicit account, that describe management and
+     interactions between contracts (whether implicit or
+     smart). *)
   | Manager_operation : {
       source : Signature.Public_key_hash.t;
       fee : Tez_repr.tez;
@@ -223,8 +264,15 @@ and _ contents =
     }
       -> 'kind Kind.manager contents
 
+(** A [manager_operation] describes management and interactions
+    between contracts (whether implicit or smart). *)
 and _ manager_operation =
+  (* [Reveal] for the revelation of a public key, a one-time
+     prerequisite to any signed operation, in order to be able to
+     check the sender’s signature. *)
   | Reveal : Signature.Public_key.t -> Kind.reveal manager_operation
+  (* [Transaction] of some amount to some destination contract. It can
+     also be used to execute/call smart-contracts. *)
   | Transaction : {
       amount : Tez_repr.tez;
       parameters : Script_repr.lazy_expr;
@@ -232,6 +280,8 @@ and _ manager_operation =
       destination : Destination_repr.t;
     }
       -> Kind.transaction manager_operation
+  (* [Origination] of a contract using a smart-contract [script] and
+     initially credited with the amount [credit]. *)
   | Origination : {
       delegate : Signature.Public_key_hash.t option;
       script : Script_repr.t;
@@ -239,16 +289,27 @@ and _ manager_operation =
       preorigination : Contract_repr.t option;
     }
       -> Kind.origination manager_operation
+  (* [Delegation] to some staking contract (designated by its public
+     key hash). When this value is None, delegation is reverted as it
+     is set to nobody. *)
   | Delegation :
       Signature.Public_key_hash.t option
       -> Kind.delegation manager_operation
+  (* [Register_global_constant] allows registration and substitution
+     of a global constant available from any contract and registered in
+     the context. *)
   | Register_global_constant : {
       value : Script_repr.lazy_expr;
     }
       -> Kind.register_global_constant manager_operation
+  (* [Set_deposits_limit] sets an optional limit for frozen deposits
+     of a contract at a lower value than the maximum limit.  When None,
+     the limit in unset back to the default maximum limit. *)
   | Set_deposits_limit :
       Tez_repr.t option
       -> Kind.set_deposits_limit manager_operation
+  (* [Tx_rollup_origination] allows an implicit contract to originate
+     a new transactional rollup. *)
   | Tx_rollup_origination : Kind.tx_rollup_origination manager_operation
   | Tx_rollup_submit_batch : {
       tx_rollup : Tx_rollup_repr.t;
@@ -261,17 +322,27 @@ and _ manager_operation =
       commitment : Tx_rollup_commitment_repr.t;
     }
       -> Kind.tx_rollup_commit manager_operation
+  (* [Sc_rollup_originate] allows an implicit account to originate a new
+     smart contract rollup (initialized with a given boot
+     sector). *)
   | Sc_rollup_originate : {
       kind : Sc_rollup_repr.Kind.t;
       boot_sector : Sc_rollup_repr.PVM.boot_sector;
     }
       -> Kind.sc_rollup_originate manager_operation
+  (* [Sc_rollup_add_messages] adds messages to a given rollup's
+      inbox. *)
   | Sc_rollup_add_messages : {
       rollup : Sc_rollup_repr.t;
       messages : string list;
     }
       -> Kind.sc_rollup_add_messages manager_operation
 
+(** Counters are used as anti-replay protection mechanism in
+    manager operations: each manager account stores a counter and
+    each manager operation declares a value for the counter. When
+    a manager operation is applied, the value of the counter of
+    its manager is checked and incremented. *)
 and counter = Z.t
 
 type 'kind internal_operation = {
