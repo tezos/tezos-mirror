@@ -64,6 +64,8 @@ let get_rollup_parameter_file ~protocol =
   let base = Either.right (protocol, None) in
   Protocol.write_parameter_file ~base enable_tx_rollup
 
+(* Checks that the configuration is stored and that the required
+   fields are present. *)
 let test_node_configuration =
   Protocol.register_test
     ~__FILE__
@@ -90,24 +92,21 @@ let test_node_configuration =
       let* filename =
         Rollup_node.config_init tx_rollup_node tx_rollup_hash block_hash
       in
-      let configuration =
+      Log.info "Tx_rollup configuration file was successfully created" ;
+      let () =
         let open Ezjsonm in
+        let req = ["client-keys"; "rollup-id"] in
+        (* TODO: add optional args checks *)
         match from_channel @@ open_in filename with
         | `O fields ->
-            `O
-              (List.map
-                 (fun (k, v) ->
-                   let x =
-                     if k = "data-dir" || k = "block-hash" || k = "rpc-port"
-                     then `String "<variable>"
-                     else v
-                   in
-                   (k, x))
-                 fields)
-            |> to_string
-        | _ -> failwith "Unexpected configuration format"
+            List.iter
+              (fun k ->
+                if List.exists (fun (key, _v) -> String.equal k key) fields then
+                  ()
+                else Test.fail "unexpected configuration field")
+              req
+        | _ -> Test.fail "Unexpected configuration format"
       in
-      let () = Regression.capture configuration in
       unit)
 
 let test_tx_node_is_ready =
