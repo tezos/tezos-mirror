@@ -194,7 +194,13 @@ module Regressions = struct
       let limit = 5000 in
       let batch = String.make limit 'b' in
       let* () = submit_batch_and_bake ~batch state in
-      unit
+      let batch = String.make (limit + 1) 'c' in
+      let*? process = submit_batch ~batch ~rollup:state.rollup state.client in
+      Process.check_error
+        ~msg:
+          (rex
+             "A message submtitted to a transaction rollup inbox exceeds limit")
+        process
   end
 
   module Fail = struct
