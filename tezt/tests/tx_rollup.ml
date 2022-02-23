@@ -179,6 +179,21 @@ module Regressions = struct
       let batch = "" in
       let* () = submit_batch ~batch state in
       unit
+
+    let submit_maximum_size_batch ~protocols =
+      Protocol.register_regression_test
+        ~__FILE__
+        ~output_file:"tx_rollup_limit_maximum_size_batch"
+        ~title:"Submit maximum size batch"
+        ~tags:["tx_rollup"; "batch"; "client"]
+        ~protocols
+      @@ fun protocol ->
+      let* state = init_with_tx_rollup ~protocol in
+      (* The constant comes from the default parameters of the protocol. *)
+      let limit = 5000 in
+      let batch = String.make limit 'b' in
+      let* () = submit_batch ~batch state in
+      unit
   end
 
   module Fail = struct
@@ -221,6 +236,7 @@ module Regressions = struct
     RPC.rpc_inbox ~protocols ;
     RPC.rpc_commitment ~protocols ;
     Limits.submit_empty_batch ~protocols ;
+    Limits.submit_maximum_size_batch ~protocols ;
     Fail.client_submit_batch_invalid_rollup_address ~protocols
 end
 
