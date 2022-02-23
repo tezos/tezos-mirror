@@ -43,6 +43,9 @@
     be ignored by the node and will never be broadcast. If the operation is
     only [branch_refused] or [branch_delayed], it may be added to the mempool
     if it passes the application/precheck in the future.
+
+    See the {{!page-prevalidator} prevalidator implementation overview} to
+    learn more.
 *)
 
 (** An (abstract) prevalidator context. Separate prevalidator contexts should be
