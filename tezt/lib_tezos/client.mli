@@ -1008,7 +1008,8 @@ val init_with_node :
     - Create [additional_account_count] accounts with
       [default_accounts_balance]
     - Activate the given protocol with [additional_account_count]
-      additional bootstrap accounts
+      additional bootstrap accounts whose aliases are given by 
+     [Account.bootstrap].
 
     In addition to the client, returns the first created node
     (if [`Light] is passed, a second node has been created, but it is

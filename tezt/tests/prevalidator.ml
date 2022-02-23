@@ -162,7 +162,7 @@ module Revamped = struct
     let* additional_bootstrap_accounts =
       Lwt_list.map_s
         (fun i ->
-          let alias = sf "bootstrap%d" i in
+          let alias = Account.bootstrap i in
           let* key = Client.gen_and_show_keys ~alias client in
           return (key, None))
         (range

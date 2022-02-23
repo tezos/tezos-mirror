@@ -39,3 +39,5 @@ let sign_bytes ~watermark ~signer (message : Bytes.t) =
     Tezos_crypto.Signature.Secret_key.of_b58check_exn b58_secret_key
   in
   Tezos_crypto.Signature.sign ~watermark secret_key message
+
+let bootstrap i = sf "bootstrap%d" i
