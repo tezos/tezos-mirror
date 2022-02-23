@@ -36,13 +36,24 @@ let test_roundtrip len () =
   Array.iter2 (fun a b -> assert (Int.equal a b)) data data_out
 
 let test_invalid_argument () =
-  match Data_encoding.Fixed.array 0 Data_encoding.int31 with
+  (match Data_encoding.Fixed.array 0 Data_encoding.int31 with
   | _ -> assert false
-  | exception Invalid_argument _ -> (
-      () ;
-      match Data_encoding.Fixed.array (-1) Data_encoding.int31 with
-      | _ -> assert false
-      | exception Invalid_argument _ -> ())
+  | exception Invalid_argument _ -> ()) ;
+  (match Data_encoding.Fixed.array (-1) Data_encoding.int31 with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  (match Data_encoding.(Fixed.array 1 (Variable.list int31)) with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  (match Data_encoding.Fixed.array 1 Data_encoding.unit with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  (match
+     Data_encoding.(Fixed.array 1 (obj1 (opt "zeroable" (Variable.list int31))))
+   with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  ()
 
 let test_array_too_long len () =
   let open Data_encoding in

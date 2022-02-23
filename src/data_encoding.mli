@@ -233,7 +233,7 @@ module Encoding : sig
       If [max_length] is passed and the encoding of elements has fixed
       size, a {!check_size} is automatically added for earlier rejection.
 
-      @raise Invalid_argument if the inner encoding is also variable. *)
+      @raise Invalid_argument if the inner encoding is variable. *)
   val list : ?max_length:int -> 'a encoding -> 'a list encoding
 
   (** Provide a transformer from one encoding to a different one.
@@ -696,6 +696,11 @@ let encoding_t =
         cause other failures further down the line when the AST traversal
         becomes out-of-sync with the underlying byte-stream traversal.
 
+        The difference of the errors being used when encoding and decoding is
+        because when encoding we have access to the list and we can check the
+        actual length, whereas when decoding we only see bytes, sometimes too
+        many, sometimes not enough.
+
         This encoding has a narrow set of possible applications because it is
         very restrictive. Still, it can to:
         - mirror static guarantees about the length of some lists,
@@ -737,12 +742,18 @@ let expr_encoding =
         Interestingly, the cases for known lengths can be generated
         programmatically.
 
-        @raise Invalid_argument if the argument is less or equal to zero. *)
+        @raise Invalid_argument if the argument [n] is less or equal to zero.
+
+        @raise Invalid_argument if the argument [e] is a [`Variable]-size
+        encoding or a zero-byte encoding. *)
     val list : int -> 'a encoding -> 'a list encoding
 
     (** See [list] above.
 
-      @raise Invalid_argument if the argument is less or equal to zero. *)
+        @raise Invalid_argument if the argument [n] is less or equal to zero.
+
+        @raise Invalid_argument if the argument [e] is a [`Variable]-size
+        encoding or a zero-byte encoding. *)
     val array : int -> 'a encoding -> 'a array encoding
   end
 

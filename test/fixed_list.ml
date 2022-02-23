@@ -36,13 +36,24 @@ let test_roundtrip len () =
   assert (List.for_all2 Int.equal data data_out)
 
 let test_invalid_argument () =
-  match Data_encoding.Fixed.list 0 Data_encoding.int31 with
+  (match Data_encoding.Fixed.list 0 Data_encoding.int31 with
   | _ -> assert false
-  | exception Invalid_argument _ -> (
-      () ;
-      match Data_encoding.Fixed.list (-1) Data_encoding.int31 with
-      | _ -> assert false
-      | exception Invalid_argument _ -> ())
+  | exception Invalid_argument _ -> ()) ;
+  (match Data_encoding.Fixed.list (-1) Data_encoding.int31 with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  (match Data_encoding.(Fixed.list 1 (Variable.array int31)) with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  (match Data_encoding.Fixed.list 1 Data_encoding.unit with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  (match
+     Data_encoding.(Fixed.list 1 (obj1 (opt "zeroable" (Variable.array int31))))
+   with
+  | _ -> assert false
+  | exception Invalid_argument _ -> ()) ;
+  ()
 
 let test_list_too_long len () =
   let open Data_encoding in
