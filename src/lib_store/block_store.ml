@@ -1228,7 +1228,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
           ~new_head
           ~new_head_metadata
       in
-      let merge_start = Systime_os.now () in
+      let merge_start = Time.System.now () in
       let* () =
         Lwt_idle_waiter.force_idle block_store.merge_scheduler (fun () ->
             (* Move the rw in the ro stores and create a new tmp *)
@@ -1293,7 +1293,7 @@ let merge_stores block_store ~(on_error : tztrace -> unit tzresult Lwt.t)
                     Lwt_mutex.unlock block_store.merge_mutex ;
                     Lwt.return_unit)
               in
-              let merge_end = Systime_os.now () in
+              let merge_end = Time.System.now () in
               let merging_time = Ptime.diff merge_end merge_start in
               let*! () = Store_events.(emit end_merging_stores) merging_time in
               return_unit

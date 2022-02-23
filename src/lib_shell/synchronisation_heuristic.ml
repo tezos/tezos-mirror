@@ -133,7 +133,7 @@ module Core = struct
     if state.threshold < 0 then Not_synchronised
     else if state.threshold = 0 then Synchronised {is_chain_stuck = false}
     else
-      let now = Time.System.to_protocol @@ Systime_os.now () in
+      let now = Time.System.to_protocol @@ Time.System.now () in
       match
         ( state.candidates.(state.index_of_youngest_candidate),
           state.candidates.(state.index_of_oldest_candidate) )

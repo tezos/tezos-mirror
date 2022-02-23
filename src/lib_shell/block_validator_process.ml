@@ -205,7 +205,7 @@ module Internal_validator_process = struct
       block_header operations =
     make_apply_environment validator chain_store predecessor max_operations_ttl
     >>=? fun env ->
-    let now = Systime_os.now () in
+    let now = Time.System.now () in
     let block_hash = Block_header.hash block_header in
     let predecessor_context_hash = Store.Block.context_hash predecessor in
     Events.(emit validation_request (block_hash, env.chain_id)) >>= fun () ->
@@ -222,7 +222,7 @@ module Internal_validator_process = struct
       ~cache
     >>=? fun {result; cache} ->
     let timespan =
-      let then_ = Systime_os.now () in
+      let then_ = Time.System.now () in
       Ptime.diff then_ now
     in
     validator.cache <- Some {context_hash = block_header.shell.context; cache} ;
@@ -613,7 +613,7 @@ module External_validator_process = struct
         (* Make sure that the promise is not canceled between a send and recv *)
         Lwt.protected
           (Lwt_mutex.with_lock vp.lock (fun () ->
-               let now = Systime_os.now () in
+               let now = Time.System.now () in
                Events.(emit request_for request) >>= fun () ->
                External_validation.send
                  process_stdin
@@ -623,7 +623,7 @@ module External_validator_process = struct
                External_validation.recv_result process_stdout result_encoding
                >>= fun res ->
                let timespan =
-                 let then_ = Systime_os.now () in
+                 let then_ = Time.System.now () in
                  Ptime.diff then_ now
                in
                Events.(emit request_result (request, timespan)) >>= fun () ->

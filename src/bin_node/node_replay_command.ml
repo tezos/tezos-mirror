@@ -252,7 +252,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                 in
                 let operations = Store.Block.operations block in
                 let header = Store.Block.header block in
-                let start_time = Systime_os.now () in
+                let start_time = Time.System.now () in
                 let*! () =
                   Event.(emit block_validation_start)
                     ( block_alias,
@@ -267,7 +267,7 @@ let replay ~singleprocess (config : Node_config_file.t) blocks =
                     header
                     operations
                 in
-                let now = Systime_os.now () in
+                let now = Time.System.now () in
                 let*! () =
                   Event.(emit block_validation_end) (Ptime.diff now start_time)
                 in

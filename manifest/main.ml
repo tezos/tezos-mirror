@@ -202,7 +202,7 @@ let ppx_deriving = external_lib "ppx_deriving" V.True
 
 let ppx_deriving_show = external_sublib ppx_deriving "ppx_deriving.show"
 
-let ptime_clock_os = external_sublib ptime "ptime.clock.os"
+let ptime_clock_os = external_sublib ~js_compatible:true ptime "ptime.clock.os"
 
 let pure_splitmix =
   external_lib ~js_compatible:true "pure-splitmix" V.(exactly "0.2")
@@ -766,7 +766,6 @@ let tezos_stdlib_unix =
         re;
         ezjsonm;
         ptime;
-        ptime_clock_os;
         mtime;
         mtime_clock_os;
         lwt_log;
@@ -862,6 +861,7 @@ let tezos_base =
         tezos_micheline |> open_;
         tezos_event_logging |> open_;
         ptime;
+        ptime_clock_os;
         ezjsonm;
         lwt;
         ipaddr;

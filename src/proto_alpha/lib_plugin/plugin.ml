@@ -927,7 +927,9 @@ module Mempool = struct
             (let proposal_timestamp =
                Alpha_context.Timestamp.predecessor ctxt
              in
-             let now_timestamp = Systime_os.now () |> Time.System.to_protocol in
+             let now_timestamp =
+               Time.System.now () |> Time.System.to_protocol
+             in
              let Level.{level; _} = Alpha_context.Level.current ctxt in
              let proposal_level =
                match Raw_level.pred level with

@@ -170,7 +170,7 @@ let create_connection t p2p_conn id_point point_info peer_info
       negotiated_version
   in
   let conn_meta = P2p_socket.remote_metadata p2p_conn in
-  let timestamp = Systime_os.now () in
+  let timestamp = Time.System.now () in
   Option.iter
     (fun point_info ->
       let point = P2p_point_state.Info.point point_info in
@@ -184,7 +184,7 @@ let create_connection t p2p_conn id_point point_info peer_info
   Lwt_canceler.on_cancel canceler (fun () ->
       let open Lwt_syntax in
       let* () = Events.(emit disconnected) (peer_id, id_point) in
-      let timestamp = Systime_os.now () in
+      let timestamp = Time.System.now () in
       Option.iter
         (P2p_point_state.set_disconnected
            ~timestamp
@@ -333,7 +333,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
         may_register_my_id_point t.pool err ;
         t.log (Authentication_failed point) ;
         (if not incoming then
-         let timestamp = Systime_os.now () in
+         let timestamp = Time.System.now () in
          Option.iter
            (P2p_point_state.set_disconnected
               ~timestamp
@@ -408,7 +408,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       let*! () = P2p_socket.nack auth_conn motive point_list in
       let () =
         if not incoming then
-          let timestamp = Systime_os.now () in
+          let timestamp = Time.System.now () in
           Option.iter
             (P2p_point_state.set_disconnected
                ~timestamp
@@ -442,7 +442,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
       Lwt.return err
   | Ok version ->
       t.log (Accepting_request (point, info.id_point, info.peer_id)) ;
-      let timestamp = Systime_os.now () in
+      let timestamp = Time.System.now () in
       Option.iter
         (fun point_info ->
           P2p_point_state.set_accepted
@@ -498,7 +498,7 @@ let raw_authenticate t ?point_info canceler scheduled_conn point =
             let*! () =
               Events.(emit authenticate_status) ("rejected", point, info.peer_id)
             in
-            let timestamp = Systime_os.now () in
+            let timestamp = Time.System.now () in
             Option.iter
               (P2p_point_state.set_disconnected
                  ~timestamp
@@ -616,7 +616,7 @@ let connect ?timeout t point =
           P2p_errors.Private_mode
       in
       let* () = fail_unless_disconnected_point point_info in
-      let timestamp = Systime_os.now () in
+      let timestamp = Time.System.now () in
       P2p_point_state.set_requested ~timestamp point_info canceler ;
       let*! fd = P2p_fd.socket PF_INET6 SOCK_STREAM 0 in
       let uaddr = Lwt_unix.ADDR_INET (Ipaddr_unix.V6.to_inet_addr addr, port) in
@@ -630,7 +630,7 @@ let connect ?timeout t point =
             return_unit)
           ~on_error:(fun err ->
             let*! () = Events.(emit connect_error) (point, err) in
-            let timestamp = Systime_os.now () in
+            let timestamp = Time.System.now () in
             P2p_point_state.set_disconnected
               ~timestamp
               t.config.reconnection_config

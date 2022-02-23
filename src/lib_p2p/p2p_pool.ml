@@ -79,7 +79,7 @@ let gc_points {config = {max_known_points; _}; known_points; log; _} =
       let current_size = P2p_point.Table.length known_points in
       if current_size > target then (
         let to_remove_target = current_size - target in
-        let now = Systime_os.now () in
+        let now = Time.System.now () in
         (* TODO: maybe time of discovery? *)
         let table = Gc_point_set.create to_remove_target in
         P2p_point.Table.iter
@@ -208,7 +208,7 @@ let register_peer pool peer_id =
   match P2p_peer.Table.find pool.known_peer_ids peer_id with
   | None ->
       P2p_trigger.broadcast_new_peer pool.triggers ;
-      let created = Systime_os.now () in
+      let created = Time.System.now () in
       let peer =
         P2p_peer_state.Info.create
           ~created

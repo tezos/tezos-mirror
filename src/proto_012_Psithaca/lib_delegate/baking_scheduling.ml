@@ -86,7 +86,7 @@ let timestamp_of_round known_timestamps round_durations ~predecessor_timestamp
 let sleep_until time =
   (* Sleeping is a system op, baking is a protocol op, this is where we convert *)
   let time = Time.System.of_protocol_exn time in
-  let delay = Ptime.diff time (Tezos_stdlib_unix.Systime_os.now ()) in
+  let delay = Ptime.diff time (Tezos_base.Time.System.now ()) in
   if Ptime.Span.compare delay Ptime.Span.zero < 0 then None
   else Some (Lwt_unix.sleep (Ptime.Span.to_float_s delay))
 
@@ -295,7 +295,7 @@ let compute_next_potential_baking_time_at_next_level state =
         elected_block.proposal.block.shell.timestamp
       in
       let predecessor_round = elected_block.proposal.block.round in
-      let now = Systime_os.now () |> Time.System.to_protocol in
+      let now = Time.System.now () |> Time.System.to_protocol in
       (* Lookup the next slot information if already stored in the
          memoization table [Round_timestamp_interval_tbl]. *)
       match
@@ -438,7 +438,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
   let open Baking_state in
   let wait_end_of_round ?(delta = 0L) (next_round_time, next_round) =
     let next_time = Time.Protocol.add next_round_time delta in
-    let now = Systime_os.now () in
+    let now = Time.System.now () in
     let delay = Ptime.diff (Time.System.of_protocol_exn next_time) now in
     let current_round = Int32.pred @@ Round.to_int32 next_round in
     (if delta = 0L then
@@ -458,7 +458,7 @@ let compute_next_timeout state : Baking_state.timeout_kind Lwt.t tzresult Lwt.t
     | Some t -> return (t >>= fun () -> end_of_round)
   in
   let wait_baking_time_next_level (next_baking_time, next_baking_round) =
-    let now = Systime_os.now () in
+    let now = Time.System.now () in
     let delay = Ptime.diff (Time.System.of_protocol_exn next_baking_time) now in
     Events.(emit waiting_time_to_bake (delay, next_baking_time)) >>= fun () ->
     match sleep_until next_baking_time with

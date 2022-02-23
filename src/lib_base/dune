@@ -15,6 +15,7 @@
   tezos-micheline
   tezos-event-logging
   ptime
+  ptime.clock.os
   ezjsonm
   lwt
   ipaddr)

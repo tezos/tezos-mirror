@@ -106,7 +106,7 @@ let create_prevalidation
      and type validation_state = unit
      and type chain_store = Chain_store.chain_store)
 
-let now () = Time.System.to_protocol (Tezos_stdlib_unix.Systime_os.now ())
+let now () = Time.System.to_protocol (Tezos_base.Time.System.now ())
 
 (** The value of [chain_store] used in all tests below. *)
 let chain_store = ()

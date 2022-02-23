@@ -66,7 +66,7 @@ let block_forged ?prev ops =
       {
         chain_id = network;
         predecessor = pred;
-        timestamp = Systime_os.now ();
+        timestamp = Time.System.now ();
         fitness = from_int64 1L;
         operations = ops;
       }

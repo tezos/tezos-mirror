@@ -140,6 +140,8 @@ module System = struct
 
   type t = Ptime.t
 
+  let now () = Ptime_clock.now ()
+
   include Compare.Make (Ptime)
 
   let epoch = Ptime.epoch

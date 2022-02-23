@@ -104,7 +104,7 @@ module Reference : S = struct
     if threshold < 0 then Not_synchronised
     else if threshold = 0 then Synchronised {is_chain_stuck = false}
     else
-      let now = Time.System.to_protocol @@ Systime_os.now () in
+      let now = Time.System.to_protocol @@ Time.System.now () in
       if Compare.List_length_with.(candidates < threshold) then Not_synchronised
       else
         match (best_of candidates, least_of candidates) with
@@ -136,7 +136,7 @@ let peer_id =
   (* The returned generator either produces one of [P1] to [P9] or a fresh one *)
   delay (fun () -> oneof (pure (forge_peer_id (), "fresh") :: static))
 
-let now = Time.System.to_protocol @@ Systime_os.now ()
+let now = Time.System.to_protocol @@ Time.System.now ()
 
 let forge_timestamp ~delay = Time.Protocol.add now (Int64.of_int delay)
 

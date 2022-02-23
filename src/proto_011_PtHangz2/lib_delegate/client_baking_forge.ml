@@ -1423,10 +1423,10 @@ let build_block cctxt ~user_activated_upgrades state seed_nonce_hash
         | Ok (final_context, (validation_result, _), operations, valid_timestamp)
           ->
             (if
-             Time.System.(Systime_os.now () < of_protocol_exn valid_timestamp)
+             Time.System.(Time.System.now () < of_protocol_exn valid_timestamp)
             then
              Events.(emit waiting_before_injection)
-               (Systime_os.now (), Time.System.of_protocol_exn valid_timestamp)
+               (Time.System.now (), Time.System.of_protocol_exn valid_timestamp)
              >>= fun () ->
              match Client_baking_scheduling.sleep_until valid_timestamp with
              | None -> Lwt.return_unit
