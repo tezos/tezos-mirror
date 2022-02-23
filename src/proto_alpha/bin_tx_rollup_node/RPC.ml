@@ -44,16 +44,20 @@ let current_inbox =
     RPC_path.(open_root / "current_inbox")
 
 let register_current_tezos_head state dir =
+  let open Lwt_tzresult_syntax in
   RPC_directory.register0 dir current_tezos_head (fun () () ->
-      State.get_head state >|= ok)
+      let*! head = State.get_head state in
+      return head)
 
 let register_current_inbox state dir =
+  let open Lwt_tzresult_syntax in
   RPC_directory.register0 dir current_inbox (fun () () ->
-      State.get_head state >|= ok >>=? function
+      let*! head = State.get_head state in
+      match head with
       | None -> return None
       | Some hash ->
-          State.find_inbox state hash >|= fun x ->
-          ok (Option.map Inbox.to_protocol_inbox x))
+          let*! inbox = State.find_inbox state hash in
+          return (Option.map Inbox.to_protocol_inbox inbox))
 
 let register state =
   RPC_directory.empty
@@ -61,14 +65,28 @@ let register state =
   |> register_current_inbox state
 
 let launch ~host ~acl ~node ~dir () =
-  RPC_server.launch ~media_types:Media_type.all_media_types ~host ~acl node dir
-  >>= return
+  let open Lwt_tzresult_syntax in
+  let*! r =
+    RPC_server.launch
+      ~media_types:Media_type.all_media_types
+      ~host
+      ~acl
+      node
+      dir
+  in
+  return r
 
 let start configuration state =
+  let open Lwt_syntax in
   let Configuration.{rpc_addr; rpc_port; _} = configuration in
   let addr = P2p_addr.of_string_exn rpc_addr in
   let host = Ipaddr.V6.to_string addr in
   let dir = register state in
   let node = `TCP (`Port rpc_port) in
   let acl = RPC_server.Acl.default addr in
-  Lwt.catch (launch ~host ~acl ~node ~dir) fail_with_exn
+  Lwt.catch
+    (fun () ->
+      let* rpc_server = launch ~host ~acl ~node ~dir () in
+      let* () = Event.(emit node_is_ready) (rpc_addr, rpc_port) in
+      Lwt.return rpc_server)
+    fail_with_exn

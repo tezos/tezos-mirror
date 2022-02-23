@@ -106,13 +106,11 @@ let process_messages_and_inboxes state rollup_genesis block_info rollup_id =
   let messages = compute_messages block_info rollup_id in
   let messages_len = List.length messages in
   let inbox = messages_to_inbox messages in
-  let* () = Event.messages_application messages_len in
+  let*! () = Event.(emit messages_application) messages_len in
   let* () = State.save_inbox state current_hash inbox in
-  let* () =
-    Event.inbox_stored
-      ~block_hash:current_hash
-      ~messages:inbox.contents
-      ~cumulated_size:inbox.cumulated_size
+  let*! () =
+    Event.(emit inbox_stored)
+      (current_hash, inbox.contents, inbox.cumulated_size)
   in
   return_unit
 
@@ -128,7 +126,9 @@ and process_block cctxt state rollup_genesis block_info rollup_id =
   let current_hash = block_info.hash in
   let predecessor_hash = block_info.header.shell.predecessor in
   let*! was_processed = State.block_already_seen state current_hash in
-  if was_processed then Event.block_already_seen current_hash
+  if was_processed then
+    let*! () = Event.(emit block_already_seen) current_hash in
+    return_unit
   else
     let*! predecessor_was_processed =
       State.block_already_seen state predecessor_hash
@@ -138,30 +138,29 @@ and process_block cctxt state rollup_genesis block_info rollup_id =
         (not predecessor_was_processed)
         && not (Block_hash.equal rollup_genesis current_hash)
       then
-        let* () = Event.processing_block_predecessor predecessor_hash in
+        let*! () = Event.(emit processing_block_predecessor) predecessor_hash in
         process_hash cctxt state rollup_genesis predecessor_hash rollup_id
       else return ()
     in
-    let* () =
-      Event.processing_block ~block_hash:current_hash ~predecessor_hash
-    in
+    let*! () = Event.(emit processing_block) (current_hash, predecessor_hash) in
     let* () =
       process_messages_and_inboxes state rollup_genesis block_info rollup_id
     in
     let* () = State.set_new_head state current_hash in
-    let* () = Event.new_tezos_head current_hash in
-    Event.block_processed current_hash
+    let*! () = Event.(emit new_tezos_head) current_hash in
+    let*! () = Event.(emit block_processed) current_hash in
+    return_unit
 
 let process_inboxes cctxt state rollup_genesis current_hash rollup_id =
   let open Lwt_result_syntax in
-  let* () = Event.new_block current_hash in
+  let*! () = Event.(emit new_block) current_hash in
   let* () = process_hash cctxt state rollup_genesis current_hash rollup_id in
   return_unit
 
 let main_exit_callback data_dir exit_status =
   let open Lwt_syntax in
   let* () = Stores.close data_dir in
-  let* () = Event.node_is_shutting_down ~exit_status in
+  let* () = Event.(emit node_is_shutting_down) exit_status in
   Tezos_base_unix.Internal_event_unix.close ()
 
 let rec connect ~delay cctxt =
@@ -170,7 +169,7 @@ let rec connect ~delay cctxt =
   match res with
   | Ok (stream, stopper) -> Error_monad.return (stream, stopper)
   | Error _ ->
-      let* () = Event.cannot_connect ~delay in
+      let* () = Event.(emit cannot_connect) delay in
       let* () = Lwt_unix.sleep delay in
       connect ~delay cctxt
 
@@ -180,16 +179,9 @@ let valid_history_mode = function
 
 let run ~data_dir cctxt =
   let open Lwt_result_syntax in
-  let* () = Event.starting_node () in
-  let* ({
-          data_dir;
-          rpc_addr;
-          rpc_port;
-          rollup_id;
-          rollup_genesis;
-          reconnection_delay;
-          _;
-        } as configuration) =
+  let*! () = Event.(emit starting_node) () in
+  let* ({data_dir; rollup_id; rollup_genesis; reconnection_delay; _} as
+       configuration) =
     Configuration.load ~data_dir
   in
   let* state =
@@ -202,8 +194,6 @@ let run ~data_dir cctxt =
       ~loc:__LOC__
       (main_exit_callback configuration.data_dir)
   in
-  let* () = Event.irmin_store_loaded data_dir in
-  let* () = Event.node_is_ready ~rpc_addr ~rpc_port in
   let* (_, _, _, history_mode) = Chain_services.checkpoint cctxt () in
   let* () =
     fail_unless
@@ -217,16 +207,26 @@ let run ~data_dir cctxt =
           let* (block_stream, interupt) =
             connect ~delay:reconnection_delay cctxt
           in
-          Lwt_stream.iter_s
-            (fun (current_hash, _header) ->
-              process_inboxes cctxt state rollup_genesis current_hash rollup_id
-              >>= function
-              | Ok () -> Lwt.return ()
-              | Error _ ->
-                  let () = interupt () in
-                  Lwt.return ())
-            block_stream
-          >>= Event.connection_lost >>= loop)
+          let*! () =
+            Lwt_stream.iter_s
+              (fun (current_hash, _header) ->
+                let*! r =
+                  process_inboxes
+                    cctxt
+                    state
+                    rollup_genesis
+                    current_hash
+                    rollup_id
+                in
+                match r with
+                | Ok () -> Lwt.return ()
+                | Error _ ->
+                    let () = interupt () in
+                    Lwt.return ())
+              block_stream
+          in
+          let*! () = Event.(emit connection_lost) () in
+          loop ())
         fail_with_exn
     in
     Lwt_utils.never_ending ()
