@@ -59,41 +59,23 @@ let get_node_inbox ?(block = "head") node =
       let hash = JSON.(json |-> "hash" |> as_string) in
       return Rollup.{cumulated_size; contents; hash}
 
-let test ~__FILE__ ?output_file ?(tags = []) title k =
-  match output_file with
-  | None ->
-      Protocol.register_test ~__FILE__ ~title ~tags:("tx_rollup" :: tags) k
-  | Some output_file ->
-      Protocol.register_regression_test
-        ~output_file
-        ~__FILE__
-        ~title
-        ~tags:("tx_rollup" :: tags)
-        k
-
-let setup f ~protocol =
+let get_rollup_parameter_file ~protocol =
   let enable_tx_rollup = [(["tx_rollup_enable"], Some "true")] in
   let base = Either.right (protocol, None) in
-  let* parameter_file = Protocol.write_parameter_file ~base enable_tx_rollup in
-  let* (node, client) =
-    Client.init_with_protocol ~parameter_file `Client ~protocol ()
-  in
-  let bootstrap1_key = Constant.bootstrap1 in
-  let bootstrap2_key = Constant.bootstrap2 in
-  f node client bootstrap1_key bootstrap2_key
-
-let test_with_setup ~__FILE__ ?output_file ?(tags = []) title f =
-  test ~__FILE__ ?output_file ~tags title (fun protocol ->
-      setup ~protocol (f protocol))
+  Protocol.write_parameter_file ~base enable_tx_rollup
 
 let test_node_configuration =
-  let output_file = "tx_node_configuration" in
-  test_with_setup
+  Protocol.register_test
     ~__FILE__
-    ~output_file
-    "TX_rollup: configuration"
-    (fun _protocol node client bootstrap1_key _ ->
-      let operator = bootstrap1_key.public_key_hash in
+    ~title:"TX_rollup: configuration"
+    ~tags:["tx_rollup"; "configuration"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
+      (* Originate a rollup with a given operator *)
       let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
       let* json = RPC.get_block client in
       let* block_hash = get_block_hash json in
@@ -129,11 +111,16 @@ let test_node_configuration =
       unit)
 
 let test_tx_node_is_ready =
-  test_with_setup
+  Protocol.register_test
     ~__FILE__
-    "TX_rollup: test if the node is ready"
-    (fun _protocol node client bootstrap1_key _ ->
-      let operator = bootstrap1_key.public_key_hash in
+    ~title:"TX_rollup: test if the node is ready"
+    ~tags:["tx_rollup"; "ready"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
       let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
@@ -153,11 +140,16 @@ let test_tx_node_is_ready =
       unit)
 
 let test_tx_node_store_inbox =
-  test_with_setup
+  Protocol.register_test
     ~__FILE__
-    "TX_rollup: test"
-    (fun _protocol node client bootstrap1_key _ ->
-      let operator = bootstrap1_key.public_key_hash in
+    ~title:"TX_rollup: test"
+    ~tags:["tx_rollup"; "test"]
+    (fun protocol ->
+      let* parameter_file = get_rollup_parameter_file ~protocol in
+      let* (node, client) =
+        Client.init_with_protocol ~parameter_file `Client ~protocol ()
+      in
+      let operator = Constant.bootstrap1.public_key_hash in
       let*! rollup = Client.Tx_rollup.originate ~src:operator client in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 2 in
