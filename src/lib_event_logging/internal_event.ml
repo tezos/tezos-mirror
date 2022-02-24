@@ -497,7 +497,7 @@ module Simple = struct
         | Ok () -> Lwt.return_unit
         | Error trace ->
             (* Having to handle errors when sending events would make the
-               code very heavy. We are much more likely to just use [>>=?]
+               code very heavy. We are much more likely to just use [let*]
                to propagate the error, assuming that sending events cannot
                fail. But consider this example:
                - we log that we are going to do some cleanup, like remove

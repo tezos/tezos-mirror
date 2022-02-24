@@ -55,7 +55,14 @@ let compose_parameters {converter = c1; autocomplete = a1'}
   }
 
 let map_parameter ~f {converter; autocomplete} =
-  {converter = (fun ctx s -> converter ctx s >|=? f); autocomplete}
+  let open Lwt_result_syntax in
+  {
+    converter =
+      (fun ctx s ->
+        let+ v = converter ctx s in
+        f v);
+    autocomplete;
+  }
 
 type label = {long : string; short : char option}
 
@@ -769,7 +776,8 @@ let parse_arg :
           Some x
       | Some (_ :: _) -> fail (Multiple_occurrences ("--" ^ long, command)))
   | DefArg {label = {long; short = _}; kind = {converter; _}; default; _} -> (
-      converter ctx default >>= function
+      let*! r = converter ctx default in
+      match r with
       | Error _ ->
           invalid_arg
             (Format.sprintf
@@ -1501,11 +1509,11 @@ let exec (type ctx)
          conv;
          _;
        } as command) (ctx : ctx) params args_dict =
+  let open Lwt_tzresult_syntax in
   let rec exec :
       type ctx a.
       int -> ctx -> (a, ctx) params -> a -> string list -> unit tzresult Lwt.t =
    fun i ctx spec cb params ->
-    let open Lwt_tzresult_syntax in
     match (spec, params) with
     | (Stop, _) -> cb ctx
     | (Seq (_, _, {converter; _}), seq) ->
@@ -1553,7 +1561,7 @@ let exec (type ctx)
     | _ -> Stdlib.failwith "cli_entries internal error: exec no case matched"
   in
   let ctx = conv ctx in
-  parse_args ~command options_spec args_dict ctx >>=? fun parsed_options ->
+  let* parsed_options = parse_args ~command options_spec args_dict ctx in
   exec 1 ctx spec (handler (converter parsed_options)) params
 
 [@@@ocaml.warning "-30"]
@@ -1826,9 +1834,10 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
         else complete_spec name rest
   in
   let rec help args ind seen =
+    let open Lwt_result_syntax in
     match args with
     | _ when ind = 0 ->
-        continuation args 0 >|=? fun cont_args ->
+        let+ cont_args = continuation args 0 in
         cont_args @ remaining_spec seen args_spec
     | [] -> Stdlib.failwith "cli_entries internal autocomplete error"
     | arg :: tl ->
@@ -1837,7 +1846,7 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
           let seen = TzString.Set.add long seen in
           match (arity, tl) with
           | (0, args) when ind = 0 ->
-              continuation args 0 >|=? fun cont_args ->
+              let+ cont_args = continuation args 0 in
               remaining_spec seen args_spec @ cont_args
           | (0, args) -> help args (ind - 1) seen
           | (1, _) when ind = 1 -> complete_spec arg args_spec
@@ -1847,7 +1856,9 @@ let complete_options (type ctx) continuation args args_spec ind (ctx : ctx) =
   in
   help args ind TzString.Set.empty
 
-let complete_next_tree cctxt = function
+let complete_next_tree cctxt =
+  let open Lwt_result_syntax in
+  function
   | TPrefix {stop; prefix} ->
       return
         ((match stop with
@@ -1855,10 +1866,10 @@ let complete_next_tree cctxt = function
          | Some command -> list_command_args command)
         @ List.map fst prefix)
   | TSeq (command, autocomplete) ->
-      complete_func autocomplete cctxt >|=? fun completions ->
+      let+ completions = complete_func autocomplete cctxt in
       completions @ list_command_args command
   | TNonTerminalSeq {autocomplete; suffix; _} ->
-      complete_func autocomplete cctxt >|=? fun completions ->
+      let+ completions = complete_func autocomplete cctxt in
       completions @ [WithExceptions.Option.get ~loc:__LOC__ @@ List.hd suffix]
   | TParam {autocomplete; _} -> complete_func autocomplete cctxt
   | TStop command -> return (list_command_args command)
@@ -1911,6 +1922,7 @@ let complete_tree cctxt tree index args =
 
 let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
     cctxt =
+  let open Lwt_result_syntax in
   let tree = make_dispatch_tree commands in
   let rec ind n = function
     | [] -> None
@@ -1919,22 +1931,23 @@ let autocompletion ~script ~cur_arg ~prev_arg ~args ~global_options commands
           Some (Option.value ~default:(n + 1) (ind (n + 1) tl))
         else ind (n + 1) tl
   in
-  (if prev_arg = script then
-   complete_next_tree cctxt tree >|=? fun command_completions ->
-   let (Argument {spec; _}) = global_options in
-   list_args spec @ command_completions
-  else
-    match ind 0 args with
-    | None -> return_nil
-    | Some index ->
-        let (Argument {spec; _}) = global_options in
-        complete_options
-          (fun args ind -> complete_tree cctxt tree ind args)
-          args
-          spec
-          index
-          cctxt)
-  >|=? fun completions ->
+  let+ completions =
+    if prev_arg = script then
+      let+ command_completions = complete_next_tree cctxt tree in
+      let (Argument {spec; _}) = global_options in
+      list_args spec @ command_completions
+    else
+      match ind 0 args with
+      | None -> return_nil
+      | Some index ->
+          let (Argument {spec; _}) = global_options in
+          complete_options
+            (fun args ind -> complete_tree cctxt tree ind args)
+            args
+            spec
+            index
+            cctxt
+  in
   List.filter
     (fun completion ->
       Re.Str.(string_match (regexp_string cur_arg) completion 0))

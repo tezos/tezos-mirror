@@ -67,5 +67,7 @@ let apply {active_sinks} =
   List.iter_es Internal_event.All_sinks.activate active_sinks
 
 let reapply config =
+  let open Lwt_result_syntax in
   let except u = Uri.scheme u = Some "lwt-log" in
-  Internal_event.All_sinks.close ~except () >>=? fun () -> apply config
+  let* () = Internal_event.All_sinks.close ~except () in
+  apply config
