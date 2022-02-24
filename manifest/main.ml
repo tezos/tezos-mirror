@@ -2455,9 +2455,6 @@ let todo ?main_module ?opam name = external_lib ?main_module ?opam name V.True
 
 let todo_sub lib sub = external_sublib lib sub
 
-let tezos_alpha_test_helpers =
-  todo ~main_module:"Tezos_alpha_test_helpers" "tezos-alpha-test-helpers"
-
 let tezos_protocol_alpha_parameters =
   todo
     ~main_module:"Tezos_protocol_alpha_parameters"
@@ -2919,21 +2916,6 @@ let _tezos_shell_tests =
             ~package:"tezos-shell"
             ~action:(run_exe "test_locator" ["--bench"]);
         ]
-
-let _tezos_shell_benchs =
-  tests
-    ["bench_simple"; "bench_tool"]
-    ~path:"src/lib_shell/bench"
-    ~opam:"src/lib_shell/tezos-shell"
-    ~deps:
-      [
-        tezos_base |> open_ ~m:"TzPervasives";
-        tezos_shell |> open_;
-        Protocol.(main alpha) |> open_;
-        Protocol.(plugin_exn alpha) |> open_;
-        tezos_protocol_alpha_parameters |> open_;
-        tezos_alpha_test_helpers |> open_;
-      ]
 
 (* INTERNAL EXES *)
 
