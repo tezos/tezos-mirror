@@ -164,7 +164,6 @@ val register_regression_test :
   title:string ->
   tags:string list ->
   output_file:string ->
-  ?regression_output_path:string ->
   (t -> unit Lwt.t) ->
   protocols:t list ->
   unit

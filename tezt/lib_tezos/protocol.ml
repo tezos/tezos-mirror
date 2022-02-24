@@ -169,16 +169,11 @@ let register_long_test ~__FILE__ ~title ~tags ?team ~executors ~timeout body
   in
   List.iter register_with_protocol protocols
 
-let register_regression_test ~__FILE__ ~title ~tags ~output_file
-    ?regression_output_path body ~protocols =
+let register_regression_test ~__FILE__ ~title ~tags ~output_file body ~protocols
+    =
   let register_with_protocol protocol =
     let (title, tags) = add_to_test_parameters protocol title tags in
-    Regression.register
-      ~__FILE__
-      ~title
-      ~tags
-      ~output_file
-      ?regression_output_path
-      (fun () -> body protocol)
+    Regression.register ~__FILE__ ~title ~tags ~output_file (fun () ->
+        body protocol)
   in
   List.iter register_with_protocol protocols

@@ -51,7 +51,9 @@ let channel =
     list;
     global_timeout = _;
     test_timeout = _;
+    regression_dir = _;
     reset_regressions = _;
+    delete_unknown_regression_files = _;
     loop_mode = _;
     time = _;
     starting_port = _;

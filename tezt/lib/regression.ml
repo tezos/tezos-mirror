@@ -78,20 +78,27 @@ let log_regression_diff diff =
         Log.log ~level:Error ~color "%s" line)
     (String.split_on_char '\n' diff)
 
-let register ~__FILE__ ~title ~tags ~output_file
-    ?(regression_output_path = "tezt/_regressions") f =
+let all_output_files = ref String_set.empty
+
+let full_output_file output_file =
+  (Cli.options.regression_dir // output_file) ^ ".out"
+
+let register ~__FILE__ ~title ~tags ~output_file f =
   let tags = "regression" :: tags in
-  let output_file = Format.asprintf "%s.out" output_file in
-  let stored_output_file = regression_output_path // output_file in
+  all_output_files := String_set.add output_file !all_output_files ;
   Test.register ~__FILE__ ~title ~tags (fun () ->
+      (* We cannot compute [stored_output_file] before [Test.register]
+         because [Cli.init] must have been called. *)
+      let stored_output_file = full_output_file output_file in
       (* when the stored output doesn't already exists, must reset regressions *)
       if
         not (Sys.file_exists stored_output_file || Cli.options.reset_regressions)
       then
         Test.fail
-          "No existing regression output file found (%s). To generate it, run \
-           with option \"--reset-regressions\""
-          stored_output_file ;
+          "Regression output file not found: %s. To generate it, use: \
+           --reset-regressions --test %s"
+          (Log.quote_shell stored_output_file)
+          (Log.quote_shell title) ;
       let capture_f ~output_file =
         run_and_capture_output ~output_file @@ fun () ->
         capture stored_output_file ;
@@ -135,4 +142,59 @@ let register ~__FILE__ ~title ~tags ~output_file
             let diff = Buffer.contents buffer in
             Buffer.reset buffer ;
             log_regression_diff diff ;
-            Test.fail "The regression test output contains differences")
+            Test.fail
+              "Regression output file contains differences: %s. To accept the \
+               differences, use: --reset-regressions --test %s"
+              (Log.quote_shell stored_output_file)
+              (Log.quote_shell title))
+
+let check_unknown_output_files () =
+  let full_output_files = String_set.map full_output_file !all_output_files in
+  let explain_how_to_delete = ref false in
+  let rec browse path =
+    let handle_file filename =
+      let full = path // filename in
+      match Sys.is_directory full with
+      | exception Sys_error _ ->
+          (* If we can't browse, ignore. *)
+          ()
+      | true -> browse full
+      | false ->
+          if not (String_set.mem full full_output_files) then
+            if Cli.options.delete_unknown_regression_files then
+              try
+                Sys.remove full ;
+                Log.report "Deleted file: %s" full
+              with Sys_error message ->
+                Log.warn "Failed to delete file: %s" message
+            else (
+              Log.warn "%s is not used by any test and can be deleted." full ;
+              explain_how_to_delete := true)
+    in
+    Array.iter handle_file (Sys.readdir path) ;
+    (* Check whether directory is empty now that we may have deleted files. *)
+    match Sys.readdir path with
+    | [||] ->
+        if Cli.options.delete_unknown_regression_files then
+          try
+            Sys.rmdir path ;
+            Log.report "Deleted directory: %s" path
+          with Sys_error message ->
+            Log.warn "Failed to delete directory: %s" message
+        else (
+          Log.warn "%s is empty and can be deleted." path ;
+          explain_how_to_delete := true)
+    | _ -> ()
+  in
+  browse Cli.options.regression_dir ;
+  if !explain_how_to_delete then
+    Log.warn
+      "Use --delete-unknown-regression-files to delete those files and/or \
+       directories." ;
+  if Cli.options.delete_unknown_regression_files then exit 0
+
+let () =
+  (* We cannot run [check_unknown_output_files] before [Cli.init],
+     and we cannot run it from the [Test] module because it would create
+     a circular dependency. *)
+  Test.before_test_run check_unknown_output_files
