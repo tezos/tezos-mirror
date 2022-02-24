@@ -100,9 +100,88 @@ let documentation_mentions_correct_tag_bit_counts () =
     = 13) ;
   ()
 
+let roundtrip_binary loc encoding1 encoding2 value =
+  let blob = Data_encoding.Binary.to_string_exn encoding1 value in
+  let value' = Data_encoding.Binary.of_string_exn encoding2 blob in
+  if value <> value' then raise (Failure ("Roundtrip failure at " ^ loc))
+
+let no_roundtrip_binary loc encoding1 encoding2 value =
+  let blob = Data_encoding.Binary.to_string_exn encoding1 value in
+  match Data_encoding.Binary.of_string_exn encoding2 blob with
+  | exception Data_encoding.Binary.Read_error _ -> ()
+  | value' ->
+      if value = value' then
+        raise (Failure ("Unexpected successful rountrip at " ^ loc))
+
+let roundtrip_with_voids () =
+  let open Data_encoding.Compact in
+  let casel =
+    case
+      ~title:"Left"
+      (payload Data_encoding.uint8)
+      Either.find_left
+      Either.left
+  in
+  let caser =
+    case
+      ~title:"Right"
+      (payload Data_encoding.uint8)
+      Either.find_right
+      Either.right
+  in
+  let all_inputs = List.init 256 Either.left @ List.init 256 Either.right in
+  let compatible_unions =
+    [
+      union ~union_tag_bits:1 [casel; caser];
+      union ~union_tag_bits:2 [casel; caser];
+      union
+        ~union_tag_bits:2
+        [casel; caser; void_case ~title:"a"; void_case ~title:"b"];
+    ]
+  in
+  let incompatible_unions =
+    [
+      union ~union_tag_bits:1 [caser; casel];
+      union
+        ~union_tag_bits:2
+        [void_case ~title:"a"; void_case ~title:"b"; casel; caser];
+      union
+        ~union_tag_bits:2
+        [void_case ~title:"a"; casel; void_case ~title:"b"; caser];
+      union
+        ~union_tag_bits:2
+        [void_case ~title:"a"; casel; caser; void_case ~title:"b"];
+    ]
+  in
+  List.iter
+    (fun encoding1 ->
+      let encoding1 = make ~tag_size:`Uint8 encoding1 in
+      List.iter
+        (fun encoding2 ->
+          let encoding2 = make ~tag_size:`Uint8 encoding2 in
+          List.iter
+            (fun value -> roundtrip_binary __LOC__ encoding1 encoding2 value)
+            all_inputs)
+        compatible_unions)
+    compatible_unions ;
+  List.iter
+    (fun encoding1 ->
+      let encoding1 = make ~tag_size:`Uint8 encoding1 in
+      List.iter
+        (fun encoding2 ->
+          let encoding2 = make ~tag_size:`Uint8 encoding2 in
+          List.iter
+            (fun value ->
+              no_roundtrip_binary __LOC__ encoding1 encoding2 value ;
+              no_roundtrip_binary __LOC__ encoding2 encoding1 value)
+            all_inputs)
+        compatible_unions)
+    incompatible_unions
+
 let tests =
   [
     ( "tag_bit_count documentation",
       `Quick,
       documentation_mentions_correct_tag_bit_counts );
+    ("roundtrip (heavy on void)", `Quick, roundtrip_with_voids);
   ]

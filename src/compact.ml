@@ -194,7 +194,7 @@ type ('a, 'b, 'layout) case_open = {
 }
 
 type ('a, 'b, 'layout) case_layout_open = {
-  extra_tag : int;
+  tag : int; (* The tag which identifies this specific case out of the others *)
   proj : 'a -> 'b option;
   inj : 'b -> 'a;
   compact : (module S with type input = 'b and type layout = 'layout);
@@ -225,13 +225,12 @@ let case_to_layout_open :
     (a, b, layout) case_open ->
     ((a, b, layout) case_layout_open -> c) ->
     c list =
- fun extra_tag {proj; inj; compact; _} f ->
+ fun tag {proj; inj; compact; _} f ->
   let (module C : S with type input = b and type layout = layout) = compact in
-  List.map (fun layout -> f {extra_tag; proj; inj; compact; layout}) C.layouts
+  List.map (fun layout -> f {tag; proj; inj; compact; layout}) C.layouts
 
 let case_to_layout : type a. tag -> a case -> a case_layout list =
- fun extra_tag (Case case) ->
-  case_to_layout_open extra_tag case (fun x -> Case_layout x)
+ fun tag (Case case) -> case_to_layout_open tag case (fun x -> Case_layout x)
 
 let cases_to_layouts : type a. a case list -> a case_layout list =
  fun cases -> List.mapi (fun i -> case_to_layout i) cases |> List.concat
@@ -242,36 +241,37 @@ let classify_with_case_open :
     (a, b, layout) case_open ->
     a ->
     (a, b, layout) case_layout_open option =
- fun extra_tag {compact; proj; inj; _} input ->
+ fun tag {compact; proj; inj; _} input ->
   let (module C : S with type input = b and type layout = layout) = compact in
   match proj input with
   | Some input' ->
       let layout = C.classify input' in
-      Some {proj; inj; extra_tag; layout; compact}
+      Some {proj; inj; tag; layout; compact}
   | None -> None
 
 let classify_with_case : type a. tag -> a case -> a -> a case_layout option =
- fun extra_tag (Case case) input ->
-  match classify_with_case_open extra_tag case input with
+ fun tag (Case case) input ->
+  match classify_with_case_open tag case input with
   | Some layout -> Some (Case_layout layout)
   | None -> None
 
-let classify_with_cases_exn : type a. a case list -> a -> a case_layout =
- fun cases input ->
-  let rec classify_aux extra_tag = function
+let classify_with_cases_exn : type a. (int * a case) list -> a -> a case_layout
+    =
+ fun icases input ->
+  let rec classify_aux = function
     | [] -> raise (Invalid_argument "classify_exn")
-    | case :: rst -> (
-        match classify_with_case extra_tag case input with
+    | (tag, case) :: rst -> (
+        match classify_with_case tag case input with
         | Some layout -> layout
-        | None -> classify_aux (succ extra_tag) rst)
+        | None -> classify_aux rst)
   in
-  classify_aux 0 cases
+  classify_aux icases
 
 let tag_with_case_layout_open :
     type a b layout. int -> (a, b, layout) case_layout_open -> tag =
- fun inner_tag_len {extra_tag; compact; layout; _} ->
+ fun inner_tag_len {tag; compact; layout; _} ->
   let (module C : S with type input = b and type layout = layout) = compact in
-  (extra_tag lsl inner_tag_len) lor C.tag layout
+  (tag lsl inner_tag_len) lor C.tag layout
 
 let tag_with_case_layout : type a. int -> a case_layout -> tag =
  fun inner_tag_len (Case_layout case) ->
@@ -323,6 +323,9 @@ let void_case : type a. title:string -> a case =
     (fun _ -> None)
     refute
 
+let is_void_case : type a. a case -> bool =
+ fun (Case {compact; _}) -> Obj.repr compact == Obj.repr void
+
 let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
@@ -370,7 +373,17 @@ let union :
 
     let layouts = cases_to_layouts cases
 
-    let classify = classify_with_cases_exn cases
+    let classify =
+      let cleaned_cases =
+        let rec aux acc idx = function
+          | [] -> List.rev acc
+          | case :: cases ->
+              if is_void_case case then aux acc (idx + 1) cases
+              else aux ((idx, case) :: acc) (idx + 1) cases
+        in
+        aux [] 0 cases
+      in
+      classify_with_cases_exn cleaned_cases
 
     let partial_encoding = partial_encoding_of_case_layout
 
