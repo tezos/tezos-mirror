@@ -926,76 +926,30 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     let open Lwt_syntax in
     let data_merkle_root = Hash.of_context_hash data_merkle_root in
     let parents = List.map Hash.of_context_hash parents_contexts in
-    let protocol_hash_bytes = Protocol_hash.to_bytes given_protocol_hash in
-    let tree = Store.Tree.empty () in
-    let* tree = Store.Tree.add tree current_protocol_key protocol_hash_bytes in
-    let test_chain_status_bytes =
-      Data_encoding.Binary.to_bytes_exn
-        Test_chain_status.encoding
-        test_chain_status
-    in
-    let* tree =
-      Store.Tree.add tree current_test_chain_key test_chain_status_bytes
-    in
-    let* tree =
-      match predecessor_block_metadata_hash with
-      | Some predecessor_block_metadata_hash ->
-          let predecessor_block_metadata_hash_value =
-            Block_metadata_hash.to_bytes predecessor_block_metadata_hash
-          in
-          Store.Tree.add
-            tree
-            current_predecessor_block_metadata_hash_key
-            predecessor_block_metadata_hash_value
-      | None -> Lwt.return tree
-    in
-    let* tree =
-      match predecessor_ops_metadata_hash with
-      | Some predecessor_ops_metadata_hash ->
-          let predecessor_ops_metadata_hash_value =
-            Operation_metadata_list_list_hash.to_bytes
-              predecessor_ops_metadata_hash
-          in
-          Store.Tree.add
-            tree
-            current_predecessor_ops_metadata_hash_key
-            predecessor_ops_metadata_hash_value
-      | None -> Lwt.return tree
-    in
     let info = Info.v ~author (Time.Protocol.to_seconds timestamp) ~message in
-    let data_tree = Store.Tree.pruned (`Node data_merkle_root) in
-    let* node = Store.Tree.add_tree tree current_data_key data_tree in
-    let node = Store.Tree.hash node in
-    let commit_hash =
-      P.Commit_portable.v ~parents ~node ~info |> Commit_hash.hash
+    let tree = Store.Tree.empty () in
+    let* tree = Root_tree.add_test_chain tree test_chain_status in
+    let* tree = Root_tree.add_protocol tree given_protocol_hash in
+    let* tree =
+      Option.fold
+        predecessor_block_metadata_hash
+        ~none:(Lwt.return tree)
+        ~some:(Root_tree.add_predecessor_block_metadata_hash tree)
     in
-    let computed_context_hash = Hash.to_context_hash commit_hash in
-    if not (Context_hash.equal expected_context_hash computed_context_hash) then
-      Lwt.return_false
-    else
-      let tree = Store.Tree.empty () in
-      let* tree = Root_tree.add_test_chain tree test_chain_status in
-      let* tree = Root_tree.add_protocol tree given_protocol_hash in
-      let* tree =
-        Option.fold
-          predecessor_block_metadata_hash
-          ~none:(Lwt.return tree)
-          ~some:(Root_tree.add_predecessor_block_metadata_hash tree)
-      in
-      let* tree =
-        Option.fold
-          predecessor_ops_metadata_hash
-          ~none:(Lwt.return tree)
-          ~some:(Root_tree.add_predecessor_ops_metadata_hash tree)
-      in
-      let data_t = Store.Tree.pruned (`Node data_merkle_root) in
-      let+ new_tree = Store.Tree.add_tree tree current_data_key data_t in
-      let node = Store.Tree.hash new_tree in
-      let ctxt_h =
-        P.Commit_portable.v ~info ~parents ~node
-        |> Commit_hash.hash |> Hash.to_context_hash
-      in
-      Context_hash.equal ctxt_h expected_context_hash
+    let* tree =
+      Option.fold
+        predecessor_ops_metadata_hash
+        ~none:(Lwt.return tree)
+        ~some:(Root_tree.add_predecessor_ops_metadata_hash tree)
+    in
+    let data_t = Store.Tree.pruned (`Node data_merkle_root) in
+    let+ new_tree = Store.Tree.add_tree tree current_data_key data_t in
+    let node = Store.Tree.hash new_tree in
+    let ctxt_h =
+      P.Commit_portable.v ~info ~parents ~node
+      |> Commit_hash.hash |> Hash.to_context_hash
+    in
+    Context_hash.equal ctxt_h expected_context_hash
 
   (* Context dumper *)
 
