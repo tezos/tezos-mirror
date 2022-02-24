@@ -887,6 +887,17 @@ module Tx_rollup : sig
     rollup:string ->
     Client.t ->
     JSON.t Process.runnable
+
+  (** Call RPC /chain/[chain]/blocks/[block]/context/[rollup_hash]/pending_bonded_commitments *)
+  val get_pending_bonded_commitments :
+    ?endpoint:Client.endpoint ->
+    ?hooks:Process.hooks ->
+    ?chain:string ->
+    ?block:string ->
+    tx_rollup:string ->
+    public_key_hash:string ->
+    Client.t ->
+    JSON.t Process.runnable
 end
 
 module Sc_rollup : sig

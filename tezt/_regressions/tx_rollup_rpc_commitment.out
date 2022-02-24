@@ -2,7 +2,7 @@ tezt/_regressions/tx_rollup_rpc_commitment.out
 
 ./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2257.216 units (will add 100 for safety)
+Estimated gas: 2257.250 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -24,7 +24,7 @@ This sequence of operations was run:
       This tx rollup submit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2257.216
+      Consumed gas: 2257.250
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/inbox'
@@ -34,7 +34,7 @@ This sequence of operations was run:
 
 ./tezos-client --wait none submit tx rollup commitment 3 i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
-Estimated gas: 2250.464 units (will add 100 for safety)
+Estimated gas: 2870.480 units (will add 100 for safety)
 Estimated storage: no bytes added
 Operation successfully injected in the node.
 Operation hash is '[OPERATION_HASH]'
@@ -45,19 +45,19 @@ and/or an external block explorer to make sure that it has been included.
 This sequence of operations was run:
   Manager signed operations:
     From: [PUBLIC_KEY_HASH]
-    Fee to the baker: ꜩ0.000529
+    Fee to the baker: ꜩ0.000591
     Expected counter: 3
-    Gas limit: 2351
+    Gas limit: 2971
     Storage limit: 0 bytes
     Balance updates:
-      [PUBLIC_KEY_HASH] ... -ꜩ0.000529
-      payload fees(the block proposer) ....... +ꜩ0.000529
+      [PUBLIC_KEY_HASH] ... -ꜩ0.000591
+      payload fees(the block proposer) ....... +ꜩ0.000591
     Tx rollup commitment:[TX_ROLLUP_HASH], commitment 3 : batches = 726f6f74 predecessor  for inbox i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5
       From: [PUBLIC_KEY_HASH]
       This tx rollup commit operation was successfully applied
       Balance updates:
         
-      Consumed gas: 2250.464
+      Consumed gas: 2870.480
 
 
 ./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitment?offset=3'

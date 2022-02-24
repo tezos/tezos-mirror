@@ -264,3 +264,27 @@ val tx_rollup_commit :
   Tx_rollup.t ->
   Tx_rollup_commitment.t ->
   Operation.packed tzresult Lwt.t
+
+(** [tx_rollup_return_bond ctxt source tx_rollup] returns a commitment bond. *)
+val tx_rollup_return_bond :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  Operation.packed tzresult Lwt.t
+
+(** [tx_rollup_Finalize ctxt source tx_rollup] finalizes the most recent
+    final level of a rollup. *)
+val tx_rollup_finalize :
+  ?counter:Z.t ->
+  ?fee:Tez.tez ->
+  ?gas_limit:Gas.Arith.integral ->
+  ?storage_limit:Z.t ->
+  Context.t ->
+  Contract.t ->
+  Tx_rollup.t ->
+  Raw_level.t ->
+  Operation.packed tzresult Lwt.t

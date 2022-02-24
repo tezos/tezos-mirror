@@ -104,6 +104,9 @@ let constants_mainnet =
     (* Transaction rollup’s size limits are expressed in number of bytes *)
     tx_rollup_hard_size_limit_per_inbox = 100_000;
     tx_rollup_hard_size_limit_per_message = 5_000;
+    tx_rollup_commitment_bond = Tez.of_mutez_exn 10_000_000_000L;
+    tx_rollup_finality_period = 2_000;
+    tx_rollup_max_unfinalized_levels = 2_100;
     sc_rollup_enable = false;
     (* The following value is chosen to prevent spam. *)
     sc_rollup_origination_size = 6_314;

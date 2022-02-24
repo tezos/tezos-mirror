@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Marigold <contact@marigold.dev>                        *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Oxhead Alpha <info@oxheadalpha.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -198,11 +199,6 @@ let assert_ok res = match res with Ok r -> r | Error _ -> assert false
 
 let raw_level level = assert_ok @@ Raw_level.of_int32 level
 
-let public_key_hash_exn contract =
-  match Contract.is_implicit contract with
-  | None -> assert false
-  | Some public_key_hash -> public_key_hash
-
 (* Make a valid commitment for a batch.  TODO/TORU: roots are still
    wrong, of course, until we get Merkle proofs*)
 let make_commitment_for_batch i level tx_rollup =
@@ -234,12 +230,32 @@ let make_commitment_for_batch i level tx_rollup =
         (Tx_rollup_commitment.get_commitment ctxt tx_rollup predecessor_level)
       >|=? function
       | (_, None) -> None
-      | (_, Some sub) -> Some (Tx_rollup_commitment.hash sub.commitment)))
+      | (_, Some {commitment; _}) -> Some (Tx_rollup_commitment.hash commitment)
+      ))
   >>=? fun predecessor ->
   let commitment : Tx_rollup_commitment.t =
     {level; batches; predecessor; inbox_hash = metadata.hash}
   in
   return commitment
+
+let check_bond ctxt tx_rollup contract count =
+  let pkh = is_implicit_exn contract in
+  wrap (Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh)
+  >>=? fun (_, pending) ->
+  Alcotest.(check int "Pending bonded commitment count correct" count pending) ;
+  return ()
+
+let rec bake_until i top =
+  let level = Incremental.level i in
+  if level >= top then return i
+  else
+    Incremental.finalize_block i >>=? fun b ->
+    Incremental.begin_construction b >>=? fun i -> bake_until i top
+
+let assert_retired retired =
+  match retired with
+  | `Retired -> return_unit
+  | _ -> failwith "Expected retired"
 
 (** ---- TESTS -------------------------------------------------------------- *)
 
@@ -820,7 +836,7 @@ let test_finalization () =
 let test_inbox_linked_list () =
   let assert_level_equals ~loc expected actual =
     match actual with
-    | None -> assert false
+    | None -> raise (Invalid_argument "Error: No level found")
     | Some level ->
         Assert.equal
           ~loc
@@ -898,7 +914,7 @@ let test_commitment_duplication () =
   let contract2 =
     WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 1
   in
-  let pkh1 = public_key_hash_exn contract1 in
+  let pkh1 = is_implicit_exn contract1 in
   originate b contract1 >>=? fun (b, tx_rollup) ->
   Context.Contract.balance (B b) contract1 >>=? fun balance ->
   Context.Contract.balance (B b) contract2 >>=? fun balance2 ->
@@ -951,8 +967,8 @@ let test_commitment_duplication () =
   let ctxt = Incremental.alpha_ctxt i in
   wrap (Tx_rollup_commitment.get_commitment ctxt tx_rollup level)
   >>=? fun (_, commitment_opt) ->
-  match commitment_opt with
-  | None -> assert false
+  (match commitment_opt with
+  | None -> raise (Invalid_argument "No commitment")
   | Some {commitment = expected_commitment; committer; submitted_at} ->
       Alcotest.(
         check commitment_testable "Commitment" expected_commitment commitment) ;
@@ -960,10 +976,11 @@ let test_commitment_duplication () =
       Alcotest.(check public_key_hash_testable "Committer" pkh1 committer) ;
 
       Alcotest.(
-        check raw_level_testable "Submitted" submitted_level submitted_at) ;
-      return () >>=? fun () ->
-      ignore i ;
-      return ()
+        check raw_level_testable "Submitted" submitted_level submitted_at)) ;
+  check_bond ctxt tx_rollup contract1 1 >>=? fun () ->
+  check_bond ctxt tx_rollup contract2 0 >>=? fun () ->
+  ignore i ;
+  return ()
 
 let make_transactions_in tx_rollup contract blocks b =
   let contents = "batch " in
@@ -980,7 +997,10 @@ let make_transactions_in tx_rollup contract blocks b =
   in
   aux 2 blocks b
 
-let assert_ok res = match res with Ok r -> r | Error _ -> assert false
+let assert_ok res =
+  match res with
+  | Ok r -> r
+  | Error _ -> raise (Invalid_argument "Error: assert_ok")
 
 let raw_level level = assert_ok @@ Raw_level.of_int32 level
 
@@ -1056,6 +1076,144 @@ let test_commitment_predecessor () =
   ignore i ;
   return ()
 
+(** [test_commitment_retire_simple] tests commitment retirement simple cases.
+    Note that it manually retires commitments rather than waiting for them to
+    age out. *)
+let test_commitment_retire () =
+  context_init 1 >>=? fun (b, contracts) ->
+  let contract1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract1 >>=? fun (b, tx_rollup) ->
+  (* In order to have a permissible commitment, we need a transaction. *)
+  let contents = "batch" in
+  Op.tx_rollup_submit_batch (B b) contract1 tx_rollup contents
+  >>=? fun operation ->
+  Block.bake ~operation b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  let level = raw_level 2l in
+  Incremental.finalize_block i >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  (* Test retirement with no commitment *)
+  wrap
+    (Tx_rollup_commitment.Internal_for_tests.retire_rollup_level
+       (Incremental.alpha_ctxt i)
+       tx_rollup
+       level
+       (raw_level @@ Incremental.level i))
+  >>=? fun (_ctxt, retired) ->
+  (match retired with
+  | `No_commitment -> return_unit
+  | _ -> failwith "Expected no commitment")
+  >>=? fun () ->
+  (* Now, make a commitment *)
+  make_commitment_for_batch i level tx_rollup >>=? fun commitment ->
+  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  let commitment_submit_level =
+    (Level.current (Incremental.alpha_ctxt i)).level
+  in
+  check_bond (Incremental.alpha_ctxt i) tx_rollup contract1 1 >>=? fun () ->
+  (* We can retire this level *)
+  wrap
+    (Tx_rollup_commitment.Internal_for_tests.retire_rollup_level
+       (Incremental.alpha_ctxt i)
+       tx_rollup
+       level
+       commitment_submit_level)
+  >>=? fun (ctxt, retired) ->
+  assert_retired retired >>=? fun () ->
+  check_bond ctxt tx_rollup contract1 0 >>=? fun () ->
+  ignore i ;
+  return ()
+
+let test_full_inbox () =
+  let constants =
+    {
+      Tezos_protocol_alpha_parameters.Default_parameters.constants_test with
+      consensus_threshold = 0;
+      endorsing_reward_per_slot = Tez.zero;
+      baking_reward_bonus_per_slot = Tez.zero;
+      baking_reward_fixed_portion = Tez.zero;
+      tx_rollup_enable = true;
+      tx_rollup_max_unfinalized_levels = 15;
+    }
+  in
+  Context.init_with_constants constants 1 >>=? fun (b, contracts) ->
+  let contract =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  originate b contract >>=? fun (b, tx_rollup) ->
+  let range start top =
+    let rec aux n acc = if n < start then acc else aux (n - 1) (n :: acc) in
+    aux top []
+  in
+  (* Transactions in blocks [2..17) *)
+  make_transactions_in tx_rollup contract (range 2 17) b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_submit_batch (B b) contract tx_rollup "contents" >>=? fun op ->
+  Incremental.add_operation i op ~expect_failure:(function
+      | Environment.Ecoproto_error
+          (Tx_rollup_commitment.Too_many_unfinalized_levels as e)
+        :: _ ->
+          Assert.test_error_encodings e ;
+          return_unit
+      | _ -> failwith "Need to avoid too many unfinalized inboxes")
+  >>=? fun i ->
+  ignore i ;
+  return ()
+
+(** [test_bond_finalization] tests that level retirement
+    in fact allows bonds to be returned. *)
+let test_bond_finalization () =
+  context_init 2 >>=? fun (b, contracts) ->
+  let contract1 =
+    WithExceptions.Option.get ~loc:__LOC__ @@ List.nth contracts 0
+  in
+  let pkh1 = is_implicit_exn contract1 in
+  originate b contract1 >>=? fun (b, tx_rollup) ->
+  (* Transactions in block 2, 3, 4 *)
+  make_transactions_in tx_rollup contract1 [2; 3; 4] b >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Incremental.finalize_block i >>=? fun b ->
+  Incremental.begin_construction b >>=? fun i ->
+  Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation i op ~expect_failure:(function
+      | Environment.Ecoproto_error
+          (Tx_rollup_commitment.Bond_does_not_exist a_pkh1 as e)
+        :: _
+        when a_pkh1 = pkh1 ->
+          Assert.test_error_encodings e ;
+          return_unit
+      | _ -> failwith "Commitment bond should not exist yet")
+  >>=? fun i ->
+  make_commitment_for_batch i (raw_level 2l) tx_rollup >>=? fun commitment_a ->
+  Op.tx_rollup_commit (I i) contract1 tx_rollup commitment_a >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation i op ~expect_failure:(function
+      | Environment.Ecoproto_error
+          (Tx_rollup_commitment.Bond_in_use a_pkh1 as e)
+        :: _
+        when a_pkh1 = pkh1 ->
+          Assert.test_error_encodings e ;
+          return_unit
+      | _ -> failwith "Need to check that bond is in-use ")
+  >>=? fun i ->
+  wrap
+    (Tx_rollup_commitment.Internal_for_tests.retire_rollup_level
+       (Incremental.alpha_ctxt i)
+       tx_rollup
+       (raw_level 2l)
+       (raw_level 30l))
+  >>=? fun (ctxt, retired) ->
+  assert_retired retired >>=? fun () ->
+  let i = Incremental.set_alpha_ctxt i ctxt in
+  Op.tx_rollup_return_bond (I i) contract1 tx_rollup >>=? fun op ->
+  Incremental.add_operation i op >>=? fun i ->
+  ignore i ;
+  return ()
+
 let tests =
   [
     Tztest.tztest
@@ -1111,4 +1269,7 @@ let tests =
       "Test commitment predecessor edge cases"
       `Quick
       test_commitment_predecessor;
+    Tztest.tztest "Test commitment retirement" `Quick test_commitment_retire;
+    Tztest.tztest "Test full inbox" `Quick test_full_inbox;
+    Tztest.tztest "Test bond finalization" `Quick test_bond_finalization;
   ]

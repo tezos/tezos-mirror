@@ -58,6 +58,16 @@ module S = struct
         (Data_encoding.option
            Tx_rollup_commitment.Submitted_commitment.encoding)
       RPC_path.(custom_root /: Tx_rollup.rpc_arg / "commitment")
+
+  let pending_bonded_commitments =
+    RPC_service.get_service
+      ~description:
+        "Get the number of pending bonded commitments for a pkh on a rollup"
+      ~query:RPC_query.empty
+      ~output:Data_encoding.int32
+      RPC_path.(
+        custom_root /: Tx_rollup.rpc_arg / "pending_bonded_commitments"
+        /: Signature.Public_key_hash.rpc_arg)
 end
 
 let register () =
@@ -78,7 +88,13 @@ let register () =
                 failwith "the offset is not valid: The block level is negative."
             | Some level -> level)
       in
-      Tx_rollup_commitment.get_commitment ctxt tx_rollup level.level >|=? snd)
+      Tx_rollup_commitment.get_commitment ctxt tx_rollup level.level >|=? snd) ;
+  register2
+    ~chunked:false
+    S.pending_bonded_commitments
+    (fun ctxt tx_rollup pkh () () ->
+      Tx_rollup_commitment.pending_bonded_commitments ctxt tx_rollup pkh
+      >|=? fun (_, count) -> Int32.of_int count)
 
 let state ctxt block tx_rollup =
   RPC_context.make_call1 S.state ctxt block tx_rollup () ()

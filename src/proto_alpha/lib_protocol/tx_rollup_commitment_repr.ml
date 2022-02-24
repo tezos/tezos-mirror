@@ -31,11 +31,22 @@ type error += (* `Temporary *) Missing_commitment_predecessor
 
 type error += (* `Branch *) Wrong_batch_count
 
-type error += (* `Temporary *) Commitment_too_early
+type error +=
+  | (* `Temporary *) Commitment_too_early of Raw_level_repr.t * Raw_level_repr.t
 
 type error += (* `Temporary *) Level_already_has_commitment of Raw_level_repr.t
 
 type error += (* `Temporary *) Wrong_inbox_hash
+
+type error += (* `Branch *)
+              Retire_uncommitted_level of Raw_level_repr.t
+
+type error += (* `Temporary *)
+              Bond_does_not_exist of Signature.public_key_hash
+
+type error += (* `Temporary *) Bond_in_use of Signature.public_key_hash
+
+type error += (* `Temporary *) Too_many_unfinalized_levels
 
 let () =
   let open Data_encoding in
@@ -74,9 +85,15 @@ let () =
     ~id:"tx_rollup_commitment_too_early"
     ~title:"This commitment is for a level that hasn't finished yet"
     ~description:"This commitment is for a level that hasn't finished yet"
-    unit
-    (function Commitment_too_early -> Some () | _ -> None)
-    (fun () -> Commitment_too_early) ;
+    (obj2
+       (req "commitment_level" Raw_level_repr.encoding)
+       (req "submit_level" Raw_level_repr.encoding))
+    (function
+      | Commitment_too_early (commitment_level, submit_level) ->
+          Some (commitment_level, submit_level)
+      | _ -> None)
+    (fun (commitment_level, submit_level) ->
+      Commitment_too_early (commitment_level, submit_level)) ;
   (* Level_already_has_commitment *)
   register_error_kind
     `Temporary
@@ -94,7 +111,36 @@ let () =
     ~description:"This commitment has a different hash than its inbox"
     unit
     (function Wrong_inbox_hash -> Some () | _ -> None)
-    (fun () -> Wrong_inbox_hash)
+    (fun () -> Wrong_inbox_hash) ;
+  (* Too_many_unfinalized_levels *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_too_many_unfinalized_levels"
+    ~title:"This rollup hasn't had a commitment in too long"
+    ~description:
+      "This rollup hasn't had a commitment in too long. We don't allow new \
+       messages to keep commitment gas reasonable."
+    empty
+    (function Too_many_unfinalized_levels -> Some () | _ -> None)
+    (fun () -> Too_many_unfinalized_levels) ;
+  (* Bond_does_not_exist *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_bond_does_not_exist"
+    ~title:"This account does not have a bond for this rollup"
+    ~description:"This account does not have a bond for this rollup"
+    (obj1 (req "contract" Signature.Public_key_hash.encoding))
+    (function Bond_does_not_exist contract -> Some contract | _ -> None)
+    (fun contract -> Bond_does_not_exist contract) ;
+  (* Bond_in_use *)
+  register_error_kind
+    `Temporary
+    ~id:"tx_rollup_bond_in_use"
+    ~title:"This account's bond is in use for one or more commitments"
+    ~description:"This account's bond is in use for one or more commitments"
+    (obj1 (req "contract" Signature.Public_key_hash.encoding))
+    (function Bond_in_use contract -> Some contract | _ -> None)
+    (fun contract -> Bond_in_use contract)
 
 module Commitment_hash = struct
   let commitment_hash = "\017\249\195\013" (* toc1(54) *)

@@ -107,3 +107,11 @@ let () =
     (obj1 (req "rollup_address" Tx_rollup_repr.encoding))
     (function Tx_rollup_does_not_exist rollup -> Some rollup | _ -> None)
     (fun rollup -> Tx_rollup_does_not_exist rollup)
+
+let first_unfinalized_level :
+    Raw_context.t ->
+    Tx_rollup_repr.t ->
+    (Raw_context.t * Raw_level_repr.t option) tzresult Lwt.t =
+ fun ctxt tx_rollup ->
+  Storage.Tx_rollup.State.get ctxt tx_rollup >>=? fun (ctxt, state) ->
+  return (ctxt, Tx_rollup_state_repr.first_unfinalized_level state)

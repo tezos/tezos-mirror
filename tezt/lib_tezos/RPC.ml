@@ -569,6 +569,32 @@ module Tx_rollup = struct
     let path = sub_path ~chain ~block ~rollup "commitment" in
     let query_string = [("offset", string_of_int offset)] in
     Client.Spawn.rpc ?endpoint ?hooks ~query_string GET path client
+
+  let sub_pkh_path ?(chain = "main") ?(block = "head") ~tx_rollup
+      ~public_key_hash sub =
+    [
+      "chains";
+      chain;
+      "blocks";
+      block;
+      "context";
+      "tx_rollup";
+      tx_rollup;
+      sub;
+      public_key_hash;
+    ]
+
+  let get_pending_bonded_commitments ?endpoint ?hooks ?(chain = "main")
+      ?(block = "head") ~tx_rollup ~public_key_hash client =
+    let path =
+      sub_pkh_path
+        ~chain
+        ~block
+        ~tx_rollup
+        ~public_key_hash
+        "pending_bonded_commitments"
+    in
+    Client.Spawn.rpc ?endpoint ?hooks GET path client
 end
 
 module Sc_rollup = struct

@@ -80,3 +80,11 @@ val update :
     transaction rollup address. *)
 val assert_exist :
   Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t
+
+(** [first_unfinalized_level] returns the first unfinalized level
+    of [tx_rollup].  If None, then there are no unfinalized levels
+    with inboxes. *)
+val first_unfinalized_level :
+  Raw_context.t ->
+  Tx_rollup_repr.t ->
+  (Raw_context.t * Raw_level_repr.t option) tzresult Lwt.t

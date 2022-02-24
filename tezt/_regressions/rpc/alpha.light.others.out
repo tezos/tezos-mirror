@@ -32,7 +32,10 @@ protocol of light mode unspecified, using the node's protocol: ProtoGenesisGenes
   "cache_stake_distribution_cycles": 8, "cache_sampler_state_cycles": 8,
   "tx_rollup_enable": false, "tx_rollup_origination_size": 60000,
   "tx_rollup_hard_size_limit_per_inbox": 100000,
-  "tx_rollup_hard_size_limit_per_message": 5000, "sc_rollup_enable": false,
+  "tx_rollup_hard_size_limit_per_message": 5000,
+  "tx_rollup_commitment_bond": "10000000000",
+  "tx_rollup_finality_period": 2000,
+  "tx_rollup_max_unfinalized_levels": 2100, "sc_rollup_enable": false,
   "sc_rollup_origination_size": 6314 }
 
 ./tezos-client --mode light rpc get /chains/main/blocks/head/helpers/baking_rights
