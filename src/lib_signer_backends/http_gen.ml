@@ -92,23 +92,26 @@ struct
 
     let parse uri =
       (* extract `tz1..` from the last component of the path *)
+      let open Lwt_tzresult_syntax in
       assert (Uri.scheme uri = Some scheme) ;
       let path = Uri.path uri in
-      (match String.rindex_opt path '/' with
-      | None -> failwith "Invalid locator %a" Uri.pp_hum uri
-      | Some i ->
-          let pkh =
-            try String.sub path (i + 1) (String.length path - i - 1)
-            with _ -> ""
-          in
-          let path = String.sub path 0 i in
-          return (Uri.with_path uri path, pkh))
-      >>=? fun (base, pkh) ->
-      Lwt.return (Signature.Public_key_hash.of_b58check pkh) >>=? fun pkh ->
+      let* (base, pkh) =
+        match String.rindex_opt path '/' with
+        | None -> failwith "Invalid locator %a" Uri.pp_hum uri
+        | Some i ->
+            let pkh =
+              try String.sub path (i + 1) (String.length path - i - 1)
+              with _ -> ""
+            in
+            let path = String.sub path 0 i in
+            return (Uri.with_path uri path, pkh)
+      in
+      let* pkh = Lwt.return (Signature.Public_key_hash.of_b58check pkh) in
       return (base, pkh)
 
     let public_key uri =
-      parse (uri : pk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      let open Lwt_result_syntax in
+      let* (base, pkh) = parse (uri : pk_uri :> Uri.t) in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -120,41 +123,50 @@ struct
         ()
 
     let neuterize uri =
-      Client_keys.make_pk_uri (uri : sk_uri :> Uri.t) >>?= return
+      let open Lwt_result_syntax in
+      let*? v = Client_keys.make_pk_uri (uri : sk_uri :> Uri.t) in
+      return v
 
     let public_key_hash uri =
-      public_key uri >>=? fun pk ->
+      let open Lwt_result_syntax in
+      let* pk = public_key uri in
       return (Signature.Public_key.hash pk, Some pk)
 
     let import_secret_key ~io:_ = public_key_hash
 
     let get_signature base pkh msg =
-      RPC_client.call_service
-        ~logger:P.logger
-        ?headers
-        Media_type.all_media_types
-        ~base
-        Signer_services.authorized_keys
-        ()
-        ()
-        ()
-      >>=? function
+      let open Lwt_result_syntax in
+      let* o =
+        RPC_client.call_service
+          ~logger:P.logger
+          ?headers
+          Media_type.all_media_types
+          ~base
+          Signer_services.authorized_keys
+          ()
+          ()
+          ()
+      in
+      match o with
       | Some authorized_keys ->
-          P.authenticate
-            authorized_keys
-            (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg)
-          >>=? fun signature -> return_some signature
+          let* signature =
+            P.authenticate
+              authorized_keys
+              (Signer_messages.Sign.Request.to_sign ~pkh ~data:msg)
+          in
+          return_some signature
       | None -> return_none
 
     let sign ?watermark uri msg =
-      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
+      let open Lwt_result_syntax in
+      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
       let msg =
         match watermark with
         | None -> msg
         | Some watermark ->
             Bytes.cat (Signature.bytes_of_watermark watermark) msg
       in
-      get_signature base pkh msg >>=? fun signature ->
+      let* signature = get_signature base pkh msg in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -166,8 +178,9 @@ struct
         msg
 
     let deterministic_nonce uri msg =
-      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
-      get_signature base pkh msg >>=? fun signature ->
+      let open Lwt_result_syntax in
+      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* signature = get_signature base pkh msg in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -179,8 +192,9 @@ struct
         msg
 
     let deterministic_nonce_hash uri msg =
-      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
-      get_signature base pkh msg >>=? fun signature ->
+      let open Lwt_result_syntax in
+      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let* signature = get_signature base pkh msg in
       RPC_client.call_service
         ~logger:P.logger
         ?headers
@@ -192,17 +206,20 @@ struct
         msg
 
     let supports_deterministic_nonces uri =
-      parse (uri : sk_uri :> Uri.t) >>=? fun (base, pkh) ->
-      RPC_client.call_service
-        ~logger:P.logger
-        ?headers
-        Media_type.all_media_types
-        ~base
-        Signer_services.supports_deterministic_nonces
-        ((), pkh)
-        ()
-        ()
-      >>= function
+      let open Lwt_result_syntax in
+      let* (base, pkh) = parse (uri : sk_uri :> Uri.t) in
+      let*! r =
+        RPC_client.call_service
+          ~logger:P.logger
+          ?headers
+          Media_type.all_media_types
+          ~base
+          Signer_services.supports_deterministic_nonces
+          ((), pkh)
+          ()
+          ()
+      in
+      match r with
       | Ok ans -> return ans
       | Error (RPC_context.Not_found _ :: _) -> return_false
       | Error _ as res -> Lwt.return res
