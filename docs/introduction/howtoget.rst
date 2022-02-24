@@ -422,7 +422,9 @@ another location (such as ``/usr/local/bin``), the Tezos binaries may
 prompt you to install the Zcash parameter files. The easiest way is to
 download and run this script::
 
-   https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+   wget https://raw.githubusercontent.com/zcash/zcash/master/zcutil/fetch-params.sh
+   chmod +x fetch-params.sh
+   ./fetch-params.sh
 
 The node will try to find Zcash parameters in the following directories,
 in this order:
