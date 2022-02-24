@@ -35,6 +35,8 @@ type error += (* `Temporary *) Commitment_too_early
 
 type error += (* `Temporary *) Level_already_has_commitment of Raw_level_repr.t
 
+type error += (* `Temporary *) Wrong_inbox_hash
+
 (** A specialized Blake2B implementation for hashing commitments with
     "toc1" as a base58 prefix *)
 module Commitment_hash : sig
@@ -61,6 +63,7 @@ type t = {
   level : Raw_level_repr.t;
   batches : batch_commitment list;
   predecessor : Commitment_hash.t option;
+  inbox_hash : Tx_rollup_inbox_repr.hash;
 }
 
 include Compare.S with type t := t

@@ -30,7 +30,7 @@ module Tx_rollup : sig
     last_inbox_level : int option;
   }
 
-  type inbox = {cumulated_size : int; contents : string list}
+  type inbox = {cumulated_size : int; contents : string list; hash : string}
 
   val get_state :
     ?hooks:Process.hooks -> rollup:string -> Client.t -> state Process.runnable

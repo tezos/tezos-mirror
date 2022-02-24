@@ -49,6 +49,7 @@
         "Tx_rollup_repr",
         "Tx_rollup_state_repr",
         "Tx_rollup_message_repr",
+        "Tx_rollup_inbox_repr",
         "Tx_rollup_commitment_repr",
         "Vote_repr",
         "Block_header_repr",
@@ -68,7 +69,6 @@
         "Storage_sigs",
         "Storage_functors",
         "Tx_rollup_message_builder",
-        "Tx_rollup_inbox_repr",
         "Storage",
 
         "Ticket_hash_builder",

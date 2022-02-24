@@ -911,6 +911,7 @@ module Tx_rollup : sig
     level:int ->
     roots:string list ->
     predecessor:string option ->
+    inbox_hash:string ->
     rollup:string ->
     src:string ->
     t ->

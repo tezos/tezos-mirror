@@ -56,11 +56,16 @@ let check_commitment_predecessor_hash ctxt tx_rollup
 let add_commitment ctxt tx_rollup pkh (commitment : Tx_rollup_commitment_repr.t)
     =
   let key = (commitment.level, tx_rollup) in
-  Tx_rollup_inbox_storage.get ctxt ~level:(`Level commitment.level) tx_rollup
-  >>=? fun (ctxt, inbox) ->
-  let expected_len = List.length inbox.contents in
+  Tx_rollup_inbox_storage.get_metadata ctxt commitment.level tx_rollup
+  >>=? fun (ctxt, {inbox_length; hash; _}) ->
   let actual_len = List.length commitment.batches in
-  fail_unless Compare.Int.(expected_len = actual_len) Wrong_batch_count
+  fail_unless
+    Compare.Int.(Int32.to_int inbox_length = actual_len)
+    Wrong_batch_count
+  >>=? fun () ->
+  fail_unless
+    (Tx_rollup_inbox_repr.equal_hash commitment.inbox_hash hash)
+    Wrong_inbox_hash
   >>=? fun () ->
   Storage.Tx_rollup.Commitment.mem ctxt key >>=? fun (ctxt, old_commitment) ->
   fail_when old_commitment (Level_already_has_commitment commitment.level)

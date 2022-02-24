@@ -74,6 +74,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -92,7 +93,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    tx_rollup_message_builder.mli tx_rollup_message_builder.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
@@ -235,6 +235,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -253,7 +254,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    tx_rollup_message_builder.mli tx_rollup_message_builder.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
@@ -396,6 +396,7 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -414,7 +415,6 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    tx_rollup_message_builder.mli tx_rollup_message_builder.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml
@@ -579,6 +579,7 @@ include Tezos_raw_protocol_alpha.Main
    Tx_rollup_repr
    Tx_rollup_state_repr
    Tx_rollup_message_repr
+   Tx_rollup_inbox_repr
    Tx_rollup_commitment_repr
    Vote_repr
    Block_header_repr
@@ -597,7 +598,6 @@ include Tezos_raw_protocol_alpha.Main
    Storage_sigs
    Storage_functors
    Tx_rollup_message_builder
-   Tx_rollup_inbox_repr
    Storage
    Ticket_hash_builder
    Constants_storage
@@ -781,6 +781,7 @@ include Tezos_raw_protocol_alpha.Main
    tx_rollup_repr.mli tx_rollup_repr.ml
    tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
+   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
@@ -799,7 +800,6 @@ include Tezos_raw_protocol_alpha.Main
    storage_sigs.ml
    storage_functors.mli storage_functors.ml
    tx_rollup_message_builder.mli tx_rollup_message_builder.ml
-   tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    storage.mli storage.ml
    ticket_hash_builder.mli ticket_hash_builder.ml
    constants_storage.mli constants_storage.ml

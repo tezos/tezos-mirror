@@ -32,7 +32,11 @@ open Protocol.Alpha_context
 
 (** The type representing an inbox whose contents are the messages and not the
     hashed messages. *)
-type t = {contents : Tx_rollup_message.t list; cumulated_size : int}
+type t = {
+  contents : Tx_rollup_message.t list;
+  cumulated_size : int;
+  hash : Tx_rollup_inbox.hash;
+}
 
 (** [to_protocol_inbox node_inbox] will hash the contents of [node_inbox] to
     produces an [Tx_rollup_inbox.t]. *)

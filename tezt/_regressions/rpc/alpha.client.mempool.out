@@ -693,6 +693,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "A Ed25519, Secp256k1, or P256 public key hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Tx_rollup_inbox_hash": {
+                        "title": "The hash of a transaction rollup inbox (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "alpha.block_header.alpha.full_header": {
                         "title": "Shell header",
                         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
@@ -1949,9 +1953,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "inbox_hash": {
+                                    "$ref": "#/definitions/Tx_rollup_inbox_hash"
                                   }
                                 },
                                 "required": [
+                                  "inbox_hash",
                                   "predecessor",
                                   "batches",
                                   "level"
@@ -2594,6 +2602,17 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                               },
                               "data_kind": {
                                 "kind": "Dynamic"
+                              },
+                              "kind": "named"
+                            },
+                            {
+                              "name": "inbox_hash",
+                              "layout": {
+                                "kind": "Bytes"
+                              },
+                              "data_kind": {
+                                "size": 32,
+                                "kind": "Float"
                               },
                               "kind": "named"
                             }
@@ -5989,6 +6008,10 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                         "title": "A Ed25519, Secp256k1, or P256 public key hash (Base58Check-encoded)",
                         "$ref": "#/definitions/unistring"
                       },
+                      "Tx_rollup_inbox_hash": {
+                        "title": "The hash of a transaction rollup inbox (Base58Check-encoded)",
+                        "$ref": "#/definitions/unistring"
+                      },
                       "alpha.block_header.alpha.full_header": {
                         "title": "Shell header",
                         "description": "Block header's shell-related content. It contains information such as the block level, its predecessor and timestamp.",
@@ -7245,9 +7268,13 @@ curl -s 'http://localhost:[PORT]/describe/chains/main/mempool?recurse=yes'
                                         "type": "null"
                                       }
                                     ]
+                                  },
+                                  "inbox_hash": {
+                                    "$ref": "#/definitions/Tx_rollup_inbox_hash"
                                   }
                                 },
                                 "required": [
+                                  "inbox_hash",
                                   "predecessor",
                                   "batches",
                                   "level"

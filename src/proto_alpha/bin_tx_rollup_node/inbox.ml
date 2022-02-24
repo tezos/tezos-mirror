@@ -27,27 +27,35 @@
 
 open Protocol.Alpha_context
 
-type t = {contents : Tx_rollup_message.t list; cumulated_size : int}
+type t = {
+  contents : Tx_rollup_message.t list;
+  cumulated_size : int;
+  hash : Tx_rollup_inbox.hash;
+}
 
-let pp fmt {contents; cumulated_size} =
+let pp fmt {contents; cumulated_size; hash} =
   Format.fprintf
     fmt
-    "tx rollup inbox: %d messages using %d bytes"
+    "tx rollup inbox: %d messages using %d bytes with hash %a"
     (List.length contents)
     cumulated_size
+    Tx_rollup_inbox.pp_hash
+    hash
 
 let encoding =
   let open Data_encoding in
   conv
-    (fun {contents; cumulated_size} -> (contents, cumulated_size))
-    (fun (contents, cumulated_size) -> {contents; cumulated_size})
-    (obj2
+    (fun {contents; cumulated_size; hash} -> (contents, cumulated_size, hash))
+    (fun (contents, cumulated_size, hash) -> {contents; cumulated_size; hash})
+    (obj3
        (req "contents" @@ list Tx_rollup_message.encoding)
-       (req "cumulated_size" int31))
+       (req "cumulated_size" int31)
+       (req "hash" Tx_rollup_inbox.hash_encoding))
 
-let to_protocol_inbox {contents; cumulated_size} =
+let to_protocol_inbox {contents; cumulated_size; hash} =
   Tx_rollup_inbox.
     {
       contents = List.map Tx_rollup_message.hash_uncarbonated contents;
       cumulated_size;
+      hash;
     }

@@ -48,11 +48,20 @@ let save_inbox store hash inbox =
   match previous_inbox with
   | None -> Stores.Inboxes.add store hash inbox
   | Some x ->
+      let hashes =
+        List.map
+          (fun msg -> Tx_rollup_message.hash_uncarbonated msg)
+          inbox.contents
+      in
+      let inbox_hash =
+        List.fold_left Tx_rollup_inbox.extend_hash x.hash hashes
+      in
       let inbox =
         Inbox.
           {
             contents = x.contents @ inbox.contents;
             cumulated_size = x.cumulated_size + inbox.cumulated_size;
+            hash = inbox_hash;
           }
       in
       Stores.Inboxes.add store hash inbox

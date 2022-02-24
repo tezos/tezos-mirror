@@ -2253,6 +2253,12 @@ let commands_rw () =
            ~desc:"The level"
            Client_proto_args.int_parameter
       @@ Clic.param
+           ~name:"inbox_hash"
+           ~desc:
+             "the hash of the inbox to commit to, in b58check notation \
+              (starting with the prefix i)."
+           Client_proto_args.string_parameter
+      @@ Clic.param
            ~name:"predecessor"
            ~desc:
              "a bytes representation of the predecessor commitment in \
@@ -2282,6 +2288,7 @@ let commands_rw () =
              fee_cap,
              burn_cap )
            level
+           inbox_hash
            predecessor
            batches
            tx_rollup
@@ -2325,6 +2332,7 @@ let commands_rw () =
               ~fee_parameter
               ~tx_rollup
               ~level
+              ~inbox_hash
               ~batches
               ~predecessor
               ()

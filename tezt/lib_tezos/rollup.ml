@@ -30,7 +30,7 @@ module Tx_rollup = struct
     last_inbox_level : int option;
   }
 
-  type inbox = {cumulated_size : int; contents : string list}
+  type inbox = {cumulated_size : int; contents : string list; hash : string}
 
   let get_state ?hooks ~rollup client =
     let parse json =
@@ -50,7 +50,8 @@ module Tx_rollup = struct
       let contents =
         JSON.(json |-> "contents" |> as_list |> List.map as_string)
       in
-      {cumulated_size; contents}
+      let hash = JSON.(json |-> "hash" |> as_string) in
+      {cumulated_size; contents; hash}
     in
     let runnable = RPC.Tx_rollup.get_inbox ?hooks ~rollup client in
     Process.runnable_map parse runnable
@@ -69,7 +70,8 @@ module Tx_rollup = struct
     let inbox : inbox Check.typ =
       let open Check in
       convert
-        (fun {cumulated_size; contents} -> (cumulated_size, contents))
-        (tuple2 int (list string))
+        (fun {cumulated_size; contents; hash} ->
+          (cumulated_size, contents, hash))
+        (tuple3 int (list string) string)
   end
 end

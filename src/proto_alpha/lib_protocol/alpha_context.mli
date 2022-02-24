@@ -2081,7 +2081,37 @@ end
 (** This module re-exports definitions from {!Tx_rollup_inbox_repr} and
     {!Tx_rollup_inbox_storage}. *)
 module Tx_rollup_inbox : sig
-  type t = {contents : Tx_rollup_message.hash list; cumulated_size : int}
+  type hash
+
+  type t = {
+    contents : Tx_rollup_message.hash list;
+    cumulated_size : int;
+    hash : hash;
+  }
+
+  val compare_hash : hash -> hash -> int
+
+  val equal_hash : hash -> hash -> bool
+
+  val pp_hash : Format.formatter -> hash -> unit
+
+  val hash_of_bytes_exn : bytes -> hash
+
+  val hash_of_bytes_opt : bytes -> hash option
+
+  val hash_of_b58check_exn : string -> hash
+
+  val hash_of_b58check_opt : string -> hash option
+
+  val hash_encoding : hash Data_encoding.t
+
+  val hash_to_bytes : hash -> bytes
+
+  val hash_to_b58check : hash -> string
+
+  val extend_hash : hash -> Tx_rollup_message.hash -> hash
+
+  val hash_inbox : Tx_rollup_message.t list -> hash
 
   val pp : Format.formatter -> t -> unit
 
@@ -2124,6 +2154,22 @@ module Tx_rollup_inbox : sig
     Tx_rollup.t ->
     (context * Raw_level.t option * Raw_level.t option) tzresult Lwt.t
 
+  module Internal_for_tests : sig
+    type metadata = {
+      inbox_length : int32;
+      cumulated_size : int;
+      hash : hash;
+      predecessor : Raw_level_repr.t option;
+      successor : Raw_level_repr.t option;
+    }
+
+    val get_metadata :
+      context ->
+      Raw_level.t ->
+      Tx_rollup.t ->
+      (context * metadata) tzresult Lwt.t
+  end
+
   type error +=
     | Tx_rollup_inbox_does_not_exist of Tx_rollup.t * Raw_level.t
     | Tx_rollup_inbox_size_would_exceed_limit of Tx_rollup.t
@@ -2146,6 +2192,7 @@ module Tx_rollup_commitment : sig
     level : Raw_level.t;
     batches : batch_commitment list;
     predecessor : Commitment_hash.t option;
+    inbox_hash : Tx_rollup_inbox.hash;
   }
 
   include Compare.S with type t := t
@@ -2175,6 +2222,8 @@ module Tx_rollup_commitment : sig
   type error += Commitment_too_early
 
   type error += Level_already_has_commitment of Raw_level.t
+
+  type error += Wrong_inbox_hash
 
   val add_commitment :
     context ->

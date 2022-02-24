@@ -483,6 +483,7 @@ val submit_tx_rollup_commitment :
   src_sk:Client_keys.sk_uri ->
   fee_parameter:Injection.fee_parameter ->
   level:int32 ->
+  inbox_hash:string ->
   batches:string ->
   predecessor:string option ->
   tx_rollup:Tx_rollup.t ->
