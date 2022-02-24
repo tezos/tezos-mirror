@@ -147,8 +147,8 @@ let gen_keys_containing ?(encrypted = false) ?(prefix = false) ?(force = false)
                       cctxt
                       secret_key
                   else
-                    Tezos_signer_backends.Unencrypted.make_sk secret_key
-                    >>?= return
+                    Lwt.return
+                      (Tezos_signer_backends.Unencrypted.make_sk secret_key)
                 in
                 let* () =
                   register_key
@@ -314,7 +314,7 @@ let commands network : Client_context.full Clic.command list =
                 Tezos_signer_backends.Encrypted.prompt_twice_and_encrypt
                   cctxt
                   sk
-              else Tezos_signer_backends.Unencrypted.make_sk sk >>?= return
+              else Lwt.return (Tezos_signer_backends.Unencrypted.make_sk sk)
             in
             register_key cctxt ~force (pkh, pk_uri, sk_uri) name));
     (match network with

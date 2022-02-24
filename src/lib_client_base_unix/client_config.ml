@@ -566,14 +566,16 @@ let password_filename_arg () =
 
 let client_mode_arg () =
   let mode_strings = List.map client_mode_to_string all_modes in
-  let parse_client_mode (str : string) : client_mode tzresult Lwt.t =
-    List.combine
-      ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
-      mode_strings
-      all_modes
-    >>?= fun modes_and_strings ->
+  let parse_client_mode (str : string) : client_mode tzresult =
+    let open Tzresult_syntax in
+    let* modes_and_strings =
+      List.combine
+        ~when_different_lengths:(TzTrace.make @@ Exn (Failure __LOC__))
+        mode_strings
+        all_modes
+    in
     match List.assoc_opt ~equal:String.equal str modes_and_strings with
-    | None -> fail @@ Invalid_mode_arg str
+    | None -> fail (Invalid_mode_arg str)
     | Some mode -> return mode
   in
   default_arg
@@ -584,7 +586,7 @@ let client_mode_arg () =
     ~default:(client_mode_to_string `Mode_client)
     (parameter
        ~autocomplete:(fun _ -> return mode_strings)
-       (fun _ param -> parse_client_mode param))
+       (fun _ param -> Lwt.return (parse_client_mode param)))
 
 let read_config_file config_file =
   let open Lwt_tzresult_syntax in
