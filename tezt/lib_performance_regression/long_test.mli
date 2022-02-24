@@ -513,7 +513,11 @@ v}
     because measurements in Grafana queries are prefixed with the measurement prefix
     configured for InfluxDB. *)
 
-(** Read configuration file. *)
+(** Read configuration file.
+
+    Please, be sure this function is called at first before using
+    any function from [Long_test] to avoid undesired behaviour regarding
+    the loading of the configuration. *)
 val init : unit -> unit
 
 (** Get the [test_data_path] field from the configuration. *)

@@ -36,6 +36,11 @@
    Each module defines tests which are thematically related,
    as functions to be called here. *)
 
+(* Warning: Please, be sure this function is called at first before using
+   any function from [Long_test] to avoid undesired behaviour regarding
+   the loading of the configuration. *)
+let () = Long_test.init ()
+
 let () =
   Long_test.update_grafana_dashboard
     {
@@ -50,7 +55,6 @@ let () =
 let default_executors = Long_test.[x86_executor1]
 
 let () =
-  Long_test.init () ;
   (* Register your tests here. *)
   (* This test depends on [Tezos_protocol_alpha.*] Tezos libraries *)
   Qcheck_rpc.register ~executors:default_executors () ;
