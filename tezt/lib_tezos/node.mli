@@ -265,6 +265,9 @@ module Config_file : sig
 
   (** Set the peer_validator configuration in the given configuration. *)
   val set_peer_validator : ?new_head_request_timeout:float -> JSON.t -> JSON.t
+
+  (** Set the network config to a sandbox with the same chain_id than the permanent testnet (initialy Ithacanet). *)
+  val set_ghostnet_sandbox_network : JSON.t -> JSON.t
 end
 
 (** Same as [config_init], but do not wait for the process to exit. *)

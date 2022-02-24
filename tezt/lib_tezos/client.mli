@@ -693,6 +693,8 @@ val submit_proposals :
   ?wait:string ->
   ?proto_hash:string ->
   ?proto_hashes:string list ->
+  ?force:bool ->
+  ?expect_failure:bool ->
   t ->
   unit Lwt.t
 
@@ -702,6 +704,7 @@ val spawn_submit_proposals :
   ?wait:string ->
   ?proto_hash:string ->
   ?proto_hashes:string list ->
+  ?force:bool ->
   t ->
   Process.t
 
