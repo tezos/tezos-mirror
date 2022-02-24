@@ -8,6 +8,7 @@
  (libraries
   tezos-shell-services
   tezos-base
+  tezos-version
   index
   irmin-pack
   tezos-context

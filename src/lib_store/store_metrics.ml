@@ -30,9 +30,10 @@ type metrics = {
   alternate_heads_count : Prometheus.Gauge.t;
 }
 
+let namespace = Tezos_version.Node_version.namespace
+
 let metrics =
-  let namespace = String.concat "_" ["node"; "store"] in
-  let subsystem = None in
+  let subsystem = Some (String.concat "_" ["node"; "store"]) in
   let checkpoint_level =
     let help = "Current checkpoint level" in
     Prometheus.Gauge.v ~help ~namespace ?subsystem "checkpoint_level"
