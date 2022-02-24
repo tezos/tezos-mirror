@@ -38,8 +38,11 @@ let build_rpc_directory ~user_activated_upgrades
          let chain_store = Store.main_chain_store store in
          return (Store.Chain.history_mode chain_store))
   |> register Config_services.Logging.configure (fun () () configuration ->
-         Internal_event_unix.Configuration.reapply configuration >>=? fun () ->
-         Chain_validator.reconfigure_event_logging
-           mainchain_validator
-           configuration
-         >>=? fun () -> return_unit)
+         let open Lwt_result_syntax in
+         let* () = Internal_event_unix.Configuration.reapply configuration in
+         let* () =
+           Chain_validator.reconfigure_event_logging
+             mainchain_validator
+             configuration
+         in
+         return_unit)

@@ -41,12 +41,14 @@ type t = {
 let create state db peer_validator_limits block_validator_limits
     block_validator_kind prevalidator_limits chain_validator_limits
     ~start_testchain =
-  Block_validator.create
-    block_validator_limits
-    db
-    block_validator_kind
-    ~start_testchain
-  >>=? fun block_validator ->
+  let open Lwt_result_syntax in
+  let* block_validator =
+    Block_validator.create
+      block_validator_limits
+      db
+      block_validator_kind
+      ~start_testchain
+  in
   let valid_block_input = Lwt_watcher.create_input () in
   let chains_input = Lwt_watcher.create_input () in
   return
@@ -65,10 +67,11 @@ let create state db peer_validator_limits block_validator_limits
     }
 
 let activate v ~start_prevalidator ~validator_process chain_store =
+  let open Lwt_syntax in
   let chain_id = Store.Chain.chain_id chain_store in
-  Validator_event.(emit activate_chain) chain_id >>= fun () ->
+  let* () = Validator_event.(emit activate_chain) chain_id in
   match Chain_id.Table.find v.active_chains chain_id with
-  | Some chain -> return chain
+  | Some chain -> return_ok chain
   | None ->
       Chain_validator.create
         ~start_prevalidator
@@ -94,18 +97,21 @@ let get_active_chains {active_chains; _} =
   List.rev l
 
 let read_block store h =
-  Store.all_chain_stores store >>= fun chain_stores ->
+  let open Lwt_syntax in
+  let* chain_stores = Store.all_chain_stores store in
   Lwt_utils.find_map_s
     (fun chain_store ->
-      Store.Block.read_block_opt chain_store h
-      >|= Option.map (fun b -> (Store.Chain.chain_id chain_store, b)))
+      let+ b = Store.Block.read_block_opt chain_store h in
+      Option.map (fun b -> (Store.Chain.chain_id chain_store, b)) b)
     chain_stores
 
 let read_block_header db h =
-  read_block (Distributed_db.store db) h
-  >|= Option.map (fun (chain_id, block) -> (chain_id, Store.Block.header block))
+  let open Lwt_syntax in
+  let+ b = read_block (Distributed_db.store db) h in
+  Option.map (fun (chain_id, block) -> (chain_id, Store.Block.header block)) b
 
 let validate_block v ?(force = false) ?chain_id bytes operations =
+  let open Lwt_result_syntax in
   let hash = Block_hash.hash_bytes [bytes] in
   match Block_header.of_bytes bytes with
   | None -> failwith "Cannot parse block header."
@@ -113,48 +119,53 @@ let validate_block v ?(force = false) ?chain_id bytes operations =
       if not (Clock_drift.is_not_too_far_in_the_future block.shell.timestamp)
       then failwith "Block in the future."
       else
-        (match chain_id with
-        | None -> (
-            read_block_header v.db block.shell.predecessor >>= function
-            | None ->
-                failwith
-                  "Unknown predecessor (%a), cannot inject the block."
-                  Block_hash.pp_short
-                  block.shell.predecessor
-            | Some (chain_id, _bh) -> Lwt.return (get v chain_id))
-        | Some chain_id -> (
-            Lwt.return (get v chain_id) >>=? fun nv ->
-            if force then return nv
-            else
-              Distributed_db.Block_header.known
-                (Chain_validator.chain_db nv)
-                block.shell.predecessor
-              >>= function
-              | true -> return nv
-              | false ->
+        let* nv =
+          match chain_id with
+          | None -> (
+              let*! o = read_block_header v.db block.shell.predecessor in
+              match o with
+              | None ->
                   failwith
                     "Unknown predecessor (%a), cannot inject the block."
                     Block_hash.pp_short
-                    block.shell.predecessor))
-        >>=? fun nv ->
+                    block.shell.predecessor
+              | Some (chain_id, _bh) -> Lwt.return (get v chain_id))
+          | Some chain_id -> (
+              let* nv = Lwt.return (get v chain_id) in
+              if force then return nv
+              else
+                let*! b =
+                  Distributed_db.Block_header.known
+                    (Chain_validator.chain_db nv)
+                    block.shell.predecessor
+                in
+                match b with
+                | true -> return nv
+                | false ->
+                    failwith
+                      "Unknown predecessor (%a), cannot inject the block."
+                      Block_hash.pp_short
+                      block.shell.predecessor)
+        in
         let validation =
           Chain_validator.validate_block nv ~force hash block operations
         in
         return (hash, validation)
 
 let shutdown {active_chains; block_validator; _} =
+  let open Lwt_syntax in
   let chain_validator_jobs =
     List.of_seq
     @@ Seq.map
          (fun (id, nv) ->
-           Validator_event.(emit shutdown_chain_validator) id >>= fun () ->
+           let* () = Validator_event.(emit shutdown_chain_validator) id in
            Chain_validator.shutdown nv)
          (Chain_id.Table.to_seq active_chains)
   in
   (* Shutdown the chain_validator (peer_validators, prevalidator,
      etc.) before the block_validator *)
-  Lwt.join chain_validator_jobs >>= fun () ->
-  Validator_event.(emit shutdown_block_validator) () >>= fun () ->
+  let* () = Lwt.join chain_validator_jobs in
+  let* () = Validator_event.(emit shutdown_block_validator) () in
   Block_validator.shutdown block_validator
 
 let watcher {valid_block_input; _} = Lwt_watcher.create_stream valid_block_input
@@ -162,6 +173,7 @@ let watcher {valid_block_input; _} = Lwt_watcher.create_stream valid_block_input
 let chains_watcher {chains_input; _} = Lwt_watcher.create_stream chains_input
 
 let inject_operation v ?chain_id ~force op =
+  let open Lwt_result_syntax in
   let inject_operation_on nv ~handle_missing_prevalidator =
     match Chain_validator.prevalidator nv with
     | Some pv -> Prevalidator.inject_operation pv ~force op
@@ -172,7 +184,8 @@ let inject_operation v ?chain_id ~force op =
   in
   match chain_id with
   | None -> (
-      read_block_header v.db op.Operation.shell.branch >>= function
+      let*! o = read_block_header v.db op.Operation.shell.branch in
+      match o with
       | None ->
           if force then
             Chain_id.Table.iter_es
@@ -187,10 +200,10 @@ let inject_operation v ?chain_id ~force op =
               Block_hash.pp_short
               op.shell.branch
       | Some (chain_id, _bh) ->
-          get v chain_id >>?= fun nv ->
+          let*? nv = get v chain_id in
           inject_operation_on nv ~handle_missing_prevalidator)
   | Some chain_id ->
-      get v chain_id >>?= fun nv ->
+      let*? nv = get v chain_id in
       inject_operation_on nv ~handle_missing_prevalidator
 
 let distributed_db {db; _} = db

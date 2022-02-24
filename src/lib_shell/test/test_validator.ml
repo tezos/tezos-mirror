@@ -42,9 +42,12 @@ let init_validator
       'a ->
       unit ->
       unit Lwt.t) test_dir switch () : unit Lwt.t =
-  ( Shell_test_helpers.init_chain test_dir >>= fun store ->
-    Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
-    >>=? fun p2p ->
+  let open Lwt_result_syntax in
+  let*! r =
+    let*! store = Shell_test_helpers.init_chain test_dir in
+    let* p2p =
+      Shell_test_helpers.init_mock_p2p Distributed_db_version.Name.zero
+    in
     let chain_store = Store.(main_chain_store store) in
     let db = Distributed_db.create store p2p in
     let validator_environment =
@@ -53,23 +56,25 @@ let init_validator
         user_activated_protocol_overrides = [];
       }
     in
-    Block_validator_process.init
-      validator_environment
-      (Block_validator_process.Internal chain_store)
-    >>=? fun block_validator ->
-    Validator.create
-      store
-      db
-      Node.default_peer_validator_limits
-      Node.default_block_validator_limits
-      block_validator
-      Node.default_prevalidator_limits
-      Node.default_chain_validator_limits
-      ~start_testchain:false
-    >>=? fun validator ->
+    let* block_validator =
+      Block_validator_process.init
+        validator_environment
+        (Block_validator_process.Internal chain_store)
+    in
+    let* validator =
+      Validator.create
+        store
+        db
+        Node.default_peer_validator_limits
+        Node.default_block_validator_limits
+        block_validator
+        Node.default_prevalidator_limits
+        Node.default_chain_validator_limits
+        ~start_testchain:false
+    in
     Lwt.return (ok (block_validator, validator, Store.main_chain_store store))
-  )
-  >>= function
+  in
+  match r with
   | Ok (block_validator, validator, chain) ->
       f validator block_validator chain switch ()
   | Error errors ->
@@ -93,12 +98,15 @@ let wrap f _switch () =
 (** Checks that validator emits activation and shutdown events. *)
 let validator_events validator block_validator chain _switch () =
   (* activate validator and check that the corresponding event is emitted *)
-  Validator.activate
-    ~start_prevalidator:false
-    validator
-    ~validator_process:block_validator
-    chain
-  >>= function
+  let open Lwt_syntax in
+  let* r =
+    Validator.activate
+      ~start_prevalidator:false
+      validator
+      ~validator_process:block_validator
+      chain
+  in
+  match r with
   | Error trace ->
       Format.printf "Error:\n   %a\n" pp_print_trace trace ;
       Format.print_flush () ;
@@ -119,7 +127,7 @@ let validator_events validator block_validator chain _switch () =
       Mock_sink.clear_events () ;
       (* now shutdown the validator and verify that shutdown events are emitted
         *)
-      Validator.shutdown validator >>= fun () ->
+      let* () = Validator.shutdown validator in
       Mock_sink.assert_has_events
         "Should have an shutdown_block_validator"
         ?filter

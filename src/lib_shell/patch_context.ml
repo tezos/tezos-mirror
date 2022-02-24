@@ -25,27 +25,31 @@
 (*****************************************************************************)
 
 let patch_context (genesis : Genesis.t) key_json ctxt =
-  (match key_json with
-  | None -> Lwt.return ctxt
-  | Some (key, json) ->
-      Tezos_context.Context.add
-        ctxt
-        [key]
-        (Data_encoding.Binary.to_bytes_exn Data_encoding.json json))
-  >>= fun ctxt ->
-  Registered_protocol.get_result genesis.protocol >>=? fun proto ->
+  let open Lwt_result_syntax in
+  let*! ctxt =
+    match key_json with
+    | None -> Lwt.return ctxt
+    | Some (key, json) ->
+        Tezos_context.Context.add
+          ctxt
+          [key]
+          (Data_encoding.Binary.to_bytes_exn Data_encoding.json json)
+  in
+  let* proto = Registered_protocol.get_result genesis.protocol in
   let module Proto = (val proto) in
   let ctxt = Shell_context.wrap_disk_context ctxt in
-  Proto.init
-    ctxt
-    {
-      level = 0l;
-      proto_level = 0;
-      predecessor = genesis.block;
-      timestamp = genesis.time;
-      validation_passes = 0;
-      operations_hash = Operation_list_list_hash.empty;
-      fitness = [];
-      context = Context_hash.zero;
-    }
-  >>=? fun {context; _} -> return (Shell_context.unwrap_disk_context context)
+  let* {context; _} =
+    Proto.init
+      ctxt
+      {
+        level = 0l;
+        proto_level = 0;
+        predecessor = genesis.block;
+        timestamp = genesis.time;
+        validation_passes = 0;
+        operations_hash = Operation_list_list_hash.empty;
+        fitness = [];
+        context = Context_hash.zero;
+      }
+  in
+  return (Shell_context.unwrap_disk_context context)

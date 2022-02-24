@@ -24,7 +24,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Lwt.Infix
 open Tezos_base
 
 type error += Non_recoverable_context
@@ -94,19 +93,26 @@ let init_connection_metadata opt disable_mempool =
   | Some c -> {disable_mempool; private_node = c.P2p.private_mode}
 
 let init_p2p chain_name p2p_params disable_mempool =
+  let open Lwt_result_syntax in
   let message_cfg = Distributed_db_message.cfg chain_name in
   match p2p_params with
   | None ->
       let c_meta = init_connection_metadata None disable_mempool in
-      Node_event.(emit p2p_event) "p2p_layer_disabled" >>= fun () ->
+      let*! () = Node_event.(emit p2p_event) "p2p_layer_disabled" in
       return (P2p.faked_network message_cfg peer_metadata_cfg c_meta)
   | Some (config, limits) ->
       let c_meta = init_connection_metadata (Some config) disable_mempool in
       let conn_metadata_cfg = connection_metadata_cfg c_meta in
-      Node_event.(emit p2p_event) "bootstrapping" >>= fun () ->
-      P2p.create ~config ~limits peer_metadata_cfg conn_metadata_cfg message_cfg
-      >>=? fun p2p ->
-      Node_event.(emit p2p_event) "p2p_maintain_started" >>= fun () ->
+      let*! () = Node_event.(emit p2p_event) "bootstrapping" in
+      let* p2p =
+        P2p.create
+          ~config
+          ~limits
+          peer_metadata_cfg
+          conn_metadata_cfg
+          message_cfg
+      in
+      let*! () = Node_event.(emit p2p_event) "p2p_maintain_started" in
       return p2p |> trace Failed_to_init_P2P
 
 type config = {
@@ -158,6 +164,7 @@ let test_protocol_hashes =
     ]
 
 let store_known_protocols store =
+  let open Lwt_syntax in
   let embedded_protocols = Registered_protocol.seq_embedded () in
   Seq.iter_s
     (fun protocol_hash ->
@@ -179,7 +186,8 @@ let store_known_protocols store =
                 else
                   Node_event.(emit store_protocol_incorrect_hash) protocol_hash
               else
-                Store.Protocol.store store hash protocol >>= function
+                let* o = Store.Protocol.store store hash protocol in
+                match o with
                 | Some hash' ->
                     assert (hash = hash') ;
                     Node_event.(emit store_protocol_success) protocol_hash
@@ -189,14 +197,16 @@ let store_known_protocols store =
     embedded_protocols
 
 let check_context_consistency store =
+  let open Lwt_tzresult_syntax in
   let main_chain_store = Store.main_chain_store store in
-  Store.Chain.current_head main_chain_store >>= fun block ->
-  Store.Block.context_exists main_chain_store block >>= function
+  let*! block = Store.Chain.current_head main_chain_store in
+  let*! b = Store.Block.context_exists main_chain_store block in
+  match b with
   | true ->
-      Node_event.(emit storage_context_already_consistent ()) >>= fun () ->
+      let*! () = Node_event.(emit storage_context_already_consistent ()) in
       return_unit
   | false ->
-      Node_event.(emit storage_corrupted_context_detected ()) >>= fun () ->
+      let*! () = Node_event.(emit storage_corrupted_context_detected ()) in
       fail Non_recoverable_context
 
 let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
@@ -217,92 +227,105 @@ let create ?(sandboxed = false) ?sandbox_parameters ~singleprocess
       enable_testchain;
     } peer_validator_limits block_validator_limits prevalidator_limits
     chain_validator_limits history_mode =
+  let open Lwt_tzresult_syntax in
   let (start_prevalidator, start_testchain) =
     match p2p_params with
     | Some _ -> (not disable_mempool, enable_testchain)
     | None -> (true, true)
   in
-  init_p2p
-    (if sandboxed then sandboxed_chain_name else chain_name)
-    p2p_params
-    disable_mempool
-  >>=? fun p2p ->
-  (let open Block_validator_process in
-  let validator_environment =
-    {user_activated_upgrades; user_activated_protocol_overrides}
+  let* p2p =
+    init_p2p
+      (if sandboxed then sandboxed_chain_name else chain_name)
+      p2p_params
+      disable_mempool
   in
-  if singleprocess then
-    Store.init
-      ?patch_context
-      ?history_mode
-      ~store_dir:store_root
-      ~context_dir:context_root
-      ~allow_testchains:start_testchain
-      genesis
-    >>=? fun store ->
-    let main_chain_store = Store.main_chain_store store in
-    init validator_environment (Internal main_chain_store)
-    >>=? fun validator_process -> return (validator_process, store)
-  else
-    init
-      validator_environment
-      (External
-         {
-           data_dir;
-           genesis;
-           context_root;
-           protocol_root;
-           process_path = Sys.executable_name;
-           sandbox_parameters;
-         })
-    >>=? fun validator_process ->
-    let commit_genesis ~chain_id =
-      Block_validator_process.commit_genesis validator_process ~chain_id
+  let* (validator_process, store) =
+    let open Block_validator_process in
+    let validator_environment =
+      {user_activated_upgrades; user_activated_protocol_overrides}
     in
-    Store.init
-      ?patch_context
-      ?history_mode
-      ~commit_genesis
-      ~store_dir:store_root
-      ~context_dir:context_root
-      ~allow_testchains:start_testchain
-      genesis
-    >>=? fun store -> return (validator_process, store))
-  >>=? fun (validator_process, store) ->
-  check_context_consistency store >>=? fun () ->
+    if singleprocess then
+      let* store =
+        Store.init
+          ?patch_context
+          ?history_mode
+          ~store_dir:store_root
+          ~context_dir:context_root
+          ~allow_testchains:start_testchain
+          genesis
+      in
+      let main_chain_store = Store.main_chain_store store in
+      let* validator_process =
+        init validator_environment (Internal main_chain_store)
+      in
+      return (validator_process, store)
+    else
+      let* validator_process =
+        init
+          validator_environment
+          (External
+             {
+               data_dir;
+               genesis;
+               context_root;
+               protocol_root;
+               process_path = Sys.executable_name;
+               sandbox_parameters;
+             })
+      in
+      let commit_genesis ~chain_id =
+        Block_validator_process.commit_genesis validator_process ~chain_id
+      in
+      let* store =
+        Store.init
+          ?patch_context
+          ?history_mode
+          ~commit_genesis
+          ~store_dir:store_root
+          ~context_dir:context_root
+          ~allow_testchains:start_testchain
+          genesis
+      in
+      return (validator_process, store)
+  in
+  let* () = check_context_consistency store in
   let main_chain_store = Store.main_chain_store store in
-  Option.iter_es
-    (fun target_descr -> Store.Chain.set_target main_chain_store target_descr)
-    target
-  >>=? fun () ->
+  let* () =
+    Option.iter_es
+      (fun target_descr -> Store.Chain.set_target main_chain_store target_descr)
+      target
+  in
   let distributed_db = Distributed_db.create store p2p in
-  store_known_protocols store >>= fun () ->
-  Validator.create
-    store
-    distributed_db
-    peer_validator_limits
-    block_validator_limits
-    validator_process
-    prevalidator_limits
-    chain_validator_limits
-    ~start_testchain
-  >>=? fun validator ->
-  Validator.activate
-    validator
-    ~start_prevalidator
-    ~validator_process
-    main_chain_store
-  >>=? fun mainchain_validator ->
+  let*! () = store_known_protocols store in
+  let* validator =
+    Validator.create
+      store
+      distributed_db
+      peer_validator_limits
+      block_validator_limits
+      validator_process
+      prevalidator_limits
+      chain_validator_limits
+      ~start_testchain
+  in
+  let* mainchain_validator =
+    Validator.activate
+      validator
+      ~start_prevalidator
+      ~validator_process
+      main_chain_store
+  in
   let shutdown () =
     (* Shutdown workers in the reverse order of creation *)
-    Node_event.(emit shutdown_validator) () >>= fun () ->
-    Validator.shutdown validator >>= fun () ->
-    Node_event.(emit shutdown_ddb) () >>= fun () ->
-    Distributed_db.shutdown distributed_db >>= fun () ->
-    Node_event.(emit shutdown_store) () >>= fun () ->
-    Store.close_store store >>= fun _ ->
-    Node_event.(emit shutdown_p2p_layer) () >>= fun () ->
-    P2p.shutdown p2p >>= fun () -> Lwt.return_unit
+    let*! () = Node_event.(emit shutdown_validator) () in
+    let*! () = Validator.shutdown validator in
+    let*! () = Node_event.(emit shutdown_ddb) () in
+    let*! () = Distributed_db.shutdown distributed_db in
+    let*! () = Node_event.(emit shutdown_store) () in
+    let*! _ = Store.close_store store in
+    let*! () = Node_event.(emit shutdown_p2p_layer) () in
+    let*! () = P2p.shutdown p2p in
+    Lwt.return_unit
   in
   return
     {

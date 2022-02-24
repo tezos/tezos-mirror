@@ -255,21 +255,24 @@ module Bootstrapping = struct
     }
 
   let activate state =
+    let open Lwt_syntax in
     let is_synchronised =
       match state.heuristic.current_status with
       | Synchronised _ -> true
       | _ -> false
     in
-    set_bootstrapped ~initialisation:true state is_synchronised >>= fun () ->
+    let* () = set_bootstrapped ~initialisation:true state is_synchronised in
     state.when_status_changes (Core.get_status state.heuristic)
 
   let update state candidate =
+    let open Lwt_syntax in
     let old_status = Core.get_status state.heuristic in
     Core.update state.heuristic candidate ;
     let new_status = Core.get_status state.heuristic in
-    (if old_status <> new_status then state.when_status_changes new_status
-    else Lwt.return_unit)
-    >>= fun () ->
+    let* () =
+      if old_status <> new_status then state.when_status_changes new_status
+      else Lwt.return_unit
+    in
     match new_status with
     | Synchronised _ when state.bootstrapped = false ->
         set_bootstrapped state true
