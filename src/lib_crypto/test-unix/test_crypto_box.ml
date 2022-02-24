@@ -38,9 +38,9 @@ let (_sk, pk, _pkh) = Crypto_box.random_keypair ()
     by [Crypto_box.check_proof_of_work].
 *)
 let test_check_pow () =
-  let open Lwt.Infix in
+  let open Lwt.Syntax in
   let target = Crypto_box.make_pow_target 2. in
-  Crypto_box.generate_proof_of_work pk target >|= fun pow ->
+  let+ pow = Crypto_box.generate_proof_of_work pk target in
   Alcotest.(check bool)
     "check_pow"
     (Crypto_box.check_proof_of_work pk pow target)
