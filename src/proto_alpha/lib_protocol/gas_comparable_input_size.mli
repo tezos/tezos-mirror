@@ -1,9 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
-(* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
-(* Copyright (c) 2021-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Nomadic Labs <contact@nomadic-labs.com>                *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -25,58 +23,51 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-open Alpha_context
-open Script_typed_ir
+(** [Gas_input_size] includes the definitions for the different sizes used
+    in the gas models of the protocol. They do not always represent memory
+    sizes, but rather they can be seen as an information size. They are
+    tailored to the models that use them, and should not be used for anything
+    other than gas computation.
 
-let make x = Set_tag x
+    [Gas_comparable_input_size] is the restriction of [Gas_input_size] to
+    comparable types.
+ *)
 
-let get (Set_tag x) = x
+type t = int
 
-let empty : type a. a comparable_ty -> a set =
- fun ty ->
-  let module OPS : Boxed_set_OPS with type elt = a = struct
-    let elt_size = Gas_comparable_input_size.size_of_comparable_value ty
+type micheline_size = {traversal : t; int_bytes : t; string_bytes : t}
 
-    include Set.Make (struct
-      type t = a
+(* ------------------------------------------------------------------------- *)
+(* encoding *)
 
-      let compare = Script_comparable.compare_comparable ty
-    end)
-  end in
-  Set_tag
-    (module struct
-      type elt = a
+val encoding : t Data_encoding.encoding
 
-      module OPS = OPS
+val micheline_size_encoding : micheline_size Data_encoding.encoding
 
-      let boxed = OPS.empty
+(* ------------------------------------------------------------------------- *)
 
-      let size = 0
-    end)
+val zero : t
 
-let update : type a. a -> bool -> a set -> a set =
- fun v b (Set_tag (module Box)) ->
-  Set_tag
-    (module struct
-      type elt = a
+val add : t -> t -> t
 
-      module OPS = Box.OPS
+val pp : Format.formatter -> t -> unit
 
-      let boxed =
-        if b then Box.OPS.add v Box.boxed else Box.OPS.remove v Box.boxed
+val pp_micheline_size : Format.formatter -> micheline_size -> unit
 
-      let size =
-        let mem = Box.OPS.mem v Box.boxed in
-        if mem then if b then Box.size else Box.size - 1
-        else if b then Box.size + 1
-        else Box.size
-    end)
+val to_int : t -> int
 
-let mem : type elt. elt -> elt set -> bool =
- fun v (Set_tag (module Box)) -> Box.OPS.mem v Box.boxed
+val of_int : int -> t
 
-let fold : type elt acc. (elt -> acc -> acc) -> elt set -> acc -> acc =
- fun f (Set_tag (module Box)) -> Box.OPS.fold f Box.boxed
+val integer : 'a Alpha_context.Script_int.num -> t
 
-let size : type elt. elt set -> Script_int.n Script_int.num =
- fun (Set_tag (module Box)) -> Script_int.(abs (of_int Box.size))
+val string : string -> t
+
+val script_string : Alpha_context.Script_string.t -> t
+
+val bytes : Bytes.t -> t
+
+val mutez : Alpha_context.Tez.tez -> t
+
+val timestamp : Alpha_context.Script_timestamp.t -> t
+
+val size_of_comparable_value : 'a Script_typed_ir.comparable_ty -> 'a -> t

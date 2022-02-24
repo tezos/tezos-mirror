@@ -6179,8 +6179,6 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
 
           type value = M.value
 
-          let key_ty = M.key_ty
-
           let boxed = m
 
           let size = M.size

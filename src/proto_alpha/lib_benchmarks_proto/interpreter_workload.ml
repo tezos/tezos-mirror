@@ -1174,11 +1174,11 @@ let extract_ir_sized_step :
   | (ISet_iter _, (set, _)) -> Instructions.set_iter (Size.set set)
   | (ISet_mem (_, _), (v, (set, _))) ->
       let (module S) = Script_set.get set in
-      let sz = Size.size_of_comparable_value S.elt_ty v in
+      let sz = S.OPS.elt_size v in
       Instructions.set_mem sz (Size.set set)
   | (ISet_update (_, _), (v, (_flag, (set, _)))) ->
       let (module S) = Script_set.get set in
-      let sz = Size.size_of_comparable_value S.elt_ty v in
+      let sz = S.OPS.elt_size v in
       Instructions.set_update sz (Size.set set)
   | (ISet_size (_, _), (set, _)) -> Instructions.set_size (Size.set set)
   | (IEmpty_map (_, _, _), _) -> Instructions.empty_map
@@ -1186,19 +1186,19 @@ let extract_ir_sized_step :
   | (IMap_iter _, (map, _)) -> Instructions.map_iter (Size.map map)
   | (IMap_mem (_, _), (v, (map, _))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = Size.size_of_comparable_value Map.key_ty v in
+      let key_size = Map.OPS.key_size v in
       Instructions.map_mem key_size (Size.map map)
   | (IMap_get (_, _), (v, (map, _))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = Size.size_of_comparable_value Map.key_ty v in
+      let key_size = Map.OPS.key_size v in
       Instructions.map_get key_size (Size.map map)
   | (IMap_update (_, _), (v, (_elt_opt, (map, _)))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = Size.size_of_comparable_value Map.key_ty v in
+      let key_size = Map.OPS.key_size v in
       Instructions.map_update key_size (Size.map map)
   | (IMap_get_and_update (_, _), (v, (_elt_opt, (map, _)))) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = Size.size_of_comparable_value Map.key_ty v in
+      let key_size = Map.OPS.key_size v in
       Instructions.map_get_and_update key_size (Size.map map)
   | (IMap_size (_, _), (map, _)) -> Instructions.map_size (Size.map map)
   | (IEmpty_big_map (_, _, _, _), _) -> Instructions.empty_big_map
@@ -1439,7 +1439,7 @@ let extract_control_trace (type bef_top bef aft_top aft)
       Control.map_enter_body (Size.of_int (List.length xs))
   | KMap_exit_body (_, _, map, k, _) ->
       let (module Map) = Script_map.get_module map in
-      let key_size = Size.size_of_comparable_value Map.key_ty k in
+      let key_size = Map.OPS.key_size k in
       Control.map_exit_body key_size (Size.map map)
   | KView_exit _ -> Control.view_exit
   | KLog _ -> Control.log
