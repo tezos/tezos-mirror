@@ -44,3 +44,18 @@ val of_memory_tree : Tezos_context_memory.Context.tree -> Proxy_delegate.t
     it requires a full-fledged context instead of a tree (a context contains
     a tree, so a context is harder to obtain). *)
 val of_memory_context : Tezos_context_memory.Context.t -> Proxy_delegate.t
+
+(** [make_index context_path] creates an index that is suitable for being
+    passed to {!of_index}. *)
+val make_index : context_path:string -> Tezos_context.Context.index Lwt.t
+
+(** [of_index index ctxt_hash] creates a delegate that checkouts the given
+    index at the given [ctxt_hash]. It fails in the error monad if the hash is unknown.
+    Otherwise it returns a delegate that queries the tree of data at this hash.
+
+    This constructor is the hardest to use of all of this file, because
+    to obtain an [index], you need a full-fledged context on disk. *)
+val of_index :
+  index:Tezos_context.Context.index ->
+  Context_hash.t ->
+  Proxy_delegate.t tzresult Lwt.t
