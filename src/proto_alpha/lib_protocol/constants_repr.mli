@@ -103,6 +103,7 @@ module Generated : sig
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
     endorsing_reward_per_slot : Tez_repr.t;
+    liquidity_baking_subsidy : Tez_repr.t;
   }
 
   (* This function is meant to be used just in lib_parameters and in the

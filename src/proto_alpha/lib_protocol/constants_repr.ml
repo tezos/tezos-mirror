@@ -329,6 +329,7 @@ module Generated = struct
     baking_reward_fixed_portion : Tez_repr.t;
     baking_reward_bonus_per_slot : Tez_repr.t;
     endorsing_reward_per_slot : Tez_repr.t;
+    liquidity_baking_subsidy : Tez_repr.t;
   }
 
   let generate ~consensus_committee_size ~blocks_per_minute =
@@ -358,6 +359,7 @@ module Generated = struct
         else Tez_repr.div_exn rewards_quarter bonus_committee_size);
       endorsing_reward_per_slot =
         Tez_repr.div_exn rewards_half consensus_committee_size;
+      liquidity_baking_subsidy = Tez_repr.div_exn rewards_per_block 16;
     }
 end
 
