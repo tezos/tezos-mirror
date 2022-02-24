@@ -33,11 +33,37 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
     module Schema = Tezos_context_encoding.Context.Schema
   end
 
-  type kinded_key = [`Node of Store.node_key | `Value of Store.contents_key]
+  type kinded_key = [`Value of Context_hash.t | `Node of Context_hash.t]
 
-  module Tree = Tezos_context_helpers.Context.Make_tree (Store)
+  module Kinded_key = struct
+    let to_irmin_key (t : kinded_key) =
+      match t with
+      | `Node hash -> `Node (Hash.of_context_hash hash)
+      | `Value hash -> `Contents (Hash.of_context_hash hash, ())
+  end
+
+  module Tree = struct
+    include Tezos_context_helpers.Context.Make_tree (Store)
+
+    let shallow repo key = Store.Tree.shallow repo (Kinded_key.to_irmin_key key)
+  end
+
   include Tree
   include Tezos_context_helpers.Context.Make_proof (Store)
+
+  let produce_tree_proof t key =
+    produce_tree_proof
+      t
+      (match key with
+      | `Node hash -> `Node (Hash.of_context_hash hash)
+      | `Value hash -> `Value (Hash.of_context_hash hash))
+
+  let produce_stream_proof t key =
+    produce_stream_proof
+      t
+      (match key with
+      | `Node hash -> `Node (Hash.of_context_hash hash)
+      | `Value hash -> `Value (Hash.of_context_hash hash))
 
   type index = Store.repo
 

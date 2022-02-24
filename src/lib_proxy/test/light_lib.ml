@@ -111,13 +111,15 @@ let rec irmin_tree_to_simple_tree tree =
   match Store.Tree.kind tree with
   | `Value -> Lwt.return SLeaf
   | `Tree ->
-      let* pairs = Store.Tree.list tree [] in
-      let+ l =
-        List.map_s
-          (fun (k, i) -> irmin_tree_to_simple_tree i >|= fun st -> (k, st))
-          pairs
-      in
-      sdir_of_list l
+      if Store.Tree.is_shallow tree then Lwt.return SLeaf
+      else
+        let* pairs = Store.Tree.list tree [] in
+        let+ l =
+          List.map_s
+            (fun (k, i) -> irmin_tree_to_simple_tree i >|= fun st -> (k, st))
+            pairs
+        in
+        sdir_of_list l
 
 let rec merkle_node_to_simple_tree node =
   let open Tezos_shell_services.Block_services in

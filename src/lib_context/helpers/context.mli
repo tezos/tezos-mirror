@@ -58,6 +58,8 @@ module Make_tree (DB : DB) : sig
 
   val shallow : DB.repo -> kinded_key -> DB.tree
 
+  val is_shallow : DB.tree -> bool
+
   (** Exception raised by [find_tree] and [add_tree] when applied to shallow
     trees. It is exposed for so that the memory context can in turn raise it. *)
   exception Context_dangling_hash of string

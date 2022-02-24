@@ -172,6 +172,11 @@ module Make_tree (Store : DB) = struct
     in
     Store.Tree.shallow repo kinded_hash
 
+  let is_shallow tree =
+    match Store.Tree.inspect tree with
+    | `Node `Key -> true
+    | `Node (`Map | `Value | `Portable_dirty | `Pruned) | `Contents -> false
+
   let list tree ?offset ?length key =
     Store.Tree.list ~cache:true tree ?offset ?length key
 
@@ -179,13 +184,12 @@ module Make_tree (Store : DB) = struct
 
   exception Context_dangling_hash of string
 
-  exception Dangling_hash = Store.Backend.Node.Val.Dangling_hash
-
   let find_tree tree key =
     Lwt.catch
       (fun () -> Store.Tree.find_tree tree key)
       (function
-        | Dangling_hash {context; hash} ->
+        | Store.Backend.Node.Val.Dangling_hash {context; hash}
+        | Store.Tree.Dangling_hash {context; hash} ->
             let str =
               Fmt.str
                 "%s encountered dangling hash %a"
@@ -200,7 +204,8 @@ module Make_tree (Store : DB) = struct
     Lwt.catch
       (fun () -> Store.Tree.add_tree tree key value)
       (function
-        | Dangling_hash {context; hash} ->
+        | Store.Backend.Node.Val.Dangling_hash {context; hash}
+        | Store.Tree.Dangling_hash {context; hash} ->
             let str =
               Fmt.str
                 "%s encountered dangling hash %a"
