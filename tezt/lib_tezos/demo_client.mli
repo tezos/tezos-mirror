@@ -1,7 +1,7 @@
 (*****************************************************************************)
 (*                                                                           *)
 (* Open Source License                                                       *)
-(* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 G.B. Fefe  <gb.fefe@protonmail.com>                    *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -23,41 +23,41 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t = {a : int32; b : int32}
+(** Run Tezos client with commands related to `demo_protocol`. *)
 
-let invariant {a; b} = Compare.Int32.(a >= 0l && b >= 0l)
+(** Run [tezos-client activate protocol] with `demo_protocol`.
 
-let create a b =
-  let st = {a; b} in
-  if invariant st then Some st else None
+    If [timestamp] is not specified explicitely, it is set to [now
+    -. timestamp_delay]. Default value for [timestamp_delay] is 365
+    days, which allows to bake plenty of blocks before their timestamp
+    reach the present (at which point one would have to wait between
+    each block so that peers do not reject them for being in the
+    future). *)
+val activate :
+  ?endpoint:Client.endpoint ->
+  ?fitness:int ->
+  ?key:string ->
+  ?timestamp:string ->
+  ?timestamp_delay:float ->
+  Client.t ->
+  unit Lwt.t
 
-let encoding =
-  Data_encoding.conv
-    (fun {a; b} -> (a, b))
-    (fun (a, b) -> {a; b})
-    Data_encoding.(obj2 (req "demo_a" int32) (req "demo_b" int32))
+(** Run [tezos-client bake]. *)
+val bake : ?msg:string -> Client.t -> unit Lwt.t
 
-let encoding_length =
-  match Data_encoding.Binary.fixed_length encoding with
-  | None ->
-      assert false
-  | Some length ->
-      length
+(** Run [tezos-client get a], get the current value of counter `a`. *)
+val get_a : Client.t -> int Lwt.t
 
-let state_key = ["state"]
+(** Run [tezos-client get a], get the current value of counter `b`. *)
+val get_b : Client.t -> int Lwt.t
 
-let get_state context =
-  Context.find context state_key
-  >|= function
-  | None ->
-      assert false
-  | Some encoded_state -> (
-    match Data_encoding.Binary.of_bytes_opt encoding encoded_state with
-    | Some x ->
-        x
-    | None ->
-        assert false )
+(** Run [tezos-client increment a], add one to counter `a`. *)
+val increment_a : Client.t -> unit Lwt.t
 
-let update_state context state =
-  let encoded_state = Data_encoding.Binary.to_bytes_exn encoding state in
-  Context.add context state_key encoded_state
+(** Run [tezos-client increment b], add one to counter `a`.. *)
+val increment_b : Client.t -> unit Lwt.t
+
+(** Run [tezos-client transfer amount], when [amount] is positive,
+    transfer [amount] from counter `a` to counter `b. When [amount] is
+    negative, transfer [-amount] from `b` to `a`. *)
+val transfer : Client.t -> int -> unit Lwt.t

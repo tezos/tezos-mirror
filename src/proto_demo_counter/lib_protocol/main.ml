@@ -62,17 +62,12 @@ type operation = {
   protocol_data : operation_data;
 }
 
-let compare_operations op1 op2 =
-  Proto_operation.compare op1.protocol_data op2.protocol_data
-
 type validation_state = {context : Context.t; fitness : Fitness.t}
-
-let current_context {context; _} = return context
 
 let begin_application ~chain_id:_ ~predecessor_context:context
     ~predecessor_timestamp:_ ~predecessor_fitness (raw_block : block_header) =
   let fitness = raw_block.shell.fitness in
-  Logging.log_notice
+  Logging.log Notice
     "begin_application: pred_fitness = %a  block_fitness = %a%!"
     Fitness.pp
     predecessor_fitness
@@ -84,7 +79,7 @@ let begin_application ~chain_id:_ ~predecessor_context:context
 
 let begin_partial_application ~chain_id ~ancestor_context
     ~predecessor_timestamp ~predecessor_fitness block_header =
-  Logging.log_notice "begin_partial_application%!" ;
+  Logging.log Notice "begin_partial_application%!" ;
   begin_application
     ~chain_id
     ~predecessor_context:ancestor_context
@@ -92,14 +87,22 @@ let begin_partial_application ~chain_id ~ancestor_context
     ~predecessor_fitness
     block_header
 
-let version_number = "\001"
+(* we use here the same fitness format than proto alpha,
+   but with higher [version_number] to allow testing
+   migration from alpha to demo_counter. *)
+let version_number = "\255"
 
 let int64_to_bytes i =
-  let b = MBytes.create 8 in
-  MBytes.set_int64 b 0 i ; b
+  let b = Bytes.make 8 '\000' in
+  TzEndian.set_int64 b 0 i ;
+  b
 
 let fitness_from_level level =
-  [MBytes.of_string version_number; int64_to_bytes level]
+  [Bytes.of_string version_number;
+   Bytes.of_string "\000";
+   Bytes.of_string "\000";
+   Bytes.of_string "\000";
+   int64_to_bytes level]
 
 let begin_construction ~chain_id:_ ~predecessor_context:context
     ~predecessor_timestamp:_ ~predecessor_level ~predecessor_fitness
@@ -108,7 +111,7 @@ let begin_construction ~chain_id:_ ~predecessor_context:context
   let mode =
     match protocol_data with Some _ -> "block" | None -> "mempool"
   in
-  Logging.log_notice
+  Logging.log Notice
     "begin_construction (%s): pred_fitness = %a  constructed fitness = %a%!"
     mode
     Fitness.pp
@@ -118,7 +121,7 @@ let begin_construction ~chain_id:_ ~predecessor_context:context
   return {context; fitness}
 
 let apply_operation validation_state operation =
-  Logging.log_notice "apply_operation" ;
+  Logging.log Notice "apply_operation" ;
   let {context; fitness} = validation_state in
   State.get_state context
   >>= fun state ->
@@ -130,9 +133,9 @@ let apply_operation validation_state operation =
       State.update_state context state
       >>= fun context -> return ({context; fitness}, receipt)
 
-let finalize_block validation_state =
+let finalize_block validation_state _header  =
   let fitness = validation_state.fitness in
-  Logging.log_notice "finalize_block: fitness = %a%!" Fitness.pp fitness ;
+  Logging.log Notice "finalize_block: fitness = %a%!" Fitness.pp fitness ;
   let fitness = validation_state.fitness in
   let message = Some (Format.asprintf "fitness <- %a" Fitness.pp fitness) in
   let context = validation_state.context in
@@ -157,12 +160,12 @@ let decode_json json =
 
 let get_init_state context : State.t tzresult Lwt.t =
   let protocol_params_key = ["protocol_parameters"] in
-  Context.get context protocol_params_key
+  Context.find context protocol_params_key
   >>= (function
         | None ->
             return Proto_params.default
         | Some bytes -> (
-          match Data_encoding.Binary.of_bytes Data_encoding.json bytes with
+          match Data_encoding.Binary.of_bytes_opt Data_encoding.json bytes with
           | None ->
               fail (Error.Failed_to_parse_parameter bytes)
           | Some json ->
@@ -178,7 +181,7 @@ let get_init_state context : State.t tzresult Lwt.t =
 let init context block_header =
   let open Block_header in
   let fitness = block_header.fitness in
-  Logging.log_notice "init: fitness = %a%!" Fitness.pp fitness ;
+  Logging.log Notice "init: fitness = %a%!" Fitness.pp fitness ;
   get_init_state context
   >>=? fun init_state ->
   State.update_state context init_state
@@ -191,5 +194,13 @@ let init context block_header =
       max_operations_ttl = 0;
       last_allowed_fork_level = block_header.level;
     }
+
+let relative_position_within_block _ _ = 0
+
+type Context.Cache.value += Demo of int
+
+let value_of_key ~chain_id:_ ~predecessor_context:_ ~predecessor_timestamp:_
+    ~predecessor_level:_ ~predecessor_fitness:_ ~predecessor:_ ~timestamp:_ =
+  return (fun _ -> return (Demo 123))
 
 let rpc_services = Services.rpc_services

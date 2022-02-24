@@ -96,6 +96,7 @@ let () =
   (* Tests that are heavily protocol-dependent.
      Those modules define different tests for different protocols in their [register]. *)
   RPC_test.register [Ithaca; Jakarta; Alpha] ;
+  Demo_counter.register () ;
   (* Alpha cannot stitch from Jakarta yet, but when it can, we can
      add a voting test from Jakarta to Alpha. *)
   Voting.register

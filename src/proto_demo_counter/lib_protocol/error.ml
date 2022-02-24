@@ -27,7 +27,7 @@ type error += Demo_error of int
 
 type error += Invalid_operation
 
-type error += Failed_to_parse_parameter of MBytes.t
+type error += Failed_to_parse_parameter of bytes
 
 type error += Invalid_protocol_parameters
 
@@ -43,7 +43,7 @@ let () =
       Format.fprintf
         ppf
         "Cannot parse the protocol parameter: %s"
-        (MBytes.to_string bytes))
+        (Bytes.to_string bytes))
     (obj1 (req "contents" bytes))
     (function Failed_to_parse_parameter data -> Some data | _ -> None)
     (fun data -> Failed_to_parse_parameter data) ;

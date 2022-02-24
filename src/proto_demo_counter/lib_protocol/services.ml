@@ -44,12 +44,12 @@ end
 let rpc_services : Updater.rpc_context RPC_directory.t =
   let dir = RPC_directory.empty in
   let dir =
-    RPC_directory.register dir S.service_counter_a (fun ctxt () () ->
+    RPC_directory.register ~chunked:false dir S.service_counter_a (fun ctxt () () ->
         let context = ctxt.Updater.context in
         State.get_state context >>= fun state -> return state.State.a)
   in
   let dir =
-    RPC_directory.register dir S.service_counter_b (fun ctxt () () ->
+    RPC_directory.register ~chunked:false dir S.service_counter_b (fun ctxt () () ->
         let context = ctxt.Updater.context in
         State.get_state context >>= fun state -> return state.State.b)
   in
