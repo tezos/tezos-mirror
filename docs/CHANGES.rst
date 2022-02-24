@@ -271,7 +271,6 @@ Client
   the baker, in which case, the latter might includes the first operation and
   the second one becomes invalid.
 
-`
 Baker / Endorser / Accuser
 --------------------------
 
