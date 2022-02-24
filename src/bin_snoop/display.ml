@@ -208,9 +208,13 @@ let rec plot_stacked :
   match plots with
   | [] -> Plot.return ()
   | `Dim2 ax :: tl ->
-      Plot.(subplot_2d ~row ~col ax >>= fun () -> plot_stacked (row + 1) col tl)
+      let open Plot in
+      let* () = subplot_2d ~row ~col ax in
+      plot_stacked (row + 1) col tl
   | `Dim3 ax :: tl ->
-      Plot.(subplot_3d ~row ~col ax >>= fun () -> plot_stacked (row + 1) col tl)
+      let open Plot in
+      let* () = subplot_3d ~row ~col ax in
+      plot_stacked (row + 1) col tl
 
 let validator (problem : Inference.problem) (solution : Inference.solution) =
   match problem with
@@ -233,8 +237,9 @@ let validator (problem : Inference.problem) (solution : Inference.solution) =
 
 let empirical (workload_data : (Sparse_vec.String.t * float) list) :
     (int * (col:int -> unit Plot.t), string) result =
-  empirical_data workload_data >>? fun (columns, timings) ->
-  plot_scatter "Empirical" columns [timings] >>? fun plots ->
+  let open Result_syntax in
+  let* (columns, timings) = empirical_data workload_data in
+  let* plots = plot_scatter "Empirical" columns [timings] in
   let nrows = List.length plots in
   Ok (nrows, fun ~col -> plot_stacked 0 col plots)
 
@@ -332,8 +337,9 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
     else
       let plot =
         let open Plot in
-        empirical >>= fun () ->
-        validator >>= fun () -> validator_emp
+        let* () = empirical in
+        let* () = validator in
+        validator_emp
       in
       Some (!max_rows, !current_col, plot)
   in
@@ -344,23 +350,26 @@ let perform_plot ~measure ~model_name ~problem ~solution ~plot_target =
         ~nrows
         ~ncols
         (let open Plot in
-        plot >>= fun () ->
-        suptitle ~title:Bench.name ~fontsize:None >>= fun () ->
+        let* () = plot in
+        let* () = suptitle ~title:Bench.name ~fontsize:None in
         match plot_target with
         | Save {file} -> (
             match file with
             | None ->
                 savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95
             | Some filename -> savefig ~filename ~dpi:3000 ~quality:95)
-        | Show -> Plot.(show () >>= fun () -> return ())
+        | Show ->
+            Plot.(
+              let* () = show () in
+              return ())
         | ShowAndSave {file} -> (
             match file with
             | None ->
                 Plot.(
-                  show () >>= fun () ->
+                  let* () = show () in
                   savefig ~filename:(filename "collected") ~dpi:3000 ~quality:95)
             | Some filename ->
                 Plot.(
-                  show () >>= fun () -> savefig ~filename ~dpi:3000 ~quality:95)
-            )) ;
+                  let* () = show () in
+                  savefig ~filename ~dpi:3000 ~quality:95))) ;
       true

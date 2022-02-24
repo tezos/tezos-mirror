@@ -34,18 +34,21 @@ let assert_ok ~msg = function
       exit 1
 
 let prepare_genesis base_dir =
-  Tezos_context.Context.init ~readonly:false base_dir >>= fun index ->
+  let open Lwt_result_syntax in
+  let*! index = Tezos_context.Context.init ~readonly:false base_dir in
   let genesis_block =
     Block_hash.of_b58check_exn
       "BLockGenesisGenesisGenesisGenesisGenesisGeneskvg68z"
   in
-  Tezos_context.Context.commit_genesis
-    index
-    ~chain_id:(Chain_id.of_block_hash genesis_block)
-    ~time:(Time.Protocol.of_seconds 0L)
-    ~protocol:(Obj.magic ())
-  >>=? fun context_hash ->
-  Tezos_context.Context.checkout index context_hash >>= function
+  let* context_hash =
+    Tezos_context.Context.commit_genesis
+      index
+      ~chain_id:(Chain_id.of_block_hash genesis_block)
+      ~time:(Time.Protocol.of_seconds 0L)
+      ~protocol:(Obj.magic ())
+  in
+  let*! o = Tezos_context.Context.checkout index context_hash in
+  match o with
   | None -> assert false
   | Some context ->
       let context =
@@ -62,13 +65,17 @@ let commit context =
     context
 
 let prepare_empty_context base_dir =
-  prepare_genesis base_dir >>=? fun (index, context, _context_hash) ->
-  commit context >>= fun context_hash ->
-  Tezos_context.Context.close index >>= fun () -> return context_hash
+  let open Lwt_result_syntax in
+  let* (index, context, _context_hash) = prepare_genesis base_dir in
+  let*! context_hash = commit context in
+  let*! () = Tezos_context.Context.close index in
+  return context_hash
 
 let load_context_from_disk_lwt base_dir context_hash =
-  Tezos_context.Context.init ~readonly:false base_dir >>= fun index ->
-  Tezos_context.Context.checkout index context_hash >>= function
+  let open Lwt_syntax in
+  let* index = Tezos_context.Context.init ~readonly:false base_dir in
+  let* o = Tezos_context.Context.checkout index context_hash in
+  match o with
   | None -> assert false
   | Some context ->
       Lwt.return
@@ -80,8 +87,10 @@ let load_context_from_disk base_dir context_hash =
 let with_context ~base_dir ~context_hash f =
   let (context, index) = load_context_from_disk base_dir context_hash in
   Lwt_main.run
-    ( f context >>= fun res ->
-      Tezos_context.Context.close index >>= fun () -> Lwt.return res )
+    (let open Lwt_syntax in
+    let* res = f context in
+    let* () = Tezos_context.Context.close index in
+    Lwt.return res)
 
 let prepare_base_dir base_dir =
   Unix.unlink base_dir ;
@@ -93,8 +102,9 @@ let initialize_key rng_state context path storage_size =
   Tezos_protocol_environment.Context.add context path bytes
 
 let commit_and_reload base_dir index context =
-  commit context >>= fun context_hash ->
-  Tezos_context.Context.close index >>= fun () ->
+  let open Lwt_syntax in
+  let* context_hash = commit context in
+  let* () = Tezos_context.Context.close index in
   load_context_from_disk_lwt base_dir context_hash
 
 (** Maps from string lists to bytes. No balancing. A key cannot be a prefix
@@ -183,10 +193,7 @@ module Key_map = struct
   let of_seq seq = Seq.fold_left (fun map (k, v) -> insert k v map) empty seq
 
   let fold_lwt f m accu =
-    Seq.fold_left
-      (fun acc_lwt (k, v) -> acc_lwt >>= fun acc -> f k v acc)
-      (Lwt.return accu)
-      (to_seq m)
+    Seq.fold_left_s (fun acc (k, v) -> f k v acc) accu (to_seq m)
 
   let sample_uniform map =
     if is_empty map then None
