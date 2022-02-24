@@ -416,7 +416,7 @@ let test_protocol_locator base_dir =
     make_multiple_protocol_chain chain_store ~chain_length ~fork_points
   in
   let*! () =
-    Lwt_list.iter_s
+    List.iter_s
       (fun (proto_level, (inf, sup)) ->
         let*! o =
           Store.Chain.compute_protocol_locator chain_store ~proto_level seed

@@ -379,10 +379,8 @@ let build_raw_rpc_directory (module Proto : Block_services.PROTO)
           header.protocol_data
       in
       let* metadata =
-        let*! r = block_metadata chain_store block in
-        match r with
-        | Ok metadata -> return_some metadata
-        | Error _ -> return_none
+        let*! metadata = block_metadata chain_store block in
+        return (Option.of_result metadata)
       in
       let* operations = operations chain_store block in
       return

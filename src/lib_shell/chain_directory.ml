@@ -31,13 +31,11 @@ let get_chain_id store =
   let main_chain_store = Store.main_chain_store store in
   function
   | `Main -> Lwt.return (Store.Chain.chain_id main_chain_store)
-  | `Test -> (
-      let* o = Store.Chain.testchain main_chain_store in
-      match o with
-      | None -> Lwt.fail Not_found
-      | Some testchain ->
-          let testchain_store = Store.Chain.testchain_store testchain in
-          Lwt.return (Store.Chain.chain_id testchain_store))
+  | `Test ->
+      let* testchain = Store.Chain.testchain main_chain_store in
+      let testchain = WithExceptions.Option.to_exn ~none:Not_found testchain in
+      let testchain_store = Store.Chain.testchain_store testchain in
+      Lwt.return (Store.Chain.chain_id testchain_store)
   | `Hash chain_id -> Lwt.return chain_id
 
 let get_chain_id_opt store chain =
@@ -46,10 +44,9 @@ let get_chain_id_opt store chain =
 let get_chain_store_exn store chain =
   let open Lwt_syntax in
   let* chain_id = get_chain_id store chain in
-  let* o = Store.get_chain_store_opt store chain_id in
-  match o with
-  | Some chain_store -> Lwt.return chain_store
-  | None -> Lwt.fail Not_found
+  let* chain_store = Store.get_chain_store_opt store chain_id in
+  let chain_store = WithExceptions.Option.to_exn ~none:Not_found chain_store in
+  Lwt.return chain_store
 
 let get_checkpoint store (chain : Chain_services.chain) =
   let open Lwt_syntax in
@@ -79,7 +76,7 @@ let list_blocks chain_store ?(length = 1) ?min_date heads =
     | [] ->
         let*! heads = Store.Chain.known_heads chain_store in
         let*! heads =
-          Lwt_list.filter_map_p
+          List.filter_map_p
             (fun (h, _) -> Store.Block.read_block_opt chain_store h)
             heads
         in
