@@ -284,6 +284,7 @@ let gen_keys count client =
 
 let vest ?(expect_failure = false) ?(amount = Tez.zero) vesting_contract =
   let open StateMonad in
+  Log.debug "Vesting %f ꜩ on %s" (Tez.to_float amount) vesting_contract ;
   let* () =
     transfer
       ~source:"bootstrap1"
@@ -315,6 +316,11 @@ let sign_transfer ?(expect_failure = false) ~contract ~replay ~receiver ~signers
          (left @@ left @@ pair (str receiver) (tez amount))
          (sigs_michelson signatures)
   in
+  Log.debug
+    "Signing transfer of %f ꜩ from %s to %s."
+    (Tez.to_float amount)
+    contract
+    receiver ;
   let* () =
     transfer
       ~expect_failure
@@ -331,13 +337,22 @@ let sign_transfer ?(expect_failure = false) ~contract ~replay ~receiver ~signers
 let set_pour ~replay ~signers info contract =
   let open StateMonad in
   let* keys = getf StateRecord.get_keys in
-  let pour_info (recipient, authorizer) =
-    let open Contract_storage in
-    let recp_pk_hash = (Array.get keys recipient).public_key_hash in
-    let auth = Array.get keys authorizer in
-    {pour_dest = recp_pk_hash; pour_authorizer = auth.public_key}
+  let new_pour_info =
+    match info with
+    | Some (recipient, authorizer) ->
+        let open Contract_storage in
+        let recp_pk_hash = (Array.get keys recipient).public_key_hash in
+        let auth = Array.get keys authorizer in
+        Log.debug
+          "Setting pour from %s to %s (%s)."
+          contract
+          auth.alias
+          auth.public_key_hash ;
+        Some {pour_dest = recp_pk_hash; pour_authorizer = auth.public_key}
+    | None ->
+        Log.debug "Clearing pour on %s." contract ;
+        None
   in
-  let new_pour_info = Option.map pour_info info in
   let pour_info_micheline =
     Contract_storage.pour_info_micheline new_pour_info
   in
@@ -370,11 +385,11 @@ let execute_pour ?(expect_failure = false) ~authorizer ~recipient ~amount
     ~replay contract =
   let open StateMonad in
   let* keys = getf StateRecord.get_keys in
-  let recp_pk_hash = (Array.get keys recipient).public_key_hash in
+  let recp = Array.get keys recipient in
   let to_sign =
     let open Test_michelson in
     pair
-      (pair (str recp_pk_hash) (tez amount))
+      (pair (str recp.public_key_hash) (tez amount))
       (pair (str contract) (num replay))
   in
   let typ =
@@ -386,6 +401,12 @@ let execute_pour ?(expect_failure = false) ~authorizer ~recipient ~amount
     let open Test_michelson in
     right @@ some @@ pair (str signature) (tez amount)
   in
+  Log.debug
+    "Executing pour of %f ꜩ from %s to %s (%s)."
+    (Tez.to_float amount)
+    contract
+    recp.alias
+    recp.public_key_hash ;
   let* () =
     transfer
       ~source:"bootstrap1"
