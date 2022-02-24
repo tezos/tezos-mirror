@@ -46,7 +46,7 @@ val ( and* ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
     More precisely, if one of the two promises is rejected
     or canceled, cancel the other promise and reject the resulting
     promise immediately with the original exception. *)
-val ( and*! ) : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
+val lwt_both_fail_early : 'a Lwt.t -> 'b Lwt.t -> ('a * 'b) Lwt.t
 
 (** Same as [Lwt.return]. *)
 val return : 'a -> 'a Lwt.t

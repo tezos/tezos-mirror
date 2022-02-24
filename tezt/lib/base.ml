@@ -42,7 +42,7 @@ let ( let* ) = Lwt.bind
 
 let ( and* ) = Lwt.both
 
-let ( and*! ) a b =
+let lwt_both_fail_early a b =
   let (main_promise, main_awakener) = Lwt.task () in
   let already_woke_up = ref false in
   Lwt.on_failure a (fun exn ->
