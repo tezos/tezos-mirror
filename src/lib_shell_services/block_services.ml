@@ -1534,25 +1534,28 @@ module Make (Proto : PROTO) (Next_proto : PROTO) = struct
         ?(version = S.Mempool.default_pending_operations_version)
         ?(applied = true) ?(branch_delayed = true) ?(branch_refused = true)
         ?(refused = true) ?(outdated = true) () =
-      RPC_context.make_call1
-        (S.Mempool.pending_operations (mempool_path chain_path))
-        ctxt
-        chain
-        (object
-           method version = version
+      let open Lwt_result_syntax in
+      let* v =
+        RPC_context.make_call1
+          (S.Mempool.pending_operations (mempool_path chain_path))
+          ctxt
+          chain
+          (object
+             method version = version
 
-           method applied = applied
+             method applied = applied
 
-           method refused = refused
+             method refused = refused
 
-           method outdated = outdated
+             method outdated = outdated
 
-           method branch_refused = branch_refused
+             method branch_refused = branch_refused
 
-           method branch_delayed = branch_delayed
-        end)
-        ()
-      >>=? function
+             method branch_delayed = branch_delayed
+          end)
+          ()
+      in
+      match v with
       | Version_1 pending_operations | Version_0 pending_operations ->
           return pending_operations
 
