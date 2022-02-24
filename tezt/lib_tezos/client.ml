@@ -1573,11 +1573,12 @@ let init_with_protocol ?path ?admin_path ?name ?color ?base_dir ?event_level
   let* _ = Node.wait_for_level node 1 in
   return (node, client)
 
-let register_key owner client =
+let spawn_register_key owner client =
   spawn_command
     client
     ["--wait"; "none"; "register"; "key"; owner; "as"; "delegate"]
-  |> Process.check
+
+let register_key owner client = spawn_register_key owner client |> Process.check
 
 let contract_storage ?unparsing_mode address client =
   let unparsing_mode_to_string = function

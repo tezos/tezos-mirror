@@ -1135,6 +1135,9 @@ val spawn_command :
   Process.t
 
 (** Register public key for given account with given client. *)
+val spawn_register_key : string -> t -> Process.t
+
+(** Register public key for given account with given client. *)
 val register_key : string -> t -> unit Lwt.t
 
 (** Get contract storage for a contract. Returns a Micheline expression

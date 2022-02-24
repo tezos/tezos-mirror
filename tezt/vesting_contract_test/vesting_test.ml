@@ -24,12 +24,20 @@
 (*****************************************************************************)
 
 module StateRecord = struct
+  module AddrMap = Map.Make (String)
+
+  type balance = {alias : string option; amount : Tez.t}
+
+  let with_balance ~amount f balance =
+    {balance with amount = f balance.amount amount}
+
   type t = {
     node : Node.t;
     client : Client.t;
     keys : Account.key Array.t;
     vesting_contract : string;
     storage : Contract_storage.t;
+    balances : balance AddrMap.t;
   }
 
   let get_client {client; _} = client
@@ -37,6 +45,31 @@ module StateRecord = struct
   let get_keys {keys; _} = keys
 
   let key i {keys; _} = Array.get keys i
+
+  let balance_of address {balances; _} = AddrMap.find address balances
+
+  let track_balance addr amount state =
+    {state with balances = AddrMap.add addr amount state.balances}
+
+  let increase_balance addr ~amount state =
+    {
+      state with
+      balances =
+        AddrMap.update
+          addr
+          (Option.map (with_balance ~amount Tez.( + )))
+          state.balances;
+    }
+
+  let decrease_balance addr ~amount state =
+    {
+      state with
+      balances =
+        AddrMap.update
+          addr
+          (Option.map (with_balance ~amount Tez.( - )))
+          state.balances;
+    }
 end
 
 module StateMonad = struct
@@ -45,6 +78,20 @@ module StateMonad = struct
   let parameter_file = "src/proto_alpha/parameters/sandbox-parameters.json"
 
   let client = getf StateRecord.get_client
+
+  let track_balance_of ?alias ?amount addr =
+    update
+      (StateRecord.track_balance
+         addr
+         StateRecord.{alias; amount = Option.value ~default:Tez.zero amount})
+
+  let get_balance_of addr = getf (StateRecord.balance_of addr)
+
+  let increase_balance_of addr ~amount =
+    update (StateRecord.increase_balance addr ~amount)
+
+  let decrease_balance_of addr ~amount =
+    update (StateRecord.decrease_balance addr ~amount)
 
   let rec update_storage = function
     | [] -> return ()
@@ -67,6 +114,36 @@ module StateMonad = struct
   let user_pk i =
     let+ k = getf (StateRecord.key i) in
     k.public_key
+
+  let assert_balance account =
+    let* c = client in
+    let* {alias; amount = expected} = get_balance_of account in
+    let* actual = lift @@ Client.get_balance_for ~account c in
+    let pp_account fmt = function
+      | None -> Format.(pp_print_string fmt account)
+      | Some al -> Format.fprintf fmt "%s (%s)" al account
+    in
+    if actual = expected then (
+      Log.debug
+        "Balance of %s is ꜩ %s as expected."
+        account
+        (Tez.to_string expected) ;
+      return ())
+    else
+      Test.fail
+        "Balance for %a is ꜩ %s instead of expected ꜩ %s."
+        pp_account
+        alias
+        (Tez.to_string actual)
+        (Tez.to_string expected)
+
+  let assert_increased_balance account ~amount =
+    let* () = increase_balance_of account ~amount in
+    assert_balance account
+
+  let assert_decreased_balance account ~amount =
+    let* () = decrease_balance_of account ~amount in
+    assert_balance account
 
   let initialise_vesting_state ?overall_treshold ?vesting_increment ?next_payout
       ?payout_interval ?pour_info key_indices =
@@ -152,32 +229,35 @@ module StateMonad = struct
            client
     in
     let* () = bake in
+    let* () = track_balance_of ~alias hash ~amount in
     return hash
 
   let make_delegate u =
+    let add_fees total line =
+      let open String in
+      let line = trim line in
+      if length line >= 16 && sub line 0 16 = "Fee to the baker" then
+        let fee = Tez.parse_floating line in
+        Tez.(fee + total)
+      else total
+    in
     let* c = client in
     let* target = alias (`User u) in
+    let* addr = user_address u in
+    let amount = Tez.of_int 100 in
+    let* () = track_balance_of addr ~alias:target in
     let* () =
-      transfer
-        ~source:"bootstrap1"
-        ~target
-        ~burn_cap:(Tez.of_int 1)
-        (Tez.of_int 100)
+      transfer ~source:"bootstrap1" ~target ~burn_cap:(Tez.of_int 1) amount
     in
+    let* () = assert_increased_balance ~amount addr in
     let* () = bake in
-    let* () = lift @@ Client.register_key target c in
-    bake
-
-  let assert_balance account expected =
-    let* c = client in
-    let* actual = lift @@ Client.get_balance_for ~account c in
-    if actual = expected then return ()
-    else
-      Test.fail
-        "Balance for %s is ꜩ %s instead of expected ꜩ %s."
-        account
-        (Tez.to_string actual)
-        (Tez.to_string expected)
+    let reg_process = Client.spawn_register_key target c in
+    let* () = lift @@ Process.check reg_process in
+    let* output = lift @@ Lwt_io.read (Process.stdout reg_process) in
+    let output_lines = String.split_on_char '\n' output in
+    let fee = List.fold_left add_fees Tez.zero output_lines in
+    let* () = bake in
+    assert_decreased_balance ~amount:fee addr
 
   (* Assert that the actual storage is identical to the one maintained
      by the test state. *)
@@ -196,7 +276,7 @@ module StateMonad = struct
             Format.pp_print_string fmt @@ Test_michelson.to_string e)
           diff
     | None ->
-        Log.info
+        Log.debug
           "Current storage:\n%a"
           Micheline_printer.print_expr
           (Micheline.map_node
@@ -284,7 +364,7 @@ let gen_keys count client =
 
 let vest ?(expect_failure = false) ?(amount = Tez.zero) vesting_contract =
   let open StateMonad in
-  Log.debug "Vesting %f ꜩ on %s" (Tez.to_float amount) vesting_contract ;
+  Log.debug "Vesting on %s." vesting_contract ;
   let* () =
     transfer
       ~source:"bootstrap1"
@@ -293,6 +373,10 @@ let vest ?(expect_failure = false) ?(amount = Tez.zero) vesting_contract =
       ~burn_cap:Tez.one
       ~expect_failure
       amount
+  in
+  let* () =
+    if expect_failure then assert_balance vesting_contract
+    else assert_increased_balance ~amount vesting_contract
   in
   assert_updated_storage
     (if expect_failure then []
@@ -329,6 +413,14 @@ let sign_transfer ?(expect_failure = false) ~contract ~replay ~receiver ~signers
       ~burn_cap:Tez.(of_mutez_int 100000)
       ~arg
       Tez.zero
+  in
+  let* () =
+    if expect_failure then
+      let* () = assert_balance receiver in
+      assert_balance contract
+    else
+      let* () = assert_increased_balance receiver ~amount in
+      assert_decreased_balance contract ~amount
   in
   assert_updated_storage
     (if expect_failure then [] else Contract_storage.[pay_out amount])
@@ -416,6 +508,12 @@ let execute_pour ?(expect_failure = false) ~authorizer ~recipient ~amount
       ~expect_failure
       Tez.zero
   in
+  let* () =
+    if expect_failure then assert_balance contract
+    else
+      let* () = assert_increased_balance ~amount recp.public_key_hash in
+      assert_decreased_balance ~amount contract
+  in
   assert_updated_storage
     (if expect_failure then [] else Contract_storage.[pay_out amount])
     contract
@@ -437,6 +535,7 @@ let set_delegate ~delegate ~signers ~replay contract =
          (sigs_michelson signatures)
   in
   let* () = transfer ~source:"bootstrap1" ~target:contract ~arg Tez.zero in
+  let* () = assert_balance contract in
   assert_updated_storage Contract_storage.[bump_replay_counter] contract
 
 let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
@@ -473,6 +572,7 @@ let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
     let open Test_michelson in
     left @@ pair key_groups_micheline (sigs_michelson signatures)
   in
+  Log.debug "Setting keys for %s." contract ;
   let* () =
     transfer
       ~expect_failure
@@ -482,6 +582,7 @@ let set_keys ?(expect_failure = false) ~signers ~key_groups ~overall_treshold
       ~arg
       Tez.zero
   in
+  let* () = assert_balance contract in
   assert_updated_storage
     (if expect_failure then []
     else Contract_storage.[update_keys key_groups overall_treshold])
@@ -492,12 +593,9 @@ let transfer_and_pour_happy_path =
   let* () = activate_alpha in
   let* () = initialise_vesting_state [([0], 1); ([1], 1); ([2], 1)] in
   let* contract = originate_vesting "vesting_3_keys_60s" (Tez.of_int 500) in
-  let* () = assert_balance contract @@ Tez.of_int 500 in
   let* () = assert_storage contract in
 
-  (* Make 5 consecutive vest operations from the vesting contract. After each
-     of them [vested_balance] should increase by ꜩ100 and [next_payout] by 60s.
-     Appropriate assertions are performed automatically. *)
+  Log.info "Make 5 consecutive vest operations." ;
   let* () = vest contract in
   let* () = vest contract in
   let* () = vest contract in
@@ -505,7 +603,8 @@ let transfer_and_pour_happy_path =
   let* () = vest contract in
 
   let* receiver = user_address 3 in
-  let* () = assert_balance receiver Tez.zero in
+  let* () = track_balance_of ~alias:"receiver" receiver in
+  let* () = assert_balance receiver in
   let* () =
     sign_transfer
       ~contract
@@ -514,11 +613,9 @@ let transfer_and_pour_happy_path =
       ~replay:0
       Tez.(of_int 400)
   in
-  let* () = assert_balance receiver @@ Tez.of_int 400 in
-  let* () = assert_balance contract @@ Tez.of_int 100 in
   let* () = vest contract in
-  (* This is expected to fail, as we order transfer of more funds than is available.
-     ꜩ400 out of ꜩ500 transferred initially to the contract are already spent. *)
+  Log.info
+    "Next transfer is expected to fail due to insufficient contract's balance." ;
   let* () =
     sign_transfer
       ~contract
@@ -528,7 +625,7 @@ let transfer_and_pour_happy_path =
       ~expect_failure:true
       Tez.(of_int 100 + of_mutez_int 1)
   in
-  (* Hence transferring exactly ꜩ100 is still possible. *)
+  Log.info "However, transferring exactly ꜩ100 is still possible. " ;
   let* () =
     sign_transfer
       ~contract
@@ -537,13 +634,12 @@ let transfer_and_pour_happy_path =
       ~replay:1
       Tez.(of_int 100)
   in
-  let* () = assert_balance receiver @@ Tez.of_int 500 in
-  let* () = assert_balance contract @@ Tez.of_int 0 in
   let* () = vest ~amount:(Tez.of_int 200) contract in
-  let* () = assert_balance contract @@ Tez.of_int 200 in
 
-  (* Decide to pour funds from the vesting contract to a previously agreed
-     account by a single signature. *)
+  Log.info
+    "Set a special account transfer to which require only a single signature." ;
+  let* pour_recipient = user_address 4 in
+  let* () = track_balance_of ~alias:"pour recipient" pour_recipient in
   let* () =
     set_pour_for
       ~authorizer:5
@@ -552,8 +648,6 @@ let transfer_and_pour_happy_path =
       ~replay:2
       contract
   in
-  let* pour_receiver = user_address 4 in
-  let* () = assert_balance pour_receiver @@ Tez.of_int 0 in
   let* () =
     execute_pour
       ~authorizer:5
@@ -562,9 +656,7 @@ let transfer_and_pour_happy_path =
       ~amount:Tez.(of_int 100)
       contract
   in
-  let* () = assert_balance contract @@ Tez.of_int 100 in
-  let* () = assert_balance pour_receiver @@ Tez.of_int 100 in
-  (* Pour cannot exceed the available balance. *)
+  Log.info "Pour cannot exceed the available balance." ;
   let* () =
     execute_pour
       ~expect_failure:true
@@ -574,7 +666,7 @@ let transfer_and_pour_happy_path =
       ~amount:Tez.(of_int 100 + of_mutez_int 1)
       contract
   in
-  (* Pour can equal the available balance, though. *)
+  Log.info "Pour can equal the available balance, though." ;
   let* () =
     execute_pour
       ~authorizer:5
@@ -583,12 +675,11 @@ let transfer_and_pour_happy_path =
       ~amount:Tez.(of_int 100)
       contract
   in
-  let* () = assert_balance pour_receiver @@ Tez.of_int 200 in
-  let* () = assert_balance contract @@ Tez.of_int 0 in
-  (* Transfer of ꜩ0 to a smart contract is always possible. *)
+  Log.info "Transfer of ꜩ0 to a smart contract is always possible." ;
   let* empty_contract =
     originate ~alias:"empty" ~storage:Test_michelson.unit empty_contract
   in
+  let* () = track_balance_of ~alias:"empty contract" empty_contract in
   let* () =
     sign_transfer
       ~contract
@@ -597,15 +688,17 @@ let transfer_and_pour_happy_path =
       ~replay:5
       Tez.zero
   in
-  (* Nothing has changed. *)
-  let* () = assert_balance receiver @@ Tez.of_int 500 in
-  assert_balance contract @@ Tez.of_int 0
+  Log.info "Nothing has changed." ;
+  let* () = assert_balance empty_contract in
+  assert_balance contract
 
 let vesting_3_keys_2s =
   let open StateMonad in
   let* () = activate_alpha in
-  (* For 4 first users (ids 0-3) give each ꜩ100 and register
-     him as a delegate. *)
+  Log.info
+    "For 4 first users (ids 0-3) give each ꜩ100 and register him as a \
+     delegate." ;
+  Log.info "This action automatically starts tracking their balances." ;
   let* () = iter_int make_delegate 4 in
 
   let* _empty_contract_hash =
@@ -623,8 +716,9 @@ let vesting_3_keys_2s =
       [([0], 1); ([1], 1); ([2], 1)]
   in
   let* contract = originate_vesting "vesting_3_keys_2s" (Tez.of_int 1000) in
+  Log.info "Vesting operation will fail, because its time has not come yet." ;
   let* () = vest ~expect_failure:true contract in
-  (* A block later, vest succeeds. *)
+  Log.info "A block later vesting succeeds." ;
   let* () = bake in
   let* () = vest contract in
   let* () = vest contract in
@@ -661,7 +755,7 @@ let test_delegation =
       contract
   in
   let* () = assert_delegate contract (Some deleg2) in
-  (* Now remove the delegate. *)
+  Log.info "Remove the delegate." ;
   let* () =
     set_delegate
       ~delegate:None
@@ -670,8 +764,6 @@ let test_delegation =
       contract
   in
   let* () = assert_delegate contract None in
-  let* () = assert_balance deleg @@ Tez.of_mutez_int 99999393 in
-  let* () = assert_balance contract @@ Tez.of_int 1000 in
   let* () =
     sign_transfer
       ~contract
@@ -680,14 +772,13 @@ let test_delegation =
       ~signers:[[Some 0]; [None]; [Some 2]]
       Tez.(of_int 100)
   in
-  let* () = assert_balance deleg @@ Tez.of_mutez_int 199999393 in
-  assert_balance contract @@ Tez.of_int 900
+  return ()
 
 let test_invalid_transfers =
   let open StateMonad in
   let* contract = vesting_3_keys_2s in
   let* receiver = user_address 0 in
-  (* Transfer fails without enough signatures. *)
+  Log.info "Transfer with insuficient number of signatures fails." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -726,6 +817,7 @@ let test_invalid_transfers =
   in
 
   let* receiver = user_address 5 in
+  let* () = track_balance_of ~alias:"user5" receiver in
   let* () =
     set_pour_for
       ~replay:0
@@ -734,7 +826,7 @@ let test_invalid_transfers =
       ~signers:[[Some 0]; [None]; [Some 2]]
       contract
   in
-  (* Transaction exceeds available balance. *)
+  Log.info "Transaction fails because it exceeds available balance." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -744,8 +836,6 @@ let test_invalid_transfers =
       ~signers:[[Some 0]; [Some 1]; [Some 2]]
       Tez.(of_int 1000)
   in
-  let* () = assert_balance receiver @@ Tez.of_int 0 in
-  let* () = assert_balance contract @@ Tez.of_int 1000 in
   let* () =
     sign_transfer
       ~contract
@@ -754,8 +844,6 @@ let test_invalid_transfers =
       ~signers:[[Some 0]; [None]; [Some 2]]
       Tez.(of_int 75)
   in
-  let* () = assert_balance receiver @@ Tez.of_int 75 in
-  let* () = assert_balance contract @@ Tez.of_int 925 in
   let* () =
     sign_transfer
       ~contract
@@ -764,8 +852,6 @@ let test_invalid_transfers =
       ~signers:[[None]; [Some 1]; [Some 2]]
       Tez.(of_int 25)
   in
-  let* () = assert_balance receiver @@ Tez.of_int 100 in
-  let* () = assert_balance contract @@ Tez.of_int 900 in
 
   let* () = vest contract in
   let* () =
@@ -776,10 +862,8 @@ let test_invalid_transfers =
       ~replay:3
       contract
   in
-  let* () = assert_balance receiver @@ Tez.of_int 150 in
-  let* () = assert_balance contract @@ Tez.of_int 850 in
 
-  (* Pour fails if amount exceeds available funds. *)
+  Log.info "Pour fails if amount exceeds available funds." ;
   let* () =
     execute_pour
       ~expect_failure:true
@@ -789,9 +873,7 @@ let test_invalid_transfers =
       ~replay:4
       contract
   in
-  let* () = assert_balance receiver @@ Tez.of_int 150 in
-  let* () = assert_balance contract @@ Tez.of_int 850 in
-  (* Pour fails if replay counter is too large. *)
+  Log.info "Pour fails if replay counter is too large." ;
   let* () =
     execute_pour
       ~expect_failure:true
@@ -801,9 +883,7 @@ let test_invalid_transfers =
       ~replay:5
       contract
   in
-  let* () = assert_balance receiver @@ Tez.of_int 150 in
-  let* () = assert_balance contract @@ Tez.of_int 850 in
-  (* Pour fails if replay counter is too small. *)
+  Log.info "Pour fails if replay counter is too small." ;
   let* () =
     execute_pour
       ~expect_failure:true
@@ -813,9 +893,7 @@ let test_invalid_transfers =
       ~replay:3
       contract
   in
-  let* () = assert_balance receiver @@ Tez.of_int 150 in
-  let* () = assert_balance contract @@ Tez.of_int 850 in
-  (* Pour fails if signature is incorrect. *)
+  Log.info "Pour fails if signature is incorrect." ;
   let* () =
     execute_pour
       ~expect_failure:true
@@ -825,14 +903,12 @@ let test_invalid_transfers =
       ~replay:4
       contract
   in
-  let* () = assert_balance receiver @@ Tez.of_int 150 in
-  let* () = assert_balance contract @@ Tez.of_int 850 in
   let* () =
     disable_pour ~replay:4 ~signers:[[None]; [Some 1]; [Some 2]] contract
   in
 
   let* () = vest contract in
-  (* Pour fails when no pour info is set. *)
+  Log.info "Pour fails when no pour info is set." ;
   execute_pour
     ~expect_failure:true
     ~replay:5
@@ -845,6 +921,7 @@ let test_update_keys : unit StateMonad.t =
   let open StateMonad in
   let* contract = vesting_3_keys_2s in
   let* receiver = user_address 4 in
+  let* () = track_balance_of receiver ~alias:"receiver" in
   let* () =
     sign_transfer
       ~contract
@@ -853,39 +930,40 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[Some 0]; [Some 1]; [None]]
       Tez.(of_int 100)
   in
-  let* () = assert_balance contract @@ Tez.of_int 900 in
-  let* () = assert_balance receiver @@ Tez.of_int 100 in
+  Log.info "Overall threshold cannot be 0." ;
   let* () =
     set_keys
-      ~expect_failure:true (* Overall treshold can't be 0. *)
+      ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([6], 1)]
       ~overall_treshold:0
       ~replay:1
       contract
   in
+  Log.info "Overall treshold can't be greater than number of keys." ;
   let* () =
     set_keys
-      ~expect_failure:
-        true (* Overall treshold can't be greater than number of keys. *)
+      ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([6], 1)]
       ~overall_treshold:4
       ~replay:1
       contract
   in
+  Log.info "Group threshold can't be 0." ;
   let* () =
     set_keys
-      ~expect_failure:true (* Group threshold can't be 0. *)
+      ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 0); ([5], 1); ([6], 1)]
       ~overall_treshold:2
       ~replay:1
       contract
   in
+  Log.info "Group cannot be empty." ;
   let* () =
     set_keys
-      ~expect_failure:true (* Group cannot be empty. *)
+      ~expect_failure:true
       ~signers:[[Some 0]; [Some 1]; [None]]
       ~key_groups:[([3; 4], 1); ([5], 1); ([], 1)]
       ~overall_treshold:2
@@ -900,10 +978,8 @@ let test_update_keys : unit StateMonad.t =
       ~replay:1
       contract
   in
-  (* unchanged *)
-  let* () = assert_balance contract @@ Tez.of_int 900 in
   let* receiver = user_address 1 in
-  (* Old signatures don't work anymore. *)
+  Log.info "Old signatures don't work anymore." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -913,9 +989,6 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[Some 0]; [Some 1]; [Some 2]]
       Tez.(of_int 200)
   in
-  (* unchanged *)
-  let* () = assert_balance contract @@ Tez.of_int 900 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 99999393 in
   let* () =
     sign_transfer
       ~contract
@@ -924,8 +997,6 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[Some 3; None]; [Some 5]; [Some 6]]
       Tez.(of_int 100)
   in
-  let* () = assert_balance contract @@ Tez.of_int 800 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 199999393 in
   let* () = vest contract in
   let* () =
     sign_transfer
@@ -935,8 +1006,6 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[Some 3; None]; [None]; [Some 6]]
       Tez.(of_int 100)
   in
-  let* () = assert_balance contract @@ Tez.of_int 700 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 299999393 in
   let* () = vest contract in
   let* () =
     sign_transfer
@@ -946,8 +1015,6 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[None; None]; [Some 5]; [Some 6]]
       Tez.(of_int 100)
   in
-  let* () = assert_balance contract @@ Tez.of_int 600 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 399999393 in
   let* () = vest contract in
   let* () =
     sign_transfer
@@ -957,9 +1024,7 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[None; Some 4]; [Some 5]; [None]]
       Tez.(of_int 10)
   in
-  let* () = assert_balance contract @@ Tez.of_int 590 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 409999393 in
-  (* Group treshold must be met. *)
+  Log.info "Group treshold must be met." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -969,8 +1034,6 @@ let test_update_keys : unit StateMonad.t =
       ~signers:[[Some 3; Some 4]; [None]; [None]]
       Tez.(of_int 10)
   in
-  let* () = assert_balance contract @@ Tez.of_int 590 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 409999393 in
   return ()
 
 let test_all_sigs_required =
@@ -994,8 +1057,6 @@ let test_all_sigs_required =
       ~signers:[[Some 3; Some 4]; [Some 5]; [None]]
       Tez.(of_int 10)
   in
-  let* () = assert_balance contract @@ Tez.of_int 1000 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 99999393 in
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -1005,8 +1066,6 @@ let test_all_sigs_required =
       ~signers:[[None; None]; [Some 5]; [Some 6]]
       Tez.(of_int 10)
   in
-  let* () = assert_balance contract @@ Tez.of_int 1000 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 99999393 in
   let* () =
     sign_transfer
       ~contract
@@ -1015,8 +1074,6 @@ let test_all_sigs_required =
       ~signers:[[Some 3; Some 4]; [Some 5]; [Some 6]]
       Tez.(of_int 10)
   in
-  let* () = assert_balance contract @@ Tez.of_int 990 in
-  let* () = assert_balance receiver @@ Tez.of_mutez_int 109999393 in
   return ()
 
 let test_full_contract =
@@ -1046,7 +1103,7 @@ let test_full_contract =
   in
   (* 10% of the total token supply. *)
   let initial_balance = Tez.of_mutez_int 7633069296900 in
-  (* Ensure bootstrap1 has enough funds to cover the initial balance. *)
+  Log.info "Ensure bootstrap1 has enough funds to cover the initial balance." ;
   let* () =
     transfer ~source:"bootstrap2" ~target:"bootstrap1" Tez.(of_int 3000000)
   in
@@ -1055,7 +1112,6 @@ let test_full_contract =
   in
   let* contract = originate_vesting "full_vesting_contract" initial_balance in
   let* () = vest contract (* 1 / 12 *) in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7633069296900 in
   let* () = vest contract (* 2 / 12 *) in
 
   let* () = make_delegate 0 in
@@ -1077,7 +1133,6 @@ let test_full_contract =
       contract
   in
   let* () = assert_delegate contract (Some delegate) in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7633069296900 in
   let* () =
     set_delegate
       ~delegate:None
@@ -1095,8 +1150,9 @@ let test_full_contract =
       contract
   in
   let* u27 = user_address 27 in
+  let* () = track_balance_of u27 ~alias:"user27" in
   let* () = assert_delegate contract None in
-  let* () = assert_balance u27 @@ Tez.of_int 0 in
+  let* () = assert_balance u27 in
   let* () =
     sign_transfer
       ~contract
@@ -1114,8 +1170,6 @@ let test_full_contract =
         ]
       Tez.(of_int 100)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 100 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632969296900 in
   let* () =
     sign_transfer
       ~contract
@@ -1133,9 +1187,7 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 300 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632769296900 in
-  (* Group thresholds must be met. *)
+  Log.info "Group thresholds must be met." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -1154,9 +1206,7 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 300 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632769296900 in
-  (* Overall threshold must be met. *)
+  Log.info "Overall threshold must be met." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -1175,9 +1225,7 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 300 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632769296900 in
-  (* All signatures must be valid key (#0 signed in the wrong slot). *)
+  Log.info "All signatures must be valid key (#0 signed in the wrong slot)." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -1196,10 +1244,8 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 300 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632769296900 in
 
-  (* Change keys: *)
+  Log.info "Change keys." ;
   let* () =
     set_keys
       ~signers:
@@ -1226,7 +1272,7 @@ let test_full_contract =
       ~replay:4
       contract
   in
-  (* Old keys no longer work. *)
+  Log.info "Old keys no longer work." ;
   let* () =
     sign_transfer
       ~expect_failure:true
@@ -1245,9 +1291,7 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 300 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632769296900 in
-  (* New keys do work. *)
+  Log.info "New keys do work." ;
   let* () =
     sign_transfer
       ~contract
@@ -1265,10 +1309,8 @@ let test_full_contract =
         ]
       Tez.(of_int 200)
   in
-  let* () = assert_balance u27 @@ Tez.of_int 500 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632569296900 in
 
-  (* Pour  must be set up first. *)
+  Log.info "Pour must be set up first." ;
   let* () =
     execute_pour
       ~expect_failure:true
@@ -1278,8 +1320,6 @@ let test_full_contract =
       ~replay:6
       contract
   in
-  let* () = assert_balance u27 @@ Tez.of_int 500 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632569296900 in
   let* () =
     set_pour_for
       ~replay:6
@@ -1297,17 +1337,12 @@ let test_full_contract =
       ~recipient:27
       contract
   in
-  let* () =
-    execute_pour
-      ~authorizer:0
-      ~recipient:27
-      ~amount:Tez.(of_int 500)
-      ~replay:7
-      contract
-  in
-  let* () = assert_balance u27 @@ Tez.of_int 1000 in
-  let* () = assert_balance contract @@ Tez.of_mutez_int 7632069296900 in
-  return ()
+  execute_pour
+    ~authorizer:0
+    ~recipient:27
+    ~amount:Tez.(of_int 500)
+    ~replay:7
+    contract
 
 let execute ~user_count ~contract test () =
   let* node = Node.init [Connections 0; Synchronisation_threshold 0] in
@@ -1315,6 +1350,7 @@ let execute ~user_count ~contract test () =
   let* keys = gen_keys user_count client in
   let vesting_contract = path_to contract in
   let storage = Contract_storage.initial [] in
+  let balances = StateRecord.AddrMap.empty in
   StateMonad.eval
-    StateRecord.{node; client; keys; vesting_contract; storage}
+    StateRecord.{node; client; keys; vesting_contract; storage; balances}
     test
