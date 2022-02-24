@@ -570,6 +570,7 @@ let all_instructions =
     N_ICreate_contract;
     N_ISet_delegate;
     N_INow;
+    N_IMin_block_time;
     N_IBalance;
     N_ICheck_signature_ed25519;
     N_ICheck_signature_secp256k1;
