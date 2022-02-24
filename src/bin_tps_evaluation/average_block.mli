@@ -40,3 +40,7 @@ val encoding : t Data_encoding.t
 (** Load a description of the average block from a file. If [None] is
     passed, the default average block is returned. *)
 val load : string option -> t Lwt.t
+
+(** Verify that all smart contracts in the description of the average block
+    are known to us. *)
+val check_for_unknown_smart_contracts : t -> unit Lwt.t

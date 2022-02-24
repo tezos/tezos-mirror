@@ -58,4 +58,6 @@ let to_string amount =
 
 let to_float amount = Float.mul (Int64.to_float amount) 0.000_001
 
+let to_mutez amount = Int64.to_int amount
+
 let ( + ) = Int64.add
