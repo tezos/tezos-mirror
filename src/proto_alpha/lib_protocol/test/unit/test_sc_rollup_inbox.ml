@@ -35,9 +35,9 @@
 open Protocol
 open Sc_rollup_inbox_repr
 
-type error += Invalid_sc_rollup_inbox_test of string
+exception Sc_rollup_inbox_test_error of string
 
-let err s = Invalid_sc_rollup_inbox_test s
+let err x = Exn (Sc_rollup_inbox_test_error x)
 
 let rollup = Sc_rollup_repr.Address.hash_string [""]
 
@@ -53,23 +53,37 @@ let test_empty () =
     Z.(equal (number_of_available_messages inbox) zero)
     (err "An empty inbox should have no available message.")
 
-let setup_inbox_with_messages payloads f =
+let setup_inbox_with_messages list_of_payloads f =
   let open Tezos_protocol_environment_alpha.Environment in
   create_context () >>=? fun ctxt ->
   let empty_messages = Context.Tree.empty ctxt in
   let inbox = empty rollup level in
-  let nb_payloads = List.length payloads in
-  add_messages inbox level payloads empty_messages >>= fun (messages, inbox) ->
-  f nb_payloads messages inbox
+  let history = history_at_genesis in
+  let rec aux level history inbox inboxes messages = function
+    | [] -> return (messages, history, inbox, inboxes)
+    | payloads :: ps ->
+        add_messages history inbox level payloads messages
+        >>=? fun (messages, history, inbox') ->
+        let level = Raw_level_repr.succ level in
+        aux level history inbox' (inbox :: inboxes) messages ps
+  in
+  aux level history inbox [] empty_messages list_of_payloads
+  >|= Environment.wrap_tzresult
+  >>=? fun (messages, history, inbox, inboxes) ->
+  f messages history inbox inboxes
 
 let test_add_messages payloads =
-  setup_inbox_with_messages payloads @@ fun nb_payloads _messages inbox ->
+  let nb_payloads = List.length payloads in
+  setup_inbox_with_messages [payloads]
+  @@ fun _messages _history inbox _inboxes ->
   fail_unless
     Z.(equal (number_of_available_messages inbox) (of_int nb_payloads))
     (err "Invalid number of available messages.")
 
 let test_consume_messages (payloads, nb_consumed_messages) =
-  setup_inbox_with_messages payloads @@ fun nb_payloads _messages inbox ->
+  let nb_payloads = List.length payloads in
+  setup_inbox_with_messages [payloads]
+  @@ fun _messages _history inbox _inboxes ->
   consume_n_messages nb_consumed_messages inbox |> Environment.wrap_tzresult
   >>?= function
   | Some inbox ->
@@ -95,7 +109,8 @@ let check_payload message payload =
         (err (Printf.sprintf "Expected payload %s, got %s" payload payload'))
 
 let test_get_message payloads =
-  setup_inbox_with_messages payloads @@ fun _ messages _inbox ->
+  setup_inbox_with_messages [payloads]
+  @@ fun messages _history _inbox _inboxes ->
   List.iteri_es
     (fun i payload ->
       get_message messages (Z.of_int i) >>= function
@@ -104,7 +119,8 @@ let test_get_message payloads =
     payloads
 
 let test_get_message_payload payloads =
-  setup_inbox_with_messages payloads @@ fun _ messages _inbox ->
+  setup_inbox_with_messages [payloads]
+  @@ fun messages _history _inbox _inboxes ->
   List.iteri_es
     (fun i payload ->
       get_message_payload messages (Z.of_int i) >>= function
@@ -116,6 +132,42 @@ let test_get_message_payload payloads =
           fail
             (err (Printf.sprintf "No message payload number %d in messages" i)))
     payloads
+
+let test_inclusion_proof_production (list_of_payloads, n) =
+  setup_inbox_with_messages list_of_payloads
+  @@ fun _messages history _inbox inboxes ->
+  let inbox = Stdlib.List.hd inboxes in
+  let old_inbox = Stdlib.List.nth inboxes n in
+  produce_inclusion_proof history old_inbox inbox |> function
+  | None ->
+      fail
+      @@ err
+           "It should be possible to produce an inclusion proof between two \
+            versions of the same inbox."
+  | Some proof ->
+      fail_unless
+        (verify_inclusion_proof proof old_inbox inbox)
+        (err "The produced inclusion proof is invalid.")
+
+let test_inclusion_proof_verification (list_of_payloads, n) =
+  setup_inbox_with_messages list_of_payloads
+  @@ fun _messages history _inbox inboxes ->
+  let inbox = Stdlib.List.hd inboxes in
+  let old_inbox = Stdlib.List.nth inboxes n in
+  produce_inclusion_proof history old_inbox inbox |> function
+  | None ->
+      fail
+      @@ err
+           "It should be possible to produce an inclusion proof between two \
+            versions of the same inbox."
+  | Some proof ->
+      let old_inbox' = Stdlib.List.nth inboxes (Random.int (1 + n)) in
+      fail_unless
+        (old_inbox = old_inbox'
+        || not (verify_inclusion_proof proof old_inbox' inbox))
+        (err
+           "Verification should rule out a valid proof which is not about the \
+            given inboxes.")
 
 let tests =
   [
@@ -141,4 +193,28 @@ let tests =
             let* n = 0 -- ((List.length l * 2) + 1) in
             return (l, n)))
       test_consume_messages;
+  ]
+  @
+  let gen_inclusion_proof_inputs =
+    QCheck.(
+      make
+        Gen.(
+          let* a = list string in
+          let* b = list string in
+          let* l = list (list string) in
+          let l = a :: b :: l in
+          let* n = 0 -- (List.length l - 2) in
+          return (l, n)))
+  in
+  [
+    Tztest.tztest_qcheck
+      ~count:10
+      ~name:"Produce inclusion proof between two related inboxes."
+      gen_inclusion_proof_inputs
+      test_inclusion_proof_production;
+    Tztest.tztest_qcheck
+      ~count:10
+      ~name:"Verify inclusion proofs."
+      gen_inclusion_proof_inputs
+      test_inclusion_proof_verification;
   ]

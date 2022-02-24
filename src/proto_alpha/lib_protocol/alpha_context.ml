@@ -29,6 +29,8 @@ type t = Raw_context.t
 
 type context = t
 
+type tree = Raw_context.tree
+
 module type BASIC_DATA = sig
   type t
 

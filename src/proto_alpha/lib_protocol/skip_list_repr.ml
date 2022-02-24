@@ -169,24 +169,21 @@ end) : S = struct
     in
     {index; content; back_pointers}
 
-  let best_skip deref cell target_index =
+  let best_skip cell target_index =
     let index = cell.index in
-    let rec aux idx best_ptr best_skip =
+    let rec aux idx pow best_idx best_skip =
       if Compare.Int.(idx >= FallbackArray.length cell.back_pointers) then
-        best_ptr
+        best_idx
       else
-        let ptr = back_pointer_unsafe cell idx in
-        match deref ptr with
-        | None -> assert false (* By precondition, [deref] is valid. *)
-        | Some cell ->
-            let skip = index - cell.index in
-            if
-              Compare.Int.(cell.index < target_index)
-              || Option.equal Compare.Int.equal (Some skip) best_skip
-            then best_ptr
-            else aux (idx + 1) (Some ptr) (Some skip)
+        let idx_index = index - (index mod pow) - 1 in
+        let skip = index - idx_index in
+        if
+          Compare.Int.(idx_index < target_index)
+          || Option.equal Compare.Int.equal (Some skip) best_skip
+        then best_idx
+        else aux (idx + 1) (basis * pow) (Some idx) (Some skip)
     in
-    aux 0 None None
+    aux 0 1 None None
 
   let back_path ~deref ~cell_ptr ~target_index =
     let rec aux path ptr =
@@ -196,8 +193,8 @@ end) : S = struct
       if Compare.Int.(target_index = index) then Some (List.rev path)
       else if Compare.Int.(target_index > index) then None
       else
-        Option.bind (best_skip deref cell target_index) @@ fun ptr ->
-        aux path ptr
+        Option.bind (best_skip cell target_index) @@ fun best_idx ->
+        Option.bind (back_pointer cell best_idx) @@ fun ptr -> aux path ptr
     in
     aux [] cell_ptr
 
@@ -227,7 +224,8 @@ end) : S = struct
           assume_some (deref cell_ptr) @@ fun cell ->
           assume_some (deref cell_ptr') @@ fun cell' ->
           mem equal_ptr cell_ptr' cell.back_pointers
-          && assume_some (best_skip deref cell target_index) @@ fun best_ptr ->
+          && assume_some (best_skip cell target_index) @@ fun best_idx ->
+             assume_some (back_pointer cell best_idx) @@ fun best_ptr ->
              let minimal = equal_ptr best_ptr cell_ptr' in
              let index' = cell'.index in
              minimal && valid_path index' cell_ptr' path

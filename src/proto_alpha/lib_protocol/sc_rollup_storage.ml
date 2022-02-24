@@ -271,8 +271,14 @@ let add_messages ctxt rollup messages =
   Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   |> fun current_messages ->
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
-  Sc_rollup_inbox_repr.add_messages inbox level messages current_messages
-  >>= fun (current_messages, inbox) ->
+  (*
+      Notice that the protocol is forgetful: it throws away the inbox
+      history. On the contrary, the history is stored by the rollup
+      node to produce inclusion proofs when needed.
+  *)
+  Sc_rollup_inbox_repr.(
+    add_messages history_at_genesis inbox level messages current_messages)
+  >>=? fun (current_messages, _, inbox) ->
   Sc_rollup_in_memory_inbox.set_current_messages ctxt rollup current_messages
   |> fun ctxt ->
   Storage.Sc_rollup.Inbox.update ctxt rollup inbox >>=? fun (ctxt, size) ->

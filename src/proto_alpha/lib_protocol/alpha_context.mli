@@ -58,6 +58,8 @@ type t
 
 type context = t
 
+type tree
+
 type public_key = Signature.Public_key.t
 
 type public_key_hash = Signature.Public_key_hash.t
