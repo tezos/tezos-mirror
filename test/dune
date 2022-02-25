@@ -2,4 +2,52 @@
  (names test test_generated test_legacy_compatibility test_json_stream
    test_json_stream_sizes test_classifiers test_sub_string
    json_roundtrip_in_binary)
- (libraries data_encoding zarith alcotest crowbar))
+ (modes native js)
+ (js_of_ocaml)
+ (libraries data_encoding zarith zarith_stubs_js alcotest crowbar))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./test.bc.js})))
+
+; We need to increase the stack size
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node --stack-size=50000 %{dep:./test_generated.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./test_legacy_compatibility.bc.js})))
+
+; We need to increase the stack size because jsonm is no very jsoo friendly.
+; jsonm uses cps which cannot be optimized by jsoo.
+; see https://github.com/dbuenzli/jsonm/pull/20
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node --stack-size=50000 %{dep:./test_json_stream.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./test_json_stream_sizes.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./test_classifiers.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./test_sub_string.bc.js})))
+
+(rule
+ (alias runtest_js)
+ (action
+  (run node %{dep:./json_roundtrip_in_binary.bc.js})))

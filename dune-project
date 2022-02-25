@@ -1,3 +1,3 @@
-(lang dune 1.11)
+(lang dune 2.0)
 (name data-encoding)
-(using fmt 1.1)
+(formatting (enabled_for dune ocaml))
