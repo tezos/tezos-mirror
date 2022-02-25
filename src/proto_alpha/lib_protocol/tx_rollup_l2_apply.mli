@@ -200,3 +200,10 @@ module Make (Context : CONTEXT) : sig
   *)
   val apply_message : ctxt -> Tx_rollup_message.t -> (ctxt * Message_result.t) m
 end
+
+module Internal_for_tests : sig
+  val address_indexes_of_list :
+    (Tx_rollup_l2_address.t * 'a) list -> 'a Address_indexes.t
+
+  val ticket_indexes_of_list : (Ticket_hash.t * 'a) list -> 'a Ticket_indexes.t
+end

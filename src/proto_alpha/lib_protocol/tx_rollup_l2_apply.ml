@@ -702,3 +702,9 @@ module Make (Context : CONTEXT) = struct
             return (ctxt, Batch_V1_result result)
         | None -> fail Invalid_batch_encoding)
 end
+
+module Internal_for_tests = struct
+  let address_indexes_of_list = address_indexes_of_list
+
+  let ticket_indexes_of_list = ticket_indexes_of_list
+end
