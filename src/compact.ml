@@ -326,6 +326,13 @@ let void_case : type a. title:string -> a case =
 let is_void_case : type a. a case -> bool =
  fun (Case {compact; _}) -> Obj.repr compact == Obj.repr void
 
+let union_bits title min = function
+  | Some choice when min <= choice -> choice
+  | None -> min
+  | Some _ ->
+      raise
+        (Invalid_argument (Format.sprintf "union: not enough %s bits" title))
+
 let union :
     type a. ?union_tag_bits:int -> ?cases_tag_bits:int -> a case list -> a t =
  fun ?union_tag_bits ?cases_tag_bits cases ->
@@ -334,13 +341,6 @@ let union :
     @@ Invalid_argument "Data_encoding.Compact.union: empty list of cases." ;
   (module struct
     type input = a
-
-    let bits title min = function
-      | Some choice when min <= choice -> choice
-      | None -> min
-      | Some _ ->
-          raise
-            (Invalid_argument (Format.sprintf "union: not enough %s bits" title))
 
     (* [union_tag_len] is the number of bits introduced by [union] to
        distinguish between cases, while [inner_tag] is the greatest
@@ -360,8 +360,8 @@ let union :
               rst
             |> fun (_, _, extra, len) -> (extra, len)
       in
-      ( bits "tag" min_union union_tag_bits,
-        bits "inner" min_cases cases_tag_bits )
+      ( union_bits "tag" min_union union_tag_bits,
+        union_bits "inner" min_cases cases_tag_bits )
 
     let tag_len =
       let r = union_tag_len + cases_tag_len in
