@@ -193,11 +193,23 @@ and _ successful_manager_operation_result =
       consumed_gas : Gas.Arith.fp;
     }
       -> Kind.tx_rollup_return_bond successful_manager_operation_result
-  | Tx_rollup_finalize_result : {
+  | Tx_rollup_finalize_commitment_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      level : Tx_rollup_level.t;
+    }
+      -> Kind.tx_rollup_finalize_commitment successful_manager_operation_result
+  | Tx_rollup_remove_commitment_result : {
+      balance_updates : Receipt.balance_updates;
+      consumed_gas : Gas.Arith.fp;
+      level : Tx_rollup_level.t;
+    }
+      -> Kind.tx_rollup_remove_commitment successful_manager_operation_result
+  | Tx_rollup_rejection_result : {
       balance_updates : Receipt.balance_updates;
       consumed_gas : Gas.Arith.fp;
     }
-      -> Kind.tx_rollup_finalize successful_manager_operation_result
+      -> Kind.tx_rollup_rejection successful_manager_operation_result
   | Sc_rollup_originate_result : {
       balance_updates : Receipt.balance_updates;
       address : Sc_rollup.Address.t;

@@ -593,11 +593,12 @@ module Tx_rollup : sig
        and type value = Tx_rollup_state_repr.t
        and type t := Raw_context.t
 
-  (** The number of bytes allocated by the messages stored in each inbox,
-      as well as its predecessor and successor. *)
+  (** Each inbox has a set of metadata attached to it. See
+      {!Tx_rollup_inbox_repr.metadata} for a description of the actual
+      content. *)
   module Inbox_metadata :
     Non_iterable_indexed_carbonated_data_storage
-      with type t := Raw_context.t * Raw_level_repr.t
+      with type t := Raw_context.t * Tx_rollup_level_repr.t
        and type key = Tx_rollup_repr.t
        and type value = Tx_rollup_inbox_repr.metadata
 
@@ -611,45 +612,36 @@ module Tx_rollup : sig
   module Inbox_contents : sig
     include
       Non_iterable_indexed_carbonated_data_storage
-        with type t := (Raw_context.t * Raw_level_repr.t) * Tx_rollup_repr.t
+        with type t :=
+              (Raw_context.t * Tx_rollup_level_repr.t) * Tx_rollup_repr.t
          and type key = int32
          and type value = Tx_rollup_message_repr.hash
 
-    (** [list_values ?offset ?length ((ctxt, level), tx_rollup)] returns
-        the list of message hash of the inbox of [tx_rollup] at [level].
+    (** [list_values ?offset ?length ((ctxt, tx_level), rollup)]
+        returns the list of message hashes of the inbox of [rollup] at
+        [tx_level].
 
-        [length] and [offset] can be used to retreive a subset of the
+        [length] and [offset] can be used to retrieve a subset of the
         result. [length] is the maximum number of elements to fetch. A
-        negative [length] produces an empty list of result. [offset]
+        negative [length] produces an empty list of results. [offset]
         is the number of elements to ignore. If [offset] is negative,
-        then it is treated as if it was equal to [0].
+        then it is treated as if it were equal to [0].
 
         {b: Note:} This is the same HACK as [Big_map.Contents]. **)
     val list_values :
       ?offset:int ->
       ?length:int ->
-      (Raw_context.t * Raw_level_repr.t) * Tx_rollup_repr.t ->
+      (Raw_context.t * Tx_rollup_level_repr.t) * Tx_rollup_repr.t ->
       (Raw_context.t * Tx_rollup_message_repr.hash list) tzresult Lwt.t
   end
 
-  (** [fold (ctxt, level) ~order ~init ~f] traverses all rollups with
-      a nonempty inbox at [level].
-
-      No assurances whatsoever are provided regarding the order of
-      traversal. *)
-  val fold :
-    Raw_context.t ->
-    Raw_level_repr.t ->
-    init:'a ->
-    f:(Tx_rollup_repr.t -> 'a -> 'a Lwt.t) ->
-    'a Lwt.t
-
-  (* A commitments for each rollup and level.  The level,
-     here, is the level committed to (not the level the commitment was
-     submitted). *)
+  (* A rollup can have at most one commitment per rollup level. Some
+     metadata are sauved in addition to the commitment itself. See
+     {!Tx_rollup_commitment_repr.Submitted_commitment.t} for the exact
+     content. *)
   module Commitment :
     Non_iterable_indexed_carbonated_data_storage
-      with type key = Raw_level_repr.t * Tx_rollup_repr.t
+      with type key = Tx_rollup_level_repr.t * Tx_rollup_repr.t
        and type value = Tx_rollup_commitment_repr.Submitted_commitment.t
        and type t := Raw_context.t
 

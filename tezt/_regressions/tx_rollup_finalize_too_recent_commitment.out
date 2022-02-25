@@ -1,4 +1,4 @@
-tezt/_regressions/tx_rollup_rpc_commitment.out
+tezt/_regressions/tx_rollup_finalize_too_recent_commitment.out
 
 ./tezos-client --wait none submit tx rollup batch 626c6f62 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
@@ -26,6 +26,11 @@ This sequence of operations was run:
         
       Consumed gas: 2257.424
 
+
+./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/inbox/0'
+{ "contents": [ "M22FciVGoiULYX21PdQPj9Jv5a9rEZeEjRLw4Mi9YTzyENMQdk1" ],
+  "cumulated_size": 4,
+  "hash": "i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5" }
 
 ./tezos-client --wait none submit tx rollup commitment 0 i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5  726f6f74 to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
 Node is bootstrapped.
@@ -55,9 +60,19 @@ This sequence of operations was run:
       Consumed gas: 3280.860
 
 
-./tezos-client rpc get '/chains/main/blocks/head/context/tx_rollup/[TX_ROLLUP_HASH]/commitment/0'
-{ "commitment":
-    { "level": 0, "batches": [ { "root": "726f6f74" } ], "predecessor": null,
-      "inbox_hash": "i3RQpwA1RgvBitqJGtQkzpNd16N52GSX63WuBh49r2ZkFziPoq5" },
-  "commitment_hash": "[TX_ROLLUP_COMMITMENT_HASH]",
-  "committer": "[PUBLIC_KEY_HASH]", "submitted_at": 5 }
+./tezos-client --wait none submit tx rollup finalize commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+Node is bootstrapped.
+This simulation failed:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0
+    Expected counter: 4
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
+    Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
+    From: [PUBLIC_KEY_HASH]
+    This operation FAILED.
+
+Error:
+  { "id": "proto.alpha.tx_rollup_no_commitment_to_finalize",
+  "description": "There is no commitment to finalize", "data": {} }

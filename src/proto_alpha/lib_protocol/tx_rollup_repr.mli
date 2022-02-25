@@ -93,3 +93,5 @@ type deposit_parameters = {
   amount : Tx_rollup_l2_qty.t;
   destination : Tx_rollup_l2_address.Indexable.value;
 }
+
+module Set : Set.S with type elt = tx_rollup

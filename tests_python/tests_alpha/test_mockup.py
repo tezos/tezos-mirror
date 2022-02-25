@@ -661,6 +661,7 @@ def _test_create_mockup_init_show_roundtrip(
                 "tx_rollup_hard_size_limit_per_message": 9_999,
                 "tx_rollup_commitment_bond": "10000000000",
                 "tx_rollup_finality_period": 2000,
+                "tx_rollup_withdraw_period": 123456,
                 "tx_rollup_max_unfinalized_levels": 2100,
                 "sc_rollup_enable": False,
                 "sc_rollup_origination_size": 6_314,

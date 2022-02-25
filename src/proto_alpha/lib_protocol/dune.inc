@@ -69,13 +69,15 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_repr.mli contract_repr.ml
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
+   tx_rollup_level_repr.mli tx_rollup_level_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
-   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
+   tx_rollup_errors_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
@@ -231,13 +233,15 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_repr.mli contract_repr.ml
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
+   tx_rollup_level_repr.mli tx_rollup_level_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
-   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
+   tx_rollup_errors_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
@@ -393,13 +397,15 @@ module CamlinternalFormatBasics = struct include CamlinternalFormatBasics end
    contract_repr.mli contract_repr.ml
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
+   tx_rollup_level_repr.mli tx_rollup_level_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
-   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
+   tx_rollup_errors_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml
@@ -577,13 +583,15 @@ include Tezos_raw_protocol_alpha.Main
    Contract_repr
    Indexable
    Entrypoint_repr
+   Tx_rollup_level_repr
    Tx_rollup_l2_address
    Tx_rollup_l2_qty
    Tx_rollup_repr
-   Tx_rollup_state_repr
    Tx_rollup_message_repr
    Tx_rollup_inbox_repr
    Tx_rollup_commitment_repr
+   Tx_rollup_errors_repr
+   Tx_rollup_state_repr
    Vote_repr
    Block_header_repr
    Destination_repr
@@ -780,13 +788,15 @@ include Tezos_raw_protocol_alpha.Main
    contract_repr.mli contract_repr.ml
    indexable.mli indexable.ml
    entrypoint_repr.mli entrypoint_repr.ml
+   tx_rollup_level_repr.mli tx_rollup_level_repr.ml
    tx_rollup_l2_address.mli tx_rollup_l2_address.ml
    tx_rollup_l2_qty.mli tx_rollup_l2_qty.ml
    tx_rollup_repr.mli tx_rollup_repr.ml
-   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    tx_rollup_message_repr.mli tx_rollup_message_repr.ml
    tx_rollup_inbox_repr.mli tx_rollup_inbox_repr.ml
    tx_rollup_commitment_repr.mli tx_rollup_commitment_repr.ml
+   tx_rollup_errors_repr.ml
+   tx_rollup_state_repr.mli tx_rollup_state_repr.ml
    vote_repr.mli vote_repr.ml
    block_header_repr.mli block_header_repr.ml
    destination_repr.mli destination_repr.ml

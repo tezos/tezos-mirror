@@ -183,6 +183,9 @@ let get_seed ctxt = Alpha_services.Seed.get rpc_ctxt ctxt
 
 let get_constants ctxt = Alpha_services.Constants.all rpc_ctxt ctxt
 
+let default_test_contants =
+  Tezos_protocol_alpha_parameters.Default_parameters.constants_test
+
 let get_baking_reward_fixed_portion ctxt =
   get_constants ctxt
   >>=? fun {Constants.parametric = {baking_reward_fixed_portion; _}; _} ->

@@ -25,9 +25,7 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error +=
-  | Tx_rollup_already_exists of Tx_rollup_repr.t
-  | Tx_rollup_does_not_exist of Tx_rollup_repr.t
+open Tx_rollup_errors_repr
 
 let init : Raw_context.t -> Tx_rollup_repr.t -> Raw_context.t tzresult Lwt.t =
  fun ctxt tx_rollup ->
@@ -68,50 +66,3 @@ let update :
  fun ctxt tx_rollup t ->
   Storage.Tx_rollup.State.update ctxt tx_rollup t >>=? fun (ctxt, _) ->
   return ctxt
-
-(* ------ Error registration ------------------------------------------------ *)
-
-let () =
-  let open Data_encoding in
-  (* Tx_rollup_already_exists *)
-  register_error_kind
-    `Permanent
-    ~id:"tx_rollup_already_exists"
-    ~title:"Transaction rollup was already created"
-    ~description:
-      "The protocol tried to originate the same transaction rollup twice"
-    ~pp:(fun ppf addr ->
-      Format.fprintf
-        ppf
-        "Transaction rollup %a is already used for an existing transaction \
-         rollup. This should not happen, and indicates there is a bug in the \
-         protocol. If you can, please report this bug \
-         (https://gitlab.com/tezos/tezos/-/issues.)"
-        Tx_rollup_repr.pp
-        addr)
-    (obj1 (req "rollup_address" Tx_rollup_repr.encoding))
-    (function Tx_rollup_already_exists rollup -> Some rollup | _ -> None)
-    (fun rollup -> Tx_rollup_already_exists rollup) ;
-  (* Tx_rollup_does_not_exist *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_does_not_exist"
-    ~title:"Transaction rollup does not exist"
-    ~description:"An invalid transaction rollup address was submitted"
-    ~pp:(fun ppf addr ->
-      Format.fprintf
-        ppf
-        "Invalid transaction rollup address %a"
-        Tx_rollup_repr.pp
-        addr)
-    (obj1 (req "rollup_address" Tx_rollup_repr.encoding))
-    (function Tx_rollup_does_not_exist rollup -> Some rollup | _ -> None)
-    (fun rollup -> Tx_rollup_does_not_exist rollup)
-
-let first_unfinalized_level :
-    Raw_context.t ->
-    Tx_rollup_repr.t ->
-    (Raw_context.t * Raw_level_repr.t option) tzresult Lwt.t =
- fun ctxt tx_rollup ->
-  Storage.Tx_rollup.State.get ctxt tx_rollup >>=? fun (ctxt, state) ->
-  return (ctxt, Tx_rollup_state_repr.first_unfinalized_level state)

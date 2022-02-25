@@ -235,6 +235,9 @@ module Contract = struct
   module Internal_for_tests = Contract_repr
 end
 
+module Tx_rollup_level = Tx_rollup_level_repr
+module Tx_rollup_commitment_hash = Tx_rollup_commitment_repr.Commitment_hash
+
 module Tx_rollup = struct
   include Tx_rollup_repr
   include Tx_rollup_storage
@@ -282,13 +285,9 @@ end
 module Tx_rollup_commitment = struct
   include Tx_rollup_commitment_repr
   include Tx_rollup_commitment_storage
-
-  module Internal_for_tests = struct
-    include Tx_rollup_commitment_repr
-    include Tx_rollup_commitment_storage
-  end
 end
 
+module Tx_rollup_errors = Tx_rollup_errors_repr
 module Global_constants_storage = Global_constants_storage
 
 module Big_map = struct

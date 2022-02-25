@@ -73,6 +73,10 @@ val get_seed : t -> Seed.seed tzresult Lwt.t
 (** Returns all the constants of the protocol *)
 val get_constants : t -> Constants.t tzresult Lwt.t
 
+(** The default constants used in the test framework. To be used with
+    [init_with_constants]. *)
+val default_test_contants : Constants.parametric
+
 val get_baking_reward_fixed_portion : t -> Tez.t tzresult Lwt.t
 
 val get_bonus_reward : t -> endorsing_power:int -> Tez.t tzresult Lwt.t
@@ -178,7 +182,8 @@ module Tx_rollup : sig
   (** [inbox ctxt tx_rollup] returns the inbox of this transaction
       rollup at the current level. If the inbox does not exist, the
       function returns an error. *)
-  val inbox : t -> Tx_rollup.t -> Tx_rollup_inbox.t tzresult Lwt.t
+  val inbox :
+    t -> Tx_rollup.t -> Tx_rollup_level.t -> Tx_rollup_inbox.t tzresult Lwt.t
 end
 
 (** [init n] : returns an initial block with [n] initialized accounts

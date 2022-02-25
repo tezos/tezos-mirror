@@ -106,33 +106,23 @@ let encoding =
        (req "cumulated_size" int31)
        (req "hash" hash_encoding))
 
-type metadata = {
-  inbox_length : int32;
-  cumulated_size : int;
-  hash : hash;
-  predecessor : Raw_level_repr.t option;
-  successor : Raw_level_repr.t option;
-}
+type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
 
 let metadata_encoding =
   let open Data_encoding in
   conv
-    (fun {inbox_length; cumulated_size; predecessor; successor; hash} ->
-      (inbox_length, cumulated_size, predecessor, successor, hash))
-    (fun (inbox_length, cumulated_size, predecessor, successor, hash) ->
-      {inbox_length; cumulated_size; predecessor; successor; hash})
-    (obj5
+    (fun {inbox_length; cumulated_size; hash} ->
+      (inbox_length, cumulated_size, hash))
+    (fun (inbox_length, cumulated_size, hash) ->
+      {inbox_length; cumulated_size; hash})
+    (obj3
        (req "inbox_length" int32)
        (req "cumulated_size" int31)
-       (req "predecessor" (option Raw_level_repr.encoding))
-       (req "successor" (option Raw_level_repr.encoding))
        (req "hash" hash_encoding))
 
-let empty_metadata predecessor =
+let empty_metadata =
   {
     inbox_length = 0l;
     cumulated_size = 0;
-    predecessor;
-    successor = None;
     hash = Inbox_hash.hash_bytes [Bytes.make hash_size @@ Char.chr 0];
   }

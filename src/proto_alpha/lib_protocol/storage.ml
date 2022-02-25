@@ -1397,20 +1397,17 @@ module Tx_rollup = struct
     Make_indexed_subcontext
       (Make_subcontext (Registered) (Raw_context)
          (struct
-           let name = ["level_index"]
+           let name = ["tx_level"]
          end))
-         (Make_index (Raw_level_repr.Index))
+         (Make_index (Tx_rollup_level_repr.Index))
 
   module Level_tx_rollup_context =
     Make_indexed_subcontext
       (Make_subcontext (Registered) (Level_context.Raw_context)
          (struct
-           let name = ["tx_rollup_index"]
+           let name = ["tx_rollup"]
          end))
          (Make_index (Tx_rollup_repr.Index))
-
-  let fold ctxt level =
-    Level_tx_rollup_context.fold_keys (ctxt, level) ~order:`Undefined
 
   module Inbox_metadata =
     Level_tx_rollup_context.Make_carbonated_map
@@ -1465,7 +1462,7 @@ module Tx_rollup = struct
          end))
          (Pair
             (Make_index
-               (Raw_level_repr.Index))
+               (Tx_rollup_level_repr.Index))
                (Make_index (Tx_rollup_repr.Index)))
 
   module Commitment =

@@ -86,20 +86,12 @@ val pp : Format.formatter -> t -> unit
 
 val encoding : t Data_encoding.t
 
-(* The metadata for an inbox stores the [cumulated_size] in bytes for
-   the inbox, the [inbox_length] ({i i.e.}, the number of messages),
-   the [predecessor] level, the [successor] level, and the cumulative
-   hash of the inbox contents. For all inboxes, the [successor] will
-   be [None] until a subsequent inbox is created. For newly created
-   inboxes, the [hash] is initialized as an array 32 null byte. *)
-type metadata = {
-  inbox_length : int32;
-  cumulated_size : int;
-  hash : hash;
-  predecessor : Raw_level_repr.t option;
-  successor : Raw_level_repr.t option;
-}
+(** The metadata for an inbox stores the [cumulated_size] in bytes for
+    the inbox, the [inbox_length] ({i i.e.}, the number of messages),
+    and the cumulative [hash] of the inbox contents. For newly created
+    inboxes, the [hash] is initialized as an array 32 null byte. *)
+type metadata = {inbox_length : int32; cumulated_size : int; hash : hash}
 
 val metadata_encoding : metadata Data_encoding.t
 
-val empty_metadata : Raw_level_repr.t option -> metadata
+val empty_metadata : metadata

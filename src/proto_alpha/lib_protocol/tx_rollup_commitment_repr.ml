@@ -25,123 +25,6 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type error += (* `Branch *) Wrong_commitment_predecessor_level
-
-type error += (* `Temporary *) Missing_commitment_predecessor
-
-type error += (* `Branch *) Wrong_batch_count
-
-type error +=
-  | (* `Temporary *) Commitment_too_early of Raw_level_repr.t * Raw_level_repr.t
-
-type error += (* `Temporary *) Level_already_has_commitment of Raw_level_repr.t
-
-type error += (* `Temporary *) Wrong_inbox_hash
-
-type error += (* `Branch *)
-              Retire_uncommitted_level of Raw_level_repr.t
-
-type error += (* `Temporary *)
-              Bond_does_not_exist of Signature.public_key_hash
-
-type error += (* `Temporary *) Bond_in_use of Signature.public_key_hash
-
-type error += (* `Temporary *) Too_many_unfinalized_levels
-
-let () =
-  let open Data_encoding in
-  (* Wrong_commitment_predecessor_level *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_wrong_commitment_predecessor_level"
-    ~title:"This commitment's predecessor is invalid"
-    ~description:
-      "This commitment has a predecessor but shouldn't, or doesn't but should"
-    unit
-    (function Wrong_commitment_predecessor_level -> Some () | _ -> None)
-    (fun () -> Wrong_commitment_predecessor_level) ;
-  (* Missing_commitment_predecessor *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_missing_commitment_predecessor"
-    ~title:"This commitment refers to a predecessor that doesn't exist"
-    ~description:"This commitment refers to a predecessor that doesn't exist"
-    unit
-    (function Missing_commitment_predecessor -> Some () | _ -> None)
-    (fun () -> Missing_commitment_predecessor) ;
-  (* Wrong_batch_count *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_wrong_batch_count"
-    ~title:"This commitment has the wrong number of batches"
-    ~description:
-      "This commitment has a different number of batches than its inbox"
-    unit
-    (function Wrong_batch_count -> Some () | _ -> None)
-    (fun () -> Wrong_batch_count) ;
-  (* Commitment_too_early *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_commitment_too_early"
-    ~title:"This commitment is for a level that hasn't finished yet"
-    ~description:"This commitment is for a level that hasn't finished yet"
-    (obj2
-       (req "commitment_level" Raw_level_repr.encoding)
-       (req "submit_level" Raw_level_repr.encoding))
-    (function
-      | Commitment_too_early (commitment_level, submit_level) ->
-          Some (commitment_level, submit_level)
-      | _ -> None)
-    (fun (commitment_level, submit_level) ->
-      Commitment_too_early (commitment_level, submit_level)) ;
-  (* Level_already_has_commitment *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_level_already_has_commitment"
-    ~title:"This commitment is for a level that already has a commitment"
-    ~description:"This commitment is for a level that already has a commitment"
-    (obj1 (req "level" Raw_level_repr.encoding))
-    (function Level_already_has_commitment level -> Some level | _ -> None)
-    (fun level -> Level_already_has_commitment level) ;
-  (* Wrong_inbox_hash *)
-  register_error_kind
-    `Temporary
-    ~id:"Wrong_inbox_hash"
-    ~title:"This commitment has the wrong inbox hash"
-    ~description:"This commitment has a different hash than its inbox"
-    unit
-    (function Wrong_inbox_hash -> Some () | _ -> None)
-    (fun () -> Wrong_inbox_hash) ;
-  (* Too_many_unfinalized_levels *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_too_many_unfinalized_levels"
-    ~title:"This rollup hasn't had a commitment in too long"
-    ~description:
-      "This rollup hasn't had a commitment in too long. We don't allow new \
-       messages to keep commitment gas reasonable."
-    empty
-    (function Too_many_unfinalized_levels -> Some () | _ -> None)
-    (fun () -> Too_many_unfinalized_levels) ;
-  (* Bond_does_not_exist *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_bond_does_not_exist"
-    ~title:"This account does not have a bond for this rollup"
-    ~description:"This account does not have a bond for this rollup"
-    (obj1 (req "contract" Signature.Public_key_hash.encoding))
-    (function Bond_does_not_exist contract -> Some contract | _ -> None)
-    (fun contract -> Bond_does_not_exist contract) ;
-  (* Bond_in_use *)
-  register_error_kind
-    `Temporary
-    ~id:"tx_rollup_bond_in_use"
-    ~title:"This account's bond is in use for one or more commitments"
-    ~description:"This account's bond is in use for one or more commitments"
-    (obj1 (req "contract" Signature.Public_key_hash.encoding))
-    (function Bond_in_use contract -> Some contract | _ -> None)
-    (fun contract -> Bond_in_use contract)
-
 module Commitment_hash = struct
   let commitment_hash = "\017\249\195\013" (* toc1(54) *)
 
@@ -206,7 +89,7 @@ let batch_commitment_equal : batch_commitment -> batch_commitment -> bool =
   Batch.equal
 
 type t = {
-  level : Raw_level_repr.t;
+  level : Tx_rollup_level_repr.t;
   batches : batch_commitment list;
   predecessor : Commitment_hash.t option;
   inbox_hash : Tx_rollup_inbox_repr.hash;
@@ -220,7 +103,7 @@ include Compare.Make (struct
   module Compare_root_list = Compare.List (Batch)
 
   let compare r1 r2 =
-    compare_or Raw_level_repr.compare r1.level r2.level (fun () ->
+    compare_or Tx_rollup_level_repr.compare r1.level r2.level (fun () ->
         compare_or Compare_root_list.compare r1.batches r2.batches (fun () ->
             compare_or
               (Option.compare Commitment_hash.compare)
@@ -235,7 +118,7 @@ let pp : Format.formatter -> t -> unit =
   Format.fprintf
     fmt
     "commitment %a : batches = %a predecessor %a for inbox %a"
-    Raw_level_repr.pp
+    Tx_rollup_level_repr.pp
     t.level
     (Format.pp_print_list Batch.pp)
     t.batches
@@ -255,7 +138,7 @@ let encoding =
     (fun (level, batches, predecessor, inbox_hash) ->
       {level; batches; predecessor; inbox_hash})
     (obj4
-       (req "level" Raw_level_repr.encoding)
+       (req "level" Tx_rollup_level_repr.encoding)
        (req "batches" (list Batch.encoding))
        (req "predecessor" (option Commitment_hash.encoding))
        (req "inbox_hash" Tx_rollup_inbox_repr.hash_encoding))
@@ -293,19 +176,23 @@ end
 module Submitted_commitment = struct
   type nonrec t = {
     commitment : t;
+    commitment_hash : Commitment_hash.t;
     committer : Signature.Public_key_hash.t;
     submitted_at : Raw_level_repr.t;
+    finalized_at : Raw_level_repr.t option;
   }
 
   let encoding =
     let open Data_encoding in
     conv
-      (fun {commitment; committer; submitted_at} ->
-        (commitment, committer, submitted_at))
-      (fun (commitment, committer, submitted_at) ->
-        {commitment; committer; submitted_at})
-      (obj3
+      (fun {commitment; commitment_hash; committer; submitted_at; finalized_at} ->
+        (commitment, commitment_hash, committer, submitted_at, finalized_at))
+      (fun (commitment, commitment_hash, committer, submitted_at, finalized_at) ->
+        {commitment; commitment_hash; committer; submitted_at; finalized_at})
+      (obj5
          (req "commitment" encoding)
+         (req "commitment_hash" Commitment_hash.encoding)
          (req "committer" Signature.Public_key_hash.encoding)
-         (req "submitted_at" Raw_level_repr.encoding))
+         (req "submitted_at" Raw_level_repr.encoding)
+         (opt "finalized_at" Raw_level_repr.encoding))
 end

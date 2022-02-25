@@ -69,11 +69,13 @@ type t = Hash.t
 
 type tx_rollup = t
 
-include Compare.Make (struct
+module Compare_impl = Compare.Make (struct
   type nonrec t = t
 
   let compare r1 r2 = Hash.compare r1 r2
 end)
+
+include Compare_impl
 
 let in_memory_size _ =
   let open Cache_memory_helpers in
@@ -161,3 +163,9 @@ type deposit_parameters = {
   amount : Tx_rollup_l2_qty.t;
   destination : Tx_rollup_l2_address.Indexable.value;
 }
+
+module Set = Set.Make (struct
+  type t = tx_rollup
+
+  include Compare_impl
+end)

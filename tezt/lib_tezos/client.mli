@@ -916,6 +916,45 @@ module Tx_rollup : sig
     src:string ->
     t ->
     unit Process.runnable
+
+  (** Run [tezos-client submit tx rollup finalize commitment to <tx_rollup> from <src>]. *)
+  val submit_finalize_commitment :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Process.runnable
+
+  (** Run [tezos-client submit tx rollup remove commitment to <tx_rollup> from <src>]. *)
+  val submit_remove_commitment :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Process.runnable
+
+  (** Run [tezos-client submit tx rollup rejection commitment at level
+     <level> message <message> at <position> with <proof> to
+     <tx_rollup> from <src>]. *)
+  val submit_rejection :
+    ?wait:string ->
+    ?burn_cap:Tez.t ->
+    ?storage_limit:int ->
+    ?hooks:Process.hooks ->
+    level:int ->
+    message:string ->
+    position:int ->
+    proof:bool ->
+    rollup:string ->
+    src:string ->
+    t ->
+    unit Process.runnable
 end
 
 (** Run [tezos-client show voting period] and return the period name. *)

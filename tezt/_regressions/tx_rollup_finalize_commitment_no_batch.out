@@ -1,0 +1,18 @@
+tezt/_regressions/tx_rollup_finalize_commitment_no_batch.out
+
+./tezos-client --wait none submit tx rollup finalize commitment to '[TX_ROLLUP_HASH]' from '[PUBLIC_KEY_HASH]'
+Node is bootstrapped.
+This simulation failed:
+  Manager signed operations:
+    From: [PUBLIC_KEY_HASH]
+    Fee to the baker: ꜩ0
+    Expected counter: 2
+    Gas limit: 1040000
+    Storage limit: 60000 bytes
+    Tx rollup finalize commitment:[TX_ROLLUP_HASH] 
+    From: [PUBLIC_KEY_HASH]
+    This operation FAILED.
+
+Error:
+  { "id": "proto.alpha.tx_rollup_no_commitment_to_finalize",
+  "description": "There is no commitment to finalize", "data": {} }

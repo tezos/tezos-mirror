@@ -32,7 +32,8 @@ val state :
   Tx_rollup.t ->
   Tx_rollup_state.t shell_tzresult Lwt.t
 
-(** Returns the inbox for a transaction rollup for current level.
+(** Returns the inbox for a transaction rollup for a given rollup
+    level.
 
     Returns [Not_found] if the transaction rollup exists, but does not
     have inbox at that level. Fails if the transaction rollup does not
@@ -41,13 +42,14 @@ val inbox :
   'a #RPC_context.simple ->
   'a ->
   Tx_rollup.t ->
+  Tx_rollup_level.t ->
   Tx_rollup_inbox.t shell_tzresult Lwt.t
 
 val commitment :
   'a #RPC_context.simple ->
   'a ->
-  ?offset:int ->
   Tx_rollup.t ->
+  Tx_rollup_level.t ->
   Tx_rollup_commitment.Submitted_commitment.t option shell_tzresult Lwt.t
 
 val register : unit -> unit

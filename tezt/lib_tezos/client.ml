@@ -1223,7 +1223,6 @@ module Tx_rollup = struct
       ~roots ~predecessor ~inbox_hash ~rollup ~src client =
     let process =
       let predecessor = Option.value ~default:"" predecessor in
-
       spawn_command
         ?hooks
         client
@@ -1235,13 +1234,80 @@ module Tx_rollup = struct
             "commitment";
             Int.to_string level;
             inbox_hash;
-            Hex.(of_string predecessor |> show);
+            predecessor;
           ]
         @ [
             String.concat "!"
             @@ List.map (fun root -> Hex.show @@ Hex.of_string root) roots;
           ]
         @ ["to"; rollup; "from"; src]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let submit_finalize_commitment ?(wait = "none") ?burn_cap ?storage_limit
+      ?hooks ~rollup ~src client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ ["submit"; "tx"; "rollup"; "finalize"; "commitment"]
+        @ ["to"; rollup; "from"; src]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let submit_remove_commitment ?(wait = "none") ?burn_cap ?storage_limit ?hooks
+      ~rollup ~src client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ ["submit"; "tx"; "rollup"; "remove"; "commitment"]
+        @ ["to"; rollup; "from"; src]
+        @ Option.fold
+            ~none:[]
+            ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
+            burn_cap
+        @ Option.fold
+            ~none:[]
+            ~some:(fun s -> ["--storage-limit"; string_of_int s])
+            storage_limit)
+    in
+    let parse process = Process.check process in
+    {value = process; run = parse}
+
+  let submit_rejection ?(wait = "none") ?burn_cap ?storage_limit ?hooks ~level
+      ~message ~position ~proof ~rollup ~src client =
+    let process =
+      spawn_command
+        ?hooks
+        client
+        (["--wait"; wait]
+        @ ["submit"; "tx"; "rollup"; "reject"; "commitment"]
+        @ ["at"; "level"; string_of_int level]
+        @ ["message"; message]
+        @ ["at"; "position"; string_of_int position]
+        @ ["with"; "proof"; string_of_bool proof]
+        @ ["to"; rollup] @ ["from"; src]
         @ Option.fold
             ~none:[]
             ~some:(fun burn_cap -> ["--burn-cap"; Tez.to_string burn_cap])
