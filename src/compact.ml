@@ -440,13 +440,14 @@ let conv : type a b. ?json:a Encoding.t -> (a -> b) -> (b -> a) -> b t -> a t =
 
 let option compact =
   union
+    ~union_tag_bits:1
     [
-      case ~title:"some" compact (fun x -> x) (fun x -> Some x);
       case
         ~title:"none"
         unit
         (function None -> Some () | _ -> None)
         (fun () -> None);
+      case ~title:"some" compact (fun x -> x) (fun x -> Some x);
     ]
 
 let tup1 : type a. a t -> a t =
