@@ -109,33 +109,41 @@ let test_node_configuration =
       in
       unit)
 
-let test_tx_node_is_ready =
+let init_and_run_rollup_node ~operator node client =
+  let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
+  let* () = Client.bake_for client in
+  let* _ = Node.wait_for_level node 2 in
+  Log.info "Tx_rollup %s was successfully originated" tx_rollup_hash ;
+  let* json = RPC.get_block client in
+  let* block_hash = get_block_hash json in
+  let tx_node =
+    Rollup_node.create
+      ~rollup_id:tx_rollup_hash
+      ~rollup_genesis:block_hash
+      ~operator
+      client
+      node
+  in
+  let* _ = Rollup_node.config_init tx_node tx_rollup_hash block_hash in
+  let* () = Rollup_node.run tx_node in
+  Log.info "Tx_rollup node is now running" ;
+  let* () = Rollup_node.wait_for_ready tx_node in
+  Lwt.return (tx_rollup_hash, tx_node)
+
+(* Checks that the tx_node is ready after originating an associated
+   rollup key. *)
+let test_tx_node_origination =
   Protocol.register_test
     ~__FILE__
     ~title:"TX_rollup: test if the node is ready"
-    ~tags:["tx_rollup"; "ready"]
+    ~tags:["tx_rollup"; "ready"; "originate"]
     (fun protocol ->
       let* parameter_file = get_rollup_parameter_file ~protocol in
       let* (node, client) =
         Client.init_with_protocol ~parameter_file `Client ~protocol ()
       in
       let operator = Constant.bootstrap1.public_key_hash in
-      let*! tx_rollup_hash = Client.Tx_rollup.originate ~src:operator client in
-      let* () = Client.bake_for client in
-      let* _ = Node.wait_for_level node 2 in
-      let* json = RPC.get_block client in
-      let* block_hash = get_block_hash json in
-      let tx_node =
-        Rollup_node.create
-          ~rollup_id:tx_rollup_hash
-          ~rollup_genesis:block_hash
-          ~operator
-          client
-          node
-      in
-      let* _ = Rollup_node.config_init tx_node tx_rollup_hash block_hash in
-      let* () = Rollup_node.run tx_node in
-      let* () = Rollup_node.wait_for_ready tx_node in
+      let* _tx_node = init_and_run_rollup_node ~operator node client in
       unit)
 
 let test_tx_node_store_inbox =
@@ -233,5 +241,5 @@ let test_tx_node_store_inbox =
 
 let register ~protocols =
   test_node_configuration protocols ;
-  test_tx_node_is_ready protocols ;
+  test_tx_node_origination protocols ;
   test_tx_node_store_inbox protocols
