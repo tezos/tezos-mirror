@@ -11,10 +11,12 @@
  (action
   (run node %{dep:./test.bc.js})))
 
+; We need to increase the stack size
+
 (rule
  (alias runtest_js)
  (action
-  (run node %{dep:./test_generated.bc.js})))
+  (run node --stack-size=50000 %{dep:./test_generated.bc.js})))
 
 (rule
  (alias runtest_js)
