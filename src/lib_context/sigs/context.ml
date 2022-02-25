@@ -382,7 +382,9 @@ module type S = sig
   (** The type for context repositories. *)
   type index
 
-  (** The type of tree for which to build a shallow tree with [shallow] *)
+  (** The type of references to tree objects annotated with the type of that
+      object (either a value or a node). Used to build a shallow tree with
+      {!Tree.shallow} *)
   type kinded_key
 
   module Tree : sig
@@ -415,8 +417,10 @@ module type S = sig
 
     val make_repo : unit -> repo Lwt.t
 
-    (** [shallow repo k] is the shallow tree having key [k] based on
-        the repository [r]. *)
+    (** [shallow repo k] is the "shallow" tree having key [k] based on the
+        repository [repo]. A shallow tree is a tree that exists in an underlying
+        backend repository, but has not yet been loaded into memory from that
+        backend. *)
     val shallow : repo -> kinded_key -> tree
 
     val is_shallow : tree -> bool
