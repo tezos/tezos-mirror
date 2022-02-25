@@ -682,7 +682,7 @@ let test_invalid_transaction () =
   let* () =
     expect_error_status
       ~msg:"an invalid transaction must fail"
-      Tx_rollup_l2_context.Balance_too_low
+      Tx_rollup_l2_context_sig.Balance_too_low
       status
       (let* () =
          check_balance

@@ -36,7 +36,7 @@
 open Tztest
 open Tx_rollup_l2_helpers
 open Protocol
-open Tx_rollup_l2_context
+open Tx_rollup_l2_context_sig
 
 (** {1. Storage and context tests. } *)
 
