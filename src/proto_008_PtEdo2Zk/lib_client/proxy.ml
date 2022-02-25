@@ -126,12 +126,8 @@ module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC = struct
 end
 
 let initial_context
-    (proxy_builder :
-      Tezos_proxy.Proxy_proto.proto_rpc ->
-      Tezos_proxy.Proxy_getter.proxy_m Lwt.t)
-    (rpc_context : RPC_context.generic) (mode : Tezos_proxy.Proxy.mode)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
+    ({printer = _; proxy_builder; rpc_context; mode; chain; block} :
+      Tezos_proxy.Proxy_getter.rpc_context_args) :
     Environment_context.Context.t Lwt.t =
   let p_rpc = (module ProtoRpc : Tezos_proxy.Proxy_proto.PROTO_RPC) in
   proxy_builder p_rpc >>= fun (module M) ->
@@ -166,17 +162,12 @@ let time_between_blocks (rpc_context : RPC_context.generic)
   let times = constants.parametric.time_between_blocks in
   return @@ Option.map Alpha_context.Period.to_seconds (List.hd times)
 
-let init_env_rpc_context (_printer : Tezos_client_base.Client_context.printer)
-    (proxy_builder :
-      Tezos_proxy.Proxy_proto.proto_rpc ->
-      Tezos_proxy.Proxy_getter.proxy_m Lwt.t)
-    (rpc_context : RPC_context.generic) (mode : Tezos_proxy.Proxy.mode)
-    (chain : Tezos_shell_services.Block_services.chain)
-    (block : Tezos_shell_services.Block_services.block) :
+let init_env_rpc_context (ctxt : Tezos_proxy.Proxy_getter.rpc_context_args) :
     Tezos_protocol_environment.rpc_context tzresult Lwt.t =
-  proxy_block_header rpc_context chain block >>=? fun {shell; hash; _} ->
+  proxy_block_header ctxt.rpc_context ctxt.chain ctxt.block
+  >>=? fun {shell; hash; _} ->
   let block_hash = hash in
-  initial_context proxy_builder rpc_context mode chain block >>= fun context ->
+  initial_context ctxt >>= fun context ->
   return {Tezos_protocol_environment.block_hash; block_header = shell; context}
 
 let () =

@@ -120,6 +120,15 @@ end
 
 type proxy_m = (module M)
 
+type rpc_context_args = {
+  printer : Tezos_client_base.Client_context.printer option;
+  proxy_builder : Proxy_proto.proto_rpc -> proxy_m Lwt.t;
+  rpc_context : RPC_context.generic;
+  mode : Proxy.mode;
+  chain : Tezos_shell_services.Block_services.chain;
+  block : Tezos_shell_services.Block_services.block;
+}
+
 module StringMap = TzString.Map
 
 module Tree : Proxy.TREE with type t = Local.tree with type key = Local.key =

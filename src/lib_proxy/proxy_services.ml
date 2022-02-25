@@ -305,15 +305,17 @@ let build_directory (printer : Tezos_client_base.Client_context.printer)
     in
     let key = (chain, block_key) in
     let compute_value (chain, block_key) =
-      let* initial_context =
-        Proxy_environment.init_env_rpc_context
-          printer
-          (make chain block_key)
-          rpc_context
-          (to_client_server_mode mode)
-          chain
-          block_key
+      let ctx : Proxy_getter.rpc_context_args =
+        {
+          printer = Some printer;
+          proxy_builder = make chain block_key;
+          rpc_context;
+          mode = to_client_server_mode mode;
+          chain;
+          block;
+        }
       in
+      let* initial_context = Proxy_environment.init_env_rpc_context ctx in
       fill_b2h @@ initial_context.block_hash ;
       let*! () =
         schedule_clearing

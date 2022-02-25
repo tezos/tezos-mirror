@@ -66,12 +66,7 @@ module type Proxy_sig = sig
 
   (** How to build the context to execute RPCs on *)
   val init_env_rpc_context :
-    Tezos_client_base.Client_context.printer ->
-    (Proxy_proto.proto_rpc -> Proxy_getter.proxy_m Lwt.t) ->
-    RPC_context.generic ->
-    Proxy.mode ->
-    Block_services.chain ->
-    Block_services.block ->
+    Proxy_getter.rpc_context_args ->
     Tezos_protocol_environment.rpc_context tzresult Lwt.t
 
   val time_between_blocks :
