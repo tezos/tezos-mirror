@@ -173,10 +173,6 @@ class TestAllPerBlockVotes:
         filename = "tests_alpha/per_block_vote_files/false.json"
         run_wrong_content_file_test(sandbox, filename, 'pass')
 
-    def test_nonboolean(self, sandbox: Sandbox):
-        filename = "tests_alpha/per_block_vote_files/non_boolean.json"
-        run_wrong_content_file_test(sandbox, filename, 'pass')
-
     def test_wrong_key(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/wrong_key.json"
         run_wrong_content_file_test(sandbox, filename, 'pass')
