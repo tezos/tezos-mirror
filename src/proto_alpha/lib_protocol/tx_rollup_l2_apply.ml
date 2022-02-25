@@ -133,12 +133,95 @@ type indexes = {
   ticket_indexes : ticket_indexes;
 }
 
+let address_indexes_to_list x =
+  let seq = Address_indexes.to_seq x in
+  Seq.fold_left (fun acc x -> x :: acc) [] seq
+
+let address_indexes_of_list l =
+  let seq = List.fold_left (fun seq x -> Seq.cons x seq) Seq.empty l in
+  Address_indexes.of_seq seq
+
+let ticket_indexes_to_list x =
+  let seq = Ticket_indexes.to_seq x in
+  Seq.fold_left (fun acc x -> x :: acc) [] seq
+
+let ticket_indexes_of_list l =
+  let seq = List.fold_left (fun seq x -> Seq.cons x seq) Seq.empty l in
+  Ticket_indexes.of_seq seq
+
+let encoding_indexes : indexes Data_encoding.t =
+  let open Data_encoding in
+  conv
+    (fun {address_indexes; ticket_indexes} ->
+      ( address_indexes_to_list address_indexes,
+        ticket_indexes_to_list ticket_indexes ))
+    (fun (address_indexes_list, ticket_indexes_list) ->
+      let address_indexes = address_indexes_of_list address_indexes_list in
+      let ticket_indexes = ticket_indexes_of_list ticket_indexes_list in
+      {address_indexes; ticket_indexes})
+  @@ tup2
+       (list
+          (tup2
+             Tx_rollup_l2_address.encoding
+             Tx_rollup_l2_address.Indexable.index_encoding))
+       (list
+          (tup2
+             Ticket_hash.encoding
+             Tx_rollup_l2_context_sig.Ticket_indexable.index_encoding))
+
 module Message_result = struct
   type transaction_result =
     | Transaction_success
     | Transaction_failure of {index : int; reason : error}
 
   type deposit_result = Deposit_success of indexes | Deposit_failure of error
+
+  let encoding_transaction_result =
+    let open Data_encoding in
+    union
+      [
+        (let kind = "transaction_success" in
+         case
+           ~title:kind
+           (Tag 0)
+           (constant kind)
+           (function Transaction_success -> Some () | _ -> None)
+           (fun () -> Transaction_success));
+        (let kind = "transaction_failure" in
+         case
+           ~title:kind
+           (Tag 1)
+           (obj1
+              (req
+                 kind
+                 (obj2
+                    (req "transaction_index" Data_encoding.int31)
+                    (req "reason" Error_monad.error_encoding))))
+           (function
+             | Transaction_failure {index; reason} -> Some (index, reason)
+             | _ -> None)
+           (fun (index, reason) -> Transaction_failure {index; reason}));
+      ]
+
+  let encoding_deposit_result =
+    let open Data_encoding in
+    union
+      [
+        (let kind = "deposit_success" in
+         case
+           ~title:kind
+           (Tag 0)
+           (obj1 (req kind encoding_indexes))
+           (function Deposit_success indexes -> Some indexes | _ -> None)
+           (fun indexes -> Deposit_success indexes));
+        (let kind = "deposit_failure" in
+         case
+           ~title:kind
+           (Tag 1)
+           (obj1 (req kind (obj1 (req "reason" Error_monad.error_encoding))))
+           (function Deposit_failure reason -> Some reason | _ -> None)
+           (fun reason -> Deposit_failure reason));
+      ]
 
   module Batch_V1 = struct
     type t =
@@ -149,9 +232,44 @@ module Message_result = struct
             list;
           indexes : indexes;
         }
+
+    let encoding =
+      let open Data_encoding in
+      conv
+        (fun (Batch_result {results; indexes}) -> (results, indexes))
+        (fun (results, indexes) -> Batch_result {results; indexes})
+        (obj2
+           (req "results"
+           @@ list
+                (Data_encoding.tup2
+                   (Compact.make
+                      ~tag_size:`Uint8
+                      V1.compact_transaction_signer_index)
+                   encoding_transaction_result))
+           (req "allocated_indexes" encoding_indexes))
   end
 
   type t = Deposit_result of deposit_result | Batch_V1_result of Batch_V1.t
+
+  let encoding =
+    let open Data_encoding in
+    union
+      [
+        (let kind = "deposit_result" in
+         case
+           ~title:kind
+           (Tag 0)
+           (obj1 (req kind encoding_deposit_result))
+           (function Deposit_result result -> Some result | _ -> None)
+           (fun result -> Deposit_result result));
+        (let kind = "batch_v1_result" in
+         case
+           ~title:kind
+           (Tag 1)
+           (obj1 (req kind Batch_V1.encoding))
+           (function Batch_V1_result result -> Some result | _ -> None)
+           (fun result -> Batch_V1_result result));
+      ]
 end
 
 module Make (Context : CONTEXT) = struct

@@ -109,25 +109,40 @@ module V1 = struct
   let operation_content_encoding =
     Data_encoding.Compact.make ~tag_size compact_operation_content
 
-  let compact_operation =
+  let compact_operation encoding_signer =
     Data_encoding.Compact.(
       conv
         (fun {signer; counter; contents} -> (signer, counter, contents))
         (fun (signer, counter, contents) -> {signer; counter; contents})
       @@ obj3
-           (req "signer" @@ Signer_indexable.compact)
+           (req "signer" encoding_signer)
            (req "counter" int64)
            (req "contents" @@ list ~bits:4 operation_content_encoding))
 
-  let operation_encoding =
-    Data_encoding.Compact.(make ~tag_size compact_operation)
+  let operation_encoding encoding_signer =
+    Data_encoding.Compact.(make ~tag_size (compact_operation encoding_signer))
 
-  let compact_transaction =
-    Data_encoding.Compact.list ~bits:8 operation_encoding
+  let compact_transaction encoding_signer =
+    Data_encoding.Compact.list ~bits:8 (operation_encoding encoding_signer)
 
   let transaction_encoding :
-      (Indexable.unknown, Indexable.unknown) transaction Data_encoding.t =
-    Data_encoding.Compact.(make ~tag_size compact_transaction)
+      'a -> ('b, Indexable.unknown) transaction Data_encoding.t =
+   fun encoding_signer ->
+    Data_encoding.Compact.(make ~tag_size (compact_transaction encoding_signer))
+
+  let compact_signer_index =
+    Data_encoding.Compact.(conv Indexable.to_int32 Indexable.index_exn int32)
+
+  let compact_signer_either = Signer_indexable.compact
+
+  let compact_operation = compact_operation compact_signer_either
+
+  let compact_transaction_signer_index =
+    compact_transaction compact_signer_index
+
+  let compact_transaction = compact_transaction compact_signer_either
+
+  let transaction_encoding = transaction_encoding compact_signer_either
 
   let compact ~bits :
       (Indexable.unknown, Indexable.unknown) t Data_encoding.Compact.t =

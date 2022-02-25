@@ -106,6 +106,8 @@ module Message_result : sig
   end
 
   type t = Deposit_result of deposit_result | Batch_V1_result of Batch_V1.t
+
+  val encoding : t Data_encoding.t
 end
 
 module Make (Context : CONTEXT) : sig
