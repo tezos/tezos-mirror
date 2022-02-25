@@ -75,8 +75,7 @@ module type S = sig
   val genesis : 'content -> ('content, 'ptr) cell
 
   (** [next ~prev_cell ~prev_cell_ptr content] creates a new cell
-     that carries some [content], that follows [prev_cell],
-     and that has the position [index] in the sequence. *)
+     that carries some [content], that follows [prev_cell]. *)
   val next :
     prev_cell:('content, 'ptr) cell ->
     prev_cell_ptr:'ptr ->

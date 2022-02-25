@@ -25,7 +25,7 @@
 
 (** Testing
     -------
-    Component:  Protocol (saturated arithmetic)
+    Component:  Protocol (skip lists)
     Invocation: dune exec src/proto_alpha/lib_protocol/test/unit/main.exe \
                 -- test "^\[Unit\] skip list$"
     Subject:    Test skip list implementation

@@ -68,7 +68,7 @@ let () =
   register_error_kind
     `Permanent
     ~id:"sc_rollup_inbox.invalid_level_add_messages"
-    ~title:"Internal error: Trying to add an message to a previous level inbox"
+    ~title:"Internal error: Trying to add an message to an inbox from the past"
     ~description:
       "An inbox can only accept messages for its current level or for the next \
        levels."
@@ -372,6 +372,14 @@ module MakeHashingScheme
       in
       return (messages, history, {inbox with current_messages_hash})
 
+  (* An [inclusion_proof] is a path in the Merkelized skip list
+     showing that a given inbox history is a prefix of another one.
+     This path has a size logarithmic in the difference between the
+     levels of the two inboxes.
+
+     [Irmin.Proof.{tree_proof, stream_proof}] could not be reused here
+     because there is no obviously encoding of sequences in these data
+     structures with the same guarantee about the size of proofs. *)
   type inclusion_proof = history_proof list
 
   let pp_inclusion_proof fmt proof =

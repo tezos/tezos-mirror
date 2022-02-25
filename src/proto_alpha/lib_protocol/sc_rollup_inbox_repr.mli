@@ -74,7 +74,7 @@
 
    By design, inboxes are logically indexed by Tezos levels. This is
    required to have a simple way to decide if two commitments are in
-   conflict. (See {!Sc_rollup_commitment}.)
+   conflict. (See {!Sc_rollup_storage}.)
 
    A commitment included in the block at level L describes the effect
    of the messages of the inboxes with a level between a starting
@@ -94,7 +94,7 @@
    This module is meant to be used both by the protocol and by the
    rollup node in order to maintain consistent inboxes on both side.
    These two clients slightly differ on the amount of information they
-   stored about the inbox.
+   store about the inbox.
 
    On the one hand, to reduce the space consumption of rollups on the
    chain storage, the protocol only stores metadata about the
@@ -184,6 +184,9 @@ module type MerkelizedOperations = sig
      of [messages] for [level].
 
      This function fails if [level] is older than [inbox]'s [level].
+
+     This function fails with {!Max_number_of_available_messages_reached}
+     if the inbox is full.
 
   *)
   val add_messages :

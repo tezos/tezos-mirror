@@ -105,13 +105,13 @@ end) : S = struct
   let index cell = cell.index
 
   let back_pointers_to_list a =
-    let l = ref [] in
-    FallbackArray.iter
-      (function
-        | Some ptr -> l := ptr :: !l
+    FallbackArray.fold
+      (fun l -> function
+        | Some ptr -> ptr :: l
         | None -> (* By [cell] invariants. *) assert false)
-      a ;
-    List.rev !l
+      a
+      []
+    |> List.rev
 
   let encoding ptr_encoding content_encoding =
     let of_list =

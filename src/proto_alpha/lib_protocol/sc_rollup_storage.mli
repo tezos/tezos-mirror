@@ -164,7 +164,13 @@ val kind :
 
 (** [add_message context rollup msg] adds [msg] to [rollup]'s inbox.
 
-    This function returns the updated context as well as the size diff. *)
+    This function returns the updated context as well as the size diff.
+
+    May fail with:
+    {ul
+      {li [sc_rollup_max_available_messages] if [inbox] is full}
+    }
+*)
 val add_messages :
   Raw_context.t ->
   Sc_rollup_repr.t ->

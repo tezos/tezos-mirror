@@ -41,8 +41,19 @@ type error +=
       Sc_rollup_unknown_commitment of
       Sc_rollup_repr.Commitment_hash.t
   | (* `Temporary *) Sc_rollup_bad_inbox_level
+  | (* `Temporary *) Sc_rollup_max_number_of_available_messages_reached
 
 let () =
+  register_error_kind
+    `Temporary
+    ~id:"Sc_rollup_max_number_of_available_messages_reached"
+    ~title:"Maximum number of available messages reached"
+    ~description:"Maximum number of available messages reached"
+    Data_encoding.unit
+    (function
+      | Sc_rollup_max_number_of_available_messages_reached -> Some ()
+      | _ -> None)
+    (fun () -> Sc_rollup_max_number_of_available_messages_reached) ;
   let description = "Already staked." in
   register_error_kind
     `Temporary
@@ -265,9 +276,21 @@ let inbox ctxt rollup =
   | None -> fail (Sc_rollup_does_not_exist rollup)
   | Some inbox -> return (inbox, ctxt)
 
+let assert_inbox_size_ok ctxt next_size =
+  let max_size = Constants_storage.sc_rollup_max_available_messages ctxt in
+  fail_unless
+    Compare.Z.(next_size <= Z.of_int max_size)
+    Sc_rollup_max_number_of_available_messages_reached
+
 let add_messages ctxt rollup messages =
   let open Raw_context in
   Storage.Sc_rollup.Inbox.get ctxt rollup >>=? fun (ctxt, inbox) ->
+  let next_size =
+    Z.add
+      (Sc_rollup_inbox_repr.number_of_available_messages inbox)
+      (Z.of_int (List.length messages))
+  in
+  assert_inbox_size_ok ctxt next_size >>=? fun () ->
   Sc_rollup_in_memory_inbox.current_messages ctxt rollup
   |> fun current_messages ->
   let {Level_repr.level; _} = Raw_context.current_level ctxt in
@@ -275,7 +298,7 @@ let add_messages ctxt rollup messages =
       Notice that the protocol is forgetful: it throws away the inbox
       history. On the contrary, the history is stored by the rollup
       node to produce inclusion proofs when needed.
-  *)
+    *)
   Sc_rollup_inbox_repr.(
     add_messages history_at_genesis inbox level messages current_messages)
   >>=? fun (current_messages, _, inbox) ->
