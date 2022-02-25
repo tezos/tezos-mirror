@@ -33,8 +33,6 @@
 module Rollup = Rollup.Tx_rollup
 module Rollup_node = Rollup_node.Tx_node
 
-let hooks = Tezos_regression.hooks
-
 let get_block_hash block_json =
   JSON.(block_json |-> "hash" |> as_string) |> return
 
@@ -146,11 +144,31 @@ let test_tx_node_origination =
       let* _tx_node = init_and_run_rollup_node ~operator node client in
       unit)
 
+let check_inbox_equality (i1 : Rollup.inbox) (i2 : Rollup.inbox) =
+  Check.(
+    (( = )
+       i1.cumulated_size
+       i2.cumulated_size
+       ~error_msg:
+         "Cumulated size of inboxes computed by the rollup node should be \
+          equal to the cumulated size given by the RPC")
+      int) ;
+  Check.(
+    ( = )
+      i1.contents
+      i2.contents
+      ~error_msg:
+        "Content of inboxes computed by the rollup node should be equal to the \
+         cumulated size given by the RPC"
+      (list string))
+
+(* Checks that an inbox received by the tx_rollup node is well stored
+   and available in a percistent way. *)
 let test_tx_node_store_inbox =
   Protocol.register_test
     ~__FILE__
-    ~title:"TX_rollup: test"
-    ~tags:["tx_rollup"; "test"]
+    ~title:"TX_rollup: store inbox"
+    ~tags:["tx_rollup"; "store"; "inbox"]
     (fun protocol ->
       let* parameter_file = get_rollup_parameter_file ~protocol in
       let* (node, client) =
@@ -173,10 +191,9 @@ let test_tx_node_store_inbox =
       let* _ = Rollup_node.config_init tx_node rollup block_hash in
       let* () = Rollup_node.run tx_node in
       (* Submit a batch *)
-      let batch = "tezos" in
+      let batch = "tezos_l2_batch_1" in
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~hooks
           ~content:batch
           ~rollup
           ~src:Constant.bootstrap1.public_key_hash
@@ -184,38 +201,15 @@ let test_tx_node_store_inbox =
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 3 in
-      let* node_inbox_head = get_node_inbox tx_node in
-      let* node_inbox_0 = get_node_inbox ~block:"0" tx_node in
-      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:0 client in
-      (* Enusre that stored inboxes on daemon side are equivalent of inboxes
-         returned by the rpc call. *)
-      Check.(
-        (( = )
-           node_inbox_head.cumulated_size
-           inbox.cumulated_size
-           ~error_msg:
-             "Cumulated size of inboxes computed by the rollup node should be \
-              equal to the cumulated size given by the RPC")
-          int) ;
-      Check.(
-        ( = )
-          node_inbox_head.contents
-          inbox.contents
-          ~error_msg:
-            "Content of inboxes computed by the rollup node should be equal to \
-             the contents given by the RPC"
-          (list string)) ;
-      Check.(
-        ( = )
-          node_inbox_head.contents
-          node_inbox_0.contents
-          ~error_msg:
-            "Content of inbox at head (%L) and level 0 (%R) are different"
-          (list string)) ;
-      let snd_batch = "tezos_tezos" in
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 3 in
+      let* node_inbox_1 = get_node_inbox ~block:"0" tx_node in
+      let*! inbox_1 = Rollup.get_inbox ~rollup ~level:0 client in
+      (* Ensure that stored inboxes on daemon's side are equivalent of
+         inboxes returned by the rpc call. *)
+      check_inbox_equality node_inbox_1 inbox_1 ;
+      let snd_batch = "tezos_l2_batch_2" in
       let*! () =
         Client.Tx_rollup.submit_batch
-          ~hooks
           ~content:snd_batch
           ~rollup
           ~src:Constant.bootstrap1.public_key_hash
@@ -223,20 +217,18 @@ let test_tx_node_store_inbox =
       in
       let* () = Client.bake_for client in
       let* _ = Node.wait_for_level node 4 in
-      let* node_inbox_head = get_node_inbox tx_node in
-      let* node_inbox_1 = get_node_inbox ~block:"1" tx_node in
-      let*! inbox = Rollup.get_inbox ~hooks ~rollup ~level:1 client in
-      (* Enusre that stored inboxes on daemon side are equivalent of inboxes
+      let* _ = Rollup_node.wait_for_tezos_level tx_node 4 in
+      let* node_inbox_2 = get_node_inbox ~block:"1" tx_node in
+      let*! inbox_2 = Rollup.get_inbox ~rollup ~level:1 client in
+      (* Ensure that stored inboxes on daemon side are equivalent of inboxes
          returned by the rpc call. *)
-      assert (Int.equal node_inbox_head.cumulated_size inbox.cumulated_size) ;
-      assert (List.equal String.equal node_inbox_head.contents inbox.contents) ;
-      Check.(
-        ( = )
-          node_inbox_head.contents
-          node_inbox_1.contents
-          ~error_msg:
-            "Content of inbox at head (%L) and level 1 (%R) are different"
-          (list string)) ;
+      check_inbox_equality node_inbox_2 inbox_2 ;
+      (* Stop the node and try to get the inbox once again*)
+      let* () = Rollup_node.terminate tx_node in
+      let* () = Rollup_node.run tx_node in
+      let* () = Rollup_node.wait_for_ready tx_node in
+      let*! inbox_after_restart = Rollup.get_inbox ~rollup ~level:1 client in
+      check_inbox_equality node_inbox_2 inbox_after_restart ;
       unit)
 
 let register ~protocols =
