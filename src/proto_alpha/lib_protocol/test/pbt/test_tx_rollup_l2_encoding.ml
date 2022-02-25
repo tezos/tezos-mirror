@@ -35,6 +35,7 @@ open Lib_test
 open Lib_test.Qcheck2_helpers
 open Protocol.Indexable
 open Protocol.Tx_rollup_l2_batch
+open Protocol.Tx_rollup_l2_apply
 
 (* ------ generators and compact encodings ---------------------------------- *)
 
@@ -53,6 +54,10 @@ let signer_gen : Signer_indexable.either QCheck2.Gen.t =
   let* choice = bool in
   if choice then (fun pk -> from_value pk) <$> bls_pk_gen
   else (fun x -> from_index_exn x) <$> ui32
+
+let signer_index_gen : Signer_indexable.index QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  (fun x -> Protocol.Indexable.index_exn x) <$> ui32
 
 let l2_address_gen =
   let open QCheck2.Gen in
@@ -114,6 +119,85 @@ let v1_batch =
 let batch =
   let open QCheck2.Gen in
   (fun batch -> V1 batch) <$> v1_batch
+
+let indexes_gen =
+  let open QCheck2.Gen in
+  let ticket_hash_gen =
+    match Tx_rollup_l2_helpers.gen_n_ticket_hash 1 with
+    | [ticket] -> pure ticket
+    | _ -> assert false
+  in
+  let* addresses =
+    small_list (pair l2_address_gen (map Protocol.Indexable.index_exn ui32))
+  in
+  let+ tickets =
+    small_list (pair ticket_hash_gen (map Protocol.Indexable.index_exn ui32))
+  in
+  let address_indexes : address_indexes =
+    Protocol.Tx_rollup_l2_apply.Internal_for_tests.address_indexes_of_list
+      addresses
+  in
+  let ticket_indexes : ticket_indexes =
+    Protocol.Tx_rollup_l2_apply.Internal_for_tests.ticket_indexes_of_list
+      tickets
+  in
+  {address_indexes; ticket_indexes}
+
+let deposit_result_gen =
+  let open QCheck2.Gen in
+  let open Message_result in
+  let success =
+    let+ indexes = indexes_gen in
+    Deposit_success indexes
+  in
+  (* We do no test here the encodings for every errors *)
+  let failure =
+    let error = Protocol.Tx_rollup_l2_apply.Incorrect_aggregated_signature in
+    pure (Deposit_failure error)
+  in
+  let+ result = oneof [success; failure] in
+  Deposit_result result
+
+(** This is a particular transaction generator, the signers are provided
+    with indexes only. *)
+let v1_transaction_index_signer_gen :
+    (index_only, unknown) V1.transaction QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let operation_signer_index_gen =
+    let+ signer = signer_index_gen
+    and+ counter = Int64.of_int <$> int
+    and+ contents = small_list v1_operation_content_gen in
+    V1.{signer; counter; contents}
+  in
+  small_list operation_signer_index_gen
+
+let transaction_result_gen =
+  let open QCheck2.Gen in
+  let open Message_result in
+  let success = pure Transaction_success in
+  let failure =
+    let reason = Protocol.Tx_rollup_l2_apply.Incorrect_aggregated_signature in
+    let+ index = small_nat in
+    Transaction_failure {index; reason}
+  in
+  oneof [success; failure]
+
+let batch_v1_result_gen : Message_result.Batch_V1.t QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let* results =
+    small_list (pair v1_transaction_index_signer_gen transaction_result_gen)
+  in
+  let+ indexes = indexes_gen in
+  Message_result.Batch_V1.Batch_result {results; indexes}
+
+let message_result : Message_result.t QCheck2.Gen.t =
+  let open QCheck2.Gen in
+  let open Message_result in
+  let batch_v1_result_gen =
+    let+ result = batch_v1_result_gen in
+    Batch_V1_result result
+  in
+  frequency [(2, deposit_result_gen); (8, batch_v1_result_gen)]
 
 let pp fmt _ = Format.fprintf fmt "{}"
 
@@ -191,5 +275,12 @@ let () =
               ( = )
               pp
               Protocol.Tx_rollup_l2_batch.encoding;
+            test_roundtrip
+              ~count:1_000
+              "message_result"
+              message_result
+              ( = )
+              pp
+              Protocol.Tx_rollup_l2_apply.Message_result.encoding;
           ] );
     ]
