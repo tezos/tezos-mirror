@@ -59,3 +59,6 @@ val config_init : t -> string -> string -> string Lwt.t
 
 (** [run node] launches the given transaction rollup node. *)
 val run : t -> unit Lwt.t
+
+(** See [Daemon.Make.terminate]. *)
+val terminate : ?kill:bool -> t -> unit Lwt.t
