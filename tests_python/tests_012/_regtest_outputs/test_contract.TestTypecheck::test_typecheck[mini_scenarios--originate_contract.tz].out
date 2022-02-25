@@ -1,0 +1,28 @@
+tests_012/test_contract.py::TestTypecheck::test_typecheck[mini_scenarios/originate_contract.tz]
+
+Well typed
+Gas remaining: 1039988.320 units remaining
+{ parameter unit ;
+  storage unit ;
+  code { DROP
+         /* [ @storage unit ] */ ;
+         UNIT
+         /* [ list operation : @storage unit ] */ ;
+         AMOUNT
+         /* [ @amount mutez : unit ] */ ;
+         NONE key_hash
+         /* [ pair (list operation) (unit @storage) ] */ ;
+         CREATE_CONTRACT
+           { parameter unit ; storage unit ; code { CDR ; NIL operation ; PAIR } }
+         /* [ operation : address ] */ ;
+         DIP { DROP
+               /* [] */ ;
+               PUSH unit Unit
+               /* [ unit ] */ ;
+               NIL operation
+               /* [ list operation : unit ] */ }
+         /* [ operation : list operation : unit ] */ ;
+         CONS
+         /* [ list operation : unit ] */ ;
+         PAIR
+         /* [ pair (list operation) unit ] */ } }
