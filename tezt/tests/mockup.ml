@@ -66,21 +66,28 @@ let transfer_data =
 let test_balances_after_transfer giver amount receiver =
   let (giver_balance_before, giver_balance_after) = giver in
   let (receiver_balance_before, receiver_balance_after) = receiver in
-  if not (giver_balance_after < giver_balance_before -. amount) then
+  if
+    not
+      Tez.(
+        to_mutez giver_balance_after
+        < to_mutez giver_balance_before - to_mutez amount)
+  then
     Test.fail
-      "Invalid balance of giver after transfer: %f (before it was %f)"
-      giver_balance_after
-      giver_balance_before ;
-  Log.info "Balance of giver after transfer is valid: %f" giver_balance_after ;
-  let receiver_expected_after = receiver_balance_before +. amount in
+      "Invalid balance of giver after transfer: %s (before it was %s)"
+      (Tez.to_string giver_balance_after)
+      (Tez.to_string giver_balance_before) ;
+  Log.info
+    "Balance of giver after transfer is valid: %s"
+    (Tez.to_string giver_balance_after) ;
+  let receiver_expected_after = Tez.(receiver_balance_before + amount) in
   if receiver_balance_after <> receiver_expected_after then
     Test.fail
-      "Invalid balance of receiver after transfer: %f (expected %f)"
-      receiver_balance_after
-      receiver_expected_after ;
+      "Invalid balance of receiver after transfer: %s (expected %s)"
+      (Tez.to_string receiver_balance_after)
+      (Tez.to_string receiver_expected_after) ;
   Log.info
-    "Balance of receiver after transfer is valid: %f"
-    receiver_balance_after
+    "Balance of receiver after transfer is valid: %s"
+    (Tez.to_string receiver_balance_after)
 
 (* Test.
    Transfer some tz and check balance changes are as expected.
@@ -109,7 +116,7 @@ let test_transfer =
   in
   test_balances_after_transfer
     (giver_balance_before, giver_balance_after)
-    (Tez.to_float amount)
+    amount
     (receiver_balance_before, receiver_balance_after) ;
   return ()
 
@@ -335,16 +342,16 @@ let test_multiple_baking =
       let* alice_balance = Client.get_balance_for ~account:alice client in
       let* bob_balance = Client.get_balance_for ~account:bob client in
       Log.info
-        "%d. Balances\n  - Alice :: %f\n  - Bob ::   %f"
+        "%d. Balances\n  - Alice :: %s\n  - Bob ::   %s"
         i
-        alice_balance
-        bob_balance ;
+        (Tez.to_string alice_balance)
+        (Tez.to_string bob_balance) ;
       if alice_balance <> bob_balance then
         Test.fail
-          "Unexpected balances for Alice (%f) and Bob (%f). They should be \
+          "Unexpected balances for Alice (%s) and Bob (%s). They should be \
            equal."
-          alice_balance
-          bob_balance ;
+          (Tez.to_string alice_balance)
+          (Tez.to_string bob_balance) ;
       return ())
     (range 1 10)
 
@@ -461,7 +468,7 @@ let test_migration_transfer ?migration_spec () =
       in
       test_balances_after_transfer
         (giver_balance_before, giver_balance_after)
-        (Tez.to_float amount)
+        amount
         (receiver_balance_before, receiver_balance_after) ;
       return ())
     ~info:"transfer"

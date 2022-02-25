@@ -61,3 +61,26 @@ let to_float amount = Float.mul (Int64.to_float amount) 0.000_001
 let to_mutez amount = Int64.to_int amount
 
 let ( + ) = Int64.add
+
+let parse_floating tez_string =
+  let re = rex "(\\d+)\\.?(\\d*)" in
+  let fail () = Test.fail "Invalid tez value: '%s'." tez_string in
+  let parse_int s =
+    match int_of_string_opt s with None -> fail () | Some i -> i
+  in
+  let (integral, decimal) =
+    match tez_string =~** re with None -> fail () | Some (i, d) -> (i, d)
+  in
+  let integral = parse_int integral in
+  let decimal =
+    match String.length decimal with
+    | 0 -> 0
+    | 1 -> 100_000 * parse_int decimal
+    | 2 -> 10_000 * parse_int decimal
+    | 3 -> 1_000 * parse_int decimal
+    | 4 -> 100 * parse_int decimal
+    | 5 -> 10 * parse_int decimal
+    | 6 -> parse_int decimal
+    | _ -> fail ()
+  in
+  of_int integral + of_mutez_int decimal
