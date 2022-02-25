@@ -23,14 +23,36 @@
 (*                                                                           *)
 (*****************************************************************************)
 
-type t
+module Worker : sig
+  type t
 
-val declare :
-  label_names:string list ->
-  namespace:string ->
-  ?subsystem:string ->
-  unit ->
-  string list ->
-  t
+  val update : t -> Worker_types.request_status -> unit
+end
 
-val update : t -> Worker_types.request_status -> unit
+module Block_validator : sig
+  type t = {
+    already_commited_blocks_count : Prometheus.Counter.t;
+    outdated_blocks_count : Prometheus.Counter.t;
+    validated_blocks_count : Prometheus.Counter.t;
+    validation_errors_count : Prometheus.Counter.t;
+    preapplied_blocks_count : Prometheus.Counter.t;
+    preapplication_errors_count : Prometheus.Counter.t;
+    validation_errors_after_precheck_count : Prometheus.Counter.t;
+    precheck_failed_count : Prometheus.Counter.t;
+    validation_worker_metrics : Worker.t;
+  }
+
+  val init : string trace -> t
+end
+
+module Chain_validator : sig
+  type t = {
+    head_level : Prometheus.Gauge.t;
+    ignored_head_count : Prometheus.Counter.t;
+    branch_switch_count : Prometheus.Counter.t;
+    head_increment_count : Prometheus.Counter.t;
+    validation_worker_metrics : Worker.t;
+  }
+
+  val init : string trace -> Chain_id.t -> t
+end
