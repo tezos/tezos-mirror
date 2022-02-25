@@ -165,6 +165,8 @@ class TestAllPerBlockVotes:
         filename = "tests_alpha/per_block_vote_files/invalid.json"
         run_invalid_file_test(sandbox, filename, 'pass')
 
+    # Tests that using booleans (which was possible until Ithaca) is
+    # not possible anymore.
     def test_true_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/true.json"
         run_wrong_content_file_test(sandbox, filename, 'pass')
