@@ -582,6 +582,15 @@ let test_set_version_hash_tzresult {idx; block2; _} =
     (* Only version 0 is supported atm *)
     [1; 2; 256]
 
+let test_to_memory_tree {idx; block2; _} : unit Lwt.t =
+  let open Lwt_syntax in
+  let* ctxt = Context.checkout_exn idx block2 in
+  let* tree = Context.to_memory_tree ctxt ["a"; "b"] in
+  let () = Assert.equal_bool true (Option.is_some tree) in
+  let* tree = Context.to_memory_tree ctxt ["a"; "x"] in
+  let () = Assert.equal_bool true (Option.is_none tree) in
+  return_unit
+
 (******************************************************************************)
 
 let tests : (string * (t -> unit Lwt.t)) list =
@@ -601,6 +610,7 @@ let tests : (string * (t -> unit Lwt.t)) list =
     ("encoding", test_encoding);
     ("get_hash_version", test_get_version_hash);
     ("set_hash_version_tzresult", test_set_version_hash_tzresult);
+    ("to_memory_tree", test_to_memory_tree);
   ]
 
 let tests =

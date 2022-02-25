@@ -384,6 +384,26 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
         let+ res = List.fold_left_s f String.Map.empty kvs in
         Block_services.Dir res
 
+  let tree_to_memory_tree (tree : tree) :
+      Tezos_context_memory.Context.tree Lwt.t =
+    let contents path bytes acc =
+      Tezos_context_memory.Context.Tree.add acc path bytes
+    in
+    Store.Tree.fold
+      ~force:`True
+      ~order:`Undefined
+      ~cache:false
+      ~uniq:`False
+      ~contents
+      tree
+      Tezos_context_memory.Context.(Tree.empty empty)
+
+  let to_memory_tree (ctxt : t) (key : string list) :
+      Tezos_context_memory.Context.tree option Lwt.t =
+    let open Lwt_syntax in
+    let* ctxt_tree = find_tree ctxt key in
+    Option.map_s tree_to_memory_tree ctxt_tree
+
   let merkle_hash tree =
     let merkle_hash_kind =
       match Store.Tree.destruct tree with

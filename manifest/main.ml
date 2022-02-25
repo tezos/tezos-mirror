@@ -1348,6 +1348,7 @@ let tezos_context =
         tezos_context_sigs;
         tezos_context_helpers;
         tezos_context_encoding;
+        tezos_context_memory;
       ]
 
 let _tezos_context_tests =
