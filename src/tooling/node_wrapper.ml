@@ -1,13 +1,17 @@
 module Lib = struct
   type version = string
 
-  type t = Hacl | Secp256k1
+  type t = Hacl | Secp256k1 | Bls12_381
 
-  let to_string = function Hacl -> "hacl" | Secp256k1 -> "secp256k1"
+  let to_string = function
+    | Hacl -> "hacl"
+    | Secp256k1 -> "secp256k1"
+    | Bls12_381 -> "bls12_381"
 
   let to_js_lib = function
     | Hacl -> "hacl-wasm"
     | Secp256k1 -> "@nomadic-labs/secp256k1wasm"
+    | Bls12_381 -> "@dannywillems/ocaml-bls12-381"
 
   let to_load_ident x = Printf.sprintf "load_%s" (to_string x)
 
@@ -43,6 +47,18 @@ function %s() {
 |}
           load_ident
           js_lib
+    | Bls12_381 ->
+        Printf.sprintf
+          {|
+function %s() {
+  var loader = require('%s');
+  return loader().then(function(loaded) {
+    console.log('bls12-381 loaded');
+    global._BLS12381 = loaded})
+}
+           |}
+          load_ident
+          js_lib
 end
 
 let files = ref []
@@ -58,6 +74,9 @@ let () =
       ( "--secp256k1",
         Unit (fun () -> libs := Lib.Secp256k1 :: !libs),
         "Load @nomadic-labs/secp256k1wasm" );
+      ( "--bls12-381",
+        Unit (fun () -> libs := Lib.Bls12_381 :: !libs),
+        "Load @dannywillems/ocaml-bls12-381" );
       ( "--",
         Rest_all (fun l -> args := List.rev_append l !args),
         "args to pass to the scripts" );

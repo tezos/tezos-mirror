@@ -30,6 +30,8 @@ module Node_wrapper_flags = struct
   let secp256k1 = ["--secp256k1"]
 
   let hacl = ["--hacl"]
+
+  let bls12_381 = ["--bls12-381"]
 end
 (* EXTERNAL LIBS *)
 
@@ -47,7 +49,11 @@ let bigstringaf =
 let bisect_ppx = opam_only "bisect_ppx" V.(at_least "2.7.0")
 
 let bls12_381 =
-  external_lib "bls12-381" V.(at_least "3.0.0" && less_than "3.1.0")
+  external_lib
+    ~js_compatible:true
+    ~node_wrapper_flags:Node_wrapper_flags.bls12_381
+    "bls12-381"
+    V.(at_least "3.0.0" && less_than "3.1.0")
 
 let bls12_381_legacy = external_lib "bls12-381-legacy" V.True
 
