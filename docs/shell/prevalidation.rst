@@ -25,6 +25,14 @@ The prevalidator aims to protect the network against DDoS attacks.
 Consequently, it has to decide which operations are broadcast, and
 which ones are kept in its bounded memory.
 
+The following diagram shows the lifecycle of an operation through the
+prevalidator from its arrival or injection to its advertising and
+classification.
+
+.. figure:: images/diagram_prevalidator.svg
+   :alt: prevalidator diagram
+
+   Lifecycle of an operation, including entry points, states, and processing steps
 
 Prevalidator filtering mechanisms
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
