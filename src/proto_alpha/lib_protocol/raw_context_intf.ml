@@ -294,7 +294,6 @@ module type PROOF = sig
       [{length=l; segment = [i_0;..;i_n]; proof=p}] sharing the same lenght [l]
       and final proof [p]. *)
   type 'a inode_extender = {length : int; segment : index list; proof : 'a}
-  [@@deriving irmin]
 
   (** The type for compressed and partial Merkle tree proofs.
 
