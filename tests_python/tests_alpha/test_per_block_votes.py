@@ -17,7 +17,7 @@ MINIMAL_BLOCK_DELAY = 2
 SLEEP = 2 * MINIMAL_BLOCK_DELAY
 
 
-def run_vote_file(sandbox: Sandbox, filename: str) -> None:
+def run_vote_file(sandbox: Sandbox, filename: str, default_vote: str) -> None:
     sandbox.rm_baker(0, proto=protocol.DAEMON)
     sandbox.add_baker(
         0,
@@ -27,7 +27,7 @@ def run_vote_file(sandbox: Sandbox, filename: str) -> None:
             "--votefile",
             filename,
             '--liquidity-baking-toggle-vote',
-            'pass',
+            default_vote,
         ],
     )
     if not sandbox.log_dir:
@@ -43,8 +43,24 @@ def check_baker_logs(sandbox: Sandbox, pattern: str) -> bool:
     return utils.check_logs(logs, pattern)
 
 
-def run_vote_file_test(sandbox: Sandbox, filename: str) -> None:
-    run_vote_file(sandbox, filename)
+def get_what_the_baker_votes_from_its_logs(sandbox: Sandbox) -> str:
+    if not check_baker_logs(
+        sandbox, 'Voting on for liquidity baking toggle vote'
+    ):
+        return 'on'
+    if not check_baker_logs(
+        sandbox, 'Voting off for liquidity baking toggle vote'
+    ):
+        return 'off'
+    if not check_baker_logs(
+        sandbox, 'Voting pass for liquidity baking toggle vote'
+    ):
+        return 'pass'
+    return 'error'
+
+
+def run_vote_file_test(sandbox: Sandbox, filename: str, default_vote) -> str:
+    run_vote_file(sandbox, filename, default_vote)
     assert check_baker_logs(
         sandbox,
         (
@@ -58,37 +74,39 @@ def run_vote_file_test(sandbox: Sandbox, filename: str) -> None:
             f'"{filename}" is a valid JSON file but its content is unexpected.'
         ),
     )
+    return get_what_the_baker_votes_from_its_logs(sandbox)
 
 
 def run_vote_file_test_error(
-    sandbox: Sandbox, filename: str, error_pattern: str
+    sandbox: Sandbox, filename: str, error_pattern: str, default_vote: str
 ) -> None:
-    run_vote_file(sandbox, filename)
+    run_vote_file(sandbox, filename, default_vote)
     assert not check_baker_logs(sandbox, error_pattern)
+    assert get_what_the_baker_votes_from_its_logs(sandbox) == default_vote
 
 
-def run_nonexistent_file_test(sandbox, filename):
+def run_nonexistent_file_test(sandbox, filename, default_vote):
     error_pattern = (
         r'The provided block vote file path '
         f'"{filename}" does not point to an existing file.'
     )
-    run_vote_file_test_error(sandbox, filename, error_pattern)
+    run_vote_file_test_error(sandbox, filename, error_pattern, default_vote)
 
 
-def run_invalid_file_test(sandbox, filename):
+def run_invalid_file_test(sandbox, filename, default_vote):
     error_pattern = (
         r'The provided block vote file path '
         f'"{filename}" does not point to a valid JSON file.'
     )
-    run_vote_file_test_error(sandbox, filename, error_pattern)
+    run_vote_file_test_error(sandbox, filename, error_pattern, default_vote)
 
 
-def run_wrong_content_file_test(sandbox, filename):
+def run_wrong_content_file_test(sandbox, filename, default_vote):
     error_pattern = (
         r'The provided block vote file '
         f'"{filename}" is a valid JSON file but its content is unexpected.'
     )
-    run_vote_file_test_error(sandbox, filename, error_pattern)
+    run_vote_file_test_error(sandbox, filename, error_pattern, default_vote)
 
 
 @pytest.fixture(scope="class")
@@ -129,36 +147,36 @@ class TestAllPerBlockVotes:
 
     def test_on_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/on.json"
-        run_vote_file_test(sandbox, filename)
+        assert run_vote_file_test(sandbox, filename, 'off') == 'on'
 
     def test_off_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/off.json"
-        run_vote_file_test(sandbox, filename)
+        assert run_vote_file_test(sandbox, filename, 'on') == 'off'
 
     def test_pass_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/pass.json"
-        run_vote_file_test(sandbox, filename)
+        assert run_vote_file_test(sandbox, filename, 'on') == 'pass'
 
     def test_nonexistent_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/nonexistant.json"
-        run_nonexistent_file_test(sandbox, filename)
+        run_nonexistent_file_test(sandbox, filename, 'pass')
 
     def test_invalid_json(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/invalid.json"
-        run_invalid_file_test(sandbox, filename)
+        run_invalid_file_test(sandbox, filename, 'pass')
 
     def test_true_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/true.json"
-        run_wrong_content_file_test(sandbox, filename)
+        run_wrong_content_file_test(sandbox, filename, 'pass')
 
     def test_false_vote_file(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/false.json"
-        run_wrong_content_file_test(sandbox, filename)
+        run_wrong_content_file_test(sandbox, filename, 'pass')
 
     def test_nonboolean(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/non_boolean.json"
-        run_wrong_content_file_test(sandbox, filename)
+        run_wrong_content_file_test(sandbox, filename, 'pass')
 
     def test_wrong_key(self, sandbox: Sandbox):
         filename = "tests_alpha/per_block_vote_files/wrong_key.json"
-        run_wrong_content_file_test(sandbox, filename)
+        run_wrong_content_file_test(sandbox, filename, 'pass')
