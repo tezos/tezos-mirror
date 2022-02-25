@@ -32,10 +32,17 @@ def run_vote_file(sandbox: Sandbox, filename: str) -> None:
     assert sandbox.logs
 
 
+def check_baker_logs(sandbox: Sandbox, pattern: str) -> bool:
+    baker_logs = sandbox.bakers[protocol.DAEMON][0].log_file
+    assert baker_logs
+    logs = [baker_logs]
+    return utils.check_logs(logs, pattern)
+
+
 def run_vote_file_test(sandbox: Sandbox, filename: str) -> None:
     run_vote_file(sandbox, filename)
-    assert utils.check_logs(
-        sandbox.logs,
+    assert check_baker_logs(
+        sandbox,
         (
             r'The provided block vote file path '
             f'"{filename}" does not point to an existing file.'
@@ -53,7 +60,7 @@ def run_vote_file_test_error(
     sandbox: Sandbox, filename: str, error_pattern: str
 ) -> None:
     run_vote_file(sandbox, filename)
-    assert not utils.check_logs(sandbox.logs, error_pattern)
+    assert not check_baker_logs(sandbox, error_pattern)
 
 
 def run_nonexistent_file_test(sandbox, filename):
