@@ -4193,7 +4193,8 @@ let _tezos_tps_evaluation =
     ~release:false
 
 (* For now we don't generate:
-   - protocol files (that's a TODO);
+   - lib_protocol files (that's a TODO);
+   - proto_/parameters/dune (it only has a (copy_files) stanza);
    - lib_time_measurement (its dune structure is *very* specific);
    - src/lib_protocol_compiler/test/dune (it does not define any library,
      executable or test stanza, it only defines aliases).
@@ -4201,7 +4202,19 @@ let _tezos_tps_evaluation =
    Note that [filename] is relative to the manifest directory,
    i.e. it starts with "../". *)
 let exclude filename =
-  has_prefix ~prefix:"../src/proto_" filename
+  let is_in_lib_protocol =
+    match String.split_on_char '/' filename with
+    | ".." :: "src" :: maybe_proto :: "lib_protocol" :: _ ->
+        has_prefix ~prefix:"proto_" maybe_proto
+    | _ -> false
+  in
+  let is_protocol_parameters =
+    match String.split_on_char '/' filename with
+    | ".." :: "src" :: maybe_proto :: "parameters" :: _ ->
+        has_prefix ~prefix:"proto_" maybe_proto
+    | _ -> false
+  in
+  is_in_lib_protocol || is_protocol_parameters
   || has_prefix ~prefix:"../src/lib_time_measurement/" filename
   ||
   match filename with
