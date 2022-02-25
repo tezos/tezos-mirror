@@ -25,13 +25,19 @@
 
 (* ---- Constants ----------------------------------------------------------- *)
 
-let max_uint8_l = Int32.of_int (Binary_size.max_int `Uint8)
+let max_uint8 = Binary_size.max_int `Uint8
 
-let max_uint16_l = Int32.of_int (Binary_size.max_int `Uint16)
+let max_uint16 = Binary_size.max_int `Uint16
 
-let max_uint8_L = Int64.of_int32 max_uint8_l
+let max_uint8_l = Int32.of_int max_uint8
 
-let max_uint16_L = Int64.of_int32 max_uint16_l
+let max_uint16_l = Int32.of_int max_uint16
+
+let max_uint8_L = Int64.of_int max_uint8
+
+let max_uint16_L = Int64.of_int max_uint16
+
+let max_uint32 = Int32.(to_int max_int)
 
 let max_uint32_L = 0xFFFF_FFFFL
 
@@ -404,11 +410,11 @@ let payload : type a. a Encoding.t -> a t =
 
     let tag_len = 0
 
-    let tag _ = 0
+    let tag () = 0
 
-    let classify _ = ()
+    let classify (_ : input) = ()
 
-    let partial_encoding _ = encoding
+    let partial_encoding () = encoding
 
     let json_encoding = encoding
   end)
@@ -1172,7 +1178,7 @@ let field_to_inner_compact : type a b. (a, b) field_open -> b t = function
   | Req f1 -> f1.compact
   | Opt f1 -> option f1.compact
 
-type 'a field = Field : ('b, 'a) field_open -> 'a field
+type 'a field = Field : ('b, 'a) field_open -> 'a field [@@unboxed]
 
 let field_to_data_encoding_open :
     type a b. (a, b) field_open -> b Encoding.field = function
@@ -1566,13 +1572,24 @@ let int32_cases =
       (fun i ->
         if max_uint8_l < i && i <= max_uint16_l then Some (Int32.to_int i)
         else None)
-      (fun i -> Int32.of_int i);
+      (fun i ->
+        if i <= max_uint8 then
+          raise
+            (Binary_error_types.Read_error
+               (Invalid_int {min = max_uint8 + 1; v = i; max = max_uint16})) ;
+        let r = Int32.of_int i in
+        r);
     case
       ~title:"big"
       ~description:"An int32 which doesn't fit within a uint16"
       (payload Encoding.int32)
       (fun i -> if max_uint16_l < i || i < 0l then Some i else None)
-      (fun i -> i);
+      (fun i ->
+        if 0l <= i && i <= max_uint16_l then
+          raise
+            (Binary_error_types.Read_error
+               (Invalid_int {min = max_uint16 + 1; v = Int32.to_int i; max = 0})) ;
+        i);
   ]
 
 let int32 = union ~union_tag_bits:2 ~cases_tag_bits:0 int32_cases
@@ -1596,7 +1613,12 @@ let int64 =
         (fun i ->
           if max_uint8_L < i && i <= max_uint16_L then Some (Int64.to_int i)
           else None)
-        (fun i -> Int64.of_int i);
+        (fun i ->
+          if i <= max_uint8 then
+            raise
+              (Binary_error_types.Read_error
+                 (Invalid_int {min = max_uint8 + 1; v = i; max = max_uint16})) ;
+          Int64.of_int i);
       case
         ~title:"biggish"
         ~description:"An int64 which fits within a uint32"
@@ -1604,13 +1626,26 @@ let int64 =
         (fun i ->
           if max_uint16_L < i && i <= max_uint32_L then Some (Int64.to_int32 i)
           else None)
-        (fun x -> Int64.(logand 0xFFFF_FFFFL (of_int32 x)));
+        (fun x ->
+          let r = Int64.(logand 0xFFFF_FFFFL (of_int32 x)) in
+          if r <= max_uint16_L then
+            raise
+              (Binary_error_types.Read_error
+                 (Invalid_int
+                    {min = max_uint16 + 1; v = Int32.to_int x; max = max_uint32})) ;
+          r);
       case
         ~title:"bigger"
         ~description:"An int64 which doesn't fit within a uint32"
         (payload Encoding.int64)
         (fun i -> if max_uint32_L < i || i < 0L then Some i else None)
-        (fun i -> i);
+        (fun i ->
+          if 0L <= i && i <= max_uint32_L then
+            raise
+              (Binary_error_types.Read_error
+                 (Invalid_int
+                    {min = max_uint32 + 1; v = Int64.to_int i; max = 0})) ;
+          i);
     ]
 
 module Compact_list = struct
