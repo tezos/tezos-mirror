@@ -36,7 +36,7 @@ module Conf = struct
 end
 
 module Kv = struct
-  open Irmin_pack.KV (Conf)
+  open Irmin_pack_unix.KV (Conf)
 
   include Make (Irmin.Contents.String)
 end

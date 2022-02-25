@@ -3,6 +3,7 @@
  (package tezos-protocol-plugin-alpha-tests)
  (libraries tezos-base
             tezos-base-test-helpers
+            tezos-base.unix
             alcotest-lwt
             tezos-test-helpers
             qcheck-alcotest

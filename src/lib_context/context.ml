@@ -159,7 +159,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
   (** Tezos - Versioned (key x value) store (over Irmin) *)
 
   module Store = struct
-    module Maker = Irmin_pack.Maker (Conf)
+    module Maker = Irmin_pack_unix.Maker (Conf)
     include Maker.Make (Schema)
     module Schema = Tezos_context_encoding.Context.Schema
   end
@@ -169,14 +169,14 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) = struct
 
   module Checks = struct
     module Maker = struct
-      module Maker = Irmin_pack.Maker (Conf)
+      module Maker = Irmin_pack_unix.Maker (Conf)
       include Maker.Make (Schema)
     end
 
-    module Pack : Irmin_pack.Checks.S = Irmin_pack.Checks.Make (Maker)
+    module Pack : Irmin_pack_unix.Checks.S = Irmin_pack_unix.Checks.Make (Maker)
 
     module Index = struct
-      module I = Irmin_pack.Index.Make (Hash)
+      module I = Irmin_pack_unix.Index.Make (Hash)
       include I.Checks
     end
   end

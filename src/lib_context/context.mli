@@ -192,7 +192,7 @@ module Make (Encoding : module type of Tezos_context_encoding.Context) : sig
 
   (** Offline integrity checking and statistics for contexts. *)
   module Checks : sig
-    module Pack : Irmin_pack.Checks.S
+    module Pack : Irmin_pack_unix.Checks.S
 
     module Index : Index.Checks.S
   end
