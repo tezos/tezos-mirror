@@ -29,11 +29,20 @@ val protocol : Protocol.t
 (** The protocol constants we are using. *)
 val protocol_constants : Protocol.constants
 
-(** A list of all bootstrap accounts, excluding the activator account. *)
-val all_bootstraps : Account.key list
-
 (** The bootstrap account that is supposed to originate smart contracts. *)
 val originating_bootstrap : Account.key
 
-(** A list of delegate aliases. *)
-val delegates : string list
+(** Produce a list of delegate aliases given the total number of bootstrap accounts. *)
+val make_delegates : int -> string list
+
+(** The number of bootstrap accounts available by default. *)
+val default_bootstraps_count : int
+
+(** TPS that is used when protocol limits are lifted. This is a high enough
+    value (not yet achievable) so that we're not limited by it. This value
+    affects the total number of accounts we will need, so we cannot use a
+    ridiculously high number here. *)
+val lifted_limits_tps : int
+
+(** Safety margin for gas estimations. *)
+val gas_safety_margin : int

@@ -34,4 +34,11 @@ let all_bootstraps =
 
 let originating_bootstrap = Stdlib.List.hd all_bootstraps
 
-let delegates = List.map (fun {Account.alias; _} -> alias) all_bootstraps
+let make_delegates n =
+  Stdlib.List.init n (fun x -> Printf.sprintf "bootstrap%d" (x + 1))
+
+let default_bootstraps_count = List.length Constant.bootstrap_keys
+
+let lifted_limits_tps = 1_000
+
+let gas_safety_margin = 100

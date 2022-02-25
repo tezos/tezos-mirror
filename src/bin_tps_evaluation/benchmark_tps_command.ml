@@ -32,15 +32,13 @@ open Constants
    protocol, thus we wait till level 1 is decided, i.e. we want level 3. *)
 let benchmark_starting_level = 3
 
-(** Print out the file at [path] to the stdout. *)
-let print_out_file path =
-  let open Lwt_io in
-  let open Lwt_syntax in
-  with_file ~mode:Input path (fun ic ->
-      let* str = read ic in
-      let* () = write stdout str in
-      let* () = write stdout "\n\n" in
-      flush stdout)
+(** Look up the minimal block delay given [protocol] and [protocol_constants]. *)
+let get_minimal_block_delay protocol protocol_constants =
+  let json =
+    JSON.parse_file
+      (Protocol.parameter_file ~constants:protocol_constants protocol)
+  in
+  int_of_float JSON.(json |-> "minimal_block_delay" |> as_float)
 
 (** Get a list of hashes of the given number of most recent blocks. *)
 let get_blocks blocks_total client =
@@ -108,65 +106,27 @@ let get_total_applied_transactions_for_block block client =
   List.length (JSON.as_list json)
 
 (** The entry point of the benchmark. *)
-let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
-    ~accounts_total ~blocks_total ~average_block_path () =
+let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection ~blocks_total
+    ~average_block_path () =
   let open Lwt_syntax in
+  (* We run the gas tps estimation in a separate network first in order to
+     figure out just how many accounts we need for the benchmark. *)
+  let* gas_tps_estimation_results =
+    Gas_tps_command.estimate_gas_tps ~average_block_path ()
+  in
   Log.info "Tezos TPS benchmark" ;
   Log.info "Protocol: %s" (Protocol.name protocol) ;
-  Log.info "Total number of accounts to use: %d" accounts_total ;
   Log.info "Blocks to bake: %d" blocks_total ;
   let* parameter_file =
     Protocol.write_parameter_file
       ~base:(Either.right (protocol, Some protocol_constants))
       (if lift_protocol_limits then
        [
-         (* We're using the maximum representable number. (2 ^ 31 - 1) *)
          (["hard_gas_limit_per_block"], Some {|"2147483647"|});
          (["hard_gas_limit_per_operation"], Some {|"2147483647"|});
        ]
       else [])
   in
-  Log.info "Spinning up the network..." ;
-  (* For now we disable operations precheck, but ideally we should
-     pre-populate enough bootstrap accounts and do 1 transaction per
-     account per block. *)
-  let* (node, client) =
-    Client.init_with_protocol
-      ~nodes_args:
-        Node.
-          [
-            Connections 0;
-            Synchronisation_threshold 0;
-            Disable_operations_precheck;
-          ]
-      ~parameter_file
-      ~timestamp_delay:0.0
-      `Client
-      ~protocol
-      ()
-  in
-  let* average_block = Average_block.load average_block_path in
-  let* () = Average_block.check_for_unknown_smart_contracts average_block in
-  let* _baker = Baker.init ~protocol ~delegates node client in
-  Log.info "Originating smart contracts" ;
-  let* () =
-    Client.stresstest_originate_smart_contracts originating_bootstrap client
-  in
-  Log.info "Waiting to reach the next level" ;
-  let* _ = Node.wait_for_level node 2 in
-  (* It is important to give the chain time to include the smart contracts
-     we have originated before we run gas estimations. *)
-  let* transaction_costs = Client.stresstest_estimate_gas client in
-  let average_transaction_cost =
-    Gas.average_transaction_cost transaction_costs average_block
-  in
-  Log.info "Average transaction cost: %d" average_transaction_cost ;
-  Log.info "Using the parameter file: %s" parameter_file ;
-  let* () = print_out_file parameter_file in
-  Log.info "Waiting to reach level %d" benchmark_starting_level ;
-  let* _ = Node.wait_for_level node benchmark_starting_level in
-  let bench_start = Unix.gettimeofday () in
-  Log.info "The benchmark has been started" ;
   (* It is important to use a good estimate of max possible TPS that is
      theoretically achievable. If we send operations with lower TPS than
      this we risk obtaining a sub-estimated value for TPS. If we use a
@@ -176,22 +136,79 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
     match provided_tps_of_injection with
     | Some tps_value -> tps_value
     | None ->
-        (* This is a high enough value (not realistically achievable
-           by the benchmark) so we're not limited by it. *)
-        if lift_protocol_limits then max_int
+        if lift_protocol_limits then Constants.lifted_limits_tps
         else
           Gas.deduce_tps
             ~protocol
             ~protocol_constants
-            ~average_transaction_cost
+            ~average_transaction_cost:
+              gas_tps_estimation_results.average_transaction_cost
             ()
   in
+  let round0_duration = get_minimal_block_delay protocol protocol_constants in
+  (* We need as many accounts as operations in a block. *)
+  let total_bootstraps = target_tps_of_injection * round0_duration in
+  let additional_bootstrap_account_count =
+    total_bootstraps - Constants.default_bootstraps_count
+  in
+  Log.info "Accounts to use: %d" total_bootstraps ;
+  Log.info "Spinning up the network..." ;
   let (regular_transaction_fee, regular_transaction_gas_limit) =
-    Gas.deduce_fee_and_gas_limit transaction_costs.regular
+    Gas.deduce_fee_and_gas_limit
+      gas_tps_estimation_results.transaction_costs.regular
   in
   let smart_contract_parameters =
-    Gas.calculate_smart_contract_parameters average_block transaction_costs
+    Gas.calculate_smart_contract_parameters
+      gas_tps_estimation_results.average_block
+      gas_tps_estimation_results.transaction_costs
   in
+  let max_single_transaction_fee =
+    List.fold_left
+      max
+      (Tez.to_mutez regular_transaction_fee)
+      (List.map
+         (fun (_, x) -> Tez.to_mutez x.Client.invocation_fee)
+         smart_contract_parameters)
+  in
+  (* We want to give the extra bootstraps as little as possible, just enough
+     to do their job. *)
+  let default_accounts_balance =
+    (max_single_transaction_fee + Constants.gas_safety_margin) * blocks_total
+  in
+  let* (node, client) =
+    Client.init_with_protocol
+      ~nodes_args:Node.[Connections 0; Synchronisation_threshold 0]
+      ~parameter_file
+      ~timestamp_delay:0.0
+      ~additional_bootstrap_account_count
+      ~default_accounts_balance
+      `Client
+      ~protocol
+      ()
+  in
+  (* Unknown smart contracts will fail the benchmark anyway, but later and less
+     gracefully. Here we try to do it the nice way. *)
+  let* () =
+    Average_block.check_for_unknown_smart_contracts
+      gas_tps_estimation_results.average_block
+  in
+  (* Use only the default bootstraps as delegates. The baker doesn't like
+     to have tens of thousands of delegates passed to it. Luckily, if we
+     give very little Tez to the extra bootstraps, the default bootstraps will
+     dominate in terms of stake. *)
+  let delegates = make_delegates Constants.default_bootstraps_count in
+  let _baker = Baker.init ~protocol ~delegates node client in
+  Log.info "Originating smart contracts" ;
+  let* () =
+    Client.stresstest_originate_smart_contracts originating_bootstrap client
+  in
+  Log.info "Waiting to reach the next level" ;
+  let* _ = Node.wait_for_level node (benchmark_starting_level - 1) in
+  Log.info "Using the parameter file: %s" parameter_file ;
+  Log.info "Waiting to reach level %d" benchmark_starting_level ;
+  let* _ = Node.wait_for_level node benchmark_starting_level in
+  let bench_start = Unix.gettimeofday () in
+  Log.info "The benchmark has been started" ;
   let client_stresstest_process =
     Client.spawn_stresstest
       ~fee:regular_transaction_fee
@@ -202,7 +219,16 @@ let run_benchmark ~lift_protocol_limits ~provided_tps_of_injection
            new accounts along the way. We do not want that, so we set it to
            0. *)
       ~fresh_probability:0.0
+      ~single_op_per_pkh_per_block:true
       ~smart_contract_parameters
+      ~source_aliases:
+        (make_delegates Constants.default_bootstraps_count)
+        (* It is essential not to pass all accounts via aliases because every
+           alias has to be normalized and that's an extra call of the client
+           per account. This does not scale well. On the other hand, if we
+           pass Account.key list directly, the stresstest command can use it
+           right away. *)
+      ~source_accounts:(Client.additional_bootstraps client)
       client
   in
   let* _level =
@@ -276,7 +302,6 @@ let register () =
             | Some x -> Some (Some x))
           "provided_tps_of_injection"
       in
-      let accounts_total = Cli.get_int ~default:5 "accounts-total" in
       let blocks_total = Cli.get_int ~default:10 "blocks-total" in
       let average_block_path =
         Cli.get ~default:None (fun s -> Some (Some s)) "average-block"
@@ -288,7 +313,6 @@ let register () =
         run_benchmark
           ~lift_protocol_limits
           ~provided_tps_of_injection
-          ~accounts_total
           ~blocks_total
           ~average_block_path
           ()

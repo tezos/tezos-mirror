@@ -196,6 +196,18 @@ val register_key :
   string ->
   unit tzresult Lwt.t
 
+(** Similar to repeated calls to [register_key], but is more efficient.
+    Always forces addition of new elements. *)
+val register_keys :
+  #Client_context.wallet ->
+  (string
+  * Signature.Public_key_hash.t
+  * Signature.public_key
+  * pk_uri
+  * sk_uri)
+  list ->
+  unit tzresult Lwt.t
+
 val list_keys :
   #Client_context.wallet ->
   (string * Public_key_hash.t * Signature.public_key option * sk_uri option)

@@ -67,6 +67,9 @@ module type Alias = sig
   val add :
     force:bool -> #Client_context.wallet -> string -> t -> unit tzresult Lwt.t
 
+  val add_many :
+    #Client_context.wallet -> (string * t) list -> unit tzresult Lwt.t
+
   val del : #Client_context.wallet -> string -> unit tzresult Lwt.t
 
   val update : #Client_context.wallet -> string -> t -> unit tzresult Lwt.t
@@ -291,6 +294,17 @@ module Alias (Entity : Entity) = struct
           cache.list_assoc
     in
     if !keep then return_unit else update_cache wallet cache name (Some value)
+
+  let add_many (wallet : #wallet) xs =
+    let open Lwt_tzresult_syntax in
+    let* cache = get_cache wallet in
+    let map_to_add = Map.of_seq (List.to_seq xs) in
+    cache.map <- Map.union (fun _key x _existing -> Some x) map_to_add cache.map ;
+    cache.list_assoc <- List.of_seq (Map.to_seq cache.map) ;
+    let* () = wallet#write Entity.name cache.list_assoc wallet_encoding in
+    let* mtime = wallet#last_modification_time Entity.name in
+    cache.mtime <- mtime ;
+    return_unit
 
   let del (wallet : #wallet) name =
     let open Lwt_tzresult_syntax in

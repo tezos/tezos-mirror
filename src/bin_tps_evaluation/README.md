@@ -79,7 +79,7 @@ protocol parameters.
 [14:26:27.956] Reading description of the average block from src/bin_tps_evaluation/average-block.json
 [14:26:28.061] Originating smart contracts
 [14:26:28.285] Waiting to reach the next level
-[14:26:57.514] Average transaction cost: 2899
+[14:26:57.514] Average transaction cost: 2900
 [14:26:57.514] Gas TPS: 60
 [14:26:57.536] [SUCCESS] (1/1) tezos_tps_gas
 ```
@@ -93,17 +93,18 @@ instructions][long-tezts-locally]).
 
 ## Running the TPS benchmark
 
-The TPS benchmark is run with the `benchmark-tps` command. It spawns a
-network comprising a node, a baker, and a client. The network will use the
-same constants and parameters as the Mainnet. It will wait till level 3 is
-reached and after that it will run the stress test client command.
+The TPS benchmark is run with the `tezos-tps-evaluation-benchmark-tps`
+command. It spawns a network comprising a node, a baker, and a client. The
+network will use the same constants and parameters as the Mainnet. It will
+wait till level 3 is reached and after that it will run the stress test
+client command.
 
 The TPS parameter that is passed to the stress test command (we call this
 **target TPS of injection**) depends on the presence of the
 `-a lift-protocol-limits` flag:
 
-* If `-a lift-protocol-limits` is passed, an arbitrary big value is passed,
-  so that stress test will inject as fast as possible.
+* If `-a lift-protocol-limits` is passed, a high enough value is passed, so
+  that stress test will inject as fast as possible.
 * If no `-a lift-protocol-limits` is passed, TPS computed from gas (see the
   previous section for details) will be used as the target TPS of injection.
 
@@ -139,133 +140,48 @@ Right now, the empirical TPS value is an intermediate result. We need to
 address the following problems before we can consider the result
 trustworthy:
 
-* Over 60% of transactions on Mainnet are smart contract calls. We need to
-  add support for more smart contract calls to the benchmark.
-
-* We should enable the mempool pre-check to be closer to the behavior of the
-  system in the real world. Another reason to add support for the mempool
-  pre-check is that currently when there is a mix of transactions to both
-  implicit contracts and smart contracts they are not ordered in the mempool
-  correctly so when the time comes to apply these transactions a
-  considerable part of them will be applied out of order and so with
-  incorrect counters. This will make the validating function reject these
-  transactions and will lead to a lower TPS.
-
 * There is usually a small gap between the target TPS of injection and the
   de facto TPS of injection (see [issue 2414][issue-2414]). It is worth
-  investigating this and trying to close the gap, however only after support
-  for the mempool pre-check is implemented, because that work will likely
-  result in a significant change in how stress test works and might fix this
-  issue for us.
+  investigating this and trying to close the gap.
 
 ### Example usage
 
 ```
-./tezos-tps-evaluation-benchmark-tps -a average-block=src/bin_tps_evaluation/average_block.json -a lift-protocol-limits
-[12:20:57.387] Tezos TPS benchmark
-[12:20:57.387] Protocol: Alpha
-[12:20:57.387] Total number of accounts to use: 5
-[12:20:57.387] Blocks to bake: 10
-[12:20:57.387] Spinning up the network...
-[12:21:00.039] Reading description of the average block from src/bin_tps_evaluation/average-block.json
-[12:21:00.162] Originating smart contracts
-[12:21:00.374] Waiting to reach the next level
-[12:21:29.529] Average transaction cost: 2899
-[12:21:29.529] Using the parameter file: /run/user/1000/tezt-27422/1/parameters.json
-{
-  "bootstrap_accounts": [
-    [
-      "edpkuBknW28nW72KG6RoHtYW7p12T6GKc7nAbwYX5m8Wd9sDVC9yav",
-      "4000000000000"
-    ],
-    [
-      "edpktzNbDAUjUk697W7gYg2CRuBQjyPxbEg8dLccYYwKSKvkPvjtV9",
-      "4000000000000"
-    ],
-    [
-      "edpkuTXkJDGcFd5nh6VvMz8phXxU3Bi7h6hqgywNFi1vZTfQNnS1RV",
-      "4000000000000"
-    ],
-    [
-      "edpkuFrRoDSEbJYgxRtLx2ps82UdaYc1WwfS9sE11yhauZt5DgCHbU",
-      "4000000000000"
-    ],
-    [
-      "edpkv8EUUH68jmo3f7Um5PezmfGrRF24gnfLpH3sVNwJnV5bVCxL2n",
-      "4000000000000"
-    ]
-  ],
-  "preserved_cycles": 5,
-  "blocks_per_cycle": 8192,
-  "blocks_per_commitment": 64,
-  "blocks_per_stake_snapshot": 512,
-  "cycles_per_voting_period": 5,
-  "hard_gas_limit_per_operation": "2147483647",
-  "hard_gas_limit_per_block": "2147483647",
-  "proof_of_work_threshold": "70368744177663",
-  "tokens_per_roll": "6000000000",
-  "seed_nonce_revelation_tip": "125000",
-  "origination_size": 257,
-  "baking_reward_fixed_portion": "10000000",
-  "baking_reward_bonus_per_slot": "4286",
-  "endorsing_reward_per_slot": "2857",
-  "cost_per_byte": "250",
-  "hard_storage_limit_per_operation": "60000",
-  "quorum_min": 2000,
-  "quorum_max": 7000,
-  "min_proposal_quorum": 500,
-  "liquidity_baking_subsidy": "2500000",
-  "liquidity_baking_sunset_level": 3063809,
-  "liquidity_baking_toggle_ema_threshold": 1000000000,
-  "max_operations_time_to_live": 120,
-  "minimal_block_delay": "30",
-  "delay_increment_per_round": "15",
-  "consensus_committee_size": 7000,
-  "consensus_threshold": 4667,
-  "minimal_participation_ratio": {
-    "numerator": 2,
-    "denominator": 3
-  },
-  "max_slashing_period": 2,
-  "frozen_deposits_percentage": 10,
-  "double_baking_punishment": "640000000",
-  "ratio_of_frozen_deposits_slashed_per_double_endorsement": {
-    "numerator": 1,
-    "denominator": 2
-  },
-  "cache_script_size": 100000000,
-  "cache_stake_distribution_cycles": 8,
-  "cache_sampler_state_cycles": 8,
-  "tx_rollup_enable": false,
-  "tx_rollup_origination_size": 60000,
-  "tx_rollup_hard_size_limit_per_inbox": 100000,
-  "tx_rollup_hard_size_limit_per_message": 5000,
-  "tx_rollup_commitment_bond": "10000000000",
-  "tx_rollup_finality_period": 2000,
-  "tx_rollup_max_unfinalized_levels": 2100,
-  "sc_rollup_enable": false,
-  "sc_rollup_origination_size": 6314
-}
-
-[12:21:29.529] Waiting to reach level 3
-[12:21:59.188] The benchmark has been started
-[12:27:01.356] Produced 10 block(s) in 302.17 seconds
-[12:27:01.959] BMTfY86i2G9iWfrQ395Coprc4Ji2P2duVKpoS1rjYzzgp27qruE -> 2014
-[12:27:02.195] BLgrwkXPzHVuXYNJV3b5o4nk5VizjGD67XG1WJh4zdxwicTBV85 -> 57
-[12:27:02.456] BLVTPZqLyq9iH4v5bZykvwEPdM5ToUG8h3iZVVcJAiuVnrdRqGH -> 2086
-[12:27:02.745] BKorq793VjQc2QULXonkLUiSWNx8A2FutEUNjFoFeJQEUeDswds -> 3791
-[12:27:02.989] BMURSqymubCeQ4tf893t8AnTcRvnUBVZ9AHzGAaindM1FKnvZVx -> 1377
-[12:27:03.223] BL4gsjMVnv96gZgvdqWA9sewTprNbB2cTYFSVnqM7v1yFpYbHv8 -> 1463
-[12:27:03.463] BLA71V1YeaXTrqtximFwf5mqjJzUhbGwNBJyFWsHVoQBK2efH4k -> 1794
-[12:27:03.675] BLMwr2nwYtm1Brmf53o2k4ZrDPmVTanUtVqmxnfZ75zguZ6rUX6 -> 125
-[12:27:03.980] BMJFTH9ye7FNvmwzgnrx5ZzUYokMHLsb3S9ChtLLdCPnvTRUCFJ -> 1791
-[12:27:04.227] BKxbmXuJf5TgtyhCGdtsRoJBxrdCDqnVvvEeuvNtYmE4PPe2zV2 -> 1656
-[12:27:04.227] Total applied transactions: 16154
-[12:27:04.227] Total injected transactions: 86111
-[12:27:04.227] TPS of injection (target): 4611686018427387903
-[12:27:04.227] TPS of injection (de facto): 284.98
-[12:27:04.227] Empirical TPS: 53.46
-[12:27:04.252] [SUCCESS] (1/1) tezos_tps_benchmark
+./tezos-tps-evaluation-benchmark-tps -a average-block=src/bin_tps_evaluation/average-block.json -a lift-protocol-limits
+[20:42:19.167] Starting test: tezos_tps_benchmark
+[20:42:19.167] Gas TPS estimation
+[20:42:21.761] Reading description of the average block from src/bin_tps_evaluation/average-block.json
+[20:42:21.858] Originating smart contracts
+[20:42:22.082] Waiting to reach the next level
+[20:42:51.262] Average transaction cost: 2900
+[20:42:51.262] Gas TPS: 60
+[20:42:51.293] Tezos TPS benchmark
+[20:42:51.293] Protocol: Alpha
+[20:42:51.293] Blocks to bake: 10
+[20:42:51.293] Accounts to use: 30000
+[20:42:51.293] Spinning up the network...
+[20:43:01.039] Originating smart contracts
+[20:43:01.861] Waiting to reach the next level
+[20:43:27.301] Using the parameter file: /run/user/1000/tezt-185969/1/parameters.json
+[20:43:27.301] Waiting to reach level 3
+[20:43:57.054] The benchmark has been started
+[20:49:03.482] Produced 10 block(s) in 306.43 seconds
+[20:49:04.091] BLSh3JB76aHp2Zg37zrv35kr6XNu8Nti9hiGELriEWNJXHoEQN9 -> 5699
+[20:49:04.431] BM2MMEawEUvKZm25LoB81rGEm2MtQtdkaXzAeuJACsbcZcsuuD2 -> 5651
+[20:49:04.759] BLRN2oxtgpep1D3oCiD6NGo9GPha6Z2S69LiTa8SPskHLdjN1Ag -> 5762
+[20:49:05.095] BMD3U3mv8EM9ZKYsK6sxFob5ZHHCYRUZiSn6LJVgvnp8eMaV8bY -> 5822
+[20:49:05.411] BLCZf4mHGaawCCuJZLF2yFXwhg1tn32BbBezYm4dnik1mfDQ4wK -> 5892
+[20:49:05.684] BLpPYyppLmp4enYopGBWNHvhGLzBFuWaFSJmEqkR1QQK1stWbPt -> 3868
+[20:49:05.996] BKmqoWrZgevEmmd7RXaEX5umsBQaW3cnHJRK4AJq5uzEXzaryeE -> 5721
+[20:49:06.303] BMGpJV4HtYjzfeq5HLJmvN9LFpPoPeuBeEdGdwYsZ57rc7gyvnQ -> 5810
+[20:49:06.610] BLYCC8jRAb4xAQAYzZixC4PSYLacFtFHAV2C6jWi43obZL9aXVw -> 5537
+[20:49:06.918] BLAb72vxpN5tnGoq2gbLP1ce8XfAqEruWgbkheyKdiUmMC5LuDt -> 5417
+[20:49:06.918] Total applied transactions: 55179
+[20:49:06.918] Total injected transactions: 55452
+[20:49:06.918] TPS of injection (target): 1000
+[20:49:06.918] TPS of injection (de facto): 180.96
+[20:49:06.918] Empirical TPS: 180.07
+[20:49:06.962] [SUCCESS] (1/1) tezos_tps_benchmark
 ```
 
 ## Automatic daily runs of the TPS benchmark
