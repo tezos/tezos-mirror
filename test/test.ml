@@ -44,4 +44,5 @@ let () =
       ("mu_phantom", Reference_check.Mu_phantom.tests);
       ("fixed_list", Fixed_list.tests);
       ("fixed_array", Fixed_array.tests);
+      ("compact", Compact.tests);
     ]
