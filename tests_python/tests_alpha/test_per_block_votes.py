@@ -1,3 +1,7 @@
+# This test relies on events read from the logs of the baker. It must
+# be run from the tests_python/ directory with the "--log-dir" option
+# of pytest set to "tmp"
+
 import time
 
 from typing import Optional, Iterator
