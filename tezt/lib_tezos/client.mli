@@ -520,7 +520,7 @@ val spawn_withdraw_delegate :
   ?endpoint:endpoint -> ?wait:string -> src:string -> t -> Process.t
 
 (** Run [tezos-client get balance for]. *)
-val get_balance_for : ?endpoint:endpoint -> account:string -> t -> float Lwt.t
+val get_balance_for : ?endpoint:endpoint -> account:string -> t -> Tez.t Lwt.t
 
 (** Same as [get_balance_for], but do not wait for the process to exit. *)
 val spawn_get_balance_for :

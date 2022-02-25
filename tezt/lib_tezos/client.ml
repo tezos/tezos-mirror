@@ -713,21 +713,11 @@ let withdraw_delegate ?endpoint ?wait ~src client =
 let spawn_get_balance_for ?endpoint ~account client =
   spawn_command ?endpoint client ["get"; "balance"; "for"; account]
 
-let get_balance_for =
-  let re = rex "(\\d+(?:\\.\\d+)?) \u{A729}" in
-  fun ?endpoint ~account client ->
-    let extract_balance (client_output : string) : float =
-      match client_output =~* re with
-      | None ->
-          Test.fail
-            "Cannot extract balance from client_output: %s"
-            client_output
-      | Some balance -> float_of_string balance
-    in
-    let process = spawn_get_balance_for ?endpoint ~account client in
-    let* () = Process.check process
-    and* output = Lwt_io.read (Process.stdout process) in
-    return @@ extract_balance output
+let get_balance_for ?endpoint ~account client =
+  let process = spawn_get_balance_for ?endpoint ~account client in
+  let* () = Process.check process
+  and* output = Lwt_io.read (Process.stdout process) in
+  return @@ Tez.parse_floating output
 
 let spawn_create_mockup ?(sync_mode = Synchronous) ?parameter_file ~protocol
     client =
