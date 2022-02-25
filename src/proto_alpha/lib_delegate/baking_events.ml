@@ -655,6 +655,16 @@ module Actions = struct
       ~level:Error
       ~msg:"cannot fetch mempool: {errs}"
       ("errs", Error_monad.(TzTrace.encoding error_encoding))
+
+  let vote_for_liquidity_baking_toggle =
+    declare_1
+      ~section
+      ~name:"vote_for_liquidity_baking_toggle"
+      ~level:Notice
+      ~msg:"Voting {value} for liquidity baking toggle vote"
+      ( "value",
+        Protocol.Alpha_context.Liquidity_baking
+        .liquidity_baking_toggle_vote_encoding )
 end
 
 module Nonces = struct

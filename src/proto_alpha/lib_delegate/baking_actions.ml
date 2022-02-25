@@ -277,6 +277,8 @@ let inject_block ~state_recorder state block_to_bake ~updated_state =
         ~default
         ~per_block_vote_file)
   >>= fun liquidity_baking_toggle_vote ->
+  Events.(emit vote_for_liquidity_baking_toggle) liquidity_baking_toggle_vote
+  >>= fun () ->
   Block_forge.forge
     cctxt
     ~chain_id
