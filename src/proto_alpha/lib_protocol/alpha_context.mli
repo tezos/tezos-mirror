@@ -2309,7 +2309,7 @@ module Tx_rollup_inbox : sig
   end
 end
 
-(** This simply re-exports [Tx_rollup_commitments_repr] *)
+(** This simply re-exports [Tx_rollup_commitment_repr] *)
 module Tx_rollup_commitment : sig
   type batch_commitment = {root : bytes}
 
