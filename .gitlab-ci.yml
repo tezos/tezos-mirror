@@ -13,12 +13,10 @@ include: 'https://gitlab.com/nomadic-labs/gitlab-ocaml-ci-example/-/raw/main/.gi
     - OCAML_COMPILER: "4.11.2"
     - OCAML_COMPILER: "4.12.1"
     - OCAML_COMPILER: "4.13.1"
-    - OCAML_COMPILER: "4.13.1"
-      DUNE_TEST_TARGETS: "@runtest_js"
 
 variables:
   CLEAN_OPAM_CACHE: "false"
   CLEAN_DUNE_CACHE: "false"
   DUNE_BUILD_TARGETS: "@src/all"
-  DUNE_TEST_TARGETS: "@fmt @runtest"
+  DUNE_TEST_TARGETS: "@fmt @runtest @runtest_js"
   DUNE_DOC_TARGETS: "@doc"
