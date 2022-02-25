@@ -140,17 +140,12 @@ module Regressions = struct
 
     let*! inbox = Rollup.get_inbox ~hooks ~rollup client in
 
-    (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
-
-       we introduce two bakes to ensure the block is finalised. This
-       should be removed once we do not rely on Tenderbake anymore. *)
-    let* () = Client.bake_for client in
     let* () = Client.bake_for client in
 
     (* FIXME https://gitlab.com/tezos/tezos/-/issues/2503
 
-       At the same time we remove the dependency to Tenderbake for
-       commitment, we will ensure the root is indeed the root of the
+       At the same time we add actual Irmin Merkle roots for
+       commitments, we will ensure the root is indeed the root of the
        previous inbox. I don't know yet how we will be able to do that
        yes, something is missing. *)
     let* () =
