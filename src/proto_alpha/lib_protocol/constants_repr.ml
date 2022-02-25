@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2020-2021 Nomadic Labs <contact@nomadic-labs.com>           *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -124,7 +125,7 @@ type parametric = {
   blocks_per_cycle : int32;
   blocks_per_commitment : int32;
   blocks_per_stake_snapshot : int32;
-  blocks_per_voting_period : int32;
+  cycles_per_voting_period : int32;
   hard_gas_limit_per_operation : Gas_limit_repr.Arith.integral;
   hard_gas_limit_per_block : Gas_limit_repr.Arith.integral;
   proof_of_work_threshold : int64;
@@ -177,7 +178,7 @@ let parametric_encoding =
           c.blocks_per_cycle,
           c.blocks_per_commitment,
           c.blocks_per_stake_snapshot,
-          c.blocks_per_voting_period,
+          c.cycles_per_voting_period,
           c.hard_gas_limit_per_operation,
           c.hard_gas_limit_per_block,
           c.proof_of_work_threshold,
@@ -222,7 +223,7 @@ let parametric_encoding =
              blocks_per_cycle,
              blocks_per_commitment,
              blocks_per_stake_snapshot,
-             blocks_per_voting_period,
+             cycles_per_voting_period,
              hard_gas_limit_per_operation,
              hard_gas_limit_per_block,
              proof_of_work_threshold,
@@ -267,7 +268,7 @@ let parametric_encoding =
         blocks_per_cycle;
         blocks_per_commitment;
         blocks_per_stake_snapshot;
-        blocks_per_voting_period;
+        cycles_per_voting_period;
         hard_gas_limit_per_operation;
         hard_gas_limit_per_block;
         proof_of_work_threshold;
@@ -315,7 +316,7 @@ let parametric_encoding =
           (req "blocks_per_cycle" int32)
           (req "blocks_per_commitment" int32)
           (req "blocks_per_stake_snapshot" int32)
-          (req "blocks_per_voting_period" int32)
+          (req "cycles_per_voting_period" int32)
           (req
              "hard_gas_limit_per_operation"
              Gas_limit_repr.Arith.z_integral_encoding)
@@ -463,14 +464,6 @@ let check_constants constants =
     (Invalid_protocol_constants
        "The ratio of frozen deposits ratio slashed per double endorsement must \
         be a non-negative valid ratio.")
-  >>? fun () ->
-  error_unless
-    (let remainder =
-       Int32.rem constants.blocks_per_voting_period constants.blocks_per_cycle
-     in
-     Compare.Int32.(remainder = 0l))
-    (Invalid_protocol_constants
-       "blocks_per_voting_period should be a multiple of blocks_per_cycle.")
   >>? fun () ->
   error_unless
     (let snapshot_frequence =

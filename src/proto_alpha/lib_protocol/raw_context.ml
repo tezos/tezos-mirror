@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -831,6 +832,10 @@ let prepare_first_block ~level ~timestamp ctxt =
       add_constants ctxt param.constants >|= ok
   | Ithaca_012 ->
       get_previous_protocol_constants ctxt >>= fun c ->
+      let cycles_per_voting_period =
+        (* Ignore reminder if any *)
+        Int32.div c.blocks_per_voting_period c.blocks_per_cycle
+      in
       let constants =
         Constants_repr.
           {
@@ -838,7 +843,7 @@ let prepare_first_block ~level ~timestamp ctxt =
             blocks_per_cycle = c.blocks_per_cycle;
             blocks_per_commitment = c.blocks_per_commitment;
             blocks_per_stake_snapshot = c.blocks_per_stake_snapshot;
-            blocks_per_voting_period = c.blocks_per_voting_period;
+            cycles_per_voting_period;
             hard_gas_limit_per_operation = c.hard_gas_limit_per_operation;
             hard_gas_limit_per_block = c.hard_gas_limit_per_block;
             proof_of_work_threshold = c.proof_of_work_threshold;

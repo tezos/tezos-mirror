@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -84,6 +85,10 @@
      cycle_position mod blocks_per_cycle ==
      position_in_period mod blocks_per_cycle *)
 
+let blocks_per_voting_period ctxt =
+  let open Constants_storage in
+  Int32.(mul (cycles_per_voting_period ctxt) (blocks_per_cycle ctxt))
+
 let set_current = Storage.Vote.Current_period.update
 
 let get_current = Storage.Vote.Current_period.get
@@ -117,9 +122,7 @@ let get_current_kind ctxt = get_current ctxt >|=? fun {kind; _} -> kind
 
 let get_current_info ctxt =
   get_current ctxt >|=? fun voting_period ->
-  let blocks_per_voting_period =
-    Constants_storage.blocks_per_voting_period ctxt
-  in
+  let blocks_per_voting_period = blocks_per_voting_period ctxt in
   let level = Level_storage.current ctxt in
   let position = Voting_period_repr.position_since level voting_period in
   let remaining =
@@ -132,9 +135,7 @@ let get_current_info ctxt =
 
 let get_current_remaining ctxt =
   get_current ctxt >|=? fun voting_period ->
-  let blocks_per_voting_period =
-    Constants_storage.blocks_per_voting_period ctxt
-  in
+  let blocks_per_voting_period = blocks_per_voting_period ctxt in
   Voting_period_repr.remaining_blocks
     (Level_storage.current ctxt)
     voting_period
@@ -155,9 +156,7 @@ let get_rpc_current_info ctxt =
   >>=? fun ({voting_period; position; _} as voting_period_info) ->
   if Compare.Int32.(position = Int32.minus_one) then
     let level = Level_storage.current ctxt in
-    let blocks_per_voting_period =
-      Constants_storage.blocks_per_voting_period ctxt
-    in
+    let blocks_per_voting_period = blocks_per_voting_period ctxt in
     Storage.Vote.Pred_period_kind.get ctxt >|=? fun pred_kind ->
     let voting_period : Voting_period_repr.t =
       {
@@ -184,9 +183,7 @@ let get_rpc_succ_info ctxt =
     (Level_storage.current ctxt).level
   >>?= fun level ->
   get_current ctxt >|=? fun voting_period ->
-  let blocks_per_voting_period =
-    Constants_storage.blocks_per_voting_period ctxt
-  in
+  let blocks_per_voting_period = blocks_per_voting_period ctxt in
   let position = Voting_period_repr.position_since level voting_period in
   let remaining =
     Voting_period_repr.remaining_blocks

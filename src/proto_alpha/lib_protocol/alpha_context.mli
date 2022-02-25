@@ -3,7 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2019-2022 Nomadic Labs <contact@nomadic-labs.com>           *)
-(* Copyright (c) 2021 Trili Tech, <contact@trili.tech>                       *)
+(* Copyright (c) 2021-2022 Trili Tech, <contact@trili.tech>                  *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -758,7 +758,7 @@ module Constants : sig
     blocks_per_cycle : int32;
     blocks_per_commitment : int32;
     blocks_per_stake_snapshot : int32;
-    blocks_per_voting_period : int32;
+    cycles_per_voting_period : int32;
     hard_gas_limit_per_operation : Gas.Arith.integral;
     hard_gas_limit_per_block : Gas.Arith.integral;
     proof_of_work_threshold : int64;
@@ -824,7 +824,7 @@ module Constants : sig
 
   val blocks_per_stake_snapshot : context -> int32
 
-  val blocks_per_voting_period : context -> int32
+  val cycles_per_voting_period : context -> int32
 
   val hard_gas_limit_per_operation : context -> Gas.Arith.integral
 

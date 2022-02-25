@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -236,7 +237,7 @@ let context_init =
      ease accounting of exact baker stake. *)
   Context.init
     ~blocks_per_cycle:4l
-    ~blocks_per_voting_period:4l
+    ~cycles_per_voting_period:1l
     ~consensus_threshold:0
     ~endorsing_reward_per_slot:Tez.zero
     ~baking_reward_bonus_per_slot:Tez.zero

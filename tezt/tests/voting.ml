@@ -26,7 +26,7 @@
 (* Testing
    -------
    Component:    Amendment process
-   Invocation:   dune exec tezt/tests/main.exe -- --file amendment.ml
+   Invocation:   dune exec tezt/tests/main.exe -- --file voting.ml
    Subject:      Test the voting process from proposal to adoption.
 
    This test activates a protocol [from_protocol]. Then it uses the
@@ -49,8 +49,17 @@
 (* Protocol to inject when testing injection. *)
 let test_proto_dir = "src/bin_client/test/proto_test_injection"
 
-(* Files that are to be copied from [test_proto_dir]. *)
-let test_proto_files = ["main.ml"; "main.mli"; "TEZOS_PROTOCOL"]
+(* Files that are to be copied from [test_proto_dir].
+   We do not copy [TEZOS_PROTOCOL] because it declares an environment version
+   which is too old when trying to adopt protocol Alpha *)
+let test_proto_files = ["main.ml"; "main.mli"]
+
+let test_proto_TEZOS_PROTOCOL =
+  {|{
+    "modules": ["Main"],
+    "expected_env_version": 5
+}
+|}
 
 type period_kind = Proposal | Exploration | Cooldown | Promotion | Adoption
 
@@ -231,6 +240,8 @@ let inject_test_protocol client =
       (List.map (fun filename -> test_proto_dir // filename) test_proto_files
       @ [protocol_path])
   in
+  ( with_open_out (protocol_path // "TEZOS_PROTOCOL") @@ fun ch ->
+    output_string ch test_proto_TEZOS_PROTOCOL ) ;
   let* protocols_before = Client.Admin.list_protocols client in
   let* test_proto_hash = Client.Admin.inject_protocol client ~protocol_path in
   let* protocols_after = Client.Admin.list_protocols client in
@@ -273,19 +284,35 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   @@ fun () ->
   (* Prepare protocol parameters such that voting periods are shorter
      to make the test run faster. *)
+  (* Protocol Alpha uses [cycles_per_voting_period]
+     instead of [blocks_per_voting_period],
+     we use the values [blocks_per_cycle] = 4 and
+     [cycles_for_voting_period] = 1 for Alpha, and we set
+     [blocks_per_cycle] = 4 and [blocks_per_voting_period] = 4
+     for other protocols. This way periods have the same number
+     of blocks for all protocols, and we do not need to handle
+     different cases when checking levels and periods in tests. *)
+  let parameters =
+    match from_protocol with
+    | Alpha ->
+        [
+          (["blocks_per_cycle"], Some "4");
+          (["cycles_per_voting_period"], Some "1");
+        ]
+    | _ ->
+        (* Note: the test fails with [blocks_per_voting_period] < [blocks_per_cycle]
+           when migrating to protocol Alpha, as this will cause the migration to
+           set [cycles_per_voting_period] = 0. The test also fails when
+           [blocks_per_voting_period] % [blocks_per_cycle] <> 0, as the starting
+           position of a period will change when migrating a protocol to Alpha.
+        *)
+        [
+          (["blocks_per_cycle"], Some "4");
+          (["blocks_per_voting_period"], Some "4");
+        ]
+  in
   let* parameter_file =
-    (* Note: default [blocks_per_cycle] is already 8.
-       We explicitely set it here anyway to make it clear that voting works
-       with [blocks_per_voting_period < blocks_per_cycle]. *)
-    (* Note: the test fails with [blocks_per_voting_period = 2]
-       and [blocks_per_voting_period = 3], and enters an infinite loop
-       with [blocks_per_voting_period = 1] and [blocks_per_voting_period = 0]. *)
-    Protocol.write_parameter_file
-      ~base:(Right (from_protocol, None))
-      [
-        (["blocks_per_cycle"], Some "8");
-        (["blocks_per_voting_period"], Some "4");
-      ]
+    Protocol.write_parameter_file ~base:(Right (from_protocol, None)) parameters
   in
   (* Start a node and activate [from_protocol]. *)
   let* node = Node.init [Synchronisation_threshold 0] in
@@ -407,17 +434,20 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   (* Bake until exploration period while checking RPC behavior. *)
   let* () = Client.bake_for client in
   let* () = Client.bake_for client in
-  let* () =
-    check_current_level
-      client
-      {
-        level = 8;
-        level_position = 7;
-        cycle = 0;
-        cycle_position = 7;
-        expected_commitment = true;
-      }
+  let expected_level =
+    (* level_position = 7, 4 blocks per cycle =>
+       cycle = 7/4 = 1,
+       cycle_position = 7 % 4 = 3
+    *)
+    {
+      level = 8;
+      level_position = 7;
+      cycle = 1;
+      cycle_position = 3;
+      expected_commitment = true;
+    }
   in
+  let* () = check_current_level client expected_level in
   let* () =
     check_current_period
       client
@@ -461,15 +491,20 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   (* Bake until cooldown period while checking RPCs. *)
   let* () = Client.bake_for client in
   let* () =
-    check_current_level
-      client
+    let expected_level =
+      (* level_position = 9, 4 blocks_per_cycle =>
+         cycle = 9/4 = 2
+         cycle_position = 9 % 4 = 1
+      *)
       {
         level = 10;
         level_position = 9;
-        cycle = 1;
+        cycle = 2;
         cycle_position = 1;
         expected_commitment = false;
       }
+    in
+    check_current_level client expected_level
   in
   let* () =
     check_current_period
@@ -517,15 +552,20 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   (* Bake until promotion period while checking RPCs. *)
   let* () = Client.bake_for client in
   let* () =
-    check_current_level
-      client
+    let expected_level =
+      (* level_position = 13, 4 blocks_per_cycle =>
+         cycle = 13/4 = 3
+         cycle_position = 13 % 4 = 1
+      *)
       {
         level = 14;
         level_position = 13;
-        cycle = 1;
-        cycle_position = 5;
+        cycle = 3;
+        cycle_position = 1;
         expected_commitment = false;
       }
+    in
+    check_current_level client expected_level
   in
   let* () =
     check_current_period
@@ -579,15 +619,20 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   (* Bake until adoption period while checking RPCs. *)
   let* () = Client.bake_for client in
   let* () =
-    check_current_level
-      client
+    let expected_level =
+      (* level_position = 17, 4 blocks_per_cycle =>
+         cycle = 17/4 = 4
+         cycle_position = 17 % 4 = 1
+      *)
       {
         level = 18;
         level_position = 17;
-        cycle = 2;
+        cycle = 4;
         cycle_position = 1;
         expected_commitment = false;
       }
+    in
+    check_current_level client expected_level
   in
   let* () =
     check_current_period
@@ -635,15 +680,20 @@ let test_voting ~from_protocol ~(to_protocol : target_protocol) ~loser_protocols
   (* Bake until next_protocol changes. *)
   let* () = Client.bake_for client in
   let* () =
-    check_current_level
-      client
+    let expected_level =
+      (* level_position = 21, 4 blocks_per_cycle =>
+         cycle = 21/4 = 5
+         cycle_position = 21 % 4 = 1
+      *)
       {
         level = 22;
         level_position = 21;
-        cycle = 2;
-        cycle_position = 5;
+        cycle = 5;
+        cycle_position = 1;
         expected_commitment = false;
       }
+    in
+    check_current_level client expected_level
   in
   let* () =
     check_current_period

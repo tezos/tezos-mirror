@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -868,7 +869,7 @@ module ConcreteBaseMachine :
       ~baking_reward_fixed_portion:Tez.zero
       ~origination_size:0
       ~blocks_per_cycle:10_000l
-      ~blocks_per_voting_period:10_000l
+      ~cycles_per_voting_period:1l
       ?liquidity_baking_subsidy
     >>= function
     | (blk, holder :: accounts) ->

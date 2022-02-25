@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -45,7 +46,7 @@ let constants_mainnet =
     blocks_per_cycle = 8192l;
     blocks_per_commitment = 64l;
     blocks_per_stake_snapshot = 512l;
-    blocks_per_voting_period = 40960l (* 5 cycles *);
+    cycles_per_voting_period = 5l;
     hard_gas_limit_per_operation = Gas.Arith.(integral_of_int_exn 1_040_000);
     hard_gas_limit_per_block = Gas.Arith.(integral_of_int_exn 5_200_000);
     proof_of_work_threshold = Int64.(sub (shift_left 1L 46) 1L);
@@ -132,7 +133,7 @@ let constants_sandbox =
     blocks_per_cycle = 8l;
     blocks_per_commitment = 4l;
     blocks_per_stake_snapshot = 4l;
-    blocks_per_voting_period = 64l;
+    cycles_per_voting_period = 8l;
     proof_of_work_threshold = Int64.of_int (-1);
     liquidity_baking_sunset_level = 128l;
     minimal_block_delay = Period.of_seconds_exn (Int64.of_int block_time);
@@ -165,7 +166,7 @@ let constants_test =
     blocks_per_cycle = 12l;
     blocks_per_commitment = 4l;
     blocks_per_stake_snapshot = 4l;
-    blocks_per_voting_period = 24l;
+    cycles_per_voting_period = 2l;
     proof_of_work_threshold = Int64.of_int (-1);
     liquidity_baking_sunset_level = 4096l;
     consensus_committee_size;

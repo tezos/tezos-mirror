@@ -3,6 +3,7 @@
 (* Open Source License                                                       *)
 (* Copyright (c) 2020 Metastate AG <hello@metastate.dev>                     *)
 (* Copyright (c) 2021 Nomadic Labs <contact@nomadic-labs.com>                *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -1050,7 +1051,7 @@ let register () =
                (* reduced periods duration to get to testing vote period faster *)
                ([
                   (["blocks_per_cycle"], Some "4");
-                  (["blocks_per_voting_period"], Some "4");
+                  (["cycles_per_voting_period"], Some "1");
                 ]
                @ alpha_consensus_threshold),
              None );

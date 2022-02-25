@@ -15,8 +15,8 @@ The rest of this page gives more details about the amendment and voting process.
 Periods
 -------
 
-The amendment process consists of five *periods*. Each period lasts for 40960
-blocks (5 cycles) (or approximately two weeks). The periods (listed below)
+The amendment process consists of five *periods*. Each period lasts for 5 cycles
+(or approximately two weeks). The periods (listed below)
 typically succeed one to another for a total duration of approximately 2 months and
 a half, after which the whole amendment process starts again.
 

@@ -96,6 +96,8 @@ Minor Changes
 
 - Make cache layout a parametric constant of the protocol. (MR :gl:`!4035`)
 
+- Change ``blocks_per_voting period`` in context with ``cycles_per_voting_period`` (MR :gl:`!4456`)
+
 Michelson
 ---------
 

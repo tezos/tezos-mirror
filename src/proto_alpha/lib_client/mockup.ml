@@ -2,6 +2,7 @@
 (*                                                                           *)
 (* Open Source License                                                       *)
 (* Copyright (c) 2018 Dynamic Ledger Solutions, Inc. <contact@tezos.com>     *)
+(* Copyright (c) 2022 Trili Tech  <contact@trili.tech>                       *)
 (*                                                                           *)
 (* Permission is hereby granted, free of charge, to any person obtaining a   *)
 (* copy of this software and associated documentation files (the "Software"),*)
@@ -39,7 +40,7 @@ module Protocol_constants_overrides = struct
     blocks_per_cycle : int32 option;
     blocks_per_commitment : int32 option;
     blocks_per_stake_snapshot : int32 option;
-    blocks_per_voting_period : int32 option;
+    cycles_per_voting_period : int32 option;
     hard_gas_limit_per_operation : Gas.Arith.integral option;
     hard_gas_limit_per_block : Gas.Arith.integral option;
     proof_of_work_threshold : int64 option;
@@ -95,7 +96,7 @@ module Protocol_constants_overrides = struct
             c.blocks_per_cycle,
             c.blocks_per_commitment,
             c.blocks_per_stake_snapshot,
-            c.blocks_per_voting_period,
+            c.cycles_per_voting_period,
             c.hard_gas_limit_per_operation,
             c.hard_gas_limit_per_block,
             c.proof_of_work_threshold,
@@ -142,7 +143,7 @@ module Protocol_constants_overrides = struct
                blocks_per_cycle,
                blocks_per_commitment,
                blocks_per_stake_snapshot,
-               blocks_per_voting_period,
+               cycles_per_voting_period,
                hard_gas_limit_per_operation,
                hard_gas_limit_per_block,
                proof_of_work_threshold,
@@ -190,7 +191,7 @@ module Protocol_constants_overrides = struct
           blocks_per_cycle;
           blocks_per_commitment;
           blocks_per_stake_snapshot;
-          blocks_per_voting_period;
+          cycles_per_voting_period;
           hard_gas_limit_per_operation;
           hard_gas_limit_per_block;
           proof_of_work_threshold;
@@ -240,7 +241,7 @@ module Protocol_constants_overrides = struct
             (opt "blocks_per_cycle" int32)
             (opt "blocks_per_commitment" int32)
             (opt "blocks_per_stake_snapshot" int32)
-            (opt "blocks_per_voting_period" int32)
+            (opt "cycles_per_voting_period" int32)
             (opt "hard_gas_limit_per_operation" Gas.Arith.z_integral_encoding)
             (opt "hard_gas_limit_per_block" Gas.Arith.z_integral_encoding)
             (opt "proof_of_work_threshold" int64)
@@ -317,7 +318,7 @@ module Protocol_constants_overrides = struct
         blocks_per_cycle = Some parametric.blocks_per_cycle;
         blocks_per_commitment = Some parametric.blocks_per_commitment;
         blocks_per_stake_snapshot = Some parametric.blocks_per_stake_snapshot;
-        blocks_per_voting_period = Some parametric.blocks_per_voting_period;
+        cycles_per_voting_period = Some parametric.cycles_per_voting_period;
         hard_gas_limit_per_operation =
           Some parametric.hard_gas_limit_per_operation;
         hard_gas_limit_per_block = Some parametric.hard_gas_limit_per_block;
@@ -384,7 +385,7 @@ module Protocol_constants_overrides = struct
       blocks_per_cycle = None;
       blocks_per_commitment = None;
       blocks_per_stake_snapshot = None;
-      blocks_per_voting_period = None;
+      cycles_per_voting_period = None;
       hard_gas_limit_per_operation = None;
       hard_gas_limit_per_block = None;
       proof_of_work_threshold = None;
@@ -478,8 +479,8 @@ module Protocol_constants_overrides = struct
           };
         O
           {
-            name = "blocks_per_voting_period";
-            override_value = o.blocks_per_voting_period;
+            name = "cycles_per_voting_period";
+            override_value = o.cycles_per_voting_period;
             pp = pp_print_int32;
           };
         O
@@ -727,10 +728,10 @@ module Protocol_constants_overrides = struct
            Option.value
              ~default:c.blocks_per_stake_snapshot
              o.blocks_per_stake_snapshot;
-         blocks_per_voting_period =
+         cycles_per_voting_period =
            Option.value
-             ~default:c.blocks_per_voting_period
-             o.blocks_per_voting_period;
+             ~default:c.cycles_per_voting_period
+             o.cycles_per_voting_period;
          hard_gas_limit_per_operation =
            Option.value
              ~default:c.hard_gas_limit_per_operation

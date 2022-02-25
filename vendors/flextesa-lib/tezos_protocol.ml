@@ -145,8 +145,52 @@ let default () =
   ; timestamp_delay= None
   ; custom_protocol_parameters= None }
 
+let extract_custom_parameter ~get ~key s =
+  let open Ezjsonm in
+  get_option (fun v -> get (find v [key])) (value s)
+
+let add_optional_parameter ~key ~to_value ~v s =
+  let open Ezjsonm in
+  match v with
+  | None -> s
+  | Some v ->
+      let d = get_dict (value s) in
+      dict ((key, to_value v) :: d)
+
+let remove_custom_parameter ~key s =
+  let open Ezjsonm in
+  let d = get_dict (value s) in
+  dict (List.filter d ~f:(fun (key', _) -> String.equal key key'))
+
 let protocol_parameters_json t : Ezjsonm.t =
   let open Ezjsonm in
+  (* Because Alpha uses cycles_per_voting_period
+     instead of blocks_per_voting_period, we need to change `t.custom_parameter_type`
+     to convert `blocks_per_voting_period` to `cycles_per_voting_period`.
+     Note that if the `blocks_per_voting_period` is a custom parameter
+      but `blocks_per_cycle` is not, then we fallback to `default().blocks_per_cycle`
+     to compute the `cycles_per_voting_period`.
+  *)
+  let custom_parameters t =
+    match (t.custom_protocol_parameters, t.kind) with
+    | Some s, `Alpha ->
+        let blocks_per_voting_period =
+          extract_custom_parameter ~get:Ezjsonm.get_int
+            ~key:"blocks_per_voting_period" s in
+        let blocks_per_cycle =
+          match
+            extract_custom_parameter ~get:get_int ~key:"blocks_per_cycle" s
+          with
+          | None -> Some (default ()).blocks_per_cycle
+          | b -> b in
+        let cycles_per_voting_period =
+          Option.map2 blocks_per_voting_period blocks_per_cycle ~f:(fun a b ->
+              a / b ) in
+        let r = remove_custom_parameter ~key:"blocks_per_voting_period" s in
+        Some
+          (add_optional_parameter ~key:"cycles_per_voting_period"
+             ~to_value:Ezjsonm.int ~v:cycles_per_voting_period s )
+    | _, _ -> t.custom_protocol_parameters in
   let make_account (account, amount) =
     strings [Account.pubkey account; sprintf "%Ld" amount] in
   let extra_post_babylon_stuff subkind =
@@ -159,8 +203,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("tx_rollup_hard_size_limit_per_inbox", int 100_000)
           ; ("tx_rollup_hard_size_limit_per_message", int 5_000)
           ; ("sc_rollup_enable", bool false)
-          ; ("sc_rollup_origination_size", int 6_314)
-          ]
+          ; ("sc_rollup_origination_size", int 6_314) ]
       | `Hangzhou | `Ithaca -> []
       | _ -> failwith "unsupported protocol" in
     let list_of_zs = list (fun i -> string (Int.to_string i)) in
@@ -181,8 +224,7 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("frozen_deposits_percentage", int 10)
           ; ( "ratio_of_frozen_deposits_slashed_per_double_endorsement"
             , dict [("numerator", int 1); ("denominator", int 2)] )
-          ; ("double_baking_punishment", string "640000000")
-          ]
+          ; ("double_baking_punishment", string "640000000") ]
       | `Hangzhou ->
           [ ("blocks_per_roll_snapshot", int t.blocks_per_roll_snapshot)
           ; ("initial_endorsers", int 1)
@@ -198,12 +240,20 @@ let protocol_parameters_json t : Ezjsonm.t =
           ; ("minimal_block_delay", string (Int.to_string t.minimal_block_delay))
           ]
       | _ -> failwith "unsupported protocol" in
-    alpha_specific_parameters @ pre_alpha_specific_parameters in
+    let blocks_or_cycle_per_voting_period =
+      match subkind with
+      | `Alpha ->
+          [ ( "cycles_per_voting_period"
+            , int (t.blocks_per_voting_period / t.blocks_per_cycle) ) ]
+      | `Ithaca | `Hangzhou ->
+          [("blocks_per_voting_period", int t.blocks_per_voting_period)]
+      | _ -> failwith "unsupported protocol" in
+    alpha_specific_parameters @ pre_alpha_specific_parameters
+    @ blocks_or_cycle_per_voting_period in
   let common =
     [ ( "bootstrap_accounts"
       , list make_account (t.bootstrap_accounts @ [(t.dictator, 10_000_000L)])
-      ); ("blocks_per_voting_period", int t.blocks_per_voting_period)
-    ; ("blocks_per_cycle", int t.blocks_per_cycle)
+      ); ("blocks_per_cycle", int t.blocks_per_cycle)
     ; ("preserved_cycles", int t.preserved_cycles)
     ; ("proof_of_work_threshold", ksprintf string "%d" t.proof_of_work_threshold)
     ; ("blocks_per_commitment", int 4)
@@ -218,7 +268,7 @@ let protocol_parameters_json t : Ezjsonm.t =
     ; ("liquidity_baking_subsidy", string "2500000")
     ; ("liquidity_baking_sunset_level", int 525600)
     ; ("liquidity_baking_escape_ema_threshold", int 1000000) ] in
-  match t.custom_protocol_parameters with
+  match custom_parameters t with
   | Some s -> s
   | None -> dict (common @ extra_post_babylon_stuff t.kind)
 
