@@ -303,17 +303,17 @@ let fail ?__LOC__ error_msg pp_a a pp_b b =
   in
   Test.fail ?__LOC__ "%s" error_msg
 
-let eq a b typ ~error_msg =
+let eq a b ?__LOC__ typ ~error_msg =
   if not (get_equal typ a b) then
     let pp = get_pp typ in
-    fail error_msg pp a pp b
+    fail ?__LOC__ error_msg pp a pp b
 
-let neq a b typ ~error_msg =
+let neq a b ?__LOC__ typ ~error_msg =
   if get_equal typ a b then
     let pp = get_pp typ in
-    fail error_msg pp a pp b
+    fail ?__LOC__ error_msg pp a pp b
 
-let comparison function_name predicate a b typ ~error_msg =
+let comparison function_name predicate a b ?__LOC__ typ ~error_msg =
   match typ with
   | E _ ->
       let pp = get_pp typ in
@@ -328,11 +328,11 @@ let comparison function_name predicate a b typ ~error_msg =
           b
           error_msg
       in
-      Test.fail "%s" message
+      Test.fail ?__LOC__ "%s" message
   | C {pp = _; compare} ->
       if not (predicate (compare a b)) then
         let pp = get_pp typ in
-        fail error_msg pp a pp b
+        fail ?__LOC__ error_msg pp a pp b
 
 let lt x = comparison "(<)" (fun c -> c < 0) x
 

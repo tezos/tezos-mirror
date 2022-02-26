@@ -31,16 +31,16 @@
 
  *)
 
-let check_a ~__LOC__ client expected =
+let check_a ?__LOC__ client expected =
   let* a = Demo_client.get_a client in
-  Check.((a = expected) int)
-    ~error_msg:(__LOC__ ^ ": expected amount for a = %R, got %L ") ;
+  Check.((a = expected) ?__LOC__ int)
+    ~error_msg:"expected amount for a = %R, got %L " ;
   unit
 
-let check_b ~__LOC__ client expected =
+let check_b ?__LOC__ client expected =
   let* b = Demo_client.get_b client in
-  Check.((b = expected) int)
-    ~error_msg:(__LOC__ ^ ": expected amount for b = %R, got %L") ;
+  Check.((b = expected) ?__LOC__ int)
+    ~error_msg:"expected amount for b = %R, got %L" ;
   unit
 
 let register () =
