@@ -169,47 +169,6 @@ end
 
 let () = Registration_helpers.register (module Type_size_benchmark)
 
-(** Benchmarking {!Script_typed_ir_size.comparable_ty_size}. *)
-
-module Comparable_type_size_benchmark : Tezos_benchmark.Benchmark.S = struct
-  include Size_benchmarks_shared_config
-
-  let name = "COMPARABLE_TYPE_SIZE"
-
-  let info =
-    "Benchmarking the time it takes to compute \
-     Script_typed_ir_size.comparable_ty_size"
-
-  let models = [(model_name, size_based_model name)]
-
-  let type_size_benchmark (Script_ir_translator.Ex_comparable_ty ty) =
-    let open Script_typed_ir_size.Internal_for_tests in
-    let workload =
-      let open Cache_memory_helpers in
-      {size = Nodes.to_int @@ fst @@ comparable_ty_size ty}
-    in
-    let closure () = ignore (comparable_ty_size ty) in
-    Generator.Plain {workload; closure}
-
-  let make_bench rng_state _cfg () =
-    (* The [size] here is a parameter to the random sampler and does not
-       match the [size] returned by [type_size]. *)
-    let size =
-      Base_samplers.sample_in_interval ~range:{min = 1; max = 1000} rng_state
-    in
-    let ex_ty =
-      Michelson_generation.Samplers.Random_type.m_comparable_type
-        ~size
-        rng_state
-    in
-    type_size_benchmark ex_ty
-
-  let create_benchmarks ~rng_state ~bench_num config =
-    List.repeat bench_num (make_bench rng_state config)
-end
-
-let () = Registration_helpers.register (module Comparable_type_size_benchmark)
-
 (** Benchmarking {!Script_typed_ir_size.kinstr_size}. *)
 
 module Kinstr_size_benchmark : sig

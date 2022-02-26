@@ -95,9 +95,6 @@ let ty_traverse_f =
   in
   ({apply} : nodes_and_size ty_traverse)
 
-let comparable_ty_size : type a. a comparable_ty -> nodes_and_size =
- fun cty -> ty_traverse cty zero ty_traverse_f
-
 let ty_size : type a ac. (a, ac) ty -> nodes_and_size =
  fun ty -> ty_traverse ty zero ty_traverse_f
 
@@ -338,7 +335,7 @@ and big_map_size :
   let big_map_id_size s = z_size (Big_map.Id.unparse_to_z s) in
   let id_size = option_size big_map_id_size id in
   ret_adding
-    (comparable_ty_size key_type ++ ty_size value_type ++ diff_size)
+    (ty_size key_type ++ ty_size value_type ++ diff_size)
     (h4w +! id_size)
 
 and lambda_size :
@@ -402,17 +399,13 @@ and kinstr_size :
     | IList_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
     | IList_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_set (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | ISet_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo)
     | ISet_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISet_update (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISet_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_map (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | IMap_map (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
     | IMap_iter (kinfo, _, _) -> ret_succ_adding accu (base kinfo +! word_size)
     | IMap_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -422,7 +415,7 @@ and kinstr_size :
     | IMap_size (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IEmpty_big_map (kinfo, cty, ty, _) ->
         ret_succ_adding
-          (accu ++ comparable_ty_size cty ++ ty_size ty)
+          (accu ++ ty_size cty ++ ty_size ty)
           (base kinfo +! (word_size *? 2))
     | IBig_map_mem (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IBig_map_get (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -482,9 +475,7 @@ and kinstr_size :
     | IFailwith (kinfo, _, ty) ->
         ret_succ_adding (accu ++ ty_size ty) (base kinfo +! word_size)
     | ICompare (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | IEq (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | INeq (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ILt (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -594,9 +585,7 @@ and kinstr_size :
     | IRead_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ISplit_ticket (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IJoin_tickets (kinfo, cty, _) ->
-        ret_succ_adding
-          (accu ++ comparable_ty_size cty)
-          (base kinfo +! word_size)
+        ret_succ_adding (accu ++ ty_size cty) (base kinfo +! word_size)
     | IOpen_chest (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | IHalt kinfo -> ret_succ_adding accu (h1w +! kinfo_size kinfo)
     | ILog (_, _, _, _) ->
@@ -635,7 +624,7 @@ let rec kinstr_extra_size : type a s r f. (a, s, r, f) kinstr -> nodes_and_size
       | IRead_ticket (_, k) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr k in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
-      | ICompare (_, ty, _) -> comparable_ty_size ty
+      | ICompare (_, ty, _) -> ty_size ty
       | ISet_iter (_, body, _) -> (
           let kinfo = Script_typed_ir.kinfo_of_kinstr body in
           match kinfo.kstack_ty with Item_t (ty, _) -> ty_size ty)
@@ -681,8 +670,6 @@ let value_size ty x = value_size ~count_lambda_nodes:true zero (L ty) x
 
 module Internal_for_tests = struct
   let ty_size = ty_size
-
-  let comparable_ty_size = comparable_ty_size
 
   let kinstr_size = kinstr_size
 end

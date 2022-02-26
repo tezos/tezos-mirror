@@ -64,11 +64,6 @@ module Internal_for_tests : sig
   val ty_size :
     ('a, _) Script_typed_ir.ty -> Cache_memory_helpers.nodes_and_size
 
-  (** [comparable_ty_size cty] returns an overapproximation of the size
-   of the in-memory representation of comparable type [cty]. *)
-  val comparable_ty_size :
-    'a Script_typed_ir.comparable_ty -> Cache_memory_helpers.nodes_and_size
-
   (** [kinstr_size i] returns an overapproximation of the size of the
       internal IR [i]. *)
   val kinstr_size :
