@@ -1635,20 +1635,8 @@ val bool_t : bool comparable_ty
 val pair_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) pair ty_ex_c tzresult
 
-val comparable_pair_t :
-  Script.location ->
-  ('a, yes) ty ->
-  ('b, yes) ty ->
-  (('a, 'b) pair, yes) ty tzresult
-
 val union_t :
   Script.location -> ('a, _) ty -> ('b, _) ty -> ('a, 'b) union ty_ex_c tzresult
-
-val comparable_union_t :
-  Script.location ->
-  ('a, yes) ty ->
-  ('b, yes) ty ->
-  ('a, 'b) union comparable_ty tzresult
 
 val union_bytes_bool_t : (Bytes.t, bool) union comparable_ty
 
