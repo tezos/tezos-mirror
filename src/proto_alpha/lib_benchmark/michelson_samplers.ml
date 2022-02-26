@@ -331,7 +331,7 @@ end)
       | `TUnit -> Ex_comparable_ty unit_t
       | `TSignature -> Ex_comparable_ty signature_t
       | `TKey -> Ex_comparable_ty key_t
-      | `TChain_id -> Ex_comparable_ty chain_id_key
+      | `TChain_id -> Ex_comparable_ty chain_id_t
 
     let rec m_type ~size : Script_ir_translator.ex_ty sampler =
       let open Script_ir_translator in

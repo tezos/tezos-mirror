@@ -1068,7 +1068,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         (Ex_comparable_ty timestamp_t, ctxt)
     | Prim (loc, T_chain_id, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty chain_id_key, ctxt)
+        (Ex_comparable_ty chain_id_t, ctxt)
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty address_key, ctxt)

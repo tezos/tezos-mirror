@@ -1977,8 +1977,6 @@ let sapling_state_t ~memo_size = Sapling_state_t memo_size
 
 let chain_id_t = Chain_id_t
 
-let chain_id_key = chain_id_t
-
 let never_t = Never_t
 
 let bls12_381_g1_t = Bls12_381_g1_t
