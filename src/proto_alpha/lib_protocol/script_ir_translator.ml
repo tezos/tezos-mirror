@@ -1060,9 +1060,9 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         check_type_annot loc annot >|? fun () -> (Ex_comparable_ty bool_t, ctxt)
     | Prim (loc, T_key_hash, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty key_hash_key, ctxt)
+        (Ex_comparable_ty key_hash_t, ctxt)
     | Prim (loc, T_key, [], annot) ->
-        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_key, ctxt)
+        check_type_annot loc annot >|? fun () -> (Ex_comparable_ty key_t, ctxt)
     | Prim (loc, T_timestamp, [], annot) ->
         check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty timestamp_key, ctxt)

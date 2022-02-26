@@ -1856,11 +1856,7 @@ let mutez_t = Mutez_t
 
 let key_hash_t = Key_hash_t
 
-let key_hash_key = key_hash_t
-
 let key_t = Key_t
-
-let key_key = key_t
 
 let timestamp_t = Timestamp_t
 
