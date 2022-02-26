@@ -253,6 +253,9 @@ module type UTXO = sig
       The root corresponds to a merkle tree where the inputs are present.
       Even if this root can in principle be very old, a verifier may
       keep only the last n known roots considering anything older as invalid.
+      [bound_data] is arbitrary data that gets signed by the Sapling keys and
+      can typically be used to connect the Sapling protocol to another one.
+      For example it can contain the recipient address of an unshield operation.
       The memo_size field is checked at encoding and encoding to be the real
       memo size of all outputs.
       A transaction leaks the balance between inputs and outputs and the number
@@ -266,6 +269,7 @@ module type UTXO = sig
     binding_sig : binding_sig;
     balance : int64;
     root : hash;
+    bound_data : string;
   }
 
   (** The encoding enforces the limits on number of inputs and outputs. *)
@@ -276,6 +280,24 @@ module type UTXO = sig
   val max_amount : int64
 
   val valid_amount : int64 -> bool
+
+  module Legacy : sig
+    type transaction_new = transaction
+
+    (* This type is for backward compatibility with a previous definition of
+       [transaction] which didn't have any [bound_data]. *)
+    type transaction = {
+      inputs : input list;
+      outputs : output list;
+      binding_sig : binding_sig;
+      balance : int64;
+      root : hash;
+    }
+
+    val transaction_encoding : transaction Data_encoding.t
+
+    val cast : transaction -> transaction_new
+  end
 end
 
 (** Regroups what needs to be exposed to a Validator **)
@@ -482,6 +504,7 @@ module type Client = sig
       UTXO.input list ->
       UTXO.output list ->
       balance:int64 ->
+      bound_data:string ->
       string ->
       UTXO.binding_sig
   end

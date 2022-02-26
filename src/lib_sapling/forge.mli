@@ -59,6 +59,7 @@ val forge_transaction :
   output list ->
   Core.Spending_key.t ->
   string ->
+  bound_data:string ->
   S.state ->
   Core.UTXO.transaction
 
@@ -70,5 +71,25 @@ val forge_shield_transaction :
   output list ->
   int64 ->
   string ->
+  bound_data:string ->
   S.state ->
   Core.UTXO.transaction
+
+val forge_transaction_legacy :
+  ?number_dummy_inputs:int ->
+  ?number_dummy_outputs:int ->
+  Input.t list ->
+  output list ->
+  Core.Spending_key.t ->
+  string ->
+  S.state ->
+  Core.UTXO.Legacy.transaction
+
+val forge_shield_transaction_legacy :
+  ?number_dummy_inputs:int ->
+  ?number_dummy_outputs:int ->
+  output list ->
+  int64 ->
+  string ->
+  S.state ->
+  Core.UTXO.Legacy.transaction
