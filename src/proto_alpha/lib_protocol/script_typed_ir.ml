@@ -1860,8 +1860,6 @@ let key_t = Key_t
 
 let timestamp_t = Timestamp_t
 
-let timestamp_key = timestamp_t
-
 let address_t = Address_t
 
 let address_key = address_t
