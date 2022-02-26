@@ -161,40 +161,6 @@ let check_kind kinds expr =
    (everything that cannot contain a lambda). The rest is located at
    the end of the file. *)
 
-let rec unparse_comparable_ty_uncarbonated :
-    type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
- fun ~loc -> function
-  | Unit_t -> Prim (loc, T_unit, [], [])
-  | Never_t -> Prim (loc, T_never, [], [])
-  | Int_t -> Prim (loc, T_int, [], [])
-  | Nat_t -> Prim (loc, T_nat, [], [])
-  | Signature_t -> Prim (loc, T_signature, [], [])
-  | String_t -> Prim (loc, T_string, [], [])
-  | Bytes_t -> Prim (loc, T_bytes, [], [])
-  | Mutez_t -> Prim (loc, T_mutez, [], [])
-  | Bool_t -> Prim (loc, T_bool, [], [])
-  | Key_hash_t -> Prim (loc, T_key_hash, [], [])
-  | Key_t -> Prim (loc, T_key, [], [])
-  | Timestamp_t -> Prim (loc, T_timestamp, [], [])
-  | Address_t -> Prim (loc, T_address, [], [])
-  | Tx_rollup_l2_address_t -> Prim (loc, T_tx_rollup_l2_address, [], [])
-  | Chain_id_t -> Prim (loc, T_chain_id, [], [])
-  | Pair_t (l, r, _meta, YesYes) -> (
-      let tl = unparse_comparable_ty_uncarbonated ~loc l in
-      let tr = unparse_comparable_ty_uncarbonated ~loc r in
-      (* Fold [pair a1 (pair ... (pair an-1 an))] into [pair a1 ... an] *)
-      (* Note that the folding does not happen if the pair on the right has a
-         field annotation because this annotation would be lost *)
-      match tr with
-      | Prim (_, T_pair, ts, []) -> Prim (loc, T_pair, tl :: ts, [])
-      | _ -> Prim (loc, T_pair, [tl; tr], []))
-  | Union_t (l, r, _meta, YesYes) ->
-      let tl = unparse_comparable_ty_uncarbonated ~loc l in
-      let tr = unparse_comparable_ty_uncarbonated ~loc r in
-      Prim (loc, T_or, [tl; tr], [])
-  | Option_t (t, _meta, Yes) ->
-      Prim (loc, T_option, [unparse_comparable_ty_uncarbonated ~loc t], [])
-
 let unparse_memo_size ~loc memo_size =
   let z = Sapling.Memo_size.unparse_to_z memo_size in
   Int (loc, z)
@@ -307,6 +273,10 @@ let rec unparse_ty_and_entrypoints_uncarbonated :
         [Entrypoint.unparse_as_field_annot name]
   in
   Prim (loc, name, args, annot)
+
+and unparse_comparable_ty_uncarbonated :
+    type a loc. loc:loc -> a comparable_ty -> loc Script.michelson_node =
+ fun ~loc ty -> unparse_ty_entrypoints_uncarbonated ~loc ty no_entrypoints
 
 let unparse_ty_uncarbonated ~loc ty =
   unparse_ty_and_entrypoints_uncarbonated ~loc ty no_entrypoints
