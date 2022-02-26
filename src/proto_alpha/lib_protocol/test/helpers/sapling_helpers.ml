@@ -236,6 +236,62 @@ module Alpha_context_helpers = struct
         >>= wrap
         >|=? fun (ctx, _, _) -> Some (ctx, id)
 
+  (* Same as before but for legacy *)
+  let verify_update_legacy ctx ?memo_size ?id vt =
+    let anti_replay = "anti-replay" in
+    (match id with
+    | None ->
+        (match memo_size with
+        | None -> (
+            match vt.Environment.Sapling.UTXO.Legacy.outputs with
+            | [] -> failwith "Can't infer memo_size from empty outputs"
+            | output :: _ ->
+                return
+                @@ Environment.Sapling.Ciphertext.get_memo_size
+                     output.ciphertext)
+        | Some memo_size -> return memo_size)
+        >>=? fun memo_size ->
+        let memo_size = memo_size_of_int memo_size in
+        let vs = Alpha_context.Sapling.empty_state ~memo_size () in
+        return (vs, ctx)
+    | Some id ->
+        (* Storage.Sapling.Roots.get (Obj.magic ctx, id) 0l *)
+        (*       >>= wrap *)
+        (*       >>=? fun (_, root) -> *)
+        (*       print ~prefix:"verify: " Environment.Sapling.Hash.encoding root ; *)
+        Alpha_context.Sapling.state_from_id ctx id >>= wrap)
+    >>=? fun (vs, ctx) ->
+    Alpha_context.Sapling.Legacy.verify_update ctx vs vt anti_replay >>= wrap
+    >>=? fun (ctx, res) ->
+    match res with
+    | None -> return_none
+    | Some (_balance, vs) ->
+        finalize ctx vs >>=? fun (ctx, id) ->
+        let fake_fitness =
+          Alpha_context.(
+            let level =
+              match Raw_level.of_int32 0l with
+              | Error _ -> assert false
+              | Ok l -> l
+            in
+            Fitness.create_without_locked_round
+              ~level
+              ~predecessor_round:Round.zero
+              ~round:Round.zero
+            |> Fitness.to_raw)
+        in
+        let ectx = (Alpha_context.finalize ctx fake_fitness).context in
+        (* bump the level *)
+        Alpha_context.prepare
+          ectx
+          ~level:
+            Alpha_context.(
+              Raw_level.to_int32 Level.((succ ctx (current ctx)).level))
+          ~predecessor_timestamp:(Time.Protocol.of_seconds Int64.zero)
+          ~timestamp:(Time.Protocol.of_seconds Int64.zero)
+        >>= wrap
+        >|=? fun (ctx, _, _) -> Some (ctx, id)
+
   let transfer_inputs_outputs w cs is =
     (* Tezos_sapling.Storage.size cs *)
     (*   |> fun (a, b) -> *)
@@ -262,7 +318,19 @@ module Alpha_context_helpers = struct
     let anti_replay = "anti-replay" in
     let (ins, outs) = transfer_inputs_outputs w cs is in
     (* change the wallet of this last line *)
-    Tezos_sapling.Forge.forge_transaction ins outs w.sk anti_replay cs
+    Tezos_sapling.Forge.forge_transaction
+      ins
+      outs
+      w.sk
+      anti_replay
+      ~bound_data:""
+      cs
+
+  let transfer_legacy w cs is =
+    let anti_replay = "anti-replay" in
+    let (ins, outs) = transfer_inputs_outputs w cs is in
+    (* change the wallet of this last line *)
+    Tezos_sapling.Forge.forge_transaction_legacy ins outs w.sk anti_replay cs
 
   let client_state_alpha ctx id =
     Alpha_context.Sapling.get_diff ctx id () >>= wrap >>=? fun diff ->
@@ -305,7 +373,13 @@ module Interpreter_helpers = struct
       Tezos_sapling.Forge.make_output addr 15L (Bytes.create memo_size)
     in
     let pt =
-      Tezos_sapling.Forge.forge_transaction [] [output] wallet.sk anti_replay ps
+      Tezos_sapling.Forge.forge_transaction
+        []
+        [output]
+        wallet.sk
+        anti_replay
+        ~bound_data:""
+        ps
     in
     let hex_string =
       "0x"
@@ -367,6 +441,7 @@ module Interpreter_helpers = struct
                outputs
                sk
                anti_replay
+               ~bound_data:""
                state)
             Tezos_sapling.Core.Client.UTXO.transaction_encoding
         in

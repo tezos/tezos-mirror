@@ -1,12 +1,12 @@
-parameter (pair (sapling_transaction_deprecated 8) (sapling_state 8));
+parameter (pair (sapling_transaction 8) (sapling_state 8));
 storage (sapling_state 8);
 code { UNPAIR;
        UNPAIR;
        DIIP { DROP };
        SAPLING_VERIFY_UPDATE;
        ASSERT_SOME;
-       UNPAIR;
-       DROP;
+       CDR;
+       CDR;
        NIL operation;
        PAIR;
      }

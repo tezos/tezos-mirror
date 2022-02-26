@@ -1,5 +1,5 @@
-storage (option (sapling_transaction_deprecated 8));
-parameter (or (sapling_transaction_deprecated 8) (sapling_state 8));
+storage (option (sapling_transaction 8));
+parameter (or (sapling_transaction 8) (sapling_state 8));
 code { UNPAIR ;
        IF_LEFT
          {
@@ -11,7 +11,7 @@ code { UNPAIR ;
            SAPLING_VERIFY_UPDATE;
            ASSERT_SOME;
            DROP ;
-           NONE (sapling_transaction_deprecated 8) ;
+           NONE (sapling_transaction 8) ;
          };
        NIL operation;
        PAIR;
