@@ -1554,8 +1554,6 @@ val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
-val bytes_key : Bytes.t comparable_ty
-
 val mutez_key : Tez.t comparable_ty
 
 val bool_key : bool comparable_ty

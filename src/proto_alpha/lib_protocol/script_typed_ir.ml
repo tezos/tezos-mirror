@@ -1852,8 +1852,6 @@ let string_t = String_t
 
 let bytes_t = Bytes_t
 
-let bytes_key = bytes_t
-
 let mutez_t = Mutez_t
 
 let mutez_key = mutez_t
