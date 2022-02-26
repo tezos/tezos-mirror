@@ -1075,7 +1075,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
     | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
         if Constants.tx_rollup_enable ctxt then
           check_type_annot loc annot >|? fun () ->
-          (Ex_comparable_ty tx_rollup_l2_address_key, ctxt)
+          (Ex_comparable_ty tx_rollup_l2_address_t, ctxt)
         else error @@ Tx_rollup_addresses_disabled loc
     | Prim
         ( loc,

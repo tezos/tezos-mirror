@@ -1866,8 +1866,6 @@ let bool_t = Bool_t
 
 let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
 
-let tx_rollup_l2_address_key = tx_rollup_l2_address_t
-
 let pair_t :
     type a ac b bc.
     Script.location -> (a, ac) ty -> (b, bc) ty -> (a, b) pair ty_ex_c tzresult

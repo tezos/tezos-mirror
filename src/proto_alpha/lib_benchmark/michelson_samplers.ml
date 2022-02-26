@@ -323,7 +323,7 @@ end)
       | `TBytes -> Ex_comparable_ty bytes_t
       | `TBool -> Ex_comparable_ty bool_t
       | `TAddress -> Ex_comparable_ty address_t
-      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_key
+      | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_t
       | `TTimestamp -> Ex_comparable_ty timestamp_t
       | `TKey_hash -> Ex_comparable_ty key_hash_t
       | `TMutez -> Ex_comparable_ty mutez_t

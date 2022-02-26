@@ -1554,8 +1554,6 @@ val is_comparable : ('v, 'c) ty -> 'c dbool
 
 type 'v ty_ex_c = Ty_ex_c : ('v, _) ty -> 'v ty_ex_c [@@ocaml.unboxed]
 
-val tx_rollup_l2_address_key : tx_rollup_l2_address comparable_ty
-
 val pair_key :
   Script.location ->
   'a comparable_ty ->
