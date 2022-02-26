@@ -92,8 +92,8 @@ let ty_traverse_f =
     | Chest_t -> ret_succ_adding accu base_basic
     | Pair_t (_ty1, _ty2, a, _) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
-    | Union_t (_ty1, _ty2, a) ->
-        ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
+    | Union_t (_ty1, _ty2, a, _) ->
+        ret_succ_adding accu @@ (base_compound a +! (word_size *? 3))
     | Lambda_t (_ty1, _ty2, a) ->
         ret_succ_adding accu @@ (base_compound a +! (word_size *? 2))
     | Option_t (_ty, a) -> ret_succ_adding accu @@ (base_compound a +! word_size)
@@ -286,7 +286,7 @@ let rec value_size :
         ret_succ_adding accu (tx_rollup_l2_address_size x)
     | Bool_t -> ret_succ accu
     | Pair_t (_, _, _, _) -> ret_succ_adding accu h2w
-    | Union_t (_, _, _) -> ret_succ_adding accu h1w
+    | Union_t (_, _, _, _) -> ret_succ_adding accu h1w
     | Lambda_t (_, _, _) ->
         (lambda_size [@ocaml.tailcall]) ~count_lambda_nodes (ret_succ accu) x
     | Option_t (_, _) -> ret_succ_adding accu (option_size (fun _ -> !!0) x)

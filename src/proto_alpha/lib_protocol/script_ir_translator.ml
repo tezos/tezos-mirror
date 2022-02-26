@@ -180,7 +180,7 @@ let rec ty_of_comparable_ty : type a. a comparable_ty -> a ty = function
   | Pair_key (l, r, meta) ->
       Pair_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, ())
   | Union_key (l, r, meta) ->
-      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta)
+      Union_t (ty_of_comparable_ty l, ty_of_comparable_ty r, meta, ())
   | Option_key (t, meta) -> Option_t (ty_of_comparable_ty t, meta)
 
 let rec unparse_comparable_ty_uncarbonated :
@@ -257,7 +257,7 @@ let rec unparse_ty_entrypoints_uncarbonated :
         match tr with
         | Prim (_, T_pair, ts, []) -> (T_pair, tl :: ts)
         | _ -> (T_pair, [tl; tr]))
-    | Union_t (utl, utr, _meta) ->
+    | Union_t (utl, utr, _meta, _) ->
         let (entrypoints_l, entrypoints_r) =
           match nested_entrypoints with
           | Entrypoints_None -> (no_entrypoints, no_entrypoints)
@@ -356,7 +356,7 @@ let[@coq_axiom_with_reason "gadt"] rec comparable_ty_of_ty :
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
       (Pair_key (lty, rty, pname), ctxt)
-  | Union_t (l, r, meta) ->
+  | Union_t (l, r, meta, _) ->
       comparable_ty_of_ty ctxt loc l >>? fun (lty, ctxt) ->
       comparable_ty_of_ty ctxt loc r >|? fun (rty, ctxt) ->
       (Union_key (lty, rty, meta), ctxt)
@@ -709,7 +709,7 @@ let check_dupable_ty ctxt loc ty =
     | Pair_t (ty_a, ty_b, _, _) ->
         let* () = aux loc ty_a in
         aux loc ty_b
-    | Union_t (ty_a, ty_b, _) ->
+    | Union_t (ty_a, ty_b, _, _) ->
         let* () = aux loc ty_a in
         aux loc ty_b
     | Lambda_t (_, _, _) ->
@@ -957,7 +957,7 @@ let ty_eq :
         let+ Eq = help tar tbr in
         (Eq : (ta ty, tb ty) eq)
     | (Pair_t _, _) -> not_equal ()
-    | (Union_t (tal, tar, meta1), Union_t (tbl, tbr, meta2)) ->
+    | (Union_t (tal, tar, meta1, _), Union_t (tbl, tbr, meta2, _)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tal tbl in
         let+ Eq = help tar tbr in
@@ -1754,7 +1754,7 @@ let check_packable ~legacy loc root =
     | Bls12_381_g2_t -> Result.return_unit
     | Bls12_381_fr_t -> Result.return_unit
     | Pair_t (l_ty, r_ty, _, _) -> check l_ty >>? fun () -> check r_ty
-    | Union_t (l_ty, r_ty, _) -> check l_ty >>? fun () -> check r_ty
+    | Union_t (l_ty, r_ty, _, _) -> check l_ty >>? fun () -> check r_ty
     | Option_t (v_ty, _) -> check v_ty
     | List_t (elt_ty, _) -> check elt_ty
     | Map_t (_, elt_ty, _) -> check elt_ty
@@ -1934,7 +1934,8 @@ let find_entrypoint (type full error_trace)
     match (ty, entrypoints) with
     | (_, {name = Some name; _}) when Entrypoint.(name = entrypoint) ->
         return (Ex_ty_cstr (ty, fun e -> e))
-    | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) -> (
+    | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _})
+      -> (
         Gas_monad.bind_recover (find_entrypoint tl left entrypoint) @@ function
         | Ok (Ex_ty_cstr (t, f)) -> return (Ex_ty_cstr (t, fun e -> L (f e)))
         | Error () ->
@@ -2004,7 +2005,7 @@ let well_formed_entrypoints (type full) (full : full ty) entrypoints =
       (prim list option * Entrypoint.Set.t) tzresult =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
-    | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) ->
+    | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _}) ->
         merge (D_Left :: path) tl left reachable acc
         >>? fun (acc, l_reachable) ->
         merge (D_Right :: path) tr right reachable acc
@@ -2689,7 +2690,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
       in
       traced @@ parse_pair parse_l parse_r ctxt ~legacy r_witness expr
   (* Unions *)
-  | (Union_t (tl, tr, _), expr) ->
+  | (Union_t (tl, tr, _, _), expr) ->
       let parse_l ctxt v =
         non_terminal_recursion ?type_logger ctxt ~legacy tl v
       in
@@ -3438,7 +3439,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
       let stack_ty = Item_t (ty, rest) in
       typed ctxt loc cons_right stack_ty
   | ( Prim (loc, I_IF_LEFT, [bt; bf], annot),
-      (Item_t (Union_t (tl, tr, _), rest) as bef) ) ->
+      (Item_t (Union_t (tl, tr, _, _), rest) as bef) ) ->
       check_kind [Seq_kind] bt >>?= fun () ->
       check_kind [Seq_kind] bf >>?= fun () ->
       error_unexpected_annot loc annot >>?= fun () ->
@@ -3983,7 +3984,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           in
           typed_no_lwt ctxt loc instr rest)
   | ( Prim (loc, I_LOOP_LEFT, [body], annot),
-      (Item_t (Union_t (tl, tr, _), rest) as stack) ) -> (
+      (Item_t (Union_t (tl, tr, _, _), rest) as stack) ) -> (
       check_kind [Seq_kind] body >>?= fun () ->
       check_var_annot loc annot >>?= fun () ->
       non_terminal_recursion
@@ -5588,7 +5589,7 @@ let list_entrypoints ctxt (type full) (full : full ty)
       tzresult =
    fun t entrypoints path reachable acc ->
     match (t, entrypoints) with
-    | (Union_t (tl, tr, _), {nested = Entrypoints_Union {left; right}; _}) ->
+    | (Union_t (tl, tr, _, _), {nested = Entrypoints_Union {left; right}; _}) ->
         merge (D_Left :: path) tl left reachable acc
         >>? fun (acc, l_reachable) ->
         merge (D_Right :: path) tr right reachable acc
@@ -5661,7 +5662,7 @@ let[@coq_axiom_with_reason "gadt"] rec unparse_data :
       let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
       let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
       unparse_pair ~loc unparse_l unparse_r ctxt mode r_witness pair
-  | (Union_t (tl, tr, _), v) ->
+  | (Union_t (tl, tr, _, _), v) ->
       let unparse_l ctxt v = non_terminal_recursion ctxt mode tl v in
       let unparse_r ctxt v = non_terminal_recursion ctxt mode tr v in
       unparse_union ~loc unparse_l unparse_r ctxt v
@@ -6155,7 +6156,7 @@ let rec has_lazy_storage : type t. t ty -> t has_lazy_storage =
   | Chest_key_t -> False_f
   | Chest_t -> False_f
   | Pair_t (l, r, _, _) -> aux2 (fun l r -> Pair_f (l, r)) l r
-  | Union_t (l, r, _) -> aux2 (fun l r -> Union_f (l, r)) l r
+  | Union_t (l, r, _, _) -> aux2 (fun l r -> Union_f (l, r)) l r
   | Option_t (t, _) -> aux1 (fun h -> Option_f h) t
   | List_t (t, _) -> aux1 (fun h -> List_f h) t
   | Map_t (_, t, _) -> aux1 (fun h -> Map_f h) t
@@ -6215,10 +6216,10 @@ let[@coq_axiom_with_reason "gadt"] extract_lazy_storage_updates ctxt mode
         aux ctxt mode ~temporary ids_to_copy acc tyr xr ~has_lazy_storage:hr
         >|=? fun (ctxt, xr, ids_to_copy, acc) ->
         (ctxt, (xl, xr), ids_to_copy, acc)
-    | (Union_f (has_lazy_storage, _), Union_t (ty, _, _), L x) ->
+    | (Union_f (has_lazy_storage, _), Union_t (ty, _, _, _), L x) ->
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, L x, ids_to_copy, acc)
-    | (Union_f (_, has_lazy_storage), Union_t (_, ty, _), R x) ->
+    | (Union_f (_, has_lazy_storage), Union_t (_, ty, _, _), R x) ->
         aux ctxt mode ~temporary ids_to_copy acc ty x ~has_lazy_storage
         >|=? fun (ctxt, x, ids_to_copy, acc) -> (ctxt, R x, ids_to_copy, acc)
     | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->
@@ -6310,9 +6311,9 @@ let[@coq_axiom_with_reason "gadt"] rec fold_lazy_storage :
       | Fold_lazy_storage.Ok init ->
           fold_lazy_storage ~f ~init ctxt tyr xr ~has_lazy_storage:hr
       | Fold_lazy_storage.Error -> ok (init, ctxt))
-  | (Union_f (has_lazy_storage, _), Union_t (ty, _, _), L x) ->
+  | (Union_f (has_lazy_storage, _), Union_t (ty, _, _, _), L x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
-  | (Union_f (_, has_lazy_storage), Union_t (_, ty, _), R x) ->
+  | (Union_f (_, has_lazy_storage), Union_t (_, ty, _, _), R x) ->
       fold_lazy_storage ~f ~init ctxt ty x ~has_lazy_storage
   | (_, Option_t (_, _), None) -> ok (Fold_lazy_storage.Ok init, ctxt)
   | (Option_f has_lazy_storage, Option_t (ty, _), Some x) ->

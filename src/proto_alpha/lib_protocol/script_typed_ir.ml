@@ -1243,7 +1243,9 @@ and 'ty ty =
   | Pair_t :
       'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
       -> ('a, 'b) pair ty
-  | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
+  | Union_t :
+      'a ty * 'b ty * ('a, 'b) union ty_metadata * to_be_replaced
+      -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty
@@ -1770,7 +1772,7 @@ let ty_metadata : type a. a ty -> a ty_metadata = function
   | Tx_rollup_l2_address_t ->
       meta_basic
   | Pair_t (_, _, meta, _) -> meta
-  | Union_t (_, _, meta) -> meta
+  | Union_t (_, _, meta, _) -> meta
   | Option_t (_, meta) -> meta
   | Lambda_t (_, _, meta) -> meta
   | List_t (_, meta) -> meta
@@ -1863,9 +1865,9 @@ let pair_3_key loc l m r = pair_key loc m r >>? fun r -> pair_key loc l r
 
 let union_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Ty_ex_c (Union_t (l, r, {size}))
+  Ty_ex_c (Union_t (l, r, {size}, ()))
 
-let union_bytes_bool_t = Union_t (bytes_t, bool_t, {size = Type_size.three})
+let union_bytes_bool_t = Union_t (bytes_t, bool_t, {size = Type_size.three}, ())
 
 let union_key loc l r =
   Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
@@ -2197,7 +2199,7 @@ let (ty_traverse, comparable_ty_traverse) =
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
     | Pair_t (ty1, ty2, _, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
-    | Union_t (ty1, ty2, _) ->
+    | Union_t (ty1, ty2, _, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
@@ -2277,7 +2279,7 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
         (return [@ocaml.tailcall]) ()
     | Pair_t (ty1, ty2, _, _) ->
         (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
-    | Union_t (ty1, ty2, _) -> (
+    | Union_t (ty1, ty2, _, _) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l
         | R r -> (next [@ocaml.tailcall]) ty2 r)

@@ -561,7 +561,7 @@ end)
               let* left_v = value left_t in
               let* right_v = value right_t in
               return (left_v, right_v))
-        | Union_t (left_t, right_t, _) ->
+        | Union_t (left_t, right_t, _, _) ->
             fun rng_state ->
               if Base_samplers.uniform_bool rng_state then
                 L (value left_t rng_state)

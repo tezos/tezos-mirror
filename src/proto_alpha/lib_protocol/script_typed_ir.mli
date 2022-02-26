@@ -1347,7 +1347,9 @@ and 'ty ty =
   | Pair_t :
       'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
       -> ('a, 'b) pair ty
-  | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
+  | Union_t :
+      'a ty * 'b ty * ('a, 'b) union ty_metadata * to_be_replaced
+      -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
       -> ('arg, 'ret) lambda ty

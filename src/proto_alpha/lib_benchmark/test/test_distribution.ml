@@ -73,7 +73,7 @@ let rec tnames_of_type :
   | Script_typed_ir.Bool_t -> `TBool :: acc
   | Script_typed_ir.Pair_t (lty, rty, _, _) ->
       tnames_of_type lty (tnames_of_type rty (`TPair :: acc))
-  | Script_typed_ir.Union_t (lty, rty, _) ->
+  | Script_typed_ir.Union_t (lty, rty, _, _) ->
       tnames_of_type lty (tnames_of_type rty (`TUnion :: acc))
   | Script_typed_ir.Lambda_t (dom, range, _) ->
       tnames_of_type dom (tnames_of_type range (`TLambda :: acc))

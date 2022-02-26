@@ -2048,7 +2048,7 @@ module RPC = struct
             let tl = unparse_ty ~loc utl in
             let tr = unparse_ty ~loc utr in
             return (T_pair, [tl; tr], annot)
-        | Union_t (utl, utr, _meta) ->
+        | Union_t (utl, utr, _meta, _) ->
             let annot = [] in
             let tl = unparse_ty ~loc utl in
             let tr = unparse_ty ~loc utr in
