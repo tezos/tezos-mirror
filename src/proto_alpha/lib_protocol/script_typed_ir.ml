@@ -1872,8 +1872,6 @@ let address_key = address_t
 
 let bool_t = Bool_t
 
-let bool_key = bool_t
-
 let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
 
 let tx_rollup_l2_address_key = tx_rollup_l2_address_t

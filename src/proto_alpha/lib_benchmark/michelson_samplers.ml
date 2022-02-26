@@ -321,7 +321,7 @@ end)
       | `TString -> Ex_comparable_ty string_t
       | `TNat -> Ex_comparable_ty nat_t
       | `TBytes -> Ex_comparable_ty bytes_t
-      | `TBool -> Ex_comparable_ty bool_key
+      | `TBool -> Ex_comparable_ty bool_t
       | `TAddress -> Ex_comparable_ty address_key
       | `TTx_rollup_l2_address -> Ex_comparable_ty tx_rollup_l2_address_key
       | `TTimestamp -> Ex_comparable_ty timestamp_key
