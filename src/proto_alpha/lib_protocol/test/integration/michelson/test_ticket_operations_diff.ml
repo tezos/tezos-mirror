@@ -176,7 +176,7 @@ let string_token ~ticketer content =
     @@ Script_string.of_string content
   in
   Ticket_token.Ex_token
-    {ticketer; contents_type = Script_typed_ir.string_key; contents}
+    {ticketer; contents_type = Script_typed_ir.string_t; contents}
 
 (** Initializes one address for operations and one baker. *)
 let init ?tx_rollup_enable () =
@@ -381,7 +381,7 @@ let ticket_big_map_script =
   |}
 
 let list_ticket_string_ty =
-  ticket_t Micheline.dummy_location string_key >>? fun ticket_ty ->
+  ticket_t Micheline.dummy_location string_t >>? fun ticket_ty ->
   list_t Micheline.dummy_location ticket_ty
 
 let make_ticket (ticketer, contents, amount) =
@@ -1095,7 +1095,7 @@ let test_transfer_big_map_with_tickets () =
   in
   let open Lwt_tzresult_syntax in
   let*? value_type =
-    Environment.wrap_tzresult @@ ticket_t Micheline.dummy_location string_key
+    Environment.wrap_tzresult @@ ticket_t Micheline.dummy_location string_t
   in
   let*? parameters_ty =
     Environment.wrap_tzresult
@@ -1154,7 +1154,7 @@ let test_tx_rollup_deposit_one_ticket () =
   let* incr = Incremental.add_operation incr operation in
 
   let*? ticket_ty =
-    Script_typed_ir.(ticket_t Micheline.dummy_location string_key)
+    Script_typed_ir.(ticket_t Micheline.dummy_location string_t)
     |> Environment.wrap_tzresult
   in
   let*? (Ty_ex_c parameters_ty) =

@@ -413,7 +413,7 @@ let transfer_operation ctxt ~src ~destination ~arg_type ~arg =
 
 let ticket_string_type =
   WithExceptions.Result.get_ok ~loc:__LOC__
-  @@ Script_typed_ir.(ticket_t (-1) string_key)
+  @@ Script_typed_ir.(ticket_t (-1) string_t)
 
 let ticket_string_list_type =
   Result.value_f ~default:(fun _ -> assert false)
@@ -481,7 +481,7 @@ let string_ticket_token ticketer content =
   let*? ticketer = Environment.wrap_tzresult @@ Contract.of_b58check ticketer in
   return
     (Ticket_token.Ex_token
-       {ticketer; contents_type = Script_typed_ir.string_key; contents})
+       {ticketer; contents_type = Script_typed_ir.string_t; contents})
 
 let test_diffs_empty () =
   let open Lwt_tzresult_syntax in

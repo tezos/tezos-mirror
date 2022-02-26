@@ -318,7 +318,7 @@ end)
         (cmp_tn : 'a comparable_and_atomic) :
         Script_ir_translator.ex_comparable_ty =
       match cmp_tn with
-      | `TString -> Ex_comparable_ty string_key
+      | `TString -> Ex_comparable_ty string_t
       | `TNat -> Ex_comparable_ty nat_t
       | `TBytes -> Ex_comparable_ty bytes_key
       | `TBool -> Ex_comparable_ty bool_key

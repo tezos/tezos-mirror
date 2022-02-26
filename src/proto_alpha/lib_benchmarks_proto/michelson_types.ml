@@ -34,8 +34,6 @@ let bot = Bot_t
 
 let unit = unit_t
 
-let string_cmp = string_key
-
 (* the type of integers *)
 let int = int_t
 

@@ -1051,7 +1051,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         (Ex_comparable_ty signature_t, ctxt)
     | Prim (loc, T_string, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty string_key, ctxt)
+        (Ex_comparable_ty string_t, ctxt)
     | Prim (loc, T_bytes, [], annot) ->
         check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty bytes_key, ctxt)
@@ -5190,7 +5190,7 @@ and parse_toplevel :
             let allowed = [K_parameter; K_storage; K_code; K_view] in
             error (Invalid_primitive (loc, allowed, name))
       in
-      find_fields ctxt None None None (Script_map.empty string_key) fields
+      find_fields ctxt None None None (Script_map.empty string_t) fields
       >>? fun (ctxt, toplevel) ->
       match toplevel with
       | (None, _, _, _) -> error (Missing_field K_parameter)
