@@ -2279,8 +2279,7 @@ type 'a value_traverse = {
   apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
 }
 
-let value_traverse (type t tc) (ty : ((t, tc) ty, t comparable_ty) union)
-    (x : t) init f =
+let value_traverse (type t tc) (ty : (t, tc) ty) (x : t) init f =
   let rec aux : type ret t tc. 'accu -> (t, tc) ty -> t -> ('accu -> ret) -> ret
       =
    fun accu ty x continue ->
@@ -2350,9 +2349,7 @@ let value_traverse (type t tc) (ty : ((t, tc) ty, t comparable_ty) union)
         (aux [@ocaml.tailcall]) accu ty' v @@ fun accu ->
         (on_bindings [@ocaml.tailcall]) accu kty ty' continue xs
   in
-  match ty with
-  | L ty -> aux init ty x (fun accu -> accu)
-  | R cty -> aux init cty x (fun accu -> accu)
+  aux init ty x (fun accu -> accu)
   [@@coq_axiom_with_reason "local mutually recursive definition not handled"]
 
 let stack_top_ty : type a b s. (a, b * s) stack_ty -> a ty_ex_c = function

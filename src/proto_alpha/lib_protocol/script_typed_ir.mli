@@ -1755,7 +1755,6 @@ type 'a value_traverse = {
   apply_comparable : 't. 'a -> 't comparable_ty -> 't -> 'a;
 }
 
-val value_traverse :
-  (('t, _) ty, 't comparable_ty) union -> 't -> 'r -> 'r value_traverse -> 'r
+val value_traverse : ('t, _) ty -> 't -> 'r -> 'r value_traverse -> 'r
 
 val stack_top_ty : ('a, 'b * 's) stack_ty -> 'a ty_ex_c

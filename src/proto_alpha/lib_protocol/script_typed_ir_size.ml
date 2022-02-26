@@ -208,7 +208,7 @@ let rec value_size :
     type a ac.
     count_lambda_nodes:bool ->
     nodes_and_size ->
-    ((a, ac) ty, a comparable_ty) union ->
+    (a, ac) ty ->
     a ->
     nodes_and_size =
  fun ~count_lambda_nodes accu ty x ->
@@ -317,16 +317,12 @@ and big_map_size :
           (* The following recursive call cannot introduce a stack
              overflow because this would require a key of type
              big_map while big_map is not comparable. *)
-          let accu = value_size ~count_lambda_nodes accu (R cty) key in
+          let accu = value_size ~count_lambda_nodes accu cty key in
           match value with
           | None -> accu
           | Some value ->
               let accu = ret_succ_adding accu h1w in
-              (value_size [@ocaml.tailcall])
-                ~count_lambda_nodes
-                accu
-                (L ty')
-                value)
+              (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu ty' value)
         diff.map
         accu
     in
@@ -380,7 +376,7 @@ and kinstr_size :
     | IConst (kinfo, x, k) ->
         let accu = ret_succ_adding accu (base kinfo +! word_size) in
         let (Ty_ex_c top_ty) = stack_top_ty (kinfo_of_kinstr k).kstack_ty in
-        (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu (L top_ty) x
+        (value_size [@ocaml.tailcall]) ~count_lambda_nodes accu top_ty x
     | ICons_pair (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICar (kinfo, _) -> ret_succ_adding accu (base kinfo)
     | ICdr (kinfo, _) -> ret_succ_adding accu (base kinfo)
@@ -666,7 +662,7 @@ let kinstr_size kinstr =
   let size = (kinstr_size *? 157 /? 100) +! (kinstr_extra_size *? 18 /? 100) in
   (Nodes.add kinstr_nodes kinstr_extra_size_nodes, size)
 
-let value_size ty x = value_size ~count_lambda_nodes:true zero (L ty) x
+let value_size ty x = value_size ~count_lambda_nodes:true zero ty x
 
 module Internal_for_tests = struct
   let ty_size = ty_size
