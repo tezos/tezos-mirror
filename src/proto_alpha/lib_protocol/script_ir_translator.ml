@@ -1071,7 +1071,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         (Ex_comparable_ty chain_id_t, ctxt)
     | Prim (loc, T_address, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty address_key, ctxt)
+        (Ex_comparable_ty address_t, ctxt)
     | Prim (loc, T_tx_rollup_l2_address, [], annot) ->
         if Constants.tx_rollup_enable ctxt then
           check_type_annot loc annot >|? fun () ->
@@ -2043,7 +2043,7 @@ let parse_uint11 = parse_uint ~nb_bits:11
 (* This type is used to:
    - serialize and deserialize tickets when they are stored or transferred,
    - type the READ_TICKET instruction. *)
-let opened_ticket_type loc ty = pair_3_key loc address_key ty nat_t
+let opened_ticket_type loc ty = pair_3_key loc address_t ty nat_t
 
 (* -- parse data of primitive types -- *)
 

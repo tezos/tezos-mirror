@@ -1862,8 +1862,6 @@ let timestamp_t = Timestamp_t
 
 let address_t = Address_t
 
-let address_key = address_t
-
 let bool_t = Bool_t
 
 let tx_rollup_l2_address_t = Tx_rollup_l2_address_t
