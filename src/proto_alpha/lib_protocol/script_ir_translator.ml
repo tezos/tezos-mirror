@@ -694,83 +694,6 @@ let default_ty_eq_error loc ty1 ty2 =
   let ty2 = serialize_ty_for_error ty2 in
   Inconsistent_types (loc, ty1, ty2)
 
-(* Check that two comparable types are equal.
-
-   The result is an equality witness between the types of the two inputs within
-   the gas monad (for gas consumption).
- *)
-let rec comparable_ty_eq :
-    type ta tb error_trace.
-    error_details:error_trace error_details ->
-    Script.location ->
-    ta comparable_ty ->
-    tb comparable_ty ->
-    ((ta comparable_ty, tb comparable_ty) eq, error_trace) Gas_monad.t =
-  let open Gas_monad in
-  fun ~error_details loc ta tb ->
-    let open Gas_monad.Syntax in
-    let* () = Gas_monad.consume_gas Typecheck_costs.merge_cycle in
-    let type_metadata_eq meta_a meta_b =
-      of_result @@ type_metadata_eq ~error_details meta_a meta_b
-    in
-    let not_equal () =
-      of_result
-      @@ Error
-           (match error_details with
-           | Fast -> (Inconsistent_types_fast : error_trace)
-           | Informative -> trace_of_error @@ default_ty_eq_error loc ta tb)
-    in
-    match (ta, tb) with
-    | (Unit_t, Unit_t) -> return (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Unit_t, _) -> not_equal ()
-    | (Never_t, Never_t) -> return Eq
-    | (Never_t, _) -> not_equal ()
-    | (Int_t, Int_t) -> return Eq
-    | (Int_t, _) -> not_equal ()
-    | (Nat_t, Nat_t) -> return Eq
-    | (Nat_t, _) -> not_equal ()
-    | (Signature_t, Signature_t) -> return Eq
-    | (Signature_t, _) -> not_equal ()
-    | (String_t, String_t) -> return Eq
-    | (String_t, _) -> not_equal ()
-    | (Bytes_t, Bytes_t) -> return Eq
-    | (Bytes_t, _) -> not_equal ()
-    | (Mutez_t, Mutez_t) -> return Eq
-    | (Mutez_t, _) -> not_equal ()
-    | (Bool_t, Bool_t) -> return Eq
-    | (Bool_t, _) -> not_equal ()
-    | (Key_hash_t, Key_hash_t) -> return Eq
-    | (Key_hash_t, _) -> not_equal ()
-    | (Key_t, Key_t) -> return Eq
-    | (Key_t, _) -> not_equal ()
-    | (Timestamp_t, Timestamp_t) -> return Eq
-    | (Timestamp_t, _) -> not_equal ()
-    | (Chain_id_t, Chain_id_t) -> return Eq
-    | (Chain_id_t, _) -> not_equal ()
-    | (Address_t, Address_t) -> return Eq
-    | (Address_t, _) -> not_equal ()
-    | (Tx_rollup_l2_address_t, Tx_rollup_l2_address_t) -> return Eq
-    | (Tx_rollup_l2_address_t, _) -> not_equal ()
-    | ( Pair_t (left_a, right_a, meta_a, YesYes),
-        Pair_t (left_b, right_b, meta_b, YesYes) ) ->
-        let* () = type_metadata_eq meta_a meta_b in
-        let* Eq = comparable_ty_eq ~error_details loc left_a left_b in
-        let+ Eq = comparable_ty_eq ~error_details loc right_a right_b in
-        (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Pair_t _, _) -> not_equal ()
-    | ( Union_t (left_a, right_a, meta_a, YesYes),
-        Union_t (left_b, right_b, meta_b, YesYes) ) ->
-        let* () = type_metadata_eq meta_a meta_b in
-        let* Eq = comparable_ty_eq ~error_details loc left_a left_b in
-        let+ Eq = comparable_ty_eq ~error_details loc right_a right_b in
-        (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Union_t _, _) -> not_equal ()
-    | (Option_t (ta, meta_a, Yes), Option_t (tb, meta_b, Yes)) ->
-        let* () = type_metadata_eq meta_a meta_b in
-        let+ Eq = comparable_ty_eq ~error_details loc ta tb in
-        (Eq : (ta comparable_ty, tb comparable_ty) eq)
-    | (Option_t _, _) -> not_equal ()
-
 let memo_size_eq :
     type error_trace.
     error_details:error_trace error_details ->
@@ -785,8 +708,12 @@ let memo_size_eq :
       | Fast -> Inconsistent_types_fast
       | Informative -> trace_of_error @@ Inconsistent_memo_sizes (ms1, ms2))
 
-(** Same as comparable_ty_eq but for any types. *)
-let ty_eq :
+(* Check that two types are equal.
+
+   The result is an equality witness between the types of the two inputs within
+   the gas monad (for gas consumption).
+ *)
+let rec ty_eq :
     type a ac b bc error_trace.
     error_details:error_trace error_details ->
     Script.location ->
@@ -870,23 +797,23 @@ let ty_eq :
     | (Map_t (tal, tar, meta1), Map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = comparable_ty_eq ~error_details loc tal tbl in
+        let+ Eq = ty_eq ~error_details loc tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Map_t _, _) -> not_equal ()
     | (Big_map_t (tal, tar, meta1), Big_map_t (tbl, tbr, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
         let* Eq = help tar tbr in
-        let+ Eq = comparable_ty_eq ~error_details loc tal tbl in
+        let+ Eq = ty_eq ~error_details loc tal tbl in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Big_map_t _, _) -> not_equal ()
     | (Set_t (ea, meta1), Set_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = comparable_ty_eq ~error_details loc ea eb in
+        let+ Eq = ty_eq ~error_details loc ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Set_t _, _) -> not_equal ()
     | (Ticket_t (ea, meta1), Ticket_t (eb, meta2)) ->
         let* () = type_metadata_eq meta1 meta2 in
-        let+ Eq = comparable_ty_eq ~error_details loc ea eb in
+        let+ Eq = ty_eq ~error_details loc ea eb in
         (Eq : ((ta, tac) ty, (tb, tbc) ty) eq)
     | (Ticket_t _, _) -> not_equal ()
     | (Pair_t (tal, tar, meta1, cmp1), Pair_t (tbl, tbr, meta2, cmp2)) ->
@@ -2766,9 +2693,7 @@ let[@coq_axiom_with_reason "gadt"] rec parse_data :
                     (Gas_monad.run ctxt
                     @@
                     let open Gas_monad.Syntax in
-                    let* Eq =
-                      comparable_ty_eq ~error_details:Informative loc tk btk
-                    in
+                    let* Eq = ty_eq ~error_details:Informative loc tk btk in
                     ty_eq ~error_details:Informative loc tv btv)
                     >>? fun (eq, ctxt) ->
                     eq >|? fun Eq -> (Some id, ctxt) )
@@ -4819,11 +4744,7 @@ and[@coq_axiom_with_reason "gadt"] parse_instr :
           rest ) ) ->
       check_var_annot loc annot >>?= fun () ->
       Gas_monad.run ctxt
-      @@ comparable_ty_eq
-           ~error_details:Informative
-           loc
-           contents_ty_a
-           contents_ty_b
+      @@ ty_eq ~error_details:Informative loc contents_ty_a contents_ty_b
       >>?= fun (eq, ctxt) ->
       eq >>?= fun Eq ->
       option_t loc ty_a >>?= fun res_ty ->
