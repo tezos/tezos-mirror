@@ -1077,10 +1077,10 @@ module Instructions = struct
 
   let sapling_empty_state = ir_sized_step N_ISapling_empty_state nullary
 
-  let sapling_verify_update inputs outputs _state =
+  let sapling_verify_update inputs outputs bound_data _state =
     ir_sized_step
       N_ISapling_verify_update
-      (binary "inputs" inputs "outputs" outputs)
+      (ternary "inputs" inputs "outputs" outputs "bound_data" bound_data)
 
   let map_get_and_update key_size map_size =
     ir_sized_step
@@ -1363,11 +1363,18 @@ let extract_ir_sized_step :
   | (ISelf_address (_, _), _) -> Instructions.self_address
   | (IAmount (_, _), _) -> Instructions.amount
   | (ISapling_empty_state (_, _, _), _) -> Instructions.sapling_empty_state
-  | (ISapling_verify_update_deprecated (_, _), (transaction, (_state, _))) ->
+  | (ISapling_verify_update (_, _), (transaction, (_state, _))) ->
       let inputs = Size.sapling_transaction_inputs transaction in
       let outputs = Size.sapling_transaction_outputs transaction in
+      let bound_data = Size.sapling_transaction_bound_data transaction in
       let state = Size.zero in
-      Instructions.sapling_verify_update inputs outputs state
+      Instructions.sapling_verify_update inputs outputs bound_data state
+  | (ISapling_verify_update_deprecated (_, _), (transaction, (_state, _))) ->
+      let inputs = List.length transaction.inputs in
+      let outputs = List.length transaction.outputs in
+      let bound_data = Size.zero in
+      let state = Size.zero in
+      Instructions.sapling_verify_update inputs outputs bound_data state
   | (IDig (_, n, _, _), _) -> Instructions.dig (Size.of_int n)
   | (IDug (_, n, _, _), _) -> Instructions.dug (Size.of_int n)
   | (IDipn (_, n, _, _, _), _) -> Instructions.dipn (Size.of_int n)

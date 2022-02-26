@@ -121,6 +121,7 @@ module Internal_for_tests : sig
     | `TOption
     | `TPair
     | `TSapling_state
+    | `TSapling_transaction
     | `TSapling_transaction_deprecated
     | `TSet
     | `TSignature

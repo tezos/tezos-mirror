@@ -380,17 +380,23 @@ let generate ~(nb_input : int) ~(nb_output : int) ~(nb_nf : int) ~(nb_cm : int)
           to_forge
       in
       let balance = Int64.sub input_amount output_amount in
+      let bound_data =
+        (* in the reference usage this contains a pkh encoded in micheline,
+           thus roughly 32 bytes *)
+        String.make 32 '0'
+      in
       let binding_sig =
         Tezos_sapling.Core.Client.Proving.make_binding_sig
           proving_ctx
           inputs
           outputs
           ~balance
+          ~bound_data
           anti_replay
       in
       let transaction =
         Tezos_sapling.Core.Validator.UTXO.
-          {inputs; outputs; binding_sig; balance; root}
+          {inputs; outputs; binding_sig; balance; root; bound_data}
       in
       return transaction)
   >>=? fun transaction ->

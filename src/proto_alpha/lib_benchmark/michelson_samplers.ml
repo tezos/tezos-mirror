@@ -81,6 +81,7 @@ type type_name =
   | `TMap
   | `TBig_map
   | `TContract
+  | `TSapling_transaction
   | `TSapling_transaction_deprecated
   | `TSapling_state
   | `TOperation
@@ -104,6 +105,7 @@ type atomic_type_name =
   | `TAddress
   | `TTx_rollup_l2_address
   | `TBool
+  | `TSapling_transaction
   | `TSapling_transaction_deprecated
   | `TSapling_state
   | `TChain_id
@@ -144,6 +146,7 @@ let all_atomic_type_names : atomic_type_name array =
     `TAddress;
     `TTx_rollup_l2_address;
     `TBool;
+    `TSapling_transaction;
     `TSapling_transaction_deprecated;
     `TSapling_state;
     `TChain_id;
@@ -308,6 +311,7 @@ end)
       | `TUnit -> Ex_ty unit_t
       | `TInt -> Ex_ty int_t
       | `TSapling_state -> Ex_ty (sapling_state_t ~memo_size)
+      | `TSapling_transaction -> Ex_ty (sapling_transaction_t ~memo_size)
       | `TSapling_transaction_deprecated ->
           Ex_ty (sapling_transaction_deprecated_t ~memo_size)
       | `TChain_id -> Ex_ty chain_id_t
@@ -580,6 +584,9 @@ end)
         | Ticket_t (contents_ty, _) ->
             let ty = comparable_downcast contents_ty in
             generate_ticket ty
+        | Sapling_transaction_t _ ->
+            fail_sampling
+              "Michelson_samplers: sapling transactions not handled yet"
         | Sapling_transaction_deprecated_t _ ->
             fail_sampling
               "Michelson_samplers: sapling transactions not handled yet"
