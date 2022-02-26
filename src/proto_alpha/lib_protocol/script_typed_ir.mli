@@ -1327,6 +1327,8 @@ and logger = {
           produced. *)
 }
 
+and to_be_replaced = unit
+
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
   | Unit_t : unit ty
@@ -1342,7 +1344,9 @@ and 'ty ty =
   | Address_t : address ty
   | Tx_rollup_l2_address_t : tx_rollup_l2_address ty
   | Bool_t : bool ty
-  | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
+  | Pair_t :
+      'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
+      -> ('a, 'b) pair ty
   | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata

@@ -1223,6 +1223,8 @@ and logger = {
   get_log : unit -> execution_trace option tzresult Lwt.t;
 }
 
+and to_be_replaced = unit
+
 (* ---- Auxiliary types -----------------------------------------------------*)
 and 'ty ty =
   | Unit_t : unit ty
@@ -1238,7 +1240,9 @@ and 'ty ty =
   | Address_t : address ty
   | Tx_rollup_l2_address_t : tx_rollup_l2_address ty
   | Bool_t : bool ty
-  | Pair_t : 'a ty * 'b ty * ('a, 'b) pair ty_metadata -> ('a, 'b) pair ty
+  | Pair_t :
+      'a ty * 'b ty * ('a, 'b) pair ty_metadata * to_be_replaced
+      -> ('a, 'b) pair ty
   | Union_t : 'a ty * 'b ty * ('a, 'b) union ty_metadata -> ('a, 'b) union ty
   | Lambda_t :
       'arg ty * 'ret ty * ('arg, 'ret) lambda ty_metadata
@@ -1765,7 +1769,7 @@ let ty_metadata : type a. a ty -> a ty_metadata = function
   | Mutez_t | Bool_t | Key_hash_t | Key_t | Timestamp_t | Chain_id_t | Address_t
   | Tx_rollup_l2_address_t ->
       meta_basic
-  | Pair_t (_, _, meta) -> meta
+  | Pair_t (_, _, meta, _) -> meta
   | Union_t (_, _, meta) -> meta
   | Option_t (_, meta) -> meta
   | Lambda_t (_, _, meta) -> meta
@@ -1849,7 +1853,7 @@ let tx_rollup_l2_address_key = Tx_rollup_l2_address_key
 
 let pair_t loc l r =
   Type_size.compound2 loc (ty_size l) (ty_size r) >|? fun size ->
-  Ty_ex_c (Pair_t (l, r, {size}))
+  Ty_ex_c (Pair_t (l, r, {size}, ()))
 
 let pair_key loc l r =
   Type_size.compound2 loc (comparable_ty_size l) (comparable_ty_size r)
@@ -1884,20 +1888,23 @@ let option_nat_t = Option_t (nat_t, {size = Type_size.two})
 
 let option_pair_nat_nat_t =
   Option_t
-    (Pair_t (nat_t, nat_t, {size = Type_size.three}), {size = Type_size.four})
+    ( Pair_t (nat_t, nat_t, {size = Type_size.three}, ()),
+      {size = Type_size.four} )
 
 let option_pair_nat_mutez_t =
   Option_t
-    (Pair_t (nat_t, mutez_t, {size = Type_size.three}), {size = Type_size.four})
+    ( Pair_t (nat_t, mutez_t, {size = Type_size.three}, ()),
+      {size = Type_size.four} )
 
 let option_pair_mutez_mutez_t =
   Option_t
-    ( Pair_t (mutez_t, mutez_t, {size = Type_size.three}),
+    ( Pair_t (mutez_t, mutez_t, {size = Type_size.three}, ()),
       {size = Type_size.four} )
 
 let option_pair_int_nat_t =
   Option_t
-    (Pair_t (int_t, nat_t, {size = Type_size.three}), {size = Type_size.four})
+    ( Pair_t (int_t, nat_t, {size = Type_size.three}, ()),
+      {size = Type_size.four} )
 
 let option_key loc t =
   Type_size.compound1 loc (comparable_ty_size t) >|? fun size ->
@@ -2188,7 +2195,8 @@ let (ty_traverse, comparable_ty_traverse) =
         (continue [@ocaml.tailcall]) accu
     | Ticket_t (cty, _) -> aux f accu cty continue
     | Chest_key_t | Chest_t -> (continue [@ocaml.tailcall]) accu
-    | Pair_t (ty1, ty2, _) -> (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
+    | Pair_t (ty1, ty2, _, _) ->
+        (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Union_t (ty1, ty2, _) ->
         (next2' [@ocaml.tailcall]) f accu ty1 ty2 continue
     | Lambda_t (ty1, ty2, _) ->
@@ -2267,7 +2275,8 @@ let value_traverse (type t) (ty : (t ty, t comparable_ty) union) (x : t) init f
     | Bls12_381_g2_t | Bls12_381_fr_t | Chest_key_t | Chest_t
     | Lambda_t (_, _, _) ->
         (return [@ocaml.tailcall]) ()
-    | Pair_t (ty1, ty2, _) -> (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
+    | Pair_t (ty1, ty2, _, _) ->
+        (next2 [@ocaml.tailcall]) ty1 ty2 (fst x) (snd x)
     | Union_t (ty1, ty2, _) -> (
         match x with
         | L l -> (next [@ocaml.tailcall]) ty1 l

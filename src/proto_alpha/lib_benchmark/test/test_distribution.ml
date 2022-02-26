@@ -71,7 +71,7 @@ let rec tnames_of_type :
   | Script_typed_ir.Address_t -> `TAddress :: acc
   | Script_typed_ir.Tx_rollup_l2_address_t -> `TTx_rollup_l2_address :: acc
   | Script_typed_ir.Bool_t -> `TBool :: acc
-  | Script_typed_ir.Pair_t (lty, rty, _) ->
+  | Script_typed_ir.Pair_t (lty, rty, _, _) ->
       tnames_of_type lty (tnames_of_type rty (`TPair :: acc))
   | Script_typed_ir.Union_t (lty, rty, _) ->
       tnames_of_type lty (tnames_of_type rty (`TUnion :: acc))

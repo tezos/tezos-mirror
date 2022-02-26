@@ -556,7 +556,7 @@ end)
         | Bool_t -> Base_samplers.uniform_bool
         | Address_t -> address
         | Tx_rollup_l2_address_t -> tx_rollup_l2_address
-        | Pair_t (left_t, right_t, _) ->
+        | Pair_t (left_t, right_t, _, _) ->
             M.(
               let* left_v = value left_t in
               let* right_v = value right_t in
