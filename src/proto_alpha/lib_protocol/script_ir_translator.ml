@@ -1048,7 +1048,7 @@ let[@coq_struct "ty"] rec parse_comparable_ty :
         check_type_annot loc annot >|? fun () -> (Ex_comparable_ty nat_t, ctxt)
     | Prim (loc, T_signature, [], annot) ->
         check_type_annot loc annot >|? fun () ->
-        (Ex_comparable_ty signature_key, ctxt)
+        (Ex_comparable_ty signature_t, ctxt)
     | Prim (loc, T_string, [], annot) ->
         check_type_annot loc annot >|? fun () ->
         (Ex_comparable_ty string_key, ctxt)

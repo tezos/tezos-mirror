@@ -329,7 +329,7 @@ end)
       | `TMutez -> Ex_comparable_ty mutez_key
       | `TInt -> Ex_comparable_ty int_t
       | `TUnit -> Ex_comparable_ty unit_t
-      | `TSignature -> Ex_comparable_ty signature_key
+      | `TSignature -> Ex_comparable_ty signature_t
       | `TKey -> Ex_comparable_ty key_key
       | `TChain_id -> Ex_comparable_ty chain_id_key
 

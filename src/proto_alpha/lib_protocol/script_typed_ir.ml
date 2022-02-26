@@ -1848,8 +1848,6 @@ let nat_t = Nat_t
 
 let signature_t = Signature_t
 
-let signature_key = signature_t
-
 let string_t = String_t
 
 let string_key = string_t
